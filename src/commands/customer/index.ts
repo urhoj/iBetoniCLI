@@ -1,6 +1,11 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
+import {
+  type WriteFlags,
+  writeFlagsToHeaders,
+  addWriteFlagsToCommand,
+} from "../../api/writeFlags.js";
 import { writeJson, writeError } from "../../output/json.js";
 
 export interface CustomerListFilter {
@@ -51,10 +56,44 @@ export async function runCustomerSearch(
 }
 
 /**
- * Register `ib customer` read subcommands on the parent commander instance:
+ * POST /api/asiakas/createY with a free-form body forwarded to the existing
+ * BE endpoint (FE: `asiakas_createY()`). Write flags are surfaced as
+ * `X-Dry-Run`, `Idempotency-Key`, and `X-Action-Reason` headers.
+ */
+export async function runCustomerCreate(
+  client: ApiClient,
+  body: Record<string, unknown>,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>("/api/asiakas/createY", body, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/**
+ * POST /api/asiakas/set/:asiakasId with a free-form body forwarded to the
+ * existing BE endpoint. Write flags surface as the universal headers.
+ */
+export async function runCustomerUpdate(
+  client: ApiClient,
+  asiakasId: number,
+  body: Record<string, unknown>,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>(`/api/asiakas/set/${asiakasId}`, body, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/**
+ * Register `ib customer` subcommands on the parent commander instance:
  *   - list    filterable by --limit/--cursor
  *   - get     single asiakas by id
  *   - search  free-text search (existing /api/asiakas/search route)
+ *   - create  POST /api/asiakas/createY with --body JSON (write flags)
+ *   - update  POST /api/asiakas/set/<asiakasId> with --body JSON (write flags)
+ *
+ * All mutation subcommands accept --dry-run / --idempotency-key / --reason.
  *
  * Exit codes: 1 = generic API/runtime failure.
  */
@@ -104,4 +143,72 @@ export function registerCustomerCommands(
         process.exit(1);
       }
     });
+
+  const createCmd = c
+    .command("create")
+    .description("Create a new customer (POST /api/asiakas/createY)")
+    .requiredOption(
+      "--body <json>",
+      "JSON object forwarded verbatim as the request body"
+    );
+  addWriteFlagsToCommand(createCmd).action(
+    async (opts: {
+      body: string;
+      dryRun?: boolean;
+      idempotencyKey?: string;
+      reason?: string;
+    }) => {
+      try {
+        const client = await getClient();
+        const parsed = JSON.parse(opts.body) as Record<string, unknown>;
+        const result = await runCustomerCreate(client, parsed, {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        });
+        writeJson(result);
+      } catch (e) {
+        writeError(e);
+        process.exit(1);
+      }
+    }
+  );
+
+  const updateCmd = c
+    .command("update <asiakasId>")
+    .description("Update a customer (POST /api/asiakas/set/<asiakasId>)")
+    .requiredOption(
+      "--body <json>",
+      "JSON object forwarded verbatim as the request body"
+    );
+  addWriteFlagsToCommand(updateCmd).action(
+    async (
+      idStr: string,
+      opts: {
+        body: string;
+        dryRun?: boolean;
+        idempotencyKey?: string;
+        reason?: string;
+      }
+    ) => {
+      try {
+        const client = await getClient();
+        const parsed = JSON.parse(opts.body) as Record<string, unknown>;
+        const result = await runCustomerUpdate(
+          client,
+          Number(idStr),
+          parsed,
+          {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+          }
+        );
+        writeJson(result);
+      } catch (e) {
+        writeError(e);
+        process.exit(1);
+      }
+    }
+  );
 }
