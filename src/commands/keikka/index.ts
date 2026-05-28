@@ -1,6 +1,11 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
+import {
+  type WriteFlags,
+  writeFlagsToHeaders,
+  addWriteFlagsToCommand,
+} from "../../api/writeFlags.js";
 import { writeJson, writeError } from "../../output/json.js";
 
 export interface KeikkaListFilter {
@@ -64,11 +69,70 @@ export async function runKeikkaGet(
 }
 
 /**
- * Register `ib keikka` read subcommands on the parent commander instance:
- *   - list   filterable by --from/--to/--customer/--vehicle/--status/--limit/--cursor
- *   - get    single keikka by id
+ * POST /api/keikka/newKeikka with a free-form body forwarded to the existing
+ * BE endpoint. Write flags are surfaced as `X-Dry-Run`, `Idempotency-Key`,
+ * and `X-Action-Reason` headers.
+ */
+export async function runKeikkaCreate(
+  client: ApiClient,
+  body: Record<string, unknown>,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>("/api/keikka/newKeikka", body, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/**
+ * Update a keikka. v1.0 supports only `--status`; other fields are deferred
+ * until the dedicated CLI mutation routes ship (v1.1). Calls the existing
+ * `/api/keikka/setStatus` endpoint with the universal write-flag headers.
+ */
+export async function runKeikkaUpdate(
+  client: ApiClient,
+  keikkaId: number,
+  fields: Record<string, unknown>,
+  flags: WriteFlags
+): Promise<unknown> {
+  if (!("status" in fields)) {
+    throw new Error(
+      "v1.0 only supports --status; other fields are pending v1.1"
+    );
+  }
+  return client.post<unknown>(
+    "/api/keikka/setStatus",
+    { keikkaId, tila: fields.status },
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
+ * POST /api/keikka/defaultDriver/assign/:keikkaId with an empty body. The
+ * backend uses the JWT/keikka context to pick the appropriate default
+ * driver; the CLI just forwards write flags.
+ */
+export async function runKeikkaDriversAssign(
+  client: ApiClient,
+  keikkaId: number,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>(
+    `/api/keikka/defaultDriver/assign/${keikkaId}`,
+    {},
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
+ * Register `ib keikka` subcommands on the parent commander instance:
+ *   - list     filterable by --from/--to/--customer/--vehicle/--status/--limit/--cursor
+ *   - get      single keikka by id
+ *   - create   POST /api/keikka/newKeikka with --body JSON (write flags)
+ *   - update   POST /api/keikka/setStatus (v1.0: --status only)
+ *   - drivers  drivers assign <keikkaId> → POST default-driver assignment
  *
  * Date aliases (today/yesterday/tomorrow) are resolved before the API call.
+ * All mutation subcommands accept --dry-run / --idempotency-key / --reason.
  *
  * Exit codes: 1 = generic API/runtime failure.
  */
@@ -115,4 +179,98 @@ export function registerKeikkaCommands(
         process.exit(1);
       }
     });
+
+  const createCmd = k
+    .command("create")
+    .description("Create a new keikka (POST /api/keikka/newKeikka)")
+    .requiredOption(
+      "--body <json>",
+      "JSON object forwarded verbatim as the request body"
+    );
+  addWriteFlagsToCommand(createCmd).action(
+    async (opts: {
+      body: string;
+      dryRun?: boolean;
+      idempotencyKey?: string;
+      reason?: string;
+    }) => {
+      try {
+        const client = await getClient();
+        const parsed = JSON.parse(opts.body) as Record<string, unknown>;
+        const result = await runKeikkaCreate(client, parsed, {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        });
+        writeJson(result);
+      } catch (e) {
+        writeError(e);
+        process.exit(1);
+      }
+    }
+  );
+
+  const updateCmd = k
+    .command("update <keikkaId>")
+    .description("Update a keikka (v1.0: --status only)")
+    .option("--status <s>", "New status (forwarded as `tila`)");
+  addWriteFlagsToCommand(updateCmd).action(
+    async (
+      idStr: string,
+      opts: {
+        status?: string;
+        dryRun?: boolean;
+        idempotencyKey?: string;
+        reason?: string;
+      }
+    ) => {
+      try {
+        const client = await getClient();
+        const fields: Record<string, unknown> = {};
+        if (opts.status !== undefined) fields.status = opts.status;
+        const result = await runKeikkaUpdate(
+          client,
+          Number(idStr),
+          fields,
+          {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+          }
+        );
+        writeJson(result);
+      } catch (e) {
+        writeError(e);
+        process.exit(1);
+      }
+    }
+  );
+
+  const drivers = k.command("drivers").description("Driver assignment commands");
+  const assignCmd = drivers
+    .command("assign <keikkaId>")
+    .description("Assign the default driver to a keikka");
+  addWriteFlagsToCommand(assignCmd).action(
+    async (
+      idStr: string,
+      opts: {
+        dryRun?: boolean;
+        idempotencyKey?: string;
+        reason?: string;
+      }
+    ) => {
+      try {
+        const client = await getClient();
+        const result = await runKeikkaDriversAssign(client, Number(idStr), {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        });
+        writeJson(result);
+      } catch (e) {
+        writeError(e);
+        process.exit(1);
+      }
+    }
+  );
 }
