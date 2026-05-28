@@ -3,16 +3,23 @@
   "version": "0.1.0-alpha",
   "description": "iBetoni CLI — AI-driven command-line interface for betoni.online",
   "type": "module",
-  "bin": { "ib": "./dist/bin/ib.js" },
-  "files": ["dist", "README.md"],
-  "engines": { "node": ">=20.10.0" },
+  "bin": {
+    "ib": "./dist/bin/ib.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20.10.0"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/bin/ib.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src test",
-    "lint:fix": "eslint --fix src test",
+    "lint": "cross-env ESLINT_USE_FLAT_CONFIG=false eslint src test",
+    "lint:fix": "cross-env ESLINT_USE_FLAT_CONFIG=false eslint --fix src test",
     "type-check": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -26,6 +33,9 @@
   },
   "devDependencies": {
     "@types/node": "^20.12.0",
+    "@typescript-eslint/eslint-plugin": "^8.60.0",
+    "@typescript-eslint/parser": "^8.60.0",
+    "cross-env": "^10.1.0",
     "eslint": "^9.18.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
