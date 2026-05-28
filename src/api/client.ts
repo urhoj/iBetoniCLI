@@ -6,27 +6,56 @@ interface ApiClientOptions {
   token: string;
   version: string;
   requestId?: string;
+  /**
+   * Optional callback invoked on a 401 to obtain a freshly-issued JWT.
+   * If provided, the client retries the request ONCE with the new token.
+   * Caller is responsible for persisting the rotated token (read it back via
+   * `getCurrentToken()`).
+   */
+  onRefresh?: (currentJwt: string) => Promise<string>;
 }
 
 interface FetchOptions {
   headers?: Record<string, string>;
 }
 
-export function createApiClient({ endpoint, token, version, requestId }: ApiClientOptions) {
+export function createApiClient({
+  endpoint,
+  token,
+  version,
+  requestId,
+  onRefresh,
+}: ApiClientOptions) {
   const platform = `${process.platform} node-${process.versions.node}`;
   const userAgent = `ib-cli/${version} (${platform})`;
+  let currentToken = token;
 
   function buildHeaders(
     extra: Record<string, string> = {},
     withBody = false
   ): Record<string, string> {
     return {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${currentToken}`,
       "User-Agent": userAgent,
       "X-Request-ID": requestId || randomUUID(),
       ...(withBody ? { "Content-Type": "application/json" } : {}),
       ...extra,
     };
+  }
+
+  async function doFetch(
+    method: string,
+    path: string,
+    body: unknown,
+    opts: FetchOptions
+  ): Promise<Response> {
+    const url = `${endpoint}${path}`;
+    const withBody = method !== "GET" && body !== undefined;
+    return fetch(url, {
+      method,
+      headers: buildHeaders(opts.headers, withBody),
+      body: withBody ? JSON.stringify(body) : undefined,
+    });
   }
 
   async function request<T = unknown>(
@@ -35,13 +64,17 @@ export function createApiClient({ endpoint, token, version, requestId }: ApiClie
     body?: unknown,
     opts: FetchOptions = {}
   ): Promise<T> {
-    const url = `${endpoint}${path}`;
-    const withBody = method !== "GET" && body !== undefined;
-    const res = await fetch(url, {
-      method,
-      headers: buildHeaders(opts.headers, withBody),
-      body: withBody ? JSON.stringify(body) : undefined,
-    });
+    let res = await doFetch(method, path, body, opts);
+
+    // Single-retry refresh path: only the first 401 triggers a refresh+retry.
+    // A second consecutive 401 (post-refresh) falls through to the normal
+    // error mapping so callers know to re-run `ib auth login`.
+    if (res.status === 401 && onRefresh) {
+      const newToken = await onRefresh(currentToken);
+      currentToken = newToken;
+      res = await doFetch(method, path, body, opts);
+    }
+
     const contentType = res.headers.get("content-type") || "";
     const parsed = contentType.includes("application/json")
       ? await res.json()
@@ -68,6 +101,7 @@ export function createApiClient({ endpoint, token, version, requestId }: ApiClie
       request<T>("PUT", path, body, opts),
     delete: <T = unknown>(path: string, opts?: FetchOptions) =>
       request<T>("DELETE", path, undefined, opts),
+    getCurrentToken: () => currentToken,
   };
 }
 
