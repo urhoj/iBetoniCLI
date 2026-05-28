@@ -1,0 +1,1150 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Help snapshots — contract stability > help for ib auth login matches snapshot 1`] = `
+"USAGE
+  ib auth login [flags]
+
+DESCRIPTION
+  Open the system browser to authorize this CLI via OAuth 2.1 + PKCE and persist credentials to ~/.ibetoni/credentials.json (mode 0600).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --endpoint URL    API endpoint to authorize against (default: https://api.ibetoni.fi)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  stderr: 'Logged in as <email> at <company>.'; credentials file written
+
+ERRORS (stderr, exit non-zero)
+  2  OAuth flow failed      → retry; check network / browser
+  500  Backend error          → retry later
+
+EXAMPLES
+  ib auth login
+  ib auth login --endpoint https://api-staging.ibetoni.fi
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib auth logout matches snapshot 1`] = `
+"USAGE
+  ib auth logout [flags]
+
+DESCRIPTION
+  Revoke the refresh token server-side (best-effort) and delete the local credentials file.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  no stdout output; exit 0 on success
+
+ERRORS (stderr, exit non-zero)
+  1  I/O error              → check file permissions
+
+EXAMPLES
+  ib auth logout
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib auth refresh matches snapshot 1`] = `
+"USAGE
+  ib auth refresh [flags]
+
+DESCRIPTION
+  Manually refresh the JWT against /api/auth/refresh-token. Automatic refresh-on-401 also happens in the API client.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { ok: true }
+
+ERRORS (stderr, exit non-zero)
+  2  Refresh failed         → ib auth login to re-authenticate
+
+EXAMPLES
+  ib auth refresh
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib auth switch matches snapshot 1`] = `
+"USAGE
+  ib auth switch [flags]
+
+DESCRIPTION
+  Switch the active company. Issues a new JWT bound to the target ownerAsiakasId and persists it.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --to NUMBER    Target asiakasId to switch to
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { ok: true, activeCompany: { asiakasId, name } }
+
+ERRORS (stderr, exit non-zero)
+  2  Not logged in          → ib auth login
+  403  No access to target    → verify ownership via \`ib company list\`
+
+EXAMPLES
+  ib auth switch --to 1349
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib auth whoami matches snapshot 1`] = `
+"USAGE
+  ib auth whoami [flags]
+
+DESCRIPTION
+  Print the current authenticated user's personId, active company, and endpoint.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { personId, activeCompany: { asiakasId, name }, endpoint }
+
+ERRORS (stderr, exit non-zero)
+  2  Not logged in          → ib auth login first
+
+EXAMPLES
+  ib auth whoami
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib company current matches snapshot 1`] = `
+"USAGE
+  ib company current [flags]
+
+DESCRIPTION
+  Return the record of the active company (the one bound to the current JWT).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { asiakasId, name }
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib company current
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib company list matches snapshot 1`] = `
+"USAGE
+  ib company list [flags]
+
+DESCRIPTION
+  List the companies the current user can act on, with the active one marked \`current: true\`.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ asiakasId, name, current }> = { items, nextCursor, count }
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib company list
+  ib company list --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib company switch matches snapshot 1`] = `
+"USAGE
+  ib company switch [flags]
+
+DESCRIPTION
+  Switch the active company. Alias of \`ib auth switch\`. Persists the rotated JWT.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --to NUMBER    Target asiakasId to switch to
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { ok: true, activeCompany: { asiakasId, name } }
+
+ERRORS (stderr, exit non-zero)
+  403  No access to target    → verify via \`ib company list\`
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib company switch --to 1349
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib customer create matches snapshot 1`] = `
+"USAGE
+  ib customer create [flags]
+
+DESCRIPTION
+  Create a new customer via POST /api/asiakas/createY. Body forwarded verbatim.
+  Permissions: requires auth.page.asiakas.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --body JSON    JSON object with the new customer fields
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { asiakasId, ... } (raw backend response)
+
+ERRORS (stderr, exit non-zero)
+  400  Validation failed      → fix --body fields
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.asiakas.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib customer create --body '{"name":"Example Oy","yTunnus":"1234567-8"}' --idempotency-key new-example-oy
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib customer get matches snapshot 1`] = `
+"USAGE
+  ib customer get [flags]
+
+DESCRIPTION
+  Get a single customer (asiakas) by id with flat contact fields.
+  Permissions: requires auth.page.asiakas.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --asiakasId NUMBER    Positional — asiakasId to fetch
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { asiakasId, name, yTunnus, type, address, city, email, phone }
+
+ERRORS (stderr, exit non-zero)
+  404  Customer not found     → verify asiakasId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.asiakas.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib customer get 1349
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib customer list matches snapshot 1`] = `
+"USAGE
+  ib customer list [flags]
+
+DESCRIPTION
+  List customers (asiakkaat) visible to the active company. ownerAsiakasId derived from JWT.
+  Permissions: requires auth.page.asiakas.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --limit NUMBER    Max rows (capped at 500) (default: 100)
+  --cursor STRING    Pagination cursor
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ asiakasId, name, yTunnus, type }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.asiakas.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib customer list
+  ib customer list --limit 50 --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib customer search matches snapshot 1`] = `
+"USAGE
+  ib customer search [flags]
+
+DESCRIPTION
+  Free-text search across customer names / yTunnus / contacts. GET /api/asiakas/search?q=...
+  Permissions: requires auth.page.asiakas.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --query STRING    Positional — search string
+  --limit NUMBER    Max results (default: 50)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ asiakasId, name, yTunnus, score }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.asiakas.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib customer search Example
+  ib customer search 1234567
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib customer update matches snapshot 1`] = `
+"USAGE
+  ib customer update [flags]
+
+DESCRIPTION
+  Update a customer via POST /api/asiakas/set/:asiakasId. Body forwarded verbatim.
+  Permissions: requires auth.page.asiakas.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --asiakasId NUMBER    Positional — asiakasId to update
+  --body JSON    JSON object with the fields to update
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { ok: true, ... } (raw backend response)
+
+ERRORS (stderr, exit non-zero)
+  400  Validation failed      → fix --body fields
+  404  Customer not found     → verify asiakasId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.asiakas.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib customer update 1349 --body '{"email":"new@example.com"}' --reason 'customer requested'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib keikka create matches snapshot 1`] = `
+"USAGE
+  ib keikka create [flags]
+
+DESCRIPTION
+  Create a new keikka. The body is forwarded verbatim to POST /api/keikka/newKeikka — see the backend route for required fields.
+  Permissions: requires auth.page.grid.tilaus.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --body JSON    JSON object with the new keikka fields
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { keikkaId, ...echoed fields } (raw backend response)
+
+ERRORS (stderr, exit non-zero)
+  400  Validation failed      → fix --body fields
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.grid.tilaus.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib keikka create --body '{"asiakasId":1349,"pvm":"2026-06-01"}' --reason 'manual booking'
+  ib keikka create --body '{...}' --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib keikka drivers assign matches snapshot 1`] = `
+"USAGE
+  ib keikka drivers assign [flags]
+
+DESCRIPTION
+  Assign the default driver to a keikka. POST /api/keikka/defaultDriver/assign/:keikkaId; driver is selected by the backend from JWT/keikka context.
+  Permissions: requires auth.page.grid.tilaus.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --keikkaId NUMBER    Positional — keikkaId to assign default driver to
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { ok: true, driver:{personId,name} } (raw backend response)
+
+ERRORS (stderr, exit non-zero)
+  404  Keikka not found       → verify keikkaId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.grid.tilaus.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib keikka drivers assign 9001
+  ib keikka drivers assign 9001 --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib keikka get matches snapshot 1`] = `
+"USAGE
+  ib keikka get [flags]
+
+DESCRIPTION
+  Get a single keikka by id with related customer / worksite / vehicle / driver projections.
+  Permissions: requires auth.page.grid.tilaus.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --keikkaId NUMBER    Positional argument — the keikkaId to fetch
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { keikkaId, pvm, time, customer:{asiakasId,name}, worksite:{tyomaaId,address}, vehicle:{vehicleId,plate}, driver:{personId,name}, m3, status }
+
+ERRORS (stderr, exit non-zero)
+  404  Keikka not found       → verify keikkaId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.grid.tilaus.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib keikka get 9001
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib keikka list matches snapshot 1`] = `
+"USAGE
+  ib keikka list [flags]
+
+DESCRIPTION
+  List concrete delivery orders (keikkas) for the active company within a date range. Flat envelope optimised for AI/CI consumption.
+  Permissions: requires auth.page.grid.tilaus.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --from DATE    Start date (YYYY-MM-DD or today/yesterday/tomorrow) (default: today)
+  --to DATE    End date (YYYY-MM-DD or today/yesterday/tomorrow) (default: today)
+  --customer NUMBER    Filter by asiakasId
+  --vehicle NUMBER    Filter by vehicleId
+  --status STRING    Filter by tila/status
+  --limit NUMBER    Max rows (server caps at 500) (default: 100)
+  --cursor STRING    Pagination cursor
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.grid.tilaus.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib keikka list --from 2026-05-28 --to 2026-05-30
+  ib keikka list --customer 1349 --status planned --limit 50
+  ib keikka list --from today --to tomorrow --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib keikka update matches snapshot 1`] = `
+"USAGE
+  ib keikka update [flags]
+
+DESCRIPTION
+  Update a keikka. v1.0 supports only \`--status\` (forwarded as \`tila\` to POST /api/keikka/setStatus). Other field-setters land in v1.1.
+  Permissions: requires auth.page.grid.tilaus.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --keikkaId NUMBER    Positional — keikkaId to update
+  --status STRING    New tila/status value
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { ok: true } or backend response
+
+ERRORS (stderr, exit non-zero)
+  400  Validation failed      → check --status
+  404  Keikka not found       → verify keikkaId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.grid.tilaus.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib keikka update 9001 --status done
+  ib keikka update 9001 --status confirmed --reason 'phone confirmation'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person get matches snapshot 1`] = `
+"USAGE
+  ib person get [flags]
+
+DESCRIPTION
+  Get a single person by personId.
+  Permissions: requires auth.page.person.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --personId NUMBER    Positional — personId to fetch
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { personId, name, email, phone, roles:number[] }
+
+ERRORS (stderr, exit non-zero)
+  404  Person not found       → verify personId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.person.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib person get 6233
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person list matches snapshot 1`] = `
+"USAGE
+  ib person list [flags]
+
+DESCRIPTION
+  List persons (drivers, admins, etc.) visible to the active company. Optional --role uses ROLE_NAME_BY_TYPEID from @ibetoni/constants.
+  Permissions: requires auth.page.person.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --role STRING    Filter by role name (e.g. driver, admin, laskuAdmin)
+  --asiakas NUMBER    Filter by asiakasId membership
+  --limit NUMBER    Max rows (capped at 500) (default: 100)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ personId, name, email, roles:number[] }>
+
+ERRORS (stderr, exit non-zero)
+  400  Unknown role           → use a role from @ibetoni/constants ROLE_TYPEID_BY_NAME
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.person.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib person list --role driver
+  ib person list --asiakas 1349 --limit 50
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person search matches snapshot 1`] = `
+"USAGE
+  ib person search [flags]
+
+DESCRIPTION
+  Free-text search across person names / emails. POST /api/person/search.
+  Permissions: requires auth.page.person.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --query STRING    Positional — search string
+  --limit NUMBER    Max results (default: 50)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ personId, name, email, score }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.person.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib person search 'Matti'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib reference dump matches snapshot 1`] = `
+"USAGE
+  ib reference dump [flags]
+
+DESCRIPTION
+  Emit the full command surface as JSON (version, generatedAt, commands map). Read by AI assistants for one-shot CLI ingestion.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { version: string, generatedAt: ISO-8601, commands: { '<command>': CommandSpec } }
+
+ERRORS (stderr, exit non-zero)
+  1  I/O error              → retry; check stdout pipe
+
+EXAMPLES
+  ib reference dump
+  ib reference dump | jq .version
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib schedule day matches snapshot 1`] = `
+"USAGE
+  ib schedule day [flags]
+
+DESCRIPTION
+  List keikkas for a specific day.
+  Permissions: requires auth.page.grid.tilaus.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --date DATE    Positional — date (YYYY-MM-DD or today/yesterday/tomorrow)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.grid.tilaus.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib schedule day 2026-06-01
+  ib schedule day tomorrow
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib schedule today matches snapshot 1`] = `
+"USAGE
+  ib schedule today [flags]
+
+DESCRIPTION
+  List today's keikkas for the active company. Wrapper around \`ib keikka list --from today --to today\`.
+  Permissions: requires auth.page.grid.tilaus.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.grid.tilaus.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib schedule today
+  ib schedule today --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib schedule week matches snapshot 1`] = `
+"USAGE
+  ib schedule week [flags]
+
+DESCRIPTION
+  List keikkas for a 7-day window starting at the given date.
+  Permissions: requires auth.page.grid.tilaus.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --start DATE    Positional — week start date (YYYY-MM-DD or today/yesterday/tomorrow)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.grid.tilaus.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib schedule week 2026-06-01
+  ib schedule week today
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib sijainti create matches snapshot 1`] = `
+"USAGE
+  ib sijainti create [flags]
+
+DESCRIPTION
+  Create a new sijainti via POST /api/geocode/sijainti/add. Body forwarded verbatim.
+  Permissions: requires auth.page.sijainnit.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --body JSON    JSON object with the new sijainti fields
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { sijaintiId, ... } (raw backend response)
+
+ERRORS (stderr, exit non-zero)
+  400  Validation failed      → fix --body fields
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.sijainnit.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib sijainti create --body '{"name":"Depot A","address":"Industrial St 1","sijaintiTypeId":1}'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib sijainti get matches snapshot 1`] = `
+"USAGE
+  ib sijainti get [flags]
+
+DESCRIPTION
+  Get a single sijainti by id.
+  Permissions: requires auth.page.sijainnit.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --sijaintiId NUMBER    Positional — sijaintiId to fetch
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { sijaintiId, name, address, coords:{lat,lng}, type }
+
+ERRORS (stderr, exit non-zero)
+  404  Sijainti not found     → verify sijaintiId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.sijainnit.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib sijainti get 42
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib sijainti list matches snapshot 1`] = `
+"USAGE
+  ib sijainti list [flags]
+
+DESCRIPTION
+  List geocoded locations (sijainnit) — depots, plants, customer destinations. Optional --type filters by sijaintiTypeId.
+  Permissions: requires auth.page.sijainnit.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --type NUMBER    Filter by sijaintiTypeId
+  --limit NUMBER    Max rows (capped at 500) (default: 100)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.sijainnit.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib sijainti list
+  ib sijainti list --type 1
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib sijainti update matches snapshot 1`] = `
+"USAGE
+  ib sijainti update [flags]
+
+DESCRIPTION
+  Update a sijainti via POST /api/geocode/updateSijainti. Body forwarded verbatim.
+  Permissions: requires auth.page.sijainnit.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --body JSON    JSON object with the fields to update (must include sijaintiId)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { ok: true, ... } (raw backend response)
+
+ERRORS (stderr, exit non-zero)
+  400  Validation failed      → fix --body fields
+  404  Sijainti not found     → verify sijaintiId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.sijainnit.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib sijainti update --body '{"sijaintiId":42,"name":"Renamed depot"}'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle drivers matches snapshot 1`] = `
+"USAGE
+  ib vehicle drivers [flags]
+
+DESCRIPTION
+  Driver assignment history for a vehicle within a date range.
+  Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --vehicleId NUMBER    Positional — vehicleId to inspect
+  --from DATE    Start date (YYYY-MM-DD) (default: today)
+  --to DATE    End date (YYYY-MM-DD) (default: today)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ pvm, driverId, driverName, shiftStart, shiftEnd }>
+
+ERRORS (stderr, exit non-zero)
+  404  Vehicle not found      → verify vehicleId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle drivers 7 --from 2026-05-01 --to 2026-05-31
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle get matches snapshot 1`] = `
+"USAGE
+  ib vehicle get [flags]
+
+DESCRIPTION
+  Get a single vehicle by id.
+  Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --vehicleId NUMBER    Positional — vehicleId to fetch
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { vehicleId, plate, type, capacity }
+
+ERRORS (stderr, exit non-zero)
+  404  Vehicle not found      → verify vehicleId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle get 7
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle list matches snapshot 1`] = `
+"USAGE
+  ib vehicle list [flags]
+
+DESCRIPTION
+  List vehicles visible to the active company. ownerAsiakasId derived from JWT.
+  Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --limit NUMBER    Max rows (capped at 500) (default: 100)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ vehicleId, plate, type, capacity }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle list
+  ib vehicle list --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle status matches snapshot 1`] = `
+"USAGE
+  ib vehicle status [flags]
+
+DESCRIPTION
+  Current operational status for a vehicle: current driver, current keikka, latest GPS ping (via Ecofleet).
+  Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --vehicleId NUMBER    Positional — vehicleId to inspect
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,at}|null }
+
+ERRORS (stderr, exit non-zero)
+  404  Vehicle not found      → verify vehicleId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle status 7
+  ib vehicle status 7 --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib worksite create matches snapshot 1`] = `
+"USAGE
+  ib worksite create [flags]
+
+DESCRIPTION
+  Create a new worksite via POST /api/tyomaa/new. Body forwarded verbatim.
+  Permissions: requires auth.page.tyomaa.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --body JSON    JSON object with the new tyomaa fields
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { tyomaaId, ... } (raw backend response)
+
+ERRORS (stderr, exit non-zero)
+  400  Validation failed      → fix --body fields
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite create --body '{"name":"Site A","address":"Main St 1","asiakasId":1349}'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib worksite get matches snapshot 1`] = `
+"USAGE
+  ib worksite get [flags]
+
+DESCRIPTION
+  Get a single worksite (tyomaa) by id with flat address fields.
+  Permissions: requires auth.page.tyomaa.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --tyomaaId NUMBER    Positional — tyomaaId to fetch
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { tyomaaId, name, address, asiakasId, city, comment, coords:{lat,lng} }
+
+ERRORS (stderr, exit non-zero)
+  404  Worksite not found     → verify tyomaaId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite get 99
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib worksite list matches snapshot 1`] = `
+"USAGE
+  ib worksite list [flags]
+
+DESCRIPTION
+  List worksites (tyomaat) visible to the active company. ownerAsiakasId derived from JWT.
+  Permissions: requires auth.page.tyomaa.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --customer NUMBER    Filter by parent asiakasId
+  --limit NUMBER    Max rows (capped at 500) (default: 100)
+  --cursor STRING    Pagination cursor
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ tyomaaId, name, address, asiakasId, city }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite list
+  ib worksite list --customer 1349
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib worksite search matches snapshot 1`] = `
+"USAGE
+  ib worksite search [flags]
+
+DESCRIPTION
+  Free-text search across worksite names / addresses. POST /api/tyomaa/search.
+  Permissions: requires auth.page.tyomaa.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --query STRING    Positional — search string
+  --limit NUMBER    Max results (default: 50)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ tyomaaId, name, address, asiakasId, score }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite search 'Main St'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib worksite update matches snapshot 1`] = `
+"USAGE
+  ib worksite update [flags]
+
+DESCRIPTION
+  Update a worksite via POST /api/tyomaa/set/:ownerAsiakasId/:tyomaaId/:yyyymmdd.
+  Permissions: requires auth.page.tyomaa.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --tyomaaId NUMBER    Positional — tyomaaId to update
+  --body JSON    JSON object with the fields to update
+  --date DATE    Effective date (YYYYMMDD; today by default) (default: today)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { ok: true, ... } (raw backend response)
+
+ERRORS (stderr, exit non-zero)
+  400  Validation failed      → fix --body fields
+  404  Worksite not found     → verify tyomaaId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite update 99 --body '{"comment":"Pickup at gate B"}'
+"
+`;
