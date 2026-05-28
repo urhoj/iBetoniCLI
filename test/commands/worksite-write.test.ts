@@ -1,0 +1,77 @@
+import { describe, test, expect, vi, beforeEach } from "vitest";
+import {
+  runWorksiteCreate,
+  runWorksiteUpdate,
+} from "../../src/commands/worksite/index.js";
+import type { ApiClient } from "../../src/api/client.js";
+
+const mockClient = {
+  get: vi.fn(),
+  post: vi.fn(),
+  put: vi.fn(),
+  delete: vi.fn(),
+  getCurrentToken: vi.fn(),
+} as unknown as ApiClient;
+
+describe("ib worksite create/update", () => {
+  beforeEach(() => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockReset();
+  });
+
+  test("runWorksiteCreate forwards body + all three write-flag headers", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      tyomaaId: 5151,
+    });
+    const body = { tyomaaNimi: "Helsinki Site A", asiakasId: 1349 };
+    const result = await runWorksiteCreate(mockClient, body, {
+      dryRun: true,
+      idempotencyKey: "create-hsinki-a",
+      reason: "phase D import",
+    });
+    expect(mockClient.post).toHaveBeenCalledWith("/api/tyomaa/new", body, {
+      headers: {
+        "X-Dry-Run": "1",
+        "Idempotency-Key": "create-hsinki-a",
+        "X-Action-Reason": "phase D import",
+      },
+    });
+    expect((result as { tyomaaId: number }).tyomaaId).toBe(5151);
+  });
+
+  test("runWorksiteUpdate uses explicit yyyymmdd when given, defaults to today's YYYYMMDD otherwise", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
+      success: true,
+    });
+    const body = { tyomaaNimi: "Helsinki Site A — renamed" };
+
+    // Explicit yyyymmdd
+    await runWorksiteUpdate(
+      mockClient,
+      { tyomaaId: 5151, ownerAsiakasId: 1349, yyyymmdd: "20260615" },
+      body,
+      { reason: "naming cleanup" }
+    );
+    expect(mockClient.post).toHaveBeenLastCalledWith(
+      "/api/tyomaa/set/1349/5151/20260615",
+      body,
+      { headers: { "X-Action-Reason": "naming cleanup" } }
+    );
+
+    // Default yyyymmdd → today, in YYYYMMDD form
+    await runWorksiteUpdate(
+      mockClient,
+      { tyomaaId: 5151, ownerAsiakasId: 1349 },
+      body,
+      {}
+    );
+    const lastCall = (mockClient.post as ReturnType<typeof vi.fn>).mock
+      .calls[1];
+    const url = lastCall[0] as string;
+    expect(url).toMatch(/^\/api\/tyomaa\/set\/1349\/5151\/\d{8}$/);
+    const today = new Date();
+    const expected = `${today.getFullYear()}${String(
+      today.getMonth() + 1
+    ).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
+    expect(url.endsWith(expected)).toBe(true);
+  });
+});
