@@ -864,6 +864,179 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib schedule week 2026-06-01", "ib schedule week today"],
   },
 
+  // ─── v1.0.1 additions: customer/worksite/person lifecycle (11) ──────────
+  {
+    command: "ib customer delete",
+    description: "Delete a customer (asiakas). Requires --reason; --dry-run available.",
+    permissions: ["auth.page.asiakas.edit"],
+    flags: [
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: number }",
+    errors: [
+      { code: 404, meaning: "Customer not found", remedy: "verify asiakasId" },
+      ...permErrors("auth.page.asiakas.edit"),
+    ],
+    examples: ['ib customer delete 9001 --reason "lifecycle cleanup"'],
+  },
+  {
+    command: "ib customer person add",
+    description: "Attach a person to a customer (asiakasPerson). Requires --reason.",
+    permissions: ["auth.page.asiakas.edit"],
+    flags: [
+      { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
+      { name: "person", type: "number", description: "Target personId (REQUIRED)" },
+      { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId (1 = pumppari)" },
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ added: { asiakasId, personId } } or write-success envelope",
+    errors: [
+      { code: 400, meaning: "Company limit (26) reached", remedy: "remove an existing link first" },
+      ...permErrors("auth.page.asiakas.edit"),
+    ],
+    examples: ['ib customer person add --asiakas 26 --person 5351 --contact-type 1 --reason "onboard driver"'],
+  },
+  {
+    command: "ib customer person remove",
+    description: "Detach a person from a customer (asiakasPerson). Requires --reason.",
+    permissions: ["auth.page.asiakas.edit"],
+    flags: [
+      { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
+      { name: "person", type: "number", description: "Target personId (REQUIRED)" },
+      { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId" },
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ removed: { asiakasId, personId } }",
+    errors: [
+      { code: 404, meaning: "Link not found", remedy: "verify asiakasId+personId combination" },
+      ...permErrors("auth.page.asiakas.edit"),
+    ],
+    examples: ['ib customer person remove --asiakas 26 --person 5351 --reason "offboard driver"'],
+  },
+  {
+    command: "ib customer person list",
+    description: "List persons attached to a customer. Optional --role filter.",
+    permissions: ["auth.page.asiakas.read"],
+    flags: [
+      { name: "role", type: "string", description: "Filter by role name (e.g. keikkaHandler)" },
+    ],
+    outputShape: "ListEnvelope<{ personId, name, email, role }>",
+    errors: [
+      { code: 400, meaning: "Unknown role name", remedy: "see ROLE_TYPEID_BY_NAME in @ibetoni/constants" },
+      ...permErrors("auth.page.asiakas.read"),
+    ],
+    examples: ["ib customer person list 26", "ib customer person list 26 --role keikkaHandler"],
+  },
+  {
+    command: "ib worksite delete",
+    description: "Delete a worksite (tyomaa). Requires --reason.",
+    permissions: ["auth.page.tyomaa.edit"],
+    flags: [
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ deleted: number }",
+    errors: [
+      { code: 404, meaning: "Worksite not found", remedy: "verify tyomaaId" },
+      ...permErrors("auth.page.tyomaa.edit"),
+    ],
+    examples: ['ib worksite delete 99 --reason "lifecycle cleanup"'],
+  },
+  {
+    command: "ib worksite person add",
+    description: "Attach a person to a worksite (tyomaaPerson). Requires --reason.",
+    permissions: ["auth.page.tyomaa.edit"],
+    flags: [
+      { name: "worksite", type: "number", description: "Target tyomaaId (REQUIRED)" },
+      { name: "person", type: "number", description: "Target personId (REQUIRED)" },
+      { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId" },
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ added: { tyomaaId, personId } }",
+    errors: permErrors("auth.page.tyomaa.edit"),
+    examples: ['ib worksite person add --worksite 99 --person 5351 --reason "assign foreman"'],
+  },
+  {
+    command: "ib worksite person remove",
+    description: "Detach a person from a worksite. Requires --reason.",
+    permissions: ["auth.page.tyomaa.edit"],
+    flags: [
+      { name: "worksite", type: "number", description: "Target tyomaaId (REQUIRED)" },
+      { name: "person", type: "number", description: "Target personId (REQUIRED)" },
+      { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId" },
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ removed: { tyomaaId, personId } }",
+    errors: [
+      { code: 404, meaning: "Link not found", remedy: "verify tyomaaId+personId combination" },
+      ...permErrors("auth.page.tyomaa.edit"),
+    ],
+    examples: ['ib worksite person remove --worksite 99 --person 5351 --reason "rotation"'],
+  },
+  {
+    command: "ib worksite person list",
+    description: "List persons attached to a worksite.",
+    permissions: ["auth.page.tyomaa.read"],
+    flags: [],
+    outputShape: "ListEnvelope<{ personId, name, email, contactType }>",
+    errors: permErrors("auth.page.tyomaa.read"),
+    examples: ["ib worksite person list 99"],
+  },
+  {
+    command: "ib person create",
+    description: "Create a person. Body REQUIRED via --body. Requires --reason.",
+    permissions: ["auth.page.person.edit"],
+    flags: [
+      { name: "body", type: "json", description: "Person body. Must include personFirstName, personLastName, personEmail." },
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ personId: number, ... } or { dryRun: true, wouldCreate: ... }",
+    errors: [
+      { code: 400, meaning: "Body missing required field", remedy: "include personFirstName, personLastName, personEmail" },
+      ...permErrors("auth.page.person.edit"),
+    ],
+    examples: [
+      'ib person create --body \'{"personFirstName":"Matti","personLastName":"M","personEmail":"m@x.com"}\' --reason "onboard"',
+    ],
+  },
+  {
+    command: "ib person update",
+    description: "Update a person. Body REQUIRED via --body. Requires --reason.",
+    permissions: ["auth.page.person.edit"],
+    flags: [
+      { name: "body", type: "json", description: "Patch body (JSON)" },
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ ok: true, updated: { personId } }",
+    errors: [
+      { code: 404, meaning: "Person not found", remedy: "verify personId" },
+      ...permErrors("auth.page.person.edit"),
+    ],
+    examples: ['ib person update 5351 --body \'{"personPhone":"+358501234567"}\' --reason "phone change"'],
+  },
+  {
+    command: "ib person delete",
+    description: "Delete a person. Requires --reason.",
+    permissions: ["auth.page.person.edit"],
+    flags: [
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ deleted: number }",
+    errors: [
+      { code: 404, meaning: "Person not found", remedy: "verify personId" },
+      ...permErrors("auth.page.person.edit"),
+    ],
+    examples: ['ib person delete 5351 --reason "departed"'],
+  },
+
   // ─── reference (1) ───────────────────────────────────────────────────────
   {
     command: "ib reference dump",

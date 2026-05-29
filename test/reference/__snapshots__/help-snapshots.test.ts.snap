@@ -242,6 +242,40 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib customer delete matches snapshot 1`] = `
+"USAGE
+  ib customer delete [flags]
+
+DESCRIPTION
+  Delete a customer (asiakas). Requires --reason; --dry-run available.
+  Permissions: requires auth.page.asiakas.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { deleted: number } or { dryRun: true, wouldDelete: number }
+
+ERRORS (stderr, exit non-zero)
+  404  Customer not found     → verify asiakasId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.asiakas.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib customer delete 9001 --reason "lifecycle cleanup"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib customer get matches snapshot 1`] = `
 "USAGE
   ib customer get [flags]
@@ -298,6 +332,110 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib customer list
   ib customer list --limit 50 --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib customer person add matches snapshot 1`] = `
+"USAGE
+  ib customer person add [flags]
+
+DESCRIPTION
+  Attach a person to a customer (asiakasPerson). Requires --reason.
+  Permissions: requires auth.page.asiakas.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --asiakas NUMBER    Target asiakasId (REQUIRED)
+  --person NUMBER    Target personId (REQUIRED)
+  --contact-type NUMBER    contactPersonTypeId (1 = pumppari) (default: 1)
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { added: { asiakasId, personId } } or write-success envelope
+
+ERRORS (stderr, exit non-zero)
+  400  Company limit (26) reached → remove an existing link first
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.asiakas.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib customer person add --asiakas 26 --person 5351 --contact-type 1 --reason "onboard driver"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib customer person list matches snapshot 1`] = `
+"USAGE
+  ib customer person list [flags]
+
+DESCRIPTION
+  List persons attached to a customer. Optional --role filter.
+  Permissions: requires auth.page.asiakas.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --role STRING    Filter by role name (e.g. keikkaHandler)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ personId, name, email, role }>
+
+ERRORS (stderr, exit non-zero)
+  400  Unknown role name      → see ROLE_TYPEID_BY_NAME in @ibetoni/constants
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.asiakas.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib customer person list 26
+  ib customer person list 26 --role keikkaHandler
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib customer person remove matches snapshot 1`] = `
+"USAGE
+  ib customer person remove [flags]
+
+DESCRIPTION
+  Detach a person from a customer (asiakasPerson). Requires --reason.
+  Permissions: requires auth.page.asiakas.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --asiakas NUMBER    Target asiakasId (REQUIRED)
+  --person NUMBER    Target personId (REQUIRED)
+  --contact-type NUMBER    contactPersonTypeId (default: 1)
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { removed: { asiakasId, personId } }
+
+ERRORS (stderr, exit non-zero)
+  404  Link not found         → verify asiakasId+personId combination
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.asiakas.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib customer person remove --asiakas 26 --person 5351 --reason "offboard driver"
 "
 `;
 
@@ -539,6 +677,75 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib person create matches snapshot 1`] = `
+"USAGE
+  ib person create [flags]
+
+DESCRIPTION
+  Create a person. Body REQUIRED via --body. Requires --reason.
+  Permissions: requires auth.page.person.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --body JSON    Person body. Must include personFirstName, personLastName, personEmail.
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { personId: number, ... } or { dryRun: true, wouldCreate: ... }
+
+ERRORS (stderr, exit non-zero)
+  400  Body missing required field → include personFirstName, personLastName, personEmail
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.person.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib person create --body '{"personFirstName":"Matti","personLastName":"M","personEmail":"m@x.com"}' --reason "onboard"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person delete matches snapshot 1`] = `
+"USAGE
+  ib person delete [flags]
+
+DESCRIPTION
+  Delete a person. Requires --reason.
+  Permissions: requires auth.page.person.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { deleted: number }
+
+ERRORS (stderr, exit non-zero)
+  404  Person not found       → verify personId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.person.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib person delete 5351 --reason "departed"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib person get matches snapshot 1`] = `
 "USAGE
   ib person get [flags]
@@ -626,6 +833,41 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib person search 'Matti'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person update matches snapshot 1`] = `
+"USAGE
+  ib person update [flags]
+
+DESCRIPTION
+  Update a person. Body REQUIRED via --body. Requires --reason.
+  Permissions: requires auth.page.person.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --body JSON    Patch body (JSON)
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { ok: true, updated: { personId } }
+
+ERRORS (stderr, exit non-zero)
+  404  Person not found       → verify personId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.person.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib person update 5351 --body '{"personPhone":"+358501234567"}' --reason "phone change"
 "
 `;
 
@@ -1023,6 +1265,40 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib worksite delete matches snapshot 1`] = `
+"USAGE
+  ib worksite delete [flags]
+
+DESCRIPTION
+  Delete a worksite (tyomaa). Requires --reason.
+  Permissions: requires auth.page.tyomaa.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { deleted: number }
+
+ERRORS (stderr, exit non-zero)
+  404  Worksite not found     → verify tyomaaId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite delete 99 --reason "lifecycle cleanup"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib worksite get matches snapshot 1`] = `
 "USAGE
   ib worksite get [flags]
@@ -1080,6 +1356,107 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib worksite list
   ib worksite list --customer 1349
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib worksite person add matches snapshot 1`] = `
+"USAGE
+  ib worksite person add [flags]
+
+DESCRIPTION
+  Attach a person to a worksite (tyomaaPerson). Requires --reason.
+  Permissions: requires auth.page.tyomaa.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --worksite NUMBER    Target tyomaaId (REQUIRED)
+  --person NUMBER    Target personId (REQUIRED)
+  --contact-type NUMBER    contactPersonTypeId (default: 1)
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { added: { tyomaaId, personId } }
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite person add --worksite 99 --person 5351 --reason "assign foreman"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib worksite person list matches snapshot 1`] = `
+"USAGE
+  ib worksite person list [flags]
+
+DESCRIPTION
+  List persons attached to a worksite.
+  Permissions: requires auth.page.tyomaa.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ personId, name, email, contactType }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite person list 99
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib worksite person remove matches snapshot 1`] = `
+"USAGE
+  ib worksite person remove [flags]
+
+DESCRIPTION
+  Detach a person from a worksite. Requires --reason.
+  Permissions: requires auth.page.tyomaa.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --worksite NUMBER    Target tyomaaId (REQUIRED)
+  --person NUMBER    Target personId (REQUIRED)
+  --contact-type NUMBER    contactPersonTypeId (default: 1)
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { removed: { tyomaaId, personId } }
+
+ERRORS (stderr, exit non-zero)
+  404  Link not found         → verify tyomaaId+personId combination
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite person remove --worksite 99 --person 5351 --reason "rotation"
 "
 `;
 
