@@ -425,10 +425,21 @@ export async function runCustomerPersonList(
   roleName?: string
 ): Promise<ListEnvelope<CustomerPersonListItem>> {
   const typeId = resolveRoleTypeId(roleName);
-  const rows = await client.get<PersonRow[]>(
-    `/api/asiakas/person/list/${asiakasId}/${typeId}`
-  );
-  const items = (rows || []).map((r) => ({
+  // Backend `getAsiakasPersonList` sometimes returns the raw mssql result
+  // wrapper `{ recordset, recordsets, ... }` instead of an unwrapped array
+  // (depends on cache warmth + middleware path). Unwrap defensively so the
+  // CLI is resilient to either shape.
+  const raw = await client.get<
+    PersonRow[] | { personList?: PersonRow[]; recordset?: PersonRow[]; recordsets?: PersonRow[][] }
+  >(`/api/asiakas/person/list/${asiakasId}/${typeId}`);
+  let rows: PersonRow[] = [];
+  if (Array.isArray(raw)) {
+    rows = raw;
+  } else if (raw && typeof raw === "object") {
+    const wrapper = raw as { personList?: PersonRow[]; recordset?: PersonRow[]; recordsets?: PersonRow[][] };
+    rows = wrapper.personList || wrapper.recordset || wrapper.recordsets?.[0] || [];
+  }
+  const items = rows.map((r) => ({
     personId: r.personId,
     name: `${r.personFirstName || ""} ${r.personLastName || ""}`.trim(),
     email: r.personEmail || null,
