@@ -195,6 +195,12 @@ export function registerPersonCommands(
 /**
  * POST /api/person/newPerson — create a new person record.
  * Body must include personFirstName, personLastName, personEmail.
+ *
+ * Response shape note: the backend wraps the result as
+ * `{ status: "ok", data: { recordsets, output, rowsAffected, returnValue } }`.
+ * The new personId is at `data.returnValue` — callers that need it should
+ * unwrap accordingly. See `puminet5api/utils/test/test-cli-lifecycle.js` for a
+ * tolerant fallback chain that handles older shapes too.
  */
 export async function runPersonCreate(
   client: ApiClient,

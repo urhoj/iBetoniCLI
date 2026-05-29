@@ -58,6 +58,12 @@ export async function runWorksiteSearch(
  * POST /api/tyomaa/new with a free-form body forwarded to the existing BE
  * endpoint (FE: `tyomaa_save_to_db()`). Write flags surface as the universal
  * `X-Dry-Run` / `Idempotency-Key` / `X-Action-Reason` headers.
+ *
+ * Body shape pitfalls verified by the lifecycle smoke
+ * (`puminet5api/utils/test/test-cli-lifecycle.js`):
+ *   - `ownerAsiakasId` is required (validateRequiredFields).
+ *   - `tyomaaContactPersonId` has a NOT NULL constraint; pass `0` for
+ *     "no contact assigned".
  */
 export async function runWorksiteCreate(
   client: ApiClient,
@@ -85,8 +91,13 @@ function todayYyyymmdd(): string {
 /**
  * POST /api/tyomaa/set/:ownerAsiakasId/:tyomaaId/:yyyymmdd with a free-form
  * body. `ownerAsiakasId` comes from the caller's credentials context and must
- * be passed in by the action wiring (auto-derived in G.3). `yyyymmdd` defaults
- * to today in local time (YYYYMMDD, no separators).
+ * be passed in by the action wiring. `yyyymmdd` defaults to today in local
+ * time (YYYYMMDD, no separators).
+ *
+ * Body shape pitfall verified by the lifecycle smoke
+ * (`puminet5api/utils/test/test-cli-lifecycle.js`):
+ *   - The handler runs `validateRequiredFields(body, ["tyomaaId", "ownerAsiakasId"])`,
+ *     so both ids must be in the BODY too even though they're already in the URL.
  */
 export async function runWorksiteUpdate(
   client: ApiClient,

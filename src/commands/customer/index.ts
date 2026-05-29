@@ -74,6 +74,13 @@ export async function runCustomerCreate(
 /**
  * POST /api/asiakas/set/:asiakasId with a free-form body forwarded to the
  * existing BE endpoint. Write flags surface as the universal headers.
+ *
+ * Body shape pitfalls verified by the lifecycle smoke
+ * (`puminet5api/utils/test/test-cli-lifecycle.js`):
+ *   - Include `saveGlobalAsiakas: true` — without it the handler returns
+ *     `success: true` but actually no-ops on the global asiakas row.
+ *   - `asiakasContactPersonId` (NOT NULL) must be present; `0` is a valid
+ *     "no contact person assigned" sentinel.
  */
 export async function runCustomerUpdate(
   client: ApiClient,
@@ -416,8 +423,13 @@ export interface CustomerPersonListItem {
 /**
  * GET /api/asiakas/person/list/:asiakasId/:roleTypeId — returns persons
  * attached to a customer, optionally filtered by role NAME (mapped to its
- * typeId via `ROLE_TYPEID_BY_NAME`). The flat backend array is wrapped in
- * the universal `ListEnvelope` so output formatters can render it.
+ * typeId via `ROLE_TYPEID_BY_NAME`).
+ *
+ * Backend response shape is `{ personList: [...] }` in production. Older
+ * cache-warm paths and direct-query paths may return a bare array or the raw
+ * mssql wrapper `{ recordset, recordsets, ... }`. Unwrapping defensively
+ * accepts any of the three. The flat result is wrapped in the universal
+ * `ListEnvelope` so output formatters can render it.
  */
 export async function runCustomerPersonList(
   client: ApiClient,
