@@ -103,6 +103,21 @@ export async function runWorksiteUpdate(
 }
 
 /**
+ * DELETE /api/tyomaa/delete/:tyomaaId. Universal write flags surface as
+ * headers; `--reason` is enforced by the CLI layer.
+ */
+export async function runWorksiteDelete(
+  client: ApiClient,
+  tyomaaId: number,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.delete(
+    `/api/tyomaa/delete/${tyomaaId}`,
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
  * Register `ib worksite` subcommands on the parent commander instance:
  *   - list    filterable by --limit/--cursor
  *   - get     single tyomaa by id
@@ -244,4 +259,23 @@ export function registerWorksiteCommands(
       }
     }
   );
+
+  addWriteFlagsToCommand(
+    w
+      .command("delete <tyomaaId>")
+      .description("Delete a worksite (tyomaa). Requires --reason.")
+  ).action(async (tyomaaIdStr: string, opts: WriteFlags) => {
+    if (!opts.reason) {
+      writeError(new Error("Missing required flag: --reason"));
+      process.exit(4);
+    }
+    try {
+      const client = await getClient();
+      const result = await runWorksiteDelete(client, Number(tyomaaIdStr), opts);
+      writeJson(result);
+    } catch (e) {
+      writeError(e);
+      process.exit(1);
+    }
+  });
 }
