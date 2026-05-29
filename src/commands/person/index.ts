@@ -171,6 +171,25 @@ export function registerPersonCommands(
       process.exit(1);
     }
   });
+
+  addWriteFlagsToCommand(
+    p
+      .command("delete <personId>")
+      .description("Delete a person. Requires --reason.")
+  ).action(async (personIdStr: string, opts: WriteFlags) => {
+    if (!opts.reason) {
+      writeError(new Error("Missing required flag: --reason"));
+      process.exit(4);
+    }
+    try {
+      const client = await getClient();
+      const result = await runPersonDelete(client, Number(personIdStr), opts);
+      writeJson(result);
+    } catch (e) {
+      writeError(e);
+      process.exit(1);
+    }
+  });
 }
 
 /**
@@ -202,6 +221,20 @@ export async function runPersonUpdate(
   return client.post(
     "/api/person/set",
     { personId, ...patch },
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
+ * DELETE /api/person/delete/:personId — remove a person record.
+ */
+export async function runPersonDelete(
+  client: ApiClient,
+  personId: number,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.delete(
+    `/api/person/delete/${personId}`,
     { headers: writeFlagsToHeaders(flags) }
   );
 }

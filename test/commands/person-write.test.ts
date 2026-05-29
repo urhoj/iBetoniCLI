@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { runPersonCreate, runPersonUpdate } from "../../src/commands/person/index.js";
+import { runPersonCreate, runPersonUpdate, runPersonDelete } from "../../src/commands/person/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
 const mockClient = {
@@ -36,5 +36,19 @@ describe("runPersonUpdate", () => {
       { personId: 5351, personPhone: "+358501234567" },
       { headers: { "X-Action-Reason": "phone update" } }
     );
+  });
+});
+
+describe("runPersonDelete", () => {
+  beforeEach(() => { (mockClient.delete as ReturnType<typeof vi.fn>).mockReset(); });
+
+  test("DELETEs /api/person/delete/<personId> with reason header", async () => {
+    (mockClient.delete as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ deleted: 5351 });
+    const result = await runPersonDelete(mockClient, 5351, { reason: "cleanup" });
+    expect(mockClient.delete).toHaveBeenCalledWith(
+      "/api/person/delete/5351",
+      { headers: { "X-Action-Reason": "cleanup" } }
+    );
+    expect(result).toEqual({ deleted: 5351 });
   });
 });
