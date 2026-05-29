@@ -86,6 +86,22 @@ export async function runCustomerUpdate(
 }
 
 /**
+ * DELETE /api/asiakas/delete/:asiakasId/:ownerAsiakasId. Universal write flags
+ * surface as headers; `--reason` is enforced by the CLI layer.
+ */
+export async function runCustomerDelete(
+  client: ApiClient,
+  asiakasId: number,
+  ownerAsiakasId: number,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.delete(
+    `/api/asiakas/delete/${asiakasId}/${ownerAsiakasId}`,
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
  * Register `ib customer` subcommands on the parent commander instance:
  *   - list    filterable by --limit/--cursor
  *   - get     single asiakas by id
@@ -211,4 +227,36 @@ export function registerCustomerCommands(
       }
     }
   );
+
+  addWriteFlagsToCommand(
+    c
+      .command("delete <asiakasId>")
+      .description("Delete a customer (asiakas). Requires --reason.")
+  ).action(async (asiakasIdStr: string, opts: WriteFlags) => {
+    if (!opts.reason) {
+      writeError(new Error("Missing required flag: --reason"));
+      process.exit(4);
+    }
+    try {
+      const client = await getClient();
+      const ownerAsiakasId = await resolveOwnerAsiakasIdForWrite(client);
+      const result = await runCustomerDelete(client, Number(asiakasIdStr), ownerAsiakasId, opts);
+      writeJson(result);
+    } catch (e) {
+      writeError(e);
+      process.exit(1);
+    }
+  });
+}
+
+/**
+ * Resolve the caller's current `ownerAsiakasId` via the existing
+ * `/api/company-selection/available` route, used by every customer-write
+ * subcommand that needs a tenant-owner segment in its URL.
+ */
+async function resolveOwnerAsiakasIdForWrite(client: ApiClient): Promise<number> {
+  const available = await client.get<{ currentCompanyId: number }>(
+    "/api/company-selection/available"
+  );
+  return available.currentCompanyId;
 }
