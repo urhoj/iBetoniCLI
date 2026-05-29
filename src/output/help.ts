@@ -12,7 +12,13 @@
  * The same `CommandSpec` shape is also emitted as JSON by
  * `ib reference dump` (see `src/reference/dump.ts`), keeping the human help
  * and the machine reference in lockstep — one source of truth per command.
+ *
+ * `attachRichHelp` (bottom of this file) wires this renderer into each
+ * subcommand's `--help`, so an AI inspecting a single command sees the full
+ * spec without having to run `ib reference dump`.
  */
+
+import type { Command } from "commander";
 
 export interface CommandFlag {
   /** Flag name without leading dashes, e.g. `from`, `idempotency-key`. */
@@ -114,4 +120,27 @@ export function formatHelp(spec: CommandSpec): string {
   }
 
   return lines.join("\n") + "\n";
+}
+
+/**
+ * Walk the Commander tree rooted at `root` and replace the `--help` output of
+ * every command whose full path (e.g. `ib keikka list`) matches a
+ * {@link CommandSpec.command} with the rich {@link formatHelp} rendering.
+ *
+ * Group commands and any command without a matching spec keep Commander's
+ * default auto-generated help. Matching is by exact path so the same
+ * `COMMAND_SPECS` catalogue drives both per-command `--help` and
+ * `ib reference dump` — there is no second source to drift.
+ */
+export function attachRichHelp(root: Command, specs: CommandSpec[]): void {
+  const byCommand = new Map(specs.map((s) => [s.command, s]));
+  const walk = (cmd: Command, path: string[]): void => {
+    const full = [...path, cmd.name()].join(" ");
+    const spec = byCommand.get(full);
+    if (spec) {
+      cmd.configureHelp({ formatHelp: () => formatHelp(spec) });
+    }
+    for (const sub of cmd.commands) walk(sub, [...path, cmd.name()]);
+  };
+  walk(root, []);
 }
