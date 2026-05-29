@@ -102,6 +102,32 @@ export async function runCustomerDelete(
 }
 
 /**
+ * Shape of the request body for both `person add` and `person remove`.
+ * `contactPersonTypeId` defaults to 1 (pumppari) on the CLI surface.
+ */
+export interface CustomerPersonLinkBody {
+  asiakasId: number;
+  personId: number;
+  contactPersonTypeId: number;
+}
+
+/**
+ * POST /api/asiakas/person/add — attach a person to a customer.
+ * Forwards the universal write-flag headers.
+ */
+export async function runCustomerPersonAdd(
+  client: ApiClient,
+  body: CustomerPersonLinkBody,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post(
+    "/api/asiakas/person/add",
+    body,
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
  * Register `ib customer` subcommands on the parent commander instance:
  *   - list    filterable by --limit/--cursor
  *   - get     single asiakas by id
@@ -241,6 +267,36 @@ export function registerCustomerCommands(
       const client = await getClient();
       const ownerAsiakasId = await resolveOwnerAsiakasIdForWrite(client);
       const result = await runCustomerDelete(client, Number(asiakasIdStr), ownerAsiakasId, opts);
+      writeJson(result);
+    } catch (e) {
+      writeError(e);
+      process.exit(1);
+    }
+  });
+
+  const customerPerson = c
+    .command("person")
+    .description("Manage persons attached to a customer");
+
+  addWriteFlagsToCommand(
+    customerPerson
+      .command("add")
+      .description("Attach a person to a customer (asiakasPerson). Requires --reason.")
+      .requiredOption("--asiakas <id>", "Target asiakasId", Number)
+      .requiredOption("--person <id>", "Target personId", Number)
+      .option("--contact-type <id>", "contactPersonTypeId (default 1 = pumppari)", Number, 1)
+  ).action(async (opts: WriteFlags & { asiakas: number; person: number; contactType: number }) => {
+    if (!opts.reason) {
+      writeError(new Error("Missing required flag: --reason"));
+      process.exit(4);
+    }
+    try {
+      const client = await getClient();
+      const result = await runCustomerPersonAdd(
+        client,
+        { asiakasId: opts.asiakas, personId: opts.person, contactPersonTypeId: opts.contactType },
+        opts
+      );
       writeJson(result);
     } catch (e) {
       writeError(e);
