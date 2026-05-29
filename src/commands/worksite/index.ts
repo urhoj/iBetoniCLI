@@ -160,6 +160,44 @@ export async function runWorksitePersonRemove(
   );
 }
 
+interface WorksitePersonRow {
+  personId: number;
+  personFirstName?: string;
+  personLastName?: string;
+  personEmail?: string;
+  contactPersonTypeId?: number;
+}
+
+export interface WorksitePersonListItem {
+  personId: number;
+  name: string;
+  email: string | null;
+  contactType: number | null;
+}
+
+/**
+ * GET /api/tyomaa/person/list/:tyomaaId/0 — returns persons attached to a
+ * worksite. The second URL segment is a typeId placeholder (the FE / BE
+ * route shape mirrors `asiakas/person/list`); we always pass `0` because
+ * tyomaaPerson links don't have a per-role filter. The flat backend array is
+ * wrapped in the universal `ListEnvelope` so output formatters can render it.
+ */
+export async function runWorksitePersonList(
+  client: ApiClient,
+  tyomaaId: number
+): Promise<ListEnvelope<WorksitePersonListItem>> {
+  const rows = await client.get<WorksitePersonRow[]>(
+    `/api/tyomaa/person/list/${tyomaaId}/0`
+  );
+  const items = (rows || []).map((r) => ({
+    personId: r.personId,
+    name: `${r.personFirstName || ""} ${r.personLastName || ""}`.trim(),
+    email: r.personEmail || null,
+    contactType: r.contactPersonTypeId || null,
+  }));
+  return { items, nextCursor: null, count: items.length };
+}
+
 /**
  * Register `ib worksite` subcommands on the parent commander instance:
  *   - list    filterable by --limit/--cursor
@@ -377,4 +415,18 @@ export function registerWorksiteCommands(
       process.exit(1);
     }
   });
+
+  worksitePerson
+    .command("list <tyomaaId>")
+    .description("List persons attached to a worksite.")
+    .action(async (tyomaaIdStr: string) => {
+      try {
+        const client = await getClient();
+        const result = await runWorksitePersonList(client, Number(tyomaaIdStr));
+        writeJson(result);
+      } catch (e) {
+        writeError(e);
+        process.exit(1);
+      }
+    });
 }

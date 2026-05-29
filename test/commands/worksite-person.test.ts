@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { runWorksitePersonAdd, runWorksitePersonRemove } from "../../src/commands/worksite/index.js";
+import { runWorksitePersonAdd, runWorksitePersonRemove, runWorksitePersonList } from "../../src/commands/worksite/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
 const mockClient = {
@@ -43,5 +43,19 @@ describe("runWorksitePersonRemove", () => {
       { tyomaaId: 99, personId: 5351, contactPersonTypeId: 1 },
       { headers: { "X-Action-Reason": "lifecycle remove" } }
     );
+  });
+});
+
+describe("runWorksitePersonList", () => {
+  beforeEach(() => { (mockClient.get as ReturnType<typeof vi.fn>).mockReset(); });
+
+  test("GETs /api/tyomaa/person/list/<tyomaaId>/0 (second segment ignored)", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      { personId: 5351, personFirstName: "Juha", personLastName: "Urho", personEmail: "j@example.com" },
+    ]);
+    const result = await runWorksitePersonList(mockClient, 99);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/tyomaa/person/list/99/0");
+    expect(result.items[0]).toMatchObject({ personId: 5351, name: "Juha Urho" });
+    expect(result.count).toBe(1);
   });
 });
