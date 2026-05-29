@@ -675,60 +675,6 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     examples: ["ib vehicle get 7"],
   },
-  {
-    command: "ib vehicle status",
-    description:
-      "Current operational status for a vehicle: current driver, current keikka, latest GPS ping (via Ecofleet).",
-    permissions: ["auth.page.vehicle.read"],
-    flags: [
-      {
-        name: "vehicleId",
-        type: "number",
-        description: "Positional — vehicleId to inspect",
-      },
-    ],
-    outputShape:
-      "{ vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,at}|null }",
-    errors: [
-      { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
-      ...permErrors("auth.page.vehicle.read"),
-    ],
-    examples: ["ib vehicle status 7", "ib vehicle status 7 --pretty"],
-  },
-  {
-    command: "ib vehicle drivers",
-    description:
-      "Driver assignment history for a vehicle within a date range.",
-    permissions: ["auth.page.vehicle.read"],
-    flags: [
-      {
-        name: "vehicleId",
-        type: "number",
-        description: "Positional — vehicleId to inspect",
-      },
-      {
-        name: "from",
-        type: "date",
-        default: "today",
-        description: "Start date (YYYY-MM-DD)",
-      },
-      {
-        name: "to",
-        type: "date",
-        default: "today",
-        description: "End date (YYYY-MM-DD)",
-      },
-    ],
-    outputShape:
-      "ListEnvelope<{ pvm, driverId, driverName, shiftStart, shiftEnd }>",
-    errors: [
-      { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
-      ...permErrors("auth.page.vehicle.read"),
-    ],
-    examples: [
-      "ib vehicle drivers 7 --from 2026-05-01 --to 2026-05-31",
-    ],
-  },
 
   // ─── sijainti (4) ────────────────────────────────────────────────────────
   {
