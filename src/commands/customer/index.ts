@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
@@ -345,6 +346,21 @@ export function registerCustomerCommands(
       process.exit(1);
     }
   });
+
+  customerPerson
+    .command("list <asiakasId>")
+    .description("List persons attached to a customer. Optional --role filter.")
+    .option("--role <name>", "Filter by role name (e.g. keikkaHandler)")
+    .action(async (asiakasIdStr: string, opts: { role?: string }) => {
+      try {
+        const client = await getClient();
+        const result = await runCustomerPersonList(client, Number(asiakasIdStr), opts.role);
+        writeJson(result);
+      } catch (e) {
+        writeError(e);
+        process.exit(1);
+      }
+    });
 }
 
 /**
@@ -357,4 +373,66 @@ async function resolveOwnerAsiakasIdForWrite(client: ApiClient): Promise<number>
     "/api/company-selection/available"
   );
   return available.currentCompanyId;
+}
+
+// `@ibetoni/constants` is a CommonJS package — pulled in via createRequire so
+// the ESM build doesn't need a default-export shim.
+const cjsRequire = createRequire(import.meta.url);
+
+/**
+ * Translate a role NAME (e.g. "keikkaHandler") to its `asiakasPersonSettingTypeId`
+ * using `ROLE_TYPEID_BY_NAME` from `@ibetoni/constants` (the single source of
+ * truth). Returns `0` for an unset name (BE treats 0 as "no filter").
+ *
+ * Throws a descriptive error when the role is unknown so the CLI can surface
+ * the list of valid names to the user.
+ */
+function resolveRoleTypeId(roleName?: string): number {
+  if (!roleName) return 0;
+  const constants = cjsRequire("@ibetoni/constants") as { ROLE_TYPEID_BY_NAME: Record<string, number> };
+  const id = constants.ROLE_TYPEID_BY_NAME[roleName];
+  if (!id) {
+    const valid = Object.keys(constants.ROLE_TYPEID_BY_NAME).sort().join(", ");
+    throw new Error(`unknown role: ${roleName}. Valid: ${valid}`);
+  }
+  return id;
+}
+
+interface PersonRow {
+  personId: number;
+  personFirstName?: string;
+  personLastName?: string;
+  personEmail?: string;
+  asiakasPersonSettingTypeId?: number;
+}
+
+export interface CustomerPersonListItem {
+  personId: number;
+  name: string;
+  email: string | null;
+  role: number | null;
+}
+
+/**
+ * GET /api/asiakas/person/list/:asiakasId/:roleTypeId — returns persons
+ * attached to a customer, optionally filtered by role NAME (mapped to its
+ * typeId via `ROLE_TYPEID_BY_NAME`). The flat backend array is wrapped in
+ * the universal `ListEnvelope` so output formatters can render it.
+ */
+export async function runCustomerPersonList(
+  client: ApiClient,
+  asiakasId: number,
+  roleName?: string
+): Promise<ListEnvelope<CustomerPersonListItem>> {
+  const typeId = resolveRoleTypeId(roleName);
+  const rows = await client.get<PersonRow[]>(
+    `/api/asiakas/person/list/${asiakasId}/${typeId}`
+  );
+  const items = (rows || []).map((r) => ({
+    personId: r.personId,
+    name: `${r.personFirstName || ""} ${r.personLastName || ""}`.trim(),
+    email: r.personEmail || null,
+    role: r.asiakasPersonSettingTypeId || null,
+  }));
+  return { items, nextCursor: null, count: items.length };
 }
