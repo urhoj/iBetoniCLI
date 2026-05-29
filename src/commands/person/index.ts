@@ -144,6 +144,33 @@ export function registerPersonCommands(
       process.exit(1);
     }
   });
+
+  addWriteFlagsToCommand(
+    p
+      .command("update <personId>")
+      .description("Update a person. Body REQUIRED via --body. Requires --reason.")
+      .requiredOption("--body <json>", "Patch body (JSON)")
+  ).action(async (personIdStr: string, opts: WriteFlags & { body: string }) => {
+    if (!opts.reason) {
+      writeError(new Error("Missing required flag: --reason"));
+      process.exit(4);
+    }
+    let patch: Record<string, unknown>;
+    try {
+      patch = JSON.parse(opts.body);
+    } catch {
+      writeError(new Error("--body must be valid JSON"));
+      process.exit(4);
+    }
+    try {
+      const client = await getClient();
+      const result = await runPersonUpdate(client, Number(personIdStr), patch, opts);
+      writeJson(result);
+    } catch (e) {
+      writeError(e);
+      process.exit(1);
+    }
+  });
 }
 
 /**
@@ -158,6 +185,23 @@ export async function runPersonCreate(
   return client.post(
     "/api/person/newPerson",
     body,
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
+ * POST /api/person/set — partial update for an existing person.
+ * `personId` is merged into the body alongside the caller's patch.
+ */
+export async function runPersonUpdate(
+  client: ApiClient,
+  personId: number,
+  patch: Record<string, unknown>,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post(
+    "/api/person/set",
+    { personId, ...patch },
     { headers: writeFlagsToHeaders(flags) }
   );
 }
