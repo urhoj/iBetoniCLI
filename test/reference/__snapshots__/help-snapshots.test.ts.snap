@@ -870,6 +870,37 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib vehicle drivers matches snapshot 1`] = `
+"USAGE
+  ib vehicle drivers [flags]
+
+DESCRIPTION
+  Driver assignment history for a vehicle within a date range.
+  Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --vehicleId NUMBER    Positional — vehicleId to inspect
+  --from DATE    Start date (YYYY-MM-DD or today/yesterday/tomorrow) (default: today)
+  --to DATE    End date (YYYY-MM-DD or today/yesterday/tomorrow) (default: today)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ pvm, driverId, driverName, shiftStart, shiftEnd }>
+
+ERRORS (stderr, exit non-zero)
+  404  Vehicle not found      → verify vehicleId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle drivers 7 --from 2026-05-01 --to 2026-05-31
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib vehicle get matches snapshot 1`] = `
 "USAGE
   ib vehicle get [flags]
@@ -925,6 +956,36 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib vehicle list
   ib vehicle list --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle status matches snapshot 1`] = `
+"USAGE
+  ib vehicle status [flags]
+
+DESCRIPTION
+  Current operational status for a vehicle: current driver, current keikka, latest GPS ping (via Ecofleet, best-effort).
+  Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --vehicleId NUMBER    Positional — vehicleId to inspect
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,at}|null }
+
+ERRORS (stderr, exit non-zero)
+  404  Vehicle not found      → verify vehicleId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle status 7
+  ib vehicle status 7 --pretty
 "
 `;
 

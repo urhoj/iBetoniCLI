@@ -7,6 +7,10 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { writeJson, writeError } from "../../output/json.js";
+import { resolveDate } from "../../dates.js";
+
+// Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
+export { resolveDate };
 
 export interface KeikkaListFilter {
   from?: string;
@@ -16,22 +20,6 @@ export interface KeikkaListFilter {
   status?: string;
   limit?: number;
   cursor?: string;
-}
-
-/**
- * Resolve `today`, `yesterday`, `tomorrow` to an ISO `YYYY-MM-DD` date
- * (local time). Any other input — including already-formatted dates — is
- * returned unchanged so the backend's validator gets the final say.
- */
-export function resolveDate(input: string | undefined): string | undefined {
-  if (!input) return undefined;
-  if (input === "today" || input === "yesterday" || input === "tomorrow") {
-    const d = new Date();
-    if (input === "yesterday") d.setDate(d.getDate() - 1);
-    if (input === "tomorrow") d.setDate(d.getDate() + 1);
-    return d.toISOString().slice(0, 10);
-  }
-  return input;
 }
 
 /**
