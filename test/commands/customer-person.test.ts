@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { runCustomerPersonAdd } from "../../src/commands/customer/index.js";
+import { runCustomerPersonAdd, runCustomerPersonRemove } from "../../src/commands/customer/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
 const mockClient = {
@@ -38,5 +38,25 @@ describe("runCustomerPersonAdd", () => {
     );
     const call = (mockClient.post as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(call[2].headers["X-Dry-Run"]).toBe("1");
+  });
+});
+
+describe("runCustomerPersonRemove", () => {
+  beforeEach(() => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockReset();
+  });
+
+  test("POSTs /api/asiakas/person/remove with body and reason header", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });
+    await runCustomerPersonRemove(
+      mockClient,
+      { asiakasId: 26, personId: 5351, contactPersonTypeId: 1 },
+      { reason: "test remove" }
+    );
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/asiakas/person/remove",
+      { asiakasId: 26, personId: 5351, contactPersonTypeId: 1 },
+      { headers: { "X-Action-Reason": "test remove" } }
+    );
   });
 });

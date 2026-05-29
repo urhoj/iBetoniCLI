@@ -128,6 +128,22 @@ export async function runCustomerPersonAdd(
 }
 
 /**
+ * POST /api/asiakas/person/remove — detach a person from a customer.
+ * Forwards the universal write-flag headers.
+ */
+export async function runCustomerPersonRemove(
+  client: ApiClient,
+  body: CustomerPersonLinkBody,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post(
+    "/api/asiakas/person/remove",
+    body,
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
  * Register `ib customer` subcommands on the parent commander instance:
  *   - list    filterable by --limit/--cursor
  *   - get     single asiakas by id
@@ -293,6 +309,32 @@ export function registerCustomerCommands(
     try {
       const client = await getClient();
       const result = await runCustomerPersonAdd(
+        client,
+        { asiakasId: opts.asiakas, personId: opts.person, contactPersonTypeId: opts.contactType },
+        opts
+      );
+      writeJson(result);
+    } catch (e) {
+      writeError(e);
+      process.exit(1);
+    }
+  });
+
+  addWriteFlagsToCommand(
+    customerPerson
+      .command("remove")
+      .description("Detach a person from a customer (asiakasPerson). Requires --reason.")
+      .requiredOption("--asiakas <id>", "Target asiakasId", Number)
+      .requiredOption("--person <id>", "Target personId", Number)
+      .option("--contact-type <id>", "contactPersonTypeId (default 1 = pumppari)", Number, 1)
+  ).action(async (opts: WriteFlags & { asiakas: number; person: number; contactType: number }) => {
+    if (!opts.reason) {
+      writeError(new Error("Missing required flag: --reason"));
+      process.exit(4);
+    }
+    try {
+      const client = await getClient();
+      const result = await runCustomerPersonRemove(
         client,
         { asiakasId: opts.asiakas, personId: opts.person, contactPersonTypeId: opts.contactType },
         opts
