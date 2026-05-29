@@ -145,6 +145,22 @@ export async function runWorksitePersonAdd(
 }
 
 /**
+ * POST /api/tyomaa/person/remove — detach a person from a worksite.
+ * Forwards the universal write-flag headers.
+ */
+export async function runWorksitePersonRemove(
+  client: ApiClient,
+  body: WorksitePersonLinkBody,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post(
+    "/api/tyomaa/person/remove",
+    body,
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
  * Register `ib worksite` subcommands on the parent commander instance:
  *   - list    filterable by --limit/--cursor
  *   - get     single tyomaa by id
@@ -325,6 +341,32 @@ export function registerWorksiteCommands(
     try {
       const client = await getClient();
       const result = await runWorksitePersonAdd(
+        client,
+        { tyomaaId: opts.worksite, personId: opts.person, contactPersonTypeId: opts.contactType },
+        opts
+      );
+      writeJson(result);
+    } catch (e) {
+      writeError(e);
+      process.exit(1);
+    }
+  });
+
+  addWriteFlagsToCommand(
+    worksitePerson
+      .command("remove")
+      .description("Detach a person from a worksite. Requires --reason.")
+      .requiredOption("--worksite <id>", "Target tyomaaId", Number)
+      .requiredOption("--person <id>", "Target personId", Number)
+      .option("--contact-type <id>", "contactPersonTypeId (default 1)", Number, 1)
+  ).action(async (opts: WriteFlags & { worksite: number; person: number; contactType: number }) => {
+    if (!opts.reason) {
+      writeError(new Error("Missing required flag: --reason"));
+      process.exit(4);
+    }
+    try {
+      const client = await getClient();
+      const result = await runWorksitePersonRemove(
         client,
         { tyomaaId: opts.worksite, personId: opts.person, contactPersonTypeId: opts.contactType },
         opts

@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { runWorksitePersonAdd } from "../../src/commands/worksite/index.js";
+import { runWorksitePersonAdd, runWorksitePersonRemove } from "../../src/commands/worksite/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
 const mockClient = {
@@ -24,6 +24,24 @@ describe("runWorksitePersonAdd", () => {
       "/api/tyomaa/person/add",
       { tyomaaId: 99, personId: 5351, contactPersonTypeId: 1 },
       { headers: { "X-Action-Reason": "lifecycle add" } }
+    );
+  });
+});
+
+describe("runWorksitePersonRemove", () => {
+  beforeEach(() => { (mockClient.post as ReturnType<typeof vi.fn>).mockReset(); });
+
+  test("POSTs /api/tyomaa/person/remove with body and reason", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });
+    await runWorksitePersonRemove(
+      mockClient,
+      { tyomaaId: 99, personId: 5351, contactPersonTypeId: 1 },
+      { reason: "lifecycle remove" }
+    );
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/tyomaa/person/remove",
+      { tyomaaId: 99, personId: 5351, contactPersonTypeId: 1 },
+      { headers: { "X-Action-Reason": "lifecycle remove" } }
     );
   });
 });
