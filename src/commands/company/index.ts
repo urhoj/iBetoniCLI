@@ -5,9 +5,20 @@ import { createStore, defaultCredentialsPath } from "../../auth/store.js";
 import { performSwitch } from "../../auth/switch.js";
 import { writeJson, writeError } from "../../output/json.js";
 
+interface AvailableCompany {
+  asiakasId: number;
+  // Backend returns Finnish `asiakasNimi`; older callers may have used `name`.
+  asiakasNimi?: string;
+  name?: string;
+}
+
 interface AvailableResponse {
-  companies: { asiakasId: number; name: string }[];
+  companies: AvailableCompany[];
   currentCompanyId: number;
+}
+
+function companyName(c: AvailableCompany): string {
+  return c.asiakasNimi ?? c.name ?? "";
 }
 
 export interface CompanyListItem {
@@ -33,7 +44,7 @@ export async function runCompanyList(
   );
   const items = res.companies.map((c) => ({
     asiakasId: c.asiakasId,
-    name: c.name,
+    name: companyName(c),
     current: c.asiakasId === res.currentCompanyId,
   }));
   return { items, nextCursor: null, count: items.length };
@@ -53,7 +64,7 @@ export async function runCompanyCurrent(
     (c) => c.asiakasId === res.currentCompanyId
   );
   if (!current) throw new Error("No current company in response");
-  return { asiakasId: current.asiakasId, name: current.name };
+  return { asiakasId: current.asiakasId, name: companyName(current) };
 }
 
 /**
