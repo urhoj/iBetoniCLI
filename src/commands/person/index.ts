@@ -1,6 +1,11 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
+import {
+  writeFlagsToHeaders,
+  addWriteFlagsToCommand,
+  type WriteFlags,
+} from "../../api/writeFlags.js";
 import { writeJson, writeError } from "../../output/json.js";
 
 export interface PersonListFilter {
@@ -106,4 +111,53 @@ export function registerPersonCommands(
         process.exit(1);
       }
     });
+
+  addWriteFlagsToCommand(
+    p
+      .command("create")
+      .description("Create a person. Body REQUIRED via --body. Requires --reason.")
+      .requiredOption("--body <json>", "Person body (JSON). Must include personFirstName, personLastName, personEmail.")
+  ).action(async (opts: WriteFlags & { body: string }) => {
+    if (!opts.reason) {
+      writeError(new Error("Missing required flag: --reason"));
+      process.exit(4);
+    }
+    let body: Record<string, unknown>;
+    try {
+      body = JSON.parse(opts.body);
+    } catch {
+      writeError(new Error("--body must be valid JSON"));
+      process.exit(4);
+    }
+    for (const required of ["personFirstName", "personLastName", "personEmail"]) {
+      if (!(required in body)) {
+        writeError(new Error(`Body missing required field: ${required}`));
+        process.exit(4);
+      }
+    }
+    try {
+      const client = await getClient();
+      const result = await runPersonCreate(client, body, opts);
+      writeJson(result);
+    } catch (e) {
+      writeError(e);
+      process.exit(1);
+    }
+  });
+}
+
+/**
+ * POST /api/person/newPerson — create a new person record.
+ * Body must include personFirstName, personLastName, personEmail.
+ */
+export async function runPersonCreate(
+  client: ApiClient,
+  body: Record<string, unknown>,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post(
+    "/api/person/newPerson",
+    body,
+    { headers: writeFlagsToHeaders(flags) }
+  );
 }
