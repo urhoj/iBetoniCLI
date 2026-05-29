@@ -118,6 +118,33 @@ export async function runWorksiteDelete(
 }
 
 /**
+ * Shape of the request body for both `worksite person add` and
+ * `worksite person remove`. `contactPersonTypeId` defaults to 1 on the CLI
+ * surface (matches FE default for tyomaaPerson links).
+ */
+export interface WorksitePersonLinkBody {
+  tyomaaId: number;
+  personId: number;
+  contactPersonTypeId: number;
+}
+
+/**
+ * POST /api/tyomaa/person/add — attach a person to a worksite.
+ * Forwards the universal write-flag headers.
+ */
+export async function runWorksitePersonAdd(
+  client: ApiClient,
+  body: WorksitePersonLinkBody,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post(
+    "/api/tyomaa/person/add",
+    body,
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
  * Register `ib worksite` subcommands on the parent commander instance:
  *   - list    filterable by --limit/--cursor
  *   - get     single tyomaa by id
@@ -272,6 +299,36 @@ export function registerWorksiteCommands(
     try {
       const client = await getClient();
       const result = await runWorksiteDelete(client, Number(tyomaaIdStr), opts);
+      writeJson(result);
+    } catch (e) {
+      writeError(e);
+      process.exit(1);
+    }
+  });
+
+  const worksitePerson = w
+    .command("person")
+    .description("Manage persons attached to a worksite");
+
+  addWriteFlagsToCommand(
+    worksitePerson
+      .command("add")
+      .description("Attach a person to a worksite (tyomaaPerson). Requires --reason.")
+      .requiredOption("--worksite <id>", "Target tyomaaId", Number)
+      .requiredOption("--person <id>", "Target personId", Number)
+      .option("--contact-type <id>", "contactPersonTypeId (default 1)", Number, 1)
+  ).action(async (opts: WriteFlags & { worksite: number; person: number; contactType: number }) => {
+    if (!opts.reason) {
+      writeError(new Error("Missing required flag: --reason"));
+      process.exit(4);
+    }
+    try {
+      const client = await getClient();
+      const result = await runWorksitePersonAdd(
+        client,
+        { tyomaaId: opts.worksite, personId: opts.person, contactPersonTypeId: opts.contactType },
+        opts
+      );
       writeJson(result);
     } catch (e) {
       writeError(e);
