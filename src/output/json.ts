@@ -1,6 +1,24 @@
 import { CliError } from "../api/errors.js";
+import { isListEnvelope, type ListEnvelope } from "../api/envelopes.js";
+import { renderList, renderRecord } from "./pretty.js";
+
+let outputMode: "json" | "pretty" = "json";
+
+export function setOutputMode(m: "json" | "pretty"): void {
+  outputMode = m;
+}
 
 export function writeJson(value: unknown): void {
+  if (outputMode === "pretty") {
+    if (isListEnvelope(value)) {
+      process.stdout.write(renderList(value as ListEnvelope<Record<string, unknown>>) + "\n");
+      return;
+    }
+    if (value !== null && typeof value === "object") {
+      process.stdout.write(renderRecord(value as Record<string, unknown>) + "\n");
+      return;
+    }
+  }
   process.stdout.write(JSON.stringify(value) + "\n");
 }
 
