@@ -78,6 +78,16 @@ export function registerSchemaCommands(
       }
     };
 
+  const runZero =
+    (fn: (c: ApiClient) => Promise<Record_>) => async () => {
+      try {
+        writeJson(await fn(await getClient()));
+      } catch (e) {
+        writeError(e);
+        process.exit(1);
+      }
+    };
+
   listOpt(s.command("tables").description("List dbo tables")).action(runList(runSchemaTables));
   listOpt(s.command("views").description("List dbo views")).action(runList(runSchemaViews));
   listOpt(s.command("procs").description("List dbo stored procedures and functions")).action(
@@ -96,12 +106,5 @@ export function registerSchemaCommands(
 
   s.command("dump")
     .description("Structural map of the whole schema (no proc/view bodies)")
-    .action(async () => {
-      try {
-        writeJson(await runSchemaDump(await getClient()));
-      } catch (e) {
-        writeError(e);
-        process.exit(1);
-      }
-    });
+    .action(runZero(runSchemaDump));
 }

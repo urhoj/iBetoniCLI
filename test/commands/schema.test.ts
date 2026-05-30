@@ -39,6 +39,14 @@ describe("ib schema", () => {
     );
   });
 
+  test("runSchemaTables: limit-only query string (no search key)", async () => {
+    get().mockResolvedValueOnce({ items: [], nextCursor: null, count: 0 });
+    await runSchemaTables(mockClient, { limit: 100 });
+    expect(mockClient.get).toHaveBeenCalledWith(
+      "/api/cli/schema/tables?limit=100"
+    );
+  });
+
   test("runSchemaTable: GET /api/cli/schema/table/<name>", async () => {
     get().mockResolvedValueOnce({ name: "keikka" });
     const r = (await runSchemaTable(mockClient, "keikka")) as { name: string };
