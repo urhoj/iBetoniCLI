@@ -984,6 +984,210 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib schema dump matches snapshot 1`] = `
+"USAGE
+  ib schema dump [flags]
+
+DESCRIPTION
+  Structural map of the whole dbo schema — all tables (columns+keys), FK edges, view names, and proc signatures. No proc/view bodies (use \`schema proc\`/\`schema view\` for those). Developer-only.
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { tables:[{name,columns}], foreignKeys:[{table,column,refTable,refColumn}], views:[{name}], procs:[{name,type,parameters}] }
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Not a developer        → requires isSystemAdmin or isDeveloper
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib schema dump
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib schema proc matches snapshot 1`] = `
+"USAGE
+  ib schema proc [flags]
+
+DESCRIPTION
+  Signature (parameters) and full definition (T-SQL) for one dbo proc/function. Developer-only.
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Not a developer        → requires isSystemAdmin or isDeveloper
+  500  Backend error          → retry with --verbose
+  404  Proc/function not found → check the name via \`ib schema procs\`
+
+EXAMPLES
+  ib schema proc asiakas_find
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib schema procs matches snapshot 1`] = `
+"USAGE
+  ib schema procs [flags]
+
+DESCRIPTION
+  List dbo stored procedures and functions (P/FN/TF/IF). Developer-only.
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --search STRING    Filter object names by substring
+  --limit NUMBER    Max rows (max 1000) (default: 200)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { items: [{ name, type:'P'|'FN'|'TF'|'IF' }], nextCursor: null, count }
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Not a developer        → requires isSystemAdmin or isDeveloper
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib schema procs
+  ib schema procs --search asiakas
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib schema table matches snapshot 1`] = `
+"USAGE
+  ib schema table [flags]
+
+DESCRIPTION
+  Columns (type, nullability, default, key), primary key, foreign keys, and indexes for one dbo table. Developer-only.
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { name, columns:[{name,dataType,maxLength,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], indexes:[{name,columns,unique}] }
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Not a developer        → requires isSystemAdmin or isDeveloper
+  500  Backend error          → retry with --verbose
+  404  Table not found        → check the name via \`ib schema tables\`
+
+EXAMPLES
+  ib schema table keikka
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib schema tables matches snapshot 1`] = `
+"USAGE
+  ib schema tables [flags]
+
+DESCRIPTION
+  List dbo base tables with column counts. Developer-only.
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --search STRING    Filter object names by substring
+  --limit NUMBER    Max rows (max 1000) (default: 200)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { items: [{ name, type:'table', columnCount }], nextCursor: null, count }
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Not a developer        → requires isSystemAdmin or isDeveloper
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib schema tables
+  ib schema tables --search keikka
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib schema view matches snapshot 1`] = `
+"USAGE
+  ib schema view [flags]
+
+DESCRIPTION
+  Columns and full definition (T-SQL) for one dbo view. Developer-only.
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { name, columns:[…], definition:'<T-SQL>' }
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Not a developer        → requires isSystemAdmin or isDeveloper
+  500  Backend error          → retry with --verbose
+  404  View not found         → check the name via \`ib schema views\`
+
+EXAMPLES
+  ib schema view keikkaBetoniView
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib schema views matches snapshot 1`] = `
+"USAGE
+  ib schema views [flags]
+
+DESCRIPTION
+  List dbo views with column counts. Developer-only.
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --search STRING    Filter object names by substring
+  --limit NUMBER    Max rows (max 1000) (default: 200)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { items: [{ name, type:'view', columnCount }], nextCursor: null, count }
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Not a developer        → requires isSystemAdmin or isDeveloper
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib schema views
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib sijainti create matches snapshot 1`] = `
 "USAGE
   ib sijainti create [flags]

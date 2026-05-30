@@ -1037,6 +1037,85 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ['ib person delete 5351 --reason "departed"'],
   },
 
+  // ─── schema (7) — developer-only SQL introspection ─────────────────────────
+  ...((): CommandSpec[] => {
+    const DEV_PERMS = ["developer access (isSystemAdmin or isDeveloper)"];
+    const devErrors = [
+      { code: 401, meaning: "Token expired", remedy: "ib auth refresh" },
+      { code: 403, meaning: "Not a developer", remedy: "requires isSystemAdmin or isDeveloper" },
+      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+    ];
+    const listFlags = [
+      { name: "search", type: "string", description: "Filter object names by substring" },
+      { name: "limit", type: "number", default: "200", description: "Max rows (max 1000)" },
+    ];
+    return [
+      {
+        command: "ib schema tables",
+        description: "List dbo base tables with column counts. Developer-only.",
+        permissions: DEV_PERMS,
+        flags: listFlags,
+        outputShape: "{ items: [{ name, type:'table', columnCount }], nextCursor: null, count }",
+        errors: devErrors,
+        examples: ["ib schema tables", "ib schema tables --search keikka"],
+      },
+      {
+        command: "ib schema table",
+        description: "Columns (type, nullability, default, key), primary key, foreign keys, and indexes for one dbo table. Developer-only.",
+        permissions: DEV_PERMS,
+        flags: [],
+        outputShape: "{ name, columns:[{name,dataType,maxLength,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], indexes:[{name,columns,unique}] }",
+        errors: [...devErrors, { code: 404, meaning: "Table not found", remedy: "check the name via `ib schema tables`" }],
+        examples: ["ib schema table keikka"],
+      },
+      {
+        command: "ib schema views",
+        description: "List dbo views with column counts. Developer-only.",
+        permissions: DEV_PERMS,
+        flags: listFlags,
+        outputShape: "{ items: [{ name, type:'view', columnCount }], nextCursor: null, count }",
+        errors: devErrors,
+        examples: ["ib schema views"],
+      },
+      {
+        command: "ib schema view",
+        description: "Columns and full definition (T-SQL) for one dbo view. Developer-only.",
+        permissions: DEV_PERMS,
+        flags: [],
+        outputShape: "{ name, columns:[…], definition:'<T-SQL>' }",
+        errors: [...devErrors, { code: 404, meaning: "View not found", remedy: "check the name via `ib schema views`" }],
+        examples: ["ib schema view keikkaBetoniView"],
+      },
+      {
+        command: "ib schema procs",
+        description: "List dbo stored procedures and functions (P/FN/TF/IF). Developer-only.",
+        permissions: DEV_PERMS,
+        flags: listFlags,
+        outputShape: "{ items: [{ name, type:'P'|'FN'|'TF'|'IF' }], nextCursor: null, count }",
+        errors: devErrors,
+        examples: ["ib schema procs", "ib schema procs --search asiakas"],
+      },
+      {
+        command: "ib schema proc",
+        description: "Signature (parameters) and full definition (T-SQL) for one dbo proc/function. Developer-only.",
+        permissions: DEV_PERMS,
+        flags: [],
+        outputShape: "{ name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }",
+        errors: [...devErrors, { code: 404, meaning: "Proc/function not found", remedy: "check the name via `ib schema procs`" }],
+        examples: ["ib schema proc asiakas_find"],
+      },
+      {
+        command: "ib schema dump",
+        description: "Structural map of the whole dbo schema — all tables (columns+keys), FK edges, view names, and proc signatures. No proc/view bodies (use `schema proc`/`schema view` for those). Developer-only.",
+        permissions: DEV_PERMS,
+        flags: [],
+        outputShape: "{ tables:[{name,columns}], foreignKeys:[{table,column,refTable,refColumn}], views:[{name}], procs:[{name,type,parameters}] }",
+        errors: devErrors,
+        examples: ["ib schema dump"],
+      },
+    ];
+  })(),
+
   // ─── reference (1) ───────────────────────────────────────────────────────
   {
     command: "ib reference dump",
