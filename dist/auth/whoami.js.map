@@ -1,0 +1,1 @@
+{"version":3,"file":"whoami.js","sourceRoot":"","sources":["../../src/auth/whoami.ts"],"names":[],"mappings":"AAQA;;;;;;GAMG;AACH,MAAM,UAAU,YAAY,CAAC,KAAyB;IACpD,OAAO;QACL,QAAQ,EAAE,KAAK,CAAC,QAAQ;QACxB,aAAa,EAAE;YACb,SAAS,EAAE,KAAK,CAAC,cAAc;YAC/B,IAAI,EAAE,KAAK,CAAC,gBAAgB;SAC7B;QACD,QAAQ,EAAE,KAAK,CAAC,QAAQ;KACzB,CAAC;AACJ,CAAC"}
