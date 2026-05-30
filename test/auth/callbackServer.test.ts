@@ -36,4 +36,42 @@ describe("OAuth callback HTTP listener", () => {
     await expect(server.waitForCode()).rejects.toThrow(/timeout/i);
     server.close();
   });
+
+  test("success response renders the branded Finnish page with 5s auto-close", async () => {
+    const server = await startCallbackServer({ timeoutMs: 5000, expectedState: "abc" });
+    const codePromise = server.waitForCode();
+    const res = await fetch(`http://127.0.0.1:${server.port}/callback?code=xyz&state=abc`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    const body = await res.text();
+    expect(body).toContain("Kirjautuminen onnistui");
+    expect(body).toContain("iBetoni CLI");
+    // 5-second auto-close hint + script must be present
+    expect(body).toContain("5 sekunnin");
+    expect(body).toContain("window.close");
+    await codePromise;
+    server.close();
+  });
+
+  test("error responses render the branded Finnish error page", async () => {
+    // state mismatch
+    const s1 = await startCallbackServer({ timeoutMs: 5000, expectedState: "abc" });
+    const p1 = s1.waitForCode();
+    const r1 = await fetch(`http://127.0.0.1:${s1.port}/callback?code=xyz&state=nope`);
+    expect(r1.status).toBe(400);
+    expect(r1.headers.get("content-type")).toContain("text/html");
+    expect(await r1.text()).toContain("Kirjautuminen epäonnistui");
+    await expect(p1).rejects.toThrow(/state mismatch/i);
+    s1.close();
+
+    // missing code/state
+    const s2 = await startCallbackServer({ timeoutMs: 5000, expectedState: "abc" });
+    const p2 = s2.waitForCode();
+    const r2 = await fetch(`http://127.0.0.1:${s2.port}/callback?state=abc`);
+    expect(r2.status).toBe(400);
+    expect(r2.headers.get("content-type")).toContain("text/html");
+    expect(await r2.text()).toContain("Kirjautuminen epäonnistui");
+    await expect(p2).rejects.toThrow(/missing code or state/i);
+    s2.close();
+  });
 });
