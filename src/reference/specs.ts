@@ -1042,13 +1042,18 @@ export const COMMAND_SPECS: CommandSpec[] = [
     const DEV_PERMS = ["developer access (isSystemAdmin or isDeveloper)"];
     const devErrors = [
       { code: 401, meaning: "Token expired", remedy: "ib auth refresh" },
-      { code: 403, meaning: "Not a developer", remedy: "requires isSystemAdmin or isDeveloper" },
+      { code: 403, meaning: "Not a developer", remedy: "use an account with the developer or systemAdmin global role" },
       { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
     ];
     const listFlags = [
       { name: "search", type: "string", description: "Filter object names by substring" },
       { name: "limit", type: "number", default: "200", description: "Max rows (max 1000)" },
     ];
+    const invalidNameErr = {
+      code: 400,
+      meaning: "Invalid name (letters/digits/underscore only)",
+      remedy: "use the bare object name, no schema prefix",
+    };
     return [
       {
         command: "ib schema tables",
@@ -1065,7 +1070,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
         permissions: DEV_PERMS,
         flags: [],
         outputShape: "{ name, columns:[{name,dataType,maxLength,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], indexes:[{name,columns,unique}] }",
-        errors: [...devErrors, { code: 404, meaning: "Table not found", remedy: "check the name via `ib schema tables`" }],
+        errors: [...devErrors, invalidNameErr, { code: 404, meaning: "Table not found", remedy: "check the name via `ib schema tables`" }],
         examples: ["ib schema table keikka"],
       },
       {
@@ -1082,8 +1087,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
         description: "Columns and full definition (T-SQL) for one dbo view. Developer-only.",
         permissions: DEV_PERMS,
         flags: [],
-        outputShape: "{ name, columns:[…], definition:'<T-SQL>' }",
-        errors: [...devErrors, { code: 404, meaning: "View not found", remedy: "check the name via `ib schema views`" }],
+        outputShape: "{ name, columns:[{name,dataType,maxLength,nullable,default,key}], definition:'<T-SQL>' }",
+        errors: [...devErrors, invalidNameErr, { code: 404, meaning: "View not found", remedy: "check the name via `ib schema views`" }],
         examples: ["ib schema view keikkaBetoniView"],
       },
       {
@@ -1101,12 +1106,12 @@ export const COMMAND_SPECS: CommandSpec[] = [
         permissions: DEV_PERMS,
         flags: [],
         outputShape: "{ name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }",
-        errors: [...devErrors, { code: 404, meaning: "Proc/function not found", remedy: "check the name via `ib schema procs`" }],
+        errors: [...devErrors, invalidNameErr, { code: 404, meaning: "Proc/function not found", remedy: "check the name via `ib schema procs`" }],
         examples: ["ib schema proc asiakas_find"],
       },
       {
         command: "ib schema dump",
-        description: "Structural map of the whole dbo schema — all tables (columns+keys), FK edges, view names, and proc signatures. No proc/view bodies (use `schema proc`/`schema view` for those). Developer-only.",
+        description: "Structural map of the whole dbo schema — all tables with column names and types, FK edges, view names, and proc signatures. No proc/view bodies (use `schema proc`/`schema view` for those). Developer-only.",
         permissions: DEV_PERMS,
         flags: [],
         outputShape: "{ tables:[{name,columns}], foreignKeys:[{table,column,refTable,refColumn}], views:[{name}], procs:[{name,type,parameters}] }",

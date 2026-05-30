@@ -989,7 +989,7 @@ exports[`Help snapshots — contract stability > help for ib schema dump matches
   ib schema dump [flags]
 
 DESCRIPTION
-  Structural map of the whole dbo schema — all tables (columns+keys), FK edges, view names, and proc signatures. No proc/view bodies (use \`schema proc\`/\`schema view\` for those). Developer-only.
+  Structural map of the whole dbo schema — all tables with column names and types, FK edges, view names, and proc signatures. No proc/view bodies (use \`schema proc\`/\`schema view\` for those). Developer-only.
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -1004,7 +1004,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
-  403  Not a developer        → requires isSystemAdmin or isDeveloper
+  403  Not a developer        → use an account with the developer or systemAdmin global role
   500  Backend error          → retry with --verbose
 
 EXAMPLES
@@ -1032,8 +1032,9 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
-  403  Not a developer        → requires isSystemAdmin or isDeveloper
+  403  Not a developer        → use an account with the developer or systemAdmin global role
   500  Backend error          → retry with --verbose
+  400  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
   404  Proc/function not found → check the name via \`ib schema procs\`
 
 EXAMPLES
@@ -1062,7 +1063,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
-  403  Not a developer        → requires isSystemAdmin or isDeveloper
+  403  Not a developer        → use an account with the developer or systemAdmin global role
   500  Backend error          → retry with --verbose
 
 EXAMPLES
@@ -1091,8 +1092,9 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
-  403  Not a developer        → requires isSystemAdmin or isDeveloper
+  403  Not a developer        → use an account with the developer or systemAdmin global role
   500  Backend error          → retry with --verbose
+  400  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
   404  Table not found        → check the name via \`ib schema tables\`
 
 EXAMPLES
@@ -1121,7 +1123,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
-  403  Not a developer        → requires isSystemAdmin or isDeveloper
+  403  Not a developer        → use an account with the developer or systemAdmin global role
   500  Backend error          → retry with --verbose
 
 EXAMPLES
@@ -1146,12 +1148,13 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  { name, columns:[…], definition:'<T-SQL>' }
+  { name, columns:[{name,dataType,maxLength,nullable,default,key}], definition:'<T-SQL>' }
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
-  403  Not a developer        → requires isSystemAdmin or isDeveloper
+  403  Not a developer        → use an account with the developer or systemAdmin global role
   500  Backend error          → retry with --verbose
+  400  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
   404  View not found         → check the name via \`ib schema views\`
 
 EXAMPLES
@@ -1180,7 +1183,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
-  403  Not a developer        → requires isSystemAdmin or isDeveloper
+  403  Not a developer        → use an account with the developer or systemAdmin global role
   500  Backend error          → retry with --verbose
 
 EXAMPLES
