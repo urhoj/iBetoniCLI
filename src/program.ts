@@ -20,6 +20,7 @@ import { registerPersonCommands } from "./commands/person/index.js";
 import { registerVehicleCommands } from "./commands/vehicle/index.js";
 import { registerSijaintiCommands } from "./commands/sijainti/index.js";
 import { registerScheduleCommands } from "./commands/schedule/index.js";
+import { registerSchemaCommands } from "./commands/schema/index.js";
 import { runReferenceDump } from "./reference/dump.js";
 import { attachRichHelp } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
@@ -61,6 +62,7 @@ export function buildProgram(): Command {
   registerVehicleCommands(program, getClient);
   registerSijaintiCommands(program, getClient);
   registerScheduleCommands(program, getClient);
+  registerSchemaCommands(program, getClient);
 
   const reference = program
     .command("reference")
