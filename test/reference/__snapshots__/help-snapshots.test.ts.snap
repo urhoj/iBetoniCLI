@@ -444,7 +444,7 @@ exports[`Help snapshots — contract stability > help for ib customer search mat
   ib customer search [flags]
 
 DESCRIPTION
-  Free-text search across customer names / yTunnus / contacts. GET /api/asiakas/search?q=...
+  Free-text search across customer names / yTunnus / contacts. GET /api/asiakas/search?searchString=...
   Permissions: requires auth.page.asiakas.read.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 

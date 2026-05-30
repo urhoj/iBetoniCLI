@@ -44,15 +44,17 @@ export async function runCustomerGet(
 }
 
 /**
- * GET /api/asiakas/search?q=<query> — existing (non-/api/cli/) route used by
- * the FE customer typeahead. Result shape is whatever the backend returns
- * (typically an array of asiakas records).
+ * GET /api/asiakas/search?searchString=<query> — existing (non-/api/cli/) route
+ * used by the FE customer typeahead. The backend scopes results to the caller's
+ * company (req.user.ownerAsiakasId) when no ownerAsiakasId query param is given,
+ * so the CLI sends only searchString. Result shape is whatever the backend
+ * returns (typically an array of asiakas records).
  */
 export async function runCustomerSearch(
   client: ApiClient,
   query: string
 ): Promise<unknown> {
-  const qs = new URLSearchParams({ q: query }).toString();
+  const qs = new URLSearchParams({ searchString: query }).toString();
   return client.get<unknown>(`/api/asiakas/search?${qs}`);
 }
 

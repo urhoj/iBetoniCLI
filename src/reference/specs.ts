@@ -410,7 +410,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib customer search",
     description:
-      "Free-text search across customer names / yTunnus / contacts. GET /api/asiakas/search?q=...",
+      "Free-text search across customer names / yTunnus / contacts. GET /api/asiakas/search?searchString=...",
     permissions: ["auth.page.asiakas.read"],
     flags: [
       {

@@ -55,13 +55,13 @@ describe("ib customer list/get/search", () => {
     expect((result as { asiakasId: number }).asiakasId).toBe(1349);
   });
 
-  test("runCustomerSearch: GET /api/asiakas/search?q=<query>", async () => {
+  test("runCustomerSearch: GET /api/asiakas/search?searchString=<query>", async () => {
     (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
       { asiakasId: 1349, name: "BetoniJerry" },
     ]);
     await runCustomerSearch(mockClient, "Betoni");
     expect(mockClient.get).toHaveBeenCalledWith(
-      "/api/asiakas/search?q=Betoni"
+      "/api/asiakas/search?searchString=Betoni"
     );
   });
 
@@ -69,7 +69,7 @@ describe("ib customer list/get/search", () => {
     (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
     await runCustomerSearch(mockClient, "Acme & Co");
     expect(mockClient.get).toHaveBeenCalledWith(
-      "/api/asiakas/search?q=Acme+%26+Co"
+      "/api/asiakas/search?searchString=Acme+%26+Co"
     );
   });
 });
