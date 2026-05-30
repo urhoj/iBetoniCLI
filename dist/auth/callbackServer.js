@@ -9,11 +9,12 @@ function renderPage(opts) {
     const accent = opts.ok ? "#2e9e5b" : "#d84343";
     const accent2 = opts.ok ? "#43c97a" : "#f06b6b";
     const glyph = opts.ok ? "&#10003;" : "!";
-    // Success page closes itself after 5s; browsers may block this for tabs the
-    // script did not open, so the manual "you can close this tab" hint stays.
+    // Success page closes itself after a few seconds; browsers may block this for
+    // tabs the script did not open, so the manual "you can close this tab" hint stays.
+    const closeSeconds = 5;
     const autoClose = opts.ok
-        ? `<p class="hint">Tämä välilehti sulkeutuu automaattisesti 5 sekunnin kuluttua…</p>
-       <script>setTimeout(function(){window.close();},5000);</script>`
+        ? `<p class="hint">Tämä välilehti sulkeutuu automaattisesti ${closeSeconds} sekunnin kuluttua…</p>
+       <script>setTimeout(function(){window.close();},${closeSeconds * 1000});</script>`
         : "";
     return `<!DOCTYPE html><html lang="fi"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -64,28 +65,21 @@ export async function startCallbackServer(opts) {
             res.end();
             return;
         }
+        // Render a 400 error page and reject the pending code promise.
+        const fail = (body, message) => {
+            res.statusCode = 400;
+            res.setHeader("Content-Type", "text/html; charset=utf-8");
+            res.end(renderPage({ ok: false, title: "Kirjautuminen epäonnistui", body }));
+            rejectCode(new Error(message));
+        };
         const code = url.searchParams.get("code");
         const state = url.searchParams.get("state");
         if (!code || !state) {
-            res.statusCode = 400;
-            res.setHeader("Content-Type", "text/html; charset=utf-8");
-            res.end(renderPage({
-                ok: false,
-                title: "Kirjautuminen epäonnistui",
-                body: "<p>Palaa terminaaliin ja yritä uudelleen komennolla <code>ib auth login</code>.</p>",
-            }));
-            rejectCode(new Error("Missing code or state in callback"));
+            fail("<p>Palaa terminaaliin ja yritä uudelleen komennolla <code>ib auth login</code>.</p>", "Missing code or state in callback");
             return;
         }
         if (state !== opts.expectedState) {
-            res.statusCode = 400;
-            res.setHeader("Content-Type", "text/html; charset=utf-8");
-            res.end(renderPage({
-                ok: false,
-                title: "Kirjautuminen epäonnistui",
-                body: "<p>Turvatarkistus epäonnistui. Palaa terminaaliin ja yritä uudelleen komennolla <code>ib auth login</code>.</p>",
-            }));
-            rejectCode(new Error("OAuth callback state mismatch"));
+            fail("<p>Turvatarkistus epäonnistui. Palaa terminaaliin ja yritä uudelleen komennolla <code>ib auth login</code>.</p>", "OAuth callback state mismatch");
             return;
         }
         res.statusCode = 200;
