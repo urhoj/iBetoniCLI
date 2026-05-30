@@ -44,14 +44,16 @@ export async function runWorksiteGet(
 
 /**
  * POST /api/tyomaa/search — existing (non-/api/cli/) route used by the FE
- * worksite typeahead. Body is `{ q: <query> }`. Result shape is whatever the
- * backend returns (typically an array of tyomaa records).
+ * worksite typeahead. Body is `{ searchString: <query> }`. The backend scopes
+ * results to the caller's company (req.user.ownerAsiakasId) when no
+ * ownerAsiakasId is in the body, so the CLI sends only searchString. Result
+ * shape is whatever the backend returns (typically an array of tyomaa records).
  */
 export async function runWorksiteSearch(
   client: ApiClient,
   query: string
 ): Promise<unknown> {
-  return client.post<unknown>("/api/tyomaa/search", { q: query });
+  return client.post<unknown>("/api/tyomaa/search", { searchString: query });
 }
 
 /**

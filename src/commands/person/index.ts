@@ -46,14 +46,16 @@ export async function runPersonGet(
 
 /**
  * POST /api/person/search — existing (non-/api/cli/) route used by the FE
- * person typeahead. Body is `{ q: <query> }`. Result shape is whatever the
- * backend returns (typically an array of person records).
+ * person typeahead. Body is `{ searchString: <query> }`. The backend scopes
+ * results to the caller's company (req.user.ownerAsiakasId) when no
+ * ownerAsiakasId is in the body, so the CLI sends only searchString. Result
+ * shape is whatever the backend returns (typically an array of person records).
  */
 export async function runPersonSearch(
   client: ApiClient,
   query: string
 ): Promise<unknown> {
-  return client.post<unknown>("/api/person/search", { q: query });
+  return client.post<unknown>("/api/person/search", { searchString: query });
 }
 
 /**

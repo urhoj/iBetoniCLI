@@ -56,13 +56,13 @@ describe("ib worksite list/get/search", () => {
     expect((result as { tyomaaId: number }).tyomaaId).toBe(42);
   });
 
-  test("runWorksiteSearch: POSTs /api/tyomaa/search with {q} body", async () => {
+  test("runWorksiteSearch: POSTs /api/tyomaa/search with {searchString} body", async () => {
     (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
       { tyomaaId: 42, name: "Helsinki Site" },
     ]);
     await runWorksiteSearch(mockClient, "Helsinki");
     expect(mockClient.post).toHaveBeenCalledWith("/api/tyomaa/search", {
-      q: "Helsinki",
+      searchString: "Helsinki",
     });
   });
 
@@ -70,7 +70,7 @@ describe("ib worksite list/get/search", () => {
     (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
     await runWorksiteSearch(mockClient, "Acme & Co");
     expect(mockClient.post).toHaveBeenCalledWith("/api/tyomaa/search", {
-      q: "Acme & Co",
+      searchString: "Acme & Co",
     });
   });
 });

@@ -57,13 +57,13 @@ describe("ib person list/get/search", () => {
     expect((result as { personId: number }).personId).toBe(6233);
   });
 
-  test("runPersonSearch: POSTs /api/person/search with {q} body", async () => {
+  test("runPersonSearch: POSTs /api/person/search with {searchString} body", async () => {
     (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
       { personId: 6233, name: "Jerry" },
     ]);
     await runPersonSearch(mockClient, "Jerry");
     expect(mockClient.post).toHaveBeenCalledWith("/api/person/search", {
-      q: "Jerry",
+      searchString: "Jerry",
     });
   });
 
@@ -71,7 +71,7 @@ describe("ib person list/get/search", () => {
     (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
     await runPersonSearch(mockClient, "Doe & Sons");
     expect(mockClient.post).toHaveBeenCalledWith("/api/person/search", {
-      q: "Doe & Sons",
+      searchString: "Doe & Sons",
     });
   });
 });
