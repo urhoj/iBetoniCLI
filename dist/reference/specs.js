@@ -954,7 +954,7 @@ export const COMMAND_SPECS = [
         const DEV_PERMS = ["developer access (isSystemAdmin or isDeveloper)"];
         const devErrors = [
             { code: 401, meaning: "Token expired", remedy: "ib auth refresh" },
-            { code: 403, meaning: "Not a developer", remedy: "use an account with the developer or systemAdmin global role" },
+            { code: 403, meaning: "Not a developer", remedy: "check who you are with `ib auth whoami`; if that person is not a developer, run `ib auth login` and pick a developer account (re-login as the SAME person will NOT grant it). The gate is enforced server-side, so a developer flag added in the DB only takes effect once the backend serving --endpoint has it." },
             { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
         ];
         const listFlags = [
