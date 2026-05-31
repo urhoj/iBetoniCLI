@@ -37,7 +37,7 @@ describe("OAuth callback HTTP listener", () => {
     server.close();
   });
 
-  test("success response renders the branded Finnish page with 5s auto-close", async () => {
+  test("success response renders the branded Finnish page with a manual-close hint", async () => {
     const server = await startCallbackServer({ timeoutMs: 5000, expectedState: "abc" });
     const codePromise = server.waitForCode();
     const res = await fetch(`http://127.0.0.1:${server.port}/callback?code=xyz&state=abc`);
@@ -46,9 +46,11 @@ describe("OAuth callback HTTP listener", () => {
     const body = await res.text();
     expect(body).toContain("Kirjautuminen onnistui");
     expect(body).toContain("iBetoni CLI");
-    // 5-second auto-close hint + script must be present
-    expect(body).toContain("5 sekunnin");
-    expect(body).toContain("window.close");
+    // Tells the user to close the tab manually; no auto-close promise or script
+    // (browsers block window.close() for tabs the script did not open).
+    expect(body).toContain("Voit sulkea tämän välilehden");
+    expect(body).not.toContain("window.close");
+    expect(body).not.toContain("automaattisesti");
     await codePromise;
     server.close();
   });

@@ -10,13 +10,9 @@ function renderPage(opts: { ok: boolean; title: string; body: string }): string 
   const accent = opts.ok ? "#2e9e5b" : "#d84343";
   const accent2 = opts.ok ? "#43c97a" : "#f06b6b";
   const glyph = opts.ok ? "&#10003;" : "!";
-  // Success page closes itself after a few seconds; browsers may block this for
-  // tabs the script did not open, so the manual "you can close this tab" hint stays.
-  const closeSeconds = 5;
-  const autoClose = opts.ok
-    ? `<p class="hint">Tämä välilehti sulkeutuu automaattisesti ${closeSeconds} sekunnin kuluttua…</p>
-       <script>setTimeout(function(){window.close();},${closeSeconds * 1000});</script>`
-    : "";
+  // No programmatic close: browsers ignore window.close() for tabs the script did
+  // not open (the OAuth redirect lands in an OS-opened tab), so promising auto-close
+  // is a promise we can't keep — the manual "you can close this tab" hint is the truth.
   return `<!DOCTYPE html><html lang="fi"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${opts.title} · iBetoni CLI</title>
@@ -43,7 +39,6 @@ function renderPage(opts: { ok: boolean; title: string; body: string }): string 
   <div class="ic">${glyph}</div>
   <h1>${opts.title}</h1>
   ${opts.body}
-  ${autoClose}
   <div class="brand">betoni.online · iBetoni CLI</div>
 </div></div></body></html>`;
 }
