@@ -18,6 +18,7 @@
     "dev": "tsx src/bin/ib.ts",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "lint": "cross-env ESLINT_USE_FLAT_CONFIG=false eslint src test",
     "lint:fix": "cross-env ESLINT_USE_FLAT_CONFIG=false eslint --fix src test",
     "type-check": "tsc -p tsconfig.json --noEmit"
@@ -35,6 +36,7 @@
     "@types/node": "^25.9.1",
     "@typescript-eslint/eslint-plugin": "^8.60.0",
     "@typescript-eslint/parser": "^8.60.0",
+    "@vitest/coverage-v8": "^4.1.7",
     "cross-env": "^10.1.0",
     "eslint": "^9.39.4",
     "tsx": "^4.22.3",
