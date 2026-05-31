@@ -30,7 +30,6 @@ function renderPage(opts) {
     background:linear-gradient(135deg,${accent},${accent2});-webkit-background-clip:text;
     background-clip:text;color:transparent}
   p{margin:6px 0;color:#5a6b7b;font-size:.9rem;line-height:1.5}
-  .hint{font-size:.78rem;color:#90a4ae}
   code{font-family:ui-monospace,Menlo,monospace;background:#f0f3f6;padding:1px 6px;border-radius:4px}
   .brand{margin-top:18px;font-weight:700;color:#1976d2;font-size:.74rem;letter-spacing:.05em}
 </style></head>
