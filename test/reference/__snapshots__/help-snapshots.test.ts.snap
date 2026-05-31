@@ -1004,7 +1004,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
-  403  Not a developer        → check who you are with \`ib auth whoami\`; if that person is not a developer, run \`ib auth login\` and pick a developer account (re-login as the SAME person will NOT grant it). The gate is enforced server-side, so a developer flag added in the DB only takes effect once the backend serving --endpoint has it.
+  403  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
   500  Backend error          → retry with --verbose
 
 EXAMPLES
@@ -1032,7 +1032,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
-  403  Not a developer        → check who you are with \`ib auth whoami\`; if that person is not a developer, run \`ib auth login\` and pick a developer account (re-login as the SAME person will NOT grant it). The gate is enforced server-side, so a developer flag added in the DB only takes effect once the backend serving --endpoint has it.
+  403  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
   500  Backend error          → retry with --verbose
   400  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
   404  Proc/function not found → check the name via \`ib schema procs\`
@@ -1063,7 +1063,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
-  403  Not a developer        → check who you are with \`ib auth whoami\`; if that person is not a developer, run \`ib auth login\` and pick a developer account (re-login as the SAME person will NOT grant it). The gate is enforced server-side, so a developer flag added in the DB only takes effect once the backend serving --endpoint has it.
+  403  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
   500  Backend error          → retry with --verbose
 
 EXAMPLES
@@ -1092,7 +1092,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
-  403  Not a developer        → check who you are with \`ib auth whoami\`; if that person is not a developer, run \`ib auth login\` and pick a developer account (re-login as the SAME person will NOT grant it). The gate is enforced server-side, so a developer flag added in the DB only takes effect once the backend serving --endpoint has it.
+  403  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
   500  Backend error          → retry with --verbose
   400  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
   404  Table not found        → check the name via \`ib schema tables\`
@@ -1123,7 +1123,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
-  403  Not a developer        → check who you are with \`ib auth whoami\`; if that person is not a developer, run \`ib auth login\` and pick a developer account (re-login as the SAME person will NOT grant it). The gate is enforced server-side, so a developer flag added in the DB only takes effect once the backend serving --endpoint has it.
+  403  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
   500  Backend error          → retry with --verbose
 
 EXAMPLES
@@ -1152,7 +1152,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
-  403  Not a developer        → check who you are with \`ib auth whoami\`; if that person is not a developer, run \`ib auth login\` and pick a developer account (re-login as the SAME person will NOT grant it). The gate is enforced server-side, so a developer flag added in the DB only takes effect once the backend serving --endpoint has it.
+  403  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
   500  Backend error          → retry with --verbose
   400  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
   404  View not found         → check the name via \`ib schema views\`
@@ -1183,7 +1183,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
-  403  Not a developer        → check who you are with \`ib auth whoami\`; if that person is not a developer, run \`ib auth login\` and pick a developer account (re-login as the SAME person will NOT grant it). The gate is enforced server-side, so a developer flag added in the DB only takes effect once the backend serving --endpoint has it.
+  403  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
   500  Backend error          → retry with --verbose
 
 EXAMPLES
