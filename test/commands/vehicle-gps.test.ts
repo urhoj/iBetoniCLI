@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { runVehicleLocations, runVehicleTimeline } from "../../src/commands/vehicle/index.js";
+import { runVehicleLocations, runVehicleTimeline, runVehicleRoute } from "../../src/commands/vehicle/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
 const mockClient = {
@@ -22,5 +22,14 @@ describe("ib vehicle timeline", () => {
     (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, gpsAvailable: true });
     await runVehicleTimeline(mockClient, 7, { date: "2026-06-02" });
     expect(mockClient.get).toHaveBeenCalledWith("/api/cli/vehicle/timeline/7?date=2026-06-02");
+  });
+});
+
+describe("ib vehicle route", () => {
+  beforeEach(() => { (mockClient.get as ReturnType<typeof vi.fn>).mockReset(); });
+  test("runVehicleRoute: GET with resolved date", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, gpsAvailable: true });
+    await runVehicleRoute(mockClient, 7, { date: "2026-06-02" });
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/vehicle/route/7?date=2026-06-02");
   });
 });

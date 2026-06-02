@@ -836,6 +836,22 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     examples: ["ib vehicle timeline 7", "ib vehicle timeline 7 --date yesterday"],
   },
+  {
+    command: "ib vehicle route",
+    description:
+      "Per-day ordered GPS track points (polyline) for a vehicle (snapshot-based, no external API).",
+    permissions: ["auth.page.vehicle.read"],
+    flags: [
+      { name: "vehicleId", type: "number", description: "Positional — vehicleId to inspect" },
+      { name: "date", type: "date", default: "today", description: "Day (YYYY-MM-DD or today/yesterday/tomorrow); Europe/Helsinki" },
+    ],
+    outputShape: "ListEnvelope<{ lat, lng }> & { gpsAvailable }",
+    errors: [
+      { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
+      ...permErrors("auth.page.vehicle.read"),
+    ],
+    examples: ["ib vehicle route 7", "ib vehicle route 7 --date 2026-05-31"],
+  },
 
   // ─── sijainti (4) ────────────────────────────────────────────────────────
   {

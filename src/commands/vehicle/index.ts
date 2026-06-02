@@ -100,6 +100,18 @@ export async function runVehicleTimeline(
   );
 }
 
+/** GET /api/cli/vehicle/route/:vehicleId?date= — per-day ordered GPS polyline. */
+export async function runVehicleRoute(
+  client: ApiClient,
+  vehicleId: number,
+  opts: VehicleDayFilter
+): Promise<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }> {
+  const qs = opts.date ? `?date=${opts.date}` : "";
+  return client.get<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }>(
+    `/api/cli/vehicle/route/${vehicleId}${qs}`
+  );
+}
+
 /**
  * Register `ib vehicle` subcommands on the parent commander instance:
  *   - list     filterable by --limit/--cursor
@@ -190,6 +202,18 @@ export function registerVehicleCommands(
       try {
         const client = await getClient();
         writeJson(await runVehicleTimeline(client, Number(idStr), { date: resolveDate(opts.date) }));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  v.command("route <vehicleId>")
+    .description("Per-day ordered GPS track points (polyline) for a vehicle")
+    .option("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
+    .action(async (idStr: string, opts: VehicleDayFilter) => {
+      try {
+        const client = await getClient();
+        writeJson(await runVehicleRoute(client, Number(idStr), { date: resolveDate(opts.date) }));
       } catch (e) {
         exitWithError(e);
       }

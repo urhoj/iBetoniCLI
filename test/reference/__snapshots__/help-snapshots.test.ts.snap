@@ -1933,6 +1933,37 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib vehicle route matches snapshot 1`] = `
+"USAGE
+  ib vehicle route [flags]
+
+DESCRIPTION
+  Per-day ordered GPS track points (polyline) for a vehicle (snapshot-based, no external API).
+  Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --vehicleId NUMBER    Positional — vehicleId to inspect
+  --date DATE    Day (YYYY-MM-DD or today/yesterday/tomorrow); Europe/Helsinki (default: today)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ lat, lng }> & { gpsAvailable }
+
+ERRORS (stderr, exit non-zero)
+  404  Vehicle not found      → verify vehicleId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle route 7
+  ib vehicle route 7 --date 2026-05-31
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib vehicle status matches snapshot 1`] = `
 "USAGE
   ib vehicle status [flags]
