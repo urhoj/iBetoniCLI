@@ -1698,7 +1698,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  { sijaintiId, name, address, coords:{lat,lng}, type }
+  { sijaintiId, name, address, coords:{lat,lng}, type, jerryActiveUntil, ... } (raw row)
 
 ERRORS (stderr, exit non-zero)
   404  Sijainti not found     → verify sijaintiId
@@ -1728,7 +1728,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type }>
+  ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, jerryActiveUntil }>
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh

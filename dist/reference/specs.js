@@ -750,7 +750,7 @@ export const COMMAND_SPECS = [
                 description: "Max rows (capped at 500)",
             },
         ],
-        outputShape: "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type }>",
+        outputShape: "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, jerryActiveUntil }>",
         errors: permErrors("auth.page.sijainnit.read"),
         examples: ["ib sijainti list", "ib sijainti list --type 1"],
     },
@@ -765,7 +765,7 @@ export const COMMAND_SPECS = [
                 description: "Positional — sijaintiId to fetch",
             },
         ],
-        outputShape: "{ sijaintiId, name, address, coords:{lat,lng}, type }",
+        outputShape: "{ sijaintiId, name, address, coords:{lat,lng}, type, jerryActiveUntil, ... } (raw row)",
         errors: [
             { code: 404, meaning: "Sijainti not found", remedy: "verify sijaintiId" },
             ...permErrors("auth.page.sijainnit.read"),

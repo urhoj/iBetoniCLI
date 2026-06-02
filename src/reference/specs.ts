@@ -829,7 +829,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     outputShape:
-      "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type }>",
+      "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, jerryActiveUntil }>",
     errors: permErrors("auth.page.sijainnit.read"),
     examples: ["ib sijainti list", "ib sijainti list --type 1"],
   },
@@ -845,7 +845,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     outputShape:
-      "{ sijaintiId, name, address, coords:{lat,lng}, type }",
+      "{ sijaintiId, name, address, coords:{lat,lng}, type, jerryActiveUntil, ... } (raw row)",
     errors: [
       { code: 404, meaning: "Sijainti not found", remedy: "verify sijaintiId" },
       ...permErrors("auth.page.sijainnit.read"),
