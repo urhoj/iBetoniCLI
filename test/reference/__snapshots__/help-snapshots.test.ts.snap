@@ -335,6 +335,84 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib customer modules matches snapshot 1`] = `
+"USAGE
+  ib customer modules [flags]
+
+DESCRIPTION
+  Report or toggle a customer's roolit + module flags. Field keys: pumppu (isPumppuToimittaja), jerry, henkilot, sijainnit, ajoneuvot, tiedostot, weather, lomaseuranta, shareorders. Without --set/--unset it is a read-only report (GET /api/cli/customer/modules/:asiakasId); with them it routes pumppu → POST /api/asiakas/setRoolit and modules → POST /api/asiakas/settings/save.
+  Permissions: requires company admin on the target tenant (system admin = any tenant).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --asiakasId NUMBER    Positional — asiakasId to report/modify
+  --set STRING    Comma-separated field keys to turn ON
+  --unset STRING    Comma-separated field keys to turn OFF
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  report: { asiakasId, roolit:{...}, modules:{...} } | write: { asiakasId, applied:{ set, unset, dryRun }, state:{ roolit, modules } }
+
+ERRORS (stderr, exit non-zero)
+  400  Unknown field key, or key in both --set and --unset → use only: pumppu/jerry/henkilot/sijainnit/ajoneuvot/tiedostot/weather/lomaseuranta/shareorders
+  403  Not an admin of this tenant → use a system-admin token, or an admin of the owner company
+  404  Customer not found     → verify asiakasId
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib customer modules 1349
+  ib customer modules 1349 --set jerry,weather,pumppu --reason 'enable operator features'
+  ib customer modules 1349 --unset shareorders --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib customer operator matches snapshot 1`] = `
+"USAGE
+  ib customer operator [flags]
+
+DESCRIPTION
+  Verify or provision the full operator preset — all 9 operator flags at once (pumppu + the 8 modules). Default (no flag): verify, exit 0 iff every flag is on else exit 1 (CI-gateable). --set turns all 9 on; --reset turns all 9 off. System-admin can run cross-tenant.
+  Permissions: requires company admin on the target tenant (system admin = any tenant).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --asiakasId NUMBER    Positional — asiakasId to verify/provision
+  --set BOOLEAN    Turn ALL 9 operator flags ON
+  --reset BOOLEAN    Turn ALL 9 operator flags OFF
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  verify: { asiakasId, allSet, flags:{ pumppu, jerry, … }, missing:[…] } (exit 1 when allSet=false) | set/reset: { asiakasId, applied:{ set, unset, dryRun }, state }
+
+ERRORS (stderr, exit non-zero)
+  400  --set and --reset both given → pass at most one of --set / --reset
+  403  Not an admin of this tenant → use a system-admin token, or an admin of the owner company
+  404  Customer not found     → verify asiakasId
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib customer operator 1349
+  ib customer operator 1349 --set --reason 'onboard operator'
+  ib customer operator 1349 --reset --reason 'offboard operator'
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib customer person add matches snapshot 1`] = `
 "USAGE
   ib customer person add [flags]

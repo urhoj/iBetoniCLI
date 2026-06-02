@@ -3,6 +3,7 @@ import {
   runCustomerList,
   runCustomerGet,
   runCustomerSearch,
+  runCustomerModulesReport,
 } from "../../src/commands/customer/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -71,5 +72,33 @@ describe("ib customer list/get/search", () => {
     expect(mockClient.get).toHaveBeenCalledWith(
       "/api/asiakas/search?searchString=Acme+%26+Co"
     );
+  });
+
+  test("runCustomerModulesReport: GET /api/cli/customer/modules/1349, returns state verbatim", async () => {
+    const state = {
+      asiakasId: 1349,
+      roolit: {
+        isTyomaaAsiakas: false,
+        isPumppuToimittaja: true,
+        isBetoniToimittaja: false,
+        isLattiaToimittaja: false,
+      },
+      modules: {
+        jerry: true,
+        henkilot: true,
+        sijainnit: false,
+        ajoneuvot: false,
+        tiedostot: false,
+        weather: false,
+        lomaseuranta: false,
+        shareorders: false,
+      },
+    };
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce(state);
+    const result = await runCustomerModulesReport(mockClient, 1349);
+    expect(mockClient.get).toHaveBeenCalledWith(
+      "/api/cli/customer/modules/1349"
+    );
+    expect(result).toEqual(state);
   });
 });

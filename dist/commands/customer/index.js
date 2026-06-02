@@ -21,6 +21,149 @@ export async function runCustomerGet(client, asiakasId) {
     return client.get(`/api/cli/customer/get/${asiakasId}`);
 }
 /**
+ * GET /api/cli/customer/modules/:asiakasId — report roolit booleans + the 8
+ * module flags the CLI exposes. Read-only; admin-gated server-side (system
+ * admin may read any tenant). Returns the backend shape verbatim.
+ */
+export async function runCustomerModulesReport(client, asiakasId) {
+    return client.get(`/api/cli/customer/modules/${asiakasId}`);
+}
+/** asiakasSettings-backed module field keys (excludes the roolit-backed `pumppu`). */
+export const MODULE_FIELD_KEYS = [
+    "jerry",
+    "henkilot",
+    "sijainnit",
+    "ajoneuvot",
+    "tiedostot",
+    "weather",
+    "lomaseuranta",
+    "shareorders",
+];
+/** Every togglable field key: the 8 modules plus `pumppu` (isPumppuToimittaja). */
+export const ALL_FIELD_KEYS = ["pumppu", ...MODULE_FIELD_KEYS];
+/**
+ * Map each module field key to its asiakasSettingTypeId, sourced at call time
+ * from ASIAKAS_SETTING_TYPE_IDS in @ibetoni/constants (the single source of
+ * truth). `pumppu` is intentionally absent — it is a roolit column, not a
+ * setting.
+ */
+function moduleKeyToTypeId() {
+    const constants = cjsRequire("@ibetoni/constants");
+    const ids = constants.ASIAKAS_SETTING_TYPE_IDS;
+    return {
+        jerry: ids.HAS_JERRY,
+        henkilot: ids.HAS_HENKILOT,
+        sijainnit: ids.HAS_SIJAINNIT,
+        ajoneuvot: ids.HAS_AJONEUVOT,
+        tiedostot: ids.HAS_TIEDOSTOT,
+        weather: ids.HAS_WEATHER,
+        lomaseuranta: ids.LOMASEURANTA,
+        shareorders: ids.SHARE_ORDERS_WITH_BETONI,
+    };
+}
+/**
+ * Parse --set / --unset comma-separated field lists into a desired-state map
+ * (key -> boolean). Validates each key against ALL_FIELD_KEYS and rejects a
+ * key requested both ON and OFF. Throws (caller exits 4) on bad input.
+ */
+export function parseModuleChanges(setCsv, unsetCsv) {
+    const changes = new Map();
+    const valid = new Set(ALL_FIELD_KEYS);
+    const apply = (csv, value) => {
+        if (!csv)
+            return;
+        for (const raw of csv.split(",")) {
+            const key = raw.trim().toLowerCase();
+            if (!key)
+                continue;
+            if (!valid.has(key)) {
+                throw new Error(`unknown field: ${key}. Valid: ${ALL_FIELD_KEYS.join(", ")}`);
+            }
+            if (changes.has(key) && changes.get(key) !== value) {
+                throw new Error(`field '${key}' given to both --set and --unset`);
+            }
+            changes.set(key, value);
+        }
+    };
+    apply(setCsv, true);
+    apply(unsetCsv, false);
+    if (changes.size === 0) {
+        throw new Error("no fields given — pass --set and/or --unset");
+    }
+    return changes;
+}
+/**
+ * Apply a desired-state map to one customer. `pumppu` routes to
+ * POST /api/asiakas/setRoolit (echoing the other three roolit booleans
+ * unchanged); module keys batch into POST /api/asiakas/settings/save with
+ * laskuttajaAsiakasId = asiakasId (self-billing) and asiakasSettingId null
+ * (upsert). Re-fetches and returns the resulting state. Both writes are
+ * admin-gated server-side; --dry-run / --reason / --idempotency-key flow
+ * through as the universal headers.
+ */
+export async function runCustomerModulesApply(client, asiakasId, changes, flags) {
+    const headers = writeFlagsToHeaders(flags);
+    // Roolit preservation: setRoolit overwrites all four columns, so read the
+    // current quad first and echo back the three we are not changing.
+    if (changes.has("pumppu")) {
+        const current = await runCustomerModulesReport(client, asiakasId);
+        const r = current.roolit;
+        await client.post("/api/asiakas/setRoolit", {
+            asiakasId,
+            isTyomaaAsiakas: r.isTyomaaAsiakas,
+            isPumppuToimittaja: changes.get("pumppu"),
+            isBetoniToimittaja: r.isBetoniToimittaja,
+            isLattiaToimittaja: r.isLattiaToimittaja,
+        }, { headers });
+    }
+    const typeIds = moduleKeyToTypeId();
+    const settings = [...changes.entries()]
+        .filter(([key]) => key !== "pumppu")
+        .map(([key, value]) => ({
+        asiakasSettingId: null,
+        asiakasId,
+        laskuttajaAsiakasId: asiakasId,
+        asiakasSettingTypeId: typeIds[key],
+        asiakasSettingBool: value,
+    }));
+    if (settings.length > 0) {
+        await client.post("/api/asiakas/settings/save", settings, { headers });
+    }
+    const state = await runCustomerModulesReport(client, asiakasId);
+    return {
+        asiakasId,
+        applied: {
+            set: [...changes].filter(([, v]) => v).map(([k]) => k),
+            unset: [...changes].filter(([, v]) => !v).map(([k]) => k),
+            dryRun: !!flags.dryRun,
+        },
+        state,
+    };
+}
+/**
+ * Build the operator-preset desired-state map: every one of the 9 fields set
+ * to `value`. Used by `ib customer operator --set` (true) / `--reset` (false).
+ */
+export function operatorPresetChanges(value) {
+    return new Map(ALL_FIELD_KEYS.map((k) => [k, value]));
+}
+/**
+ * Verify the operator preset for one customer: reads the modules report and
+ * checks all 9 operator fields are ON (pumppu via roolit.isPumppuToimittaja,
+ * the 8 modules via their flags). Pure read — the caller maps `allSet` to the
+ * process exit code (0 when fully provisioned, 1 otherwise).
+ */
+export async function runCustomerOperatorVerify(client, asiakasId) {
+    const state = await runCustomerModulesReport(client, asiakasId);
+    const flags = {
+        pumppu: state.roolit.isPumppuToimittaja,
+    };
+    for (const key of MODULE_FIELD_KEYS)
+        flags[key] = !!state.modules[key];
+    const missing = ALL_FIELD_KEYS.filter((k) => !flags[k]);
+    return { asiakasId, allSet: missing.length === 0, flags, missing };
+}
+/**
  * GET /api/asiakas/search?searchString=<query> — existing (non-/api/cli/) route
  * used by the FE customer typeahead. The backend scopes results to the caller's
  * company (req.user.ownerAsiakasId) when no ownerAsiakasId query param is given,
@@ -114,6 +257,74 @@ export function registerCustomerCommands(parent, getClient) {
             const client = await getClient();
             const result = await runCustomerGet(client, Number(idStr));
             writeJson(result);
+        }
+        catch (e) {
+            writeError(e);
+            process.exit(1);
+        }
+    });
+    const modulesCmd = c
+        .command("modules <asiakasId>")
+        .description("Report or toggle a customer's module flags + roolit. Without --set/--unset: read-only report. Field keys: " +
+        ALL_FIELD_KEYS.join(", "))
+        .option("--set <keys>", "Comma-separated field keys to turn ON (e.g. jerry,weather,pumppu)")
+        .option("--unset <keys>", "Comma-separated field keys to turn OFF");
+    addWriteFlagsToCommand(modulesCmd).action(async (idStr, opts) => {
+        try {
+            const client = await getClient();
+            const asiakasId = Number(idStr);
+            if (!opts.set && !opts.unset) {
+                writeJson(await runCustomerModulesReport(client, asiakasId));
+                return;
+            }
+            let changes;
+            try {
+                changes = parseModuleChanges(opts.set, opts.unset);
+            }
+            catch (validationErr) {
+                writeError(validationErr);
+                process.exit(4);
+            }
+            const result = await runCustomerModulesApply(client, asiakasId, changes, {
+                dryRun: opts.dryRun,
+                idempotencyKey: opts.idempotencyKey,
+                reason: opts.reason,
+            });
+            writeJson(result);
+        }
+        catch (e) {
+            writeError(e);
+            process.exit(1);
+        }
+    });
+    const operatorCmd = c
+        .command("operator <asiakasId>")
+        .description("Verify or provision the full operator preset (all 9 operator flags at once). System-admin, cross-tenant. Default (no flag): verify — exit 0 iff all 9 are on, else exit 1.")
+        .option("--set", "Turn ALL 9 operator flags ON")
+        .option("--reset", "Turn ALL 9 operator flags OFF");
+    addWriteFlagsToCommand(operatorCmd).action(async (idStr, opts) => {
+        try {
+            const client = await getClient();
+            const asiakasId = Number(idStr);
+            if (opts.set && opts.reset) {
+                writeError(new Error("--set and --reset are mutually exclusive"));
+                process.exit(4);
+            }
+            if (opts.set || opts.reset) {
+                const changes = operatorPresetChanges(!!opts.set);
+                const result = await runCustomerModulesApply(client, asiakasId, changes, {
+                    dryRun: opts.dryRun,
+                    idempotencyKey: opts.idempotencyKey,
+                    reason: opts.reason,
+                });
+                writeJson(result);
+                return;
+            }
+            // Verify (default): report state and gate the exit code on it.
+            const result = await runCustomerOperatorVerify(client, asiakasId);
+            writeJson(result);
+            if (!result.allSet)
+                process.exitCode = 1;
         }
         catch (e) {
             writeError(e);

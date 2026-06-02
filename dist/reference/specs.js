@@ -274,7 +274,7 @@ export const COMMAND_SPECS = [
             "ib keikka drivers assign 9001 --dry-run",
         ],
     },
-    // ─── customer (5) ────────────────────────────────────────────────────────
+    // ─── customer (7) ────────────────────────────────────────────────────────
     {
         command: "ib customer list",
         description: "List customers (asiakkaat) visible to the active company. ownerAsiakasId derived from JWT.",
@@ -378,6 +378,84 @@ export const COMMAND_SPECS = [
         outputShape: "ListEnvelope<{ asiakasId, name, yTunnus, score }>",
         errors: permErrors("auth.page.asiakas.read"),
         examples: ["ib customer search Example", "ib customer search 1234567"],
+    },
+    {
+        command: "ib customer modules",
+        description: "Report or toggle a customer's roolit + module flags. Field keys: pumppu (isPumppuToimittaja), jerry, henkilot, sijainnit, ajoneuvot, tiedostot, weather, lomaseuranta, shareorders. Without --set/--unset it is a read-only report (GET /api/cli/customer/modules/:asiakasId); with them it routes pumppu → POST /api/asiakas/setRoolit and modules → POST /api/asiakas/settings/save.",
+        permissions: ["company admin on the target tenant (system admin = any tenant)"],
+        flags: [
+            {
+                name: "asiakasId",
+                type: "number",
+                description: "Positional — asiakasId to report/modify",
+            },
+            {
+                name: "set",
+                type: "string",
+                description: "Comma-separated field keys to turn ON",
+            },
+            {
+                name: "unset",
+                type: "string",
+                description: "Comma-separated field keys to turn OFF",
+            },
+        ],
+        writeFlags: true,
+        outputShape: "report: { asiakasId, roolit:{...}, modules:{...} } | write: { asiakasId, applied:{ set, unset, dryRun }, state:{ roolit, modules } }",
+        errors: [
+            {
+                code: 400,
+                meaning: "Unknown field key, or key in both --set and --unset",
+                remedy: "use only: pumppu/jerry/henkilot/sijainnit/ajoneuvot/tiedostot/weather/lomaseuranta/shareorders",
+            },
+            {
+                code: 403,
+                meaning: "Not an admin of this tenant",
+                remedy: "use a system-admin token, or an admin of the owner company",
+            },
+            { code: 404, meaning: "Customer not found", remedy: "verify asiakasId" },
+            ...COMMON_AUTH_ERRORS,
+        ],
+        examples: [
+            "ib customer modules 1349",
+            "ib customer modules 1349 --set jerry,weather,pumppu --reason 'enable operator features'",
+            "ib customer modules 1349 --unset shareorders --dry-run",
+        ],
+    },
+    {
+        command: "ib customer operator",
+        description: "Verify or provision the full operator preset — all 9 operator flags at once (pumppu + the 8 modules). Default (no flag): verify, exit 0 iff every flag is on else exit 1 (CI-gateable). --set turns all 9 on; --reset turns all 9 off. System-admin can run cross-tenant.",
+        permissions: ["company admin on the target tenant (system admin = any tenant)"],
+        flags: [
+            {
+                name: "asiakasId",
+                type: "number",
+                description: "Positional — asiakasId to verify/provision",
+            },
+            { name: "set", type: "boolean", description: "Turn ALL 9 operator flags ON" },
+            { name: "reset", type: "boolean", description: "Turn ALL 9 operator flags OFF" },
+        ],
+        writeFlags: true,
+        outputShape: "verify: { asiakasId, allSet, flags:{ pumppu, jerry, … }, missing:[…] } (exit 1 when allSet=false) | set/reset: { asiakasId, applied:{ set, unset, dryRun }, state }",
+        errors: [
+            {
+                code: 400,
+                meaning: "--set and --reset both given",
+                remedy: "pass at most one of --set / --reset",
+            },
+            {
+                code: 403,
+                meaning: "Not an admin of this tenant",
+                remedy: "use a system-admin token, or an admin of the owner company",
+            },
+            { code: 404, meaning: "Customer not found", remedy: "verify asiakasId" },
+            ...COMMON_AUTH_ERRORS,
+        ],
+        examples: [
+            "ib customer operator 1349",
+            "ib customer operator 1349 --set --reason 'onboard operator'",
+            "ib customer operator 1349 --reset --reason 'offboard operator'",
+        ],
     },
     // ─── worksite (5) ────────────────────────────────────────────────────────
     {
