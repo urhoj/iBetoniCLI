@@ -397,6 +397,63 @@ export async function runCustomerPrhSearch(
   };
 }
 
+interface RawChangeRow {
+  changeId: number;
+  fieldName?: string | null;
+  oldValue?: string | null;
+  newValue?: string | null;
+  changeType?: string | null;
+  personId?: number | null;
+  personFullName?: string | null;
+  timestamp?: string | null;
+  description?: string | null;
+}
+
+export interface CustomerHistoryItem {
+  changeId: number;
+  field: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  changeType: string | null;
+  personId: number | null;
+  personName: string | null;
+  at: string | null;
+  description: string | null;
+}
+
+/**
+ * GET /api/changes/asiakas/:asiakasId/:ownerAsiakasId — the change-tracker
+ * audit trail for one customer (the same log the CLI's --reason writes feed).
+ * Returns a RAW array (sendSuccess(changes), no .data wrapper). Owner resolved
+ * from the active company. Auth: company member or admin (BE-enforced).
+ */
+export async function runCustomerHistory(
+  client: ApiClient,
+  asiakasId: number,
+  limit: number
+): Promise<ListEnvelope<CustomerHistoryItem>> {
+  const owner = await resolveCurrentOwnerAsiakasId(client);
+  const rows = await client.get<RawChangeRow[]>(
+    `/api/changes/asiakas/${asiakasId}/${owner}?limit=${limit}`
+  );
+  const list = Array.isArray(rows) ? rows : [];
+  return {
+    items: list.map((r) => ({
+      changeId: r.changeId,
+      field: r.fieldName ?? null,
+      oldValue: r.oldValue ?? null,
+      newValue: r.newValue ?? null,
+      changeType: r.changeType ?? null,
+      personId: r.personId ?? null,
+      personName: r.personFullName ?? null,
+      at: r.timestamp ?? null,
+      description: r.description ?? null,
+    })),
+    nextCursor: null,
+    count: list.length,
+  };
+}
+
 /**
  * POST /api/asiakas/person/remove — detach a person from a customer.
  * Forwards the universal write-flag headers.
@@ -568,6 +625,18 @@ export function registerCustomerCommands(
           process.exit(4);
         }
         writeJson(await runCustomerPrhById(client, ytunnus));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  c.command("history <asiakasId>")
+    .description("Change-tracker audit trail for one customer (who changed what, with --reason).")
+    .option("--limit <n>", "Max rows (default 100, cap 500)", (v: string) => Math.min(Number(v), 500), 100)
+    .action(async (idStr: string, opts: { limit: number }) => {
+      try {
+        const client = await getClient();
+        writeJson(await runCustomerHistory(client, Number(idStr), opts.limit));
       } catch (e) {
         exitWithError(e);
       }
