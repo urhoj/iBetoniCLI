@@ -5,6 +5,7 @@ import {
   runSijaintiSetJerry,
   runSijaintiTypes,
   runSijaintiGeocode,
+  runSijaintiClosest,
 } from "../../src/commands/sijainti/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -152,5 +153,46 @@ describe("ib sijainti geocode", () => {
       osoite: "Mannerheimintie 1, Helsinki",
     });
     expect((result as { lat: number }).lat).toBe(60.17);
+  });
+});
+
+describe("ib sijainti closest", () => {
+  const get = mockClient.get as ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    get.mockReset();
+  });
+
+  test("uses given --asiakas, passes 0 as ignored sijaintiId, tidies response", async () => {
+    get.mockResolvedValueOnce({
+      matkaM: 0,
+      min: 0,
+      success: true,
+      closestSijainti: { sijaintiId: 7, sijaintiNimi: "Asema A" },
+      closestDistance: 12.4,
+    });
+    const result = await runSijaintiClosest(mockClient, {
+      tyomaaId: 555,
+      sijaintiTypeId: 1,
+      asiakasId: 26,
+    });
+    expect(get).toHaveBeenCalledWith(
+      "/api/geocode/sijainti/getClosestAsiakasSijaintiForTyomaa/555/0/1/26"
+    );
+    expect(result).toEqual({
+      closestSijainti: { sijaintiId: 7, sijaintiNimi: "Asema A" },
+      closestDistance: 12.4,
+    });
+  });
+
+  test("resolves asiakasId from active company when --asiakas omitted", async () => {
+    get
+      .mockResolvedValueOnce({ currentCompanyId: 1349 }) // /api/company-selection/available
+      .mockResolvedValueOnce({ closestSijainti: null, closestDistance: null });
+    await runSijaintiClosest(mockClient, { tyomaaId: 555, sijaintiTypeId: 1 });
+    expect(get).toHaveBeenNthCalledWith(1, "/api/company-selection/available");
+    expect(get).toHaveBeenNthCalledWith(
+      2,
+      "/api/geocode/sijainti/getClosestAsiakasSijaintiForTyomaa/555/0/1/1349"
+    );
   });
 });

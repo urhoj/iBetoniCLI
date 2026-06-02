@@ -985,6 +985,23 @@ export const COMMAND_SPECS: CommandSpec[] = [
     errors: permErrors("auth.page.sijainnit.read"),
     examples: ['ib sijainti geocode --address "Mannerheimintie 1, Helsinki"'],
   },
+  {
+    command: "ib sijainti closest",
+    description:
+      "Find the closest sijainti of a given sijaintiTypeId to a worksite (tyomaa), by straight-line distance. asiakasId defaults to the active company.",
+    permissions: ["auth.page.sijainnit.read"],
+    flags: [
+      { name: "tyomaa", type: "number", description: "Target tyomaaId (REQUIRED)" },
+      { name: "type", type: "number", description: "sijaintiTypeId to search within (REQUIRED)" },
+      { name: "asiakas", type: "number", description: "Owner asiakasId (defaults to active company)" },
+    ],
+    outputShape: "{ closestSijainti: {...}|null, closestDistance: number|null }",
+    errors: [
+      { code: 400, meaning: "Invalid tyomaaId or missing coordinates", remedy: "verify the worksite has lat/lng" },
+      ...permErrors("auth.page.sijainnit.read"),
+    ],
+    examples: ["ib sijainti closest --tyomaa 555 --type 1"],
+  },
 
   // ─── schedule (3) ────────────────────────────────────────────────────────
   {

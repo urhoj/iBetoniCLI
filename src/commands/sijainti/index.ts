@@ -179,6 +179,50 @@ export async function runSijaintiGeocode(
 }
 
 /**
+ * Resolve the caller's active ownerAsiakasId via the existing
+ * /api/company-selection/available route. Used by closest/distance, whose
+ * legacy geocode routes still take asiakasId as a URL positional.
+ */
+async function resolveOwnerAsiakasId(client: ApiClient): Promise<number> {
+  const available = await client.get<{ currentCompanyId: number }>(
+    "/api/company-selection/available"
+  );
+  return available.currentCompanyId;
+}
+
+export interface SijaintiClosestFilter {
+  tyomaaId: number;
+  sijaintiTypeId: number;
+  asiakasId?: number;
+}
+
+/**
+ * GET /api/geocode/sijainti/getClosestAsiakasSijaintiForTyomaa — nearest
+ * sijainti of the given type to a worksite (straight-line / Haversine).
+ *
+ * The legacy route path carries a `:sijaintiId` segment the handler IGNORES —
+ * we pass `0`. asiakasId defaults to the caller's active company. The raw
+ * response is a createSuccessResponse envelope (matkaM/min/timestamp noise);
+ * we project to just `{ closestSijainti, closestDistance }`.
+ */
+export async function runSijaintiClosest(
+  client: ApiClient,
+  opts: SijaintiClosestFilter
+): Promise<{ closestSijainti: unknown; closestDistance: number | null }> {
+  const asiakasId = opts.asiakasId ?? (await resolveOwnerAsiakasId(client));
+  const raw = await client.get<{
+    closestSijainti?: unknown;
+    closestDistance?: number;
+  }>(
+    `/api/geocode/sijainti/getClosestAsiakasSijaintiForTyomaa/${opts.tyomaaId}/0/${opts.sijaintiTypeId}/${asiakasId}`
+  );
+  return {
+    closestSijainti: raw.closestSijainti ?? null,
+    closestDistance: raw.closestDistance ?? null,
+  };
+}
+
+/**
  * Register `ib sijainti` subcommands on the parent commander instance:
  *   - list    filterable by --type/--limit
  *   - get     single sijainti by id (uses existing /api/geocode/sijainti route)
@@ -384,6 +428,27 @@ export function registerSijaintiCommands(
       try {
         const client = await getClient();
         const result = await runSijaintiGeocode(client, opts.address);
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  s.command("closest")
+    .description(
+      "Find the closest sijainti of a given type to a worksite (straight-line distance)"
+    )
+    .requiredOption("--tyomaa <id>", "Target tyomaaId", Number)
+    .requiredOption("--type <id>", "sijaintiTypeId to search within", Number)
+    .option("--asiakas <id>", "Owner asiakasId (defaults to active company)", Number)
+    .action(async (opts: { tyomaa: number; type: number; asiakas?: number }) => {
+      try {
+        const client = await getClient();
+        const result = await runSijaintiClosest(client, {
+          tyomaaId: opts.tyomaa,
+          sijaintiTypeId: opts.type,
+          asiakasId: opts.asiakas,
+        });
         writeJson(result);
       } catch (e) {
         exitWithError(e);
