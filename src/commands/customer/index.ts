@@ -346,6 +346,57 @@ export async function runCustomerPersonAdd(
   );
 }
 
+/** Flat PRH company shape (mirrors backend formatCompanyData). */
+export interface PrhCompany {
+  businessId: string | null;
+  name: string | null;
+  tradeNames: string[];
+  address: { street: string | null; postCode: string | null; city: string | null; full: string | null } | null;
+  companyForm: { type?: string; name?: string } | null;
+  status: string | null;
+}
+
+/**
+ * GET /api/prh/company/:businessId — single company from the Finnish business
+ * registry. Backend wraps as { success, data, timestamp }; unwrap `.data`.
+ * 404 (unknown Y-tunnus) → CliError exit 5; invalid format → exit 4.
+ */
+export async function runCustomerPrhById(
+  client: ApiClient,
+  ytunnus: string
+): Promise<PrhCompany> {
+  const res = await client.get<{ data: PrhCompany }>(
+    `/api/prh/company/${encodeURIComponent(ytunnus)}`
+  );
+  return res.data;
+}
+
+/**
+ * GET /api/prh/search/name?q=&page= — name search. Backend wraps as
+ * { success, data: { companies, totalResults, … }, timestamp }. Project the
+ * companies into the universal list envelope.
+ */
+export async function runCustomerPrhSearch(
+  client: ApiClient,
+  name: string,
+  page = 1
+): Promise<ListEnvelope<{ businessId: string | null; name: string | null; city: string | null }>> {
+  const qs = new URLSearchParams({ q: name, page: String(page) }).toString();
+  const res = await client.get<{ data: { companies: PrhCompany[] } }>(
+    `/api/prh/search/name?${qs}`
+  );
+  const companies = res.data?.companies || [];
+  return {
+    items: companies.map((c) => ({
+      businessId: c.businessId,
+      name: c.name,
+      city: c.address?.city ?? null,
+    })),
+    nextCursor: null,
+    count: companies.length,
+  };
+}
+
 /**
  * POST /api/asiakas/person/remove — detach a person from a customer.
  * Forwards the universal write-flag headers.
@@ -494,6 +545,29 @@ export function registerCustomerCommands(
         const client = await getClient();
         const result = await runCustomerSearch(client, query);
         writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  c.command("prh [ytunnus]")
+    .description(
+      "Look up a company in the Finnish business registry (PRH). Positional <ytunnus> for an exact business-ID lookup, or --search <name>."
+    )
+    .option("--search <name>", "Search by company name instead of business ID")
+    .option("--page <n>", "Result page for --search (default 1)", (v: string) => Number(v), 1)
+    .action(async (ytunnus: string | undefined, opts: { search?: string; page: number }) => {
+      try {
+        const client = await getClient();
+        if (opts.search) {
+          writeJson(await runCustomerPrhSearch(client, opts.search, opts.page));
+          return;
+        }
+        if (!ytunnus) {
+          writeError(new Error("provide a business-ID positional or --search <name>"));
+          process.exit(4);
+        }
+        writeJson(await runCustomerPrhById(client, ytunnus));
       } catch (e) {
         exitWithError(e);
       }
