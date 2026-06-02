@@ -222,6 +222,68 @@ export async function runSijaintiClosest(
   };
 }
 
+/** Parse a "lat,lng" token into coordinates, or null if it is not that shape. */
+function parseCoordToken(token: string): { lat: number; lng: number } | null {
+  if (!token.includes(",")) return null;
+  const [a, b] = token.split(",").map((x) => Number(x.trim()));
+  if (Number.isFinite(a) && Number.isFinite(b)) return { lat: a, lng: b };
+  return null;
+}
+
+/**
+ * Resolve a distance endpoint token to coordinates. Accepts "lat,lng" or a
+ * bare sijaintiId (resolved via runSijaintiGet → its lat/lng). Throws a
+ * validation error (caller exits 4) on a malformed token or a sijainti with
+ * no coordinates.
+ */
+async function resolveDistancePoint(
+  client: ApiClient,
+  token: string
+): Promise<{ lat: number; lng: number }> {
+  const coord = parseCoordToken(token);
+  if (coord) return coord;
+  const id = Number(token);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error(`invalid point '${token}' — use 'lat,lng' or a sijaintiId`);
+  }
+  const row = (await runSijaintiGet(client, id)) as { lat?: number; lng?: number };
+  if (typeof row.lat !== "number" || typeof row.lng !== "number") {
+    throw new Error(`sijainti ${id} has no coordinates`);
+  }
+  return { lat: row.lat, lng: row.lng };
+}
+
+/**
+ * GET /api/geocode/getDrivingDistance — driving distance/time between two
+ * points (each "lat,lng" or a sijaintiId). ownerAsiakasId is resolved from the
+ * active company (the legacy route takes it as a URL positional). Projects the
+ * backend `{matkaM, matkaAika, ...}` to `{ matkaM, matkaMin, from, to }`.
+ */
+export async function runSijaintiDistance(
+  client: ApiClient,
+  fromToken: string,
+  toToken: string
+): Promise<{
+  matkaM: number | null;
+  matkaMin: number | null;
+  from: { lat: number; lng: number };
+  to: { lat: number; lng: number };
+}> {
+  // Resolve sequentially so the mocked call order in tests is deterministic.
+  const from = await resolveDistancePoint(client, fromToken);
+  const to = await resolveDistancePoint(client, toToken);
+  const ownerAsiakasId = await resolveOwnerAsiakasId(client);
+  const raw = await client.get<{ matkaM?: number; matkaAika?: number }>(
+    `/api/geocode/getDrivingDistance/${from.lat}/${from.lng}/${to.lat}/${to.lng}/${ownerAsiakasId}`
+  );
+  return {
+    matkaM: raw.matkaM ?? null,
+    matkaMin: raw.matkaAika ?? null,
+    from,
+    to,
+  };
+}
+
 /**
  * Register `ib sijainti` subcommands on the parent commander instance:
  *   - list    filterable by --type/--limit
@@ -451,6 +513,32 @@ export function registerSijaintiCommands(
         });
         writeJson(result);
       } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  s.command("distance")
+    .description(
+      "Driving distance/time between two points (each is 'lat,lng' or a sijaintiId)"
+    )
+    .requiredOption("--from <point>", "Origin: 'lat,lng' or a sijaintiId")
+    .requiredOption("--to <point>", "Destination: 'lat,lng' or a sijaintiId")
+    .action(async (opts: { from: string; to: string }) => {
+      try {
+        const client = await getClient();
+        const result = await runSijaintiDistance(client, opts.from, opts.to);
+        writeJson(result);
+      } catch (e) {
+        // A bad point token is a validation error (exit 4); API/network errors
+        // keep their contract-mapped codes via exitWithError.
+        if (
+          e instanceof Error &&
+          (e.message.startsWith("invalid point") ||
+            e.message.includes("has no coordinates"))
+        ) {
+          writeError(e);
+          process.exit(4);
+        }
         exitWithError(e);
       }
     });

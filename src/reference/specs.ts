@@ -1002,6 +1002,25 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     examples: ["ib sijainti closest --tyomaa 555 --type 1"],
   },
+  {
+    command: "ib sijainti distance",
+    description:
+      "Driving distance and time between two points (Google Maps). Each endpoint is either 'lat,lng' or a sijaintiId (resolved to its coordinates). ownerAsiakasId is derived from the active company.",
+    permissions: ["auth.page.sijainnit.read"],
+    flags: [
+      { name: "from", type: "string", description: "Origin: 'lat,lng' or a sijaintiId (REQUIRED)" },
+      { name: "to", type: "string", description: "Destination: 'lat,lng' or a sijaintiId (REQUIRED)" },
+    ],
+    outputShape: "{ matkaM: number|null, matkaMin: number|null, from:{lat,lng}, to:{lat,lng} }",
+    errors: [
+      { code: 400, meaning: "Bad point or sijainti without coordinates", remedy: "use 'lat,lng' or a sijaintiId that has coords" },
+      ...permErrors("auth.page.sijainnit.read"),
+    ],
+    examples: [
+      "ib sijainti distance --from 7 --to 42",
+      'ib sijainti distance --from "60.17,24.94" --to 42',
+    ],
+  },
 
   // ─── schedule (3) ────────────────────────────────────────────────────────
   {
