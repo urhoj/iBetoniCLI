@@ -816,22 +816,20 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "List geocoded locations (sijainnit) — depots, plants, customer destinations. Optional --type filters by sijaintiTypeId.",
     permissions: ["auth.page.sijainnit.read"],
     flags: [
-      {
-        name: "type",
-        type: "number",
-        description: "Filter by sijaintiTypeId",
-      },
-      {
-        name: "limit",
-        type: "number",
-        default: "100",
-        description: "Max rows (capped at 500)",
-      },
+      { name: "type", type: "number", description: "Filter by sijaintiTypeId" },
+      { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+      { name: "valid-at", type: "date", description: "Only sijainnit valid on this date (startDate/endDate window)" },
+      { name: "include-deleted", type: "boolean", description: "Include soft-deleted sijainnit" },
     ],
     outputShape:
       "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, jerryActiveUntil }>",
     errors: permErrors("auth.page.sijainnit.read"),
-    examples: ["ib sijainti list", "ib sijainti list --type 1"],
+    examples: [
+      "ib sijainti list",
+      "ib sijainti list --type 1",
+      "ib sijainti list --valid-at today",
+      "ib sijainti list --include-deleted",
+    ],
   },
   {
     command: "ib sijainti get",

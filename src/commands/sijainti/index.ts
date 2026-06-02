@@ -7,6 +7,7 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { resolveDate } from "../../dates.js";
 
 /**
  * Sentinel `jerryActiveUntil` value meaning "enrolled in BetoniJerry, no end
@@ -18,6 +19,8 @@ const JERRY_ACTIVE_SENTINEL = "9999-12-31 23:59:59";
 export interface SijaintiListFilter {
   type?: string;
   limit?: number;
+  validAt?: string;
+  includeDeleted?: boolean;
 }
 
 /**
@@ -31,6 +34,8 @@ export async function runSijaintiList(
   const params = new URLSearchParams();
   if (opts.type) params.set("type", opts.type);
   if (opts.limit !== undefined) params.set("limit", String(opts.limit));
+  if (opts.validAt) params.set("validAtDate", opts.validAt);
+  if (opts.includeDeleted) params.set("includeDeleted", "1");
   const qs = params.toString();
   return client.get<ListEnvelope<Record<string, unknown>>>(
     `/api/cli/sijainti/list${qs ? `?${qs}` : ""}`
@@ -307,15 +312,32 @@ export function registerSijaintiCommands(
     .description("List sijainti (locations)")
     .option("--type <t>", "Filter by sijainti type")
     .option("--limit <n>", "Max rows", (v: string) => Math.min(Number(v), 500))
-    .action(async (opts: SijaintiListFilter) => {
-      try {
-        const client = await getClient();
-        const result = await runSijaintiList(client, opts);
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
+    .option(
+      "--valid-at <date>",
+      "Only sijainnit valid on this date (YYYY-MM-DD or today/yesterday/tomorrow)"
+    )
+    .option("--include-deleted", "Include soft-deleted sijainnit")
+    .action(
+      async (opts: {
+        type?: string;
+        limit?: number;
+        validAt?: string;
+        includeDeleted?: boolean;
+      }) => {
+        try {
+          const client = await getClient();
+          const result = await runSijaintiList(client, {
+            type: opts.type,
+            limit: opts.limit,
+            validAt: opts.validAt ? resolveDate(opts.validAt) : undefined,
+            includeDeleted: opts.includeDeleted,
+          });
+          writeJson(result);
+        } catch (e) {
+          exitWithError(e);
+        }
       }
-    });
+    );
 
   s.command("get <sijaintiId>")
     .description("Get a single sijainti by sijaintiId")

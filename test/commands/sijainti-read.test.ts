@@ -60,6 +60,21 @@ describe("ib sijainti list/get", () => {
     );
     expect((result as { sijaintiId: number }).sijaintiId).toBe(99);
   });
+
+  test("runSijaintiList: includes validAtDate and includeDeleted when set", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      count: 0,
+    });
+    await runSijaintiList(mockClient, {
+      validAt: "2026-06-02",
+      includeDeleted: true,
+    });
+    expect(mockClient.get).toHaveBeenCalledWith(
+      "/api/cli/sijainti/list?validAtDate=2026-06-02&includeDeleted=1"
+    );
+  });
 });
 
 describe("ib sijainti set-jerry", () => {
