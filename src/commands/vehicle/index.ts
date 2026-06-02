@@ -18,6 +18,12 @@ export interface VehicleDayFilter {
   date?: string;
 }
 
+export interface VehicleVisitsFilter {
+  days?: number;
+}
+
+const VISIT_FILTER_TYPES = ["tyomaa", "sijainti"] as const;
+
 /**
  * GET /api/cli/vehicle/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
@@ -109,6 +115,22 @@ export async function runVehicleRoute(
   const qs = opts.date ? `?date=${opts.date}` : "";
   return client.get<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }>(
     `/api/cli/vehicle/route/${vehicleId}${qs}`
+  );
+}
+
+/** GET /api/cli/vehicle/visits/:filterType/:filterId?days= — vehicles that visited a site. */
+export async function runVehicleVisits(
+  client: ApiClient,
+  filterType: string,
+  filterId: number,
+  opts: VehicleVisitsFilter
+): Promise<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }> {
+  if (!(VISIT_FILTER_TYPES as readonly string[]).includes(filterType)) {
+    throw new Error(`filterType must be one of: ${VISIT_FILTER_TYPES.join(", ")}`);
+  }
+  const qs = opts.days !== undefined ? `?days=${opts.days}` : "";
+  return client.get<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }>(
+    `/api/cli/vehicle/visits/${filterType}/${filterId}${qs}`
   );
 }
 
@@ -214,6 +236,18 @@ export function registerVehicleCommands(
       try {
         const client = await getClient();
         writeJson(await runVehicleRoute(client, Number(idStr), { date: resolveDate(opts.date) }));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  v.command("visits <filterType> <id>")
+    .description("Vehicles that visited a worksite/location. filterType: tyomaa | sijainti")
+    .option("--days <n>", "Look-back window in days (omit for all-time)", (val: string) => Number(val))
+    .action(async (filterType: string, idStr: string, opts: VehicleVisitsFilter) => {
+      try {
+        const client = await getClient();
+        writeJson(await runVehicleVisits(client, filterType, Number(idStr), opts));
       } catch (e) {
         exitWithError(e);
       }

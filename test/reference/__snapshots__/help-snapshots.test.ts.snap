@@ -2025,6 +2025,39 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib vehicle visits matches snapshot 1`] = `
+"USAGE
+  ib vehicle visits [flags]
+
+DESCRIPTION
+  Vehicles that visited a worksite (tyomaa) or location (sijainti), grouped into visits with arrival/departure/duration (snapshot-based). tyomaa is tenant-scoped; sijainti is shared.
+  Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --filterType STRING    Positional — 'tyomaa' or 'sijainti'
+  --id NUMBER    Positional — tyomaaId or sijaintiId
+  --days NUMBER    Look-back window in days (omit for all-time)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ vehicleId|null, plate, objectName, arrived, departed, durationMin }> & { gpsAvailable }
+
+ERRORS (stderr, exit non-zero)
+  400  Invalid filterType     → use tyomaa or sijainti
+  404  tyomaa not found / not owned → verify tyomaaId belongs to the active company
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle visits tyomaa 17 --days 30
+  ib vehicle visits sijainti 3
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib worksite create matches snapshot 1`] = `
 "USAGE
   ib worksite create [flags]

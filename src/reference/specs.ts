@@ -852,6 +852,25 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     examples: ["ib vehicle route 7", "ib vehicle route 7 --date 2026-05-31"],
   },
+  {
+    command: "ib vehicle visits",
+    description:
+      "Vehicles that visited a worksite (tyomaa) or location (sijainti), grouped into visits with arrival/departure/duration (snapshot-based). tyomaa is tenant-scoped; sijainti is shared.",
+    permissions: ["auth.page.vehicle.read"],
+    flags: [
+      { name: "filterType", type: "string", description: "Positional — 'tyomaa' or 'sijainti'" },
+      { name: "id", type: "number", description: "Positional — tyomaaId or sijaintiId" },
+      { name: "days", type: "number", description: "Look-back window in days (omit for all-time)" },
+    ],
+    outputShape:
+      "ListEnvelope<{ vehicleId|null, plate, objectName, arrived, departed, durationMin }> & { gpsAvailable }",
+    errors: [
+      { code: 400, meaning: "Invalid filterType", remedy: "use tyomaa or sijainti" },
+      { code: 404, meaning: "tyomaa not found / not owned", remedy: "verify tyomaaId belongs to the active company" },
+      ...permErrors("auth.page.vehicle.read"),
+    ],
+    examples: ["ib vehicle visits tyomaa 17 --days 30", "ib vehicle visits sijainti 3"],
+  },
 
   // ─── sijainti (4) ────────────────────────────────────────────────────────
   {

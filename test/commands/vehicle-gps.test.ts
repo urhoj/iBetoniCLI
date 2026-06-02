@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { runVehicleLocations, runVehicleTimeline, runVehicleRoute } from "../../src/commands/vehicle/index.js";
+import { runVehicleLocations, runVehicleTimeline, runVehicleRoute, runVehicleVisits } from "../../src/commands/vehicle/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
 const mockClient = {
@@ -31,5 +31,23 @@ describe("ib vehicle route", () => {
     (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, gpsAvailable: true });
     await runVehicleRoute(mockClient, 7, { date: "2026-06-02" });
     expect(mockClient.get).toHaveBeenCalledWith("/api/cli/vehicle/route/7?date=2026-06-02");
+  });
+});
+
+describe("ib vehicle visits", () => {
+  beforeEach(() => { (mockClient.get as ReturnType<typeof vi.fn>).mockReset(); });
+  test("runVehicleVisits: bare path when no days", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, gpsAvailable: true });
+    await runVehicleVisits(mockClient, "tyomaa", 17, {});
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/vehicle/visits/tyomaa/17");
+  });
+  test("runVehicleVisits: appends days", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, gpsAvailable: true });
+    await runVehicleVisits(mockClient, "sijainti", 3, { days: 30 });
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/vehicle/visits/sijainti/3?days=30");
+  });
+  test("runVehicleVisits: rejects bad filterType", async () => {
+    await expect(runVehicleVisits(mockClient, "foo", 3, {})).rejects.toThrow();
+    expect(mockClient.get).not.toHaveBeenCalled();
   });
 });
