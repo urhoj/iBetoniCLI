@@ -320,12 +320,17 @@ export async function runSijaintiDistance(
 
 /**
  * Register `ib sijainti` subcommands on the parent commander instance:
- *   - list    filterable by --type/--limit
- *   - get     single sijainti by id (uses existing /api/geocode/sijainti route)
- *   - create  POST /api/geocode/sijainti/add with --body JSON (write flags)
- *   - update  POST /api/geocode/updateSijainti with --body JSON (sijaintiId
- *             must be present IN the body; the route reads it from the body,
- *             not the URL)
+ *   - list      filterable by --type/--limit/--valid-at/--include-deleted
+ *   - get       single sijainti by id (existing /api/geocode/sijainti route)
+ *   - types     sijainti type lookup (sijaintiTypeId → selite)
+ *   - geocode   address → coords via Google Maps
+ *   - closest   nearest sijainti of a type to a worksite
+ *   - distance  driving distance/time between two points
+ *   - create    POST /api/geocode/sijainti/add (typed flags or --body JSON)
+ *   - update    POST /api/geocode/updateSijainti (typed flags or --body JSON)
+ *   - delete    soft-delete (requires --reason)
+ *   - undelete  restore a soft-deleted sijainti (requires --reason)
+ *   - set-jerry enrol/unenrol a varikko in BetoniJerry (jerryActiveUntil)
  *
  * All mutation subcommands accept --dry-run / --idempotency-key / --reason.
  *

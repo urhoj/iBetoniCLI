@@ -809,7 +809,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib vehicle drivers 7 --from 2026-05-01 --to 2026-05-31"],
   },
 
-  // ─── sijainti (4) ────────────────────────────────────────────────────────
+  // ─── sijainti (11) ───────────────────────────────────────────────────────
   {
     command: "ib sijainti list",
     description:
@@ -853,7 +853,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib sijainti create",
     description:
-      "Create a new sijainti via POST /api/geocode/sijainti/add. Body forwarded verbatim.",
+      "Create a new sijainti (POST /api/geocode/sijainti/add). Provide typed flags (--name/--address/--type/--lat/--lng) or --body JSON; typed flags win over --body.",
     permissions: ["auth.page.sijainnit.edit"],
     flags: [
       { name: "body", type: "json", description: "JSON object with the new sijainti fields (optional if typed flags given)" },
@@ -877,7 +877,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib sijainti update",
     description:
-      "Update a sijainti via POST /api/geocode/updateSijainti. Body forwarded verbatim.",
+      "Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Provide typed flags or --body JSON; typed flags win over --body.",
     permissions: ["auth.page.sijainnit.edit"],
     flags: [
       { name: "body", type: "json", description: "JSON object with fields to update (optional if typed flags given)" },
