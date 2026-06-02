@@ -777,7 +777,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib person me",
     description:
-      "Your own profile, roles in the active company, and the companies you can act on. Derives identity from the JWT (works with IB_TOKEN). Roles are active-company-scoped — use `person role list --asiakas` for other companies.",
+      "Your own profile, your roles aggregated across all your companies, and the companies you can act on. Derives identity from the JWT (works with IB_TOKEN). For the roles scoped to a single company, use `person role list --asiakas`.",
     flags: [],
     outputShape:
       "{ personId, name, email, phone, activeCompany:{asiakasId,name}, roles:[{roleTypeId,role}], companies:[{asiakasId,name,current}] }",

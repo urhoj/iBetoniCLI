@@ -145,7 +145,7 @@ export async function runPersonRoleRevoke(
   return flags.dryRun ? res : { removed: 1 };
 }
 
-/** Caller's own profile + active-company roles + actable companies. */
+/** Caller's own profile + roles (aggregated across all their companies) + actable companies. */
 export interface PersonMeOutput {
   personId: number;
   name: string | null;
@@ -159,9 +159,10 @@ export interface PersonMeOutput {
 /**
  * `ib person me` — the caller's own rich profile. Derives personId from the JWT
  * (works for IB_TOKEN sessions with no credentials file), then composes
- * /api/cli/person/get/:personId (profile + active-company roles) and
- * /api/company-selection/available (actable companies). roles are scoped to the
- * active company; use `person role list --asiakas <id>` for other companies.
+ * /api/cli/person/get/:personId (profile + roles) and
+ * /api/company-selection/available (actable companies). `roles` are aggregated
+ * across ALL the person's companies (the backend role subquery is not asiakas-
+ * scoped); use `person role list --asiakas <id>` for one company's roles.
  */
 export async function runPersonMe(client: ApiClient): Promise<PersonMeOutput> {
   const claims = decodeJwtPayload(client.getCurrentToken());
@@ -426,7 +427,7 @@ export function registerPersonCommands(
 
   // ─── self-introspection ───────────────────────────────────────────────────
   p.command("me")
-    .description("Your own profile, active-company roles, and actable companies")
+    .description("Your own profile, your roles across all your companies, and actable companies")
     .action(async () => {
       try {
         const client = await getClient();
