@@ -897,6 +897,38 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "ib sijainti update --body '{\"sijaintiId\":42,\"name\":\"Renamed depot\"}'",
     ],
   },
+  {
+    command: "ib sijainti set-jerry",
+    description:
+      "Enrol or unenrol a varikko (location) in BetoniJerry by setting sijainti.jerryActiveUntil. --on writes the permanent sentinel (the varikko then receives BetoniJerry pump requests covering its delivery radius); --off clears it to null. Replicates the EditSijainti toggle: reads the row, overrides jerryActiveUntil, and writes it back via POST /api/geocode/updateSijainti (lat/lng and other fields are preserved). Visibility in matching still requires the company's isPumppuToimittaja flag.",
+    permissions: ["auth.page.sijainnit.edit"],
+    flags: [
+      {
+        name: "sijaintiId",
+        type: "number",
+        description: "Positional — sijaintiId to toggle",
+      },
+      { name: "on", type: "boolean", description: "Enrol (jerryActiveUntil = sentinel)" },
+      { name: "off", type: "boolean", description: "Unenrol (jerryActiveUntil = null)" },
+    ],
+    writeFlags: true,
+    outputShape:
+      "{ ok: true, ... } (raw backend response) or { dryRun: true, wouldUpdate: {...} }",
+    errors: [
+      {
+        code: 400,
+        meaning: "Neither/both of --on/--off given",
+        remedy: "pass exactly one of --on / --off",
+      },
+      { code: 404, meaning: "Sijainti not found", remedy: "verify sijaintiId" },
+      ...permErrors("auth.page.sijainnit.edit"),
+    ],
+    examples: [
+      "ib sijainti set-jerry 42 --on --reason 'pilot varikko in Jerry'",
+      "ib sijainti set-jerry 42 --off --reason 'seasonal pause'",
+      "ib sijainti set-jerry 42 --on --dry-run",
+    ],
+  },
 
   // ─── schedule (3) ────────────────────────────────────────────────────────
   {
@@ -1117,6 +1149,226 @@ export const COMMAND_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.person.edit"),
     ],
     examples: ['ib person delete 5351 --reason "departed"'],
+  },
+
+  // ─── jerry (12) — BetoniJerry marketplace ──────────────────────────────────
+  {
+    command: "ib jerry request list",
+    description:
+      "List BetoniJerry pump requests (tarjouspyynnöt). Default --mine returns the caller's own requests (GET /api/pumppuRequests/mine). --open returns the provider inbox of open requests (GET /api/pumppuRequests/open) and requires a provider company (isPumppuToimittaja); customer PII is masked there until your offer is accepted. --status (CSV) and --limit apply to --mine only.",
+    permissions: ["--open: provider company (isPumppuToimittaja)"],
+    flags: [
+      { name: "open", type: "boolean", description: "Provider inbox of open requests (provider role)" },
+      { name: "mine", type: "boolean", description: "Your own requests (default)" },
+      { name: "status", type: "string", description: "Filter --mine by status (CSV: open,pending_verification,accepted,cancelled,expired,no_supply)" },
+      { name: "limit", type: "number", default: "100", description: "Max rows for --mine (server caps at 200)" },
+    ],
+    outputShape:
+      "ListEnvelope<{ pumppuRequestId, status, createdAt, sentAt?, osoite, formattedAddress, totalM3|maaraM3, ... }> (fields differ between --mine and --open; --open is PII-masked)",
+    errors: [
+      { code: 403, meaning: "Not a provider (for --open)", remedy: "switch to a provider company, or use --mine" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: [
+      "ib jerry request list",
+      "ib jerry request list --open",
+      "ib jerry request list --mine --status open,accepted --limit 50",
+    ],
+  },
+  {
+    command: "ib jerry request get",
+    description:
+      "Get one pump request. Default is the customer-owned recap (GET /api/pumppuRequests/:id, scoped to the caller's personId). --provider returns the provider-facing detail (GET /api/pumppuRequests/:id/provider-detail, requires provider role) including your own offer + attachments; customer PII (lat/lng/phone/email) stays masked until your offer is accepted/confirmed.",
+    permissions: ["--provider: provider company (isPumppuToimittaja)"],
+    flags: [
+      { name: "requestId", type: "number", description: "Positional — pumppuRequestId" },
+      { name: "provider", type: "boolean", description: "Provider-facing detail view (provider role)" },
+    ],
+    outputShape:
+      "default: { pumppuRequestId, status, asiakasId, maaraM3, osoite, lat, lng, ... } | --provider: { request:{...}, ownOffer:{...}|null, ownAttachments:[…], requestAttachments:[…], messageThreadId }",
+    errors: [
+      { code: 404, meaning: "Request not found / not yours", remedy: "verify requestId (and that you own it, or use --provider)" },
+      { code: 403, meaning: "Not a provider (for --provider)", remedy: "switch to a provider company" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ["ib jerry request get 4012", "ib jerry request get 4012 --provider"],
+  },
+  {
+    command: "ib jerry request offers",
+    description:
+      "List the offers on a customer-owned request (GET /api/pumppuRequests/:id/offers). Drafts excluded; sorted pending-first then cheapest. Provider contact fields (jerryContactName/Phone, openingHours) are revealed only on the accepted offer.",
+    flags: [
+      { name: "requestId", type: "number", description: "Positional — pumppuRequestId you own" },
+    ],
+    outputShape:
+      "ListEnvelope<{ pumppuOfferId, status, priceCents, vatPercent, validUntil, asiakasNimi, ytunnus, providerDistanceKm, companyDescription, jerryContactName?, jerryContactPhone?, openingHours? }>",
+    errors: [
+      { code: 404, meaning: "Request not found / not yours", remedy: "verify requestId" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ["ib jerry request offers 4012", "ib jerry request offers 4012 --pretty"],
+  },
+  {
+    command: "ib jerry counts",
+    description:
+      "Lifecycle counts. Default --mine returns the customer view (GET /api/pumppuRequests/mine/counts: draft/open/pending_verification/accepted/cancelled/expired/no_supply). --provider returns the provider badge counts (GET /api/pumppuRequests/provider-counts: avoimet/tarjotut/voitetut/voitetutActionRequired/paattyneet) and requires a provider company.",
+    permissions: ["--provider: provider company (isPumppuToimittaja)"],
+    flags: [
+      { name: "provider", type: "boolean", description: "Provider badge counts (provider role)" },
+      { name: "mine", type: "boolean", description: "Customer counts (default)" },
+    ],
+    outputShape:
+      "--mine: { draft, open, pending_verification, accepted, cancelled, expired, no_supply } | --provider: { avoimet, tarjotut, voitetut, voitetutActionRequired, paattyneet }",
+    errors: [
+      { code: 403, meaning: "Not a provider (for --provider)", remedy: "switch to a provider company, or use --mine" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ["ib jerry counts", "ib jerry counts --provider"],
+  },
+  {
+    command: "ib jerry check-address",
+    description:
+      "Anonymous geofence feasibility probe (POST /api/pumppuRequests/checkAddress): which provider varikot cover an address. The single best tool for diagnosing 'no offers'. --address is required (the `osoite` body field); if --lat/--lng/--place-id are all supplied the server trusts them instead of re-geocoding. Not a mutation, so no write-safety flags. Rate-limited 10/min per IP. The `providers` array is only included when the token is a developer/admin.",
+    flags: [
+      { name: "address", type: "string", description: "Street address to check (REQUIRED; sent as `osoite`)" },
+      { name: "lat", type: "number", description: "Latitude (trusted only with --lng + --place-id)" },
+      { name: "lng", type: "number", description: "Longitude (trusted only with --lat + --place-id)" },
+      { name: "place-id", type: "string", description: "Google placeId (lets the server trust client coords)" },
+      { name: "formatted-address", type: "string", description: "Google formatted address" },
+    ],
+    outputShape:
+      "{ geocoded: boolean, deliverable?: boolean, lat?, lng?, placeId?, formattedAddress?, providerCount?, nearestVarikkoKm?, providers?: [{ asiakasId, asiakasNimi, distanceKm }] }",
+    errors: [
+      { code: 400, meaning: "osoite missing", remedy: "pass --address" },
+      { code: 429, meaning: "Rate limit (10/min/IP)", remedy: "wait and retry" },
+      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+    ],
+    examples: [
+      "ib jerry check-address --address 'Mannerheimintie 1, Helsinki'",
+      "ib jerry check-address --address 'Hämeenkatu 1, Tampere' --lat 61.498 --lng 23.761 --place-id ChIJxxxx",
+    ],
+  },
+  {
+    command: "ib jerry provider-settings get",
+    description:
+      "Read a provider company's BetoniJerry settings — contact person, opening hours, company description, maintainsOrderInfo (GET /api/jerry-provider-settings). Defaults to the caller's own company; --asiakas targets another company you have edit rights on. Returns defaults when no row exists yet.",
+    permissions: ["edit-tier on the target company (tarjousAdmin / company admin)"],
+    flags: [
+      { name: "asiakas", type: "number", description: "Target company asiakasId (default: your own)" },
+    ],
+    outputShape:
+      "{ asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, openingHours, companyDescription, maintainsOrderInfo }",
+    errors: [
+      { code: 403, meaning: "No edit rights on company", remedy: "use a tarjousAdmin/admin token for that company" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ["ib jerry provider-settings get", "ib jerry provider-settings get --asiakas 1402"],
+  },
+  {
+    command: "ib jerry provider-settings set",
+    description:
+      "Upsert a provider company's BetoniJerry settings (PUT /api/jerry-provider-settings). Partial-payload-safe: only the body keys present are written (omit a key to preserve it). jerryPersonId must belong to the target company. --asiakas targets another company. Requires --reason.",
+    permissions: ["edit-tier on the target company (tarjousAdmin / company admin)"],
+    flags: [
+      { name: "body", type: "json", description: "JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo? }" },
+      { name: "asiakas", type: "number", description: "Target company asiakasId (default: your own)" },
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ asiakasId } or { dryRun: true, wouldUpdate: {...} }",
+    errors: [
+      { code: 400, meaning: "Invalid field / contact not in company", remedy: "check jerryPersonId belongs to the company" },
+      { code: 403, meaning: "No edit rights on company", remedy: "use a tarjousAdmin/admin token for that company" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: [
+      'ib jerry provider-settings set --body \'{"openingHours":"ma-pe 7-16","maintainsOrderInfo":true}\' --reason "update opening hours"',
+      'ib jerry provider-settings set --body \'{"jerryPersonId":6233}\' --asiakas 1402 --reason "set contact"',
+    ],
+  },
+  {
+    command: "ib jerry admin list",
+    description:
+      "List Jerry-active companies (isPumppuToimittaja + HAS_JERRY setting) with per-company counts (admins, tarjousAdmins, pumpparit, vehicles, Jerry/non-Jerry varikot). GET /api/admin/jerry-companies. System-admin only.",
+    permissions: ["isSystemAdmin"],
+    flags: [],
+    outputShape:
+      "ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, sijaintiNonJerryCount }>",
+    errors: [
+      { code: 403, meaning: "Not a system admin", remedy: "use a system-admin token" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ["ib jerry admin list", "ib jerry admin list --pretty"],
+  },
+  {
+    command: "ib jerry admin search",
+    description:
+      "Search companies NOT yet fully Jerry-enabled, for the Add picker (GET /api/admin/jerry-companies/search?q=). Name LIKE match, min 2 chars, top 20. System-admin only.",
+    permissions: ["isSystemAdmin"],
+    flags: [
+      { name: "query", type: "string", description: "Positional — name search (min 2 chars)" },
+    ],
+    outputShape: "ListEnvelope<{ asiakasId, name }>",
+    errors: [
+      { code: 403, meaning: "Not a system admin", remedy: "use a system-admin token" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ["ib jerry admin search Betoni"],
+  },
+  {
+    command: "ib jerry admin detail",
+    description:
+      "Company Jerry drill-down: people by role (admins/tarjousAdmins/pumpparit), vehicles, and each sijainti's Jerry enrolment status (GET /api/admin/jerry-companies/:asiakasId/detail). System-admin only.",
+    permissions: ["isSystemAdmin"],
+    flags: [
+      { name: "asiakasId", type: "number", description: "Positional — company asiakasId" },
+    ],
+    outputShape:
+      "{ admins:[{personId,name}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,isJerry}] }",
+    errors: [
+      { code: 400, meaning: "Invalid asiakasId", remedy: "pass a numeric asiakasId" },
+      { code: 403, meaning: "Not a system admin", remedy: "use a system-admin token" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ["ib jerry admin detail 1402"],
+  },
+  {
+    command: "ib jerry admin enable",
+    description:
+      "Enable the BetoniJerry module for a company — the audited toggle that sets BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/enable). Change-tracked via the asiakasSql proc paths. System-admin only. Requires --reason.",
+    permissions: ["isSystemAdmin"],
+    flags: [
+      { name: "asiakasId", type: "number", description: "Positional — company asiakasId" },
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: true } }",
+    errors: [
+      { code: 400, meaning: "Invalid asiakasId", remedy: "pass a numeric asiakasId" },
+      { code: 403, meaning: "Not a system admin", remedy: "use a system-admin token" },
+      { code: 404, meaning: "Company not found", remedy: "verify asiakasId" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ['ib jerry admin enable 1402 --reason "onboard provider"', "ib jerry admin enable 1402 --dry-run"],
+  },
+  {
+    command: "ib jerry admin disable",
+    description:
+      "Disable the BetoniJerry module for a company — clears BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/disable). System-admin only. Requires --reason.",
+    permissions: ["isSystemAdmin"],
+    flags: [
+      { name: "asiakasId", type: "number", description: "Positional — company asiakasId" },
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: false } }",
+    errors: [
+      { code: 400, meaning: "Invalid asiakasId", remedy: "pass a numeric asiakasId" },
+      { code: 403, meaning: "Not a system admin", remedy: "use a system-admin token" },
+      { code: 404, meaning: "Company not found", remedy: "verify asiakasId" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ['ib jerry admin disable 1402 --reason "offboard provider"'],
   },
 
   // ─── schema (7) — developer-only SQL introspection ─────────────────────────

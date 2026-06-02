@@ -583,6 +583,385 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib jerry admin detail matches snapshot 1`] = `
+"USAGE
+  ib jerry admin detail [flags]
+
+DESCRIPTION
+  Company Jerry drill-down: people by role (admins/tarjousAdmins/pumpparit), vehicles, and each sijainti's Jerry enrolment status (GET /api/admin/jerry-companies/:asiakasId/detail). System-admin only.
+  Permissions: requires isSystemAdmin.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --asiakasId NUMBER    Positional — company asiakasId
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { admins:[{personId,name}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,isJerry}] }
+
+ERRORS (stderr, exit non-zero)
+  400  Invalid asiakasId      → pass a numeric asiakasId
+  403  Not a system admin     → use a system-admin token
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry admin detail 1402
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry admin disable matches snapshot 1`] = `
+"USAGE
+  ib jerry admin disable [flags]
+
+DESCRIPTION
+  Disable the BetoniJerry module for a company — clears BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/disable). System-admin only. Requires --reason.
+  Permissions: requires isSystemAdmin.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --asiakasId NUMBER    Positional — company asiakasId
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: false } }
+
+ERRORS (stderr, exit non-zero)
+  400  Invalid asiakasId      → pass a numeric asiakasId
+  403  Not a system admin     → use a system-admin token
+  404  Company not found      → verify asiakasId
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry admin disable 1402 --reason "offboard provider"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry admin enable matches snapshot 1`] = `
+"USAGE
+  ib jerry admin enable [flags]
+
+DESCRIPTION
+  Enable the BetoniJerry module for a company — the audited toggle that sets BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/enable). Change-tracked via the asiakasSql proc paths. System-admin only. Requires --reason.
+  Permissions: requires isSystemAdmin.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --asiakasId NUMBER    Positional — company asiakasId
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: true } }
+
+ERRORS (stderr, exit non-zero)
+  400  Invalid asiakasId      → pass a numeric asiakasId
+  403  Not a system admin     → use a system-admin token
+  404  Company not found      → verify asiakasId
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry admin enable 1402 --reason "onboard provider"
+  ib jerry admin enable 1402 --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry admin list matches snapshot 1`] = `
+"USAGE
+  ib jerry admin list [flags]
+
+DESCRIPTION
+  List Jerry-active companies (isPumppuToimittaja + HAS_JERRY setting) with per-company counts (admins, tarjousAdmins, pumpparit, vehicles, Jerry/non-Jerry varikot). GET /api/admin/jerry-companies. System-admin only.
+  Permissions: requires isSystemAdmin.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, sijaintiNonJerryCount }>
+
+ERRORS (stderr, exit non-zero)
+  403  Not a system admin     → use a system-admin token
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry admin list
+  ib jerry admin list --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry admin search matches snapshot 1`] = `
+"USAGE
+  ib jerry admin search [flags]
+
+DESCRIPTION
+  Search companies NOT yet fully Jerry-enabled, for the Add picker (GET /api/admin/jerry-companies/search?q=). Name LIKE match, min 2 chars, top 20. System-admin only.
+  Permissions: requires isSystemAdmin.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --query STRING    Positional — name search (min 2 chars)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ asiakasId, name }>
+
+ERRORS (stderr, exit non-zero)
+  403  Not a system admin     → use a system-admin token
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry admin search Betoni
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry check-address matches snapshot 1`] = `
+"USAGE
+  ib jerry check-address [flags]
+
+DESCRIPTION
+  Anonymous geofence feasibility probe (POST /api/pumppuRequests/checkAddress): which provider varikot cover an address. The single best tool for diagnosing 'no offers'. --address is required (the \`osoite\` body field); if --lat/--lng/--place-id are all supplied the server trusts them instead of re-geocoding. Not a mutation, so no write-safety flags. Rate-limited 10/min per IP. The \`providers\` array is only included when the token is a developer/admin.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --address STRING    Street address to check (REQUIRED; sent as \`osoite\`)
+  --lat NUMBER    Latitude (trusted only with --lng + --place-id)
+  --lng NUMBER    Longitude (trusted only with --lat + --place-id)
+  --place-id STRING    Google placeId (lets the server trust client coords)
+  --formatted-address STRING    Google formatted address
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { geocoded: boolean, deliverable?: boolean, lat?, lng?, placeId?, formattedAddress?, providerCount?, nearestVarikkoKm?, providers?: [{ asiakasId, asiakasNimi, distanceKm }] }
+
+ERRORS (stderr, exit non-zero)
+  400  osoite missing         → pass --address
+  429  Rate limit (10/min/IP) → wait and retry
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry check-address --address 'Mannerheimintie 1, Helsinki'
+  ib jerry check-address --address 'Hämeenkatu 1, Tampere' --lat 61.498 --lng 23.761 --place-id ChIJxxxx
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry counts matches snapshot 1`] = `
+"USAGE
+  ib jerry counts [flags]
+
+DESCRIPTION
+  Lifecycle counts. Default --mine returns the customer view (GET /api/pumppuRequests/mine/counts: draft/open/pending_verification/accepted/cancelled/expired/no_supply). --provider returns the provider badge counts (GET /api/pumppuRequests/provider-counts: avoimet/tarjotut/voitetut/voitetutActionRequired/paattyneet) and requires a provider company.
+  Permissions: requires --provider: provider company (isPumppuToimittaja).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --provider BOOLEAN    Provider badge counts (provider role)
+  --mine BOOLEAN    Customer counts (default)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  --mine: { draft, open, pending_verification, accepted, cancelled, expired, no_supply } | --provider: { avoimet, tarjotut, voitetut, voitetutActionRequired, paattyneet }
+
+ERRORS (stderr, exit non-zero)
+  403  Not a provider (for --provider) → switch to a provider company, or use --mine
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry counts
+  ib jerry counts --provider
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry provider-settings get matches snapshot 1`] = `
+"USAGE
+  ib jerry provider-settings get [flags]
+
+DESCRIPTION
+  Read a provider company's BetoniJerry settings — contact person, opening hours, company description, maintainsOrderInfo (GET /api/jerry-provider-settings). Defaults to the caller's own company; --asiakas targets another company you have edit rights on. Returns defaults when no row exists yet.
+  Permissions: requires edit-tier on the target company (tarjousAdmin / company admin).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --asiakas NUMBER    Target company asiakasId (default: your own)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, openingHours, companyDescription, maintainsOrderInfo }
+
+ERRORS (stderr, exit non-zero)
+  403  No edit rights on company → use a tarjousAdmin/admin token for that company
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry provider-settings get
+  ib jerry provider-settings get --asiakas 1402
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry provider-settings set matches snapshot 1`] = `
+"USAGE
+  ib jerry provider-settings set [flags]
+
+DESCRIPTION
+  Upsert a provider company's BetoniJerry settings (PUT /api/jerry-provider-settings). Partial-payload-safe: only the body keys present are written (omit a key to preserve it). jerryPersonId must belong to the target company. --asiakas targets another company. Requires --reason.
+  Permissions: requires edit-tier on the target company (tarjousAdmin / company admin).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --body JSON    JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo? }
+  --asiakas NUMBER    Target company asiakasId (default: your own)
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { asiakasId } or { dryRun: true, wouldUpdate: {...} }
+
+ERRORS (stderr, exit non-zero)
+  400  Invalid field / contact not in company → check jerryPersonId belongs to the company
+  403  No edit rights on company → use a tarjousAdmin/admin token for that company
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry provider-settings set --body '{"openingHours":"ma-pe 7-16","maintainsOrderInfo":true}' --reason "update opening hours"
+  ib jerry provider-settings set --body '{"jerryPersonId":6233}' --asiakas 1402 --reason "set contact"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry request get matches snapshot 1`] = `
+"USAGE
+  ib jerry request get [flags]
+
+DESCRIPTION
+  Get one pump request. Default is the customer-owned recap (GET /api/pumppuRequests/:id, scoped to the caller's personId). --provider returns the provider-facing detail (GET /api/pumppuRequests/:id/provider-detail, requires provider role) including your own offer + attachments; customer PII (lat/lng/phone/email) stays masked until your offer is accepted/confirmed.
+  Permissions: requires --provider: provider company (isPumppuToimittaja).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --requestId NUMBER    Positional — pumppuRequestId
+  --provider BOOLEAN    Provider-facing detail view (provider role)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  default: { pumppuRequestId, status, asiakasId, maaraM3, osoite, lat, lng, ... } | --provider: { request:{...}, ownOffer:{...}|null, ownAttachments:[…], requestAttachments:[…], messageThreadId }
+
+ERRORS (stderr, exit non-zero)
+  404  Request not found / not yours → verify requestId (and that you own it, or use --provider)
+  403  Not a provider (for --provider) → switch to a provider company
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry request get 4012
+  ib jerry request get 4012 --provider
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry request list matches snapshot 1`] = `
+"USAGE
+  ib jerry request list [flags]
+
+DESCRIPTION
+  List BetoniJerry pump requests (tarjouspyynnöt). Default --mine returns the caller's own requests (GET /api/pumppuRequests/mine). --open returns the provider inbox of open requests (GET /api/pumppuRequests/open) and requires a provider company (isPumppuToimittaja); customer PII is masked there until your offer is accepted. --status (CSV) and --limit apply to --mine only.
+  Permissions: requires --open: provider company (isPumppuToimittaja).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --open BOOLEAN    Provider inbox of open requests (provider role)
+  --mine BOOLEAN    Your own requests (default)
+  --status STRING    Filter --mine by status (CSV: open,pending_verification,accepted,cancelled,expired,no_supply)
+  --limit NUMBER    Max rows for --mine (server caps at 200) (default: 100)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ pumppuRequestId, status, createdAt, sentAt?, osoite, formattedAddress, totalM3|maaraM3, ... }> (fields differ between --mine and --open; --open is PII-masked)
+
+ERRORS (stderr, exit non-zero)
+  403  Not a provider (for --open) → switch to a provider company, or use --mine
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry request list
+  ib jerry request list --open
+  ib jerry request list --mine --status open,accepted --limit 50
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry request offers matches snapshot 1`] = `
+"USAGE
+  ib jerry request offers [flags]
+
+DESCRIPTION
+  List the offers on a customer-owned request (GET /api/pumppuRequests/:id/offers). Drafts excluded; sorted pending-first then cheapest. Provider contact fields (jerryContactName/Phone, openingHours) are revealed only on the accepted offer.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --requestId NUMBER    Positional — pumppuRequestId you own
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ pumppuOfferId, status, priceCents, vatPercent, validUntil, asiakasNimi, ytunnus, providerDistanceKm, companyDescription, jerryContactName?, jerryContactPhone?, openingHours? }>
+
+ERRORS (stderr, exit non-zero)
+  404  Request not found / not yours → verify requestId
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry request offers 4012
+  ib jerry request offers 4012 --pretty
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib keikka create matches snapshot 1`] = `
 "USAGE
   ib keikka create [flags]
@@ -1359,6 +1738,45 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib sijainti list
   ib sijainti list --type 1
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib sijainti set-jerry matches snapshot 1`] = `
+"USAGE
+  ib sijainti set-jerry [flags]
+
+DESCRIPTION
+  Enrol or unenrol a varikko (location) in BetoniJerry by setting sijainti.jerryActiveUntil. --on writes the permanent sentinel (the varikko then receives BetoniJerry pump requests covering its delivery radius); --off clears it to null. Replicates the EditSijainti toggle: reads the row, overrides jerryActiveUntil, and writes it back via POST /api/geocode/updateSijainti (lat/lng and other fields are preserved). Visibility in matching still requires the company's isPumppuToimittaja flag.
+  Permissions: requires auth.page.sijainnit.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --sijaintiId NUMBER    Positional — sijaintiId to toggle
+  --on BOOLEAN    Enrol (jerryActiveUntil = sentinel)
+  --off BOOLEAN    Unenrol (jerryActiveUntil = null)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { ok: true, ... } (raw backend response) or { dryRun: true, wouldUpdate: {...} }
+
+ERRORS (stderr, exit non-zero)
+  400  Neither/both of --on/--off given → pass exactly one of --on / --off
+  404  Sijainti not found     → verify sijaintiId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.sijainnit.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib sijainti set-jerry 42 --on --reason 'pilot varikko in Jerry'
+  ib sijainti set-jerry 42 --off --reason 'seasonal pause'
+  ib sijainti set-jerry 42 --on --dry-run
 "
 `;
 

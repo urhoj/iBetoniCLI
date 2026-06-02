@@ -6,7 +6,14 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson, writeError, exitWithError } from "../../output/json.js";
+
+/**
+ * Sentinel `jerryActiveUntil` value meaning "enrolled in BetoniJerry, no end
+ * date" — matches the EditSijainti toggle (a future/sentinel datetime = active,
+ * NULL = not enrolled). See sijainti.jerryActiveUntil in geoCodeSql.js.
+ */
+const JERRY_ACTIVE_SENTINEL = "9999-12-31 23:59:59";
 
 export interface SijaintiListFilter {
   type?: string;
@@ -68,6 +75,34 @@ export async function runSijaintiUpdate(
   body: Record<string, unknown>,
   flags: WriteFlags
 ): Promise<unknown> {
+  return client.post<unknown>("/api/geocode/updateSijainti", body, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/**
+ * Toggle a varikko's BetoniJerry enrolment by writing `jerryActiveUntil`. There
+ * is no partial-update route, so this replicates the EditSijainti save: GET the
+ * current row, override `jerryActiveUntil` (sentinel = on, null = off), and POST
+ * it back through /api/geocode/updateSijainti. `updateSijainti` whitelists the
+ * persisted fields via extractSijaintiBody (lat/lng/placeId are untouched by
+ * sijainti_save), so the round-trip preserves the rest of the row. `--dry-run`
+ * is honoured server-side (the route returns `wouldUpdate` without persisting).
+ */
+export async function runSijaintiSetJerry(
+  client: ApiClient,
+  sijaintiId: number,
+  on: boolean,
+  flags: WriteFlags
+): Promise<unknown> {
+  const current = await client.get<Record<string, unknown>>(
+    `/api/geocode/sijainti/get/${sijaintiId}`
+  );
+  const body = {
+    ...current,
+    sijaintiId,
+    jerryActiveUntil: on ? JERRY_ACTIVE_SENTINEL : null,
+  };
   return client.post<unknown>("/api/geocode/updateSijainti", body, {
     headers: writeFlagsToHeaders(flags),
   });
@@ -167,6 +202,43 @@ export function registerSijaintiCommands(
         const client = await getClient();
         const parsed = JSON.parse(opts.body) as Record<string, unknown>;
         const result = await runSijaintiUpdate(client, parsed, {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        });
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
+
+  const setJerryCmd = s
+    .command("set-jerry <sijaintiId>")
+    .description(
+      "Enrol/unenrol a varikko in BetoniJerry by setting jerryActiveUntil (--on/--off)"
+    )
+    .option("--on", "Enrol: jerryActiveUntil = sentinel (varikko receives Jerry requests)")
+    .option("--off", "Unenrol: jerryActiveUntil = null");
+  addWriteFlagsToCommand(setJerryCmd).action(
+    async (
+      idStr: string,
+      opts: {
+        on?: boolean;
+        off?: boolean;
+        dryRun?: boolean;
+        idempotencyKey?: string;
+        reason?: string;
+      }
+    ) => {
+      if (opts.on === opts.off) {
+        // neither or both given — ambiguous
+        writeError(new Error("Pass exactly one of --on / --off"));
+        process.exit(4);
+      }
+      try {
+        const client = await getClient();
+        const result = await runSijaintiSetJerry(client, Number(idStr), !!opts.on, {
           dryRun: opts.dryRun,
           idempotencyKey: opts.idempotencyKey,
           reason: opts.reason,

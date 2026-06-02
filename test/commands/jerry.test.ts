@@ -1,0 +1,224 @@
+import { describe, test, expect, vi, beforeEach } from "vitest";
+import {
+  runJerryRequestList,
+  runJerryRequestGet,
+  runJerryRequestOffers,
+  runJerryCounts,
+  runJerryCheckAddress,
+  runJerryProviderSettingsGet,
+  runJerryProviderSettingsSet,
+  runJerryAdminList,
+  runJerryAdminSearch,
+  runJerryAdminDetail,
+  runJerryAdminToggle,
+} from "../../src/commands/jerry/index.js";
+import type { ApiClient } from "../../src/api/client.js";
+
+const mockClient = {
+  get: vi.fn(),
+  post: vi.fn(),
+  put: vi.fn(),
+  delete: vi.fn(),
+  getCurrentToken: vi.fn(),
+} as unknown as ApiClient;
+
+const get = mockClient.get as ReturnType<typeof vi.fn>;
+const post = mockClient.post as ReturnType<typeof vi.fn>;
+const put = mockClient.put as ReturnType<typeof vi.fn>;
+
+beforeEach(() => {
+  get.mockReset();
+  post.mockReset();
+  put.mockReset();
+});
+
+describe("ib jerry request", () => {
+  test("list --mine (default) sends status + limit and wraps in an envelope", async () => {
+    get.mockResolvedValueOnce([{ pumppuRequestId: 1 }, { pumppuRequestId: 2 }]);
+    const result = await runJerryRequestList(mockClient, {
+      status: "open,accepted",
+      limit: 50,
+    });
+    expect(get).toHaveBeenCalledWith(
+      "/api/pumppuRequests/mine?status=open%2Caccepted&limit=50"
+    );
+    expect(result).toEqual({
+      items: [{ pumppuRequestId: 1 }, { pumppuRequestId: 2 }],
+      nextCursor: null,
+      count: 2,
+    });
+  });
+
+  test("list --mine with no opts hits the bare /mine path", async () => {
+    get.mockResolvedValueOnce([]);
+    await runJerryRequestList(mockClient, {});
+    expect(get).toHaveBeenCalledWith("/api/pumppuRequests/mine");
+  });
+
+  test("list --open hits the provider inbox and ignores status/limit", async () => {
+    get.mockResolvedValueOnce([{ pumppuRequestId: 9 }]);
+    const result = await runJerryRequestList(mockClient, {
+      open: true,
+      status: "open",
+      limit: 10,
+    });
+    expect(get).toHaveBeenCalledWith("/api/pumppuRequests/open");
+    expect(result.count).toBe(1);
+  });
+
+  test("list tolerates a non-array body (empty envelope)", async () => {
+    get.mockResolvedValueOnce(null);
+    const result = await runJerryRequestList(mockClient, {});
+    expect(result).toEqual({ items: [], nextCursor: null, count: 0 });
+  });
+
+  test("get (default) hits the customer recap path", async () => {
+    get.mockResolvedValueOnce({ pumppuRequestId: 4012 });
+    await runJerryRequestGet(mockClient, 4012, false);
+    expect(get).toHaveBeenCalledWith("/api/pumppuRequests/4012");
+  });
+
+  test("get --provider hits the provider-detail path", async () => {
+    get.mockResolvedValueOnce({ request: {} });
+    await runJerryRequestGet(mockClient, 4012, true);
+    expect(get).toHaveBeenCalledWith("/api/pumppuRequests/4012/provider-detail");
+  });
+
+  test("offers hits /:id/offers and wraps in an envelope", async () => {
+    get.mockResolvedValueOnce([{ pumppuOfferId: 7 }]);
+    const result = await runJerryRequestOffers(mockClient, 4012);
+    expect(get).toHaveBeenCalledWith("/api/pumppuRequests/4012/offers");
+    expect(result).toEqual({
+      items: [{ pumppuOfferId: 7 }],
+      nextCursor: null,
+      count: 1,
+    });
+  });
+});
+
+describe("ib jerry counts", () => {
+  test("default (mine) hits /mine/counts", async () => {
+    get.mockResolvedValueOnce({ open: 3 });
+    await runJerryCounts(mockClient, false);
+    expect(get).toHaveBeenCalledWith("/api/pumppuRequests/mine/counts");
+  });
+
+  test("--provider hits /provider-counts", async () => {
+    get.mockResolvedValueOnce({ avoimet: 5 });
+    await runJerryCounts(mockClient, true);
+    expect(get).toHaveBeenCalledWith("/api/pumppuRequests/provider-counts");
+  });
+});
+
+describe("ib jerry check-address", () => {
+  test("maps --address to osoite and includes only supplied coords", async () => {
+    post.mockResolvedValueOnce({ geocoded: true, deliverable: true });
+    await runJerryCheckAddress(mockClient, {
+      address: "Mannerheimintie 1, Helsinki",
+      lat: 60.17,
+      lng: 24.94,
+      placeId: "ChIJabc",
+    });
+    expect(post).toHaveBeenCalledWith("/api/pumppuRequests/checkAddress", {
+      osoite: "Mannerheimintie 1, Helsinki",
+      lat: 60.17,
+      lng: 24.94,
+      placeId: "ChIJabc",
+    });
+  });
+
+  test("address-only body omits coord keys", async () => {
+    post.mockResolvedValueOnce({ geocoded: true });
+    await runJerryCheckAddress(mockClient, { address: "Hämeenkatu 1, Tampere" });
+    expect(post).toHaveBeenCalledWith("/api/pumppuRequests/checkAddress", {
+      osoite: "Hämeenkatu 1, Tampere",
+    });
+  });
+});
+
+describe("ib jerry provider-settings", () => {
+  test("get without --asiakas hits the bare path", async () => {
+    get.mockResolvedValueOnce({ asiakasId: 1402 });
+    await runJerryProviderSettingsGet(mockClient, undefined);
+    expect(get).toHaveBeenCalledWith("/api/jerry-provider-settings");
+  });
+
+  test("get with --asiakas appends the query param", async () => {
+    get.mockResolvedValueOnce({ asiakasId: 1402 });
+    await runJerryProviderSettingsGet(mockClient, 1402);
+    expect(get).toHaveBeenCalledWith("/api/jerry-provider-settings?asiakasId=1402");
+  });
+
+  test("set PUTs the body, merges --asiakas, and forwards write-flag headers", async () => {
+    put.mockResolvedValueOnce({ asiakasId: 1402 });
+    await runJerryProviderSettingsSet(
+      mockClient,
+      { openingHours: "ma-pe 7-16" },
+      1402,
+      { dryRun: true, reason: "update hours" }
+    );
+    expect(put).toHaveBeenCalledWith(
+      "/api/jerry-provider-settings",
+      { openingHours: "ma-pe 7-16", asiakasId: 1402 },
+      { headers: { "X-Dry-Run": "1", "X-Action-Reason": "update hours" } }
+    );
+  });
+
+  test("set without --asiakas leaves the body untouched", async () => {
+    put.mockResolvedValueOnce({ asiakasId: 1 });
+    await runJerryProviderSettingsSet(
+      mockClient,
+      { maintainsOrderInfo: false },
+      undefined,
+      { reason: "x" }
+    );
+    expect(put).toHaveBeenCalledWith(
+      "/api/jerry-provider-settings",
+      { maintainsOrderInfo: false },
+      { headers: { "X-Action-Reason": "x" } }
+    );
+  });
+});
+
+describe("ib jerry admin", () => {
+  test("list wraps the company array in an envelope", async () => {
+    get.mockResolvedValueOnce([{ asiakasId: 1402, asiakasNimi: "Acme" }]);
+    const result = await runJerryAdminList(mockClient);
+    expect(get).toHaveBeenCalledWith("/api/admin/jerry-companies");
+    expect(result.count).toBe(1);
+  });
+
+  test("search url-encodes the query", async () => {
+    get.mockResolvedValueOnce([]);
+    await runJerryAdminSearch(mockClient, "Betoni Oy");
+    expect(get).toHaveBeenCalledWith(
+      "/api/admin/jerry-companies/search?q=Betoni%20Oy"
+    );
+  });
+
+  test("detail hits the drill-down path", async () => {
+    get.mockResolvedValueOnce({ admins: [] });
+    await runJerryAdminDetail(mockClient, 1402);
+    expect(get).toHaveBeenCalledWith("/api/admin/jerry-companies/1402/detail");
+  });
+
+  test("enable posts to /enable with write-flag headers", async () => {
+    post.mockResolvedValueOnce({ success: true });
+    await runJerryAdminToggle(mockClient, 1402, true, { reason: "onboard" });
+    expect(post).toHaveBeenCalledWith(
+      "/api/admin/jerry-companies/1402/enable",
+      {},
+      { headers: { "X-Action-Reason": "onboard" } }
+    );
+  });
+
+  test("disable posts to /disable", async () => {
+    post.mockResolvedValueOnce({ success: true });
+    await runJerryAdminToggle(mockClient, 1402, false, { dryRun: true });
+    expect(post).toHaveBeenCalledWith(
+      "/api/admin/jerry-companies/1402/disable",
+      {},
+      { headers: { "X-Dry-Run": "1" } }
+    );
+  });
+});

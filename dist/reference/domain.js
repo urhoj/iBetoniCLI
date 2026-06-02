@@ -64,7 +64,23 @@ export const GLOSSARY = [
     },
     {
         term: "BetoniJerry",
-        definition: "Umbrella tenant (asiakasId 1349) for pumping providers and betonijerry.fi-registered customers.",
+        definition: "A request-for-quote marketplace for concrete pumping: customers post requests, provider companies bid, the winner is confirmed into a keikka. Also an umbrella tenant (asiakasId 1349) for providers and betonijerry.fi-registered customers (`ib jerry …`).",
+    },
+    {
+        term: "tarjouspyyntö / pumppuRequest",
+        definition: "A BetoniJerry request for a concrete pump (the RFQ). Lifecycle: draft → open → accepted → confirmed (`ib jerry request …`).",
+    },
+    {
+        term: "tarjous / pumppuOffer",
+        definition: "A provider's bid (price, availability, terms) on a pumppuRequest (`ib jerry request offers`).",
+    },
+    {
+        term: "varikko",
+        definition: "A pumping provider's depot — a sijainti with a delivery radius. Enrolled in BetoniJerry per-varikko via jerryActiveUntil (`ib sijainti set-jerry`).",
+    },
+    {
+        term: "jerryActiveUntil",
+        definition: "sijainti column gating a varikko's BetoniJerry enrolment: future/sentinel datetime = active, NULL = not enrolled, past = expired.",
     },
 ];
 /**
