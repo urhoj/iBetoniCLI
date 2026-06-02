@@ -2,6 +2,9 @@ import { describe, test, expect, vi, beforeEach } from "vitest";
 import {
   runWorksiteCreate,
   runWorksiteUpdate,
+  runWorksiteRefreshLocation,
+  runWorksiteSetGeofence,
+  runWorksiteHelsinkiFetch,
 } from "../../src/commands/worksite/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -73,5 +76,35 @@ describe("ib worksite create/update", () => {
       today.getMonth() + 1
     ).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
     expect(url.endsWith(expected)).toBe(true);
+  });
+
+  test("runWorksiteRefreshLocation: POST refreshLocation with write flags", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ success: true });
+    await runWorksiteRefreshLocation(mockClient, 42, { reason: "address fix" });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/tyomaa/refreshLocation/42",
+      {},
+      { headers: { "X-Action-Reason": "address fix" } }
+    );
+  });
+
+  test("runWorksiteSetGeofence: POST geofence-radius with body + dry-run header", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ success: true });
+    await runWorksiteSetGeofence(mockClient, 42, 250, { dryRun: true });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/tyomaa/42/geofence-radius",
+      { geofenceRadius: 250 },
+      { headers: { "X-Dry-Run": "1" } }
+    );
+  });
+
+  test("runWorksiteHelsinkiFetch: POST helsinki/fetch", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ success: true });
+    await runWorksiteHelsinkiFetch(mockClient, 42, {});
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/tyomaa/helsinki/fetch/42",
+      {},
+      { headers: {} }
+    );
   });
 });

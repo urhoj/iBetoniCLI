@@ -1099,6 +1099,48 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ['ib worksite delete 99 --reason "lifecycle cleanup"'],
   },
   {
+    command: "ib worksite refresh-location",
+    description: "Re-geocode a worksite from Google Maps (POST /api/tyomaa/refreshLocation/:id).",
+    permissions: ["auth.page.tyomaa.edit"],
+    flags: [{ name: "tyomaaId", type: "number", description: "Positional — tyomaaId" }],
+    writeFlags: true,
+    outputShape: "{ success: true, tyomaa, message } (raw backend response)",
+    errors: [
+      { code: 404, meaning: "Worksite not found", remedy: "verify tyomaaId" },
+      ...permErrors("auth.page.tyomaa.edit"),
+    ],
+    examples: ['ib worksite refresh-location 99 --reason "address corrected"'],
+  },
+  {
+    command: "ib worksite set-geofence",
+    description: "Set a worksite geofence radius in metres (1-10000).",
+    permissions: ["auth.page.tyomaa.edit"],
+    flags: [
+      { name: "tyomaaId", type: "number", description: "Positional — tyomaaId" },
+      { name: "radius", type: "number", description: "Geofence radius in metres (1-10000)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ success: true }",
+    errors: [
+      { code: 400, meaning: "Radius out of range", remedy: "use 1-10000" },
+      ...permErrors("auth.page.tyomaa.edit"),
+    ],
+    examples: ["ib worksite set-geofence 99 --radius 300"],
+  },
+  {
+    command: "ib worksite helsinki-fetch",
+    description: "Refresh Helsinki building data for a worksite (POST /api/tyomaa/helsinki/fetch/:id).",
+    permissions: ["auth.page.tyomaa.edit"],
+    flags: [{ name: "tyomaaId", type: "number", description: "Positional — tyomaaId" }],
+    writeFlags: true,
+    outputShape: "{ success, ... } (raw backend response)",
+    errors: [
+      { code: 400, meaning: "Missing coordinates", remedy: "run refresh-location first" },
+      ...permErrors("auth.page.tyomaa.edit"),
+    ],
+    examples: ["ib worksite helsinki-fetch 99"],
+  },
+  {
     command: "ib worksite person add",
     description: "Attach a person to a worksite (tyomaaPerson). Requires --reason.",
     permissions: ["auth.page.tyomaa.edit"],

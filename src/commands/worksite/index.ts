@@ -149,6 +149,33 @@ export async function runWorksiteDatesExpiring(
   );
 }
 
+/** POST /api/tyomaa/refreshLocation/:tyomaaId — re-geocode from Google Maps. */
+export async function runWorksiteRefreshLocation(
+  client: ApiClient, tyomaaId: number, flags: WriteFlags
+): Promise<unknown> {
+  return client.post(`/api/tyomaa/refreshLocation/${tyomaaId}`, {}, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/** POST /api/tyomaa/:tyomaaId/geofence-radius — set geofence radius (1-10000 m). */
+export async function runWorksiteSetGeofence(
+  client: ApiClient, tyomaaId: number, radius: number, flags: WriteFlags
+): Promise<unknown> {
+  return client.post(`/api/tyomaa/${tyomaaId}/geofence-radius`, { geofenceRadius: radius }, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/** POST /api/tyomaa/helsinki/fetch/:tyomaaId — refresh Helsinki building data. */
+export async function runWorksiteHelsinkiFetch(
+  client: ApiClient, tyomaaId: number, flags: WriteFlags
+): Promise<unknown> {
+  return client.post(`/api/tyomaa/helsinki/fetch/${tyomaaId}`, {}, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
 /**
  * DELETE /api/tyomaa/delete/:tyomaaId. Universal write flags surface as
  * headers; `--reason` is enforced by the CLI layer.
@@ -433,6 +460,47 @@ export function registerWorksiteCommands(
       const client = await getClient();
       const result = await runWorksiteDelete(client, Number(tyomaaIdStr), opts);
       writeJson(result);
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
+
+  addWriteFlagsToCommand(
+    w.command("refresh-location <tyomaaId>")
+      .description("Re-geocode a worksite from Google Maps")
+  ).action(async (idStr: string, opts: WriteFlags) => {
+    try {
+      const client = await getClient();
+      writeJson(await runWorksiteRefreshLocation(client, Number(idStr), opts));
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
+
+  addWriteFlagsToCommand(
+    w.command("set-geofence <tyomaaId>")
+      .description("Set a worksite geofence radius in metres (1-10000)")
+      .requiredOption("--radius <m>", "Geofence radius in metres", Number)
+  ).action(async (idStr: string, opts: WriteFlags & { radius: number }) => {
+    if (!Number.isInteger(opts.radius) || opts.radius < 1 || opts.radius > 10000) {
+      writeError(new Error("--radius must be an integer between 1 and 10000"));
+      process.exit(4);
+    }
+    try {
+      const client = await getClient();
+      writeJson(await runWorksiteSetGeofence(client, Number(idStr), opts.radius, opts));
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
+
+  addWriteFlagsToCommand(
+    w.command("helsinki-fetch <tyomaaId>")
+      .description("Refresh Helsinki building data for a worksite")
+  ).action(async (idStr: string, opts: WriteFlags) => {
+    try {
+      const client = await getClient();
+      writeJson(await runWorksiteHelsinkiFetch(client, Number(idStr), opts));
     } catch (e) {
       exitWithError(e);
     }
