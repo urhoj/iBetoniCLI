@@ -254,6 +254,27 @@ export async function runVehicleUpdate(
 }
 
 /**
+ * Assign a per-day driver to a vehicle (vehicleDriverDays). The date flag is
+ * resolved through {@link resolveDate} (today/yesterday/tomorrow aliases) and
+ * collapsed to the backend's integer `yyyymmdd` key. Write-safety flags
+ * (--dry-run / --idempotency-key / --reason) map to headers as usual.
+ */
+export async function runVehicleDriversAssign(
+  client: ApiClient,
+  vehicleId: number,
+  personId: number,
+  date: string,
+  flags: WriteFlags
+): Promise<unknown> {
+  const yyyymmdd = Number(resolveDate(date)!.replace(/-/g, ""));
+  return client.post(
+    "/api/vehicle/driverDays/save",
+    { vehicleId, personId, yyyymmdd },
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
  * Register `ib vehicle` subcommands on the parent commander instance:
  *   - list     filterable by --limit/--cursor
  *   - get      single vehicle by id
@@ -494,4 +515,39 @@ export function registerVehicleCommands(
         exitWithError(e);
       }
     });
+
+  const assignCmd = v
+    .command("driver-assign <vehicleId>")
+    .description("Assign a per-day driver to a vehicle (vehicleDriverDays)")
+    .requiredOption("--person <pid>", "Driver personId", (s: string) =>
+      Number(s)
+    )
+    .option(
+      "--date <d>",
+      "Day YYYY-MM-DD (or today/yesterday/tomorrow)",
+      "today"
+    );
+  addWriteFlagsToCommand(assignCmd).action(
+    async (
+      idStr: string,
+      opts: WriteFlags & { person: number; date: string }
+    ) => {
+      try {
+        const result = await runVehicleDriversAssign(
+          await getClient(),
+          Number(idStr),
+          opts.person,
+          opts.date,
+          {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+          }
+        );
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
 }
