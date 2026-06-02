@@ -760,7 +760,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib vehicle status",
     description:
-      "Current operational status for a vehicle: current driver, current keikka, latest GPS ping (via Ecofleet, best-effort).",
+      "Current operational status for a vehicle: current driver, current keikka, and the latest GPS ping (via the shared Ecofleet cache, best-effort). gpsAvailable:false when Ecofleet is not enabled.",
     permissions: ["auth.page.vehicle.read"],
     flags: [
       {
@@ -770,7 +770,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     outputShape:
-      "{ vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,at}|null }",
+      "{ vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,speed,direction,engineState,address,at}|null, gpsAvailable }",
     errors: [
       { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
       ...permErrors("auth.page.vehicle.read"),

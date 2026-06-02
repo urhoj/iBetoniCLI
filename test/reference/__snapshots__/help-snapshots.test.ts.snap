@@ -1969,7 +1969,7 @@ exports[`Help snapshots — contract stability > help for ib vehicle status matc
   ib vehicle status [flags]
 
 DESCRIPTION
-  Current operational status for a vehicle: current driver, current keikka, latest GPS ping (via Ecofleet, best-effort).
+  Current operational status for a vehicle: current driver, current keikka, and the latest GPS ping (via the shared Ecofleet cache, best-effort). gpsAvailable:false when Ecofleet is not enabled.
   Permissions: requires auth.page.vehicle.read.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -1980,7 +1980,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  { vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,at}|null }
+  { vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,speed,direction,engineState,address,at}|null, gpsAvailable }
 
 ERRORS (stderr, exit non-zero)
   404  Vehicle not found      → verify vehicleId
