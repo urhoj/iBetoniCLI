@@ -120,11 +120,15 @@ const SETTING_ALIASES: Record<string, string> = {
 
 /**
  * Build a lowercase-key → asiakasSettingTypeId map covering every canonical
- * ASIAKAS_SETTING_TYPE_IDS name PLUS the 8 friendly aliases, sourced at call
- * time from @ibetoni/constants. `pumppu` is intentionally absent — it is a
- * roolit column, handled separately. Replaces the old 8-key moduleKeyToTypeId().
+ * ASIAKAS_SETTING_TYPE_IDS name PLUS the 8 friendly aliases, sourced once
+ * (memoized) from @ibetoni/constants. `pumppu` is intentionally absent — it is
+ * a roolit column, handled separately. Replaces the old 8-key moduleKeyToTypeId().
+ * Memoized so validation (allSettingKeys) and the typeId lookup
+ * (applySettingWrites) provably share one source and skip the rebuild.
  */
+let _settingTypeIdMap: Record<string, number> | null = null;
 function settingTypeIdMap(): Record<string, number> {
+  if (_settingTypeIdMap) return _settingTypeIdMap;
   const constants = cjsRequire("@ibetoni/constants") as {
     ASIAKAS_SETTING_TYPE_IDS: Record<string, number>;
   };
@@ -132,6 +136,7 @@ function settingTypeIdMap(): Record<string, number> {
   const map: Record<string, number> = {};
   for (const [name, id] of Object.entries(ids)) map[name.toLowerCase()] = id;
   for (const [alias, canonical] of Object.entries(SETTING_ALIASES)) map[alias] = ids[canonical];
+  _settingTypeIdMap = map;
   return map;
 }
 
@@ -192,7 +197,7 @@ export function parseSettingChanges(
       const key = raw.trim().toLowerCase();
       if (!key) continue;
       if (!valid.has(key)) {
-        throw new Error(`unknown field: ${key}. Valid: canonical ASIAKAS_SETTING_TYPE_IDS names, aliases, or pumppu`);
+        throw new Error(`unknown field: ${key}. Valid: ${[...valid].sort().join(", ")}`);
       }
       if (changes.has(key) && changes.get(key) !== value) {
         throw new Error(`field '${key}' given to both --set and --unset`);
@@ -822,7 +827,7 @@ export function registerCustomerCommands(
           writeError(validationErr);
           process.exit(4);
         }
-        writeJson(await runCustomerSettingsApply(client, asiakasId, changes!, {
+        writeJson(await runCustomerSettingsApply(client, asiakasId, changes, {
           dryRun: opts.dryRun,
           idempotencyKey: opts.idempotencyKey,
           reason: opts.reason,

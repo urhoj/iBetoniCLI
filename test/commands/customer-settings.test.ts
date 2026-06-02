@@ -34,6 +34,10 @@ describe("parseSettingChanges", () => {
   test("rejects an unknown name", () => {
     expect(() => parseSettingChanges("not_a_setting", undefined)).toThrow(/unknown field/);
   });
+
+  test("rejects a key given to both --set and --unset", () => {
+    expect(() => parseSettingChanges("has_fennoa", "has_fennoa")).toThrow(/both --set and --unset/);
+  });
 });
 
 describe("runCustomerSettingsApply", () => {
