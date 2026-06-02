@@ -76,6 +76,35 @@ export async function runVehicleDrivers(
 }
 
 /**
+ * GET /api/cli/vehicle/types — list selectable vehicle types
+ * (vehicleTypeId + name) for the active company, in the list envelope shape.
+ */
+export async function runVehicleTypes(
+  client: ApiClient
+): Promise<ListEnvelope<Record<string, unknown>>> {
+  return client.get<ListEnvelope<Record<string, unknown>>>(
+    "/api/cli/vehicle/types"
+  );
+}
+
+/**
+ * GET /api/cli/vehicle/list?search=…&limit=… — substring search over the
+ * vehicle list (reg-no / name). Reuses the list endpoint with a `search`
+ * query param; `limit` is appended only when supplied.
+ */
+export async function runVehicleSearch(
+  client: ApiClient,
+  query: string,
+  limit?: number
+): Promise<ListEnvelope<Record<string, unknown>>> {
+  const params = new URLSearchParams({ search: query });
+  if (limit !== undefined) params.set("limit", String(limit));
+  return client.get<ListEnvelope<Record<string, unknown>>>(
+    `/api/cli/vehicle/list?${params.toString()}`
+  );
+}
+
+/**
  * Register `ib vehicle` subcommands on the parent commander instance:
  *   - list     filterable by --limit/--cursor
  *   - get      single vehicle by id
@@ -142,6 +171,29 @@ export function registerVehicleCommands(
           to: resolveDate(opts.to),
         });
         writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  v.command("types")
+    .description("List vehicle types (vehicleTypeId + name)")
+    .action(async () => {
+      try {
+        writeJson(await runVehicleTypes(await getClient()));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  v.command("search <query>")
+    .description("Search vehicles by reg-no / name substring")
+    .option("--limit <n>", "Max rows", (val: string) =>
+      Math.min(Number(val), 500)
+    )
+    .action(async (query: string, opts: { limit?: number }) => {
+      try {
+        writeJson(await runVehicleSearch(await getClient(), query, opts.limit));
       } catch (e) {
         exitWithError(e);
       }
