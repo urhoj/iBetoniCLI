@@ -2415,7 +2415,7 @@ exports[`Help snapshots — contract stability > help for ib worksite update mat
   ib worksite update [flags]
 
 DESCRIPTION
-  Update a worksite via POST /api/tyomaa/set/:ownerAsiakasId/:tyomaaId/:yyyymmdd.
+  Update a worksite via POST /api/tyomaa/set (ownerAsiakasId derived from the session JWT; yyyymmdd defaults to today).
   Permissions: requires auth.page.tyomaa.edit.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 

@@ -7,6 +7,7 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { decodeJwtPayload } from "../../auth/jwt.js";
 
 export interface WorksiteListFilter {
   limit?: number;
@@ -192,6 +193,20 @@ export async function runWorksiteDelete(
 }
 
 /**
+ * Derive the active company's ownerAsiakasId from the client's JWT. Used by
+ * `worksite update` so the CLI no longer asks for --owner-asiakas-id. Throws a
+ * clean error (exit 4) when the token carries no usable owner claim.
+ */
+export function resolveOwnerAsiakasId(client: ApiClient): number {
+  const token = client.getCurrentToken();
+  const owner = token ? decodeJwtPayload(token).ownerAsiakasId : NaN;
+  if (!Number.isFinite(owner) || owner < 1) {
+    throw new Error("Could not derive ownerAsiakasId from the active session token");
+  }
+  return owner;
+}
+
+/**
  * Shape of the request body for both `worksite person add` and
  * `worksite person remove`. `contactPersonTypeId` defaults to 1 on the CLI
  * surface (matches FE default for tyomaaPerson links).
@@ -280,8 +295,8 @@ export async function runWorksitePersonList(
  *   - create  POST /api/tyomaa/new with --body JSON (write flags)
  *   - update  POST /api/tyomaa/set/<ownerAsiakasId>/<tyomaaId>/<yyyymmdd>
  *
- * The `update` action currently takes `--owner-asiakas-id <id>` as a temporary
- * flag until G.3 wires the auto-derive from the credentials context.
+ * The `update` action derives ownerAsiakasId from the session JWT via
+ * `resolveOwnerAsiakasId` — no --owner-asiakas-id flag required.
  * `--yyyymmdd` defaults to today.
  *
  * Exit codes: 1 = generic API/runtime failure.
@@ -398,17 +413,10 @@ export function registerWorksiteCommands(
 
   const updateCmd = w
     .command("update <tyomaaId>")
-    .description(
-      "Update a worksite (POST /api/tyomaa/set/<ownerAsiakasId>/<tyomaaId>/<yyyymmdd>)"
-    )
+    .description("Update a worksite (owner auto-derived from the session)")
     .requiredOption(
       "--body <json>",
       "JSON object forwarded verbatim as the request body"
-    )
-    .requiredOption(
-      "--owner-asiakas-id <id>",
-      "Owner asiakasId (temporary; auto-derived in G.3)",
-      (v: string) => Number(v)
     )
     .option("--yyyymmdd <date>", "Date segment YYYYMMDD (defaults to today)");
   addWriteFlagsToCommand(updateCmd).action(
@@ -416,7 +424,6 @@ export function registerWorksiteCommands(
       idStr: string,
       opts: {
         body: string;
-        ownerAsiakasId: number;
         yyyymmdd?: string;
         dryRun?: boolean;
         idempotencyKey?: string;
@@ -425,20 +432,13 @@ export function registerWorksiteCommands(
     ) => {
       try {
         const client = await getClient();
+        const ownerAsiakasId = resolveOwnerAsiakasId(client);
         const parsed = JSON.parse(opts.body) as Record<string, unknown>;
         const result = await runWorksiteUpdate(
           client,
-          {
-            tyomaaId: Number(idStr),
-            ownerAsiakasId: opts.ownerAsiakasId,
-            yyyymmdd: opts.yyyymmdd,
-          },
+          { tyomaaId: Number(idStr), ownerAsiakasId, yyyymmdd: opts.yyyymmdd },
           parsed,
-          {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          }
+          { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }
         );
         writeJson(result);
       } catch (e) {

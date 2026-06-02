@@ -631,7 +631,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib worksite update",
     description:
-      "Update a worksite via POST /api/tyomaa/set/:ownerAsiakasId/:tyomaaId/:yyyymmdd.",
+      "Update a worksite via POST /api/tyomaa/set (ownerAsiakasId derived from the session JWT; yyyymmdd defaults to today).",
     permissions: ["auth.page.tyomaa.edit"],
     flags: [
       {

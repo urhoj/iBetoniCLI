@@ -5,8 +5,13 @@ import {
   runWorksiteRefreshLocation,
   runWorksiteSetGeofence,
   runWorksiteHelsinkiFetch,
+  resolveOwnerAsiakasId,
 } from "../../src/commands/worksite/index.js";
 import type { ApiClient } from "../../src/api/client.js";
+import { decodeJwtPayload } from "../../src/auth/jwt.js";
+vi.mock("../../src/auth/jwt.js", () => ({
+  decodeJwtPayload: vi.fn(),
+}));
 
 const mockClient = {
   get: vi.fn(),
@@ -106,5 +111,17 @@ describe("ib worksite create/update", () => {
       {},
       { headers: {} }
     );
+  });
+
+  test("resolveOwnerAsiakasId decodes the active token's ownerAsiakasId", () => {
+    (mockClient.getCurrentToken as ReturnType<typeof vi.fn>).mockReturnValue("jwt.token.sig");
+    (decodeJwtPayload as ReturnType<typeof vi.fn>).mockReturnValue({ ownerAsiakasId: 1349 });
+    expect(resolveOwnerAsiakasId(mockClient)).toBe(1349);
+  });
+
+  test("resolveOwnerAsiakasId throws when owner missing", () => {
+    (mockClient.getCurrentToken as ReturnType<typeof vi.fn>).mockReturnValue("jwt.token.sig");
+    (decodeJwtPayload as ReturnType<typeof vi.fn>).mockReturnValue({ ownerAsiakasId: NaN });
+    expect(() => resolveOwnerAsiakasId(mockClient)).toThrow();
   });
 });
