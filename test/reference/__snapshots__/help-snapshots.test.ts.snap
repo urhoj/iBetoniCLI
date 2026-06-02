@@ -2063,6 +2063,35 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib worksite metrics matches snapshot 1`] = `
+"USAGE
+  ib worksite metrics [flags]
+
+DESCRIPTION
+  Volume / keikka-count metrics for a worksite (GET /api/cli/worksite/metrics/:tyomaaId).
+  Permissions: requires auth.page.tyomaa.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --tyomaaId NUMBER    Positional — tyomaaId
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { tyomaaId, summary:{...}, monthlyBreakdown:[...] }
+
+ERRORS (stderr, exit non-zero)
+  404  Worksite not found     → verify tyomaaId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite metrics 99
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib worksite person add matches snapshot 1`] = `
 "USAGE
   ib worksite person add [flags]

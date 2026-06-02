@@ -560,6 +560,21 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib worksite get 99"],
   },
   {
+    command: "ib worksite metrics",
+    description:
+      "Volume / keikka-count metrics for a worksite (GET /api/cli/worksite/metrics/:tyomaaId).",
+    permissions: ["auth.page.tyomaa.read"],
+    flags: [
+      { name: "tyomaaId", type: "number", description: "Positional — tyomaaId" },
+    ],
+    outputShape: "{ tyomaaId, summary:{...}, monthlyBreakdown:[...] }",
+    errors: [
+      { code: 404, meaning: "Worksite not found", remedy: "verify tyomaaId" },
+      ...permErrors("auth.page.tyomaa.read"),
+    ],
+    examples: ["ib worksite metrics 99"],
+  },
+  {
     command: "ib worksite create",
     description:
       "Create a new worksite via POST /api/tyomaa/new. Body forwarded verbatim.",

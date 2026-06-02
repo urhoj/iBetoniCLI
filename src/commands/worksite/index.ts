@@ -116,6 +116,19 @@ export async function runWorksiteUpdate(
 }
 
 /**
+ * GET /api/cli/worksite/metrics/:tyomaaId — volume / keikka-count summary plus
+ * monthly breakdown. Owner derived from the JWT server-side.
+ */
+export async function runWorksiteMetrics(
+  client: ApiClient,
+  tyomaaId: number
+): Promise<Record<string, unknown>> {
+  return client.get<Record<string, unknown>>(
+    `/api/cli/worksite/metrics/${tyomaaId}`
+  );
+}
+
+/**
  * DELETE /api/tyomaa/delete/:tyomaaId. Universal write flags surface as
  * headers; `--reason` is enforced by the CLI layer.
  */
@@ -251,6 +264,18 @@ export function registerWorksiteCommands(
       try {
         const client = await getClient();
         const result = await runWorksiteGet(client, Number(idStr));
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  w.command("metrics <tyomaaId>")
+    .description("Volume / keikka-count metrics for a worksite")
+    .action(async (idStr: string) => {
+      try {
+        const client = await getClient();
+        const result = await runWorksiteMetrics(client, Number(idStr));
         writeJson(result);
       } catch (e) {
         exitWithError(e);
