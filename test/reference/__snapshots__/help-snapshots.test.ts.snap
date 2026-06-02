@@ -213,12 +213,17 @@ exports[`Help snapshots — contract stability > help for ib customer create mat
   ib customer create [flags]
 
 DESCRIPTION
-  Create a new customer via POST /api/asiakas/createY. Body forwarded verbatim.
+  Create a customer. Typed flags assemble the createY body (yTunnus REQUIRED); --from-prh prefills name+yTunnus from the PRH registry; --body raw JSON overrides flags. Returns the flat customer shape via re-fetch.
   Permissions: requires auth.page.asiakas.edit.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
-  --body JSON    JSON object with the new customer fields
+  --name STRING    Customer name (asiakasNimi)
+  --ytunnus STRING    Business ID (yTunnus) — required unless --from-prh/--body supplies it
+  --email STRING    Invoicing email (laskutusEmail)
+  --short-name STRING    Short display name (asiakasShortNimi)
+  --from-prh STRING    Prefill name + yTunnus from PRH for this business ID
+  --body JSON    Raw JSON body (overrides typed flags)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -229,16 +234,17 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  { asiakasId, ... } (raw backend response)
+  flat customer { asiakasId, name, yTunnus, type, address, city, email, contactPersonId, shortName, comment } (or wouldCreate on --dry-run)
 
 ERRORS (stderr, exit non-zero)
-  400  Validation failed      → fix --body fields
+  400  Missing yTunnus / validation → pass --ytunnus or --from-prh
   401  Token expired          → ib auth refresh
   403  Permission denied      → check auth.page.asiakas.edit
   500  Backend error          → retry with --verbose
 
 EXAMPLES
-  ib customer create --body '{"name":"Example Oy","yTunnus":"1234567-8"}' --idempotency-key new-example-oy
+  ib customer create --from-prh 0145937-9 --email billing@x.fi --reason onboard
+  ib customer create --name 'Example Oy' --ytunnus 1234567-8
 "
 `;
 
@@ -302,6 +308,36 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib customer get 1349
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib customer history matches snapshot 1`] = `
+"USAGE
+  ib customer history [flags]
+
+DESCRIPTION
+  Change-tracker audit trail for one customer — who changed which field, when, and the --reason. Reads the same log the CLI's writes populate.
+  Permissions: requires auth.page.asiakas.read (company member or admin).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --asiakasId NUMBER    Positional — asiakasId
+  --limit NUMBER    Max rows (cap 500) (default: 100)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.asiakas.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib customer history 26
+  ib customer history 26 --limit 20
 "
 `;
 
@@ -517,6 +553,37 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib customer prh matches snapshot 1`] = `
+"USAGE
+  ib customer prh [flags]
+
+DESCRIPTION
+  Look up a company in the Finnish business registry (PRH). Positional <ytunnus> for an exact business-ID lookup, or --search <name>. Read-only; any authenticated user.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --ytunnus STRING    Positional — business ID (XXXXXXXX-X)
+  --search STRING    Search by company name instead
+  --page NUMBER    Result page for --search (default: 1)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  by-id: { businessId, name, tradeNames, address:{street,postCode,city,full}, companyForm, status } | search: ListEnvelope<{ businessId, name, city }>
+
+ERRORS (stderr, exit non-zero)
+  404  Business ID not found  → verify the Y-tunnus
+  400  Invalid Y-tunnus format → use XXXXXXXX-X
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib customer prh 0145937-9
+  ib customer prh --search Betoni
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib customer search matches snapshot 1`] = `
 "USAGE
   ib customer search [flags]
@@ -547,18 +614,19 @@ EXAMPLES
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib customer update matches snapshot 1`] = `
+exports[`Help snapshots — contract stability > help for ib customer settings matches snapshot 1`] = `
 "USAGE
-  ib customer update [flags]
+  ib customer settings [flags]
 
 DESCRIPTION
-  Update a customer via POST /api/asiakas/set/:asiakasId. Body forwarded verbatim.
-  Permissions: requires auth.page.asiakas.edit.
+  Report or toggle ALL asiakasSettings (every canonical ASIAKAS_SETTING_TYPE_IDS name) plus pumppu. Without --set/--unset it is a read-only report. Names are case-insensitive; the 8 module aliases (jerry, weather, …) and pumppu are also accepted. Superset of \`customer modules\`.
+  Permissions: requires company admin on the target tenant (system admin = any tenant).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
-  --asiakasId NUMBER    Positional — asiakasId to update
-  --body JSON    JSON object with the fields to update
+  --asiakasId NUMBER    Positional — asiakasId
+  --set STRING    Comma-separated setting names to turn ON
+  --unset STRING    Comma-separated setting names to turn OFF
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -569,17 +637,61 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  { ok: true, ... } (raw backend response)
+  report: { asiakasId, roolit:{…}, settings:{ HAS_FENNOA:bool, ALV:bool, … every setting } } | write: { asiakasId, applied:{set,unset,dryRun}, state }
 
 ERRORS (stderr, exit non-zero)
-  400  Validation failed      → fix --body fields
+  400  Unknown setting name, or name in both --set/--unset → use a canonical ASIAKAS_SETTING_TYPE_IDS name, an alias, or pumppu
+  403  Not an admin of this tenant → use a system-admin token, or an admin of the owner company
+  404  Customer not found     → verify asiakasId
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib customer settings 1349
+  ib customer settings 1349 --set HAS_FENNOA,ALV --unset HAS_OCR --reason 'billing setup'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib customer update matches snapshot 1`] = `
+"USAGE
+  ib customer update [flags]
+
+DESCRIPTION
+  Update a customer via read-merge-write: reads the current record, overlays the provided flags (preserving everything else — no contact-person clobber), writes back with saveGlobalAsiakas. --body raw JSON overrides flags.
+  Permissions: requires auth.page.asiakas.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --asiakasId NUMBER    Positional — asiakasId to update
+  --name STRING    Customer name (asiakasNimi)
+  --ytunnus STRING    Business ID (ytunnus)
+  --email STRING    Invoicing email (laskutusEmail)
+  --short-name STRING    Short display name (asiakasShortNimi)
+  --comment STRING    Comment (kommentti)
+  --contact-person NUMBER    Contact person id (asiakasContactPersonId)
+  --type NUMBER    Customer type id (asiakasTypeId)
+  --body JSON    Raw JSON body (overrides typed flags)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  flat customer shape (or wouldUpdate on --dry-run)
+
+ERRORS (stderr, exit non-zero)
   404  Customer not found     → verify asiakasId
   401  Token expired          → ib auth refresh
   403  Permission denied      → check auth.page.asiakas.edit
   500  Backend error          → retry with --verbose
 
 EXAMPLES
-  ib customer update 1349 --body '{"email":"new@example.com"}' --reason 'customer requested'
+  ib customer update 26 --email new@x.fi --reason 'email change'
+  ib customer update 26 --name 'Renamed Oy'
 "
 `;
 
