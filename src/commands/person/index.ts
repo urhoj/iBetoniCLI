@@ -8,7 +8,7 @@ import {
 } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
-import { roleNameForTypeId } from "../../roles.js";
+import { roleNameForTypeId, resolveRoleTypeId } from "../../roles.js";
 
 export interface PersonListFilter {
   role?: string;
@@ -347,6 +347,107 @@ export function registerPersonCommands(
       exitWithError(e);
     }
   });
+
+  // ─── person role subgroup ────────────────────────────────────────────────
+  const personRole = p
+    .command("role")
+    .description("Manage a person's per-company roles (asiakasPersonSettings)");
+
+  personRole
+    .command("list <personId>")
+    .description("List a person's roles in a company")
+    .requiredOption("--asiakas <id>", "Target asiakasId", (v: string) => Number(v))
+    .action(async (personIdStr: string, opts: { asiakas: number }) => {
+      try {
+        const client = await getClient();
+        const result = await runPersonRoleList(client, Number(personIdStr), opts.asiakas);
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  addWriteFlagsToCommand(
+    personRole
+      .command("grant <personId>")
+      .description("Grant a role to a person in a company. Requires --role, --asiakas, --reason.")
+      .requiredOption("--role <name>", "Role name (see ROLE_TYPEID_BY_NAME)")
+      .requiredOption("--asiakas <id>", "Target asiakasId", (v: string) => Number(v))
+  ).action(async (personIdStr: string, opts: WriteFlags & { role: string; asiakas: number }) => {
+    if (!opts.reason) {
+      writeError(new Error("Missing required flag: --reason"));
+      process.exit(4);
+    }
+    let roleTypeId: number;
+    try {
+      roleTypeId = resolveRoleTypeId(opts.role);
+    } catch (validationErr) {
+      writeError(validationErr);
+      process.exit(4);
+    }
+    try {
+      const client = await getClient();
+      const result = await runPersonRoleGrant(client, Number(personIdStr), opts.asiakas, roleTypeId, opts);
+      writeJson(result);
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
+
+  addWriteFlagsToCommand(
+    personRole
+      .command("revoke <personId>")
+      .description("Revoke a role from a person in a company (idempotent). Requires --role, --asiakas, --reason.")
+      .requiredOption("--role <name>", "Role name (see ROLE_TYPEID_BY_NAME)")
+      .requiredOption("--asiakas <id>", "Target asiakasId", (v: string) => Number(v))
+  ).action(async (personIdStr: string, opts: WriteFlags & { role: string; asiakas: number }) => {
+    if (!opts.reason) {
+      writeError(new Error("Missing required flag: --reason"));
+      process.exit(4);
+    }
+    let roleTypeId: number;
+    try {
+      roleTypeId = resolveRoleTypeId(opts.role);
+    } catch (validationErr) {
+      writeError(validationErr);
+      process.exit(4);
+    }
+    try {
+      const client = await getClient();
+      const result = await runPersonRoleRevoke(client, Number(personIdStr), opts.asiakas, roleTypeId, opts);
+      writeJson(result);
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
+
+  // ─── self-introspection ───────────────────────────────────────────────────
+  p.command("me")
+    .description("Your own profile, active-company roles, and actable companies")
+    .action(async () => {
+      try {
+        const client = await getClient();
+        const result = await runPersonMe(client);
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  p.command("companies [personId]")
+    .description("List the companies a person belongs to (defaults to you)")
+    .action(async (personIdStr?: string) => {
+      try {
+        const client = await getClient();
+        const result = await runPersonCompanies(
+          client,
+          personIdStr ? Number(personIdStr) : undefined
+        );
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
 }
 
 /**

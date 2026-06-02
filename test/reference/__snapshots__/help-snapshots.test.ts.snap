@@ -1134,6 +1134,33 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib person companies matches snapshot 1`] = `
+"USAGE
+  ib person companies [flags]
+
+DESCRIPTION
+  List the companies (asiakkaat) a person belongs to. Positional personId is optional and defaults to you. Reverse of \`customer person list\`.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --personId NUMBER    Positional — personId (optional; defaults to caller)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ asiakasId, name }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib person companies
+  ib person companies 5351
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib person create matches snapshot 1`] = `
 "USAGE
   ib person create [flags]
@@ -1261,6 +1288,135 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib person list --role driver
   ib person list --asiakas 1349 --limit 50
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person me matches snapshot 1`] = `
+"USAGE
+  ib person me [flags]
+
+DESCRIPTION
+  Your own profile, roles in the active company, and the companies you can act on. Derives identity from the JWT (works with IB_TOKEN). Roles are active-company-scoped — use \`person role list --asiakas\` for other companies.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { personId, name, email, phone, activeCompany:{asiakasId,name}, roles:[{roleTypeId,role}], companies:[{asiakasId,name,current}] }
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib person me
+  ib person me --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person role grant matches snapshot 1`] = `
+"USAGE
+  ib person role grant [flags]
+
+DESCRIPTION
+  Grant a per-company role to a person. POST /api/asiakasPersonSettings/add/:asiakasId/:personId/:roleTypeId. Admin-gated on the tenant (tier depends on the role). --dry-run previews via the backend ({ dryRun:true, wouldCreate }).
+  Permissions: requires company admin on the target tenant (tier per role).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --personId NUMBER    Positional — personId
+  --role STRING    Role name (REQUIRED), e.g. keikkaHandler, vehicleHandler, hrAdmin
+  --asiakas NUMBER    Target asiakasId (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  raw backend success | { dryRun:true, wouldCreate:{ personId, asiakasId, personSettingTypeId, personSettingString }, validation }
+
+ERRORS (stderr, exit non-zero)
+  400  Unknown role / company limit reached → use a name from ROLE_TYPEID_BY_NAME
+  403  Not a tenant admin     → use a system-admin token or a tenant admin
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib person role grant 5351 --role keikkaHandler --asiakas 26 --reason 'onboard handler'
+  ib person role grant 5351 --role vehicleHandler --asiakas 26 --reason preview --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person role list matches snapshot 1`] = `
+"USAGE
+  ib person role list [flags]
+
+DESCRIPTION
+  List a person's per-company roles (asiakasPersonSettings) for a given asiakas. Role names resolved via ROLE_NAME_BY_TYPEID.
+  Permissions: requires company role read on the target tenant.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --personId NUMBER    Positional — personId
+  --asiakas NUMBER    Target asiakasId (REQUIRED)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ asiakasPersonSettingId, roleTypeId, role: string|null }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check company role access on the tenant
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib person role list 5351 --asiakas 26
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person role revoke matches snapshot 1`] = `
+"USAGE
+  ib person role revoke [flags]
+
+DESCRIPTION
+  Revoke a per-company role from a person (idempotent: { removed:0 } when absent). Looks up the asiakasPersonSettingId then DELETEs it. --dry-run previews via the backend ({ dryRun:true, wouldDelete }).
+  Permissions: requires company admin on the target tenant (tier per role).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --personId NUMBER    Positional — personId
+  --role STRING    Role name (REQUIRED)
+  --asiakas NUMBER    Target asiakasId (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { removed: 1 } | { removed: 0 } (absent) | { dryRun:true, wouldDelete:{ asiakasPersonSettingId }, validation }
+
+ERRORS (stderr, exit non-zero)
+  400  Unknown role           → use a name from ROLE_TYPEID_BY_NAME
+  403  Not a tenant admin     → use a system-admin token or a tenant admin
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib person role revoke 5351 --role keikkaHandler --asiakas 26 --reason rotation
 "
 `;
 
