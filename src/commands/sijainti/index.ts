@@ -139,6 +139,31 @@ export async function runSijaintiUndelete(
   );
 }
 
+export interface SijaintiTypeItem {
+  sijaintiTypeId: number;
+  selite: string | null;
+}
+
+/**
+ * GET /api/geocode/sijaintiTypes — the "Sijainnin laji" lookup. Projects the
+ * backend `{sijaintiTypeId, sijaintiTypeSelite}` rows into the universal list
+ * envelope with a tidy `selite` field. `--jerry` switches to the BetoniJerry
+ * type set (useJerry=1).
+ */
+export async function runSijaintiTypes(
+  client: ApiClient,
+  useJerry?: boolean
+): Promise<ListEnvelope<SijaintiTypeItem>> {
+  const rows = await client.get<
+    Array<{ sijaintiTypeId: number; sijaintiTypeSelite?: string | null }>
+  >(`/api/geocode/sijaintiTypes${useJerry ? "?useJerry=1" : ""}`);
+  const items = (rows || []).map((r) => ({
+    sijaintiTypeId: r.sijaintiTypeId,
+    selite: r.sijaintiTypeSelite ?? null,
+  }));
+  return { items, nextCursor: null, count: items.length };
+}
+
 /**
  * Register `ib sijainti` subcommands on the parent commander instance:
  *   - list    filterable by --type/--limit
@@ -320,4 +345,19 @@ export function registerSijaintiCommands(
       exitWithError(e);
     }
   });
+
+  s.command("types")
+    .description(
+      "List sijainti type categories (the 'Sijainnin laji' lookup; maps sijaintiTypeId → selite)"
+    )
+    .option("--jerry", "Use the BetoniJerry sijainti type set")
+    .action(async (opts: { jerry?: boolean }) => {
+      try {
+        const client = await getClient();
+        const result = await runSijaintiTypes(client, opts.jerry);
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
 }

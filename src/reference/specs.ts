@@ -960,6 +960,18 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     examples: ['ib sijainti undelete 42 --reason "restored after review"'],
   },
+  {
+    command: "ib sijainti types",
+    description:
+      "List sijainti type categories (the 'Sijainnin laji' lookup). Resolves the sijaintiTypeId values used by `sijainti list --type` and `create/update --type`.",
+    permissions: ["auth.page.sijainnit.read"],
+    flags: [
+      { name: "jerry", type: "boolean", description: "Use the BetoniJerry type set (useJerry=1)" },
+    ],
+    outputShape: "ListEnvelope<{ sijaintiTypeId, selite }>",
+    errors: permErrors("auth.page.sijainnit.read"),
+    examples: ["ib sijainti types", "ib sijainti types --jerry"],
+  },
 
   // ─── schedule (3) ────────────────────────────────────────────────────────
   {

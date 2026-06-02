@@ -3,6 +3,7 @@ import {
   runSijaintiList,
   runSijaintiGet,
   runSijaintiSetJerry,
+  runSijaintiTypes,
 } from "../../src/commands/sijainti/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -101,5 +102,35 @@ describe("ib sijainti set-jerry", () => {
       { sijaintiId: 42, sijaintiNimi: "X", jerryActiveUntil: null },
       { headers: { "X-Dry-Run": "1" } }
     );
+  });
+});
+
+describe("ib sijainti types", () => {
+  const get = mockClient.get as ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    get.mockReset();
+  });
+
+  test("runSijaintiTypes: GET /api/geocode/sijaintiTypes, wraps into envelope", async () => {
+    get.mockResolvedValueOnce([
+      { sijaintiTypeId: 1, sijaintiTypeSelite: "Betoniasema" },
+      { sijaintiTypeId: 6, sijaintiTypeSelite: "Toimipiste / konttori" },
+    ]);
+    const result = await runSijaintiTypes(mockClient);
+    expect(get).toHaveBeenCalledWith("/api/geocode/sijaintiTypes");
+    expect(result).toEqual({
+      items: [
+        { sijaintiTypeId: 1, selite: "Betoniasema" },
+        { sijaintiTypeId: 6, selite: "Toimipiste / konttori" },
+      ],
+      nextCursor: null,
+      count: 2,
+    });
+  });
+
+  test("runSijaintiTypes: --jerry appends ?useJerry=1", async () => {
+    get.mockResolvedValueOnce([]);
+    await runSijaintiTypes(mockClient, true);
+    expect(get).toHaveBeenCalledWith("/api/geocode/sijaintiTypes?useJerry=1");
   });
 });
