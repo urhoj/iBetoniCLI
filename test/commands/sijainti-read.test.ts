@@ -4,6 +4,7 @@ import {
   runSijaintiGet,
   runSijaintiSetJerry,
   runSijaintiTypes,
+  runSijaintiGeocode,
 } from "../../src/commands/sijainti/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -132,5 +133,24 @@ describe("ib sijainti types", () => {
     get.mockResolvedValueOnce([]);
     await runSijaintiTypes(mockClient, true);
     expect(get).toHaveBeenCalledWith("/api/geocode/sijaintiTypes?useJerry=1");
+  });
+});
+
+describe("ib sijainti geocode", () => {
+  const post = mockClient.post as ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    post.mockReset();
+  });
+
+  test("runSijaintiGeocode: POST /api/geocode/getLatLng with {osoite}, returns raw", async () => {
+    post.mockResolvedValueOnce({ status: "OK", lat: 60.17, lng: 24.94 });
+    const result = await runSijaintiGeocode(
+      mockClient,
+      "Mannerheimintie 1, Helsinki"
+    );
+    expect(post).toHaveBeenCalledWith("/api/geocode/getLatLng", {
+      osoite: "Mannerheimintie 1, Helsinki",
+    });
+    expect((result as { lat: number }).lat).toBe(60.17);
   });
 });

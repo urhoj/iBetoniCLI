@@ -972,6 +972,19 @@ export const COMMAND_SPECS: CommandSpec[] = [
     errors: permErrors("auth.page.sijainnit.read"),
     examples: ["ib sijainti types", "ib sijainti types --jerry"],
   },
+  {
+    command: "ib sijainti geocode",
+    description:
+      "Geocode a free-form address to coordinates via Google Maps. Useful before `sijainti create` to obtain lat/lng. ownerAsiakasId is derived from the token.",
+    permissions: ["auth.page.sijainnit.read"],
+    flags: [
+      { name: "address", type: "string", description: "Free-form address (REQUIRED)" },
+    ],
+    outputShape:
+      "{ status, lat, lng, ... } (raw Google geocode result; { status: 'ZERO_RESULTS' } when no match)",
+    errors: permErrors("auth.page.sijainnit.read"),
+    examples: ['ib sijainti geocode --address "Mannerheimintie 1, Helsinki"'],
+  },
 
   // ─── schedule (3) ────────────────────────────────────────────────────────
   {

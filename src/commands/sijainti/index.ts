@@ -165,6 +165,20 @@ export async function runSijaintiTypes(
 }
 
 /**
+ * POST /api/geocode/getLatLng — geocode a free-form address string to
+ * coordinates via Google Maps. The backend derives ownerAsiakasId from the
+ * token. Returns the raw Google geocode result verbatim (shape:
+ * `{ status, lat, lng, ... }`; `{ status: "ZERO_RESULTS" }` when the address
+ * is shorter than 5 characters or has no match). Read-only, no write flags.
+ */
+export async function runSijaintiGeocode(
+  client: ApiClient,
+  address: string
+): Promise<unknown> {
+  return client.post<unknown>("/api/geocode/getLatLng", { osoite: address });
+}
+
+/**
  * Register `ib sijainti` subcommands on the parent commander instance:
  *   - list    filterable by --type/--limit
  *   - get     single sijainti by id (uses existing /api/geocode/sijainti route)
@@ -355,6 +369,21 @@ export function registerSijaintiCommands(
       try {
         const client = await getClient();
         const result = await runSijaintiTypes(client, opts.jerry);
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  s.command("geocode")
+    .description(
+      "Geocode an address string to coordinates (POST /api/geocode/getLatLng, Google Maps)"
+    )
+    .requiredOption("--address <a>", "Free-form address to geocode")
+    .action(async (opts: { address: string }) => {
+      try {
+        const client = await getClient();
+        const result = await runSijaintiGeocode(client, opts.address);
         writeJson(result);
       } catch (e) {
         exitWithError(e);
