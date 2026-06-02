@@ -1075,6 +1075,7 @@ FLAGS
   --to DATE    End date (YYYY-MM-DD or today/yesterday/tomorrow) (default: today)
   --customer NUMBER    Filter by asiakasId
   --vehicle NUMBER    Filter by vehicleId
+  --worksite NUMBER    Filter by worksite (tyomaaId)
   --status STRING    Filter by tila/status
   --limit NUMBER    Max rows (server caps at 500) (default: 100)
   --cursor STRING    Pagination cursor

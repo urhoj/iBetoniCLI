@@ -203,6 +203,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
         type: "number",
         description: "Filter by vehicleId",
       },
+      { name: "worksite", type: "number", description: "Filter by worksite (tyomaaId)" },
       { name: "status", type: "string", description: "Filter by tila/status" },
       {
         name: "limit",

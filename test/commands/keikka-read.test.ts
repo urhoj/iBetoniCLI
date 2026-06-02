@@ -65,6 +65,15 @@ describe("ib keikka list/get", () => {
     expect(mockClient.get).toHaveBeenCalledWith("/api/cli/keikka/list");
   });
 
+  test("runKeikkaList: includes worksite as tyomaaId filter", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [], nextCursor: null, count: 0,
+    });
+    await runKeikkaList(mockClient, { from: "2026-06-01", to: "2026-06-30", worksite: 42 });
+    const url = (mockClient.get as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(url).toContain("worksite=42");
+  });
+
   test("runKeikkaGet: GET /api/cli/keikka/get/9001", async () => {
     (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       keikkaId: 9001,
