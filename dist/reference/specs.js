@@ -649,6 +649,75 @@ export const COMMAND_SPECS = [
         errors: permErrors("auth.page.person.read"),
         examples: ["ib person search 'Matti'"],
     },
+    {
+        command: "ib person role list",
+        description: "List a person's per-company roles (asiakasPersonSettings) for a given asiakas. Role names resolved via ROLE_NAME_BY_TYPEID.",
+        permissions: ["company role read on the target tenant"],
+        flags: [
+            { name: "personId", type: "number", description: "Positional — personId" },
+            { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
+        ],
+        outputShape: "ListEnvelope<{ asiakasPersonSettingId, roleTypeId, role: string|null }>",
+        errors: permErrors("company role access on the tenant"),
+        examples: ["ib person role list 5351 --asiakas 26"],
+    },
+    {
+        command: "ib person role grant",
+        description: "Grant a per-company role to a person. POST /api/asiakasPersonSettings/add/:asiakasId/:personId/:roleTypeId. Admin-gated on the tenant (tier depends on the role). --dry-run previews via the backend ({ dryRun:true, wouldCreate }).",
+        permissions: ["company admin on the target tenant (tier per role)"],
+        flags: [
+            { name: "personId", type: "number", description: "Positional — personId" },
+            { name: "role", type: "string", description: "Role name (REQUIRED), e.g. keikkaHandler, vehicleHandler, hrAdmin" },
+            { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
+        ],
+        writeFlags: true,
+        outputShape: "raw backend success | { dryRun:true, wouldCreate:{ personId, asiakasId, personSettingTypeId, personSettingString }, validation }",
+        errors: [
+            { code: 400, meaning: "Unknown role / company limit reached", remedy: "use a name from ROLE_TYPEID_BY_NAME" },
+            { code: 403, meaning: "Not a tenant admin", remedy: "use a system-admin token or a tenant admin" },
+            ...COMMON_AUTH_ERRORS,
+        ],
+        examples: [
+            "ib person role grant 5351 --role keikkaHandler --asiakas 26 --reason 'onboard handler'",
+            "ib person role grant 5351 --role vehicleHandler --asiakas 26 --reason preview --dry-run",
+        ],
+    },
+    {
+        command: "ib person role revoke",
+        description: "Revoke a per-company role from a person (idempotent: { removed:0 } when absent). Looks up the asiakasPersonSettingId then DELETEs it. --dry-run previews via the backend ({ dryRun:true, wouldDelete }).",
+        permissions: ["company admin on the target tenant (tier per role)"],
+        flags: [
+            { name: "personId", type: "number", description: "Positional — personId" },
+            { name: "role", type: "string", description: "Role name (REQUIRED)" },
+            { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
+        ],
+        writeFlags: true,
+        outputShape: "{ removed: 1 } | { removed: 0 } (absent) | { dryRun:true, wouldDelete:{ asiakasPersonSettingId }, validation }",
+        errors: [
+            { code: 400, meaning: "Unknown role", remedy: "use a name from ROLE_TYPEID_BY_NAME" },
+            { code: 403, meaning: "Not a tenant admin", remedy: "use a system-admin token or a tenant admin" },
+            ...COMMON_AUTH_ERRORS,
+        ],
+        examples: ["ib person role revoke 5351 --role keikkaHandler --asiakas 26 --reason rotation"],
+    },
+    {
+        command: "ib person me",
+        description: "Your own profile, roles in the active company, and the companies you can act on. Derives identity from the JWT (works with IB_TOKEN). Roles are active-company-scoped — use `person role list --asiakas` for other companies.",
+        flags: [],
+        outputShape: "{ personId, name, email, phone, activeCompany:{asiakasId,name}, roles:[{roleTypeId,role}], companies:[{asiakasId,name,current}] }",
+        errors: [...COMMON_AUTH_ERRORS],
+        examples: ["ib person me", "ib person me --pretty"],
+    },
+    {
+        command: "ib person companies",
+        description: "List the companies (asiakkaat) a person belongs to. Positional personId is optional and defaults to you. Reverse of `customer person list`.",
+        flags: [
+            { name: "personId", type: "number", description: "Positional — personId (optional; defaults to caller)" },
+        ],
+        outputShape: "ListEnvelope<{ asiakasId, name }>",
+        errors: [...COMMON_AUTH_ERRORS],
+        examples: ["ib person companies", "ib person companies 5351"],
+    },
     // ─── vehicle (4) ─────────────────────────────────────────────────────────
     {
         command: "ib vehicle list",

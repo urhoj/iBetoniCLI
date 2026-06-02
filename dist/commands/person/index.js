@@ -1,5 +1,7 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { decodeJwtPayload } from "../../auth/jwt.js";
+import { roleNameForTypeId, resolveRoleTypeId } from "../../roles.js";
 /**
  * GET /api/cli/person/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
@@ -30,6 +32,100 @@ export async function runPersonGet(client, personId) {
  */
 export async function runPersonSearch(client, query) {
     return client.post("/api/person/search", { searchString: query });
+}
+/**
+ * GET /api/asiakasPersonSettings/get/:asiakasId/:personId — the per-company
+ * roles a person holds. Resolves each asiakasPersonSettingTypeId to its role
+ * name (null for non-role/unknown typeIds). The backend may return a bare
+ * array or an mssql wrapper ({ recordset } / { recordsets }) depending on cache
+ * warmth — unwrap defensively. Wrapped in the universal ListEnvelope.
+ */
+export async function runPersonRoleList(client, personId, asiakasId) {
+    const raw = await client.get(`/api/asiakasPersonSettings/get/${asiakasId}/${personId}`);
+    let rows = [];
+    if (Array.isArray(raw)) {
+        rows = raw;
+    }
+    else if (raw && typeof raw === "object") {
+        rows = raw.recordset || raw.recordsets?.[0] || [];
+    }
+    const items = rows.map((r) => ({
+        asiakasPersonSettingId: r.asiakasPersonSettingId,
+        roleTypeId: r.asiakasPersonSettingTypeId,
+        role: roleNameForTypeId(r.asiakasPersonSettingTypeId),
+    }));
+    return { items, nextCursor: null, count: items.length };
+}
+/**
+ * POST /api/asiakasPersonSettings/add/:asiakasId/:personId/:roleTypeId — grant
+ * a per-company role. roleTypeId fills the route's positional :personSettingTypeId
+ * segment. Body is empty ({}). Write-flag headers (incl. X-Dry-Run) are forwarded;
+ * under dry-run the wrapped backend returns { dryRun:true, wouldCreate }.
+ */
+export async function runPersonRoleGrant(client, personId, asiakasId, roleTypeId, flags) {
+    return client.post(`/api/asiakasPersonSettings/add/${asiakasId}/${personId}/${roleTypeId}`, {}, { headers: writeFlagsToHeaders(flags) });
+}
+/**
+ * Revoke a per-company role. Two-step: list the person's roles for the company,
+ * find the row whose roleTypeId matches, then DELETE it by asiakasPersonSettingId.
+ * Idempotent — returns { removed: 0 } (no DELETE) when the role is absent. Under
+ * --dry-run the DELETE forwards X-Dry-Run and the wrapped backend returns
+ * { dryRun:true, wouldDelete }, passed through; otherwise returns { removed: 1 }.
+ */
+export async function runPersonRoleRevoke(client, personId, asiakasId, roleTypeId, flags) {
+    const current = await runPersonRoleList(client, personId, asiakasId);
+    const match = current.items.find((i) => i.roleTypeId === roleTypeId);
+    if (!match)
+        return { removed: 0 };
+    const res = await client.delete(`/api/asiakasPersonSettings/delete/${match.asiakasPersonSettingId}`, { headers: writeFlagsToHeaders(flags) });
+    return flags.dryRun ? res : { removed: 1 };
+}
+/**
+ * `ib person me` — the caller's own rich profile. Derives personId from the JWT
+ * (works for IB_TOKEN sessions with no credentials file), then composes
+ * /api/cli/person/get/:personId (profile + active-company roles) and
+ * /api/company-selection/available (actable companies). roles are scoped to the
+ * active company; use `person role list --asiakas <id>` for other companies.
+ */
+export async function runPersonMe(client) {
+    const claims = decodeJwtPayload(client.getCurrentToken());
+    const profile = await client.get(`/api/cli/person/get/${claims.personId}`);
+    const available = await client.get(`/api/company-selection/available`);
+    const companies = available.companies || [];
+    return {
+        personId: claims.personId,
+        name: profile.name ?? null,
+        email: profile.email ?? claims.email ?? null,
+        phone: profile.phone ?? null,
+        activeCompany: {
+            asiakasId: available.currentCompanyId,
+            name: companies.find((c) => c.asiakasId === available.currentCompanyId)?.name ?? null,
+        },
+        roles: (profile.roles || []).map((t) => ({ roleTypeId: t, role: roleNameForTypeId(t) })),
+        companies: companies.map((c) => ({
+            asiakasId: c.asiakasId,
+            name: c.name,
+            current: c.asiakasId === available.currentCompanyId,
+        })),
+    };
+}
+/**
+ * `ib person companies [personId]` — the customers a person belongs to (reverse
+ * of `customer person list`). personId defaults to the caller (from the JWT).
+ * GET /api/person/getUserAsiakasList/:personId; defensive unwrap of mssql shapes.
+ */
+export async function runPersonCompanies(client, personId) {
+    const id = personId ?? decodeJwtPayload(client.getCurrentToken()).personId;
+    const raw = await client.get(`/api/person/getUserAsiakasList/${id}`);
+    let rows = [];
+    if (Array.isArray(raw)) {
+        rows = raw;
+    }
+    else if (raw && typeof raw === "object") {
+        rows = raw.recordset || raw.recordsets?.[0] || [];
+    }
+    const items = rows.map((r) => ({ asiakasId: r.asiakasId, name: r.asiakasName ?? r.name ?? null }));
+    return { items, nextCursor: null, count: items.length };
 }
 /**
  * Register `ib person` read subcommands on the parent commander instance:
@@ -146,6 +242,101 @@ export function registerPersonCommands(parent, getClient) {
         try {
             const client = await getClient();
             const result = await runPersonDelete(client, Number(personIdStr), opts);
+            writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    // ─── person role subgroup ────────────────────────────────────────────────
+    const personRole = p
+        .command("role")
+        .description("Manage a person's per-company roles (asiakasPersonSettings)");
+    personRole
+        .command("list <personId>")
+        .description("List a person's roles in a company")
+        .requiredOption("--asiakas <id>", "Target asiakasId", (v) => Number(v))
+        .action(async (personIdStr, opts) => {
+        try {
+            const client = await getClient();
+            const result = await runPersonRoleList(client, Number(personIdStr), opts.asiakas);
+            writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    addWriteFlagsToCommand(personRole
+        .command("grant <personId>")
+        .description("Grant a role to a person in a company. Requires --role, --asiakas, --reason.")
+        .requiredOption("--role <name>", "Role name (see ROLE_TYPEID_BY_NAME)")
+        .requiredOption("--asiakas <id>", "Target asiakasId", (v) => Number(v))).action(async (personIdStr, opts) => {
+        if (!opts.reason) {
+            writeError(new Error("Missing required flag: --reason"));
+            process.exit(4);
+        }
+        let roleTypeId;
+        try {
+            roleTypeId = resolveRoleTypeId(opts.role);
+        }
+        catch (validationErr) {
+            writeError(validationErr);
+            process.exit(4);
+        }
+        try {
+            const client = await getClient();
+            const result = await runPersonRoleGrant(client, Number(personIdStr), opts.asiakas, roleTypeId, opts);
+            writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    addWriteFlagsToCommand(personRole
+        .command("revoke <personId>")
+        .description("Revoke a role from a person in a company (idempotent). Requires --role, --asiakas, --reason.")
+        .requiredOption("--role <name>", "Role name (see ROLE_TYPEID_BY_NAME)")
+        .requiredOption("--asiakas <id>", "Target asiakasId", (v) => Number(v))).action(async (personIdStr, opts) => {
+        if (!opts.reason) {
+            writeError(new Error("Missing required flag: --reason"));
+            process.exit(4);
+        }
+        let roleTypeId;
+        try {
+            roleTypeId = resolveRoleTypeId(opts.role);
+        }
+        catch (validationErr) {
+            writeError(validationErr);
+            process.exit(4);
+        }
+        try {
+            const client = await getClient();
+            const result = await runPersonRoleRevoke(client, Number(personIdStr), opts.asiakas, roleTypeId, opts);
+            writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    // ─── self-introspection ───────────────────────────────────────────────────
+    p.command("me")
+        .description("Your own profile, active-company roles, and actable companies")
+        .action(async () => {
+        try {
+            const client = await getClient();
+            const result = await runPersonMe(client);
+            writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    p.command("companies [personId]")
+        .description("List the companies a person belongs to (defaults to you)")
+        .action(async (personIdStr) => {
+        try {
+            const client = await getClient();
+            const result = await runPersonCompanies(client, personIdStr ? Number(personIdStr) : undefined);
             writeJson(result);
         }
         catch (e) {
