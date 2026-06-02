@@ -359,6 +359,15 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib customer get 1349"],
   },
   {
+    command: "ib customer worksites",
+    description: "List worksites belonging to a customer (GET /api/tyomaa/asiakasTyomaaList/:asiakasId).",
+    permissions: ["auth.page.tyomaa.read"],
+    flags: [{ name: "asiakasId", type: "number", description: "Positional — asiakasId" }],
+    outputShape: "ListEnvelope<{ tyomaaId, name, address, city }>",
+    errors: [...permErrors("auth.page.tyomaa.read")],
+    examples: ["ib customer worksites 1349"],
+  },
+  {
     command: "ib customer create",
     description:
       "Create a new customer via POST /api/asiakas/createY. Body forwarded verbatim.",

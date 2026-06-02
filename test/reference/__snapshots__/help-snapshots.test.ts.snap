@@ -583,6 +583,34 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib customer worksites matches snapshot 1`] = `
+"USAGE
+  ib customer worksites [flags]
+
+DESCRIPTION
+  List worksites belonging to a customer (GET /api/tyomaa/asiakasTyomaaList/:asiakasId).
+  Permissions: requires auth.page.tyomaa.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --asiakasId NUMBER    Positional — asiakasId
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ tyomaaId, name, address, city }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib customer worksites 1349
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib jerry admin detail matches snapshot 1`] = `
 "USAGE
   ib jerry admin detail [flags]

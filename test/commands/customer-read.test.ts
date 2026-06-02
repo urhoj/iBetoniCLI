@@ -4,6 +4,7 @@ import {
   runCustomerGet,
   runCustomerSearch,
   runCustomerModulesReport,
+  runCustomerWorksites,
 } from "../../src/commands/customer/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -72,6 +73,18 @@ describe("ib customer list/get/search", () => {
     expect(mockClient.get).toHaveBeenCalledWith(
       "/api/asiakas/search?searchString=Acme+%26+Co"
     );
+  });
+
+  test("runCustomerWorksites: GET asiakasTyomaaList, wraps array into envelope", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      { tyomaaId: 7, tyomaaNimi: "Site A", tyomaaOsoite1: "Main 1", tyomaaOsoite4: "Helsinki" },
+    ]);
+    const result = await runCustomerWorksites(mockClient, 1349);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/tyomaa/asiakasTyomaaList/1349");
+    expect(result).toEqual({
+      items: [{ tyomaaId: 7, name: "Site A", address: "Main 1", city: "Helsinki" }],
+      nextCursor: null, count: 1,
+    });
   });
 
   test("runCustomerModulesReport: GET /api/cli/customer/modules/1349, returns state verbatim", async () => {
