@@ -1,5 +1,5 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
-import { writeJson, writeError } from "../../output/json.js";
+import { writeJson, exitWithError } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 // Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
 export { resolveDate };
@@ -97,8 +97,7 @@ export function registerKeikkaCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     k.command("get <keikkaId>")
@@ -110,8 +109,7 @@ export function registerKeikkaCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     const createCmd = k
@@ -130,8 +128,7 @@ export function registerKeikkaCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     const updateCmd = k
@@ -152,8 +149,7 @@ export function registerKeikkaCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     const drivers = k.command("drivers").description("Driver assignment commands");
@@ -171,8 +167,7 @@ export function registerKeikkaCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
 }

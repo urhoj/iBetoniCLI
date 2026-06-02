@@ -1,5 +1,5 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
-import { writeJson, writeError } from "../../output/json.js";
+import { writeJson, writeError, exitWithError } from "../../output/json.js";
 /**
  * GET /api/cli/worksite/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
@@ -137,8 +137,7 @@ export function registerWorksiteCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     w.command("get <tyomaaId>")
@@ -150,8 +149,7 @@ export function registerWorksiteCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     w.command("search <query>")
@@ -163,8 +161,7 @@ export function registerWorksiteCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     const createCmd = w
@@ -183,8 +180,7 @@ export function registerWorksiteCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     const updateCmd = w
@@ -209,8 +205,7 @@ export function registerWorksiteCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     addWriteFlagsToCommand(w
@@ -226,8 +221,7 @@ export function registerWorksiteCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     const worksitePerson = w
@@ -249,8 +243,7 @@ export function registerWorksiteCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     addWriteFlagsToCommand(worksitePerson
@@ -269,8 +262,7 @@ export function registerWorksiteCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     worksitePerson
@@ -283,8 +275,7 @@ export function registerWorksiteCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
 }

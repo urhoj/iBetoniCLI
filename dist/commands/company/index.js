@@ -1,6 +1,6 @@
 import { createStore, defaultCredentialsPath } from "../../auth/store.js";
 import { performSwitch } from "../../auth/switch.js";
-import { writeJson, writeError } from "../../output/json.js";
+import { writeJson, writeError, exitWithError } from "../../output/json.js";
 function companyName(c) {
     return c.asiakasNimi ?? c.name ?? "";
 }
@@ -48,8 +48,7 @@ export function registerCompanyCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     company
@@ -62,8 +61,7 @@ export function registerCompanyCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     company
@@ -98,8 +96,7 @@ export function registerCompanyCommands(parent, getClient) {
             });
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
 }

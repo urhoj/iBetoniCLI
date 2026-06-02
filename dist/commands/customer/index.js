@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
-import { writeJson, writeError } from "../../output/json.js";
+import { writeJson, writeError, exitWithError } from "../../output/json.js";
 /**
  * GET /api/cli/customer/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
@@ -246,8 +246,7 @@ export function registerCustomerCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     c.command("get <asiakasId>")
@@ -259,8 +258,7 @@ export function registerCustomerCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     const modulesCmd = c
@@ -293,8 +291,7 @@ export function registerCustomerCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     const operatorCmd = c
@@ -327,8 +324,7 @@ export function registerCustomerCommands(parent, getClient) {
                 process.exitCode = 1;
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     c.command("search <query>")
@@ -340,8 +336,7 @@ export function registerCustomerCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     const createCmd = c
@@ -360,8 +355,7 @@ export function registerCustomerCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     const updateCmd = c
@@ -380,8 +374,7 @@ export function registerCustomerCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     addWriteFlagsToCommand(c
@@ -398,8 +391,7 @@ export function registerCustomerCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     const customerPerson = c
@@ -421,8 +413,7 @@ export function registerCustomerCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     addWriteFlagsToCommand(customerPerson
@@ -441,8 +432,7 @@ export function registerCustomerCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     customerPerson
@@ -456,8 +446,7 @@ export function registerCustomerCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
 }

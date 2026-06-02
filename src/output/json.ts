@@ -1,4 +1,4 @@
-import { CliError } from "../api/errors.js";
+import { CliError, exitCodeForError } from "../api/errors.js";
 import { isListEnvelope, type ListEnvelope } from "../api/envelopes.js";
 import { renderList, renderRecord } from "./pretty.js";
 
@@ -47,4 +47,17 @@ export function writeError(err: unknown): void {
       statusCode: 0,
     }) + "\n"
   );
+}
+
+/**
+ * Terminal error handler for command actions: emit the backend-shape error to
+ * stderr, then exit with the contract-mapped code (a {@link CliError} carries
+ * `2` auth / `3` permission / `4` validation / `5` not-found / `6` server /
+ * `7` network; anything else is `1`). Replaces the previous per-command
+ * `writeError(e); process.exit(1)` pairs that flattened every API failure to
+ * exit `1`, breaking the documented exit-code contract.
+ */
+export function exitWithError(err: unknown): never {
+  writeError(err);
+  process.exit(exitCodeForError(err));
 }

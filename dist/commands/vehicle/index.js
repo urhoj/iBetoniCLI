@@ -1,4 +1,4 @@
-import { writeJson, writeError } from "../../output/json.js";
+import { writeJson, exitWithError } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 /**
  * GET /api/cli/vehicle/list with the universal list envelope shape.
@@ -64,8 +64,7 @@ export function registerVehicleCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     v.command("get <vehicleId>")
@@ -77,8 +76,7 @@ export function registerVehicleCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     v.command("status <vehicleId>")
@@ -90,8 +88,7 @@ export function registerVehicleCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     v.command("drivers <vehicleId>")
@@ -108,8 +105,7 @@ export function registerVehicleCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
 }

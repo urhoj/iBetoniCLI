@@ -1,4 +1,4 @@
-import { writeJson, writeError } from "../../output/json.js";
+import { writeJson, exitWithError } from "../../output/json.js";
 function listQuery(path, opts) {
     const params = new URLSearchParams();
     if (opts.search)
@@ -44,8 +44,7 @@ export function registerSchemaCommands(parent, getClient) {
             writeJson(await fn(await getClient(), opts));
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     };
     const runOne = (fn) => async (name) => {
@@ -53,8 +52,7 @@ export function registerSchemaCommands(parent, getClient) {
             writeJson(await fn(await getClient(), name));
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     };
     const runZero = (fn) => async () => {
@@ -62,8 +60,7 @@ export function registerSchemaCommands(parent, getClient) {
             writeJson(await fn(await getClient()));
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     };
     listOpt(s.command("tables").description("List dbo tables")).action(runList(runSchemaTables));

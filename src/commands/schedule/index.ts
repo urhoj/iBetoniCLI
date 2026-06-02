@@ -1,8 +1,9 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
-import { writeJson, writeError } from "../../output/json.js";
+import { writeJson, exitWithError } from "../../output/json.js";
 import { runKeikkaList } from "../keikka/index.js";
+import { todayHelsinki } from "../../dates.js";
 
 /**
  * Add `days` to an ISO `YYYY-MM-DD` date and return the same ISO format.
@@ -20,7 +21,7 @@ export function addDaysISO(isoDate: string, days: number): string {
 export async function runScheduleToday(
   client: ApiClient
 ): Promise<ListEnvelope<Record<string, unknown>>> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayHelsinki();
   return runKeikkaList(client, { from: today, to: today });
 }
 
@@ -70,8 +71,7 @@ export function registerScheduleCommands(
         const result = await runScheduleToday(client);
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -83,8 +83,7 @@ export function registerScheduleCommands(
         const result = await runScheduleDay(client, date);
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -96,8 +95,7 @@ export function registerScheduleCommands(
         const result = await runScheduleWeek(client, start);
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 }

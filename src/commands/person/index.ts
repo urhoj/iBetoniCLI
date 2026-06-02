@@ -6,7 +6,7 @@ import {
   addWriteFlagsToCommand,
   type WriteFlags,
 } from "../../api/writeFlags.js";
-import { writeJson, writeError } from "../../output/json.js";
+import { writeJson, writeError, exitWithError } from "../../output/json.js";
 
 export interface PersonListFilter {
   role?: string;
@@ -83,8 +83,7 @@ export function registerPersonCommands(
         const result = await runPersonList(client, opts);
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -96,8 +95,7 @@ export function registerPersonCommands(
         const result = await runPersonGet(client, Number(idStr));
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -109,8 +107,7 @@ export function registerPersonCommands(
         const result = await runPersonSearch(client, query);
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -142,8 +139,7 @@ export function registerPersonCommands(
       const result = await runPersonCreate(client, body, opts);
       writeJson(result);
     } catch (e) {
-      writeError(e);
-      process.exit(1);
+      exitWithError(e);
     }
   });
 
@@ -169,8 +165,7 @@ export function registerPersonCommands(
       const result = await runPersonUpdate(client, Number(personIdStr), patch, opts);
       writeJson(result);
     } catch (e) {
-      writeError(e);
-      process.exit(1);
+      exitWithError(e);
     }
   });
 
@@ -188,8 +183,7 @@ export function registerPersonCommands(
       const result = await runPersonDelete(client, Number(personIdStr), opts);
       writeJson(result);
     } catch (e) {
-      writeError(e);
-      process.exit(1);
+      exitWithError(e);
     }
   });
 }

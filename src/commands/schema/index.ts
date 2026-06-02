@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
-import { writeJson, writeError } from "../../output/json.js";
+import { writeJson, exitWithError } from "../../output/json.js";
 
 export interface SchemaListFilter {
   search?: string;
@@ -63,8 +63,7 @@ export function registerSchemaCommands(
       try {
         writeJson(await fn(await getClient(), opts));
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     };
 
@@ -73,8 +72,7 @@ export function registerSchemaCommands(
       try {
         writeJson(await fn(await getClient(), name));
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     };
 
@@ -83,8 +81,7 @@ export function registerSchemaCommands(
       try {
         writeJson(await fn(await getClient()));
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     };
 

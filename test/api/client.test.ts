@@ -73,6 +73,38 @@ describe("ApiClient", () => {
     });
   });
 
+  test("network failure throws CliError with exitCode 7", async () => {
+    mockFetch.mockRejectedValueOnce(new TypeError("fetch failed"));
+    const client = createApiClient({
+      endpoint: "https://api.example.com",
+      token: "x",
+      version: "1.0.0",
+    });
+    await expect(client.get("/api/x")).rejects.toMatchObject({
+      name: "CliError",
+      exitCode: 7,
+    });
+  });
+
+  test("non-OK response with malformed JSON body still throws a CliError (not a SyntaxError)", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response("", {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      })
+    );
+    const client = createApiClient({
+      endpoint: "https://api.example.com",
+      token: "x",
+      version: "1.0.0",
+    });
+    await expect(client.get("/api/x")).rejects.toMatchObject({
+      name: "CliError",
+      statusCode: 500,
+      exitCode: 6,
+    });
+  });
+
   test("explicit headers override", async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({}), {

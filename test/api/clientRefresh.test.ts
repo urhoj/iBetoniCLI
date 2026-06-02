@@ -84,4 +84,29 @@ describe("ApiClient auto-refresh on 401", () => {
     expect(onRefresh).toHaveBeenCalledTimes(1);
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
+
+  test("refresh callback throwing surfaces as a CliError with exitCode 2 (auth)", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "Token expired" }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      })
+    );
+    const onRefresh = vi
+      .fn()
+      .mockRejectedValue(new Error("Refresh failed: HTTP 401"));
+    const client = createApiClient({
+      endpoint: "https://api.example.com",
+      token: "eyJold",
+      version: "1.0.0",
+      onRefresh,
+    });
+
+    await expect(client.get("/api/something")).rejects.toMatchObject({
+      name: "CliError",
+      exitCode: 2,
+    });
+    // No retry fetch was issued because refresh failed.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
 });

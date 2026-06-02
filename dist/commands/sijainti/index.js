@@ -1,5 +1,5 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
-import { writeJson, writeError } from "../../output/json.js";
+import { writeJson, exitWithError } from "../../output/json.js";
 /**
  * GET /api/cli/sijainti/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
@@ -66,8 +66,7 @@ export function registerSijaintiCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     s.command("get <sijaintiId>")
@@ -79,8 +78,7 @@ export function registerSijaintiCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     const createCmd = s
@@ -99,8 +97,7 @@ export function registerSijaintiCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     const updateCmd = s
@@ -119,8 +116,7 @@ export function registerSijaintiCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
 }

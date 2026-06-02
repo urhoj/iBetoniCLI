@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
-import { writeJson, writeError } from "../../output/json.js";
+import { writeJson, exitWithError } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 
 export interface VehicleListFilter {
@@ -102,8 +102,7 @@ export function registerVehicleCommands(
         const result = await runVehicleList(client, opts);
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -115,8 +114,7 @@ export function registerVehicleCommands(
         const result = await runVehicleGet(client, Number(idStr));
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -128,8 +126,7 @@ export function registerVehicleCommands(
         const result = await runVehicleStatus(client, Number(idStr));
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -146,8 +143,7 @@ export function registerVehicleCommands(
         });
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 }

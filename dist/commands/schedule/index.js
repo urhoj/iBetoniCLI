@@ -1,5 +1,6 @@
-import { writeJson, writeError } from "../../output/json.js";
+import { writeJson, exitWithError } from "../../output/json.js";
 import { runKeikkaList } from "../keikka/index.js";
+import { todayHelsinki } from "../../dates.js";
 /**
  * Add `days` to an ISO `YYYY-MM-DD` date and return the same ISO format.
  * Used for the `week` command's `start..start+6` range.
@@ -13,7 +14,7 @@ export function addDaysISO(isoDate, days) {
  * `ib schedule today` — thin wrapper around runKeikkaList with from=to=today.
  */
 export async function runScheduleToday(client) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayHelsinki();
     return runKeikkaList(client, { from: today, to: today });
 }
 /**
@@ -51,8 +52,7 @@ export function registerScheduleCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     s.command("day <date>")
@@ -64,8 +64,7 @@ export function registerScheduleCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     s.command("week <start>")
@@ -77,8 +76,7 @@ export function registerScheduleCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
 }

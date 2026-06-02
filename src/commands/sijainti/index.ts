@@ -6,7 +6,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { writeJson, writeError } from "../../output/json.js";
+import { writeJson, exitWithError } from "../../output/json.js";
 
 export interface SijaintiListFilter {
   type?: string;
@@ -102,8 +102,7 @@ export function registerSijaintiCommands(
         const result = await runSijaintiList(client, opts);
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -115,8 +114,7 @@ export function registerSijaintiCommands(
         const result = await runSijaintiGet(client, Number(idStr));
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -144,8 +142,7 @@ export function registerSijaintiCommands(
         });
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     }
   );
@@ -176,8 +173,7 @@ export function registerSijaintiCommands(
         });
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     }
   );

@@ -58,27 +58,55 @@ export function createApiClient({
     });
   }
 
+  // A fetch rejection (DNS failure, connection refused, TLS error, …) is a
+  // network problem, not an HTTP status — surface it as a CliError mapped to
+  // the documented `7` network exit code instead of letting a raw TypeError
+  // escape to the generic exit-1 handler.
+  async function fetchOrNetworkError(
+    method: string,
+    path: string,
+    body: unknown,
+    opts: FetchOptions
+  ): Promise<Response> {
+    try {
+      return await doFetch(method, path, body, opts);
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e);
+      throw new CliError(`Network error: ${detail}`, 0, null, 7);
+    }
+  }
+
   async function request<T = unknown>(
     method: string,
     path: string,
     body?: unknown,
     opts: FetchOptions = {}
   ): Promise<T> {
-    let res = await doFetch(method, path, body, opts);
+    let res = await fetchOrNetworkError(method, path, body, opts);
 
     // Single-retry refresh path: only the first 401 triggers a refresh+retry.
     // A second consecutive 401 (post-refresh) falls through to the normal
-    // error mapping so callers know to re-run `ib auth login`.
+    // error mapping so callers know to re-run `ib auth login`. A failing
+    // refresh is itself an auth problem → CliError mapped to exit 2.
     if (res.status === 401 && onRefresh) {
-      const newToken = await onRefresh(currentToken);
+      let newToken: string;
+      try {
+        newToken = await onRefresh(currentToken);
+      } catch (e) {
+        const detail = e instanceof Error ? e.message : String(e);
+        throw new CliError(detail, 401, null, 2);
+      }
       currentToken = newToken;
-      res = await doFetch(method, path, body, opts);
+      res = await fetchOrNetworkError(method, path, body, opts);
     }
 
     const contentType = res.headers.get("content-type") || "";
+    // Guard the body parse: a non-OK response can carry an empty or malformed
+    // body even with a JSON content-type — don't let a SyntaxError escape the
+    // CliError mapping below.
     const parsed = contentType.includes("application/json")
-      ? await res.json()
-      : await res.text();
+      ? await res.json().catch(() => null)
+      : await res.text().catch(() => "");
     if (!res.ok) {
       throw new CliError(
         typeof parsed === "object" && parsed && "error" in parsed

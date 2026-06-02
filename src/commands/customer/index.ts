@@ -7,7 +7,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { writeJson, writeError } from "../../output/json.js";
+import { writeJson, writeError, exitWithError } from "../../output/json.js";
 
 export interface CustomerListFilter {
   limit?: number;
@@ -390,8 +390,7 @@ export function registerCustomerCommands(
         const result = await runCustomerList(client, opts);
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -403,8 +402,7 @@ export function registerCustomerCommands(
         const result = await runCustomerGet(client, Number(idStr));
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -445,8 +443,7 @@ export function registerCustomerCommands(
         });
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     }
   );
@@ -485,8 +482,7 @@ export function registerCustomerCommands(
         writeJson(result);
         if (!result.allSet) process.exitCode = 1;
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     }
   );
@@ -499,8 +495,7 @@ export function registerCustomerCommands(
         const result = await runCustomerSearch(client, query);
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -528,8 +523,7 @@ export function registerCustomerCommands(
         });
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     }
   );
@@ -566,8 +560,7 @@ export function registerCustomerCommands(
         );
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     }
   );
@@ -587,8 +580,7 @@ export function registerCustomerCommands(
       const result = await runCustomerDelete(client, Number(asiakasIdStr), ownerAsiakasId, opts);
       writeJson(result);
     } catch (e) {
-      writeError(e);
-      process.exit(1);
+      exitWithError(e);
     }
   });
 
@@ -617,8 +609,7 @@ export function registerCustomerCommands(
       );
       writeJson(result);
     } catch (e) {
-      writeError(e);
-      process.exit(1);
+      exitWithError(e);
     }
   });
 
@@ -643,8 +634,7 @@ export function registerCustomerCommands(
       );
       writeJson(result);
     } catch (e) {
-      writeError(e);
-      process.exit(1);
+      exitWithError(e);
     }
   });
 
@@ -658,8 +648,7 @@ export function registerCustomerCommands(
         const result = await runCustomerPersonList(client, Number(asiakasIdStr), opts.role);
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 }

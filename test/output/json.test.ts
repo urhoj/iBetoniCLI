@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { writeJson, writeError } from "../../src/output/json";
+import { writeJson, writeError, exitWithError } from "../../src/output/json";
 import { CliError } from "../../src/api/errors";
 
 describe("JSON output", () => {
@@ -39,5 +39,24 @@ describe("JSON output", () => {
       code: "FORBIDDEN",
       statusCode: 403,
     });
+  });
+
+  test("exitWithError writes the error then exits with the CliError's mapped code", () => {
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(() => undefined as never);
+    exitWithError(new CliError("missing", 404, null, 5));
+    expect(stderrSpy).toHaveBeenCalled();
+    expect(exitSpy).toHaveBeenCalledWith(5);
+    exitSpy.mockRestore();
+  });
+
+  test("exitWithError exits 1 for a non-CliError", () => {
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(() => undefined as never);
+    exitWithError(new Error("plain"));
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    exitSpy.mockRestore();
   });
 });

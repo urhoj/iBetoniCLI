@@ -5,6 +5,7 @@ import {
   runScheduleWeek,
   addDaysISO,
 } from "../../src/commands/schedule/index.js";
+import { todayHelsinki } from "../../src/dates.js";
 import type { ApiClient } from "../../src/api/client.js";
 
 const mockClient = {
@@ -27,7 +28,7 @@ describe("ib schedule today/day/week", () => {
       count: 0,
     });
     await runScheduleToday(mockClient);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayHelsinki();
     expect(mockClient.get).toHaveBeenCalledWith(
       `/api/cli/keikka/list?from=${today}&to=${today}`
     );

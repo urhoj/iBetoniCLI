@@ -3,7 +3,7 @@ import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { createStore, defaultCredentialsPath } from "../../auth/store.js";
 import { performSwitch } from "../../auth/switch.js";
-import { writeJson, writeError } from "../../output/json.js";
+import { writeJson, writeError, exitWithError } from "../../output/json.js";
 
 interface AvailableCompany {
   asiakasId: number;
@@ -90,8 +90,7 @@ export function registerCompanyCommands(
         const result = await runCompanyList(client);
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -104,8 +103,7 @@ export function registerCompanyCommands(
         const result = await runCompanyCurrent(client);
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -142,8 +140,7 @@ export function registerCompanyCommands(
           },
         });
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 }

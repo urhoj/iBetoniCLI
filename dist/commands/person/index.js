@@ -1,5 +1,5 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
-import { writeJson, writeError } from "../../output/json.js";
+import { writeJson, writeError, exitWithError } from "../../output/json.js";
 /**
  * GET /api/cli/person/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
@@ -53,8 +53,7 @@ export function registerPersonCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     p.command("get <personId>")
@@ -66,8 +65,7 @@ export function registerPersonCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     p.command("search <query>")
@@ -79,8 +77,7 @@ export function registerPersonCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     addWriteFlagsToCommand(p
@@ -111,8 +108,7 @@ export function registerPersonCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     addWriteFlagsToCommand(p
@@ -137,8 +133,7 @@ export function registerPersonCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     addWriteFlagsToCommand(p
@@ -154,8 +149,7 @@ export function registerPersonCommands(parent, getClient) {
             writeJson(result);
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
 }

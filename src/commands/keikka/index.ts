@@ -6,7 +6,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { writeJson, writeError } from "../../output/json.js";
+import { writeJson, exitWithError } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 
 // Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
@@ -150,8 +150,7 @@ export function registerKeikkaCommands(
         const result = await runKeikkaList(client, resolved);
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -163,8 +162,7 @@ export function registerKeikkaCommands(
         const result = await runKeikkaGet(client, Number(idStr));
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -192,8 +190,7 @@ export function registerKeikkaCommands(
         });
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     }
   );
@@ -228,8 +225,7 @@ export function registerKeikkaCommands(
         );
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     }
   );
@@ -256,8 +252,7 @@ export function registerKeikkaCommands(
         });
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     }
   );

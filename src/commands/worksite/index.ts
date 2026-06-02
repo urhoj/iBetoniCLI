@@ -6,7 +6,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { writeJson, writeError } from "../../output/json.js";
+import { writeJson, writeError, exitWithError } from "../../output/json.js";
 
 export interface WorksiteListFilter {
   limit?: number;
@@ -241,8 +241,7 @@ export function registerWorksiteCommands(
         const result = await runWorksiteList(client, opts);
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -254,8 +253,7 @@ export function registerWorksiteCommands(
         const result = await runWorksiteGet(client, Number(idStr));
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -267,8 +265,7 @@ export function registerWorksiteCommands(
         const result = await runWorksiteSearch(client, query);
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -296,8 +293,7 @@ export function registerWorksiteCommands(
         });
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     }
   );
@@ -348,8 +344,7 @@ export function registerWorksiteCommands(
         );
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     }
   );
@@ -368,8 +363,7 @@ export function registerWorksiteCommands(
       const result = await runWorksiteDelete(client, Number(tyomaaIdStr), opts);
       writeJson(result);
     } catch (e) {
-      writeError(e);
-      process.exit(1);
+      exitWithError(e);
     }
   });
 
@@ -398,8 +392,7 @@ export function registerWorksiteCommands(
       );
       writeJson(result);
     } catch (e) {
-      writeError(e);
-      process.exit(1);
+      exitWithError(e);
     }
   });
 
@@ -424,8 +417,7 @@ export function registerWorksiteCommands(
       );
       writeJson(result);
     } catch (e) {
-      writeError(e);
-      process.exit(1);
+      exitWithError(e);
     }
   });
 
@@ -438,8 +430,7 @@ export function registerWorksiteCommands(
         const result = await runWorksitePersonList(client, Number(tyomaaIdStr));
         writeJson(result);
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 }
