@@ -1,5 +1,8 @@
 import { writeJson, exitWithError } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
+import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
+import { decodeJwtPayload } from "../../auth/jwt.js";
+import { CliError } from "../../api/errors.js";
 /**
  * GET /api/cli/vehicle/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
@@ -39,6 +42,126 @@ export async function runVehicleDrivers(client, vehicleId, opts) {
         params.set("to", opts.to);
     const qs = params.toString();
     return client.get(`/api/cli/vehicle/drivers/${vehicleId}${qs ? `?${qs}` : ""}`);
+}
+/**
+ * GET /api/cli/vehicle/types — list selectable vehicle types
+ * (vehicleTypeId + name) for the active company, in the list envelope shape.
+ */
+export async function runVehicleTypes(client) {
+    return client.get("/api/cli/vehicle/types");
+}
+/**
+ * GET /api/cli/vehicle/list?search=…&limit=… — substring search over the
+ * vehicle list (reg-no / name). Reuses the list endpoint with a `search`
+ * query param; `limit` is appended only when supplied.
+ */
+export async function runVehicleSearch(client, query, limit) {
+    const params = new URLSearchParams({ search: query });
+    if (limit !== undefined)
+        params.set("limit", String(limit));
+    return client.get(`/api/cli/vehicle/list?${params.toString()}`);
+}
+/**
+ * GET /api/cli/vehicle/dates/:vehicleId — a vehicle's inspection/cert dates
+ * (e.g. katsastus, vakuutus) in the list envelope shape.
+ */
+export async function runVehicleDatesList(client, vehicleId) {
+    return client.get(`/api/cli/vehicle/dates/${vehicleId}`);
+}
+/**
+ * GET /api/cli/vehicle/dates/expiring — inspection/cert dates expiring within
+ * the next `days` window across the whole fleet. `days` is appended as a query
+ * param only when supplied (backend default applies otherwise, typically 30).
+ */
+export async function runVehicleDatesExpiring(client, days) {
+    const qs = days !== undefined ? `?days=${days}` : "";
+    return client.get(`/api/cli/vehicle/dates/expiring${qs}`);
+}
+/**
+ * Create a vehicle. The backend `vehicle_save` proc is UPDATE-only, so creation
+ * is two-step: `POST /api/vehicle/new/:ownerAsiakasId` inserts a blank stub and
+ * returns its `vehicleId`, then `POST /api/vehicle/save` populates it.
+ *
+ * `ownerAsiakasId` is taken from the active JWT. For a dry-run we only hit the
+ * `/new` endpoint (with `X-Dry-Run`) and return the backend's preview — no save
+ * is attempted. The `--reason` audit string is sent on both calls; the
+ * `--idempotency-key` only applies to the populating save.
+ */
+export async function runVehicleCreate(client, fields, flags) {
+    const { ownerAsiakasId } = decodeJwtPayload(client.getCurrentToken());
+    if (flags.dryRun) {
+        return client.post(`/api/vehicle/new/${ownerAsiakasId}`, {}, { headers: writeFlagsToHeaders(flags) });
+    }
+    const created = await client.post(`/api/vehicle/new/${ownerAsiakasId}`, {}, { headers: writeFlagsToHeaders({ reason: flags.reason }) });
+    const body = {
+        vehicleId: created.vehicleId,
+        asiakasId: fields.asiakasId ?? ownerAsiakasId,
+        vehicleNo: fields.vehicleNo ?? null,
+        vehicleNimi: fields.vehicleNimi ?? null,
+        vehicleRegNo: fields.vehicleRegNo ?? null,
+        vehicleTypeId: fields.vehicleTypeId ?? null,
+        memo: fields.memo ?? null,
+        defaultKuski_personId: fields.defaultKuski_personId ?? null,
+        vehicleM3: fields.vehicleM3 ?? null,
+    };
+    return client.post("/api/vehicle/save", body, {
+        headers: writeFlagsToHeaders({
+            idempotencyKey: flags.idempotencyKey,
+            reason: flags.reason,
+        }),
+    });
+}
+/**
+ * Update a vehicle via read-merge-write: GET the full current row from the MAIN
+ * `/api/vehicle/get/:id` endpoint (returns an array), overlay only the provided
+ * `changes`, and POST the complete body to `/api/vehicle/save` (the proc expects
+ * every column). Throws a 404 {@link CliError} (exit 5) when the vehicle is
+ * absent so the caller surfaces "not found" rather than a malformed save.
+ */
+export async function runVehicleUpdate(client, vehicleId, changes, flags) {
+    const rows = await client.get(`/api/vehicle/get/${vehicleId}`);
+    const current = Array.isArray(rows)
+        ? rows[0]
+        : rows;
+    if (!current) {
+        throw new CliError(`Vehicle ${vehicleId} not found`, 404, null, 5);
+    }
+    const body = {
+        vehicleId,
+        asiakasId: changes.asiakasId ?? current.asiakasId,
+        vehicleNo: changes.vehicleNo ?? current.vehicleNo,
+        vehicleNimi: changes.vehicleNimi ?? current.vehicleNimi,
+        vehicleRegNo: changes.vehicleRegNo ?? current.vehicleRegNo,
+        vehiclePuomi: current.vehiclePuomi,
+        firstDate: current.firstDate,
+        lastDate: current.lastDate,
+        vehicleTypeId: changes.vehicleTypeId ?? current.vehicleTypeId,
+        memo: changes.memo ?? current.memo,
+        sortNo: current.sortNo,
+        showInGrid: current.showInGrid,
+        defaultKuski_personId: changes.defaultKuski_personId ?? current.defaultKuski_personId,
+        useNoDriverBar: current.useNoDriverBar,
+        showInReports: current.showInReports,
+        tuoteId: current.tuoteId,
+        isRestricted: current.isRestricted,
+        multiTenantVisibility: current.multiTenantVisibility,
+        defaultVisibilityAsiakasIds: current.defaultVisibilityAsiakasIds,
+        hasGpsTracking: current.hasGpsTracking,
+        vehicleM3: changes.vehicleM3 ?? current.vehicleM3,
+    };
+    return client.post("/api/vehicle/save", body, {
+        headers: writeFlagsToHeaders(flags),
+    });
+}
+/**
+ * Assign a per-day driver to a vehicle (vehicleDriverDays). The date flag is
+ * resolved through {@link resolveDate} (today/yesterday/tomorrow aliases) and
+ * collapsed to the backend's integer `yyyymmdd` key. Write-safety flags
+ * (--dry-run / --idempotency-key / --reason) map to headers as usual.
+ */
+export async function runVehicleDriversAssign(client, vehicleId, personId, date, flags) {
+    const yyyymmdd = Number(resolveDate(date).replace(/-/g, ""));
+    return client.post("/api/vehicle/driverDays/save", { vehicleId, personId, yyyymmdd }, { headers: writeFlagsToHeaders(flags) });
 }
 /**
  * Register `ib vehicle` subcommands on the parent commander instance:
@@ -101,6 +224,137 @@ export function registerVehicleCommands(parent, getClient) {
             const result = await runVehicleDrivers(client, Number(idStr), {
                 from: resolveDate(opts.from),
                 to: resolveDate(opts.to),
+            });
+            writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    v.command("types")
+        .description("List vehicle types (vehicleTypeId + name)")
+        .action(async () => {
+        try {
+            writeJson(await runVehicleTypes(await getClient()));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    v.command("search <query>")
+        .description("Search vehicles by reg-no / name substring")
+        .option("--limit <n>", "Max rows", (val) => Math.min(Number(val), 500))
+        .action(async (query, opts) => {
+        try {
+            writeJson(await runVehicleSearch(await getClient(), query, opts.limit));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    const createCmd = v
+        .command("create")
+        .description("Create a vehicle (new stub then save). ownerAsiakasId from JWT.")
+        .option("--reg <s>", "Registration number (vehicleRegNo)")
+        .option("--name <s>", "Display name (vehicleNimi)")
+        .option("--no <n>", "Fleet number (vehicleNo)", (s) => Number(s))
+        .option("--type <n>", "vehicleTypeId (see `ib vehicle types`)", (s) => Number(s))
+        .option("--memo <s>", "Free-text memo")
+        .option("--default-driver <pid>", "Default driver personId", (s) => Number(s))
+        .option("--capacity <m3>", "Concrete capacity in m3 (vehicleM3)", (s) => Number(s))
+        .option("--asiakas <id>", "Owning asiakasId (defaults to active company)", (s) => Number(s));
+    addWriteFlagsToCommand(createCmd).action(async (opts) => {
+        try {
+            const result = await runVehicleCreate(await getClient(), {
+                vehicleRegNo: opts.reg,
+                vehicleNimi: opts.name,
+                vehicleNo: opts.no,
+                vehicleTypeId: opts.type,
+                memo: opts.memo,
+                defaultKuski_personId: opts.defaultDriver,
+                vehicleM3: opts.capacity,
+                asiakasId: opts.asiakas,
+            }, {
+                dryRun: opts.dryRun,
+                idempotencyKey: opts.idempotencyKey,
+                reason: opts.reason,
+            });
+            writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    const updateCmd = v
+        .command("update <vehicleId>")
+        .description("Update a vehicle (read-merge-write; only provided flags change).")
+        .option("--reg <s>", "Registration number (vehicleRegNo)")
+        .option("--name <s>", "Display name (vehicleNimi)")
+        .option("--no <n>", "Fleet number (vehicleNo)", (s) => Number(s))
+        .option("--type <n>", "vehicleTypeId", (s) => Number(s))
+        .option("--memo <s>", "Free-text memo")
+        .option("--default-driver <pid>", "Default driver personId", (s) => Number(s))
+        .option("--capacity <m3>", "Concrete capacity in m3 (vehicleM3)", (s) => Number(s))
+        .option("--asiakas <id>", "Owning asiakasId", (s) => Number(s));
+    addWriteFlagsToCommand(updateCmd).action(async (idStr, opts) => {
+        try {
+            const result = await runVehicleUpdate(await getClient(), Number(idStr), {
+                vehicleRegNo: opts.reg,
+                vehicleNimi: opts.name,
+                vehicleNo: opts.no,
+                vehicleTypeId: opts.type,
+                memo: opts.memo,
+                defaultKuski_personId: opts.defaultDriver,
+                vehicleM3: opts.capacity,
+                asiakasId: opts.asiakas,
+            }, {
+                dryRun: opts.dryRun,
+                idempotencyKey: opts.idempotencyKey,
+                reason: opts.reason,
+            });
+            writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    const dates = v
+        .command("dates")
+        .description("Vehicle inspection/cert date reads");
+    dates
+        .command("list <vehicleId>")
+        .description("List a vehicle's dates")
+        .action(async (idStr) => {
+        try {
+            writeJson(await runVehicleDatesList(await getClient(), Number(idStr)));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    dates
+        .command("expiring")
+        .description("List expiring vehicle dates across the fleet")
+        .option("--days <n>", "Days-ahead window (default 30)", (s) => Number(s))
+        .action(async (opts) => {
+        try {
+            writeJson(await runVehicleDatesExpiring(await getClient(), opts.days));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    const assignCmd = v
+        .command("driver-assign <vehicleId>")
+        .description("Assign a per-day driver to a vehicle (vehicleDriverDays)")
+        .requiredOption("--person <pid>", "Driver personId", (s) => Number(s))
+        .option("--date <d>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today");
+    addWriteFlagsToCommand(assignCmd).action(async (idStr, opts) => {
+        try {
+            const result = await runVehicleDriversAssign(await getClient(), Number(idStr), opts.person, opts.date, {
+                dryRun: opts.dryRun,
+                idempotencyKey: opts.idempotencyKey,
+                reason: opts.reason,
             });
             writeJson(result);
         }
