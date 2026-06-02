@@ -10,6 +10,22 @@ describe("ib reference dump", () => {
     expect(Object.keys(ref.commands)).toContain("ib keikka list");
   });
 
+  test("embeds a domain primer: overview + glossary", () => {
+    const ref = buildReference();
+    expect(typeof ref.overview).toBe("string");
+    expect(ref.overview.length).toBeGreaterThan(0);
+    expect(ref.overview).toMatch(/BetoniJerry/);
+    expect(Array.isArray(ref.glossary)).toBe(true);
+    expect(ref.glossary.length).toBeGreaterThan(0);
+    for (const entry of ref.glossary) {
+      expect(typeof entry.term, "glossary term").toBe("string");
+      expect(entry.term.length).toBeGreaterThan(0);
+      expect(typeof entry.definition, "glossary definition").toBe("string");
+      expect(entry.definition.length).toBeGreaterThan(0);
+    }
+    expect(ref.glossary.map((g) => g.term)).toContain("keikka");
+  });
+
   test("every command has flags array, outputShape, errors, examples", () => {
     const ref = buildReference();
     for (const [name, spec] of Object.entries(ref.commands)) {

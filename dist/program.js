@@ -21,6 +21,7 @@ import { registerSijaintiCommands } from "./commands/sijainti/index.js";
 import { registerScheduleCommands } from "./commands/schedule/index.js";
 import { registerSchemaCommands } from "./commands/schema/index.js";
 import { runReferenceDump } from "./reference/dump.js";
+import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
 /**
@@ -33,6 +34,10 @@ export function buildProgram() {
         .name("ib")
         .description("iBetoni CLI — AI-driven command-line interface for betoni.online")
         .version(packageJson.version);
+    // Domain primer (what betoni.online is + glossary) on the root `--help`, so an
+    // AI inspecting top-level help gets the same context `ib reference dump`
+    // embeds. Sourced from reference/domain.ts — one source of truth, no drift.
+    program.addHelpText("after", renderDomainHelp());
     addGlobalOptions(program);
     async function getClient() {
         const ctx = await createCliContext({
