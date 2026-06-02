@@ -59,4 +59,10 @@ describe("runCustomerPrhSearch", () => {
       count: 2,
     });
   });
+
+  test("returns an empty envelope when no companies match", async () => {
+    get().mockResolvedValue({ success: true, data: { totalResults: 0, companies: [] } });
+    const result = await runCustomerPrhSearch(mockClient, "zzz", 1);
+    expect(result).toEqual({ items: [], nextCursor: null, count: 0 });
+  });
 });

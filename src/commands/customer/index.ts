@@ -385,7 +385,7 @@ export async function runCustomerPrhSearch(
   const res = await client.get<{ data: { companies: PrhCompany[] } }>(
     `/api/prh/search/name?${qs}`
   );
-  const companies = res.data?.companies || [];
+  const companies = res.data?.companies ?? [];
   return {
     items: companies.map((c) => ({
       businessId: c.businessId,
