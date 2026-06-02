@@ -3,6 +3,12 @@ import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
+import {
+  type WriteFlags,
+  writeFlagsToHeaders,
+  addWriteFlagsToCommand,
+} from "../../api/writeFlags.js";
+import { decodeJwtPayload } from "../../auth/jwt.js";
 
 export interface VehicleListFilter {
   limit?: number;
@@ -105,6 +111,69 @@ export async function runVehicleSearch(
 }
 
 /**
+ * The writable subset of a vehicle row. Every field is optional so the same
+ * shape backs both create (unspecified → null) and update (unspecified → keep
+ * current value via read-merge-write).
+ */
+export interface VehicleWriteFields {
+  vehicleRegNo?: string;
+  vehicleNimi?: string;
+  vehicleNo?: number;
+  vehicleTypeId?: number;
+  memo?: string;
+  defaultKuski_personId?: number;
+  vehicleM3?: number;
+  asiakasId?: number;
+}
+
+/**
+ * Create a vehicle. The backend `vehicle_save` proc is UPDATE-only, so creation
+ * is two-step: `POST /api/vehicle/new/:ownerAsiakasId` inserts a blank stub and
+ * returns its `vehicleId`, then `POST /api/vehicle/save` populates it.
+ *
+ * `ownerAsiakasId` is taken from the active JWT. For a dry-run we only hit the
+ * `/new` endpoint (with `X-Dry-Run`) and return the backend's preview — no save
+ * is attempted. The `--reason` audit string is sent on both calls; the
+ * `--idempotency-key` only applies to the populating save.
+ */
+export async function runVehicleCreate(
+  client: ApiClient,
+  fields: VehicleWriteFields,
+  flags: WriteFlags
+): Promise<unknown> {
+  const { ownerAsiakasId } = decodeJwtPayload(client.getCurrentToken());
+  if (flags.dryRun) {
+    return client.post(
+      `/api/vehicle/new/${ownerAsiakasId}`,
+      {},
+      { headers: writeFlagsToHeaders(flags) }
+    );
+  }
+  const created = await client.post<{ vehicleId: number }>(
+    `/api/vehicle/new/${ownerAsiakasId}`,
+    {},
+    { headers: writeFlagsToHeaders({ reason: flags.reason }) }
+  );
+  const body = {
+    vehicleId: created.vehicleId,
+    asiakasId: fields.asiakasId ?? ownerAsiakasId,
+    vehicleNo: fields.vehicleNo ?? null,
+    vehicleNimi: fields.vehicleNimi ?? null,
+    vehicleRegNo: fields.vehicleRegNo ?? null,
+    vehicleTypeId: fields.vehicleTypeId ?? null,
+    memo: fields.memo ?? null,
+    defaultKuski_personId: fields.defaultKuski_personId ?? null,
+    vehicleM3: fields.vehicleM3 ?? null,
+  };
+  return client.post("/api/vehicle/save", body, {
+    headers: writeFlagsToHeaders({
+      idempotencyKey: flags.idempotencyKey,
+      reason: flags.reason,
+    }),
+  });
+}
+
+/**
  * Register `ib vehicle` subcommands on the parent commander instance:
  *   - list     filterable by --limit/--cursor
  *   - get      single vehicle by id
@@ -198,4 +267,66 @@ export function registerVehicleCommands(
         exitWithError(e);
       }
     });
+
+  const createCmd = v
+    .command("create")
+    .description("Create a vehicle (new stub then save). ownerAsiakasId from JWT.")
+    .option("--reg <s>", "Registration number (vehicleRegNo)")
+    .option("--name <s>", "Display name (vehicleNimi)")
+    .option("--no <n>", "Fleet number (vehicleNo)", (s: string) => Number(s))
+    .option("--type <n>", "vehicleTypeId (see `ib vehicle types`)", (s: string) =>
+      Number(s)
+    )
+    .option("--memo <s>", "Free-text memo")
+    .option("--default-driver <pid>", "Default driver personId", (s: string) =>
+      Number(s)
+    )
+    .option(
+      "--capacity <m3>",
+      "Concrete capacity in m3 (vehicleM3)",
+      (s: string) => Number(s)
+    )
+    .option(
+      "--asiakas <id>",
+      "Owning asiakasId (defaults to active company)",
+      (s: string) => Number(s)
+    );
+  addWriteFlagsToCommand(createCmd).action(
+    async (
+      opts: WriteFlags & {
+        reg?: string;
+        name?: string;
+        no?: number;
+        type?: number;
+        memo?: string;
+        defaultDriver?: number;
+        capacity?: number;
+        asiakas?: number;
+      }
+    ) => {
+      try {
+        const result = await runVehicleCreate(
+          await getClient(),
+          {
+            vehicleRegNo: opts.reg,
+            vehicleNimi: opts.name,
+            vehicleNo: opts.no,
+            vehicleTypeId: opts.type,
+            memo: opts.memo,
+            defaultKuski_personId: opts.defaultDriver,
+            vehicleM3: opts.capacity,
+            asiakasId: opts.asiakas,
+          },
+          {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+          }
+        );
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
 }
