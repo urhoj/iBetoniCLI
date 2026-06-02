@@ -31,14 +31,29 @@ export async function runCustomerList(
   );
 }
 
+/** The flat customer record returned by GET /api/cli/customer/get/:id (extended). */
+export interface CustomerFlat {
+  asiakasId: number;
+  name: string | null;
+  yTunnus: string | null;
+  type: number | null;
+  address: string | null;
+  city: string | null;
+  email: string | null;
+  phone: string | null;
+  contactPersonId: number | null;
+  shortName: string | null;
+  comment: string | null;
+}
+
 /**
  * GET /api/cli/customer/get/:asiakasId. Returns the flat backend record as-is.
  */
 export async function runCustomerGet(
   client: ApiClient,
   asiakasId: number
-): Promise<Record<string, unknown>> {
-  return client.get<Record<string, unknown>>(
+): Promise<CustomerFlat> {
+  return client.get<CustomerFlat>(
     `/api/cli/customer/get/${asiakasId}`
   );
 }
@@ -470,6 +485,101 @@ export async function runCustomerPersonRemove(
   );
 }
 
+/** Typed flags for `customer create` (createY's writable subset + escape hatch). */
+export interface CustomerCreateFlags {
+  name?: string;
+  ytunnus?: string;
+  email?: string;
+  shortName?: string;
+  fromPrh?: string;
+  body?: string;
+}
+
+/**
+ * Assemble the POST /api/asiakas/createY body from typed flags (+ optional PRH
+ * prefill). createY accepts only yTunnus(camelCase,REQUIRED) / email /
+ * asiakasNimi / asiakasShortNimi / ownerAsiakasId(REQUIRED); it ignores
+ * asiakasTypeId and cannot write billing address/city. Precedence (low→high):
+ * PRH prefill < explicit flags < raw --body.
+ */
+export function buildAsiakasCreateBody(
+  flags: CustomerCreateFlags,
+  ownerAsiakasId: number,
+  prh?: PrhCompany
+): Record<string, unknown> {
+  const body: Record<string, unknown> = { ownerAsiakasId };
+  if (prh) {
+    if (prh.name) body.asiakasNimi = prh.name;
+    if (prh.businessId) body.yTunnus = prh.businessId;
+  }
+  if (flags.name !== undefined) body.asiakasNimi = flags.name;
+  if (flags.ytunnus !== undefined) body.yTunnus = flags.ytunnus;
+  if (flags.email !== undefined) body.email = flags.email;
+  if (flags.shortName !== undefined) body.asiakasShortNimi = flags.shortName;
+  if (flags.body) Object.assign(body, JSON.parse(flags.body));
+  return body;
+}
+
+/** Pull the new asiakasId out of createY's response (tolerant of legacy shapes). */
+export function extractAsiakasId(res: unknown): number | null {
+  const r = res as Record<string, unknown> | null;
+  if (!r || typeof r !== "object") return null;
+  const candidates = [
+    r.returnValue,
+    r.asiakasId,
+    (r.recordset as Array<Record<string, unknown>> | undefined)?.[0]?.asiakasId,
+    (r.data as Record<string, unknown> | undefined)?.returnValue,
+  ];
+  for (const c of candidates) {
+    const n = Number(c);
+    if (Number.isInteger(n) && n > 0) return n;
+  }
+  return null;
+}
+
+/** Typed flags for `customer update` (setData's writable subset + escape hatch). */
+export interface CustomerUpdateFlags {
+  name?: string;
+  ytunnus?: string;
+  email?: string;
+  shortName?: string;
+  comment?: string;
+  contactPerson?: number;
+  type?: number;
+  body?: string;
+}
+
+/**
+ * Read-merge-write: seed the full setData body from the CURRENT flat record so
+ * unspecified fields (notably asiakasContactPersonId, which setData overwrites
+ * unconditionally) are preserved, then overlay provided flags, then raw --body.
+ * Always sets saveGlobalAsiakas:true (else setData no-ops on the global row).
+ */
+export function buildAsiakasUpdateBody(
+  current: CustomerFlat,
+  flags: CustomerUpdateFlags
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    ytunnus: current.yTunnus ?? null,
+    asiakasNimi: current.name ?? null,
+    asiakasTypeId: current.type ?? 1,
+    laskutusEmail: current.email ?? null,
+    asiakasContactPersonId: current.contactPersonId ?? 0,
+    asiakasShortNimi: current.shortName ?? null,
+    kommentti: current.comment ?? null,
+    saveGlobalAsiakas: true,
+  };
+  if (flags.name !== undefined) body.asiakasNimi = flags.name;
+  if (flags.ytunnus !== undefined) body.ytunnus = flags.ytunnus;
+  if (flags.email !== undefined) body.laskutusEmail = flags.email;
+  if (flags.shortName !== undefined) body.asiakasShortNimi = flags.shortName;
+  if (flags.comment !== undefined) body.kommentti = flags.comment;
+  if (flags.contactPerson !== undefined) body.asiakasContactPersonId = flags.contactPerson;
+  if (flags.type !== undefined) body.asiakasTypeId = flags.type;
+  if (flags.body) Object.assign(body, JSON.parse(flags.body));
+  return body;
+}
+
 /**
  * Register `ib customer` subcommands on the parent commander instance:
  *   - list    filterable by --limit/--cursor
@@ -644,27 +754,35 @@ export function registerCustomerCommands(
 
   const createCmd = c
     .command("create")
-    .description("Create a new customer (POST /api/asiakas/createY)")
-    .requiredOption(
-      "--body <json>",
-      "JSON object forwarded verbatim as the request body"
-    );
+    .description(
+      "Create a customer. Typed flags assemble the createY body (yTunnus required). --from-prh prefills name+yTunnus from the business registry. --body raw JSON overrides everything."
+    )
+    .option("--name <s>", "Customer name (asiakasNimi)")
+    .option("--ytunnus <s>", "Business ID (yTunnus) — REQUIRED unless --from-prh/--body supplies it")
+    .option("--email <s>", "Invoicing email (laskutusEmail)")
+    .option("--short-name <s>", "Short display name (asiakasShortNimi)")
+    .option("--from-prh <ytunnus>", "Prefill name + yTunnus from PRH for this business ID")
+    .option("--body <json>", "Raw JSON body forwarded verbatim (overrides typed flags)");
   addWriteFlagsToCommand(createCmd).action(
-    async (opts: {
-      body: string;
-      dryRun?: boolean;
-      idempotencyKey?: string;
-      reason?: string;
-    }) => {
+    async (opts: CustomerCreateFlags & WriteFlags) => {
       try {
         const client = await getClient();
-        const parsed = JSON.parse(opts.body) as Record<string, unknown>;
-        const result = await runCustomerCreate(client, parsed, {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        });
-        writeJson(result);
+        const ownerAsiakasId = await resolveCurrentOwnerAsiakasId(client);
+        const prh = opts.fromPrh
+          ? await runCustomerPrhById(client, opts.fromPrh)
+          : undefined;
+        const body = buildAsiakasCreateBody(opts, ownerAsiakasId, prh);
+        if (body.yTunnus === undefined || body.yTunnus === null || body.yTunnus === "") {
+          writeError(new Error("create requires --ytunnus (or --from-prh / --body with yTunnus)"));
+          process.exit(4);
+        }
+        const res = await runCustomerCreate(client, body, opts);
+        if (opts.dryRun) {
+          writeJson(res);
+          return;
+        }
+        const newId = extractAsiakasId(res);
+        writeJson(newId ? await runCustomerGet(client, newId) : res);
       } catch (e) {
         exitWithError(e);
       }
@@ -673,35 +791,30 @@ export function registerCustomerCommands(
 
   const updateCmd = c
     .command("update <asiakasId>")
-    .description("Update a customer (POST /api/asiakas/set/<asiakasId>)")
-    .requiredOption(
-      "--body <json>",
-      "JSON object forwarded verbatim as the request body"
-    );
+    .description(
+      "Update a customer. Reads the current record, overlays the provided flags (preserving everything else — no contact-person clobber), and writes back. --body raw JSON overrides flags."
+    )
+    .option("--name <s>", "Customer name (asiakasNimi)")
+    .option("--ytunnus <s>", "Business ID (ytunnus)")
+    .option("--email <s>", "Invoicing email (laskutusEmail)")
+    .option("--short-name <s>", "Short display name (asiakasShortNimi)")
+    .option("--comment <s>", "Comment (kommentti)")
+    .option("--contact-person <id>", "Contact person id (asiakasContactPersonId)", (v: string) => Number(v))
+    .option("--type <id>", "Customer type id (asiakasTypeId)", (v: string) => Number(v))
+    .option("--body <json>", "Raw JSON body forwarded verbatim (overrides typed flags)");
   addWriteFlagsToCommand(updateCmd).action(
-    async (
-      idStr: string,
-      opts: {
-        body: string;
-        dryRun?: boolean;
-        idempotencyKey?: string;
-        reason?: string;
-      }
-    ) => {
+    async (idStr: string, opts: CustomerUpdateFlags & WriteFlags) => {
       try {
         const client = await getClient();
-        const parsed = JSON.parse(opts.body) as Record<string, unknown>;
-        const result = await runCustomerUpdate(
-          client,
-          Number(idStr),
-          parsed,
-          {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          }
-        );
-        writeJson(result);
+        const asiakasId = Number(idStr);
+        const current = await runCustomerGet(client, asiakasId);
+        const body = buildAsiakasUpdateBody(current, opts);
+        const res = await runCustomerUpdate(client, asiakasId, body, opts);
+        if (opts.dryRun) {
+          writeJson(res);
+          return;
+        }
+        writeJson(await runCustomerGet(client, asiakasId));
       } catch (e) {
         exitWithError(e);
       }
