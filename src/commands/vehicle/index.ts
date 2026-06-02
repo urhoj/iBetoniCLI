@@ -14,6 +14,10 @@ export interface VehicleDriversFilter {
   to?: string;
 }
 
+export interface VehicleDayFilter {
+  date?: string;
+}
+
 /**
  * GET /api/cli/vehicle/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
@@ -81,6 +85,18 @@ export async function runVehicleLocations(
 ): Promise<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }> {
   return client.get<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }>(
     "/api/cli/vehicle/locations"
+  );
+}
+
+/** GET /api/cli/vehicle/timeline/:vehicleId?date= — per-day stop/travel segments. */
+export async function runVehicleTimeline(
+  client: ApiClient,
+  vehicleId: number,
+  opts: VehicleDayFilter
+): Promise<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }> {
+  const qs = opts.date ? `?date=${opts.date}` : "";
+  return client.get<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }>(
+    `/api/cli/vehicle/timeline/${vehicleId}${qs}`
   );
 }
 
@@ -162,6 +178,18 @@ export function registerVehicleCommands(
       try {
         const client = await getClient();
         writeJson(await runVehicleLocations(client));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  v.command("timeline <vehicleId>")
+    .description("Per-day GPS timeline: named stops (sijainti/tyomaa) + travel legs with durations")
+    .option("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
+    .action(async (idStr: string, opts: VehicleDayFilter) => {
+      try {
+        const client = await getClient();
+        writeJson(await runVehicleTimeline(client, Number(idStr), { date: resolveDate(opts.date) }));
       } catch (e) {
         exitWithError(e);
       }

@@ -1963,6 +1963,37 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib vehicle timeline matches snapshot 1`] = `
+"USAGE
+  ib vehicle timeline [flags]
+
+DESCRIPTION
+  Per-day GPS timeline for a vehicle (snapshot-based, no external API): named stop segments (sijainti/tyomaa) and travel legs with durations.
+  Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --vehicleId NUMBER    Positional — vehicleId to inspect
+  --date DATE    Day (YYYY-MM-DD or today/yesterday/tomorrow); Europe/Helsinki (default: today)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ type, locationType?, locationId?, locationName?, locationAddress?, sijaintiTypeName?, asiakasNimi?, arrived, departed, durationMin, distanceKm? }> & { gpsAvailable }
+
+ERRORS (stderr, exit non-zero)
+  404  Vehicle not found      → verify vehicleId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle timeline 7
+  ib vehicle timeline 7 --date yesterday
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib worksite create matches snapshot 1`] = `
 "USAGE
   ib worksite create [flags]
