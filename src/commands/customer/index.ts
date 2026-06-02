@@ -8,6 +8,7 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { resolveRoleTypeId } from "../../roles.js";
 
 export interface CustomerListFilter {
   limit?: number;
@@ -668,25 +669,6 @@ async function resolveOwnerAsiakasIdForWrite(client: ApiClient): Promise<number>
 // `@ibetoni/constants` is a CommonJS package — pulled in via createRequire so
 // the ESM build doesn't need a default-export shim.
 const cjsRequire = createRequire(import.meta.url);
-
-/**
- * Translate a role NAME (e.g. "keikkaHandler") to its `asiakasPersonSettingTypeId`
- * using `ROLE_TYPEID_BY_NAME` from `@ibetoni/constants` (the single source of
- * truth). Returns `0` for an unset name (BE treats 0 as "no filter").
- *
- * Throws a descriptive error when the role is unknown so the CLI can surface
- * the list of valid names to the user.
- */
-function resolveRoleTypeId(roleName?: string): number {
-  if (!roleName) return 0;
-  const constants = cjsRequire("@ibetoni/constants") as { ROLE_TYPEID_BY_NAME: Record<string, number> };
-  const id = constants.ROLE_TYPEID_BY_NAME[roleName];
-  if (!id) {
-    const valid = Object.keys(constants.ROLE_TYPEID_BY_NAME).sort().join(", ");
-    throw new Error(`unknown role: ${roleName}. Valid: ${valid}`);
-  }
-  return id;
-}
 
 interface PersonRow {
   personId: number;
