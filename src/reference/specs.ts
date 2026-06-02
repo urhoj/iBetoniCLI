@@ -856,11 +856,12 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "Create a new sijainti via POST /api/geocode/sijainti/add. Body forwarded verbatim.",
     permissions: ["auth.page.sijainnit.edit"],
     flags: [
-      {
-        name: "body",
-        type: "json",
-        description: "JSON object with the new sijainti fields",
-      },
+      { name: "body", type: "json", description: "JSON object with the new sijainti fields (optional if typed flags given)" },
+      { name: "name", type: "string", description: "sijaintiNimi" },
+      { name: "address", type: "string", description: "sijaintiOsoite1 (street)" },
+      { name: "type", type: "number", description: "sijaintiTypeId (see `ib sijainti types`)" },
+      { name: "lat", type: "number", description: "Latitude" },
+      { name: "lng", type: "number", description: "Longitude" },
     ],
     writeFlags: true,
     outputShape: "{ sijaintiId, ... } (raw backend response)",
@@ -869,7 +870,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.sijainnit.edit"),
     ],
     examples: [
-      "ib sijainti create --body '{\"name\":\"Depot A\",\"address\":\"Industrial St 1\",\"sijaintiTypeId\":1}'",
+      'ib sijainti create --name "Depot A" --address "Industrial St 1" --type 1 --lat 60.17 --lng 24.94',
+      "ib sijainti create --body '{\"sijaintiNimi\":\"Depot A\",\"sijaintiTypeId\":1}'",
     ],
   },
   {
@@ -878,11 +880,13 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "Update a sijainti via POST /api/geocode/updateSijainti. Body forwarded verbatim.",
     permissions: ["auth.page.sijainnit.edit"],
     flags: [
-      {
-        name: "body",
-        type: "json",
-        description: "JSON object with the fields to update (must include sijaintiId)",
-      },
+      { name: "body", type: "json", description: "JSON object with fields to update (optional if typed flags given)" },
+      { name: "id", type: "number", description: "Target sijaintiId (or include sijaintiId in --body)" },
+      { name: "name", type: "string", description: "sijaintiNimi" },
+      { name: "address", type: "string", description: "sijaintiOsoite1 (street)" },
+      { name: "type", type: "number", description: "sijaintiTypeId" },
+      { name: "lat", type: "number", description: "Latitude" },
+      { name: "lng", type: "number", description: "Longitude" },
     ],
     writeFlags: true,
     outputShape: "{ ok: true, ... } (raw backend response)",
@@ -892,7 +896,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.sijainnit.edit"),
     ],
     examples: [
-      "ib sijainti update --body '{\"sijaintiId\":42,\"name\":\"Renamed depot\"}'",
+      'ib sijainti update --id 42 --name "Renamed depot"',
+      "ib sijainti update --body '{\"sijaintiId\":42,\"sijaintiNimi\":\"Renamed depot\"}'",
     ],
   },
   {

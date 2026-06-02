@@ -16,6 +16,35 @@ import { resolveDate } from "../../dates.js";
  */
 const JERRY_ACTIVE_SENTINEL = "9999-12-31 23:59:59";
 
+/** Typed convenience fields for `create`/`update`, mapped to backend names. */
+export interface SijaintiTypedFields {
+  id?: number;
+  name?: string;
+  address?: string;
+  type?: number;
+  lat?: number;
+  lng?: number;
+}
+
+/**
+ * Merge typed convenience flags over a parsed --body object (typed flags win).
+ * `--id` maps to sijaintiId (update only); the rest map to the backend column
+ * names. Body keys not covered by a typed flag are preserved untouched.
+ */
+export function buildSijaintiBody(
+  parsedBody: Record<string, unknown>,
+  typed: SijaintiTypedFields
+): Record<string, unknown> {
+  const body = { ...parsedBody };
+  if (typed.id !== undefined) body.sijaintiId = typed.id;
+  if (typed.name !== undefined) body.sijaintiNimi = typed.name;
+  if (typed.address !== undefined) body.sijaintiOsoite1 = typed.address;
+  if (typed.type !== undefined) body.sijaintiTypeId = typed.type;
+  if (typed.lat !== undefined) body.lat = typed.lat;
+  if (typed.lng !== undefined) body.lng = typed.lng;
+  return body;
+}
+
 export interface SijaintiListFilter {
   type?: string;
   limit?: number;
@@ -353,22 +382,46 @@ export function registerSijaintiCommands(
 
   const createCmd = s
     .command("create")
-    .description("Create a new sijainti (POST /api/geocode/sijainti/add)")
-    .requiredOption(
-      "--body <json>",
-      "JSON object forwarded verbatim as the request body"
-    );
+    .description(
+      "Create a new sijainti (POST /api/geocode/sijainti/add). Use typed flags or --body JSON (typed flags win)."
+    )
+    .option("--body <json>", "JSON object forwarded as the request body")
+    .option("--name <n>", "sijaintiNimi")
+    .option("--address <a>", "sijaintiOsoite1 (street)")
+    .option("--type <id>", "sijaintiTypeId", Number)
+    .option("--lat <n>", "Latitude", Number)
+    .option("--lng <n>", "Longitude", Number);
   addWriteFlagsToCommand(createCmd).action(
     async (opts: {
-      body: string;
+      body?: string;
+      name?: string;
+      address?: string;
+      type?: number;
+      lat?: number;
+      lng?: number;
       dryRun?: boolean;
       idempotencyKey?: string;
       reason?: string;
     }) => {
       try {
         const client = await getClient();
-        const parsed = JSON.parse(opts.body) as Record<string, unknown>;
-        const result = await runSijaintiCreate(client, parsed, {
+        const parsed = opts.body
+          ? (JSON.parse(opts.body) as Record<string, unknown>)
+          : {};
+        const body = buildSijaintiBody(parsed, {
+          name: opts.name,
+          address: opts.address,
+          type: opts.type,
+          lat: opts.lat,
+          lng: opts.lng,
+        });
+        if (Object.keys(body).length === 0) {
+          writeError(
+            new Error("provide --body or at least one field flag (--name/--address/--type/--lat/--lng)")
+          );
+          process.exit(4);
+        }
+        const result = await runSijaintiCreate(client, body, {
           dryRun: opts.dryRun,
           idempotencyKey: opts.idempotencyKey,
           reason: opts.reason,
@@ -383,23 +436,48 @@ export function registerSijaintiCommands(
   const updateCmd = s
     .command("update")
     .description(
-      "Update a sijainti (POST /api/geocode/updateSijainti; sijaintiId is in the body)"
+      "Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Typed flags win over --body."
     )
-    .requiredOption(
-      "--body <json>",
-      "JSON object forwarded verbatim as the request body (must include sijaintiId)"
-    );
+    .option("--body <json>", "JSON object forwarded as the request body")
+    .option("--id <sijaintiId>", "Target sijaintiId", Number)
+    .option("--name <n>", "sijaintiNimi")
+    .option("--address <a>", "sijaintiOsoite1 (street)")
+    .option("--type <id>", "sijaintiTypeId", Number)
+    .option("--lat <n>", "Latitude", Number)
+    .option("--lng <n>", "Longitude", Number);
   addWriteFlagsToCommand(updateCmd).action(
     async (opts: {
-      body: string;
+      body?: string;
+      id?: number;
+      name?: string;
+      address?: string;
+      type?: number;
+      lat?: number;
+      lng?: number;
       dryRun?: boolean;
       idempotencyKey?: string;
       reason?: string;
     }) => {
       try {
         const client = await getClient();
-        const parsed = JSON.parse(opts.body) as Record<string, unknown>;
-        const result = await runSijaintiUpdate(client, parsed, {
+        const parsed = opts.body
+          ? (JSON.parse(opts.body) as Record<string, unknown>)
+          : {};
+        const body = buildSijaintiBody(parsed, {
+          id: opts.id,
+          name: opts.name,
+          address: opts.address,
+          type: opts.type,
+          lat: opts.lat,
+          lng: opts.lng,
+        });
+        if (body.sijaintiId === undefined) {
+          writeError(
+            new Error("update requires sijaintiId — pass --id or include it in --body")
+          );
+          process.exit(4);
+        }
+        const result = await runSijaintiUpdate(client, body, {
           dryRun: opts.dryRun,
           idempotencyKey: opts.idempotencyKey,
           reason: opts.reason,

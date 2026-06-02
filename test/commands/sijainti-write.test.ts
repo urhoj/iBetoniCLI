@@ -4,6 +4,7 @@ import {
   runSijaintiUpdate,
   runSijaintiDelete,
   runSijaintiUndelete,
+  buildSijaintiBody,
 } from "../../src/commands/sijainti/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -62,6 +63,39 @@ describe("ib sijainti create/update", () => {
       body,
       { headers: { "X-Action-Reason": "tower split" } }
     );
+  });
+});
+
+describe("buildSijaintiBody (typed-flag merge)", () => {
+  test("maps typed flags to backend field names", () => {
+    expect(
+      buildSijaintiBody(
+        {},
+        { name: "Depot A", address: "Teollisuuskatu 5", type: 1, lat: 60.1, lng: 24.9 }
+      )
+    ).toEqual({
+      sijaintiNimi: "Depot A",
+      sijaintiOsoite1: "Teollisuuskatu 5",
+      sijaintiTypeId: 1,
+      lat: 60.1,
+      lng: 24.9,
+    });
+  });
+
+  test("typed flags win over --body keys; untouched body keys are preserved", () => {
+    expect(
+      buildSijaintiBody(
+        { sijaintiNimi: "Old", sijaintiComment: "keep me" },
+        { name: "New" }
+      )
+    ).toEqual({ sijaintiNimi: "New", sijaintiComment: "keep me" });
+  });
+
+  test("maps --id to sijaintiId (used by update)", () => {
+    expect(buildSijaintiBody({}, { id: 42, name: "X" })).toEqual({
+      sijaintiId: 42,
+      sijaintiNimi: "X",
+    });
   });
 });
 
