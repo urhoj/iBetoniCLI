@@ -106,27 +106,38 @@ export const MODULE_FIELD_KEYS = [
 /** Every togglable field key: the 8 modules plus `pumppu` (isPumppuToimittaja). */
 export const ALL_FIELD_KEYS = ["pumppu", ...MODULE_FIELD_KEYS] as const;
 
+/** Friendly alias → canonical ASIAKAS_SETTING_TYPE_IDS key (the 8 the modules cmd exposes). */
+const SETTING_ALIASES: Record<string, string> = {
+  jerry: "HAS_JERRY",
+  henkilot: "HAS_HENKILOT",
+  sijainnit: "HAS_SIJAINNIT",
+  ajoneuvot: "HAS_AJONEUVOT",
+  tiedostot: "HAS_TIEDOSTOT",
+  weather: "HAS_WEATHER",
+  lomaseuranta: "LOMASEURANTA",
+  shareorders: "SHARE_ORDERS_WITH_BETONI",
+};
+
 /**
- * Map each module field key to its asiakasSettingTypeId, sourced at call time
- * from ASIAKAS_SETTING_TYPE_IDS in @ibetoni/constants (the single source of
- * truth). `pumppu` is intentionally absent — it is a roolit column, not a
- * setting.
+ * Build a lowercase-key → asiakasSettingTypeId map covering every canonical
+ * ASIAKAS_SETTING_TYPE_IDS name PLUS the 8 friendly aliases, sourced at call
+ * time from @ibetoni/constants. `pumppu` is intentionally absent — it is a
+ * roolit column, handled separately. Replaces the old 8-key moduleKeyToTypeId().
  */
-function moduleKeyToTypeId(): Record<string, number> {
+function settingTypeIdMap(): Record<string, number> {
   const constants = cjsRequire("@ibetoni/constants") as {
     ASIAKAS_SETTING_TYPE_IDS: Record<string, number>;
   };
   const ids = constants.ASIAKAS_SETTING_TYPE_IDS;
-  return {
-    jerry: ids.HAS_JERRY,
-    henkilot: ids.HAS_HENKILOT,
-    sijainnit: ids.HAS_SIJAINNIT,
-    ajoneuvot: ids.HAS_AJONEUVOT,
-    tiedostot: ids.HAS_TIEDOSTOT,
-    weather: ids.HAS_WEATHER,
-    lomaseuranta: ids.LOMASEURANTA,
-    shareorders: ids.SHARE_ORDERS_WITH_BETONI,
-  };
+  const map: Record<string, number> = {};
+  for (const [name, id] of Object.entries(ids)) map[name.toLowerCase()] = id;
+  for (const [alias, canonical] of Object.entries(SETTING_ALIASES)) map[alias] = ids[canonical];
+  return map;
+}
+
+/** Every valid settings key for --set/--unset: all canonical (lowercased) + aliases + pumppu. */
+function allSettingKeys(): Set<string> {
+  return new Set([...Object.keys(settingTypeIdMap()), "pumppu"]);
 }
 
 /**
@@ -164,11 +175,120 @@ export function parseModuleChanges(
   return changes;
 }
 
+/**
+ * Parse --set/--unset CSV lists into a desired-state map over the FULL setting
+ * surface (canonical names case-insensitive, the 8 aliases, and pumppu). Same
+ * validation contract as parseModuleChanges but a wider valid set.
+ */
+export function parseSettingChanges(
+  setCsv?: string,
+  unsetCsv?: string
+): Map<string, boolean> {
+  const changes = new Map<string, boolean>();
+  const valid = allSettingKeys();
+  const apply = (csv: string | undefined, value: boolean): void => {
+    if (!csv) return;
+    for (const raw of csv.split(",")) {
+      const key = raw.trim().toLowerCase();
+      if (!key) continue;
+      if (!valid.has(key)) {
+        throw new Error(`unknown field: ${key}. Valid: canonical ASIAKAS_SETTING_TYPE_IDS names, aliases, or pumppu`);
+      }
+      if (changes.has(key) && changes.get(key) !== value) {
+        throw new Error(`field '${key}' given to both --set and --unset`);
+      }
+      changes.set(key, value);
+    }
+  };
+  apply(setCsv, true);
+  apply(unsetCsv, false);
+  if (changes.size === 0) throw new Error("no fields given — pass --set and/or --unset");
+  return changes;
+}
+
+/** Full settings report (roolit + all setting types by canonical name). */
+export interface CustomerSettingsState {
+  asiakasId: number;
+  roolit: AsiakasRoolit;
+  settings: Record<string, boolean>;
+}
+
+/** GET /api/cli/customer/settings/:asiakasId — admin-gated; returns the raw report. */
+export async function runCustomerSettingsReport(
+  client: ApiClient,
+  asiakasId: number
+): Promise<CustomerSettingsState> {
+  return client.get<CustomerSettingsState>(`/api/cli/customer/settings/${asiakasId}`);
+}
+
 /** Result of applying module/roolit changes: what was requested + final state. */
 export interface ModulesApplyResult {
   asiakasId: number;
   applied: { set: string[]; unset: string[]; dryRun: boolean };
   state: CustomerModulesState;
+}
+
+/**
+ * Shared write core for both module and settings applies: pumppu → setRoolit
+ * (echoing the other three roolit booleans from the modules report), the rest
+ * → one settings/save batch (self laskuttaja, upsert). Resolves typeIds via the
+ * full settingTypeIdMap so it accepts canonical names AND the 8 aliases.
+ */
+async function applySettingWrites(
+  client: ApiClient,
+  asiakasId: number,
+  changes: Map<string, boolean>,
+  flags: WriteFlags
+): Promise<void> {
+  const headers = writeFlagsToHeaders(flags);
+  if (changes.has("pumppu")) {
+    const current = await runCustomerModulesReport(client, asiakasId);
+    const r = current.roolit;
+    await client.post(
+      "/api/asiakas/setRoolit",
+      {
+        asiakasId,
+        isTyomaaAsiakas: r.isTyomaaAsiakas,
+        isPumppuToimittaja: changes.get("pumppu"),
+        isBetoniToimittaja: r.isBetoniToimittaja,
+        isLattiaToimittaja: r.isLattiaToimittaja,
+      },
+      { headers }
+    );
+  }
+  const typeIds = settingTypeIdMap();
+  const settings = [...changes.entries()]
+    .filter(([key]) => key !== "pumppu")
+    .map(([key, value]) => ({
+      asiakasSettingId: null,
+      asiakasId,
+      laskuttajaAsiakasId: asiakasId,
+      asiakasSettingTypeId: typeIds[key],
+      asiakasSettingBool: value,
+    }));
+  if (settings.length > 0) {
+    await client.post("/api/asiakas/settings/save", settings, { headers });
+  }
+}
+
+/** Apply changes and report the FULL settings state. */
+export async function runCustomerSettingsApply(
+  client: ApiClient,
+  asiakasId: number,
+  changes: Map<string, boolean>,
+  flags: WriteFlags
+): Promise<{ asiakasId: number; applied: { set: string[]; unset: string[]; dryRun: boolean }; state: CustomerSettingsState }> {
+  await applySettingWrites(client, asiakasId, changes, flags);
+  const state = await runCustomerSettingsReport(client, asiakasId);
+  return {
+    asiakasId,
+    applied: {
+      set: [...changes].filter(([, v]) => v).map(([k]) => k),
+      unset: [...changes].filter(([, v]) => !v).map(([k]) => k),
+      dryRun: !!flags.dryRun,
+    },
+    state,
+  };
 }
 
 /**
@@ -186,40 +306,7 @@ export async function runCustomerModulesApply(
   changes: Map<string, boolean>,
   flags: WriteFlags
 ): Promise<ModulesApplyResult> {
-  const headers = writeFlagsToHeaders(flags);
-
-  // Roolit preservation: setRoolit overwrites all four columns, so read the
-  // current quad first and echo back the three we are not changing.
-  if (changes.has("pumppu")) {
-    const current = await runCustomerModulesReport(client, asiakasId);
-    const r = current.roolit;
-    await client.post(
-      "/api/asiakas/setRoolit",
-      {
-        asiakasId,
-        isTyomaaAsiakas: r.isTyomaaAsiakas,
-        isPumppuToimittaja: changes.get("pumppu"),
-        isBetoniToimittaja: r.isBetoniToimittaja,
-        isLattiaToimittaja: r.isLattiaToimittaja,
-      },
-      { headers }
-    );
-  }
-
-  const typeIds = moduleKeyToTypeId();
-  const settings = [...changes.entries()]
-    .filter(([key]) => key !== "pumppu")
-    .map(([key, value]) => ({
-      asiakasSettingId: null,
-      asiakasId,
-      laskuttajaAsiakasId: asiakasId,
-      asiakasSettingTypeId: typeIds[key],
-      asiakasSettingBool: value,
-    }));
-  if (settings.length > 0) {
-    await client.post("/api/asiakas/settings/save", settings, { headers });
-  }
-
+  await applySettingWrites(client, asiakasId, changes, flags);
   const state = await runCustomerModulesReport(client, asiakasId);
   return {
     asiakasId,
@@ -706,6 +793,40 @@ export function registerCustomerCommands(
         const result = await runCustomerOperatorVerify(client, asiakasId);
         writeJson(result);
         if (!result.allSet) process.exitCode = 1;
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
+
+  const settingsCmd = c
+    .command("settings <asiakasId>")
+    .description(
+      "Report or toggle ALL asiakasSettings (every canonical ASIAKAS_SETTING_TYPE_IDS name) + pumppu. No --set/--unset = read-only report. Names accept canonical settings (case-insensitive), the 8 module aliases, or pumppu."
+    )
+    .option("--set <keys>", "Comma-separated setting names to turn ON")
+    .option("--unset <keys>", "Comma-separated setting names to turn OFF");
+  addWriteFlagsToCommand(settingsCmd).action(
+    async (idStr: string, opts: WriteFlags & { set?: string; unset?: string }) => {
+      try {
+        const client = await getClient();
+        const asiakasId = Number(idStr);
+        if (!opts.set && !opts.unset) {
+          writeJson(await runCustomerSettingsReport(client, asiakasId));
+          return;
+        }
+        let changes: Map<string, boolean>;
+        try {
+          changes = parseSettingChanges(opts.set, opts.unset);
+        } catch (validationErr) {
+          writeError(validationErr);
+          process.exit(4);
+        }
+        writeJson(await runCustomerSettingsApply(client, asiakasId, changes!, {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        }));
       } catch (e) {
         exitWithError(e);
       }
