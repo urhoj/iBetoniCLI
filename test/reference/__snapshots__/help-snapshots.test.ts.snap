@@ -1815,6 +1815,142 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib vehicle create matches snapshot 1`] = `
+"USAGE
+  ib vehicle create [flags]
+
+DESCRIPTION
+  Create a vehicle. Two-step backend flow (POST /api/vehicle/new then /save); ownerAsiakasId from JWT. Dry-run previews via /new without inserting.
+  Permissions: requires auth.page.vehicle.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --reg STRING    Registration number (vehicleRegNo)
+  --name STRING    Display name (vehicleNimi)
+  --no NUMBER    Fleet number (vehicleNo)
+  --type NUMBER    vehicleTypeId (see ib vehicle types)
+  --memo STRING    Free-text memo
+  --default-driver NUMBER    Default driver personId
+  --capacity NUMBER    Concrete capacity in m3 (vehicleM3)
+  --asiakas NUMBER    Owning asiakasId (defaults to active company)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { vehicleId, ... } (raw backend save response) | { dryRun, wouldCreate }
+
+ERRORS (stderr, exit non-zero)
+  400  Validation failed      → fix the field flags
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle create --reg ABC-123 --type 1 --capacity 7.5 --reason 'new truck'
+  ib vehicle create --reg ABC-123 --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle dates expiring matches snapshot 1`] = `
+"USAGE
+  ib vehicle dates expiring [flags]
+
+DESCRIPTION
+  List expiring vehicle dates across the fleet within a days-ahead window.
+  Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --days NUMBER    Days-ahead window (default: 30)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ vehicleDateId, vehicleId, typeName, dateValue, expirationDate, daysUntil, urgency }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle dates expiring
+  ib vehicle dates expiring --days 60 --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle dates list matches snapshot 1`] = `
+"USAGE
+  ib vehicle dates list [flags]
+
+DESCRIPTION
+  List a vehicle's inspection/certification/insurance dates.
+  Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --vehicleId NUMBER    Positional — vehicleId
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ vehicleDateId, typeId, typeName, dateValue, expirationDate, dismissedUntil, quantity, status, daysUntil }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle dates list 7
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle driver-assign matches snapshot 1`] = `
+"USAGE
+  ib vehicle driver-assign [flags]
+
+DESCRIPTION
+  Assign a per-day driver to a vehicle (vehicleDriverDays). POST /api/vehicle/driverDays/save.
+  Permissions: requires auth.page.vehicle.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --vehicleId NUMBER    Positional — vehicleId
+  --person NUMBER    Driver personId (required)
+  --date DATE    Day YYYY-MM-DD or today/yesterday/tomorrow (default: today)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  raw backend response | { dryRun, wouldUpdate }
+
+ERRORS (stderr, exit non-zero)
+  404  Vehicle not found      → verify vehicleId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle driver-assign 7 --person 555 --date 2026-06-02 --reason 'cover shift'
+  ib vehicle driver-assign 7 --person 555 --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib vehicle drivers matches snapshot 1`] = `
 "USAGE
   ib vehicle drivers [flags]
@@ -1904,6 +2040,36 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib vehicle search matches snapshot 1`] = `
+"USAGE
+  ib vehicle search [flags]
+
+DESCRIPTION
+  Search vehicles by reg-no / name substring (LIKE on vehicleRegNo/vehicleNimi).
+  Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --query STRING    Positional — substring to match
+  --limit NUMBER    Max rows (capped at 500) (default: 100)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ vehicleId, plate, type, capacity }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle search ABC
+  ib vehicle search kuorma --limit 20
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib vehicle status matches snapshot 1`] = `
 "USAGE
   ib vehicle status [flags]
@@ -1931,6 +2097,78 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib vehicle status 7
   ib vehicle status 7 --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle types matches snapshot 1`] = `
+"USAGE
+  ib vehicle types [flags]
+
+DESCRIPTION
+  List vehicle types (vehicleTypeId + name) for the active company.
+  Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ vehicleTypeId, name }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle types
+  ib vehicle types --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle update matches snapshot 1`] = `
+"USAGE
+  ib vehicle update [flags]
+
+DESCRIPTION
+  Update a vehicle (read-merge-write: only provided flags change; others preserved). POST /api/vehicle/save.
+  Permissions: requires auth.page.vehicle.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --vehicleId NUMBER    Positional — vehicleId to update
+  --reg STRING    Registration number
+  --name STRING    Display name
+  --no NUMBER    Fleet number
+  --type NUMBER    vehicleTypeId
+  --memo STRING    Free-text memo
+  --default-driver NUMBER    Default driver personId
+  --capacity NUMBER    Concrete capacity in m3
+  --asiakas NUMBER    Owning asiakasId
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { vehicleId } | { dryRun, wouldUpdate }
+
+ERRORS (stderr, exit non-zero)
+  404  Vehicle not found      → verify vehicleId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle update 70 --capacity 8 --reason 'remeasured'
+  ib vehicle update 70 --reg NEW-9 --dry-run
 "
 `;
 

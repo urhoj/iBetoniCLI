@@ -720,7 +720,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib person search 'Matti'"],
   },
 
-  // ─── vehicle (4) ─────────────────────────────────────────────────────────
+  // ─── vehicle (11) ─────────────────────────────────────────────────────────
   {
     command: "ib vehicle list",
     description:
@@ -807,6 +807,120 @@ export const COMMAND_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.vehicle.read"),
     ],
     examples: ["ib vehicle drivers 7 --from 2026-05-01 --to 2026-05-31"],
+  },
+  {
+    command: "ib vehicle types",
+    description: "List vehicle types (vehicleTypeId + name) for the active company.",
+    permissions: ["auth.page.vehicle.read"],
+    flags: [],
+    outputShape: "ListEnvelope<{ vehicleTypeId, name }>",
+    errors: permErrors("auth.page.vehicle.read"),
+    examples: ["ib vehicle types", "ib vehicle types --pretty"],
+  },
+  {
+    command: "ib vehicle search",
+    description: "Search vehicles by reg-no / name substring (LIKE on vehicleRegNo/vehicleNimi).",
+    permissions: ["auth.page.vehicle.read"],
+    flags: [
+      { name: "query", type: "string", description: "Positional — substring to match" },
+      { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+    ],
+    outputShape: "ListEnvelope<{ vehicleId, plate, type, capacity }>",
+    errors: permErrors("auth.page.vehicle.read"),
+    examples: ["ib vehicle search ABC", "ib vehicle search kuorma --limit 20"],
+  },
+  {
+    command: "ib vehicle create",
+    description:
+      "Create a vehicle. Two-step backend flow (POST /api/vehicle/new then /save); ownerAsiakasId from JWT. Dry-run previews via /new without inserting.",
+    permissions: ["auth.page.vehicle.edit"],
+    flags: [
+      { name: "reg", type: "string", description: "Registration number (vehicleRegNo)" },
+      { name: "name", type: "string", description: "Display name (vehicleNimi)" },
+      { name: "no", type: "number", description: "Fleet number (vehicleNo)" },
+      { name: "type", type: "number", description: "vehicleTypeId (see ib vehicle types)" },
+      { name: "memo", type: "string", description: "Free-text memo" },
+      { name: "default-driver", type: "number", description: "Default driver personId" },
+      { name: "capacity", type: "number", description: "Concrete capacity in m3 (vehicleM3)" },
+      { name: "asiakas", type: "number", description: "Owning asiakasId (defaults to active company)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ vehicleId, ... } (raw backend save response) | { dryRun, wouldCreate }",
+    errors: [
+      { code: 400, meaning: "Validation failed", remedy: "fix the field flags" },
+      ...permErrors("auth.page.vehicle.edit"),
+    ],
+    examples: [
+      "ib vehicle create --reg ABC-123 --type 1 --capacity 7.5 --reason 'new truck'",
+      "ib vehicle create --reg ABC-123 --dry-run",
+    ],
+  },
+  {
+    command: "ib vehicle update",
+    description:
+      "Update a vehicle (read-merge-write: only provided flags change; others preserved). POST /api/vehicle/save.",
+    permissions: ["auth.page.vehicle.edit"],
+    flags: [
+      { name: "vehicleId", type: "number", description: "Positional — vehicleId to update" },
+      { name: "reg", type: "string", description: "Registration number" },
+      { name: "name", type: "string", description: "Display name" },
+      { name: "no", type: "number", description: "Fleet number" },
+      { name: "type", type: "number", description: "vehicleTypeId" },
+      { name: "memo", type: "string", description: "Free-text memo" },
+      { name: "default-driver", type: "number", description: "Default driver personId" },
+      { name: "capacity", type: "number", description: "Concrete capacity in m3" },
+      { name: "asiakas", type: "number", description: "Owning asiakasId" },
+    ],
+    writeFlags: true,
+    outputShape: "{ vehicleId } | { dryRun, wouldUpdate }",
+    errors: [
+      { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
+      ...permErrors("auth.page.vehicle.edit"),
+    ],
+    examples: [
+      "ib vehicle update 70 --capacity 8 --reason 'remeasured'",
+      "ib vehicle update 70 --reg NEW-9 --dry-run",
+    ],
+  },
+  {
+    command: "ib vehicle dates list",
+    description: "List a vehicle's inspection/certification/insurance dates.",
+    permissions: ["auth.page.vehicle.read"],
+    flags: [{ name: "vehicleId", type: "number", description: "Positional — vehicleId" }],
+    outputShape:
+      "ListEnvelope<{ vehicleDateId, typeId, typeName, dateValue, expirationDate, dismissedUntil, quantity, status, daysUntil }>",
+    errors: permErrors("auth.page.vehicle.read"),
+    examples: ["ib vehicle dates list 7"],
+  },
+  {
+    command: "ib vehicle dates expiring",
+    description: "List expiring vehicle dates across the fleet within a days-ahead window.",
+    permissions: ["auth.page.vehicle.read"],
+    flags: [{ name: "days", type: "number", default: "30", description: "Days-ahead window" }],
+    outputShape:
+      "ListEnvelope<{ vehicleDateId, vehicleId, typeName, dateValue, expirationDate, daysUntil, urgency }>",
+    errors: permErrors("auth.page.vehicle.read"),
+    examples: ["ib vehicle dates expiring", "ib vehicle dates expiring --days 60 --pretty"],
+  },
+  {
+    command: "ib vehicle driver-assign",
+    description: "Assign a per-day driver to a vehicle (vehicleDriverDays). POST /api/vehicle/driverDays/save.",
+    permissions: ["auth.page.vehicle.edit"],
+    flags: [
+      { name: "vehicleId", type: "number", description: "Positional — vehicleId" },
+      { name: "person", type: "number", description: "Driver personId (required)" },
+      { name: "date", type: "date", default: "today", description: "Day YYYY-MM-DD or today/yesterday/tomorrow" },
+    ],
+    writeFlags: true,
+    outputShape: "raw backend response | { dryRun, wouldUpdate }",
+    errors: [
+      { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
+      ...permErrors("auth.page.vehicle.edit"),
+    ],
+    examples: [
+      "ib vehicle driver-assign 7 --person 555 --date 2026-06-02 --reason 'cover shift'",
+      "ib vehicle driver-assign 7 --person 555 --dry-run",
+    ],
   },
 
   // ─── sijainti (4) ────────────────────────────────────────────────────────
