@@ -4,6 +4,8 @@ import {
   runVehicleSearch,
   runVehicleCreate,
   runVehicleUpdate,
+  runVehicleDatesList,
+  runVehicleDatesExpiring,
 } from "../../src/commands/vehicle/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -164,5 +166,43 @@ describe("runVehicleUpdate", () => {
     await expect(
       runVehicleUpdate(c, 999, { memo: "x" }, {})
     ).rejects.toMatchObject({ exitCode: 5 });
+  });
+});
+
+describe("ib vehicle dates", () => {
+  const c = {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+    getCurrentToken: vi.fn(),
+  } as unknown as ApiClient;
+  beforeEach(() => (c.get as ReturnType<typeof vi.fn>).mockReset());
+  test("list hits /dates/:id", async () => {
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      count: 0,
+    });
+    await runVehicleDatesList(c, 7);
+    expect(c.get).toHaveBeenCalledWith("/api/cli/vehicle/dates/7");
+  });
+  test("expiring without days hits bare path", async () => {
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      count: 0,
+    });
+    await runVehicleDatesExpiring(c);
+    expect(c.get).toHaveBeenCalledWith("/api/cli/vehicle/dates/expiring");
+  });
+  test("expiring with days appends ?days=", async () => {
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      count: 0,
+    });
+    await runVehicleDatesExpiring(c, 60);
+    expect(c.get).toHaveBeenCalledWith("/api/cli/vehicle/dates/expiring?days=60");
   });
 });

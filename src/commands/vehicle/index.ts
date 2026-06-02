@@ -112,6 +112,34 @@ export async function runVehicleSearch(
 }
 
 /**
+ * GET /api/cli/vehicle/dates/:vehicleId — a vehicle's inspection/cert dates
+ * (e.g. katsastus, vakuutus) in the list envelope shape.
+ */
+export async function runVehicleDatesList(
+  client: ApiClient,
+  vehicleId: number
+): Promise<ListEnvelope<Record<string, unknown>>> {
+  return client.get<ListEnvelope<Record<string, unknown>>>(
+    `/api/cli/vehicle/dates/${vehicleId}`
+  );
+}
+
+/**
+ * GET /api/cli/vehicle/dates/expiring — inspection/cert dates expiring within
+ * the next `days` window across the whole fleet. `days` is appended as a query
+ * param only when supplied (backend default applies otherwise, typically 30).
+ */
+export async function runVehicleDatesExpiring(
+  client: ApiClient,
+  days?: number
+): Promise<ListEnvelope<Record<string, unknown>>> {
+  const qs = days !== undefined ? `?days=${days}` : "";
+  return client.get<ListEnvelope<Record<string, unknown>>>(
+    `/api/cli/vehicle/dates/expiring${qs}`
+  );
+}
+
+/**
  * The writable subset of a vehicle row. Every field is optional so the same
  * shape backs both create (unspecified → null) and update (unspecified → keep
  * current value via read-merge-write).
@@ -439,4 +467,31 @@ export function registerVehicleCommands(
       }
     }
   );
+
+  const dates = v
+    .command("dates")
+    .description("Vehicle inspection/cert date reads");
+  dates
+    .command("list <vehicleId>")
+    .description("List a vehicle's dates")
+    .action(async (idStr: string) => {
+      try {
+        writeJson(await runVehicleDatesList(await getClient(), Number(idStr)));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+  dates
+    .command("expiring")
+    .description("List expiring vehicle dates across the fleet")
+    .option("--days <n>", "Days-ahead window (default 30)", (s: string) =>
+      Number(s)
+    )
+    .action(async (opts: { days?: number }) => {
+      try {
+        writeJson(await runVehicleDatesExpiring(await getClient(), opts.days));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
 }
