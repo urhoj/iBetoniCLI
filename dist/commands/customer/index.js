@@ -164,6 +164,20 @@ export async function runCustomerOperatorVerify(client, asiakasId) {
     return { asiakasId, allSet: missing.length === 0, flags, missing };
 }
 /**
+ * GET /api/tyomaa/asiakasTyomaaList/:asiakasId — worksites belonging to a
+ * customer. Backend returns a raw array; wrapped into the universal envelope.
+ */
+export async function runCustomerWorksites(client, asiakasId) {
+    const rows = await client.get(`/api/tyomaa/asiakasTyomaaList/${asiakasId}`);
+    const items = (rows || []).map((r) => ({
+        tyomaaId: r.tyomaaId,
+        name: r.tyomaaNimi || null,
+        address: r.tyomaaOsoite1 || null,
+        city: r.tyomaaOsoite4 || null,
+    }));
+    return { items, nextCursor: null, count: items.length };
+}
+/**
  * GET /api/asiakas/search?searchString=<query> — existing (non-/api/cli/) route
  * used by the FE customer typeahead. The backend scopes results to the caller's
  * company (req.user.ownerAsiakasId) when no ownerAsiakasId query param is given,
@@ -256,6 +270,17 @@ export function registerCustomerCommands(parent, getClient) {
             const client = await getClient();
             const result = await runCustomerGet(client, Number(idStr));
             writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    c.command("worksites <asiakasId>")
+        .description("List worksites belonging to a customer")
+        .action(async (idStr) => {
+        try {
+            const client = await getClient();
+            writeJson(await runCustomerWorksites(client, Number(idStr)));
         }
         catch (e) {
             exitWithError(e);
