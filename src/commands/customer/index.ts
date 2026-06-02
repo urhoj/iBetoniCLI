@@ -576,7 +576,7 @@ export function registerCustomerCommands(
     }
     try {
       const client = await getClient();
-      const ownerAsiakasId = await resolveOwnerAsiakasIdForWrite(client);
+      const ownerAsiakasId = await resolveCurrentOwnerAsiakasId(client);
       const result = await runCustomerDelete(client, Number(asiakasIdStr), ownerAsiakasId, opts);
       writeJson(result);
     } catch (e) {
@@ -655,10 +655,10 @@ export function registerCustomerCommands(
 
 /**
  * Resolve the caller's current `ownerAsiakasId` via the existing
- * `/api/company-selection/available` route, used by every customer-write
- * subcommand that needs a tenant-owner segment in its URL.
+ * `/api/company-selection/available` route. Used by every customer command
+ * that needs the active tenant id (create body, history path, delete URL).
  */
-async function resolveOwnerAsiakasIdForWrite(client: ApiClient): Promise<number> {
+async function resolveCurrentOwnerAsiakasId(client: ApiClient): Promise<number> {
   const available = await client.get<{ currentCompanyId: number }>(
     "/api/company-selection/available"
   );
