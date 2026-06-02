@@ -2,6 +2,7 @@ import { describe, test, expect, vi, beforeEach } from "vitest";
 import {
   buildAsiakasCreateBody,
   extractAsiakasId,
+  buildAsiakasUpdateBody,
 } from "../../src/commands/customer/index.js";
 
 describe("buildAsiakasCreateBody", () => {
@@ -41,5 +42,42 @@ describe("extractAsiakasId", () => {
     expect(extractAsiakasId({ asiakasId: 5002 })).toBe(5002);
     expect(extractAsiakasId({ recordset: [{ asiakasId: 5003 }] })).toBe(5003);
     expect(extractAsiakasId({ nope: true })).toBeNull();
+  });
+});
+
+describe("buildAsiakasUpdateBody (read-merge-write, no clobber)", () => {
+  const current = {
+    asiakasId: 26, name: "Old Oy", yTunnus: "1111111-1", type: 1,
+    address: "A St", city: "Espoo", email: "old@x.fi", phone: null,
+    contactPersonId: 777, shortName: "OldOy", comment: "note",
+  };
+
+  test("seeds every setData field from current + sets saveGlobalAsiakas", () => {
+    const body = buildAsiakasUpdateBody(current, {});
+    expect(body).toEqual({
+      ytunnus: "1111111-1",
+      asiakasNimi: "Old Oy",
+      asiakasTypeId: 1,
+      laskutusEmail: "old@x.fi",
+      asiakasContactPersonId: 777,
+      asiakasShortNimi: "OldOy",
+      kommentti: "note",
+      saveGlobalAsiakas: true,
+    });
+  });
+
+  test("provided flags override; --body wins last", () => {
+    const body = buildAsiakasUpdateBody(current, {
+      name: "New Oy", email: "new@x.fi", body: '{"kommentti":"forced"}',
+    });
+    expect(body.asiakasNimi).toBe("New Oy");
+    expect(body.laskutusEmail).toBe("new@x.fi");
+    expect(body.asiakasContactPersonId).toBe(777);
+    expect(body.kommentti).toBe("forced");
+  });
+
+  test("defaults missing contact person to 0 (NOT NULL sentinel)", () => {
+    const body = buildAsiakasUpdateBody({ ...current, contactPersonId: null }, {});
+    expect(body.asiakasContactPersonId).toBe(0);
   });
 });
