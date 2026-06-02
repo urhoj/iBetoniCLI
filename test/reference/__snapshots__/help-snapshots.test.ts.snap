@@ -1969,6 +1969,63 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib worksite dates expiring matches snapshot 1`] = `
+"USAGE
+  ib worksite dates expiring [flags]
+
+DESCRIPTION
+  Company-wide worksite dates expiring within --days (default 30).
+  Permissions: requires auth.page.tyomaa.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --days NUMBER    Look-ahead window (days) (default: 30)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ tyomaaDateId, tyomaaId, tyomaaName, typeName, expirationDate, daysUntil, urgency }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite dates expiring --days 14
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib worksite dates list matches snapshot 1`] = `
+"USAGE
+  ib worksite dates list [flags]
+
+DESCRIPTION
+  List a worksite's compliance/permit dates (read-only).
+  Permissions: requires auth.page.tyomaa.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --tyomaaId NUMBER    Positional — tyomaaId
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ tyomaaDateId, typeId, typeName, date, expirationDate, daysUntil, status, quantity }>
+
+ERRORS (stderr, exit non-zero)
+  400  Bad tyomaaId           → use a positive integer
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite dates list 99
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib worksite delete matches snapshot 1`] = `
 "USAGE
   ib worksite delete [flags]

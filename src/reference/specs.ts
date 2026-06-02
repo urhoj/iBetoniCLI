@@ -575,6 +575,29 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib worksite metrics 99"],
   },
   {
+    command: "ib worksite dates list",
+    description: "List a worksite's compliance/permit dates (read-only).",
+    permissions: ["auth.page.tyomaa.read"],
+    flags: [{ name: "tyomaaId", type: "number", description: "Positional — tyomaaId" }],
+    outputShape:
+      "ListEnvelope<{ tyomaaDateId, typeId, typeName, date, expirationDate, daysUntil, status, quantity }>",
+    errors: [
+      { code: 400, meaning: "Bad tyomaaId", remedy: "use a positive integer" },
+      ...permErrors("auth.page.tyomaa.read"),
+    ],
+    examples: ["ib worksite dates list 99"],
+  },
+  {
+    command: "ib worksite dates expiring",
+    description: "Company-wide worksite dates expiring within --days (default 30).",
+    permissions: ["auth.page.tyomaa.read"],
+    flags: [{ name: "days", type: "number", default: "30", description: "Look-ahead window (days)" }],
+    outputShape:
+      "ListEnvelope<{ tyomaaDateId, tyomaaId, tyomaaName, typeName, expirationDate, daysUntil, urgency }>",
+    errors: [...permErrors("auth.page.tyomaa.read")],
+    examples: ["ib worksite dates expiring --days 14"],
+  },
+  {
     command: "ib worksite create",
     description:
       "Create a new worksite via POST /api/tyomaa/new. Body forwarded verbatim.",

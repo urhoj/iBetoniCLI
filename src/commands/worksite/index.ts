@@ -128,6 +128,27 @@ export async function runWorksiteMetrics(
   );
 }
 
+/** GET /api/cli/worksite/dates/:tyomaaId — a worksite's compliance dates. */
+export async function runWorksiteDatesList(
+  client: ApiClient,
+  tyomaaId: number
+): Promise<ListEnvelope<Record<string, unknown>>> {
+  return client.get<ListEnvelope<Record<string, unknown>>>(
+    `/api/cli/worksite/dates/${tyomaaId}`
+  );
+}
+
+/** GET /api/cli/worksite/dates/expiring?days=N — company-wide expiry feed. */
+export async function runWorksiteDatesExpiring(
+  client: ApiClient,
+  days: number | undefined
+): Promise<ListEnvelope<Record<string, unknown>>> {
+  const d = days !== undefined ? days : 30;
+  return client.get<ListEnvelope<Record<string, unknown>>>(
+    `/api/cli/worksite/dates/expiring?days=${d}`
+  );
+}
+
 /**
  * DELETE /api/tyomaa/delete/:tyomaaId. Universal write flags surface as
  * headers; `--reason` is enforced by the CLI layer.
@@ -277,6 +298,31 @@ export function registerWorksiteCommands(
         const client = await getClient();
         const result = await runWorksiteMetrics(client, Number(idStr));
         writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  const dates = w.command("dates").description("Worksite compliance dates (read-only)");
+  dates
+    .command("list <tyomaaId>")
+    .description("List a worksite's compliance/permit dates")
+    .action(async (idStr: string) => {
+      try {
+        const client = await getClient();
+        writeJson(await runWorksiteDatesList(client, Number(idStr)));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+  dates
+    .command("expiring")
+    .description("Company-wide expiring worksite dates")
+    .option("--days <n>", "Look-ahead window in days (default 30)", (v: string) => Number(v))
+    .action(async (opts: { days?: number }) => {
+      try {
+        const client = await getClient();
+        writeJson(await runWorksiteDatesExpiring(client, opts.days));
       } catch (e) {
         exitWithError(e);
       }
