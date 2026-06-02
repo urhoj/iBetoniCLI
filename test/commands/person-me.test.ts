@@ -26,8 +26,8 @@ describe("runPersonMe", () => {
       .mockResolvedValueOnce({ personId: 6233, name: "System Jerry", email: "sys@x.fi", phone: "+358", roles: [11, 8] })
       .mockResolvedValueOnce({
         companies: [
-          { asiakasId: 1349, name: "BetoniJerry" },
-          { asiakasId: 26, name: "Kalle Urho Oy" },
+          { asiakasId: 1349, asiakasNimi: "BetoniJerry" },
+          { asiakasId: 26, asiakasNimi: "Kalle Urho Oy" },
         ],
         currentCompanyId: 1349,
       });
@@ -55,7 +55,7 @@ describe("runPersonCompanies", () => {
 
   test("uses the explicit personId when given", async () => {
     (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
-      { asiakasId: 26, asiakasName: "Kalle Urho Oy" },
+      { asiakasId: 26, asiakasNimi: "Kalle Urho Oy" },
     ]);
     const result = await runPersonCompanies(mockClient, 5351);
     expect(mockClient.get).toHaveBeenCalledWith("/api/person/getUserAsiakasList/5351");

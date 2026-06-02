@@ -92,6 +92,7 @@ export async function runPersonMe(client) {
     const profile = await client.get(`/api/cli/person/get/${claims.personId}`);
     const available = await client.get(`/api/company-selection/available`);
     const companies = available.companies || [];
+    const active = companies.find((c) => c.asiakasId === available.currentCompanyId);
     return {
         personId: claims.personId,
         name: profile.name ?? null,
@@ -99,12 +100,12 @@ export async function runPersonMe(client) {
         phone: profile.phone ?? null,
         activeCompany: {
             asiakasId: available.currentCompanyId,
-            name: companies.find((c) => c.asiakasId === available.currentCompanyId)?.name ?? null,
+            name: active?.asiakasNimi ?? active?.name ?? null,
         },
         roles: (profile.roles || []).map((t) => ({ roleTypeId: t, role: roleNameForTypeId(t) })),
         companies: companies.map((c) => ({
             asiakasId: c.asiakasId,
-            name: c.name,
+            name: c.asiakasNimi ?? c.name ?? "",
             current: c.asiakasId === available.currentCompanyId,
         })),
     };
@@ -124,7 +125,7 @@ export async function runPersonCompanies(client, personId) {
     else if (raw && typeof raw === "object") {
         rows = raw.recordset || raw.recordsets?.[0] || [];
     }
-    const items = rows.map((r) => ({ asiakasId: r.asiakasId, name: r.asiakasName ?? r.name ?? null }));
+    const items = rows.map((r) => ({ asiakasId: r.asiakasId, name: r.asiakasNimi ?? r.asiakasName ?? r.name ?? null }));
     return { items, nextCursor: null, count: items.length };
 }
 /**
