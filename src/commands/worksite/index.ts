@@ -195,7 +195,8 @@ export async function runWorksiteDelete(
 /**
  * Derive the active company's ownerAsiakasId from the client's JWT. Used by
  * `worksite update` so the CLI no longer asks for --owner-asiakas-id. Throws a
- * clean error (exit 4) when the token carries no usable owner claim.
+ * clean Error when the token carries no usable owner claim; the command action
+ * routes it through exitWithError (generic exit 1).
  */
 export function resolveOwnerAsiakasId(client: ApiClient): number {
   const token = client.getCurrentToken();
