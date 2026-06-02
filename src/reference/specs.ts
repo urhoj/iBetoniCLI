@@ -929,6 +929,37 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "ib sijainti set-jerry 42 --on --dry-run",
     ],
   },
+  {
+    command: "ib sijainti delete",
+    description:
+      "Soft-delete a sijainti (sets deletedTime). Requires --reason; --dry-run available.",
+    permissions: ["auth.page.sijainnit.delete"],
+    flags: [
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ success: true }",
+    errors: [
+      { code: 404, meaning: "Sijainti not found", remedy: "verify sijaintiId" },
+      ...permErrors("auth.page.sijainnit.delete"),
+    ],
+    examples: ['ib sijainti delete 42 --reason "decommissioned depot"'],
+  },
+  {
+    command: "ib sijainti undelete",
+    description: "Restore a soft-deleted sijainti. Requires --reason.",
+    permissions: ["auth.page.sijainnit.edit"],
+    flags: [
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ success: true }",
+    errors: [
+      { code: 404, meaning: "Sijainti not found", remedy: "verify sijaintiId" },
+      ...permErrors("auth.page.sijainnit.edit"),
+    ],
+    examples: ['ib sijainti undelete 42 --reason "restored after review"'],
+  },
 
   // ─── schedule (3) ────────────────────────────────────────────────────────
   {

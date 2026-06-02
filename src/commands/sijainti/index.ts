@@ -109,6 +109,37 @@ export async function runSijaintiSetJerry(
 }
 
 /**
+ * DELETE /api/geocode/sijainti/delete/:sijaintiId — soft-delete (sets
+ * deletedTime). Server-side gate: validateSijaintiWriteAccess. Write flags
+ * surface as the universal headers; --reason is enforced at the CLI layer.
+ */
+export async function runSijaintiDelete(
+  client: ApiClient,
+  sijaintiId: number,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.delete(`/api/geocode/sijainti/delete/${sijaintiId}`, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/**
+ * POST /api/geocode/sijainti/undelete/:sijaintiId — restore a soft-deleted
+ * sijainti. Empty body; same write gate as delete.
+ */
+export async function runSijaintiUndelete(
+  client: ApiClient,
+  sijaintiId: number,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post(
+    `/api/geocode/sijainti/undelete/${sijaintiId}`,
+    {},
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
  * Register `ib sijainti` subcommands on the parent commander instance:
  *   - list    filterable by --type/--limit
  *   - get     single sijainti by id (uses existing /api/geocode/sijainti route)
@@ -249,4 +280,44 @@ export function registerSijaintiCommands(
       }
     }
   );
+
+  addWriteFlagsToCommand(
+    s
+      .command("delete <sijaintiId>")
+      .description(
+        "Soft-delete a sijainti (DELETE /api/geocode/sijainti/delete/:id). Requires --reason."
+      )
+  ).action(async (idStr: string, opts: WriteFlags) => {
+    if (!opts.reason) {
+      writeError(new Error("Missing required flag: --reason"));
+      process.exit(4);
+    }
+    try {
+      const client = await getClient();
+      const result = await runSijaintiDelete(client, Number(idStr), opts);
+      writeJson(result);
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
+
+  addWriteFlagsToCommand(
+    s
+      .command("undelete <sijaintiId>")
+      .description(
+        "Restore a soft-deleted sijainti (POST /api/geocode/sijainti/undelete/:id). Requires --reason."
+      )
+  ).action(async (idStr: string, opts: WriteFlags) => {
+    if (!opts.reason) {
+      writeError(new Error("Missing required flag: --reason"));
+      process.exit(4);
+    }
+    try {
+      const client = await getClient();
+      const result = await runSijaintiUndelete(client, Number(idStr), opts);
+      writeJson(result);
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
 }
