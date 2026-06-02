@@ -41,6 +41,7 @@ describe("extractAsiakasId", () => {
     expect(extractAsiakasId({ returnValue: 5001 })).toBe(5001);
     expect(extractAsiakasId({ asiakasId: 5002 })).toBe(5002);
     expect(extractAsiakasId({ recordset: [{ asiakasId: 5003 }] })).toBe(5003);
+    expect(extractAsiakasId({ data: { returnValue: 5004 } })).toBe(5004);
     expect(extractAsiakasId({ nope: true })).toBeNull();
   });
 });

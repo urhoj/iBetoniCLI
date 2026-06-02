@@ -514,6 +514,8 @@ export function buildAsiakasCreateBody(
   }
   if (flags.name !== undefined) body.asiakasNimi = flags.name;
   if (flags.ytunnus !== undefined) body.yTunnus = flags.ytunnus;
+  // createY's invoicing-email column is `email` (asiakasSql.createY → input("email", ...));
+  // setData/update uses `laskutusEmail` instead — the two endpoints differ by design.
   if (flags.email !== undefined) body.email = flags.email;
   if (flags.shortName !== undefined) body.asiakasShortNimi = flags.shortName;
   if (flags.body) Object.assign(body, JSON.parse(flags.body));
@@ -559,6 +561,11 @@ export function buildAsiakasUpdateBody(
   current: CustomerFlat,
   flags: CustomerUpdateFlags
 ): Record<string, unknown> {
+  // Seed every field setData writes from the current record (read-merge-write).
+  // Note: address/city/phone on CustomerFlat are intentionally NOT seeded —
+  // setData has no laskutusOsoite/laskutusKaupunki inputs, so they are read-only.
+  // asiakasTypeId ?? 1 mirrors setData's own `req.body.asiakasTypeId || 1` default;
+  // a real non-null type (incl. 0) is preserved.
   const body: Record<string, unknown> = {
     ytunnus: current.yTunnus ?? null,
     asiakasNimi: current.name ?? null,
@@ -755,7 +762,7 @@ export function registerCustomerCommands(
   const createCmd = c
     .command("create")
     .description(
-      "Create a customer. Typed flags assemble the createY body (yTunnus required). --from-prh prefills name+yTunnus from the business registry. --body raw JSON overrides everything."
+      "Create a customer. Typed flags assemble the createY body (yTunnus required). --from-prh prefills name+yTunnus from the business registry. --body raw JSON overrides the typed flags."
     )
     .option("--name <s>", "Customer name (asiakasNimi)")
     .option("--ytunnus <s>", "Business ID (yTunnus) — REQUIRED unless --from-prh/--body supplies it")
