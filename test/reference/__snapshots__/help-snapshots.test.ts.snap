@@ -1904,6 +1904,35 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib vehicle locations matches snapshot 1`] = `
+"USAGE
+  ib vehicle locations [flags]
+
+DESCRIPTION
+  Fleet-wide live GPS snapshot for the active company (via Ecofleet, cached 60s). gpsAvailable:false when Ecofleet is not enabled.
+  Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ vehicleId|null, plate, objectName, lat, lng, speed, direction, engineState, address, at }> & { gpsAvailable }
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle locations
+  ib vehicle locations --pretty
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib vehicle status matches snapshot 1`] = `
 "USAGE
   ib vehicle status [flags]

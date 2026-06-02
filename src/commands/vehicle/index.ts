@@ -75,6 +75,15 @@ export async function runVehicleDrivers(
   );
 }
 
+/** GET /api/cli/vehicle/locations — fleet-wide live position snapshot. */
+export async function runVehicleLocations(
+  client: ApiClient
+): Promise<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }> {
+  return client.get<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }>(
+    "/api/cli/vehicle/locations"
+  );
+}
+
 /**
  * Register `ib vehicle` subcommands on the parent commander instance:
  *   - list     filterable by --limit/--cursor
@@ -142,6 +151,17 @@ export function registerVehicleCommands(
           to: resolveDate(opts.to),
         });
         writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  v.command("locations")
+    .description("Fleet-wide live GPS positions (current lat/lng + speed/heading/engine/address)")
+    .action(async () => {
+      try {
+        const client = await getClient();
+        writeJson(await runVehicleLocations(client));
       } catch (e) {
         exitWithError(e);
       }

@@ -720,7 +720,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib person search 'Matti'"],
   },
 
-  // ─── vehicle (4) ─────────────────────────────────────────────────────────
+  // ─── vehicle (8) ─────────────────────────────────────────────────────────
   {
     command: "ib vehicle list",
     description:
@@ -807,6 +807,17 @@ export const COMMAND_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.vehicle.read"),
     ],
     examples: ["ib vehicle drivers 7 --from 2026-05-01 --to 2026-05-31"],
+  },
+  {
+    command: "ib vehicle locations",
+    description:
+      "Fleet-wide live GPS snapshot for the active company (via Ecofleet, cached 60s). gpsAvailable:false when Ecofleet is not enabled.",
+    permissions: ["auth.page.vehicle.read"],
+    flags: [],
+    outputShape:
+      "ListEnvelope<{ vehicleId|null, plate, objectName, lat, lng, speed, direction, engineState, address, at }> & { gpsAvailable }",
+    errors: permErrors("auth.page.vehicle.read"),
+    examples: ["ib vehicle locations", "ib vehicle locations --pretty"],
   },
 
   // ─── sijainti (4) ────────────────────────────────────────────────────────
