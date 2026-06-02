@@ -3,6 +3,7 @@ import {
   runVehicleTypes,
   runVehicleSearch,
   runVehicleCreate,
+  runVehicleUpdate,
 } from "../../src/commands/vehicle/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -96,5 +97,72 @@ describe("runVehicleCreate", () => {
     expect(c.post).toHaveBeenCalledWith("/api/vehicle/new/1349", {}, {
       headers: { "X-Dry-Run": "1" },
     });
+  });
+});
+
+describe("runVehicleUpdate", () => {
+  const c = {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+    getCurrentToken: vi.fn(),
+  } as unknown as ApiClient;
+  beforeEach(() => vi.clearAllMocks());
+
+  test("reads current, merges changes, posts full body", async () => {
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      {
+        vehicleId: 70,
+        asiakasId: 1349,
+        vehicleNimi: "Old",
+        vehicleRegNo: "OLD-1",
+        vehicleTypeId: 1,
+        vehiclePuomi: 28,
+        memo: "m",
+        showInGrid: true,
+        hasGpsTracking: false,
+        vehicleM3: 7,
+        defaultKuski_personId: null,
+        sortNo: 3,
+        showInReports: true,
+        useNoDriverBar: false,
+        tuoteId: null,
+        isRestricted: false,
+        multiTenantVisibility: false,
+        defaultVisibilityAsiakasIds: null,
+        firstDate: null,
+        lastDate: null,
+        vehicleNo: 5,
+      },
+    ]);
+    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      vehicleId: 70,
+    });
+    await runVehicleUpdate(
+      c,
+      70,
+      { vehicleRegNo: "NEW-9", vehicleM3: 9 },
+      { reason: "rebrand" }
+    );
+    expect(c.get).toHaveBeenCalledWith("/api/vehicle/get/70");
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/vehicle/save",
+      expect.objectContaining({
+        vehicleId: 70,
+        vehicleRegNo: "NEW-9",
+        vehicleM3: 9,
+        vehicleNimi: "Old",
+        vehicleTypeId: 1,
+      }),
+      { headers: { "X-Action-Reason": "rebrand" } }
+    );
+  });
+
+  test("throws 404 CliError when vehicle absent", async () => {
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    await expect(
+      runVehicleUpdate(c, 999, { memo: "x" }, {})
+    ).rejects.toMatchObject({ exitCode: 5 });
   });
 });

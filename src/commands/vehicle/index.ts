@@ -9,6 +9,7 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
+import { CliError } from "../../api/errors.js";
 
 export interface VehicleListFilter {
   limit?: number;
@@ -174,6 +175,57 @@ export async function runVehicleCreate(
 }
 
 /**
+ * Update a vehicle via read-merge-write: GET the full current row from the MAIN
+ * `/api/vehicle/get/:id` endpoint (returns an array), overlay only the provided
+ * `changes`, and POST the complete body to `/api/vehicle/save` (the proc expects
+ * every column). Throws a 404 {@link CliError} (exit 5) when the vehicle is
+ * absent so the caller surfaces "not found" rather than a malformed save.
+ */
+export async function runVehicleUpdate(
+  client: ApiClient,
+  vehicleId: number,
+  changes: VehicleWriteFields,
+  flags: WriteFlags
+): Promise<unknown> {
+  const rows = await client.get<Array<Record<string, unknown>>>(
+    `/api/vehicle/get/${vehicleId}`
+  );
+  const current = Array.isArray(rows)
+    ? rows[0]
+    : (rows as Record<string, unknown> | null);
+  if (!current) {
+    throw new CliError(`Vehicle ${vehicleId} not found`, 404, null, 5);
+  }
+  const body = {
+    vehicleId,
+    asiakasId: changes.asiakasId ?? current.asiakasId,
+    vehicleNo: changes.vehicleNo ?? current.vehicleNo,
+    vehicleNimi: changes.vehicleNimi ?? current.vehicleNimi,
+    vehicleRegNo: changes.vehicleRegNo ?? current.vehicleRegNo,
+    vehiclePuomi: current.vehiclePuomi,
+    firstDate: current.firstDate,
+    lastDate: current.lastDate,
+    vehicleTypeId: changes.vehicleTypeId ?? current.vehicleTypeId,
+    memo: changes.memo ?? current.memo,
+    sortNo: current.sortNo,
+    showInGrid: current.showInGrid,
+    defaultKuski_personId:
+      changes.defaultKuski_personId ?? current.defaultKuski_personId,
+    useNoDriverBar: current.useNoDriverBar,
+    showInReports: current.showInReports,
+    tuoteId: current.tuoteId,
+    isRestricted: current.isRestricted,
+    multiTenantVisibility: current.multiTenantVisibility,
+    defaultVisibilityAsiakasIds: current.defaultVisibilityAsiakasIds,
+    hasGpsTracking: current.hasGpsTracking,
+    vehicleM3: changes.vehicleM3 ?? current.vehicleM3,
+  };
+  return client.post("/api/vehicle/save", body, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/**
  * Register `ib vehicle` subcommands on the parent commander instance:
  *   - list     filterable by --limit/--cursor
  *   - get      single vehicle by id
@@ -307,6 +359,64 @@ export function registerVehicleCommands(
       try {
         const result = await runVehicleCreate(
           await getClient(),
+          {
+            vehicleRegNo: opts.reg,
+            vehicleNimi: opts.name,
+            vehicleNo: opts.no,
+            vehicleTypeId: opts.type,
+            memo: opts.memo,
+            defaultKuski_personId: opts.defaultDriver,
+            vehicleM3: opts.capacity,
+            asiakasId: opts.asiakas,
+          },
+          {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+          }
+        );
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
+
+  const updateCmd = v
+    .command("update <vehicleId>")
+    .description("Update a vehicle (read-merge-write; only provided flags change).")
+    .option("--reg <s>", "Registration number (vehicleRegNo)")
+    .option("--name <s>", "Display name (vehicleNimi)")
+    .option("--no <n>", "Fleet number (vehicleNo)", (s: string) => Number(s))
+    .option("--type <n>", "vehicleTypeId", (s: string) => Number(s))
+    .option("--memo <s>", "Free-text memo")
+    .option("--default-driver <pid>", "Default driver personId", (s: string) =>
+      Number(s)
+    )
+    .option(
+      "--capacity <m3>",
+      "Concrete capacity in m3 (vehicleM3)",
+      (s: string) => Number(s)
+    )
+    .option("--asiakas <id>", "Owning asiakasId", (s: string) => Number(s));
+  addWriteFlagsToCommand(updateCmd).action(
+    async (
+      idStr: string,
+      opts: WriteFlags & {
+        reg?: string;
+        name?: string;
+        no?: number;
+        type?: number;
+        memo?: string;
+        defaultDriver?: number;
+        capacity?: number;
+        asiakas?: number;
+      }
+    ) => {
+      try {
+        const result = await runVehicleUpdate(
+          await getClient(),
+          Number(idStr),
           {
             vehicleRegNo: opts.reg,
             vehicleNimi: opts.name,
