@@ -885,29 +885,27 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib vehicle drivers 7 --from 2026-05-01 --to 2026-05-31"],
   },
 
-  // ─── sijainti (4) ────────────────────────────────────────────────────────
+  // ─── sijainti (11) ───────────────────────────────────────────────────────
   {
     command: "ib sijainti list",
     description:
       "List geocoded locations (sijainnit) — depots, plants, customer destinations. Optional --type filters by sijaintiTypeId.",
     permissions: ["auth.page.sijainnit.read"],
     flags: [
-      {
-        name: "type",
-        type: "number",
-        description: "Filter by sijaintiTypeId",
-      },
-      {
-        name: "limit",
-        type: "number",
-        default: "100",
-        description: "Max rows (capped at 500)",
-      },
+      { name: "type", type: "number", description: "Filter by sijaintiTypeId" },
+      { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+      { name: "valid-at", type: "date", description: "Only sijainnit valid on this date (startDate/endDate window)" },
+      { name: "include-deleted", type: "boolean", description: "Include soft-deleted sijainnit" },
     ],
     outputShape:
       "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, jerryActiveUntil }>",
     errors: permErrors("auth.page.sijainnit.read"),
-    examples: ["ib sijainti list", "ib sijainti list --type 1"],
+    examples: [
+      "ib sijainti list",
+      "ib sijainti list --type 1",
+      "ib sijainti list --valid-at today",
+      "ib sijainti list --include-deleted",
+    ],
   },
   {
     command: "ib sijainti get",
@@ -931,14 +929,15 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib sijainti create",
     description:
-      "Create a new sijainti via POST /api/geocode/sijainti/add. Body forwarded verbatim.",
+      "Create a new sijainti (POST /api/geocode/sijainti/add). Provide typed flags (--name/--address/--type/--lat/--lng) or --body JSON; typed flags win over --body.",
     permissions: ["auth.page.sijainnit.edit"],
     flags: [
-      {
-        name: "body",
-        type: "json",
-        description: "JSON object with the new sijainti fields",
-      },
+      { name: "body", type: "json", description: "JSON object with the new sijainti fields (optional if typed flags given)" },
+      { name: "name", type: "string", description: "sijaintiNimi" },
+      { name: "address", type: "string", description: "sijaintiOsoite1 (street)" },
+      { name: "type", type: "number", description: "sijaintiTypeId (see `ib sijainti types`)" },
+      { name: "lat", type: "number", description: "Latitude" },
+      { name: "lng", type: "number", description: "Longitude" },
     ],
     writeFlags: true,
     outputShape: "{ sijaintiId, ... } (raw backend response)",
@@ -947,20 +946,23 @@ export const COMMAND_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.sijainnit.edit"),
     ],
     examples: [
-      "ib sijainti create --body '{\"name\":\"Depot A\",\"address\":\"Industrial St 1\",\"sijaintiTypeId\":1}'",
+      'ib sijainti create --name "Depot A" --address "Industrial St 1" --type 1 --lat 60.17 --lng 24.94',
+      "ib sijainti create --body '{\"sijaintiNimi\":\"Depot A\",\"sijaintiTypeId\":1}'",
     ],
   },
   {
     command: "ib sijainti update",
     description:
-      "Update a sijainti via POST /api/geocode/updateSijainti. Body forwarded verbatim.",
+      "Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Provide typed flags or --body JSON; typed flags win over --body.",
     permissions: ["auth.page.sijainnit.edit"],
     flags: [
-      {
-        name: "body",
-        type: "json",
-        description: "JSON object with the fields to update (must include sijaintiId)",
-      },
+      { name: "body", type: "json", description: "JSON object with fields to update (optional if typed flags given)" },
+      { name: "id", type: "number", description: "Target sijaintiId (or include sijaintiId in --body)" },
+      { name: "name", type: "string", description: "sijaintiNimi" },
+      { name: "address", type: "string", description: "sijaintiOsoite1 (street)" },
+      { name: "type", type: "number", description: "sijaintiTypeId" },
+      { name: "lat", type: "number", description: "Latitude" },
+      { name: "lng", type: "number", description: "Longitude" },
     ],
     writeFlags: true,
     outputShape: "{ ok: true, ... } (raw backend response)",
@@ -970,7 +972,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.sijainnit.edit"),
     ],
     examples: [
-      "ib sijainti update --body '{\"sijaintiId\":42,\"name\":\"Renamed depot\"}'",
+      'ib sijainti update --id 42 --name "Renamed depot"',
+      "ib sijainti update --body '{\"sijaintiId\":42,\"sijaintiNimi\":\"Renamed depot\"}'",
     ],
   },
   {
@@ -1003,6 +1006,98 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "ib sijainti set-jerry 42 --on --reason 'pilot varikko in Jerry'",
       "ib sijainti set-jerry 42 --off --reason 'seasonal pause'",
       "ib sijainti set-jerry 42 --on --dry-run",
+    ],
+  },
+  {
+    command: "ib sijainti delete",
+    description:
+      "Soft-delete a sijainti (sets deletedTime). Requires --reason; --dry-run available.",
+    permissions: ["auth.page.sijainnit.delete"],
+    flags: [
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ success: true }",
+    errors: [
+      { code: 404, meaning: "Sijainti not found", remedy: "verify sijaintiId" },
+      ...permErrors("auth.page.sijainnit.delete"),
+    ],
+    examples: ['ib sijainti delete 42 --reason "decommissioned depot"'],
+  },
+  {
+    command: "ib sijainti undelete",
+    description: "Restore a soft-deleted sijainti. Requires --reason.",
+    permissions: ["auth.page.sijainnit.edit"],
+    flags: [
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ success: true }",
+    errors: [
+      { code: 404, meaning: "Sijainti not found", remedy: "verify sijaintiId" },
+      ...permErrors("auth.page.sijainnit.edit"),
+    ],
+    examples: ['ib sijainti undelete 42 --reason "restored after review"'],
+  },
+  {
+    command: "ib sijainti types",
+    description:
+      "List sijainti type categories (the 'Sijainnin laji' lookup). Resolves the sijaintiTypeId values used by `sijainti list --type` and `create/update --type`.",
+    permissions: ["auth.page.sijainnit.read"],
+    flags: [
+      { name: "jerry", type: "boolean", description: "Use the BetoniJerry type set (useJerry=1)" },
+    ],
+    outputShape: "ListEnvelope<{ sijaintiTypeId, selite }>",
+    errors: permErrors("auth.page.sijainnit.read"),
+    examples: ["ib sijainti types", "ib sijainti types --jerry"],
+  },
+  {
+    command: "ib sijainti geocode",
+    description:
+      "Geocode a free-form address to coordinates via Google Maps. Useful before `sijainti create` to obtain lat/lng. ownerAsiakasId is derived from the token.",
+    permissions: ["auth.page.sijainnit.read"],
+    flags: [
+      { name: "address", type: "string", description: "Free-form address (REQUIRED)" },
+    ],
+    outputShape:
+      "{ status, lat, lng, ... } (raw Google geocode result; { status: 'ZERO_RESULTS' } when no match)",
+    errors: permErrors("auth.page.sijainnit.read"),
+    examples: ['ib sijainti geocode --address "Mannerheimintie 1, Helsinki"'],
+  },
+  {
+    command: "ib sijainti closest",
+    description:
+      "Find the closest sijainti of a given sijaintiTypeId to a worksite (tyomaa), by straight-line distance. asiakasId defaults to the active company.",
+    permissions: ["auth.page.sijainnit.read"],
+    flags: [
+      { name: "tyomaa", type: "number", description: "Target tyomaaId (REQUIRED)" },
+      { name: "type", type: "number", description: "sijaintiTypeId to search within (REQUIRED)" },
+      { name: "asiakas", type: "number", description: "Owner asiakasId (defaults to active company)" },
+    ],
+    outputShape: "{ closestSijainti: {...}|null, closestDistance: number|null }",
+    errors: [
+      { code: 400, meaning: "Invalid tyomaaId or missing coordinates", remedy: "verify the worksite has lat/lng" },
+      ...permErrors("auth.page.sijainnit.read"),
+    ],
+    examples: ["ib sijainti closest --tyomaa 555 --type 1"],
+  },
+  {
+    command: "ib sijainti distance",
+    description:
+      "Driving distance and time between two points (Google Maps). Each endpoint is either 'lat,lng' or a sijaintiId (resolved to its coordinates). ownerAsiakasId is derived from the active company.",
+    permissions: ["auth.page.sijainnit.read"],
+    flags: [
+      { name: "from", type: "string", description: "Origin: 'lat,lng' or a sijaintiId (REQUIRED)" },
+      { name: "to", type: "string", description: "Destination: 'lat,lng' or a sijaintiId (REQUIRED)" },
+    ],
+    outputShape: "{ matkaM: number|null, matkaMin: number|null, from:{lat,lng}, to:{lat,lng} }",
+    errors: [
+      { code: 400, meaning: "Bad point or sijainti without coordinates", remedy: "use 'lat,lng' or a sijaintiId that has coords" },
+      ...permErrors("auth.page.sijainnit.read"),
+    ],
+    examples: [
+      "ib sijainti distance --from 7 --to 42",
+      'ib sijainti distance --from "60.17,24.94" --to 42',
     ],
   },
 
