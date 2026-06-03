@@ -29,6 +29,9 @@ export interface VehicleVisitsFilter {
   days?: number;
 }
 
+/** List envelope returned by the GPS/telemetry vehicle reads (locations/timeline/route/visits), plus the gpsAvailable flag. */
+type GpsListEnvelope = ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean };
+
 const VISIT_FILTER_TYPES = ["tyomaa", "sijainti"] as const;
 
 /**
@@ -95,8 +98,8 @@ export async function runVehicleDrivers(
 /** GET /api/cli/vehicle/locations — fleet-wide live position snapshot. */
 export async function runVehicleLocations(
   client: ApiClient
-): Promise<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }> {
-  return client.get<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }>(
+): Promise<GpsListEnvelope> {
+  return client.get<GpsListEnvelope>(
     "/api/cli/vehicle/locations"
   );
 }
@@ -106,9 +109,9 @@ export async function runVehicleTimeline(
   client: ApiClient,
   vehicleId: number,
   opts: VehicleDayFilter
-): Promise<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }> {
+): Promise<GpsListEnvelope> {
   const qs = opts.date ? `?date=${opts.date}` : "";
-  return client.get<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }>(
+  return client.get<GpsListEnvelope>(
     `/api/cli/vehicle/timeline/${vehicleId}${qs}`
   );
 }
@@ -118,9 +121,9 @@ export async function runVehicleRoute(
   client: ApiClient,
   vehicleId: number,
   opts: VehicleDayFilter
-): Promise<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }> {
+): Promise<GpsListEnvelope> {
   const qs = opts.date ? `?date=${opts.date}` : "";
-  return client.get<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }>(
+  return client.get<GpsListEnvelope>(
     `/api/cli/vehicle/route/${vehicleId}${qs}`
   );
 }
@@ -131,12 +134,12 @@ export async function runVehicleVisits(
   filterType: string,
   filterId: number,
   opts: VehicleVisitsFilter
-): Promise<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }> {
+): Promise<GpsListEnvelope> {
   if (!(VISIT_FILTER_TYPES as readonly string[]).includes(filterType)) {
     throw new Error(`filterType must be one of: ${VISIT_FILTER_TYPES.join(", ")}`);
   }
   const qs = opts.days !== undefined ? `?days=${opts.days}` : "";
-  return client.get<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }>(
+  return client.get<GpsListEnvelope>(
     `/api/cli/vehicle/visits/${filterType}/${filterId}${qs}`
   );
 }
@@ -334,15 +337,21 @@ export async function runVehicleDriversAssign(
 }
 
 /**
- * Register `ib vehicle` subcommands on the parent commander instance:
- *   - list     filterable by --limit/--cursor
- *   - get      single vehicle by id
- *   - status   current driver + keikka + live GPS ping
- *   - drivers  driver-assignment history, filterable by --from/--to
+ * Register every `ib vehicle` subcommand on the parent commander instance.
+ *
+ * Reads: list, get, search, types, status, drivers, dates (list/expiring),
+ * and GPS/telemetry — locations, timeline, route, visits.
+ * Writes: create, update, driver-assign (carry the --dry-run/--reason/-idempotency
+ * write-safety flags).
+ *
+ * `src/reference/specs.ts` is the single source of truth for the authoritative
+ * subcommand list, flags, permissions, and output shapes (also via
+ * `ib vehicle --help` / `ib reference dump`) — keep this comment high-level so it
+ * does not drift as commands are added.
  *
  * Date aliases (today/yesterday/tomorrow) are resolved before the API call.
  *
- * Exit codes: 1 = generic API/runtime failure.
+ * Exit codes: 1 = generic API/runtime failure (else the mapped CliError codes).
  */
 export function registerVehicleCommands(
   parent: Command,

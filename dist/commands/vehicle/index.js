@@ -187,15 +187,21 @@ export async function runVehicleDriversAssign(client, vehicleId, personId, date,
     return client.post("/api/vehicle/driverDays/save", { vehicleId, personId, yyyymmdd }, { headers: writeFlagsToHeaders(flags) });
 }
 /**
- * Register `ib vehicle` subcommands on the parent commander instance:
- *   - list     filterable by --limit/--cursor
- *   - get      single vehicle by id
- *   - status   current driver + keikka + live GPS ping
- *   - drivers  driver-assignment history, filterable by --from/--to
+ * Register every `ib vehicle` subcommand on the parent commander instance.
+ *
+ * Reads: list, get, search, types, status, drivers, dates (list/expiring),
+ * and GPS/telemetry — locations, timeline, route, visits.
+ * Writes: create, update, driver-assign (carry the --dry-run/--reason/-idempotency
+ * write-safety flags).
+ *
+ * `src/reference/specs.ts` is the single source of truth for the authoritative
+ * subcommand list, flags, permissions, and output shapes (also via
+ * `ib vehicle --help` / `ib reference dump`) — keep this comment high-level so it
+ * does not drift as commands are added.
  *
  * Date aliases (today/yesterday/tomorrow) are resolved before the API call.
  *
- * Exit codes: 1 = generic API/runtime failure.
+ * Exit codes: 1 = generic API/runtime failure (else the mapped CliError codes).
  */
 export function registerVehicleCommands(parent, getClient) {
     const v = parent.command("vehicle").description("Vehicle commands");
