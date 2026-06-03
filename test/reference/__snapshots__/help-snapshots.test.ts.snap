@@ -2293,12 +2293,72 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib vehicle locations matches snapshot 1`] = `
+"USAGE
+  ib vehicle locations [flags]
+
+DESCRIPTION
+  Fleet-wide live GPS snapshot for the active company (via Ecofleet, cached 60s). gpsAvailable:false when Ecofleet is not enabled.
+  Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ vehicleId|null, plate, objectName, lat, lng, speed, direction, engineState, address, at }> & { gpsAvailable }
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle locations
+  ib vehicle locations --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle route matches snapshot 1`] = `
+"USAGE
+  ib vehicle route [flags]
+
+DESCRIPTION
+  Per-day ordered GPS track points (polyline) for a vehicle (snapshot-based, no external API).
+  Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --vehicleId NUMBER    Positional — vehicleId to inspect
+  --date DATE    Day (YYYY-MM-DD or today/yesterday/tomorrow); Europe/Helsinki (default: today)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ lat, lng }> & { gpsAvailable }
+
+ERRORS (stderr, exit non-zero)
+  404  Vehicle not found      → verify vehicleId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle route 7
+  ib vehicle route 7 --date 2026-05-31
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib vehicle status matches snapshot 1`] = `
 "USAGE
   ib vehicle status [flags]
 
 DESCRIPTION
-  Current operational status for a vehicle: current driver, current keikka, latest GPS ping (via Ecofleet, best-effort).
+  Current operational status for a vehicle: current driver, current keikka, and the latest GPS ping (via the shared Ecofleet cache, best-effort). gpsAvailable:false when Ecofleet is not enabled.
   Permissions: requires auth.page.vehicle.read.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -2309,7 +2369,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  { vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,at}|null }
+  { vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,speed,direction,engineState,address,at}|null, gpsAvailable }
 
 ERRORS (stderr, exit non-zero)
   404  Vehicle not found      → verify vehicleId
@@ -2320,6 +2380,70 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib vehicle status 7
   ib vehicle status 7 --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle timeline matches snapshot 1`] = `
+"USAGE
+  ib vehicle timeline [flags]
+
+DESCRIPTION
+  Per-day GPS timeline for a vehicle (snapshot-based, no external API): named stop segments (sijainti/tyomaa) and travel legs with durations.
+  Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --vehicleId NUMBER    Positional — vehicleId to inspect
+  --date DATE    Day (YYYY-MM-DD or today/yesterday/tomorrow); Europe/Helsinki (default: today)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ type, locationType?, locationId?, locationName?, locationAddress?, sijaintiTypeName?, asiakasNimi?, arrived, departed, durationMin, distanceKm? }> & { gpsAvailable }
+
+ERRORS (stderr, exit non-zero)
+  404  Vehicle not found      → verify vehicleId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle timeline 7
+  ib vehicle timeline 7 --date yesterday
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle visits matches snapshot 1`] = `
+"USAGE
+  ib vehicle visits [flags]
+
+DESCRIPTION
+  Vehicles that visited a worksite (tyomaa) or location (sijainti), grouped into visits with arrival/departure/duration (snapshot-based). tyomaa is tenant-scoped; sijainti is shared.
+  Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --filterType STRING    Positional — 'tyomaa' or 'sijainti'
+  --id NUMBER    Positional — tyomaaId or sijaintiId
+  --days NUMBER    Look-back window in days (omit for all-time)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ vehicleId|null, plate, objectName, arrived, departed, durationMin }> & { gpsAvailable }
+
+ERRORS (stderr, exit non-zero)
+  400  Invalid filterType     → use tyomaa or sijainti
+  404  tyomaa not found / not owned → verify tyomaaId belongs to the active company
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.vehicle.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib vehicle visits tyomaa 17 --days 30
+  ib vehicle visits sijainti 3
 "
 `;
 

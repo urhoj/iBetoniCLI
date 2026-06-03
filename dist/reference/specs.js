@@ -763,7 +763,7 @@ export const COMMAND_SPECS = [
         errors: [...COMMON_AUTH_ERRORS],
         examples: ["ib person companies", "ib person companies 5351"],
     },
-    // ─── vehicle (4) ─────────────────────────────────────────────────────────
+    // ─── vehicle (8) ─────────────────────────────────────────────────────────
     {
         command: "ib vehicle list",
         description: "List vehicles visible to the active company. ownerAsiakasId derived from JWT.",
@@ -800,7 +800,7 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib vehicle status",
-        description: "Current operational status for a vehicle: current driver, current keikka, latest GPS ping (via Ecofleet, best-effort).",
+        description: "Current operational status for a vehicle: current driver, current keikka, and the latest GPS ping (via the shared Ecofleet cache, best-effort). gpsAvailable:false when Ecofleet is not enabled.",
         permissions: ["auth.page.vehicle.read"],
         flags: [
             {
@@ -809,7 +809,7 @@ export const COMMAND_SPECS = [
                 description: "Positional — vehicleId to inspect",
             },
         ],
-        outputShape: "{ vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,at}|null }",
+        outputShape: "{ vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,speed,direction,engineState,address,at}|null, gpsAvailable }",
         errors: [
             { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
             ...permErrors("auth.page.vehicle.read"),
@@ -845,6 +845,62 @@ export const COMMAND_SPECS = [
             ...permErrors("auth.page.vehicle.read"),
         ],
         examples: ["ib vehicle drivers 7 --from 2026-05-01 --to 2026-05-31"],
+    },
+    {
+        command: "ib vehicle locations",
+        description: "Fleet-wide live GPS snapshot for the active company (via Ecofleet, cached 60s). gpsAvailable:false when Ecofleet is not enabled.",
+        permissions: ["auth.page.vehicle.read"],
+        flags: [],
+        outputShape: "ListEnvelope<{ vehicleId|null, plate, objectName, lat, lng, speed, direction, engineState, address, at }> & { gpsAvailable }",
+        errors: permErrors("auth.page.vehicle.read"),
+        examples: ["ib vehicle locations", "ib vehicle locations --pretty"],
+    },
+    {
+        command: "ib vehicle timeline",
+        description: "Per-day GPS timeline for a vehicle (snapshot-based, no external API): named stop segments (sijainti/tyomaa) and travel legs with durations.",
+        permissions: ["auth.page.vehicle.read"],
+        flags: [
+            { name: "vehicleId", type: "number", description: "Positional — vehicleId to inspect" },
+            { name: "date", type: "date", default: "today", description: "Day (YYYY-MM-DD or today/yesterday/tomorrow); Europe/Helsinki" },
+        ],
+        outputShape: "ListEnvelope<{ type, locationType?, locationId?, locationName?, locationAddress?, sijaintiTypeName?, asiakasNimi?, arrived, departed, durationMin, distanceKm? }> & { gpsAvailable }",
+        errors: [
+            { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
+            ...permErrors("auth.page.vehicle.read"),
+        ],
+        examples: ["ib vehicle timeline 7", "ib vehicle timeline 7 --date yesterday"],
+    },
+    {
+        command: "ib vehicle route",
+        description: "Per-day ordered GPS track points (polyline) for a vehicle (snapshot-based, no external API).",
+        permissions: ["auth.page.vehicle.read"],
+        flags: [
+            { name: "vehicleId", type: "number", description: "Positional — vehicleId to inspect" },
+            { name: "date", type: "date", default: "today", description: "Day (YYYY-MM-DD or today/yesterday/tomorrow); Europe/Helsinki" },
+        ],
+        outputShape: "ListEnvelope<{ lat, lng }> & { gpsAvailable }",
+        errors: [
+            { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
+            ...permErrors("auth.page.vehicle.read"),
+        ],
+        examples: ["ib vehicle route 7", "ib vehicle route 7 --date 2026-05-31"],
+    },
+    {
+        command: "ib vehicle visits",
+        description: "Vehicles that visited a worksite (tyomaa) or location (sijainti), grouped into visits with arrival/departure/duration (snapshot-based). tyomaa is tenant-scoped; sijainti is shared.",
+        permissions: ["auth.page.vehicle.read"],
+        flags: [
+            { name: "filterType", type: "string", description: "Positional — 'tyomaa' or 'sijainti'" },
+            { name: "id", type: "number", description: "Positional — tyomaaId or sijaintiId" },
+            { name: "days", type: "number", description: "Look-back window in days (omit for all-time)" },
+        ],
+        outputShape: "ListEnvelope<{ vehicleId|null, plate, objectName, arrived, departed, durationMin }> & { gpsAvailable }",
+        errors: [
+            { code: 400, meaning: "Invalid filterType", remedy: "use tyomaa or sijainti" },
+            { code: 404, meaning: "tyomaa not found / not owned", remedy: "verify tyomaaId belongs to the active company" },
+            ...permErrors("auth.page.vehicle.read"),
+        ],
+        examples: ["ib vehicle visits tyomaa 17 --days 30", "ib vehicle visits sijainti 3"],
     },
     // ─── sijainti (11) ───────────────────────────────────────────────────────
     {
