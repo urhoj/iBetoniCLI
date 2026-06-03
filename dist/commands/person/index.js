@@ -285,6 +285,13 @@ export function registerPersonCommands(parent, getClient) {
             writeError(validationErr);
             process.exit(4);
         }
+        // resolveRoleTypeId returns 0 for an empty/unset name; --role is required and
+        // must name a real role, so reject the empty-string case rather than POST a
+        // bogus roleTypeId 0 to the backend.
+        if (!roleTypeId) {
+            writeError(new Error("--role must not be empty"));
+            process.exit(4);
+        }
         try {
             const client = await getClient();
             const result = await runPersonRoleGrant(client, Number(personIdStr), opts.asiakas, roleTypeId, opts);
@@ -309,6 +316,13 @@ export function registerPersonCommands(parent, getClient) {
         }
         catch (validationErr) {
             writeError(validationErr);
+            process.exit(4);
+        }
+        // resolveRoleTypeId returns 0 for an empty/unset name; --role is required and
+        // must name a real role, so reject the empty-string case rather than POST a
+        // bogus roleTypeId 0 to the backend.
+        if (!roleTypeId) {
+            writeError(new Error("--role must not be empty"));
             process.exit(4);
         }
         try {
