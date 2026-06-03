@@ -21,6 +21,16 @@ export interface VehicleDriversFilter {
   to?: string;
 }
 
+export interface VehicleDayFilter {
+  date?: string;
+}
+
+export interface VehicleVisitsFilter {
+  days?: number;
+}
+
+const VISIT_FILTER_TYPES = ["tyomaa", "sijainti"] as const;
+
 /**
  * GET /api/cli/vehicle/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
@@ -79,6 +89,55 @@ export async function runVehicleDrivers(
   const qs = params.toString();
   return client.get<ListEnvelope<Record<string, unknown>>>(
     `/api/cli/vehicle/drivers/${vehicleId}${qs ? `?${qs}` : ""}`
+  );
+}
+
+/** GET /api/cli/vehicle/locations — fleet-wide live position snapshot. */
+export async function runVehicleLocations(
+  client: ApiClient
+): Promise<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }> {
+  return client.get<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }>(
+    "/api/cli/vehicle/locations"
+  );
+}
+
+/** GET /api/cli/vehicle/timeline/:vehicleId?date= — per-day stop/travel segments. */
+export async function runVehicleTimeline(
+  client: ApiClient,
+  vehicleId: number,
+  opts: VehicleDayFilter
+): Promise<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }> {
+  const qs = opts.date ? `?date=${opts.date}` : "";
+  return client.get<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }>(
+    `/api/cli/vehicle/timeline/${vehicleId}${qs}`
+  );
+}
+
+/** GET /api/cli/vehicle/route/:vehicleId?date= — per-day ordered GPS polyline. */
+export async function runVehicleRoute(
+  client: ApiClient,
+  vehicleId: number,
+  opts: VehicleDayFilter
+): Promise<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }> {
+  const qs = opts.date ? `?date=${opts.date}` : "";
+  return client.get<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }>(
+    `/api/cli/vehicle/route/${vehicleId}${qs}`
+  );
+}
+
+/** GET /api/cli/vehicle/visits/:filterType/:filterId?days= — vehicles that visited a site. */
+export async function runVehicleVisits(
+  client: ApiClient,
+  filterType: string,
+  filterId: number,
+  opts: VehicleVisitsFilter
+): Promise<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }> {
+  if (!(VISIT_FILTER_TYPES as readonly string[]).includes(filterType)) {
+    throw new Error(`filterType must be one of: ${VISIT_FILTER_TYPES.join(", ")}`);
+  }
+  const qs = opts.days !== undefined ? `?days=${opts.days}` : "";
+  return client.get<ListEnvelope<Record<string, unknown>> & { gpsAvailable: boolean }>(
+    `/api/cli/vehicle/visits/${filterType}/${filterId}${qs}`
   );
 }
 
@@ -356,6 +415,17 @@ export function registerVehicleCommands(
       }
     });
 
+  v.command("locations")
+    .description("Fleet-wide live GPS positions (current lat/lng + speed/heading/engine/address)")
+    .action(async () => {
+      try {
+        const client = await getClient();
+        writeJson(await runVehicleLocations(client));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
   v.command("search <query>")
     .description("Search vehicles by reg-no / name substring")
     .option("--limit <n>", "Max rows", (val: string) =>
@@ -364,6 +434,18 @@ export function registerVehicleCommands(
     .action(async (query: string, opts: { limit?: number }) => {
       try {
         writeJson(await runVehicleSearch(await getClient(), query, opts.limit));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  v.command("timeline <vehicleId>")
+    .description("Per-day GPS timeline: named stops (sijainti/tyomaa) + travel legs with durations")
+    .option("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
+    .action(async (idStr: string, opts: VehicleDayFilter) => {
+      try {
+        const client = await getClient();
+        writeJson(await runVehicleTimeline(client, Number(idStr), { date: resolveDate(opts.date) }));
       } catch (e) {
         exitWithError(e);
       }
@@ -516,6 +598,18 @@ export function registerVehicleCommands(
       }
     });
 
+  v.command("route <vehicleId>")
+    .description("Per-day ordered GPS track points (polyline) for a vehicle")
+    .option("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
+    .action(async (idStr: string, opts: VehicleDayFilter) => {
+      try {
+        const client = await getClient();
+        writeJson(await runVehicleRoute(client, Number(idStr), { date: resolveDate(opts.date) }));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
   const assignCmd = v
     .command("driver-assign <vehicleId>")
     .description("Assign a per-day driver to a vehicle (vehicleDriverDays)")
@@ -550,4 +644,16 @@ export function registerVehicleCommands(
       }
     }
   );
+
+  v.command("visits <filterType> <id>")
+    .description("Vehicles that visited a worksite/location. filterType: tyomaa | sijainti")
+    .option("--days <n>", "Look-back window in days (omit for all-time)", (val: string) => Number(val))
+    .action(async (filterType: string, idStr: string, opts: VehicleVisitsFilter) => {
+      try {
+        const client = await getClient();
+        writeJson(await runVehicleVisits(client, filterType, Number(idStr), opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
 }

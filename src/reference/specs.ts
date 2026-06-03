@@ -203,6 +203,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
         type: "number",
         description: "Filter by vehicleId",
       },
+      { name: "worksite", type: "number", description: "Filter by worksite (tyomaaId)" },
       { name: "status", type: "string", description: "Filter by tila/status" },
       {
         name: "limit",
@@ -356,6 +357,15 @@ export const COMMAND_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.asiakas.read"),
     ],
     examples: ["ib customer get 1349"],
+  },
+  {
+    command: "ib customer worksites",
+    description: "List worksites belonging to a customer (GET /api/tyomaa/asiakasTyomaaList/:asiakasId).",
+    permissions: ["auth.page.tyomaa.read"],
+    flags: [{ name: "asiakasId", type: "number", description: "Positional — asiakasId" }],
+    outputShape: "ListEnvelope<{ tyomaaId, name, address, city }>",
+    errors: [...permErrors("auth.page.tyomaa.read")],
+    examples: ["ib customer worksites 1349"],
   },
   {
     command: "ib customer create",
@@ -559,6 +569,44 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib worksite get 99"],
   },
   {
+    command: "ib worksite metrics",
+    description:
+      "Volume / keikka-count metrics for a worksite (GET /api/cli/worksite/metrics/:tyomaaId).",
+    permissions: ["auth.page.tyomaa.read"],
+    flags: [
+      { name: "tyomaaId", type: "number", description: "Positional — tyomaaId" },
+    ],
+    outputShape: "{ tyomaaId, summary:{...}, monthlyBreakdown:[...] }",
+    errors: [
+      { code: 404, meaning: "Worksite not found", remedy: "verify tyomaaId" },
+      ...permErrors("auth.page.tyomaa.read"),
+    ],
+    examples: ["ib worksite metrics 99"],
+  },
+  {
+    command: "ib worksite dates list",
+    description: "List a worksite's compliance/permit dates (read-only).",
+    permissions: ["auth.page.tyomaa.read"],
+    flags: [{ name: "tyomaaId", type: "number", description: "Positional — tyomaaId" }],
+    outputShape:
+      "ListEnvelope<{ tyomaaDateId, typeId, typeName, date, expirationDate, daysUntil, status, quantity }>",
+    errors: [
+      { code: 400, meaning: "Bad tyomaaId", remedy: "use a positive integer" },
+      ...permErrors("auth.page.tyomaa.read"),
+    ],
+    examples: ["ib worksite dates list 99"],
+  },
+  {
+    command: "ib worksite dates expiring",
+    description: "Company-wide worksite dates expiring within --days (default 30).",
+    permissions: ["auth.page.tyomaa.read"],
+    flags: [{ name: "days", type: "number", default: "30", description: "Look-ahead window (days)" }],
+    outputShape:
+      "ListEnvelope<{ tyomaaDateId, tyomaaId, tyomaaName, typeName, expirationDate, daysUntil, urgency }>",
+    errors: [...permErrors("auth.page.tyomaa.read")],
+    examples: ["ib worksite dates expiring --days 14"],
+  },
+  {
     command: "ib worksite create",
     description:
       "Create a new worksite via POST /api/tyomaa/new. Body forwarded verbatim.",
@@ -583,7 +631,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib worksite update",
     description:
-      "Update a worksite via POST /api/tyomaa/set/:ownerAsiakasId/:tyomaaId/:yyyymmdd.",
+      "Update a worksite via POST /api/tyomaa/set (ownerAsiakasId derived from the session JWT; yyyymmdd defaults to today).",
     permissions: ["auth.page.tyomaa.edit"],
     flags: [
       {
@@ -719,8 +767,84 @@ export const COMMAND_SPECS: CommandSpec[] = [
     errors: permErrors("auth.page.person.read"),
     examples: ["ib person search 'Matti'"],
   },
+  {
+    command: "ib person role list",
+    description:
+      "List a person's per-company roles (asiakasPersonSettings) for a given asiakas. Role names resolved via ROLE_NAME_BY_TYPEID.",
+    permissions: ["company role read on the target tenant"],
+    flags: [
+      { name: "personId", type: "number", description: "Positional — personId" },
+      { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
+    ],
+    outputShape:
+      "ListEnvelope<{ asiakasPersonSettingId, roleTypeId, role: string|null }>",
+    errors: permErrors("company role access on the tenant"),
+    examples: ["ib person role list 5351 --asiakas 26"],
+  },
+  {
+    command: "ib person role grant",
+    description:
+      "Grant a per-company role to a person. POST /api/asiakasPersonSettings/add/:asiakasId/:personId/:roleTypeId. Admin-gated on the tenant (tier depends on the role). --dry-run previews via the backend ({ dryRun:true, wouldCreate }).",
+    permissions: ["company admin on the target tenant (tier per role)"],
+    flags: [
+      { name: "personId", type: "number", description: "Positional — personId" },
+      { name: "role", type: "string", description: "Role name (REQUIRED), e.g. keikkaHandler, vehicleHandler, hrAdmin" },
+      { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "raw backend success | { dryRun:true, wouldCreate:{ personId, asiakasId, personSettingTypeId, personSettingString }, validation }",
+    errors: [
+      { code: 400, meaning: "Unknown role / company limit reached", remedy: "use a name from ROLE_TYPEID_BY_NAME" },
+      { code: 403, meaning: "Not a tenant admin", remedy: "use a system-admin token or a tenant admin" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: [
+      "ib person role grant 5351 --role keikkaHandler --asiakas 26 --reason 'onboard handler'",
+      "ib person role grant 5351 --role vehicleHandler --asiakas 26 --reason preview --dry-run",
+    ],
+  },
+  {
+    command: "ib person role revoke",
+    description:
+      "Revoke a per-company role from a person (idempotent: { removed:0 } when absent). Looks up the asiakasPersonSettingId then DELETEs it. --dry-run previews via the backend ({ dryRun:true, wouldDelete }).",
+    permissions: ["company admin on the target tenant (tier per role)"],
+    flags: [
+      { name: "personId", type: "number", description: "Positional — personId" },
+      { name: "role", type: "string", description: "Role name (REQUIRED)" },
+      { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ removed: 1 } | { removed: 0 } (absent) | { dryRun:true, wouldDelete:{ asiakasPersonSettingId }, validation }",
+    errors: [
+      { code: 400, meaning: "Unknown role", remedy: "use a name from ROLE_TYPEID_BY_NAME" },
+      { code: 403, meaning: "Not a tenant admin", remedy: "use a system-admin token or a tenant admin" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ["ib person role revoke 5351 --role keikkaHandler --asiakas 26 --reason rotation"],
+  },
+  {
+    command: "ib person me",
+    description:
+      "Your own profile, your roles aggregated across all your companies, and the companies you can act on. Derives identity from the JWT (works with IB_TOKEN). For the roles scoped to a single company, use `person role list --asiakas`.",
+    flags: [],
+    outputShape:
+      "{ personId, name, email, phone, activeCompany:{asiakasId,name}, roles:[{roleTypeId,role}], companies:[{asiakasId,name,current}] }",
+    errors: [...COMMON_AUTH_ERRORS],
+    examples: ["ib person me", "ib person me --pretty"],
+  },
+  {
+    command: "ib person companies",
+    description:
+      "List the companies (asiakkaat) a person belongs to. Positional personId is optional and defaults to you. Reverse of `customer person list`.",
+    flags: [
+      { name: "personId", type: "number", description: "Positional — personId (optional; defaults to caller)" },
+    ],
+    outputShape: "ListEnvelope<{ asiakasId, name }>",
+    errors: [...COMMON_AUTH_ERRORS],
+    examples: ["ib person companies", "ib person companies 5351"],
+  },
 
-  // ─── vehicle (11) ─────────────────────────────────────────────────────────
+  // ─── vehicle (15) ─────────────────────────────────────────────────────────
   {
     command: "ib vehicle list",
     description:
@@ -760,7 +884,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib vehicle status",
     description:
-      "Current operational status for a vehicle: current driver, current keikka, latest GPS ping (via Ecofleet, best-effort).",
+      "Current operational status for a vehicle: current driver, current keikka, and the latest GPS ping (via the shared Ecofleet cache, best-effort). gpsAvailable:false when Ecofleet is not enabled.",
     permissions: ["auth.page.vehicle.read"],
     flags: [
       {
@@ -770,7 +894,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     outputShape:
-      "{ vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,at}|null }",
+      "{ vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,speed,direction,engineState,address,at}|null, gpsAvailable }",
     errors: [
       { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
       ...permErrors("auth.page.vehicle.read"),
@@ -922,30 +1046,91 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "ib vehicle driver-assign 7 --person 555 --dry-run",
     ],
   },
+  {
+    command: "ib vehicle locations",
+    description:
+      "Fleet-wide live GPS snapshot for the active company (via Ecofleet, cached 60s). gpsAvailable:false when Ecofleet is not enabled.",
+    permissions: ["auth.page.vehicle.read"],
+    flags: [],
+    outputShape:
+      "ListEnvelope<{ vehicleId|null, plate, objectName, lat, lng, speed, direction, engineState, address, at }> & { gpsAvailable }",
+    errors: permErrors("auth.page.vehicle.read"),
+    examples: ["ib vehicle locations", "ib vehicle locations --pretty"],
+  },
+  {
+    command: "ib vehicle timeline",
+    description:
+      "Per-day GPS timeline for a vehicle (snapshot-based, no external API): named stop segments (sijainti/tyomaa) and travel legs with durations.",
+    permissions: ["auth.page.vehicle.read"],
+    flags: [
+      { name: "vehicleId", type: "number", description: "Positional — vehicleId to inspect" },
+      { name: "date", type: "date", default: "today", description: "Day (YYYY-MM-DD or today/yesterday/tomorrow); Europe/Helsinki" },
+    ],
+    outputShape:
+      "ListEnvelope<{ type, locationType?, locationId?, locationName?, locationAddress?, sijaintiTypeName?, asiakasNimi?, arrived, departed, durationMin, distanceKm? }> & { gpsAvailable }",
+    errors: [
+      { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
+      ...permErrors("auth.page.vehicle.read"),
+    ],
+    examples: ["ib vehicle timeline 7", "ib vehicle timeline 7 --date yesterday"],
+  },
+  {
+    command: "ib vehicle route",
+    description:
+      "Per-day ordered GPS track points (polyline) for a vehicle (snapshot-based, no external API).",
+    permissions: ["auth.page.vehicle.read"],
+    flags: [
+      { name: "vehicleId", type: "number", description: "Positional — vehicleId to inspect" },
+      { name: "date", type: "date", default: "today", description: "Day (YYYY-MM-DD or today/yesterday/tomorrow); Europe/Helsinki" },
+    ],
+    outputShape: "ListEnvelope<{ lat, lng }> & { gpsAvailable }",
+    errors: [
+      { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
+      ...permErrors("auth.page.vehicle.read"),
+    ],
+    examples: ["ib vehicle route 7", "ib vehicle route 7 --date 2026-05-31"],
+  },
+  {
+    command: "ib vehicle visits",
+    description:
+      "Vehicles that visited a worksite (tyomaa) or location (sijainti), grouped into visits with arrival/departure/duration (snapshot-based). tyomaa is tenant-scoped; sijainti is shared.",
+    permissions: ["auth.page.vehicle.read"],
+    flags: [
+      { name: "filterType", type: "string", description: "Positional — 'tyomaa' or 'sijainti'" },
+      { name: "id", type: "number", description: "Positional — tyomaaId or sijaintiId" },
+      { name: "days", type: "number", description: "Look-back window in days (omit for all-time)" },
+    ],
+    outputShape:
+      "ListEnvelope<{ vehicleId|null, plate, objectName, arrived, departed, durationMin }> & { gpsAvailable }",
+    errors: [
+      { code: 400, meaning: "Invalid filterType", remedy: "use tyomaa or sijainti" },
+      { code: 404, meaning: "tyomaa not found / not owned", remedy: "verify tyomaaId belongs to the active company" },
+      ...permErrors("auth.page.vehicle.read"),
+    ],
+    examples: ["ib vehicle visits tyomaa 17 --days 30", "ib vehicle visits sijainti 3"],
+  },
 
-  // ─── sijainti (4) ────────────────────────────────────────────────────────
+  // ─── sijainti (11) ───────────────────────────────────────────────────────
   {
     command: "ib sijainti list",
     description:
       "List geocoded locations (sijainnit) — depots, plants, customer destinations. Optional --type filters by sijaintiTypeId.",
     permissions: ["auth.page.sijainnit.read"],
     flags: [
-      {
-        name: "type",
-        type: "number",
-        description: "Filter by sijaintiTypeId",
-      },
-      {
-        name: "limit",
-        type: "number",
-        default: "100",
-        description: "Max rows (capped at 500)",
-      },
+      { name: "type", type: "number", description: "Filter by sijaintiTypeId" },
+      { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+      { name: "valid-at", type: "date", description: "Only sijainnit valid on this date (startDate/endDate window)" },
+      { name: "include-deleted", type: "boolean", description: "Include soft-deleted sijainnit" },
     ],
     outputShape:
       "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, jerryActiveUntil }>",
     errors: permErrors("auth.page.sijainnit.read"),
-    examples: ["ib sijainti list", "ib sijainti list --type 1"],
+    examples: [
+      "ib sijainti list",
+      "ib sijainti list --type 1",
+      "ib sijainti list --valid-at today",
+      "ib sijainti list --include-deleted",
+    ],
   },
   {
     command: "ib sijainti get",
@@ -969,14 +1154,15 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib sijainti create",
     description:
-      "Create a new sijainti via POST /api/geocode/sijainti/add. Body forwarded verbatim.",
+      "Create a new sijainti (POST /api/geocode/sijainti/add). Provide typed flags (--name/--address/--type/--lat/--lng) or --body JSON; typed flags win over --body.",
     permissions: ["auth.page.sijainnit.edit"],
     flags: [
-      {
-        name: "body",
-        type: "json",
-        description: "JSON object with the new sijainti fields",
-      },
+      { name: "body", type: "json", description: "JSON object with the new sijainti fields (optional if typed flags given)" },
+      { name: "name", type: "string", description: "sijaintiNimi" },
+      { name: "address", type: "string", description: "sijaintiOsoite1 (street)" },
+      { name: "type", type: "number", description: "sijaintiTypeId (see `ib sijainti types`)" },
+      { name: "lat", type: "number", description: "Latitude" },
+      { name: "lng", type: "number", description: "Longitude" },
     ],
     writeFlags: true,
     outputShape: "{ sijaintiId, ... } (raw backend response)",
@@ -985,20 +1171,23 @@ export const COMMAND_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.sijainnit.edit"),
     ],
     examples: [
-      "ib sijainti create --body '{\"name\":\"Depot A\",\"address\":\"Industrial St 1\",\"sijaintiTypeId\":1}'",
+      'ib sijainti create --name "Depot A" --address "Industrial St 1" --type 1 --lat 60.17 --lng 24.94',
+      "ib sijainti create --body '{\"sijaintiNimi\":\"Depot A\",\"sijaintiTypeId\":1}'",
     ],
   },
   {
     command: "ib sijainti update",
     description:
-      "Update a sijainti via POST /api/geocode/updateSijainti. Body forwarded verbatim.",
+      "Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Provide typed flags or --body JSON; typed flags win over --body.",
     permissions: ["auth.page.sijainnit.edit"],
     flags: [
-      {
-        name: "body",
-        type: "json",
-        description: "JSON object with the fields to update (must include sijaintiId)",
-      },
+      { name: "body", type: "json", description: "JSON object with fields to update (optional if typed flags given)" },
+      { name: "id", type: "number", description: "Target sijaintiId (or include sijaintiId in --body)" },
+      { name: "name", type: "string", description: "sijaintiNimi" },
+      { name: "address", type: "string", description: "sijaintiOsoite1 (street)" },
+      { name: "type", type: "number", description: "sijaintiTypeId" },
+      { name: "lat", type: "number", description: "Latitude" },
+      { name: "lng", type: "number", description: "Longitude" },
     ],
     writeFlags: true,
     outputShape: "{ ok: true, ... } (raw backend response)",
@@ -1008,7 +1197,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.sijainnit.edit"),
     ],
     examples: [
-      "ib sijainti update --body '{\"sijaintiId\":42,\"name\":\"Renamed depot\"}'",
+      'ib sijainti update --id 42 --name "Renamed depot"',
+      "ib sijainti update --body '{\"sijaintiId\":42,\"sijaintiNimi\":\"Renamed depot\"}'",
     ],
   },
   {
@@ -1041,6 +1231,98 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "ib sijainti set-jerry 42 --on --reason 'pilot varikko in Jerry'",
       "ib sijainti set-jerry 42 --off --reason 'seasonal pause'",
       "ib sijainti set-jerry 42 --on --dry-run",
+    ],
+  },
+  {
+    command: "ib sijainti delete",
+    description:
+      "Soft-delete a sijainti (sets deletedTime). Requires --reason; --dry-run available.",
+    permissions: ["auth.page.sijainnit.delete"],
+    flags: [
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ success: true }",
+    errors: [
+      { code: 404, meaning: "Sijainti not found", remedy: "verify sijaintiId" },
+      ...permErrors("auth.page.sijainnit.delete"),
+    ],
+    examples: ['ib sijainti delete 42 --reason "decommissioned depot"'],
+  },
+  {
+    command: "ib sijainti undelete",
+    description: "Restore a soft-deleted sijainti. Requires --reason.",
+    permissions: ["auth.page.sijainnit.edit"],
+    flags: [
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ success: true }",
+    errors: [
+      { code: 404, meaning: "Sijainti not found", remedy: "verify sijaintiId" },
+      ...permErrors("auth.page.sijainnit.edit"),
+    ],
+    examples: ['ib sijainti undelete 42 --reason "restored after review"'],
+  },
+  {
+    command: "ib sijainti types",
+    description:
+      "List sijainti type categories (the 'Sijainnin laji' lookup). Resolves the sijaintiTypeId values used by `sijainti list --type` and `create/update --type`.",
+    permissions: ["auth.page.sijainnit.read"],
+    flags: [
+      { name: "jerry", type: "boolean", description: "Use the BetoniJerry type set (useJerry=1)" },
+    ],
+    outputShape: "ListEnvelope<{ sijaintiTypeId, selite }>",
+    errors: permErrors("auth.page.sijainnit.read"),
+    examples: ["ib sijainti types", "ib sijainti types --jerry"],
+  },
+  {
+    command: "ib sijainti geocode",
+    description:
+      "Geocode a free-form address to coordinates via Google Maps. Useful before `sijainti create` to obtain lat/lng. ownerAsiakasId is derived from the token.",
+    permissions: ["auth.page.sijainnit.read"],
+    flags: [
+      { name: "address", type: "string", description: "Free-form address (REQUIRED)" },
+    ],
+    outputShape:
+      "{ status, lat, lng, ... } (raw Google geocode result; { status: 'ZERO_RESULTS' } when no match)",
+    errors: permErrors("auth.page.sijainnit.read"),
+    examples: ['ib sijainti geocode --address "Mannerheimintie 1, Helsinki"'],
+  },
+  {
+    command: "ib sijainti closest",
+    description:
+      "Find the closest sijainti of a given sijaintiTypeId to a worksite (tyomaa), by straight-line distance. asiakasId defaults to the active company.",
+    permissions: ["auth.page.sijainnit.read"],
+    flags: [
+      { name: "tyomaa", type: "number", description: "Target tyomaaId (REQUIRED)" },
+      { name: "type", type: "number", description: "sijaintiTypeId to search within (REQUIRED)" },
+      { name: "asiakas", type: "number", description: "Owner asiakasId (defaults to active company)" },
+    ],
+    outputShape: "{ closestSijainti: {...}|null, closestDistance: number|null }",
+    errors: [
+      { code: 400, meaning: "Invalid tyomaaId or missing coordinates", remedy: "verify the worksite has lat/lng" },
+      ...permErrors("auth.page.sijainnit.read"),
+    ],
+    examples: ["ib sijainti closest --tyomaa 555 --type 1"],
+  },
+  {
+    command: "ib sijainti distance",
+    description:
+      "Driving distance and time between two points (Google Maps). Each endpoint is either 'lat,lng' or a sijaintiId (resolved to its coordinates). ownerAsiakasId is derived from the active company.",
+    permissions: ["auth.page.sijainnit.read"],
+    flags: [
+      { name: "from", type: "string", description: "Origin: 'lat,lng' or a sijaintiId (REQUIRED)" },
+      { name: "to", type: "string", description: "Destination: 'lat,lng' or a sijaintiId (REQUIRED)" },
+    ],
+    outputShape: "{ matkaM: number|null, matkaMin: number|null, from:{lat,lng}, to:{lat,lng} }",
+    errors: [
+      { code: 400, meaning: "Bad point or sijainti without coordinates", remedy: "use 'lat,lng' or a sijaintiId that has coords" },
+      ...permErrors("auth.page.sijainnit.read"),
+    ],
+    examples: [
+      "ib sijainti distance --from 7 --to 42",
+      'ib sijainti distance --from "60.17,24.94" --to 42',
     ],
   },
 
@@ -1172,6 +1454,48 @@ export const COMMAND_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.tyomaa.edit"),
     ],
     examples: ['ib worksite delete 99 --reason "lifecycle cleanup"'],
+  },
+  {
+    command: "ib worksite refresh-location",
+    description: "Re-geocode a worksite from Google Maps (POST /api/tyomaa/refreshLocation/:id).",
+    permissions: ["auth.page.tyomaa.edit"],
+    flags: [{ name: "tyomaaId", type: "number", description: "Positional — tyomaaId" }],
+    writeFlags: true,
+    outputShape: "{ success: true, tyomaa, message } (raw backend response)",
+    errors: [
+      { code: 404, meaning: "Worksite not found", remedy: "verify tyomaaId" },
+      ...permErrors("auth.page.tyomaa.edit"),
+    ],
+    examples: ['ib worksite refresh-location 99 --reason "address corrected"'],
+  },
+  {
+    command: "ib worksite set-geofence",
+    description: "Set a worksite geofence radius in metres (1-10000).",
+    permissions: ["auth.page.tyomaa.edit"],
+    flags: [
+      { name: "tyomaaId", type: "number", description: "Positional — tyomaaId" },
+      { name: "radius", type: "number", description: "Geofence radius in metres (1-10000)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ success: true }",
+    errors: [
+      { code: 400, meaning: "Radius out of range", remedy: "use 1-10000" },
+      ...permErrors("auth.page.tyomaa.edit"),
+    ],
+    examples: ["ib worksite set-geofence 99 --radius 300"],
+  },
+  {
+    command: "ib worksite helsinki-fetch",
+    description: "Refresh Helsinki building data for a worksite (POST /api/tyomaa/helsinki/fetch/:id).",
+    permissions: ["auth.page.tyomaa.edit"],
+    flags: [{ name: "tyomaaId", type: "number", description: "Positional — tyomaaId" }],
+    writeFlags: true,
+    outputShape: "{ success, ... } (raw backend response)",
+    errors: [
+      { code: 400, meaning: "Missing coordinates", remedy: "run refresh-location first" },
+      ...permErrors("auth.page.tyomaa.edit"),
+    ],
+    examples: ["ib worksite helsinki-fetch 99"],
   },
   {
     command: "ib worksite person add",

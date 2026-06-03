@@ -3,6 +3,9 @@ import {
   runWorksiteList,
   runWorksiteGet,
   runWorksiteSearch,
+  runWorksiteMetrics,
+  runWorksiteDatesList,
+  runWorksiteDatesExpiring,
 } from "../../src/commands/worksite/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -72,5 +75,38 @@ describe("ib worksite list/get/search", () => {
     expect(mockClient.post).toHaveBeenCalledWith("/api/tyomaa/search", {
       searchString: "Acme & Co",
     });
+  });
+
+  test("runWorksiteMetrics: GET /api/cli/worksite/metrics/42", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      tyomaaId: 42, summary: { totalM3: 120 }, monthlyBreakdown: [],
+    });
+    const result = await runWorksiteMetrics(mockClient, 42);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/worksite/metrics/42");
+    expect((result as { tyomaaId: number }).tyomaaId).toBe(42);
+  });
+
+  test("runWorksiteDatesList: GET /api/cli/worksite/dates/42", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [], nextCursor: null, count: 0,
+    });
+    await runWorksiteDatesList(mockClient, 42);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/worksite/dates/42");
+  });
+
+  test("runWorksiteDatesExpiring: default days=30", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [], nextCursor: null, count: 0,
+    });
+    await runWorksiteDatesExpiring(mockClient, undefined);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/worksite/dates/expiring?days=30");
+  });
+
+  test("runWorksiteDatesExpiring: explicit days", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [], nextCursor: null, count: 0,
+    });
+    await runWorksiteDatesExpiring(mockClient, 14);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/worksite/dates/expiring?days=14");
   });
 });

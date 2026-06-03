@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { resolveRoleTypeId } from "../../roles.js";
 /**
  * GET /api/cli/customer/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
@@ -164,6 +165,20 @@ export async function runCustomerOperatorVerify(client, asiakasId) {
     return { asiakasId, allSet: missing.length === 0, flags, missing };
 }
 /**
+ * GET /api/tyomaa/asiakasTyomaaList/:asiakasId — worksites belonging to a
+ * customer. Backend returns a raw array; wrapped into the universal envelope.
+ */
+export async function runCustomerWorksites(client, asiakasId) {
+    const rows = await client.get(`/api/tyomaa/asiakasTyomaaList/${asiakasId}`);
+    const items = (rows || []).map((r) => ({
+        tyomaaId: r.tyomaaId,
+        name: r.tyomaaNimi || null,
+        address: r.tyomaaOsoite1 || null,
+        city: r.tyomaaOsoite4 || null,
+    }));
+    return { items, nextCursor: null, count: items.length };
+}
+/**
  * GET /api/asiakas/search?searchString=<query> — existing (non-/api/cli/) route
  * used by the FE customer typeahead. The backend scopes results to the caller's
  * company (req.user.ownerAsiakasId) when no ownerAsiakasId query param is given,
@@ -256,6 +271,17 @@ export function registerCustomerCommands(parent, getClient) {
             const client = await getClient();
             const result = await runCustomerGet(client, Number(idStr));
             writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    c.command("worksites <asiakasId>")
+        .description("List worksites belonging to a customer")
+        .action(async (idStr) => {
+        try {
+            const client = await getClient();
+            writeJson(await runCustomerWorksites(client, Number(idStr)));
         }
         catch (e) {
             exitWithError(e);
@@ -462,25 +488,6 @@ async function resolveOwnerAsiakasIdForWrite(client) {
 // `@ibetoni/constants` is a CommonJS package — pulled in via createRequire so
 // the ESM build doesn't need a default-export shim.
 const cjsRequire = createRequire(import.meta.url);
-/**
- * Translate a role NAME (e.g. "keikkaHandler") to its `asiakasPersonSettingTypeId`
- * using `ROLE_TYPEID_BY_NAME` from `@ibetoni/constants` (the single source of
- * truth). Returns `0` for an unset name (BE treats 0 as "no filter").
- *
- * Throws a descriptive error when the role is unknown so the CLI can surface
- * the list of valid names to the user.
- */
-function resolveRoleTypeId(roleName) {
-    if (!roleName)
-        return 0;
-    const constants = cjsRequire("@ibetoni/constants");
-    const id = constants.ROLE_TYPEID_BY_NAME[roleName];
-    if (!id) {
-        const valid = Object.keys(constants.ROLE_TYPEID_BY_NAME).sort().join(", ");
-        throw new Error(`unknown role: ${roleName}. Valid: ${valid}`);
-    }
-    return id;
-}
 /**
  * GET /api/asiakas/person/list/:asiakasId/:roleTypeId — returns persons
  * attached to a customer, optionally filtered by role NAME (mapped to its
