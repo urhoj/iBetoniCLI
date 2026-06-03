@@ -203,6 +203,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
         type: "number",
         description: "Filter by vehicleId",
       },
+      { name: "worksite", type: "number", description: "Filter by worksite (tyomaaId)" },
       { name: "status", type: "string", description: "Filter by tila/status" },
       {
         name: "limit",
@@ -356,6 +357,15 @@ export const COMMAND_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.asiakas.read"),
     ],
     examples: ["ib customer get 1349"],
+  },
+  {
+    command: "ib customer worksites",
+    description: "List worksites belonging to a customer (GET /api/tyomaa/asiakasTyomaaList/:asiakasId).",
+    permissions: ["auth.page.tyomaa.read"],
+    flags: [{ name: "asiakasId", type: "number", description: "Positional — asiakasId" }],
+    outputShape: "ListEnvelope<{ tyomaaId, name, address, city }>",
+    errors: [...permErrors("auth.page.tyomaa.read")],
+    examples: ["ib customer worksites 1349"],
   },
   {
     command: "ib customer create",
@@ -559,6 +569,44 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib worksite get 99"],
   },
   {
+    command: "ib worksite metrics",
+    description:
+      "Volume / keikka-count metrics for a worksite (GET /api/cli/worksite/metrics/:tyomaaId).",
+    permissions: ["auth.page.tyomaa.read"],
+    flags: [
+      { name: "tyomaaId", type: "number", description: "Positional — tyomaaId" },
+    ],
+    outputShape: "{ tyomaaId, summary:{...}, monthlyBreakdown:[...] }",
+    errors: [
+      { code: 404, meaning: "Worksite not found", remedy: "verify tyomaaId" },
+      ...permErrors("auth.page.tyomaa.read"),
+    ],
+    examples: ["ib worksite metrics 99"],
+  },
+  {
+    command: "ib worksite dates list",
+    description: "List a worksite's compliance/permit dates (read-only).",
+    permissions: ["auth.page.tyomaa.read"],
+    flags: [{ name: "tyomaaId", type: "number", description: "Positional — tyomaaId" }],
+    outputShape:
+      "ListEnvelope<{ tyomaaDateId, typeId, typeName, date, expirationDate, daysUntil, status, quantity }>",
+    errors: [
+      { code: 400, meaning: "Bad tyomaaId", remedy: "use a positive integer" },
+      ...permErrors("auth.page.tyomaa.read"),
+    ],
+    examples: ["ib worksite dates list 99"],
+  },
+  {
+    command: "ib worksite dates expiring",
+    description: "Company-wide worksite dates expiring within --days (default 30).",
+    permissions: ["auth.page.tyomaa.read"],
+    flags: [{ name: "days", type: "number", default: "30", description: "Look-ahead window (days)" }],
+    outputShape:
+      "ListEnvelope<{ tyomaaDateId, tyomaaId, tyomaaName, typeName, expirationDate, daysUntil, urgency }>",
+    errors: [...permErrors("auth.page.tyomaa.read")],
+    examples: ["ib worksite dates expiring --days 14"],
+  },
+  {
     command: "ib worksite create",
     description:
       "Create a new worksite via POST /api/tyomaa/new. Body forwarded verbatim.",
@@ -583,7 +631,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib worksite update",
     description:
-      "Update a worksite via POST /api/tyomaa/set/:ownerAsiakasId/:tyomaaId/:yyyymmdd.",
+      "Update a worksite via POST /api/tyomaa/set (ownerAsiakasId derived from the session JWT; yyyymmdd defaults to today).",
     permissions: ["auth.page.tyomaa.edit"],
     flags: [
       {
@@ -1229,6 +1277,48 @@ export const COMMAND_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.tyomaa.edit"),
     ],
     examples: ['ib worksite delete 99 --reason "lifecycle cleanup"'],
+  },
+  {
+    command: "ib worksite refresh-location",
+    description: "Re-geocode a worksite from Google Maps (POST /api/tyomaa/refreshLocation/:id).",
+    permissions: ["auth.page.tyomaa.edit"],
+    flags: [{ name: "tyomaaId", type: "number", description: "Positional — tyomaaId" }],
+    writeFlags: true,
+    outputShape: "{ success: true, tyomaa, message } (raw backend response)",
+    errors: [
+      { code: 404, meaning: "Worksite not found", remedy: "verify tyomaaId" },
+      ...permErrors("auth.page.tyomaa.edit"),
+    ],
+    examples: ['ib worksite refresh-location 99 --reason "address corrected"'],
+  },
+  {
+    command: "ib worksite set-geofence",
+    description: "Set a worksite geofence radius in metres (1-10000).",
+    permissions: ["auth.page.tyomaa.edit"],
+    flags: [
+      { name: "tyomaaId", type: "number", description: "Positional — tyomaaId" },
+      { name: "radius", type: "number", description: "Geofence radius in metres (1-10000)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ success: true }",
+    errors: [
+      { code: 400, meaning: "Radius out of range", remedy: "use 1-10000" },
+      ...permErrors("auth.page.tyomaa.edit"),
+    ],
+    examples: ["ib worksite set-geofence 99 --radius 300"],
+  },
+  {
+    command: "ib worksite helsinki-fetch",
+    description: "Refresh Helsinki building data for a worksite (POST /api/tyomaa/helsinki/fetch/:id).",
+    permissions: ["auth.page.tyomaa.edit"],
+    flags: [{ name: "tyomaaId", type: "number", description: "Positional — tyomaaId" }],
+    writeFlags: true,
+    outputShape: "{ success, ... } (raw backend response)",
+    errors: [
+      { code: 400, meaning: "Missing coordinates", remedy: "run refresh-location first" },
+      ...permErrors("auth.page.tyomaa.edit"),
+    ],
+    examples: ["ib worksite helsinki-fetch 99"],
   },
   {
     command: "ib worksite person add",

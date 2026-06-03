@@ -17,6 +17,8 @@ export async function runKeikkaList(client, opts) {
         params.set("customer", String(opts.customer));
     if (opts.vehicle !== undefined)
         params.set("vehicle", String(opts.vehicle));
+    if (opts.worksite !== undefined)
+        params.set("worksite", String(opts.worksite));
     if (opts.status)
         params.set("status", opts.status);
     if (opts.limit !== undefined)
@@ -82,6 +84,7 @@ export function registerKeikkaCommands(parent, getClient) {
         .option("--to <date>", "End date YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
         .option("--customer <id>", "Filter by asiakasId", (v) => Number(v))
         .option("--vehicle <id>", "Filter by vehicleId", (v) => Number(v))
+        .option("--worksite <id>", "Filter by worksite (tyomaaId)", (v) => Number(v))
         .option("--status <s>", "Filter by status")
         .option("--limit <n>", "Max rows", (v) => Math.min(Number(v), 500))
         .option("--cursor <c>", "Pagination cursor")

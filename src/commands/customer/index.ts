@@ -253,6 +253,33 @@ export async function runCustomerOperatorVerify(
   return { asiakasId, allSet: missing.length === 0, flags, missing };
 }
 
+interface CustomerWorksiteRow {
+  tyomaaId: number;
+  tyomaaNimi?: string;
+  tyomaaOsoite1?: string;
+  tyomaaOsoite4?: string;
+}
+
+/**
+ * GET /api/tyomaa/asiakasTyomaaList/:asiakasId — worksites belonging to a
+ * customer. Backend returns a raw array; wrapped into the universal envelope.
+ */
+export async function runCustomerWorksites(
+  client: ApiClient,
+  asiakasId: number
+): Promise<ListEnvelope<{ tyomaaId: number; name: string | null; address: string | null; city: string | null }>> {
+  const rows = await client.get<CustomerWorksiteRow[]>(
+    `/api/tyomaa/asiakasTyomaaList/${asiakasId}`
+  );
+  const items = (rows || []).map((r) => ({
+    tyomaaId: r.tyomaaId,
+    name: r.tyomaaNimi || null,
+    address: r.tyomaaOsoite1 || null,
+    city: r.tyomaaOsoite4 || null,
+  }));
+  return { items, nextCursor: null, count: items.length };
+}
+
 /**
  * GET /api/asiakas/search?searchString=<query> — existing (non-/api/cli/) route
  * used by the FE customer typeahead. The backend scopes results to the caller's
@@ -402,6 +429,17 @@ export function registerCustomerCommands(
         const client = await getClient();
         const result = await runCustomerGet(client, Number(idStr));
         writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  c.command("worksites <asiakasId>")
+    .description("List worksites belonging to a customer")
+    .action(async (idStr: string) => {
+      try {
+        const client = await getClient();
+        writeJson(await runCustomerWorksites(client, Number(idStr)));
       } catch (e) {
         exitWithError(e);
       }

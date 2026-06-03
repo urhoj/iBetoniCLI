@@ -1,5 +1,6 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { decodeJwtPayload } from "../../auth/jwt.js";
 /**
  * GET /api/cli/worksite/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
@@ -73,11 +74,59 @@ export async function runWorksiteUpdate(client, opts, body, flags) {
     return client.post(`/api/tyomaa/set/${opts.ownerAsiakasId}/${opts.tyomaaId}/${yyyymmdd}`, body, { headers: writeFlagsToHeaders(flags) });
 }
 /**
+ * GET /api/cli/worksite/metrics/:tyomaaId — volume / keikka-count summary plus
+ * monthly breakdown. Owner derived from the JWT server-side.
+ */
+export async function runWorksiteMetrics(client, tyomaaId) {
+    return client.get(`/api/cli/worksite/metrics/${tyomaaId}`);
+}
+/** GET /api/cli/worksite/dates/:tyomaaId — a worksite's compliance dates. */
+export async function runWorksiteDatesList(client, tyomaaId) {
+    return client.get(`/api/cli/worksite/dates/${tyomaaId}`);
+}
+/** GET /api/cli/worksite/dates/expiring?days=N — company-wide expiry feed. */
+export async function runWorksiteDatesExpiring(client, days) {
+    const d = days !== undefined ? days : 30;
+    return client.get(`/api/cli/worksite/dates/expiring?days=${d}`);
+}
+/** POST /api/tyomaa/refreshLocation/:tyomaaId — re-geocode from Google Maps. */
+export async function runWorksiteRefreshLocation(client, tyomaaId, flags) {
+    return client.post(`/api/tyomaa/refreshLocation/${tyomaaId}`, {}, {
+        headers: writeFlagsToHeaders(flags),
+    });
+}
+/** POST /api/tyomaa/:tyomaaId/geofence-radius — set geofence radius (1-10000 m). */
+export async function runWorksiteSetGeofence(client, tyomaaId, radius, flags) {
+    return client.post(`/api/tyomaa/${tyomaaId}/geofence-radius`, { geofenceRadius: radius }, {
+        headers: writeFlagsToHeaders(flags),
+    });
+}
+/** POST /api/tyomaa/helsinki/fetch/:tyomaaId — refresh Helsinki building data. */
+export async function runWorksiteHelsinkiFetch(client, tyomaaId, flags) {
+    return client.post(`/api/tyomaa/helsinki/fetch/${tyomaaId}`, {}, {
+        headers: writeFlagsToHeaders(flags),
+    });
+}
+/**
  * DELETE /api/tyomaa/delete/:tyomaaId. Universal write flags surface as
  * headers; `--reason` is enforced by the CLI layer.
  */
 export async function runWorksiteDelete(client, tyomaaId, flags) {
     return client.delete(`/api/tyomaa/delete/${tyomaaId}`, { headers: writeFlagsToHeaders(flags) });
+}
+/**
+ * Derive the active company's ownerAsiakasId from the client's JWT. Used by
+ * `worksite update` so the CLI no longer asks for --owner-asiakas-id. Throws a
+ * clean Error when the token carries no usable owner claim; the command action
+ * routes it through exitWithError (generic exit 1).
+ */
+export function resolveOwnerAsiakasId(client) {
+    const token = client.getCurrentToken();
+    const owner = token ? decodeJwtPayload(token).ownerAsiakasId : NaN;
+    if (!Number.isFinite(owner) || owner < 1) {
+        throw new Error("Could not derive ownerAsiakasId from the active session token");
+    }
+    return owner;
 }
 /**
  * POST /api/tyomaa/person/add — attach a person to a worksite.
@@ -118,8 +167,8 @@ export async function runWorksitePersonList(client, tyomaaId) {
  *   - create  POST /api/tyomaa/new with --body JSON (write flags)
  *   - update  POST /api/tyomaa/set/<ownerAsiakasId>/<tyomaaId>/<yyyymmdd>
  *
- * The `update` action currently takes `--owner-asiakas-id <id>` as a temporary
- * flag until G.3 wires the auto-derive from the credentials context.
+ * The `update` action derives ownerAsiakasId from the session JWT via
+ * `resolveOwnerAsiakasId` — no --owner-asiakas-id flag required.
  * `--yyyymmdd` defaults to today.
  *
  * Exit codes: 1 = generic API/runtime failure.
@@ -147,6 +196,44 @@ export function registerWorksiteCommands(parent, getClient) {
             const client = await getClient();
             const result = await runWorksiteGet(client, Number(idStr));
             writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    w.command("metrics <tyomaaId>")
+        .description("Volume / keikka-count metrics for a worksite")
+        .action(async (idStr) => {
+        try {
+            const client = await getClient();
+            const result = await runWorksiteMetrics(client, Number(idStr));
+            writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    const dates = w.command("dates").description("Worksite compliance dates (read-only)");
+    dates
+        .command("list <tyomaaId>")
+        .description("List a worksite's compliance/permit dates")
+        .action(async (idStr) => {
+        try {
+            const client = await getClient();
+            writeJson(await runWorksiteDatesList(client, Number(idStr)));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    dates
+        .command("expiring")
+        .description("Company-wide expiring worksite dates")
+        .option("--days <n>", "Look-ahead window in days (default 30)", (v) => Number(v))
+        .action(async (opts) => {
+        try {
+            const client = await getClient();
+            writeJson(await runWorksiteDatesExpiring(client, opts.days));
         }
         catch (e) {
             exitWithError(e);
@@ -185,23 +272,15 @@ export function registerWorksiteCommands(parent, getClient) {
     });
     const updateCmd = w
         .command("update <tyomaaId>")
-        .description("Update a worksite (POST /api/tyomaa/set/<ownerAsiakasId>/<tyomaaId>/<yyyymmdd>)")
+        .description("Update a worksite (owner auto-derived from the session)")
         .requiredOption("--body <json>", "JSON object forwarded verbatim as the request body")
-        .requiredOption("--owner-asiakas-id <id>", "Owner asiakasId (temporary; auto-derived in G.3)", (v) => Number(v))
         .option("--yyyymmdd <date>", "Date segment YYYYMMDD (defaults to today)");
     addWriteFlagsToCommand(updateCmd).action(async (idStr, opts) => {
         try {
             const client = await getClient();
+            const ownerAsiakasId = resolveOwnerAsiakasId(client);
             const parsed = JSON.parse(opts.body);
-            const result = await runWorksiteUpdate(client, {
-                tyomaaId: Number(idStr),
-                ownerAsiakasId: opts.ownerAsiakasId,
-                yyyymmdd: opts.yyyymmdd,
-            }, parsed, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            });
+            const result = await runWorksiteUpdate(client, { tyomaaId: Number(idStr), ownerAsiakasId, yyyymmdd: opts.yyyymmdd }, parsed, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason });
             writeJson(result);
         }
         catch (e) {
@@ -219,6 +298,41 @@ export function registerWorksiteCommands(parent, getClient) {
             const client = await getClient();
             const result = await runWorksiteDelete(client, Number(tyomaaIdStr), opts);
             writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    addWriteFlagsToCommand(w.command("refresh-location <tyomaaId>")
+        .description("Re-geocode a worksite from Google Maps")).action(async (idStr, opts) => {
+        try {
+            const client = await getClient();
+            writeJson(await runWorksiteRefreshLocation(client, Number(idStr), opts));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    addWriteFlagsToCommand(w.command("set-geofence <tyomaaId>")
+        .description("Set a worksite geofence radius in metres (1-10000)")
+        .requiredOption("--radius <m>", "Geofence radius in metres", Number)).action(async (idStr, opts) => {
+        if (!Number.isInteger(opts.radius) || opts.radius < 1 || opts.radius > 10000) {
+            writeError(new Error("--radius must be an integer between 1 and 10000"));
+            process.exit(4);
+        }
+        try {
+            const client = await getClient();
+            writeJson(await runWorksiteSetGeofence(client, Number(idStr), opts.radius, opts));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    addWriteFlagsToCommand(w.command("helsinki-fetch <tyomaaId>")
+        .description("Refresh Helsinki building data for a worksite")).action(async (idStr, opts) => {
+        try {
+            const client = await getClient();
+            writeJson(await runWorksiteHelsinkiFetch(client, Number(idStr), opts));
         }
         catch (e) {
             exitWithError(e);

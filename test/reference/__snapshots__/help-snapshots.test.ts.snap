@@ -583,6 +583,34 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib customer worksites matches snapshot 1`] = `
+"USAGE
+  ib customer worksites [flags]
+
+DESCRIPTION
+  List worksites belonging to a customer (GET /api/tyomaa/asiakasTyomaaList/:asiakasId).
+  Permissions: requires auth.page.tyomaa.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --asiakasId NUMBER    Positional — asiakasId
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ tyomaaId, name, address, city }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib customer worksites 1349
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib jerry admin detail matches snapshot 1`] = `
 "USAGE
   ib jerry admin detail [flags]
@@ -1075,6 +1103,7 @@ FLAGS
   --to DATE    End date (YYYY-MM-DD or today/yesterday/tomorrow) (default: today)
   --customer NUMBER    Filter by asiakasId
   --vehicle NUMBER    Filter by vehicleId
+  --worksite NUMBER    Filter by worksite (tyomaaId)
   --status STRING    Filter by tila/status
   --limit NUMBER    Max rows (server caps at 500) (default: 100)
   --cursor STRING    Pagination cursor
@@ -2328,6 +2357,63 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib worksite dates expiring matches snapshot 1`] = `
+"USAGE
+  ib worksite dates expiring [flags]
+
+DESCRIPTION
+  Company-wide worksite dates expiring within --days (default 30).
+  Permissions: requires auth.page.tyomaa.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --days NUMBER    Look-ahead window (days) (default: 30)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ tyomaaDateId, tyomaaId, tyomaaName, typeName, expirationDate, daysUntil, urgency }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite dates expiring --days 14
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib worksite dates list matches snapshot 1`] = `
+"USAGE
+  ib worksite dates list [flags]
+
+DESCRIPTION
+  List a worksite's compliance/permit dates (read-only).
+  Permissions: requires auth.page.tyomaa.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --tyomaaId NUMBER    Positional — tyomaaId
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ tyomaaDateId, typeId, typeName, date, expirationDate, daysUntil, status, quantity }>
+
+ERRORS (stderr, exit non-zero)
+  400  Bad tyomaaId           → use a positive integer
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite dates list 99
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib worksite delete matches snapshot 1`] = `
 "USAGE
   ib worksite delete [flags]
@@ -2391,6 +2477,40 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib worksite helsinki-fetch matches snapshot 1`] = `
+"USAGE
+  ib worksite helsinki-fetch [flags]
+
+DESCRIPTION
+  Refresh Helsinki building data for a worksite (POST /api/tyomaa/helsinki/fetch/:id).
+  Permissions: requires auth.page.tyomaa.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --tyomaaId NUMBER    Positional — tyomaaId
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { success, ... } (raw backend response)
+
+ERRORS (stderr, exit non-zero)
+  400  Missing coordinates    → run refresh-location first
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite helsinki-fetch 99
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib worksite list matches snapshot 1`] = `
 "USAGE
   ib worksite list [flags]
@@ -2419,6 +2539,35 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib worksite list
   ib worksite list --customer 1349
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib worksite metrics matches snapshot 1`] = `
+"USAGE
+  ib worksite metrics [flags]
+
+DESCRIPTION
+  Volume / keikka-count metrics for a worksite (GET /api/cli/worksite/metrics/:tyomaaId).
+  Permissions: requires auth.page.tyomaa.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --tyomaaId NUMBER    Positional — tyomaaId
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { tyomaaId, summary:{...}, monthlyBreakdown:[...] }
+
+ERRORS (stderr, exit non-zero)
+  404  Worksite not found     → verify tyomaaId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite metrics 99
 "
 `;
 
@@ -2523,6 +2672,40 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib worksite refresh-location matches snapshot 1`] = `
+"USAGE
+  ib worksite refresh-location [flags]
+
+DESCRIPTION
+  Re-geocode a worksite from Google Maps (POST /api/tyomaa/refreshLocation/:id).
+  Permissions: requires auth.page.tyomaa.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --tyomaaId NUMBER    Positional — tyomaaId
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { success: true, tyomaa, message } (raw backend response)
+
+ERRORS (stderr, exit non-zero)
+  404  Worksite not found     → verify tyomaaId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite refresh-location 99 --reason "address corrected"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib worksite search matches snapshot 1`] = `
 "USAGE
   ib worksite search [flags]
@@ -2552,12 +2735,47 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib worksite set-geofence matches snapshot 1`] = `
+"USAGE
+  ib worksite set-geofence [flags]
+
+DESCRIPTION
+  Set a worksite geofence radius in metres (1-10000).
+  Permissions: requires auth.page.tyomaa.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --tyomaaId NUMBER    Positional — tyomaaId
+  --radius NUMBER    Geofence radius in metres (1-10000)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { success: true }
+
+ERRORS (stderr, exit non-zero)
+  400  Radius out of range    → use 1-10000
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.tyomaa.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib worksite set-geofence 99 --radius 300
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib worksite update matches snapshot 1`] = `
 "USAGE
   ib worksite update [flags]
 
 DESCRIPTION
-  Update a worksite via POST /api/tyomaa/set/:ownerAsiakasId/:tyomaaId/:yyyymmdd.
+  Update a worksite via POST /api/tyomaa/set (ownerAsiakasId derived from the session JWT; yyyymmdd defaults to today).
   Permissions: requires auth.page.tyomaa.edit.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
