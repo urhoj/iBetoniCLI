@@ -1677,17 +1677,53 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib sijainti closest matches snapshot 1`] = `
+"USAGE
+  ib sijainti closest [flags]
+
+DESCRIPTION
+  Find the closest sijainti of a given sijaintiTypeId to a worksite (tyomaa), by straight-line distance. asiakasId defaults to the active company.
+  Permissions: requires auth.page.sijainnit.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --tyomaa NUMBER    Target tyomaaId (REQUIRED)
+  --type NUMBER    sijaintiTypeId to search within (REQUIRED)
+  --asiakas NUMBER    Owner asiakasId (defaults to active company)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { closestSijainti: {...}|null, closestDistance: number|null }
+
+ERRORS (stderr, exit non-zero)
+  400  Invalid tyomaaId or missing coordinates → verify the worksite has lat/lng
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.sijainnit.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib sijainti closest --tyomaa 555 --type 1
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib sijainti create matches snapshot 1`] = `
 "USAGE
   ib sijainti create [flags]
 
 DESCRIPTION
-  Create a new sijainti via POST /api/geocode/sijainti/add. Body forwarded verbatim.
+  Create a new sijainti (POST /api/geocode/sijainti/add). Provide typed flags (--name/--address/--type/--lat/--lng) or --body JSON; typed flags win over --body.
   Permissions: requires auth.page.sijainnit.edit.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
-  --body JSON    JSON object with the new sijainti fields
+  --body JSON    JSON object with the new sijainti fields (optional if typed flags given)
+  --name STRING    sijaintiNimi
+  --address STRING    sijaintiOsoite1 (street)
+  --type NUMBER    sijaintiTypeId (see \`ib sijainti types\`)
+  --lat NUMBER    Latitude
+  --lng NUMBER    Longitude
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -1707,7 +1743,101 @@ ERRORS (stderr, exit non-zero)
   500  Backend error          → retry with --verbose
 
 EXAMPLES
-  ib sijainti create --body '{"name":"Depot A","address":"Industrial St 1","sijaintiTypeId":1}'
+  ib sijainti create --name "Depot A" --address "Industrial St 1" --type 1 --lat 60.17 --lng 24.94
+  ib sijainti create --body '{"sijaintiNimi":"Depot A","sijaintiTypeId":1}'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib sijainti delete matches snapshot 1`] = `
+"USAGE
+  ib sijainti delete [flags]
+
+DESCRIPTION
+  Soft-delete a sijainti (sets deletedTime). Requires --reason; --dry-run available.
+  Permissions: requires auth.page.sijainnit.delete.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { success: true }
+
+ERRORS (stderr, exit non-zero)
+  404  Sijainti not found     → verify sijaintiId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.sijainnit.delete
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib sijainti delete 42 --reason "decommissioned depot"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib sijainti distance matches snapshot 1`] = `
+"USAGE
+  ib sijainti distance [flags]
+
+DESCRIPTION
+  Driving distance and time between two points (Google Maps). Each endpoint is either 'lat,lng' or a sijaintiId (resolved to its coordinates). ownerAsiakasId is derived from the active company.
+  Permissions: requires auth.page.sijainnit.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --from STRING    Origin: 'lat,lng' or a sijaintiId (REQUIRED)
+  --to STRING    Destination: 'lat,lng' or a sijaintiId (REQUIRED)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { matkaM: number|null, matkaMin: number|null, from:{lat,lng}, to:{lat,lng} }
+
+ERRORS (stderr, exit non-zero)
+  400  Bad point or sijainti without coordinates → use 'lat,lng' or a sijaintiId that has coords
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.sijainnit.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib sijainti distance --from 7 --to 42
+  ib sijainti distance --from "60.17,24.94" --to 42
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib sijainti geocode matches snapshot 1`] = `
+"USAGE
+  ib sijainti geocode [flags]
+
+DESCRIPTION
+  Geocode a free-form address to coordinates via Google Maps. Useful before \`sijainti create\` to obtain lat/lng. ownerAsiakasId is derived from the token.
+  Permissions: requires auth.page.sijainnit.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --address STRING    Free-form address (REQUIRED)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { status, lat, lng, ... } (raw Google geocode result; { status: 'ZERO_RESULTS' } when no match)
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.sijainnit.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib sijainti geocode --address "Mannerheimintie 1, Helsinki"
 "
 `;
 
@@ -1752,6 +1882,8 @@ DESCRIPTION
 FLAGS
   --type NUMBER    Filter by sijaintiTypeId
   --limit NUMBER    Max rows (capped at 500) (default: 100)
+  --valid-at DATE    Only sijainnit valid on this date (startDate/endDate window)
+  --include-deleted BOOLEAN    Include soft-deleted sijainnit
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
@@ -1767,6 +1899,8 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib sijainti list
   ib sijainti list --type 1
+  ib sijainti list --valid-at today
+  ib sijainti list --include-deleted
 "
 `;
 
@@ -1809,17 +1943,86 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib sijainti types matches snapshot 1`] = `
+"USAGE
+  ib sijainti types [flags]
+
+DESCRIPTION
+  List sijainti type categories (the 'Sijainnin laji' lookup). Resolves the sijaintiTypeId values used by \`sijainti list --type\` and \`create/update --type\`.
+  Permissions: requires auth.page.sijainnit.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --jerry BOOLEAN    Use the BetoniJerry type set (useJerry=1)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ sijaintiTypeId, selite }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.sijainnit.read
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib sijainti types
+  ib sijainti types --jerry
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib sijainti undelete matches snapshot 1`] = `
+"USAGE
+  ib sijainti undelete [flags]
+
+DESCRIPTION
+  Restore a soft-deleted sijainti. Requires --reason.
+  Permissions: requires auth.page.sijainnit.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { success: true }
+
+ERRORS (stderr, exit non-zero)
+  404  Sijainti not found     → verify sijaintiId
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.sijainnit.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib sijainti undelete 42 --reason "restored after review"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib sijainti update matches snapshot 1`] = `
 "USAGE
   ib sijainti update [flags]
 
 DESCRIPTION
-  Update a sijainti via POST /api/geocode/updateSijainti. Body forwarded verbatim.
+  Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Provide typed flags or --body JSON; typed flags win over --body.
   Permissions: requires auth.page.sijainnit.edit.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
-  --body JSON    JSON object with the fields to update (must include sijaintiId)
+  --body JSON    JSON object with fields to update (optional if typed flags given)
+  --id NUMBER    Target sijaintiId (or include sijaintiId in --body)
+  --name STRING    sijaintiNimi
+  --address STRING    sijaintiOsoite1 (street)
+  --type NUMBER    sijaintiTypeId
+  --lat NUMBER    Latitude
+  --lng NUMBER    Longitude
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -1840,7 +2043,8 @@ ERRORS (stderr, exit non-zero)
   500  Backend error          → retry with --verbose
 
 EXAMPLES
-  ib sijainti update --body '{"sijaintiId":42,"name":"Renamed depot"}'
+  ib sijainti update --id 42 --name "Renamed depot"
+  ib sijainti update --body '{"sijaintiId":42,"sijaintiNimi":"Renamed depot"}'
 "
 `;
 
