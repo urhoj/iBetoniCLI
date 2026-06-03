@@ -32,14 +32,29 @@ export async function runCustomerList(
   );
 }
 
+/** The flat customer record returned by GET /api/cli/customer/get/:id (extended). */
+export interface CustomerFlat {
+  asiakasId: number;
+  name: string | null;
+  yTunnus: string | null;
+  type: number | null;
+  address: string | null;
+  city: string | null;
+  email: string | null;
+  phone: string | null;
+  contactPersonId: number | null;
+  shortName: string | null;
+  comment: string | null;
+}
+
 /**
  * GET /api/cli/customer/get/:asiakasId. Returns the flat backend record as-is.
  */
 export async function runCustomerGet(
   client: ApiClient,
   asiakasId: number
-): Promise<Record<string, unknown>> {
-  return client.get<Record<string, unknown>>(
+): Promise<CustomerFlat> {
+  return client.get<CustomerFlat>(
     `/api/cli/customer/get/${asiakasId}`
   );
 }
@@ -92,27 +107,43 @@ export const MODULE_FIELD_KEYS = [
 /** Every togglable field key: the 8 modules plus `pumppu` (isPumppuToimittaja). */
 export const ALL_FIELD_KEYS = ["pumppu", ...MODULE_FIELD_KEYS] as const;
 
+/** Friendly alias → canonical ASIAKAS_SETTING_TYPE_IDS key (the 8 the modules cmd exposes). */
+const SETTING_ALIASES: Record<string, string> = {
+  jerry: "HAS_JERRY",
+  henkilot: "HAS_HENKILOT",
+  sijainnit: "HAS_SIJAINNIT",
+  ajoneuvot: "HAS_AJONEUVOT",
+  tiedostot: "HAS_TIEDOSTOT",
+  weather: "HAS_WEATHER",
+  lomaseuranta: "LOMASEURANTA",
+  shareorders: "SHARE_ORDERS_WITH_BETONI",
+};
+
 /**
- * Map each module field key to its asiakasSettingTypeId, sourced at call time
- * from ASIAKAS_SETTING_TYPE_IDS in @ibetoni/constants (the single source of
- * truth). `pumppu` is intentionally absent — it is a roolit column, not a
- * setting.
+ * Build a lowercase-key → asiakasSettingTypeId map covering every canonical
+ * ASIAKAS_SETTING_TYPE_IDS name PLUS the 8 friendly aliases, sourced once
+ * (memoized) from @ibetoni/constants. `pumppu` is intentionally absent — it is
+ * a roolit column, handled separately. Replaces the old 8-key moduleKeyToTypeId().
+ * Memoized so validation (allSettingKeys) and the typeId lookup
+ * (applySettingWrites) provably share one source and skip the rebuild.
  */
-function moduleKeyToTypeId(): Record<string, number> {
+let _settingTypeIdMap: Record<string, number> | null = null;
+function settingTypeIdMap(): Record<string, number> {
+  if (_settingTypeIdMap) return _settingTypeIdMap;
   const constants = cjsRequire("@ibetoni/constants") as {
     ASIAKAS_SETTING_TYPE_IDS: Record<string, number>;
   };
   const ids = constants.ASIAKAS_SETTING_TYPE_IDS;
-  return {
-    jerry: ids.HAS_JERRY,
-    henkilot: ids.HAS_HENKILOT,
-    sijainnit: ids.HAS_SIJAINNIT,
-    ajoneuvot: ids.HAS_AJONEUVOT,
-    tiedostot: ids.HAS_TIEDOSTOT,
-    weather: ids.HAS_WEATHER,
-    lomaseuranta: ids.LOMASEURANTA,
-    shareorders: ids.SHARE_ORDERS_WITH_BETONI,
-  };
+  const map: Record<string, number> = {};
+  for (const [name, id] of Object.entries(ids)) map[name.toLowerCase()] = id;
+  for (const [alias, canonical] of Object.entries(SETTING_ALIASES)) map[alias] = ids[canonical];
+  _settingTypeIdMap = map;
+  return map;
+}
+
+/** Every valid settings key for --set/--unset: all canonical (lowercased) + aliases + pumppu. */
+function allSettingKeys(): Set<string> {
+  return new Set([...Object.keys(settingTypeIdMap()), "pumppu"]);
 }
 
 /**
@@ -150,11 +181,120 @@ export function parseModuleChanges(
   return changes;
 }
 
+/**
+ * Parse --set/--unset CSV lists into a desired-state map over the FULL setting
+ * surface (canonical names case-insensitive, the 8 aliases, and pumppu). Same
+ * validation contract as parseModuleChanges but a wider valid set.
+ */
+export function parseSettingChanges(
+  setCsv?: string,
+  unsetCsv?: string
+): Map<string, boolean> {
+  const changes = new Map<string, boolean>();
+  const valid = allSettingKeys();
+  const apply = (csv: string | undefined, value: boolean): void => {
+    if (!csv) return;
+    for (const raw of csv.split(",")) {
+      const key = raw.trim().toLowerCase();
+      if (!key) continue;
+      if (!valid.has(key)) {
+        throw new Error(`unknown field: ${key}. Valid: ${[...valid].sort().join(", ")}`);
+      }
+      if (changes.has(key) && changes.get(key) !== value) {
+        throw new Error(`field '${key}' given to both --set and --unset`);
+      }
+      changes.set(key, value);
+    }
+  };
+  apply(setCsv, true);
+  apply(unsetCsv, false);
+  if (changes.size === 0) throw new Error("no fields given — pass --set and/or --unset");
+  return changes;
+}
+
+/** Full settings report (roolit + all setting types by canonical name). */
+export interface CustomerSettingsState {
+  asiakasId: number;
+  roolit: AsiakasRoolit;
+  settings: Record<string, boolean>;
+}
+
+/** GET /api/cli/customer/settings/:asiakasId — admin-gated; returns the raw report. */
+export async function runCustomerSettingsReport(
+  client: ApiClient,
+  asiakasId: number
+): Promise<CustomerSettingsState> {
+  return client.get<CustomerSettingsState>(`/api/cli/customer/settings/${asiakasId}`);
+}
+
 /** Result of applying module/roolit changes: what was requested + final state. */
 export interface ModulesApplyResult {
   asiakasId: number;
   applied: { set: string[]; unset: string[]; dryRun: boolean };
   state: CustomerModulesState;
+}
+
+/**
+ * Shared write core for both module and settings applies: pumppu → setRoolit
+ * (echoing the other three roolit booleans from the modules report), the rest
+ * → one settings/save batch (self laskuttaja, upsert). Resolves typeIds via the
+ * full settingTypeIdMap so it accepts canonical names AND the 8 aliases.
+ */
+async function applySettingWrites(
+  client: ApiClient,
+  asiakasId: number,
+  changes: Map<string, boolean>,
+  flags: WriteFlags
+): Promise<void> {
+  const headers = writeFlagsToHeaders(flags);
+  if (changes.has("pumppu")) {
+    const current = await runCustomerModulesReport(client, asiakasId);
+    const r = current.roolit;
+    await client.post(
+      "/api/asiakas/setRoolit",
+      {
+        asiakasId,
+        isTyomaaAsiakas: r.isTyomaaAsiakas,
+        isPumppuToimittaja: changes.get("pumppu"),
+        isBetoniToimittaja: r.isBetoniToimittaja,
+        isLattiaToimittaja: r.isLattiaToimittaja,
+      },
+      { headers }
+    );
+  }
+  const typeIds = settingTypeIdMap();
+  const settings = [...changes.entries()]
+    .filter(([key]) => key !== "pumppu")
+    .map(([key, value]) => ({
+      asiakasSettingId: null,
+      asiakasId,
+      laskuttajaAsiakasId: asiakasId,
+      asiakasSettingTypeId: typeIds[key],
+      asiakasSettingBool: value,
+    }));
+  if (settings.length > 0) {
+    await client.post("/api/asiakas/settings/save", settings, { headers });
+  }
+}
+
+/** Apply changes and report the FULL settings state. */
+export async function runCustomerSettingsApply(
+  client: ApiClient,
+  asiakasId: number,
+  changes: Map<string, boolean>,
+  flags: WriteFlags
+): Promise<{ asiakasId: number; applied: { set: string[]; unset: string[]; dryRun: boolean }; state: CustomerSettingsState }> {
+  await applySettingWrites(client, asiakasId, changes, flags);
+  const state = await runCustomerSettingsReport(client, asiakasId);
+  return {
+    asiakasId,
+    applied: {
+      set: [...changes].filter(([, v]) => v).map(([k]) => k),
+      unset: [...changes].filter(([, v]) => !v).map(([k]) => k),
+      dryRun: !!flags.dryRun,
+    },
+    state,
+  };
 }
 
 /**
@@ -172,40 +312,7 @@ export async function runCustomerModulesApply(
   changes: Map<string, boolean>,
   flags: WriteFlags
 ): Promise<ModulesApplyResult> {
-  const headers = writeFlagsToHeaders(flags);
-
-  // Roolit preservation: setRoolit overwrites all four columns, so read the
-  // current quad first and echo back the three we are not changing.
-  if (changes.has("pumppu")) {
-    const current = await runCustomerModulesReport(client, asiakasId);
-    const r = current.roolit;
-    await client.post(
-      "/api/asiakas/setRoolit",
-      {
-        asiakasId,
-        isTyomaaAsiakas: r.isTyomaaAsiakas,
-        isPumppuToimittaja: changes.get("pumppu"),
-        isBetoniToimittaja: r.isBetoniToimittaja,
-        isLattiaToimittaja: r.isLattiaToimittaja,
-      },
-      { headers }
-    );
-  }
-
-  const typeIds = moduleKeyToTypeId();
-  const settings = [...changes.entries()]
-    .filter(([key]) => key !== "pumppu")
-    .map(([key, value]) => ({
-      asiakasSettingId: null,
-      asiakasId,
-      laskuttajaAsiakasId: asiakasId,
-      asiakasSettingTypeId: typeIds[key],
-      asiakasSettingBool: value,
-    }));
-  if (settings.length > 0) {
-    await client.post("/api/asiakas/settings/save", settings, { headers });
-  }
-
+  await applySettingWrites(client, asiakasId, changes, flags);
   const state = await runCustomerModulesReport(client, asiakasId);
   return {
     asiakasId,
@@ -374,6 +481,114 @@ export async function runCustomerPersonAdd(
   );
 }
 
+/** Flat PRH company shape (mirrors backend formatCompanyData). */
+export interface PrhCompany {
+  businessId: string | null;
+  name: string | null;
+  tradeNames: string[];
+  address: { street: string | null; postCode: string | null; city: string | null; full: string | null } | null;
+  companyForm: { type?: string; name?: string } | null;
+  status: string | null;
+}
+
+/**
+ * GET /api/prh/company/:businessId — single company from the Finnish business
+ * registry. Backend wraps as { success, data, timestamp }; unwrap `.data`.
+ * 404 (unknown Y-tunnus) → CliError exit 5; invalid format → exit 4.
+ */
+export async function runCustomerPrhById(
+  client: ApiClient,
+  ytunnus: string
+): Promise<PrhCompany> {
+  const res = await client.get<{ data: PrhCompany }>(
+    `/api/prh/company/${encodeURIComponent(ytunnus)}`
+  );
+  return res.data;
+}
+
+/**
+ * GET /api/prh/search/name?q=&page= — name search. Backend wraps as
+ * { success, data: { companies, totalResults, … }, timestamp }. Project the
+ * companies into the universal list envelope.
+ */
+export async function runCustomerPrhSearch(
+  client: ApiClient,
+  name: string,
+  page = 1
+): Promise<ListEnvelope<{ businessId: string | null; name: string | null; city: string | null }>> {
+  const qs = new URLSearchParams({ q: name, page: String(page) }).toString();
+  const res = await client.get<{ data: { companies: PrhCompany[] } }>(
+    `/api/prh/search/name?${qs}`
+  );
+  const companies = res.data?.companies ?? [];
+  return {
+    items: companies.map((c) => ({
+      businessId: c.businessId,
+      name: c.name,
+      city: c.address?.city ?? null,
+    })),
+    nextCursor: null,
+    count: companies.length,
+  };
+}
+
+interface RawChangeRow {
+  changeId: number;
+  fieldName?: string | null;
+  oldValue?: string | null;
+  newValue?: string | null;
+  changeType?: string | null;
+  personId?: number | null;
+  personFullName?: string | null;
+  timestamp?: string | null;
+  description?: string | null;
+}
+
+export interface CustomerHistoryItem {
+  changeId: number;
+  field: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  changeType: string | null;
+  personId: number | null;
+  personName: string | null;
+  at: string | null;
+  description: string | null;
+}
+
+/**
+ * GET /api/changes/asiakas/:asiakasId/:ownerAsiakasId — the change-tracker
+ * audit trail for one customer (the same log the CLI's --reason writes feed).
+ * Returns a RAW array (sendSuccess(changes), no .data wrapper). Owner resolved
+ * from the active company. Auth: company member or admin (BE-enforced).
+ */
+export async function runCustomerHistory(
+  client: ApiClient,
+  asiakasId: number,
+  limit: number
+): Promise<ListEnvelope<CustomerHistoryItem>> {
+  const owner = await resolveCurrentOwnerAsiakasId(client);
+  const rows = await client.get<RawChangeRow[]>(
+    `/api/changes/asiakas/${asiakasId}/${owner}?limit=${limit}`
+  );
+  const list = Array.isArray(rows) ? rows : [];
+  return {
+    items: list.map((r) => ({
+      changeId: r.changeId,
+      field: r.fieldName ?? null,
+      oldValue: r.oldValue ?? null,
+      newValue: r.newValue ?? null,
+      changeType: r.changeType ?? null,
+      personId: r.personId ?? null,
+      personName: r.personFullName ?? null,
+      at: r.timestamp ?? null,
+      description: r.description ?? null,
+    })),
+    nextCursor: null,
+    count: list.length,
+  };
+}
+
 /**
  * POST /api/asiakas/person/remove — detach a person from a customer.
  * Forwards the universal write-flag headers.
@@ -388,6 +603,108 @@ export async function runCustomerPersonRemove(
     body,
     { headers: writeFlagsToHeaders(flags) }
   );
+}
+
+/** Typed flags for `customer create` (createY's writable subset + escape hatch). */
+export interface CustomerCreateFlags {
+  name?: string;
+  ytunnus?: string;
+  email?: string;
+  shortName?: string;
+  fromPrh?: string;
+  body?: string;
+}
+
+/**
+ * Assemble the POST /api/asiakas/createY body from typed flags (+ optional PRH
+ * prefill). createY accepts only yTunnus(camelCase,REQUIRED) / email /
+ * asiakasNimi / asiakasShortNimi / ownerAsiakasId(REQUIRED); it ignores
+ * asiakasTypeId and cannot write billing address/city. Precedence (low→high):
+ * PRH prefill < explicit flags < raw --body.
+ */
+export function buildAsiakasCreateBody(
+  flags: CustomerCreateFlags,
+  ownerAsiakasId: number,
+  prh?: PrhCompany
+): Record<string, unknown> {
+  const body: Record<string, unknown> = { ownerAsiakasId };
+  if (prh) {
+    if (prh.name) body.asiakasNimi = prh.name;
+    if (prh.businessId) body.yTunnus = prh.businessId;
+  }
+  if (flags.name !== undefined) body.asiakasNimi = flags.name;
+  if (flags.ytunnus !== undefined) body.yTunnus = flags.ytunnus;
+  // createY's invoicing-email column is `email` (asiakasSql.createY → input("email", ...));
+  // setData/update uses `laskutusEmail` instead — the two endpoints differ by design.
+  if (flags.email !== undefined) body.email = flags.email;
+  if (flags.shortName !== undefined) body.asiakasShortNimi = flags.shortName;
+  if (flags.body) Object.assign(body, JSON.parse(flags.body));
+  return body;
+}
+
+/** Pull the new asiakasId out of createY's response (tolerant of legacy shapes). */
+export function extractAsiakasId(res: unknown): number | null {
+  const r = res as Record<string, unknown> | null;
+  if (!r || typeof r !== "object") return null;
+  const candidates = [
+    r.returnValue,
+    r.asiakasId,
+    (r.recordset as Array<Record<string, unknown>> | undefined)?.[0]?.asiakasId,
+    (r.data as Record<string, unknown> | undefined)?.returnValue,
+  ];
+  for (const c of candidates) {
+    const n = Number(c);
+    if (Number.isInteger(n) && n > 0) return n;
+  }
+  return null;
+}
+
+/** Typed flags for `customer update` (setData's writable subset + escape hatch). */
+export interface CustomerUpdateFlags {
+  name?: string;
+  ytunnus?: string;
+  email?: string;
+  shortName?: string;
+  comment?: string;
+  contactPerson?: number;
+  type?: number;
+  body?: string;
+}
+
+/**
+ * Read-merge-write: seed the full setData body from the CURRENT flat record so
+ * unspecified fields (notably asiakasContactPersonId, which setData overwrites
+ * unconditionally) are preserved, then overlay provided flags, then raw --body.
+ * Always sets saveGlobalAsiakas:true (else setData no-ops on the global row).
+ */
+export function buildAsiakasUpdateBody(
+  current: CustomerFlat,
+  flags: CustomerUpdateFlags
+): Record<string, unknown> {
+  // Seed every field setData writes from the current record (read-merge-write).
+  // Note: address/city/phone on CustomerFlat are intentionally NOT seeded —
+  // setData has no laskutusOsoite/laskutusKaupunki inputs, so they are read-only.
+  // asiakasTypeId ?? 1 mirrors setData's own `req.body.asiakasTypeId || 1` default;
+  // a real non-null type (incl. 0) is preserved.
+  const body: Record<string, unknown> = {
+    ytunnus: current.yTunnus ?? null,
+    asiakasNimi: current.name ?? null,
+    asiakasTypeId: current.type ?? 1,
+    laskutusEmail: current.email ?? null,
+    asiakasContactPersonId: current.contactPersonId ?? 0,
+    asiakasShortNimi: current.shortName ?? null,
+    kommentti: current.comment ?? null,
+    saveGlobalAsiakas: true,
+  };
+  if (flags.name !== undefined) body.asiakasNimi = flags.name;
+  if (flags.ytunnus !== undefined) body.ytunnus = flags.ytunnus;
+  if (flags.email !== undefined) body.laskutusEmail = flags.email;
+  if (flags.shortName !== undefined) body.asiakasShortNimi = flags.shortName;
+  if (flags.comment !== undefined) body.kommentti = flags.comment;
+  if (flags.contactPerson !== undefined) body.asiakasContactPersonId = flags.contactPerson;
+  if (flags.type !== undefined) body.asiakasTypeId = flags.type;
+  if (flags.body) Object.assign(body, JSON.parse(flags.body));
+  return body;
 }
 
 /**
@@ -526,6 +843,40 @@ export function registerCustomerCommands(
     }
   );
 
+  const settingsCmd = c
+    .command("settings <asiakasId>")
+    .description(
+      "Report or toggle ALL asiakasSettings (every canonical ASIAKAS_SETTING_TYPE_IDS name) + pumppu. No --set/--unset = read-only report. Names accept canonical settings (case-insensitive), the 8 module aliases, or pumppu."
+    )
+    .option("--set <keys>", "Comma-separated setting names to turn ON")
+    .option("--unset <keys>", "Comma-separated setting names to turn OFF");
+  addWriteFlagsToCommand(settingsCmd).action(
+    async (idStr: string, opts: WriteFlags & { set?: string; unset?: string }) => {
+      try {
+        const client = await getClient();
+        const asiakasId = Number(idStr);
+        if (!opts.set && !opts.unset) {
+          writeJson(await runCustomerSettingsReport(client, asiakasId));
+          return;
+        }
+        let changes: Map<string, boolean>;
+        try {
+          changes = parseSettingChanges(opts.set, opts.unset);
+        } catch (validationErr) {
+          writeError(validationErr);
+          process.exit(4);
+        }
+        writeJson(await runCustomerSettingsApply(client, asiakasId, changes, {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        }));
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
+
   c.command("search <query>")
     .description("Free-text search for customers")
     .action(async (query: string) => {
@@ -538,29 +889,72 @@ export function registerCustomerCommands(
       }
     });
 
-  const createCmd = c
-    .command("create")
-    .description("Create a new customer (POST /api/asiakas/createY)")
-    .requiredOption(
-      "--body <json>",
-      "JSON object forwarded verbatim as the request body"
-    );
-  addWriteFlagsToCommand(createCmd).action(
-    async (opts: {
-      body: string;
-      dryRun?: boolean;
-      idempotencyKey?: string;
-      reason?: string;
-    }) => {
+  c.command("prh [ytunnus]")
+    .description(
+      "Look up a company in the Finnish business registry (PRH). Positional <ytunnus> for an exact business-ID lookup, or --search <name>."
+    )
+    .option("--search <name>", "Search by company name instead of business ID")
+    .option("--page <n>", "Result page for --search (default 1)", (v: string) => Number(v), 1)
+    .action(async (ytunnus: string | undefined, opts: { search?: string; page: number }) => {
       try {
         const client = await getClient();
-        const parsed = JSON.parse(opts.body) as Record<string, unknown>;
-        const result = await runCustomerCreate(client, parsed, {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        });
-        writeJson(result);
+        if (opts.search) {
+          writeJson(await runCustomerPrhSearch(client, opts.search, opts.page));
+          return;
+        }
+        if (!ytunnus) {
+          writeError(new Error("provide a business-ID positional or --search <name>"));
+          process.exit(4);
+        }
+        writeJson(await runCustomerPrhById(client, ytunnus));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  c.command("history <asiakasId>")
+    .description("Change-tracker audit trail for one customer (who changed what, with --reason).")
+    .option("--limit <n>", "Max rows (default 100, cap 500)", (v: string) => Math.min(Number(v), 500), 100)
+    .action(async (idStr: string, opts: { limit: number }) => {
+      try {
+        const client = await getClient();
+        writeJson(await runCustomerHistory(client, Number(idStr), opts.limit));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  const createCmd = c
+    .command("create")
+    .description(
+      "Create a customer. Typed flags assemble the createY body (yTunnus required). --from-prh prefills name+yTunnus from the business registry. --body raw JSON overrides the typed flags."
+    )
+    .option("--name <s>", "Customer name (asiakasNimi)")
+    .option("--ytunnus <s>", "Business ID (yTunnus) — REQUIRED unless --from-prh/--body supplies it")
+    .option("--email <s>", "Invoicing email (laskutusEmail)")
+    .option("--short-name <s>", "Short display name (asiakasShortNimi)")
+    .option("--from-prh <ytunnus>", "Prefill name + yTunnus from PRH for this business ID")
+    .option("--body <json>", "Raw JSON body forwarded verbatim (overrides typed flags)");
+  addWriteFlagsToCommand(createCmd).action(
+    async (opts: CustomerCreateFlags & WriteFlags) => {
+      try {
+        const client = await getClient();
+        const ownerAsiakasId = await resolveCurrentOwnerAsiakasId(client);
+        const prh = opts.fromPrh
+          ? await runCustomerPrhById(client, opts.fromPrh)
+          : undefined;
+        const body = buildAsiakasCreateBody(opts, ownerAsiakasId, prh);
+        if (body.yTunnus === undefined || body.yTunnus === null || body.yTunnus === "") {
+          writeError(new Error("create requires --ytunnus (or --from-prh / --body with yTunnus)"));
+          process.exit(4);
+        }
+        const res = await runCustomerCreate(client, body, opts);
+        if (opts.dryRun) {
+          writeJson(res);
+          return;
+        }
+        const newId = extractAsiakasId(res);
+        writeJson(newId ? await runCustomerGet(client, newId) : res);
       } catch (e) {
         exitWithError(e);
       }
@@ -569,35 +963,30 @@ export function registerCustomerCommands(
 
   const updateCmd = c
     .command("update <asiakasId>")
-    .description("Update a customer (POST /api/asiakas/set/<asiakasId>)")
-    .requiredOption(
-      "--body <json>",
-      "JSON object forwarded verbatim as the request body"
-    );
+    .description(
+      "Update a customer. Reads the current record, overlays the provided flags (preserving everything else — no contact-person clobber), and writes back. --body raw JSON overrides flags."
+    )
+    .option("--name <s>", "Customer name (asiakasNimi)")
+    .option("--ytunnus <s>", "Business ID (ytunnus)")
+    .option("--email <s>", "Invoicing email (laskutusEmail)")
+    .option("--short-name <s>", "Short display name (asiakasShortNimi)")
+    .option("--comment <s>", "Comment (kommentti)")
+    .option("--contact-person <id>", "Contact person id (asiakasContactPersonId)", (v: string) => Number(v))
+    .option("--type <id>", "Customer type id (asiakasTypeId)", (v: string) => Number(v))
+    .option("--body <json>", "Raw JSON body forwarded verbatim (overrides typed flags)");
   addWriteFlagsToCommand(updateCmd).action(
-    async (
-      idStr: string,
-      opts: {
-        body: string;
-        dryRun?: boolean;
-        idempotencyKey?: string;
-        reason?: string;
-      }
-    ) => {
+    async (idStr: string, opts: CustomerUpdateFlags & WriteFlags) => {
       try {
         const client = await getClient();
-        const parsed = JSON.parse(opts.body) as Record<string, unknown>;
-        const result = await runCustomerUpdate(
-          client,
-          Number(idStr),
-          parsed,
-          {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          }
-        );
-        writeJson(result);
+        const asiakasId = Number(idStr);
+        const current = await runCustomerGet(client, asiakasId);
+        const body = buildAsiakasUpdateBody(current, opts);
+        const res = await runCustomerUpdate(client, asiakasId, body, opts);
+        if (opts.dryRun) {
+          writeJson(res);
+          return;
+        }
+        writeJson(await runCustomerGet(client, asiakasId));
       } catch (e) {
         exitWithError(e);
       }
@@ -615,7 +1004,7 @@ export function registerCustomerCommands(
     }
     try {
       const client = await getClient();
-      const ownerAsiakasId = await resolveOwnerAsiakasIdForWrite(client);
+      const ownerAsiakasId = await resolveCurrentOwnerAsiakasId(client);
       const result = await runCustomerDelete(client, Number(asiakasIdStr), ownerAsiakasId, opts);
       writeJson(result);
     } catch (e) {
@@ -694,10 +1083,10 @@ export function registerCustomerCommands(
 
 /**
  * Resolve the caller's current `ownerAsiakasId` via the existing
- * `/api/company-selection/available` route, used by every customer-write
- * subcommand that needs a tenant-owner segment in its URL.
+ * `/api/company-selection/available` route. Used by every customer command
+ * that needs the active tenant id (create body, history path, delete URL).
  */
-async function resolveOwnerAsiakasIdForWrite(client: ApiClient): Promise<number> {
+async function resolveCurrentOwnerAsiakasId(client: ApiClient): Promise<number> {
   const available = await client.get<{ currentCompanyId: number }>(
     "/api/company-selection/available"
   );
