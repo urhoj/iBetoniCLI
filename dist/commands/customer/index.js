@@ -177,19 +177,28 @@ async function applySettingWrites(client, asiakasId, changes, flags) {
         await client.post("/api/asiakas/settings/save", settings, { headers });
     }
 }
-/** Apply changes and report the FULL settings state. */
+/**
+ * Summarise a change-map as the `{ set, unset, dryRun }` shape shared by the
+ * modules and settings apply results.
+ */
+function appliedFromChanges(changes, flags) {
+    return {
+        set: [...changes].filter(([, v]) => v).map(([k]) => k),
+        unset: [...changes].filter(([, v]) => !v).map(([k]) => k),
+        dryRun: !!flags.dryRun,
+    };
+}
+/**
+ * Apply setting/roolit changes, then re-fetch and return the FULL settings state
+ * (roolit + every canonical ASIAKAS_SETTING_TYPE_IDS). Writes are delegated to
+ * applySettingWrites; the returned `state` is the post-write settings report —
+ * with --dry-run the write is skipped server-side, so the report reflects the
+ * unchanged current state.
+ */
 export async function runCustomerSettingsApply(client, asiakasId, changes, flags) {
     await applySettingWrites(client, asiakasId, changes, flags);
     const state = await runCustomerSettingsReport(client, asiakasId);
-    return {
-        asiakasId,
-        applied: {
-            set: [...changes].filter(([, v]) => v).map(([k]) => k),
-            unset: [...changes].filter(([, v]) => !v).map(([k]) => k),
-            dryRun: !!flags.dryRun,
-        },
-        state,
-    };
+    return { asiakasId, applied: appliedFromChanges(changes, flags), state };
 }
 /**
  * Apply a desired-state map to one customer. `pumppu` routes to
@@ -203,15 +212,7 @@ export async function runCustomerSettingsApply(client, asiakasId, changes, flags
 export async function runCustomerModulesApply(client, asiakasId, changes, flags) {
     await applySettingWrites(client, asiakasId, changes, flags);
     const state = await runCustomerModulesReport(client, asiakasId);
-    return {
-        asiakasId,
-        applied: {
-            set: [...changes].filter(([, v]) => v).map(([k]) => k),
-            unset: [...changes].filter(([, v]) => !v).map(([k]) => k),
-            dryRun: !!flags.dryRun,
-        },
-        state,
-    };
+    return { asiakasId, applied: appliedFromChanges(changes, flags), state };
 }
 /**
  * Build the operator-preset desired-state map: every one of the 9 fields set
@@ -451,15 +452,22 @@ export function buildAsiakasUpdateBody(current, flags) {
 }
 /**
  * Register `ib customer` subcommands on the parent commander instance:
- *   - list    filterable by --limit/--cursor
- *   - get     single asiakas by id
- *   - search  free-text search (existing /api/asiakas/search route)
- *   - create  POST /api/asiakas/createY with --body JSON (write flags)
- *   - update  POST /api/asiakas/set/<asiakasId> with --body JSON (write flags)
+ *   - list      filterable by --limit/--cursor
+ *   - get       single asiakas by id (flat shape incl. contactPersonId/shortName/comment)
+ *   - search    free-text search (existing /api/asiakas/search route)
+ *   - prh       Finnish business-registry lookup (by Y-tunnus or --search name)
+ *   - create    typed flags assemble the createY body; --from-prh prefills; --body overrides (write flags)
+ *   - update    read-merge-write via typed flags; --body overrides (write flags)
+ *   - delete    DELETE /api/asiakas/delete/<id>/<owner> (requires --reason)
+ *   - history   change-tracker audit trail for one customer
+ *   - modules   report/toggle roolit + the 8 module flags (admin-gated; write flags)
+ *   - operator  verify/provision all 9 operator flags at once (admin-gated; write flags)
+ *   - settings  report/toggle ALL asiakasSettings + pumppu (admin-gated; write flags)
+ *   - person add / remove / list   manage persons attached to a customer
  *
  * All mutation subcommands accept --dry-run / --idempotency-key / --reason.
  *
- * Exit codes: 1 = generic API/runtime failure.
+ * Exit codes: 2 = auth · 3 = permission · 4 = validation · 5 = not-found.
  */
 export function registerCustomerCommands(parent, getClient) {
     const c = parent.command("customer").description("Customer commands");

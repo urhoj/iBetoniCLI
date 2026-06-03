@@ -298,7 +298,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  { asiakasId, name, yTunnus, type, address, city, email, phone }
+  { asiakasId, name, yTunnus, type, address, city, email, phone, contactPersonId, shortName, comment }
 
 ERRORS (stderr, exit non-zero)
   404  Customer not found     → verify asiakasId

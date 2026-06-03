@@ -227,12 +227,15 @@ export async function runCustomerSettingsReport(
   return client.get<CustomerSettingsState>(`/api/cli/customer/settings/${asiakasId}`);
 }
 
-/** Result of applying module/roolit changes: what was requested + final state. */
-export interface ModulesApplyResult {
+/** What an apply requested + the resulting state. `S` = the report shape re-fetched after the write. */
+export interface ApplyResult<S> {
   asiakasId: number;
   applied: { set: string[]; unset: string[]; dryRun: boolean };
-  state: CustomerModulesState;
+  state: S;
 }
+
+/** Result of applying module/roolit changes: what was requested + final modules state. */
+export type ModulesApplyResult = ApplyResult<CustomerModulesState>;
 
 /**
  * Shared write core for both module and settings applies: pumppu → setRoolit
@@ -277,24 +280,37 @@ async function applySettingWrites(
   }
 }
 
-/** Apply changes and report the FULL settings state. */
+/**
+ * Summarise a change-map as the `{ set, unset, dryRun }` shape shared by the
+ * modules and settings apply results.
+ */
+function appliedFromChanges(
+  changes: Map<string, boolean>,
+  flags: WriteFlags
+): { set: string[]; unset: string[]; dryRun: boolean } {
+  return {
+    set: [...changes].filter(([, v]) => v).map(([k]) => k),
+    unset: [...changes].filter(([, v]) => !v).map(([k]) => k),
+    dryRun: !!flags.dryRun,
+  };
+}
+
+/**
+ * Apply setting/roolit changes, then re-fetch and return the FULL settings state
+ * (roolit + every canonical ASIAKAS_SETTING_TYPE_IDS). Writes are delegated to
+ * applySettingWrites; the returned `state` is the post-write settings report —
+ * with --dry-run the write is skipped server-side, so the report reflects the
+ * unchanged current state.
+ */
 export async function runCustomerSettingsApply(
   client: ApiClient,
   asiakasId: number,
   changes: Map<string, boolean>,
   flags: WriteFlags
-): Promise<{ asiakasId: number; applied: { set: string[]; unset: string[]; dryRun: boolean }; state: CustomerSettingsState }> {
+): Promise<ApplyResult<CustomerSettingsState>> {
   await applySettingWrites(client, asiakasId, changes, flags);
   const state = await runCustomerSettingsReport(client, asiakasId);
-  return {
-    asiakasId,
-    applied: {
-      set: [...changes].filter(([, v]) => v).map(([k]) => k),
-      unset: [...changes].filter(([, v]) => !v).map(([k]) => k),
-      dryRun: !!flags.dryRun,
-    },
-    state,
-  };
+  return { asiakasId, applied: appliedFromChanges(changes, flags), state };
 }
 
 /**
@@ -314,15 +330,7 @@ export async function runCustomerModulesApply(
 ): Promise<ModulesApplyResult> {
   await applySettingWrites(client, asiakasId, changes, flags);
   const state = await runCustomerModulesReport(client, asiakasId);
-  return {
-    asiakasId,
-    applied: {
-      set: [...changes].filter(([, v]) => v).map(([k]) => k),
-      unset: [...changes].filter(([, v]) => !v).map(([k]) => k),
-      dryRun: !!flags.dryRun,
-    },
-    state,
-  };
+  return { asiakasId, applied: appliedFromChanges(changes, flags), state };
 }
 
 /**
@@ -709,15 +717,22 @@ export function buildAsiakasUpdateBody(
 
 /**
  * Register `ib customer` subcommands on the parent commander instance:
- *   - list    filterable by --limit/--cursor
- *   - get     single asiakas by id
- *   - search  free-text search (existing /api/asiakas/search route)
- *   - create  POST /api/asiakas/createY with --body JSON (write flags)
- *   - update  POST /api/asiakas/set/<asiakasId> with --body JSON (write flags)
+ *   - list      filterable by --limit/--cursor
+ *   - get       single asiakas by id (flat shape incl. contactPersonId/shortName/comment)
+ *   - search    free-text search (existing /api/asiakas/search route)
+ *   - prh       Finnish business-registry lookup (by Y-tunnus or --search name)
+ *   - create    typed flags assemble the createY body; --from-prh prefills; --body overrides (write flags)
+ *   - update    read-merge-write via typed flags; --body overrides (write flags)
+ *   - delete    DELETE /api/asiakas/delete/<id>/<owner> (requires --reason)
+ *   - history   change-tracker audit trail for one customer
+ *   - modules   report/toggle roolit + the 8 module flags (admin-gated; write flags)
+ *   - operator  verify/provision all 9 operator flags at once (admin-gated; write flags)
+ *   - settings  report/toggle ALL asiakasSettings + pumppu (admin-gated; write flags)
+ *   - person add / remove / list   manage persons attached to a customer
  *
  * All mutation subcommands accept --dry-run / --idempotency-key / --reason.
  *
- * Exit codes: 1 = generic API/runtime failure.
+ * Exit codes: 2 = auth · 3 = permission · 4 = validation · 5 = not-found.
  */
 export function registerCustomerCommands(
   parent: Command,
