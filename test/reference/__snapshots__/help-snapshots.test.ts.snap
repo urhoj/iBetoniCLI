@@ -437,7 +437,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  { added: { asiakasId, personId } } or write-success envelope
+  { added: { asiakasId, personId } } or { dryRun: true, wouldCreate: { asiakasId, personId, contactPersonTypeId } }
 
 ERRORS (stderr, exit non-zero)
   400  Company limit (26) reached → remove an existing link first
@@ -504,7 +504,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  { removed: { asiakasId, personId } }
+  { removed: { asiakasId, personId } } or { dryRun: true, wouldDelete: { asiakasId, personId } }
 
 ERRORS (stderr, exit non-zero)
   404  Link not found         → verify asiakasId+personId combination
@@ -1246,7 +1246,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  { deleted: number }
+  { deleted: number } or { dryRun: true, wouldDelete: { personId } }
 
 ERRORS (stderr, exit non-zero)
   404  Person not found       → verify personId
@@ -1500,7 +1500,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  { ok: true, updated: { personId } }
+  { ok: true, updated: { personId } } or { dryRun: true, wouldUpdate: { personId, ... } }
 
 ERRORS (stderr, exit non-zero)
   404  Person not found       → verify personId
@@ -2797,7 +2797,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  { deleted: number }
+  { deleted: number } or { dryRun: true, wouldDelete: { tyomaaId } }
 
 ERRORS (stderr, exit non-zero)
   404  Worksite not found     → verify tyomaaId
@@ -2957,7 +2957,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  { added: { tyomaaId, personId } }
+  { added: { tyomaaId, personId } } or { dryRun: true, wouldCreate: { tyomaaId, personId, contactPersonTypeId } }
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
@@ -3021,7 +3021,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  { removed: { tyomaaId, personId } }
+  { removed: { tyomaaId, personId } } or { dryRun: true, wouldDelete: { tyomaaId, personId } }
 
 ERRORS (stderr, exit non-zero)
   404  Link not found         → verify tyomaaId+personId combination

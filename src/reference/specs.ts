@@ -1401,7 +1401,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
     ],
     writeFlags: true,
-    outputShape: "{ added: { asiakasId, personId } } or write-success envelope",
+    outputShape: "{ added: { asiakasId, personId } } or { dryRun: true, wouldCreate: { asiakasId, personId, contactPersonTypeId } }",
     errors: [
       { code: 400, meaning: "Company limit (26) reached", remedy: "remove an existing link first" },
       ...permErrors("auth.page.asiakas.edit"),
@@ -1419,7 +1419,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
     ],
     writeFlags: true,
-    outputShape: "{ removed: { asiakasId, personId } }",
+    outputShape: "{ removed: { asiakasId, personId } } or { dryRun: true, wouldDelete: { asiakasId, personId } }",
     errors: [
       { code: 404, meaning: "Link not found", remedy: "verify asiakasId+personId combination" },
       ...permErrors("auth.page.asiakas.edit"),
@@ -1448,7 +1448,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
     ],
     writeFlags: true,
-    outputShape: "{ deleted: number }",
+    outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: { tyomaaId } }",
     errors: [
       { code: 404, meaning: "Worksite not found", remedy: "verify tyomaaId" },
       ...permErrors("auth.page.tyomaa.edit"),
@@ -1508,7 +1508,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
     ],
     writeFlags: true,
-    outputShape: "{ added: { tyomaaId, personId } }",
+    outputShape: "{ added: { tyomaaId, personId } } or { dryRun: true, wouldCreate: { tyomaaId, personId, contactPersonTypeId } }",
     errors: permErrors("auth.page.tyomaa.edit"),
     examples: ['ib worksite person add --worksite 99 --person 5351 --reason "assign foreman"'],
   },
@@ -1523,7 +1523,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
     ],
     writeFlags: true,
-    outputShape: "{ removed: { tyomaaId, personId } }",
+    outputShape: "{ removed: { tyomaaId, personId } } or { dryRun: true, wouldDelete: { tyomaaId, personId } }",
     errors: [
       { code: 404, meaning: "Link not found", remedy: "verify tyomaaId+personId combination" },
       ...permErrors("auth.page.tyomaa.edit"),
@@ -1566,7 +1566,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
     ],
     writeFlags: true,
-    outputShape: "{ ok: true, updated: { personId } }",
+    outputShape: "{ ok: true, updated: { personId } } or { dryRun: true, wouldUpdate: { personId, ... } }",
     errors: [
       { code: 404, meaning: "Person not found", remedy: "verify personId" },
       ...permErrors("auth.page.person.edit"),
@@ -1581,7 +1581,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
     ],
     writeFlags: true,
-    outputShape: "{ deleted: number }",
+    outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: { personId } }",
     errors: [
       { code: 404, meaning: "Person not found", remedy: "verify personId" },
       ...permErrors("auth.page.person.edit"),
