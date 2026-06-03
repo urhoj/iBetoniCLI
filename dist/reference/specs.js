@@ -631,10 +631,10 @@ export const COMMAND_SPECS = [
                 description: "JSON object with the fields to update",
             },
             {
-                name: "date",
+                name: "yyyymmdd",
                 type: "date",
                 default: "today",
-                description: "Effective date (YYYYMMDD; today by default)",
+                description: "Effective date segment YYYYMMDD (defaults to today)",
             },
         ],
         writeFlags: true,

@@ -3256,7 +3256,7 @@ DESCRIPTION
 FLAGS
   --tyomaaId NUMBER    Positional — tyomaaId to update
   --body JSON    JSON object with the fields to update
-  --date DATE    Effective date (YYYYMMDD; today by default) (default: today)
+  --yyyymmdd DATE    Effective date segment YYYYMMDD (defaults to today) (default: today)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
