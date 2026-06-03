@@ -65,7 +65,7 @@ export async function runKeikkaDriversAssign(client, keikkaId, flags) {
 }
 /**
  * Register `ib keikka` subcommands on the parent commander instance:
- *   - list     filterable by --from/--to/--customer/--vehicle/--status/--limit/--cursor
+ *   - list     filterable by --from/--to/--customer/--vehicle/--worksite/--status/--limit/--cursor
  *   - get      single keikka by id
  *   - create   POST /api/keikka/newKeikka with --body JSON (write flags)
  *   - update   POST /api/keikka/setStatus (v1.0: --status only)

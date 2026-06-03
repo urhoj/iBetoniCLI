@@ -100,7 +100,8 @@ function todayYyyymmdd(): string {
  * Body shape pitfall verified by the lifecycle smoke
  * (`puminet5api/utils/test/test-cli-lifecycle.js`):
  *   - The handler runs `validateRequiredFields(body, ["tyomaaId", "ownerAsiakasId"])`,
- *     so both ids must be in the BODY too even though they're already in the URL.
+ *     so both ids must be present in the BODY (not just the URL). We inject them
+ *     from `opts` so callers only need to put the fields-to-update in `--body`.
  */
 export async function runWorksiteUpdate(
   client: ApiClient,
@@ -109,9 +110,17 @@ export async function runWorksiteUpdate(
   flags: WriteFlags
 ): Promise<unknown> {
   const yyyymmdd = opts.yyyymmdd || todayYyyymmdd();
+  // Inject the backend-required ids; the URL/derived ids are authoritative
+  // (they override anything in --body), so the caller's body need only carry
+  // the fields to change.
+  const fullBody = {
+    ...body,
+    tyomaaId: opts.tyomaaId,
+    ownerAsiakasId: opts.ownerAsiakasId,
+  };
   return client.post<unknown>(
     `/api/tyomaa/set/${opts.ownerAsiakasId}/${opts.tyomaaId}/${yyyymmdd}`,
-    body,
+    fullBody,
     { headers: writeFlagsToHeaders(flags) }
   );
 }
@@ -290,11 +299,19 @@ export async function runWorksitePersonList(
 
 /**
  * Register `ib worksite` subcommands on the parent commander instance:
- *   - list    filterable by --limit/--cursor
- *   - get     single tyomaa by id
- *   - search  free-text search (existing POST /api/tyomaa/search route)
- *   - create  POST /api/tyomaa/new with --body JSON (write flags)
- *   - update  POST /api/tyomaa/set/<ownerAsiakasId>/<tyomaaId>/<yyyymmdd>
+ *   - list            filterable by --limit/--cursor
+ *   - get             single tyomaa by id
+ *   - metrics         GET /api/cli/worksite/metrics/:id (volume/keikka counts)
+ *   - dates list      GET /api/cli/worksite/dates/:id (compliance dates, read-only)
+ *   - dates expiring  GET /api/cli/worksite/dates/expiring?days=N (read-only)
+ *   - search          free-text search (existing POST /api/tyomaa/search route)
+ *   - create          POST /api/tyomaa/new with --body JSON (write flags)
+ *   - update          POST /api/tyomaa/set/<ownerAsiakasId>/<tyomaaId>/<yyyymmdd>
+ *   - delete          DELETE /api/tyomaa/delete/:id (write flags, --reason)
+ *   - refresh-location POST /api/tyomaa/refreshLocation/:id (write flags)
+ *   - set-geofence    POST /api/tyomaa/:id/geofence-radius (write flags)
+ *   - helsinki-fetch  POST /api/tyomaa/helsinki/fetch/:id (write flags)
+ *   - person add/remove/list  tyomaaPerson link management
  *
  * The `update` action derives ownerAsiakasId from the session JWT via
  * `resolveOwnerAsiakasId` — no --owner-asiakas-id flag required.

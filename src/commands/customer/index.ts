@@ -711,6 +711,7 @@ export function buildAsiakasUpdateBody(
  * Register `ib customer` subcommands on the parent commander instance:
  *   - list    filterable by --limit/--cursor
  *   - get     single asiakas by id
+ *   - worksites  GET /api/tyomaa/asiakasTyomaaList/:asiakasId (customer's worksites)
  *   - search  free-text search (existing /api/asiakas/search route)
  *   - create  POST /api/asiakas/createY with --body JSON (write flags)
  *   - update  POST /api/asiakas/set/<asiakasId> with --body JSON (write flags)
