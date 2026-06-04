@@ -552,7 +552,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "limit", type: "number", default: "100", description: "Max rows (cap 500)" },
     ],
     outputShape:
-      "ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description }>",
+      "ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>",
     errors: permErrors("auth.page.asiakas.read"),
     examples: ["ib customer history 26", "ib customer history 26 --limit 20"],
   },

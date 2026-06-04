@@ -211,6 +211,13 @@ describe("ib sijainti closest", () => {
       "/api/geocode/sijainti/getClosestAsiakasSijaintiForTyomaa/555/0/1/1349"
     );
   });
+
+  test("throws a clear error when the active company can't be resolved (--asiakas omitted)", async () => {
+    get.mockResolvedValueOnce({ currentCompanyId: undefined }); // backend: token lacks ownerAsiakasId
+    await expect(
+      runSijaintiClosest(mockClient, { tyomaaId: 555, sijaintiTypeId: 1 })
+    ).rejects.toThrow(/active company/);
+  });
 });
 
 describe("ib sijainti distance", () => {
@@ -248,5 +255,12 @@ describe("ib sijainti distance", () => {
       "/api/geocode/getDrivingDistance/60.17/24.94/60/24/26"
     );
     expect((result as { matkaM: number }).matkaM).toBe(500);
+  });
+
+  test("rejects a trailing-comma coord token instead of treating it as lng=0", async () => {
+    await expect(
+      runSijaintiDistance(mockClient, "60.17,", "1,2")
+    ).rejects.toThrow(/invalid point/);
+    expect(get).not.toHaveBeenCalled();
   });
 });

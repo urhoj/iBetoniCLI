@@ -34,6 +34,16 @@ describe("buildAsiakasCreateBody", () => {
     expect(body.asiakasNimi).toBe("Body Name");
     expect(body.ownerAsiakasId).toBe(1349);
   });
+
+  test("does not prefill the 'Unknown' PRH name sentinel as asiakasNimi", () => {
+    const prh = {
+      businessId: "0145937-9", name: "Unknown", tradeNames: [], address: null,
+      companyForm: null, status: "active",
+    };
+    const body = buildAsiakasCreateBody({}, 1349, prh);
+    expect(body.yTunnus).toBe("0145937-9");
+    expect("asiakasNimi" in body).toBe(false);
+  });
 });
 
 describe("extractAsiakasId", () => {

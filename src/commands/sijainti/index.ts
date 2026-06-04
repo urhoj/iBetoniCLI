@@ -218,9 +218,19 @@ export async function runSijaintiGeocode(
  * legacy geocode routes still take asiakasId as a URL positional.
  */
 async function resolveOwnerAsiakasId(client: ApiClient): Promise<number> {
-  const available = await client.get<{ currentCompanyId: number }>(
+  const available = await client.get<{ currentCompanyId?: number }>(
     "/api/company-selection/available"
   );
+  // Guard the falsy case: the backend derives currentCompanyId from the token's
+  // ownerAsiakasId and returns undefined when it is absent. Without this, the
+  // value would interpolate into the closest/distance URL as the string
+  // "undefined" (→ NaN server-side) and silently return zero results instead of
+  // a clear error.
+  if (typeof available.currentCompanyId !== "number" || available.currentCompanyId <= 0) {
+    throw new Error(
+      "could not resolve active company — run `ib auth switch` or pass --asiakas"
+    );
+  }
   return available.currentCompanyId;
 }
 
@@ -258,8 +268,15 @@ export async function runSijaintiClosest(
 
 /** Parse a "lat,lng" token into coordinates, or null if it is not that shape. */
 function parseCoordToken(token: string): { lat: number; lng: number } | null {
-  if (!token.includes(",")) return null;
-  const [a, b] = token.split(",").map((x) => Number(x.trim()));
+  // Require exactly two non-empty parts so a truncated token like "60.17," is
+  // rejected (Number("") is 0, which would otherwise pass as lng=0) and a
+  // malformed "60,24,5" doesn't silently drop its tail.
+  const parts = token.split(",");
+  if (parts.length !== 2) return null;
+  const [rawA, rawB] = parts.map((x) => x.trim());
+  if (!rawA || !rawB) return null;
+  const a = Number(rawA);
+  const b = Number(rawB);
   if (Number.isFinite(a) && Number.isFinite(b)) return { lat: a, lng: b };
   return null;
 }

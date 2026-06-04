@@ -328,7 +328,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description }>
+  ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh

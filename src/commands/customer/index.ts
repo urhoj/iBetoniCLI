@@ -550,6 +550,7 @@ interface RawChangeRow {
   personFullName?: string | null;
   timestamp?: string | null;
   description?: string | null;
+  reason?: string | null;
 }
 
 export interface CustomerHistoryItem {
@@ -562,6 +563,7 @@ export interface CustomerHistoryItem {
   personName: string | null;
   at: string | null;
   description: string | null;
+  reason: string | null;
 }
 
 /**
@@ -591,6 +593,7 @@ export async function runCustomerHistory(
       personName: r.personFullName ?? null,
       at: r.timestamp ?? null,
       description: r.description ?? null,
+      reason: r.reason ?? null,
     })),
     nextCursor: null,
     count: list.length,
@@ -637,7 +640,9 @@ export function buildAsiakasCreateBody(
 ): Record<string, unknown> {
   const body: Record<string, unknown> = { ownerAsiakasId };
   if (prh) {
-    if (prh.name) body.asiakasNimi = prh.name;
+    // "Unknown" is prhService's sentinel for a company with no registered
+    // primary name — don't persist it as the customer name (explicit --name wins).
+    if (prh.name && prh.name !== "Unknown") body.asiakasNimi = prh.name;
     if (prh.businessId) body.yTunnus = prh.businessId;
   }
   if (flags.name !== undefined) body.asiakasNimi = flags.name;
@@ -719,6 +724,7 @@ export function buildAsiakasUpdateBody(
  * Register `ib customer` subcommands on the parent commander instance:
  *   - list      filterable by --limit/--cursor
  *   - get       single asiakas by id (flat shape incl. contactPersonId/shortName/comment)
+ *   - worksites the customer's worksites (GET /api/tyomaa/asiakasTyomaaList/:asiakasId)
  *   - search    free-text search (existing /api/asiakas/search route)
  *   - prh       Finnish business-registry lookup (by Y-tunnus or --search name)
  *   - create    typed flags assemble the createY body; --from-prh prefills; --body overrides (write flags)

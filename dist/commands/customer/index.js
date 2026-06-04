@@ -351,6 +351,7 @@ export async function runCustomerHistory(client, asiakasId, limit) {
             personName: r.personFullName ?? null,
             at: r.timestamp ?? null,
             description: r.description ?? null,
+            reason: r.reason ?? null,
         })),
         nextCursor: null,
         count: list.length,
@@ -373,7 +374,9 @@ export async function runCustomerPersonRemove(client, body, flags) {
 export function buildAsiakasCreateBody(flags, ownerAsiakasId, prh) {
     const body = { ownerAsiakasId };
     if (prh) {
-        if (prh.name)
+        // "Unknown" is prhService's sentinel for a company with no registered
+        // primary name — don't persist it as the customer name (explicit --name wins).
+        if (prh.name && prh.name !== "Unknown")
             body.asiakasNimi = prh.name;
         if (prh.businessId)
             body.yTunnus = prh.businessId;
@@ -454,6 +457,7 @@ export function buildAsiakasUpdateBody(current, flags) {
  * Register `ib customer` subcommands on the parent commander instance:
  *   - list      filterable by --limit/--cursor
  *   - get       single asiakas by id (flat shape incl. contactPersonId/shortName/comment)
+ *   - worksites the customer's worksites (GET /api/tyomaa/asiakasTyomaaList/:asiakasId)
  *   - search    free-text search (existing /api/asiakas/search route)
  *   - prh       Finnish business-registry lookup (by Y-tunnus or --search name)
  *   - create    typed flags assemble the createY body; --from-prh prefills; --body overrides (write flags)

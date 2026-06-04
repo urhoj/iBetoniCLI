@@ -18,6 +18,7 @@ describe("runCustomerHistory", () => {
           changeId: 11, fieldName: "asiakasNimi", oldValue: "A", newValue: "B",
           changeType: "info_change", personId: 6233, personFullName: "Matti M",
           timestamp: "2026-06-01T10:00:00.000Z", description: "Nimi: A → B",
+          reason: "asiakas request",
         },
       ]);
     const result = await runCustomerHistory(mockClient, 26, 50);
@@ -29,6 +30,7 @@ describe("runCustomerHistory", () => {
           changeId: 11, field: "asiakasNimi", oldValue: "A", newValue: "B",
           changeType: "info_change", personId: 6233, personName: "Matti M",
           at: "2026-06-01T10:00:00.000Z", description: "Nimi: A → B",
+          reason: "asiakas request",
         },
       ],
       nextCursor: null,

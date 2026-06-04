@@ -59,9 +59,11 @@ describe("ib worksite create/update", () => {
       body,
       { reason: "naming cleanup" }
     );
+    // tyomaaId + ownerAsiakasId are injected so callers only put the
+    // fields-to-update in --body (backend validateRequiredFields needs them).
     expect(mockClient.post).toHaveBeenLastCalledWith(
       "/api/tyomaa/set/1349/5151/20260615",
-      body,
+      { tyomaaNimi: "Helsinki Site A — renamed", tyomaaId: 5151, ownerAsiakasId: 1349 },
       { headers: { "X-Action-Reason": "naming cleanup" } }
     );
 
