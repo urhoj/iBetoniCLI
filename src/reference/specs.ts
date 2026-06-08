@@ -322,21 +322,21 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib customer list",
     description:
-      "List customers (asiakkaat) visible to the active company. ownerAsiakasId derived from JWT. --full returns every flat-customer field + the jerry companyDescription in one call (diff a whole tenant without N×`customer get`); --ids 1,2,3 restricts to specific asiakasIds (refresh only what changed).",
+      "List customers (asiakkaat) visible to the active company. ownerAsiakasId derived from JWT. --full returns every flat-customer field + the jerry companyDescription in one call (diff a whole tenant without N×`customer get`); --ids 1,2,3 restricts to specific asiakasIds and returns ALL of them (NOT capped at the default 100 — bounded by the ids list, max 1000) — the efficient way to refresh only the rows you care about. Without --ids the list is capped (default 100 / max 500) and `truncated:true` flags when you hit the cap (narrow with --ids or raise --limit).",
     permissions: ["auth.page.asiakas.read"],
     flags: [
       {
         name: "limit",
         type: "number",
         default: "100",
-        description: "Max rows (capped at 500)",
+        description: "Max rows for the unbounded list (capped at 500). Ignored when --ids is given.",
       },
       { name: "cursor", type: "string", description: "Pagination cursor" },
       { name: "full", type: "boolean", description: "Return full customer fields + companyDescription (not just id/name/ytunnus/type)" },
-      { name: "ids", type: "string", description: "Comma-separated asiakasIds to return (e.g. 1,2,3)" },
+      { name: "ids", type: "string", description: "Comma-separated asiakasIds to return ALL of (max 1000) — preferred for targeted/incremental fetches" },
     ],
     outputShape:
-      "ListEnvelope<{ asiakasId, name, yTunnus, type }> · with --full: ListEnvelope<{ ...flat customer (address, postalCode, city, email, contactPersonId, shortName, comment), companyDescription }>",
+      "ListEnvelope<{ asiakasId, name, yTunnus, type }> + truncated:boolean · with --full the items are { ...flat customer (address, postalCode, city, email, contactPersonId, shortName, comment), companyDescription }",
     errors: permErrors("auth.page.asiakas.read"),
     examples: [
       "ib customer list",
