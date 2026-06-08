@@ -278,7 +278,7 @@ export const COMMAND_SPECS = [
     // ─── customer (7) ────────────────────────────────────────────────────────
     {
         command: "ib customer list",
-        description: "List customers (asiakkaat) visible to the active company. ownerAsiakasId derived from JWT. --full returns every flat-customer field + the jerry companyDescription in one call (diff a whole tenant without N×`customer get`); --ids 1,2,3 restricts to specific asiakasIds and returns ALL of them (NOT capped at the default 100 — bounded by the ids list, max 1000) — the efficient way to refresh only the rows you care about. Without --ids the list is capped (default 100 / max 500) and `truncated:true` flags when you hit the cap (narrow with --ids or raise --limit).",
+        description: "List customers (asiakkaat). Scope: regular users see their own tenant + their own company row; SYSTEM ADMINS list across ALL tenants (incl. cross-tenant --ids). --full returns every flat-customer field + the jerry companyDescription in one call (diff a whole tenant without N×`customer get`); --ids 1,2,3 restricts to specific asiakasIds and returns ALL of them (NOT capped at the default 100 — bounded by the ids list, max 1000) — the efficient way to refresh only the rows you care about. Without --ids the list is capped (default 100 / max 500) and `truncated:true` flags when you hit the cap (narrow with --ids or raise --limit).",
         permissions: ["auth.page.asiakas.read"],
         flags: [
             {
