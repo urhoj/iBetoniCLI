@@ -7,6 +7,7 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveDate } from "../../dates.js";
 
 // Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
@@ -185,7 +186,7 @@ export function registerKeikkaCommands(
     }) => {
       try {
         const client = await getClient();
-        const parsed = JSON.parse(opts.body) as Record<string, unknown>;
+        const parsed = parseJsonBodyFlag(opts.body);
         const result = await runKeikkaCreate(client, parsed, {
           dryRun: opts.dryRun,
           idempotencyKey: opts.idempotencyKey,
