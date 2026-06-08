@@ -6,7 +6,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson, writeError, exitWithError } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 
 // Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
@@ -212,14 +212,18 @@ export function registerKeikkaCommands(
         reason?: string;
       }
     ) => {
+      if (opts.status === undefined) {
+        writeError(
+          new Error("Nothing to update: pass --status (v1.0 supports --status only)")
+        );
+        process.exit(4);
+      }
       try {
         const client = await getClient();
-        const fields: Record<string, unknown> = {};
-        if (opts.status !== undefined) fields.status = opts.status;
         const result = await runKeikkaUpdate(
           client,
           Number(idStr),
-          fields,
+          { status: opts.status },
           {
             dryRun: opts.dryRun,
             idempotencyKey: opts.idempotencyKey,
