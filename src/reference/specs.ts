@@ -1316,7 +1316,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib sijainti set-jerry",
     description:
-      "Enrol or unenrol a varikko (location) in BetoniJerry by setting sijainti.jerryActiveUntil. --on writes the permanent sentinel (the varikko then receives BetoniJerry pump requests covering its delivery radius); --off clears it to null. Replicates the EditSijainti toggle: reads the row, overrides jerryActiveUntil, and writes it back via POST /api/geocode/updateSijainti (lat/lng and other fields are preserved). Visibility in matching still requires the company's isPumppuToimittaja flag.",
+      "Enrol or unenrol a varikko (location) in BetoniJerry by setting sijainti.jerryActiveUntil. --on writes the permanent sentinel; --off clears it to null. IMPORTANT: BetoniJerry coverage keys on the delivery radius maxDeliveryDistance (KM) — NOT geofenceRadius (metres, a GPS depot detector) — so --on ALSO sets that radius: --radius <km>, or a 50 km default when the varikko has none (otherwise it would be enrolled but cover nothing). Replicates the EditSijainti toggle: reads the row, overrides the fields, and writes back via POST /api/geocode/updateSijainti (lat/lng etc. preserved). Matching also requires the company's isPumppuToimittaja flag.",
     permissions: ["auth.page.sijainnit.edit"],
     flags: [
       {
@@ -1324,8 +1324,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
         type: "number",
         description: "Positional — sijaintiId to toggle",
       },
-      { name: "on", type: "boolean", description: "Enrol (jerryActiveUntil = sentinel)" },
+      { name: "on", type: "boolean", description: "Enrol (jerryActiveUntil = sentinel) + ensure a delivery radius" },
       { name: "off", type: "boolean", description: "Unenrol (jerryActiveUntil = null)" },
+      { name: "radius", type: "number", description: "Delivery radius in km (maxDeliveryDistance) to set when enrolling; defaults to 50 when the varikko has none" },
     ],
     writeFlags: true,
     outputShape:
@@ -1333,16 +1334,16 @@ export const COMMAND_SPECS: CommandSpec[] = [
     errors: [
       {
         code: 400,
-        meaning: "Neither/both of --on/--off given",
-        remedy: "pass exactly one of --on / --off",
+        meaning: "Neither/both of --on/--off given, or --radius not a positive number",
+        remedy: "pass exactly one of --on / --off; --radius is km > 0",
       },
       { code: 404, meaning: "Sijainti not found", remedy: "verify sijaintiId" },
       ...permErrors("auth.page.sijainnit.edit"),
     ],
     examples: [
-      "ib sijainti set-jerry 42 --on --reason 'pilot varikko in Jerry'",
+      "ib sijainti set-jerry 42 --on --radius 60 --reason 'pilot varikko, 60 km radius'",
+      "ib sijainti set-jerry 42 --on --reason 'enrol with default 50 km radius'",
       "ib sijainti set-jerry 42 --off --reason 'seasonal pause'",
-      "ib sijainti set-jerry 42 --on --dry-run",
     ],
   },
   {

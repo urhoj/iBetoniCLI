@@ -2250,14 +2250,15 @@ exports[`Help snapshots — contract stability > help for ib sijainti set-jerry 
   ib sijainti set-jerry [flags]
 
 DESCRIPTION
-  Enrol or unenrol a varikko (location) in BetoniJerry by setting sijainti.jerryActiveUntil. --on writes the permanent sentinel (the varikko then receives BetoniJerry pump requests covering its delivery radius); --off clears it to null. Replicates the EditSijainti toggle: reads the row, overrides jerryActiveUntil, and writes it back via POST /api/geocode/updateSijainti (lat/lng and other fields are preserved). Visibility in matching still requires the company's isPumppuToimittaja flag.
+  Enrol or unenrol a varikko (location) in BetoniJerry by setting sijainti.jerryActiveUntil. --on writes the permanent sentinel; --off clears it to null. IMPORTANT: BetoniJerry coverage keys on the delivery radius maxDeliveryDistance (KM) — NOT geofenceRadius (metres, a GPS depot detector) — so --on ALSO sets that radius: --radius <km>, or a 50 km default when the varikko has none (otherwise it would be enrolled but cover nothing). Replicates the EditSijainti toggle: reads the row, overrides the fields, and writes back via POST /api/geocode/updateSijainti (lat/lng etc. preserved). Matching also requires the company's isPumppuToimittaja flag.
   Permissions: requires auth.page.sijainnit.edit.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --sijaintiId NUMBER    Positional — sijaintiId to toggle
-  --on BOOLEAN    Enrol (jerryActiveUntil = sentinel)
+  --on BOOLEAN    Enrol (jerryActiveUntil = sentinel) + ensure a delivery radius
   --off BOOLEAN    Unenrol (jerryActiveUntil = null)
+  --radius NUMBER    Delivery radius in km (maxDeliveryDistance) to set when enrolling; defaults to 50 when the varikko has none
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -2271,16 +2272,16 @@ OUTPUT (JSON, stdout)
   { ok: true, ... } (raw backend response) or { dryRun: true, wouldUpdate: {...} }
 
 ERRORS (stderr, exit non-zero)
-  400  Neither/both of --on/--off given → pass exactly one of --on / --off
+  400  Neither/both of --on/--off given, or --radius not a positive number → pass exactly one of --on / --off; --radius is km > 0
   404  Sijainti not found     → verify sijaintiId
   401  Token expired          → ib auth refresh
   403  Permission denied      → check auth.page.sijainnit.edit
   500  Backend error          → retry with --verbose
 
 EXAMPLES
-  ib sijainti set-jerry 42 --on --reason 'pilot varikko in Jerry'
+  ib sijainti set-jerry 42 --on --radius 60 --reason 'pilot varikko, 60 km radius'
+  ib sijainti set-jerry 42 --on --reason 'enrol with default 50 km radius'
   ib sijainti set-jerry 42 --off --reason 'seasonal pause'
-  ib sijainti set-jerry 42 --on --dry-run
 "
 `;
 

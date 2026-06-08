@@ -4,6 +4,7 @@ import {
   runSijaintiUpdate,
   runSijaintiDelete,
   runSijaintiUndelete,
+  runSijaintiSetJerry,
   buildSijaintiBody,
   applySijaintiCreateDefaults,
   extractGeocodeLatLng,
@@ -143,6 +144,48 @@ describe("applySijaintiCreateDefaults", () => {
   test("reports missing required name and type", () => {
     const { missing } = applySijaintiCreateDefaults({});
     expect(missing).toEqual(["--name (sijaintiNimi)", "--type (sijaintiTypeId)"]);
+  });
+});
+
+describe("runSijaintiSetJerry (delivery radius)", () => {
+  const mGet = () => mockClient.get as ReturnType<typeof vi.fn>;
+  const mPost = () => mockClient.post as ReturnType<typeof vi.fn>;
+  const SENTINEL = "9999-12-31 23:59:59";
+  beforeEach(() => {
+    mGet().mockReset();
+    mPost().mockReset();
+  });
+
+  test("--on --radius sets maxDeliveryDistance + the enrol sentinel (other fields preserved)", async () => {
+    mGet().mockResolvedValueOnce({ sijaintiId: 42, maxDeliveryDistance: 30, lat: 60 });
+    mPost().mockResolvedValueOnce({ ok: true });
+    await runSijaintiSetJerry(mockClient, 42, true, {}, 60);
+    expect(mPost().mock.calls[0][1]).toMatchObject({
+      sijaintiId: 42, jerryActiveUntil: SENTINEL, maxDeliveryDistance: 60, lat: 60,
+    });
+  });
+
+  test("--on with no radius defaults maxDeliveryDistance to 50 when the varikko has none", async () => {
+    mGet().mockResolvedValueOnce({ sijaintiId: 42, maxDeliveryDistance: 0 });
+    mPost().mockResolvedValueOnce({ ok: true });
+    await runSijaintiSetJerry(mockClient, 42, true, {});
+    expect(mPost().mock.calls[0][1]).toMatchObject({ maxDeliveryDistance: 50 });
+  });
+
+  test("--on preserves an existing maxDeliveryDistance when no radius given", async () => {
+    mGet().mockResolvedValueOnce({ sijaintiId: 42, maxDeliveryDistance: 35 });
+    mPost().mockResolvedValueOnce({ ok: true });
+    await runSijaintiSetJerry(mockClient, 42, true, {});
+    expect(mPost().mock.calls[0][1]).toMatchObject({ maxDeliveryDistance: 35 });
+  });
+
+  test("--off clears jerryActiveUntil and leaves the radius untouched", async () => {
+    mGet().mockResolvedValueOnce({ sijaintiId: 42, maxDeliveryDistance: 35 });
+    mPost().mockResolvedValueOnce({ ok: true });
+    await runSijaintiSetJerry(mockClient, 42, false, {});
+    const body = mPost().mock.calls[0][1];
+    expect(body.jerryActiveUntil).toBeNull();
+    expect(body.maxDeliveryDistance).toBe(35);
   });
 });
 

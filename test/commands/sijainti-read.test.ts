@@ -85,7 +85,7 @@ describe("ib sijainti set-jerry", () => {
     post.mockReset();
   });
 
-  test("--on reads the row then POSTs updateSijainti with the sentinel, preserving other fields", async () => {
+  test("--on POSTs updateSijainti with the sentinel + a default delivery radius, preserving other fields", async () => {
     get.mockResolvedValueOnce({
       sijaintiId: 42,
       sijaintiNimi: "Helsinki varikko",
@@ -93,6 +93,7 @@ describe("ib sijainti set-jerry", () => {
       lat: 60.17,
       lng: 24.94,
       jerryActiveUntil: null,
+      // no maxDeliveryDistance → enrol defaults it to 50 km (else it covers nothing)
     });
     post.mockResolvedValueOnce({ ok: true });
     await runSijaintiSetJerry(mockClient, 42, true, { reason: "pilot" });
@@ -106,6 +107,7 @@ describe("ib sijainti set-jerry", () => {
         lat: 60.17,
         lng: 24.94,
         jerryActiveUntil: "9999-12-31 23:59:59",
+        maxDeliveryDistance: 50,
       },
       { headers: { "X-Action-Reason": "pilot" } }
     );

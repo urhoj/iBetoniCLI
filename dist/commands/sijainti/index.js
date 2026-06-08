@@ -126,21 +126,41 @@ export async function runSijaintiUpdate(client, body, flags) {
     });
 }
 /**
- * Toggle a varikko's BetoniJerry enrolment by writing `jerryActiveUntil`. There
- * is no partial-update route, so this replicates the EditSijainti save: GET the
- * current row, override `jerryActiveUntil` (sentinel = on, null = off), and POST
- * it back through /api/geocode/updateSijainti. `updateSijainti` whitelists the
- * persisted fields via extractSijaintiBody (lat/lng/placeId are untouched by
- * sijainti_save), so the round-trip preserves the rest of the row. `--dry-run`
- * is honoured server-side (the route returns `wouldUpdate` without persisting).
+ * Default BetoniJerry delivery radius (km) applied when a varikko is enrolled
+ * (`--on`) but has no usable `maxDeliveryDistance` — enrolling with 0 km would
+ * cover nothing. Mid-range of the typical 30–80 km a varikko serves.
  */
-export async function runSijaintiSetJerry(client, sijaintiId, on, flags) {
+const DEFAULT_JERRY_RADIUS_KM = 50;
+/**
+ * Enrol/unenrol a varikko in BetoniJerry. There is no partial-update route, so
+ * this replicates the EditSijainti save: GET the current row, override
+ * `jerryActiveUntil` (sentinel = on, null = off), and POST it back through
+ * /api/geocode/updateSijainti (extractSijaintiBody whitelists the persisted
+ * fields, so the round-trip preserves the rest of the row). `--dry-run` is
+ * honoured server-side.
+ *
+ * Coverage note: BetoniJerry feasibility (`services/varikkoMatching`) keys on
+ * `maxDeliveryDistance` (KM) — NOT `geofenceRadius` (metres, a GPS depot
+ * detector). So enrolling alone isn't enough; the varikko also needs a delivery
+ * radius. On `--on` we set it from `radius` (km), or default it to
+ * DEFAULT_JERRY_RADIUS_KM when the varikko currently has none — otherwise the
+ * varikko would be "enrolled but covering nothing".
+ */
+export async function runSijaintiSetJerry(client, sijaintiId, on, flags, radius) {
     const current = await client.get(`/api/geocode/sijainti/get/${sijaintiId}`);
     const body = {
         ...current,
         sijaintiId,
         jerryActiveUntil: on ? JERRY_ACTIVE_SENTINEL : null,
     };
+    if (on) {
+        if (radius !== undefined) {
+            body.maxDeliveryDistance = radius;
+        }
+        else if (!Number(current.maxDeliveryDistance)) {
+            body.maxDeliveryDistance = DEFAULT_JERRY_RADIUS_KM;
+        }
+    }
     return client.post("/api/geocode/updateSijainti", body, {
         headers: writeFlagsToHeaders(flags),
     });
@@ -449,13 +469,22 @@ export function registerSijaintiCommands(parent, getClient) {
     });
     const setJerryCmd = s
         .command("set-jerry <sijaintiId>")
-        .description("Enrol/unenrol a varikko in BetoniJerry by setting jerryActiveUntil (--on/--off)")
-        .option("--on", "Enrol: jerryActiveUntil = sentinel (varikko receives Jerry requests)")
-        .option("--off", "Unenrol: jerryActiveUntil = null");
+        .description("Enrol/unenrol a varikko in BetoniJerry (--on/--off). BetoniJerry coverage " +
+        "keys on the delivery radius maxDeliveryDistance (KM) — NOT geofenceRadius " +
+        "(metres, a GPS depot detector) — so --on also sets that radius: --radius " +
+        "<km>, or a 50 km default when the varikko has none (otherwise it would be " +
+        "enrolled but cover nothing). Also requires the company's isPumppuToimittaja flag.")
+        .option("--on", "Enrol: jerryActiveUntil = sentinel + ensure a delivery radius")
+        .option("--off", "Unenrol: jerryActiveUntil = null")
+        .option("--radius <km>", "Delivery radius in km (maxDeliveryDistance) to set when enrolling", Number);
     addWriteFlagsToCommand(setJerryCmd).action(async (idStr, opts) => {
         if (opts.on === opts.off) {
             // neither or both given — ambiguous
             writeError(new Error("Pass exactly one of --on / --off"));
+            process.exit(4);
+        }
+        if (opts.radius !== undefined && (!Number.isFinite(opts.radius) || opts.radius <= 0)) {
+            writeError(new Error("--radius must be a positive number of km"));
             process.exit(4);
         }
         try {
@@ -464,7 +493,7 @@ export function registerSijaintiCommands(parent, getClient) {
                 dryRun: opts.dryRun,
                 idempotencyKey: opts.idempotencyKey,
                 reason: opts.reason,
-            });
+            }, opts.radius);
             writeJson(result);
         }
         catch (e) {
