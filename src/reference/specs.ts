@@ -419,6 +419,33 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib customer create-or-update",
+    description:
+      "Upsert a customer keyed by business ID (ytunnus) — removes the search-then-create dance for idempotent onboarding. Looks the ytunnus up in your tenant (system admins: across tenants); 1 match → update (read-merge with your flags), 0 → create, >1 → error (exit 4). --from-prh <yt> uses that business ID as the key AND prefills name+yTunnus from PRH on create. Alias: `ib customer upsert`.",
+    permissions: ["auth.page.asiakas.edit"],
+    flags: [
+      { name: "ytunnus", type: "string", description: "Business ID key (yTunnus) — required unless --from-prh/--body supplies it" },
+      { name: "from-prh", type: "string", description: "Use this business ID as the key AND prefill from PRH on create" },
+      { name: "name", type: "string", description: "Customer name (asiakasNimi)" },
+      { name: "email", type: "string", description: "Invoicing email (laskutusEmail)" },
+      { name: "short-name", type: "string", description: "Short display name (asiakasShortNimi)" },
+      { name: "comment", type: "string", description: "Comment (kommentti) — applied on update" },
+      { name: "contact-person", type: "number", description: "Contact person id — applied on update" },
+      { name: "type", type: "number", description: "Customer type id — applied on update" },
+      { name: "body", type: "json", description: "Raw JSON body (overrides typed flags)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ ...flat customer, action: 'created'|'updated' } (or { action: 'would-*', dryRun } on --dry-run)",
+    errors: [
+      { code: 400, meaning: "No ytunnus key, or >1 customers share the ytunnus (ambiguous)", remedy: "provide --ytunnus/--from-prh; for an ambiguous match use `ib customer update <id>`" },
+      ...permErrors("auth.page.asiakas.edit"),
+    ],
+    examples: [
+      "ib customer create-or-update --from-prh 1234567-8 --reason 'PRH onboarding'",
+      "ib customer upsert --ytunnus 1234567-8 --name 'Example Oy' --email billing@example.fi --reason onboard",
+    ],
+  },
+  {
     command: "ib customer search",
     description:
       "Free-text search across customer names / yTunnus / contacts. GET /api/asiakas/search?searchString=...",

@@ -248,6 +248,49 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib customer create-or-update matches snapshot 1`] = `
+"USAGE
+  ib customer create-or-update [flags]
+
+DESCRIPTION
+  Upsert a customer keyed by business ID (ytunnus) — removes the search-then-create dance for idempotent onboarding. Looks the ytunnus up in your tenant (system admins: across tenants); 1 match → update (read-merge with your flags), 0 → create, >1 → error (exit 4). --from-prh <yt> uses that business ID as the key AND prefills name+yTunnus from PRH on create. Alias: \`ib customer upsert\`.
+  Permissions: requires auth.page.asiakas.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --ytunnus STRING    Business ID key (yTunnus) — required unless --from-prh/--body supplies it
+  --from-prh STRING    Use this business ID as the key AND prefill from PRH on create
+  --name STRING    Customer name (asiakasNimi)
+  --email STRING    Invoicing email (laskutusEmail)
+  --short-name STRING    Short display name (asiakasShortNimi)
+  --comment STRING    Comment (kommentti) — applied on update
+  --contact-person NUMBER    Contact person id — applied on update
+  --type NUMBER    Customer type id — applied on update
+  --body JSON    Raw JSON body (overrides typed flags)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { ...flat customer, action: 'created'|'updated' } (or { action: 'would-*', dryRun } on --dry-run)
+
+ERRORS (stderr, exit non-zero)
+  400  No ytunnus key, or >1 customers share the ytunnus (ambiguous) → provide --ytunnus/--from-prh; for an ambiguous match use \`ib customer update <id>\`
+  401  Token expired          → ib auth refresh
+  403  Permission denied      → check auth.page.asiakas.edit
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib customer create-or-update --from-prh 1234567-8 --reason 'PRH onboarding'
+  ib customer upsert --ytunnus 1234567-8 --name 'Example Oy' --email billing@example.fi --reason onboard
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib customer delete matches snapshot 1`] = `
 "USAGE
   ib customer delete [flags]

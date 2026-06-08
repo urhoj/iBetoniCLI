@@ -59,6 +59,113 @@ export async function runCustomerGet(
   );
 }
 
+/**
+ * GET /api/cli/customer/by-ytunnus/:ytunnus — exact-match lookup by business ID,
+ * the key for `customer create-or-update`. Tenant-scoped (system admins:
+ * cross-tenant). Returns ALL matches as flat records — caller treats 0 = create,
+ * 1 = update, >1 = ambiguous.
+ */
+export async function runCustomerByYtunnus(
+  client: ApiClient,
+  ytunnus: string
+): Promise<CustomerFlat[]> {
+  const res = await client.get<{ items: CustomerFlat[]; count: number }>(
+    `/api/cli/customer/by-ytunnus/${encodeURIComponent(ytunnus)}`
+  );
+  return Array.isArray(res?.items) ? res.items : [];
+}
+
+/** Typed flags for `customer create-or-update` (create + update writable subset). */
+export interface CustomerUpsertOptions {
+  ytunnus?: string;
+  fromPrh?: string;
+  name?: string;
+  email?: string;
+  shortName?: string;
+  comment?: string;
+  contactPerson?: number;
+  type?: number;
+  body?: string;
+}
+
+/**
+ * Upsert a customer keyed by business ID (ytunnus). Looks it up (tenant-scoped;
+ * system admins cross-tenant); 1 match → update via read-merge from the matched
+ * flat record, 0 → create (PRH prefill when --from-prh), >1 → throws (ambiguous).
+ * Returns the resulting flat customer plus `action: created|updated`. On
+ * --dry-run returns the backend echo with `action: would-create|would-update`.
+ * Throws on a missing key / ambiguous match (caller maps to exit 4).
+ */
+export async function runCustomerUpsert(
+  client: ApiClient,
+  opts: CustomerUpsertOptions,
+  flags: WriteFlags
+): Promise<Record<string, unknown>> {
+  const prhYt = opts.fromPrh;
+  let key = (prhYt || opts.ytunnus || "").trim();
+  if (!key && opts.body) {
+    try {
+      const b = JSON.parse(opts.body) as Record<string, unknown>;
+      key = String(b.yTunnus ?? b.ytunnus ?? "").trim();
+    } catch {
+      /* malformed --body is surfaced by the builders below */
+    }
+  }
+  if (!key) {
+    throw new Error("create-or-update requires --ytunnus (or --from-prh / --body with yTunnus)");
+  }
+
+  const matches = await runCustomerByYtunnus(client, key);
+  if (matches.length > 1) {
+    throw new Error(
+      `ambiguous: ${matches.length} customers share ytunnus ${key} (ids: ${matches
+        .map((m) => m.asiakasId)
+        .join(", ")}). Use \`ib customer update <id>\`.`
+    );
+  }
+
+  if (matches.length === 1) {
+    const current = matches[0];
+    const updateBody = buildAsiakasUpdateBody(current, {
+      name: opts.name,
+      ytunnus: opts.ytunnus,
+      email: opts.email,
+      shortName: opts.shortName,
+      comment: opts.comment,
+      contactPerson: opts.contactPerson,
+      type: opts.type,
+      body: opts.body,
+    });
+    const res = await runCustomerUpdate(client, current.asiakasId, updateBody, flags);
+    if (flags.dryRun) return { action: "would-update", asiakasId: current.asiakasId, dryRun: res };
+    return { ...(await runCustomerGet(client, current.asiakasId)), action: "updated" };
+  }
+
+  // No match → create. PRH is fetched only here (not on update).
+  const ownerAsiakasId = await resolveCurrentOwnerAsiakasId(client);
+  const prh = prhYt ? await runCustomerPrhById(client, prhYt) : undefined;
+  const createBody = buildAsiakasCreateBody(
+    {
+      name: opts.name,
+      ytunnus: opts.ytunnus,
+      email: opts.email,
+      shortName: opts.shortName,
+      fromPrh: prhYt,
+      body: opts.body,
+    },
+    ownerAsiakasId,
+    prh
+  );
+  if (createBody.yTunnus === undefined || createBody.yTunnus === null || createBody.yTunnus === "") {
+    createBody.yTunnus = key;
+  }
+  const res = await runCustomerCreate(client, createBody, flags);
+  if (flags.dryRun) return { action: "would-create", dryRun: res };
+  const newId = extractAsiakasId(res);
+  if (!newId) return { ...(res as Record<string, unknown>), action: "created" };
+  return { ...(await runCustomerGet(client, newId)), action: "created" };
+}
+
 /** The four roolit booleans carried on the asiakas row. */
 export interface AsiakasRoolit {
   isTyomaaAsiakas: boolean;
@@ -729,6 +836,7 @@ export function buildAsiakasUpdateBody(
  *   - prh       Finnish business-registry lookup (by Y-tunnus or --search name)
  *   - create    typed flags assemble the createY body; --from-prh prefills; --body overrides (write flags)
  *   - update    read-merge-write via typed flags; --body overrides (write flags)
+ *   - create-or-update  upsert keyed by ytunnus (lookup → update or create; alias `upsert`)
  *   - delete    DELETE /api/asiakas/delete/<id>/<owner> (requires --reason)
  *   - history   change-tracker audit trail for one customer
  *   - modules   report/toggle roolit + the 8 module flags (admin-gated; write flags)
@@ -1009,6 +1117,49 @@ export function registerCustomerCommands(
         }
         writeJson(await runCustomerGet(client, asiakasId));
       } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
+
+  const upsertCmd = c
+    .command("create-or-update")
+    .alias("upsert")
+    .description(
+      "Upsert a customer keyed by business ID (ytunnus). Looks it up in your tenant " +
+        "(system admins: across tenants), then 1 match → update (read-merge with your " +
+        "flags), 0 → create, >1 → error. --from-prh <yt> uses that business ID as the key " +
+        "AND prefills name+yTunnus from PRH on create. Returns { ...customer, action }."
+    )
+    .option("--ytunnus <s>", "Business ID key (yTunnus) — required unless --from-prh/--body supplies it")
+    .option("--from-prh <ytunnus>", "Use this business ID as the key AND prefill from PRH on create")
+    .option("--name <s>", "Customer name (asiakasNimi)")
+    .option("--email <s>", "Invoicing email (laskutusEmail)")
+    .option("--short-name <s>", "Short display name (asiakasShortNimi)")
+    .option("--comment <s>", "Comment (kommentti) — applied on update")
+    .option("--contact-person <id>", "Contact person id — applied on update", (v: string) => Number(v))
+    .option("--type <id>", "Customer type id — applied on update", (v: string) => Number(v))
+    .option("--body <json>", "Raw JSON body forwarded verbatim (overrides typed flags)");
+  addWriteFlagsToCommand(upsertCmd).action(
+    async (opts: CustomerUpsertOptions & WriteFlags) => {
+      try {
+        const client = await getClient();
+        const result = await runCustomerUpsert(client, opts, {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        });
+        writeJson(result);
+      } catch (e) {
+        // Caller input errors (no key / ambiguous match) are exit 4; API/network
+        // errors keep their contract-mapped codes via exitWithError.
+        if (
+          e instanceof Error &&
+          (e.message.startsWith("ambiguous:") || e.message.startsWith("create-or-update requires"))
+        ) {
+          writeError(e);
+          process.exit(4);
+        }
         exitWithError(e);
       }
     }
