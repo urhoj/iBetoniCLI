@@ -98,9 +98,12 @@ export async function runPersonGet(
  */
 export async function runPersonSearch(
   client: ApiClient,
-  query: string
+  query: string,
+  limit?: number
 ): Promise<unknown> {
-  return client.post<unknown>("/api/person/search", { searchString: query });
+  const body: Record<string, unknown> = { searchString: query };
+  if (limit !== undefined) body.limit = limit;
+  return client.post<unknown>("/api/person/search", body);
 }
 
 /** One person↔company role row, with the role name resolved. */
@@ -309,10 +312,11 @@ export function registerPersonCommands(
 
   p.command("search <query>")
     .description("Free-text search for persons")
-    .action(async (query: string) => {
+    .option("--limit <n>", "Max results", (v: string) => Math.min(Number(v), 500))
+    .action(async (query: string, opts: { limit?: number }) => {
       try {
         const client = await getClient();
-        const result = await runPersonSearch(client, query);
+        const result = await runPersonSearch(client, query, opts.limit);
         writeJson(result);
       } catch (e) {
         exitWithError(e);

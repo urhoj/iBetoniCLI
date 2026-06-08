@@ -535,10 +535,12 @@ export async function runCustomerWorksites(
  */
 export async function runCustomerSearch(
   client: ApiClient,
-  query: string
+  query: string,
+  limit?: number
 ): Promise<unknown> {
-  const qs = new URLSearchParams({ searchString: query }).toString();
-  return client.get<unknown>(`/api/asiakas/search?${qs}`);
+  const params = new URLSearchParams({ searchString: query });
+  if (limit !== undefined) params.set("limit", String(limit));
+  return client.get<unknown>(`/api/asiakas/search?${params.toString()}`);
 }
 
 /**
@@ -1096,10 +1098,11 @@ export function registerCustomerCommands(
 
   c.command("search <query>")
     .description("Free-text search for customers")
-    .action(async (query: string) => {
+    .option("--limit <n>", "Max results", (v: string) => Math.min(Number(v), 500))
+    .action(async (query: string, opts: { limit?: number }) => {
       try {
         const client = await getClient();
-        const result = await runCustomerSearch(client, query);
+        const result = await runCustomerSearch(client, query, opts.limit);
         writeJson(result);
       } catch (e) {
         exitWithError(e);

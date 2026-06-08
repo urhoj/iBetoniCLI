@@ -95,6 +95,14 @@ describe("ib customer list/get/search", () => {
     );
   });
 
+  test("runCustomerSearch forwards --limit as a query param", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    await runCustomerSearch(mockClient, "Example", 25);
+    expect(mockClient.get).toHaveBeenCalledWith(
+      "/api/asiakas/search?searchString=Example&limit=25"
+    );
+  });
+
   test("runCustomerWorksites: GET asiakasTyomaaList, wraps array into envelope", async () => {
     (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
       { tyomaaId: 7, tyomaaNimi: "Site A", tyomaaOsoite1: "Main 1", tyomaaOsoite4: "Helsinki" },

@@ -13,6 +13,7 @@ import { parseJsonBodyFlag } from "../../api/parseBody.js";
 export interface WorksiteListFilter {
   limit?: number;
   cursor?: string;
+  customer?: number;
 }
 
 /**
@@ -26,6 +27,7 @@ export async function runWorksiteList(
   const params = new URLSearchParams();
   if (opts.limit !== undefined) params.set("limit", String(opts.limit));
   if (opts.cursor) params.set("cursor", opts.cursor);
+  if (opts.customer !== undefined) params.set("customer", String(opts.customer));
   const qs = params.toString();
   return client.get<ListEnvelope<Record<string, unknown>>>(
     `/api/cli/worksite/list${qs ? `?${qs}` : ""}`
@@ -53,9 +55,12 @@ export async function runWorksiteGet(
  */
 export async function runWorksiteSearch(
   client: ApiClient,
-  query: string
+  query: string,
+  limit?: number
 ): Promise<unknown> {
-  return client.post<unknown>("/api/tyomaa/search", { searchString: query });
+  const body: Record<string, unknown> = { searchString: query };
+  if (limit !== undefined) body.limit = limit;
+  return client.post<unknown>("/api/tyomaa/search", body);
 }
 
 /**
@@ -330,10 +335,11 @@ export function registerWorksiteCommands(
     .description("List worksites")
     .option("--limit <n>", "Max rows", (v: string) => Math.min(Number(v), 500))
     .option("--cursor <c>", "Pagination cursor")
+    .option("--customer <n>", "Filter by parent asiakasId", (v: string) => Number(v))
     .action(async (opts: WorksiteListFilter) => {
       try {
         const client = await getClient();
-        const result = await runWorksiteList(client, opts);
+        const result = await runWorksiteList(client, { limit: opts.limit, cursor: opts.cursor, customer: opts.customer });
         writeJson(result);
       } catch (e) {
         exitWithError(e);
@@ -391,10 +397,11 @@ export function registerWorksiteCommands(
 
   w.command("search <query>")
     .description("Free-text search for worksites")
-    .action(async (query: string) => {
+    .option("--limit <n>", "Max results", (v: string) => Math.min(Number(v), 500))
+    .action(async (query: string, opts: { limit?: number }) => {
       try {
         const client = await getClient();
-        const result = await runWorksiteSearch(client, query);
+        const result = await runWorksiteSearch(client, query, opts.limit);
         writeJson(result);
       } catch (e) {
         exitWithError(e);

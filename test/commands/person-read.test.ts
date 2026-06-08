@@ -74,4 +74,12 @@ describe("ib person list/get/search", () => {
       searchString: "Doe & Sons",
     });
   });
+
+  test("runPersonSearch forwards limit in the body", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    await runPersonSearch(mockClient, "Matti", 10);
+    expect(mockClient.post).toHaveBeenCalledWith("/api/person/search", {
+      searchString: "Matti", limit: 10,
+    });
+  });
 });

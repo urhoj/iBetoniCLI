@@ -77,6 +77,23 @@ describe("ib worksite list/get/search", () => {
     });
   });
 
+  test("runWorksiteList forwards --customer", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [], nextCursor: null, count: 0,
+    });
+    await runWorksiteList(mockClient, { customer: 1349 });
+    const path = (mockClient.get as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(path).toContain("customer=1349");
+  });
+
+  test("runWorksiteSearch forwards limit in the body", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    await runWorksiteSearch(mockClient, "Main", 30);
+    expect(mockClient.post).toHaveBeenCalledWith("/api/tyomaa/search", {
+      searchString: "Main", limit: 30,
+    });
+  });
+
   test("runWorksiteMetrics: GET /api/cli/worksite/metrics/42", async () => {
     (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       tyomaaId: 42, summary: { totalM3: 120 }, monthlyBreakdown: [],
