@@ -4,6 +4,7 @@ import {
   runOhjeList,
   runOhjeUpdate,
   buildOhjeBody,
+  buildOhjeFields,
 } from "../../src/commands/ohje/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -81,6 +82,49 @@ describe("buildOhjeBody (GET-merge so omitted fields survive)", () => {
       htmltext: "",
       img: null,
     });
+  });
+
+  test("does NOT echo extra GET columns back into the PUT body", () => {
+    const current = {
+      helpId: "X",
+      title: "T",
+      shorttext: "s",
+      htmltext: "<p>h</p>",
+      img: null,
+      rev: 7,
+      accessCount: 99,
+      entryTime: "2020-01-01",
+    };
+    expect(buildOhjeBody(current, "X", {})).toEqual({
+      helpId: "X",
+      title: "T",
+      shorttext: "s",
+      htmltext: "<p>h</p>",
+      img: null,
+    });
+  });
+
+  test("explicit null img clears it; undefined img preserves the current value", () => {
+    const current = { helpId: "X", title: "T", shorttext: "", htmltext: "", img: "old.png" };
+    expect(buildOhjeBody(current, "X", { img: null }).img).toBeNull();
+    expect(buildOhjeBody(current, "X", {}).img).toBe("old.png");
+  });
+});
+
+describe("buildOhjeFields (typed flags win over --body; --img \"\" clears)", () => {
+  test("typed flags override matching --body keys", () => {
+    expect(
+      buildOhjeFields({ body: '{"title":"B","htmltext":"<p>b</p>"}', title: "A" })
+    ).toEqual({ title: "A", shorttext: undefined, htmltext: "<p>b</p>", img: undefined });
+  });
+
+  test("--img \"\" coerces to null (clear); a real value passes through", () => {
+    expect(buildOhjeFields({ img: "" }).img).toBeNull();
+    expect(buildOhjeFields({ img: "logo.png" }).img).toBe("logo.png");
+  });
+
+  test("--body '{\"img\":null}' passes null through", () => {
+    expect(buildOhjeFields({ body: '{"img":null}' }).img).toBeNull();
   });
 });
 

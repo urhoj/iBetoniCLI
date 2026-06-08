@@ -1,5 +1,7 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
+/** Charset the backend sanitizer (helps.get / helps.update) accepts for a helpId. */
+const HELP_ID_RE = /^[A-Za-z0-9_-]+$/;
 /**
  * GET /api/helps/get/:helpId — the content shown in a HelperIcon modal. The
  * backend returns a recordset (array); we surface the first row, or `null` when
@@ -19,21 +21,40 @@ export async function runOhjeList(client) {
     return { items, nextCursor: null, count: items.length };
 }
 /**
- * Merge the changed fields over the current row. `helps_save` overwrites EVERY
- * column, so a partial edit must carry the existing values through or it would
- * blank them — exactly what the HelperIcon editor does (it posts full state).
- * Typed field flags win; an omitted field falls back to the current value, then
- * to "" (img to null) when there is no current row (i.e. creating a new entry).
+ * Project commander options into {@link OhjeFields}: typed flags win over
+ * `--body` JSON (mirrors `buildSijaintiBody`). `--img ""` is coerced to `null`
+ * so an image can be CLEARED — otherwise `helps_save` would store an empty
+ * string instead of NULL. Exported (pure) so the merge is unit-testable without
+ * spawning the CLI.
+ */
+export function buildOhjeFields(opts) {
+    const parsed = opts.body ? JSON.parse(opts.body) : {};
+    const img = opts.img ?? parsed.img;
+    return {
+        title: opts.title ?? parsed.title,
+        shorttext: opts.shorttext ?? parsed.shorttext,
+        htmltext: opts.htmltext ?? parsed.htmltext,
+        img: img === "" ? null : img,
+    };
+}
+/**
+ * Merge the changed fields over the current row to form the full PUT body.
+ * `helps_save` overwrites EVERY column, so a partial edit must carry the
+ * existing values through or it would blank them — exactly what the HelperIcon
+ * editor does (it posts full state). Only the five persisted columns are
+ * emitted (helps_save reads just these), so extra GET columns
+ * (rev/accessCount/timestamps) are NOT echoed back — keeping the `--dry-run`
+ * `proposed` clean. An omitted field (`undefined`) falls back to the current
+ * value, then to "" ; an explicit `null` img clears the column.
  */
 export function buildOhjeBody(current, helpId, fields) {
     const base = current ?? {};
     return {
-        ...base,
         helpId,
         title: fields.title ?? base.title ?? "",
         shorttext: fields.shorttext ?? base.shorttext ?? "",
         htmltext: fields.htmltext ?? base.htmltext ?? "",
-        img: fields.img ?? base.img ?? null,
+        img: fields.img !== undefined ? fields.img : base.img ?? null,
     };
 }
 /**
@@ -71,6 +92,10 @@ export function registerOhjeCommands(parent, getClient) {
     o.command("get <helpId>")
         .description("Get one UI help entry by helpId (GET /api/helps/get/:helpId)")
         .action(async (helpId) => {
+        if (!HELP_ID_RE.test(helpId)) {
+            writeError(new Error(`Invalid helpId "${helpId}" — only [A-Za-z0-9_-] are allowed`));
+            process.exit(4);
+        }
         try {
             const client = await getClient();
             const result = await runOhjeGet(client, helpId);
@@ -105,6 +130,10 @@ export function registerOhjeCommands(parent, getClient) {
         .option("--htmltext <s>", "HTML body shown in the modal (htmltext)")
         .option("--img <s>", "Image reference (img)");
     addWriteFlagsToCommand(updateCmd).action(async (helpId, opts) => {
+        if (!HELP_ID_RE.test(helpId)) {
+            writeError(new Error(`Invalid helpId "${helpId}" — only [A-Za-z0-9_-] are allowed`));
+            process.exit(4);
+        }
         // --reason is required for an actual write; a --dry-run preview is
         // read-only, so it does not need a justification.
         if (!opts.dryRun && !opts.reason) {
@@ -113,15 +142,7 @@ export function registerOhjeCommands(parent, getClient) {
         }
         try {
             const client = await getClient();
-            const parsed = opts.body
-                ? JSON.parse(opts.body)
-                : {};
-            const fields = {
-                title: opts.title ?? parsed.title,
-                shorttext: opts.shorttext ?? parsed.shorttext,
-                htmltext: opts.htmltext ?? parsed.htmltext,
-                img: opts.img ?? parsed.img,
-            };
+            const fields = buildOhjeFields(opts);
             const result = await runOhjeUpdate(client, helpId, fields, {
                 dryRun: opts.dryRun,
                 idempotencyKey: opts.idempotencyKey,

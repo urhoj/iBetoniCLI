@@ -1335,7 +1335,7 @@ export const COMMAND_SPECS = [
         outputShape: "{ helpId, title, shorttext, htmltext, img } | null",
         errors: [
             {
-                code: 400,
+                code: 4,
                 meaning: "Invalid helpId",
                 remedy: "helpId may contain only [A-Za-z0-9_-]",
             },
@@ -1369,15 +1369,15 @@ export const COMMAND_SPECS = [
             { name: "title", type: "string", description: "Help title (otsikko)" },
             { name: "shorttext", type: "string", description: "Short text" },
             { name: "htmltext", type: "string", description: "HTML body shown in the modal" },
-            { name: "img", type: "string", description: "Image reference" },
+            { name: "img", type: "string", description: "Image reference (pass \"\" to clear it to null)" },
         ],
         writeFlags: true,
         outputShape: "{ success: true, message } (raw backend response) or { dryRun: true, helpId, current, proposed }",
         errors: [
             {
                 code: 4,
-                meaning: "Missing --reason",
-                remedy: "pass --reason (required for writes)",
+                meaning: "Missing --reason / invalid helpId",
+                remedy: "pass --reason; helpId may contain only [A-Za-z0-9_-]",
             },
             {
                 code: 400,

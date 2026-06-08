@@ -1354,7 +1354,7 @@ OUTPUT (JSON, stdout)
   { helpId, title, shorttext, htmltext, img } | null
 
 ERRORS (stderr, exit non-zero)
-  400  Invalid helpId         → helpId may contain only [A-Za-z0-9_-]
+  4  Invalid helpId         → helpId may contain only [A-Za-z0-9_-]
   401  Token expired          → ib auth refresh
   500  Backend error          → retry with --verbose
 
@@ -1406,7 +1406,7 @@ FLAGS
   --title STRING    Help title (otsikko)
   --shorttext STRING    Short text
   --htmltext STRING    HTML body shown in the modal
-  --img STRING    Image reference
+  --img STRING    Image reference (pass "" to clear it to null)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -1420,7 +1420,7 @@ OUTPUT (JSON, stdout)
   { success: true, message } (raw backend response) or { dryRun: true, helpId, current, proposed }
 
 ERRORS (stderr, exit non-zero)
-  4  Missing --reason       → pass --reason (required for writes)
+  4  Missing --reason / invalid helpId → pass --reason; helpId may contain only [A-Za-z0-9_-]
   400  Validation failed      → title ≤500, htmltext ≤10000, helpId [A-Za-z0-9_-]
   403  Permission denied      → needs isHelperEditor or system-admin/developer
   401  Token expired          → ib auth refresh
