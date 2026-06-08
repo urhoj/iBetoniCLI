@@ -7,6 +7,8 @@ export interface DecodedClaims {
   ownerAsiakasName?: string;
   email?: string;
   issuedFor?: "cli" | "mcp" | "web";
+  /** JWT `exp` (seconds since epoch), when present. Used by `ib doctor`. */
+  exp?: number;
 }
 
 /**
@@ -43,5 +45,6 @@ export function decodeJwtPayload(jwt: string): DecodedClaims {
     ownerAsiakasName: expanded.ownerAsiakasName as string | undefined,
     email: expanded.email as string | undefined,
     issuedFor: expanded.issuedFor as "cli" | "mcp" | "web" | undefined,
+    exp: typeof expanded.exp === "number" ? expanded.exp : undefined,
   };
 }

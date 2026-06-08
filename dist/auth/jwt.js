@@ -32,6 +32,7 @@ export function decodeJwtPayload(jwt) {
         ownerAsiakasName: expanded.ownerAsiakasName,
         email: expanded.email,
         issuedFor: expanded.issuedFor,
+        exp: typeof expanded.exp === "number" ? expanded.exp : undefined,
     };
 }
 //# sourceMappingURL=jwt.js.map

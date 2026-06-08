@@ -2,6 +2,7 @@ import { resolveAuth } from "./auth/resolve.js";
 import { createApiClient } from "./api/client.js";
 import { createStore } from "./auth/store.js";
 import { refreshToken } from "./auth/refresh.js";
+import { decodeJwtPayload } from "./auth/jwt.js";
 /**
  * Build a `CliContext` for the current invocation.
  *
@@ -27,12 +28,30 @@ export async function createCliContext(opts) {
     }
     const endpoint = opts.global.endpoint ?? auth.endpoint;
     const store = createStore(opts.credentialsPath);
+    // Decode the JWT (free, no network) so the client can announce the write
+    // target on the first mutation. Best-effort — a malformed token must not
+    // break the client; the diagnostic is simply skipped.
+    let actingAs;
+    try {
+        const claims = decodeJwtPayload(auth.token);
+        if (claims.ownerAsiakasId) {
+            actingAs = {
+                ownerAsiakasId: claims.ownerAsiakasId,
+                ownerAsiakasName: claims.ownerAsiakasName,
+            };
+        }
+    }
+    catch {
+        // Undecodable token — skip the acting-as diagnostic.
+    }
     const client = createApiClient({
         endpoint,
         token: auth.token,
         version: opts.version,
         requestId: opts.global.requestId ?? undefined,
         readOnly: opts.global.readOnly,
+        actingAs,
+        quiet: opts.global.quiet,
         onRefresh: auth.refreshable
             ? async (currentJwt) => {
                 const fresh = await refreshToken({ endpoint, currentJwt });

@@ -817,6 +817,33 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib doctor matches snapshot 1`] = `
+"USAGE
+  ib doctor [flags]
+
+DESCRIPTION
+  Aggregated 'is my setup working' health check. Derives identity from the active JWT (so it works for both file- and IB_TOKEN-sessions, unlike \`auth whoami\`), reports token expiry, pings the public /api/version for connectivity + which build is live, and does ONE authenticated read to prove the token is accepted by this endpoint. Read-only. Exits 1 when the aggregate \`ok\` is false.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only
+
+OUTPUT (JSON, stdout)
+  { ok:boolean, cli, endpoint, readOnly, auth:{ personId, ownerAsiakasId, ownerAsiakasName, email, issuedFor, tokenExp, tokenExpired }, connectivity:VersionReport, authProbe:{ ok, status?, error? } }
+
+ERRORS (stderr, exit non-zero)
+  1  Not healthy            → inspect connectivity / authProbe / tokenExpired in the report
+  2  Not logged in          → ib auth login (or set IB_TOKEN)
+
+EXAMPLES
+  ib doctor
+  ib doctor --endpoint https://api-staging.ibetoni.fi
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib jerry admin detail matches snapshot 1`] = `
 "USAGE
   ib jerry admin detail [flags]
@@ -2909,18 +2936,22 @@ exports[`Help snapshots — contract stability > help for ib vehicle list matche
   ib vehicle list [flags]
 
 DESCRIPTION
-  List vehicles visible to the active company. ownerAsiakasId derived from JWT.
+  List vehicles visible to the active company. ownerAsiakasId derived from JWT. Rows are self-describing (showInGrid/firstDate/lastDate/deletedTime). Default scope = non-deleted with no narrowing, so grid-hidden AND expired vehicles ARE included; only soft-deleted are excluded. Use the flags to narrow or to reveal deleted rows.
   Permissions: requires auth.page.vehicle.read.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --limit NUMBER    Max rows (capped at 500) (default: 100)
+  --deleted BOOLEAN    Include soft-deleted vehicles (default: excluded)
+  --grid-only BOOLEAN    Only vehicles shown in the grid (showInGrid=1)
+  --valid-on DATE    Only vehicles whose validity window covers this day (YYYY-MM-DD or today/yesterday/tomorrow)
+  --type NUMBER    Only this vehicleTypeId (see \`ib vehicle types\`)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ vehicleId, plate, type, capacity }>
+  ListEnvelope<{ vehicleId, plate, type, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
@@ -2930,6 +2961,9 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib vehicle list
   ib vehicle list --pretty
+  ib vehicle list --grid-only --valid-on today
+  ib vehicle list --deleted
+  ib vehicle list --type 1
 "
 `;
 

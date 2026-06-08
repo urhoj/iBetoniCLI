@@ -23,6 +23,14 @@ function parseBoolFlag(s: string): boolean {
 export interface VehicleListFilter {
   limit?: number;
   cursor?: string;
+  /** Include soft-deleted vehicles (default: excluded). */
+  deleted?: boolean;
+  /** Only vehicles with showInGrid = 1. */
+  gridOnly?: boolean;
+  /** Only vehicles whose validity window covers this YYYY-MM-DD. */
+  validOn?: string;
+  /** Only vehicles of this vehicleTypeId. */
+  type?: number;
 }
 
 export interface VehicleDriversFilter {
@@ -45,7 +53,11 @@ const VISIT_FILTER_TYPES = ["tyomaa", "sijainti"] as const;
 
 /**
  * GET /api/cli/vehicle/list with the universal list envelope shape.
- * Query parameters are appended only when set on `opts`.
+ * Query parameters are appended only when set on `opts`. Rows are
+ * self-describing — each carries showInGrid / firstDate / lastDate /
+ * deletedTime alongside { vehicleId, plate, type, capacity }. Default scope is
+ * non-deleted with no narrowing (grid-hidden AND expired rows ARE included);
+ * `deleted` / `gridOnly` / `validOn` / `type` opt into narrowing.
  */
 export async function runVehicleList(
   client: ApiClient,
@@ -54,6 +66,10 @@ export async function runVehicleList(
   const params = new URLSearchParams();
   if (opts.limit !== undefined) params.set("limit", String(opts.limit));
   if (opts.cursor) params.set("cursor", opts.cursor);
+  if (opts.deleted) params.set("deleted", "1");
+  if (opts.gridOnly) params.set("gridOnly", "1");
+  if (opts.validOn) params.set("validOn", opts.validOn);
+  if (opts.type !== undefined) params.set("type", String(opts.type));
   const qs = params.toString();
   return client.get<ListEnvelope<Record<string, unknown>>>(
     `/api/cli/vehicle/list${qs ? `?${qs}` : ""}`
@@ -411,15 +427,40 @@ export function registerVehicleCommands(
     .description("List vehicles")
     .option("--limit <n>", "Max rows", (val: string) => Math.min(Number(val), 500))
     .option("--cursor <c>", "Pagination cursor")
-    .action(async (opts: VehicleListFilter) => {
-      try {
-        const client = await getClient();
-        const result = await runVehicleList(client, opts);
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
+    .option("--deleted", "Include soft-deleted vehicles (default: excluded)")
+    .option("--grid-only", "Only vehicles shown in the grid (showInGrid=1)")
+    .option(
+      "--valid-on <date>",
+      "Only vehicles valid on this day YYYY-MM-DD (or today/yesterday/tomorrow)"
+    )
+    .option("--type <id>", "Only this vehicleTypeId", (val: string) => Number(val))
+    .action(
+      async (
+        opts: {
+          limit?: number;
+          cursor?: string;
+          deleted?: boolean;
+          gridOnly?: boolean;
+          validOn?: string;
+          type?: number;
+        }
+      ) => {
+        try {
+          const client = await getClient();
+          const result = await runVehicleList(client, {
+            limit: opts.limit,
+            cursor: opts.cursor,
+            deleted: opts.deleted,
+            gridOnly: opts.gridOnly,
+            validOn: resolveDate(opts.validOn),
+            type: opts.type,
+          });
+          writeJson(result);
+        } catch (e) {
+          exitWithError(e);
+        }
       }
-    });
+    );
 
   v.command("get <vehicleId>")
     .description("Get a single vehicle by vehicleId")

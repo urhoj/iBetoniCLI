@@ -70,6 +70,18 @@ A session write-lock for AI/CI use. Set the `--read-only` global flag or `IB_REA
 
 `ib commands` is an **offline** filtered view over `COMMAND_SPECS` (`src/reference/commandsList.ts`) — lighter than `ib reference dump`. Flags: `--mutations` (writes only), `--reads` (read-only only; named `--reads` not `--read-only` to avoid colliding with the global write-lock), `--permission <substr>`. Returns the `{ items, nextCursor, count }` envelope.
 
+### Acting-as write diagnostic
+
+On the **first write** of a process (the first non-GET that passes the read-only gate), the client prints one stderr line naming the target company — `[ib] write → asiakasId <N> (<name>)`, with a loud `⚠ BetoniJerry umbrella tenant` when `N === 1349`. A guardrail against "wrong company lens" writes after a company switch. `cliContext` decodes the JWT (free) into `actingAs` and passes it + `quiet` to `createApiClient`; suppressed by `--quiet`. stderr only — never pollutes the stdout JSON contract.
+
+### `ib doctor`
+
+One aggregated health report (`src/commands/doctor/index.ts`). Derives identity from the active JWT (works for both file- and `IB_TOKEN`-sessions, unlike `auth whoami` which reads the credentials file), reports token expiry, reuses `runVersion` for connectivity + deployed build, and does one authenticated read (`runCompanyList`) to prove the token works against the endpoint. Read-only; exits `1` when the aggregate `ok` is false.
+
+### `ib vehicle list` filters
+
+Rows are self-describing — each carries `showInGrid`/`firstDate`/`lastDate`/`deletedTime` alongside `{ vehicleId, plate, type, capacity }`. **Default scope is unchanged**: non-deleted, no narrowing — grid-hidden AND expired vehicles ARE included; only soft-deleted are excluded. Opt-in narrowing: `--deleted` (reveal soft-deleted), `--grid-only` (`showInGrid=1`), `--valid-on <date>` (validity window covers the day), `--type <id>`. The backend half (params + projection + cache-key compatibility) lives in `puminet5api` `listVehiclesForCli` / `vehicleCliRoutes.js` — **deploy-gated** (flags no-op until that backend deploys).
+
 ### Auth & credentials (`src/auth/`)
 
 - `resolve.ts` — `IB_TOKEN` env var wins (CI, non-refreshable); else the credentials file. Returns `null` if neither exists.

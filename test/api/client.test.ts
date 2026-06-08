@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { createApiClient } from "../../src/api/client.js";
 
 const mockFetch = vi.fn();
@@ -140,6 +140,80 @@ describe("ApiClient", () => {
     });
     await expect(client.get("/api/x")).resolves.toEqual({ ok: true });
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  describe("actingAs write diagnostic", () => {
+    let stderrSpy: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    });
+    afterEach(() => {
+      stderrSpy.mockRestore();
+    });
+
+    function okResponse() {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      );
+    }
+
+    test("prints the target company once on the first write, not on GET", async () => {
+      okResponse();
+      const client = createApiClient({
+        endpoint: "https://api.example.com",
+        token: "x",
+        version: "1.0.0",
+        actingAs: { ownerAsiakasId: 8, ownerAsiakasName: "Kalle Urho Oy" },
+      });
+      await client.get("/api/read"); // no announce on read
+      expect(stderrSpy).not.toHaveBeenCalled();
+      await client.post("/api/x", { a: 1 });
+      await client.post("/api/y", { a: 2 }); // second write: no repeat
+      expect(stderrSpy).toHaveBeenCalledTimes(1);
+      expect(stderrSpy.mock.calls[0][0]).toContain("asiakasId 8 (Kalle Urho Oy)");
+    });
+
+    test("flags the BetoniJerry umbrella tenant", async () => {
+      okResponse();
+      const client = createApiClient({
+        endpoint: "https://api.example.com",
+        token: "x",
+        version: "1.0.0",
+        actingAs: { ownerAsiakasId: 1349, ownerAsiakasName: "BetoniJerry" },
+      });
+      await client.post("/api/x", { a: 1 });
+      expect(stderrSpy.mock.calls[0][0]).toContain("BetoniJerry umbrella tenant");
+    });
+
+    test("quiet suppresses the diagnostic", async () => {
+      okResponse();
+      const client = createApiClient({
+        endpoint: "https://api.example.com",
+        token: "x",
+        version: "1.0.0",
+        actingAs: { ownerAsiakasId: 8 },
+        quiet: true,
+      });
+      await client.post("/api/x", { a: 1 });
+      expect(stderrSpy).not.toHaveBeenCalled();
+    });
+
+    test("read-only refusal does not announce (no write happened)", async () => {
+      const client = createApiClient({
+        endpoint: "https://api.example.com",
+        token: "x",
+        version: "1.0.0",
+        actingAs: { ownerAsiakasId: 8 },
+        readOnly: true,
+      });
+      await expect(client.post("/api/x", { a: 1 })).rejects.toMatchObject({
+        exitCode: 3,
+      });
+      expect(stderrSpy).not.toHaveBeenCalled();
+    });
   });
 
   test("explicit headers override", async () => {

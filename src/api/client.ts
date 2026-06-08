@@ -1,6 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { CliError, exitCodeFromStatus } from "./errors.js";
 
+/**
+ * BetoniJerry umbrella tenant (`@ibetoni/constants` BETONIJERRY.OWNER_ASIAKAS_ID).
+ * Writes resolved against it touch the shared umbrella org, so the acting-as
+ * diagnostic flags it loudly. Inlined (stable tenant id) to keep the client
+ * free of the CJS constants require on its hot path.
+ */
+const BETONIJERRY_UMBRELLA_ASIAKAS_ID = 1349;
+
 interface ApiClientOptions {
   endpoint: string;
   token: string;
@@ -20,6 +28,15 @@ interface ApiClientOptions {
    * (including the read half of a read-merge-write) are unaffected.
    */
   readOnly?: boolean;
+  /**
+   * The company the active JWT acts as. When set, the FIRST write (non-GET) of
+   * the process prints a one-line stderr diagnostic naming the target company —
+   * a guardrail against "wrong company lens" writes after a company switch.
+   * Decoded from the JWT by the caller (free, no network). Suppressed by `quiet`.
+   */
+  actingAs?: { ownerAsiakasId: number; ownerAsiakasName?: string };
+  /** Suppress non-data stderr diagnostics (the acting-as line). */
+  quiet?: boolean;
 }
 
 interface FetchOptions {
@@ -33,10 +50,30 @@ export function createApiClient({
   requestId,
   onRefresh,
   readOnly = false,
+  actingAs,
+  quiet = false,
 }: ApiClientOptions) {
   const platform = `${process.platform} node-${process.versions.node}`;
   const userAgent = `ib-cli/${version} (${platform})`;
   let currentToken = token;
+  let actingAsAnnounced = false;
+
+  /**
+   * Print the acting-as company once, before the process's first write. No-op
+   * when quiet, when no identity was supplied, or already announced.
+   */
+  function announceActingAs(): void {
+    if (quiet || !actingAs || actingAsAnnounced) return;
+    actingAsAnnounced = true;
+    const name = actingAs.ownerAsiakasName ? ` (${actingAs.ownerAsiakasName})` : "";
+    const umbrella =
+      actingAs.ownerAsiakasId === BETONIJERRY_UMBRELLA_ASIAKAS_ID
+        ? "  ⚠ BetoniJerry umbrella tenant"
+        : "";
+    process.stderr.write(
+      `[ib] write → asiakasId ${actingAs.ownerAsiakasId}${name}${umbrella}\n`
+    );
+  }
 
   function buildHeaders(
     extra: Record<string, string> = {},
@@ -102,6 +139,9 @@ export function createApiClient({
         3
       );
     }
+    // Announce the write target once, after the read-only gate (a refused write
+    // must not claim to have acted) and before the request leaves the process.
+    if (method !== "GET") announceActingAs();
     let res = await fetchOrNetworkError(method, path, body, opts);
 
     // Single-retry refresh path: only the first 401 triggers a refresh+retry.

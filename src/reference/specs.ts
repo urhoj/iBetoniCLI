@@ -954,7 +954,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib vehicle list",
     description:
-      "List vehicles visible to the active company. ownerAsiakasId derived from JWT.",
+      "List vehicles visible to the active company. ownerAsiakasId derived from JWT. Rows are self-describing (showInGrid/firstDate/lastDate/deletedTime). Default scope = non-deleted with no narrowing, so grid-hidden AND expired vehicles ARE included; only soft-deleted are excluded. Use the flags to narrow or to reveal deleted rows.",
     permissions: ["auth.page.vehicle.read"],
     flags: [
       {
@@ -963,11 +963,38 @@ export const COMMAND_SPECS: CommandSpec[] = [
         default: "100",
         description: "Max rows (capped at 500)",
       },
+      {
+        name: "deleted",
+        type: "boolean",
+        description: "Include soft-deleted vehicles (default: excluded)",
+      },
+      {
+        name: "grid-only",
+        type: "boolean",
+        description: "Only vehicles shown in the grid (showInGrid=1)",
+      },
+      {
+        name: "valid-on",
+        type: "date",
+        description:
+          "Only vehicles whose validity window covers this day (YYYY-MM-DD or today/yesterday/tomorrow)",
+      },
+      {
+        name: "type",
+        type: "number",
+        description: "Only this vehicleTypeId (see `ib vehicle types`)",
+      },
     ],
     outputShape:
-      "ListEnvelope<{ vehicleId, plate, type, capacity }>",
+      "ListEnvelope<{ vehicleId, plate, type, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>",
     errors: permErrors("auth.page.vehicle.read"),
-    examples: ["ib vehicle list", "ib vehicle list --pretty"],
+    examples: [
+      "ib vehicle list",
+      "ib vehicle list --pretty",
+      "ib vehicle list --grid-only --valid-on today",
+      "ib vehicle list --deleted",
+      "ib vehicle list --type 1",
+    ],
   },
   {
     command: "ib vehicle get",
@@ -2450,5 +2477,20 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "ib version --endpoint https://api.ibetoni.fi",
       "ib version --endpoint https://api-staging.ibetoni.fi",
     ],
+  },
+
+  // ─── doctor (1) ──────────────────────────────────────────────────────────
+  {
+    command: "ib doctor",
+    description:
+      "Aggregated 'is my setup working' health check. Derives identity from the active JWT (so it works for both file- and IB_TOKEN-sessions, unlike `auth whoami`), reports token expiry, pings the public /api/version for connectivity + which build is live, and does ONE authenticated read to prove the token is accepted by this endpoint. Read-only. Exits 1 when the aggregate `ok` is false.",
+    flags: [],
+    outputShape:
+      "{ ok:boolean, cli, endpoint, readOnly, auth:{ personId, ownerAsiakasId, ownerAsiakasName, email, issuedFor, tokenExp, tokenExpired }, connectivity:VersionReport, authProbe:{ ok, status?, error? } }",
+    errors: [
+      { code: 1, meaning: "Not healthy", remedy: "inspect connectivity / authProbe / tokenExpired in the report" },
+      { code: 2, meaning: "Not logged in", remedy: "ib auth login (or set IB_TOKEN)" },
+    ],
+    examples: ["ib doctor", "ib doctor --endpoint https://api-staging.ibetoni.fi"],
   },
 ];

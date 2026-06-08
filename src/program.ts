@@ -26,6 +26,7 @@ import { registerScheduleCommands } from "./commands/schedule/index.js";
 import { registerSchemaCommands } from "./commands/schema/index.js";
 import { registerWeatherCommands } from "./commands/weather/index.js";
 import { registerVersionCommand } from "./commands/version/index.js";
+import { registerDoctorCommand } from "./commands/doctor/index.js";
 import { runReferenceDump } from "./reference/dump.js";
 import { buildCommandsList } from "./reference/commandsList.js";
 import { renderDomainHelp } from "./reference/domain.js";
@@ -95,6 +96,9 @@ export function buildProgram(): Command {
   registerSchemaCommands(program, getClient);
   registerWeatherCommands(program, getClient);
   registerVersionCommand(program, packageJson.version, getEndpoint);
+  registerDoctorCommand(program, getClient, getEndpoint, packageJson.version, () =>
+    getGlobalOptions(program).readOnly
+  );
 
   const reference = program
     .command("reference")

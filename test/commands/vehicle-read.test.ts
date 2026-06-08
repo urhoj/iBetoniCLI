@@ -46,6 +46,33 @@ describe("ib vehicle list/get", () => {
     expect(result.count).toBe(1);
   });
 
+  test("runVehicleList: maps the narrowing filters to query params", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      count: 0,
+    });
+    await runVehicleList(mockClient, {
+      deleted: true,
+      gridOnly: true,
+      validOn: "2026-06-08",
+      type: 1,
+    });
+    expect(mockClient.get).toHaveBeenCalledWith(
+      "/api/cli/vehicle/list?deleted=1&gridOnly=1&validOn=2026-06-08&type=1"
+    );
+  });
+
+  test("runVehicleList: falsy filters are omitted from the query", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      count: 0,
+    });
+    await runVehicleList(mockClient, { deleted: false, gridOnly: false });
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/vehicle/list");
+  });
+
   test("runVehicleGet: GET /api/cli/vehicle/get/7", async () => {
     (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       vehicleId: 7,
