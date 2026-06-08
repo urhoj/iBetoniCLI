@@ -115,6 +115,17 @@ describe("ib customer list/get/search", () => {
     });
   });
 
+  test("runCustomerList surfaces backend 'truncated' on the envelope", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [{ asiakasId: 1 }],
+      truncated: true,
+      nextCursor: null,
+      count: 1,
+    });
+    const out = await runCustomerList(mockClient, { limit: 1 });
+    expect(out).toMatchObject({ truncated: true });
+  });
+
   test("runCustomerModulesReport: GET /api/cli/customer/modules/1349, returns state verbatim", async () => {
     const state = {
       asiakasId: 1349,
