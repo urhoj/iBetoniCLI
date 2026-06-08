@@ -571,6 +571,27 @@ export function registerPersonCommands(
         exitWithError(e);
       }
     });
+
+  p.command("history <personId>")
+    .description(
+      "Change-tracker audit trail for one person (who changed what, when, with --reason). " +
+        "Includes role grants/revokes — pass `--field asiakasPersonSetting` for role changes only."
+    )
+    .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))
+    .option("--limit <n>", "Max rows (default 100, cap 500)", (v: string) => Math.min(Number(v), 500), 100)
+    .option("--field <name>", "Filter by changeTracker fieldName (e.g. asiakasPersonSetting)")
+    .action(async (personIdStr: string, opts: { owner?: number; limit: number; field?: string }) => {
+      try {
+        const client = await getClient();
+        const result = await runPersonHistory(client, Number(personIdStr), opts.limit, {
+          owner: opts.owner,
+          field: opts.field,
+        });
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
 }
 
 /**
@@ -588,6 +609,70 @@ async function resolveOwnerAsiakasId(client: ApiClient): Promise<number> {
     );
   }
   return available.currentCompanyId;
+}
+
+interface RawPersonChangeRow {
+  changeId: number;
+  fieldName?: string | null;
+  oldValue?: string | null;
+  newValue?: string | null;
+  changeType?: string | null;
+  personId?: number | null;
+  personFullName?: string | null;
+  timestamp?: string | null;
+  description?: string | null;
+  reason?: string | null;
+}
+
+export interface PersonHistoryItem {
+  changeId: number;
+  field: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  changeType: string | null;
+  personId: number | null;
+  personName: string | null;
+  at: string | null;
+  description: string | null;
+  reason: string | null;
+}
+
+/**
+ * GET /api/changes/person/:personId/:ownerAsiakasId — the change-tracker audit
+ * trail for one person (the same log every `--reason` write feeds). Includes
+ * role grants/revokes (fieldName "asiakasPersonSetting"); pass `field` to filter
+ * client-side to one fieldName. Owner defaults to the active company. The route
+ * returns a RAW array (sendSuccess(changes), no .data wrapper). Auth: company
+ * member or admin (BE-enforced). Mirrors runCustomerHistory.
+ */
+export async function runPersonHistory(
+  client: ApiClient,
+  personId: number,
+  limit: number,
+  opts: { owner?: number; field?: string } = {}
+): Promise<ListEnvelope<PersonHistoryItem>> {
+  const owner = opts.owner ?? (await resolveOwnerAsiakasId(client));
+  const rows = await client.get<RawPersonChangeRow[]>(
+    `/api/changes/person/${personId}/${owner}?limit=${limit}`
+  );
+  let list = Array.isArray(rows) ? rows : [];
+  if (opts.field) list = list.filter((r) => r.fieldName === opts.field);
+  return {
+    items: list.map((r) => ({
+      changeId: r.changeId,
+      field: r.fieldName ?? null,
+      oldValue: r.oldValue ?? null,
+      newValue: r.newValue ?? null,
+      changeType: r.changeType ?? null,
+      personId: r.personId ?? null,
+      personName: r.personFullName ?? null,
+      at: r.timestamp ?? null,
+      description: r.description ?? null,
+      reason: r.reason ?? null,
+    })),
+    nextCursor: null,
+    count: list.length,
+  };
 }
 
 /** Pull the new personId out of newPerson's response (tolerant of legacy shapes). */

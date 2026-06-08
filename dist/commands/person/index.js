@@ -452,6 +452,25 @@ export function registerPersonCommands(parent, getClient) {
             exitWithError(e);
         }
     });
+    p.command("history <personId>")
+        .description("Change-tracker audit trail for one person (who changed what, when, with --reason). " +
+        "Includes role grants/revokes — pass `--field asiakasPersonSetting` for role changes only.")
+        .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
+        .option("--limit <n>", "Max rows (default 100, cap 500)", (v) => Math.min(Number(v), 500), 100)
+        .option("--field <name>", "Filter by changeTracker fieldName (e.g. asiakasPersonSetting)")
+        .action(async (personIdStr, opts) => {
+        try {
+            const client = await getClient();
+            const result = await runPersonHistory(client, Number(personIdStr), opts.limit, {
+                owner: opts.owner,
+                field: opts.field,
+            });
+            writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
 }
 /**
  * Resolve the caller's active ownerAsiakasId via the existing
@@ -464,6 +483,37 @@ async function resolveOwnerAsiakasId(client) {
         throw new Error("could not resolve active company — run `ib auth switch` or pass --asiakas / ownerAsiakasId in --body");
     }
     return available.currentCompanyId;
+}
+/**
+ * GET /api/changes/person/:personId/:ownerAsiakasId — the change-tracker audit
+ * trail for one person (the same log every `--reason` write feeds). Includes
+ * role grants/revokes (fieldName "asiakasPersonSetting"); pass `field` to filter
+ * client-side to one fieldName. Owner defaults to the active company. The route
+ * returns a RAW array (sendSuccess(changes), no .data wrapper). Auth: company
+ * member or admin (BE-enforced). Mirrors runCustomerHistory.
+ */
+export async function runPersonHistory(client, personId, limit, opts = {}) {
+    const owner = opts.owner ?? (await resolveOwnerAsiakasId(client));
+    const rows = await client.get(`/api/changes/person/${personId}/${owner}?limit=${limit}`);
+    let list = Array.isArray(rows) ? rows : [];
+    if (opts.field)
+        list = list.filter((r) => r.fieldName === opts.field);
+    return {
+        items: list.map((r) => ({
+            changeId: r.changeId,
+            field: r.fieldName ?? null,
+            oldValue: r.oldValue ?? null,
+            newValue: r.newValue ?? null,
+            changeType: r.changeType ?? null,
+            personId: r.personId ?? null,
+            personName: r.personFullName ?? null,
+            at: r.timestamp ?? null,
+            description: r.description ?? null,
+            reason: r.reason ?? null,
+        })),
+        nextCursor: null,
+        count: list.length,
+    };
 }
 /** Pull the new personId out of newPerson's response (tolerant of legacy shapes). */
 export function extractPersonId(res) {

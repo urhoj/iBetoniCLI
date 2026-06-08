@@ -861,6 +861,23 @@ export const COMMAND_SPECS = [
         errors: [...COMMON_AUTH_ERRORS],
         examples: ["ib person companies", "ib person companies 5351"],
     },
+    {
+        command: "ib person history",
+        description: "Change-tracker audit trail for one person — who changed what, when, with the `--reason` recorded by every write. INCLUDES role grants/revokes (fieldName 'asiakasPersonSetting', e.g. 'Rooli lisätty: asiakasAdmin (Asiakas Admin)'); pass `--field asiakasPersonSetting` to see only role changes. GET /api/changes/person/:personId/:ownerAsiakasId; owner defaults to the active company. --field filters client-side.",
+        flags: [
+            { name: "personId", type: "number", description: "Positional — personId whose history to fetch" },
+            { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+            { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+            { name: "field", type: "string", description: "Filter by changeTracker fieldName (e.g. asiakasPersonSetting for role changes)" },
+        ],
+        outputShape: "ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>",
+        errors: [
+            { code: 401, meaning: "Token expired", remedy: "ib auth refresh" },
+            { code: 403, meaning: "Not a member of that company (and not admin)", remedy: "ib company switch to that owner, or use an admin token" },
+            { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+        ],
+        examples: ["ib person history 63", "ib person history 63 --field asiakasPersonSetting", "ib person history 63 --owner 27 --limit 50"],
+    },
     // ─── vehicle (15) ─────────────────────────────────────────────────────────
     {
         command: "ib vehicle list",

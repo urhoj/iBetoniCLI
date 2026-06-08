@@ -1784,6 +1784,38 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib person history matches snapshot 1`] = `
+"USAGE
+  ib person history [flags]
+
+DESCRIPTION
+  Change-tracker audit trail for one person — who changed what, when, with the \`--reason\` recorded by every write. INCLUDES role grants/revokes (fieldName 'asiakasPersonSetting', e.g. 'Rooli lisätty: asiakasAdmin (Asiakas Admin)'); pass \`--field asiakasPersonSetting\` to see only role changes. GET /api/changes/person/:personId/:ownerAsiakasId; owner defaults to the active company. --field filters client-side.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --personId NUMBER    Positional — personId whose history to fetch
+  --owner NUMBER    ownerAsiakasId (default: active company)
+  --limit NUMBER    Max rows (capped at 500) (default: 100)
+  --field STRING    Filter by changeTracker fieldName (e.g. asiakasPersonSetting for role changes)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  403  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib person history 63
+  ib person history 63 --field asiakasPersonSetting
+  ib person history 63 --owner 27 --limit 50
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib person list matches snapshot 1`] = `
 "USAGE
   ib person list [flags]
