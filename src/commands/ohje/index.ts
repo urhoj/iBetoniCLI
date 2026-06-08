@@ -7,6 +7,7 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { parseJsonBodyFlag } from "../../api/parseBody.js";
 
 /**
  * `ib ohje` — read/write the **UI help-text content** stored in the `helps`
@@ -88,7 +89,7 @@ export function buildOhjeFields(opts: {
   htmltext?: string;
   img?: string;
 }): OhjeFields {
-  const parsed = opts.body ? (JSON.parse(opts.body) as OhjeFields) : {};
+  const parsed = opts.body ? (parseJsonBodyFlag(opts.body) as OhjeFields) : {};
   const img = opts.img ?? parsed.img;
   return {
     title: opts.title ?? parsed.title,
