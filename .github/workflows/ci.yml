@@ -27,7 +27,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20.10.0"
+          # 22.x to match the rest of the monorepo (puminet5api) and because
+          # vitest 4 / rolldown imports `styleText` from node:util (Node >= 20.12).
+          node-version: "22.x"
 
       - name: Resolve private @ibetoni packages from the checkout (CI only)
         run: |
