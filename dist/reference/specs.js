@@ -1478,20 +1478,27 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib person create",
-        description: "Create a person. Body REQUIRED via --body. Requires --reason.",
+        description: "Create a person. REQUIRED: --first, --last. --email is OPTIONAL (personEmail is nullable; phone-only contacts are fine and the email can be added later via `ib person update`). --asiakas defaults to your active company. Use typed flags or --body JSON (typed flags win). Requires --reason.",
         permissions: ["auth.page.person.edit"],
         flags: [
-            { name: "body", type: "json", description: "Person body. Must include personFirstName, personLastName, personEmail." },
+            { name: "first", type: "string", description: "personFirstName (REQUIRED)" },
+            { name: "last", type: "string", description: "personLastName (REQUIRED)" },
+            { name: "phone", type: "string", description: "personPhone" },
+            { name: "email", type: "string", description: "personEmail (optional)" },
+            { name: "asiakas", type: "number", description: "Owner asiakasId (defaults to your active company)" },
+            { name: "body", type: "json", description: "Raw JSON body, merged under typed flags (optional)" },
             { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
         ],
         writeFlags: true,
         outputShape: "{ personId: number, ... } or { dryRun: true, wouldCreate: ... }",
         errors: [
-            { code: 400, meaning: "Body missing required field", remedy: "include personFirstName, personLastName, personEmail" },
+            { code: 400, meaning: "Missing required field", remedy: "provide --first and --last (email is optional)" },
             ...permErrors("auth.page.person.edit"),
         ],
         examples: [
-            'ib person create --body \'{"personFirstName":"Matti","personLastName":"M","personEmail":"m@x.com"}\' --reason "onboard"',
+            'ib person create --first Matti --last Virtanen --phone "+358501234567" --reason "phone contact"',
+            'ib person create --first Matti --last Virtanen --email m@x.com --reason "onboard"',
+            'ib person create --body \'{"personFirstName":"Matti","personLastName":"M"}\' --reason "onboard"',
         ],
     },
     {

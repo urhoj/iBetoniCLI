@@ -1307,12 +1307,17 @@ exports[`Help snapshots — contract stability > help for ib person create match
   ib person create [flags]
 
 DESCRIPTION
-  Create a person. Body REQUIRED via --body. Requires --reason.
+  Create a person. REQUIRED: --first, --last. --email is OPTIONAL (personEmail is nullable; phone-only contacts are fine and the email can be added later via \`ib person update\`). --asiakas defaults to your active company. Use typed flags or --body JSON (typed flags win). Requires --reason.
   Permissions: requires auth.page.person.edit.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
-  --body JSON    Person body. Must include personFirstName, personLastName, personEmail.
+  --first STRING    personFirstName (REQUIRED)
+  --last STRING    personLastName (REQUIRED)
+  --phone STRING    personPhone
+  --email STRING    personEmail (optional)
+  --asiakas NUMBER    Owner asiakasId (defaults to your active company)
+  --body JSON    Raw JSON body, merged under typed flags (optional)
   --reason STRING    Audit-log reason (REQUIRED)
 
 WRITE-SAFETY FLAGS
@@ -1327,13 +1332,15 @@ OUTPUT (JSON, stdout)
   { personId: number, ... } or { dryRun: true, wouldCreate: ... }
 
 ERRORS (stderr, exit non-zero)
-  400  Body missing required field → include personFirstName, personLastName, personEmail
+  400  Missing required field → provide --first and --last (email is optional)
   401  Token expired          → ib auth refresh
   403  Permission denied      → check auth.page.person.edit
   500  Backend error          → retry with --verbose
 
 EXAMPLES
-  ib person create --body '{"personFirstName":"Matti","personLastName":"M","personEmail":"m@x.com"}' --reason "onboard"
+  ib person create --first Matti --last Virtanen --phone "+358501234567" --reason "phone contact"
+  ib person create --first Matti --last Virtanen --email m@x.com --reason "onboard"
+  ib person create --body '{"personFirstName":"Matti","personLastName":"M"}' --reason "onboard"
 "
 `;
 

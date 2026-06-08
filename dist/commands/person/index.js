@@ -3,6 +3,40 @@ import { writeJson, writeError, exitWithError } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { roleNameForTypeId, resolveRoleTypeId } from "../../roles.js";
 /**
+ * Merge typed create flags over a parsed --body object (typed flags win) into the
+ * /api/person/newPerson body. Email is intentionally optional: person.personEmail
+ * is nullable and the backend only dedupes when an email is actually given, so a
+ * phone-first contact can be created now and have its email added later. Body keys
+ * not covered by a typed flag are preserved untouched.
+ */
+export function buildPersonCreateBody(parsedBody, typed) {
+    const body = { ...parsedBody };
+    if (typed.first !== undefined)
+        body.personFirstName = typed.first;
+    if (typed.last !== undefined)
+        body.personLastName = typed.last;
+    if (typed.phone !== undefined)
+        body.personPhone = typed.phone;
+    if (typed.email !== undefined)
+        body.personEmail = typed.email;
+    if (typed.asiakas !== undefined)
+        body.ownerAsiakasId = typed.asiakas;
+    return body;
+}
+/**
+ * Required-field check for person create: first + last name (email is optional).
+ * Treats null/empty as missing. Returns the missing flag labels (empty = ok).
+ */
+export function missingPersonCreateFields(body) {
+    const missing = [];
+    const present = (v) => v !== undefined && v !== null && v !== "";
+    if (!present(body.personFirstName))
+        missing.push("--first (personFirstName)");
+    if (!present(body.personLastName))
+        missing.push("--last (personLastName)");
+    return missing;
+}
+/**
  * GET /api/cli/person/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
  */
@@ -178,30 +212,51 @@ export function registerPersonCommands(parent, getClient) {
             exitWithError(e);
         }
     });
-    addWriteFlagsToCommand(p
+    const createCmd = p
         .command("create")
-        .description("Create a person. Body REQUIRED via --body. Requires --reason.")
-        .requiredOption("--body <json>", "Person body (JSON). Must include personFirstName, personLastName, personEmail.")).action(async (opts) => {
+        .description("Create a person. Required: --first, --last. --email is OPTIONAL (phone-only " +
+        "contacts are fine; add the email later). --asiakas defaults to your active " +
+        "company. Use typed flags or --body JSON (typed flags win). Requires --reason.")
+        .option("--first <s>", "personFirstName (required)")
+        .option("--last <s>", "personLastName (required)")
+        .option("--phone <s>", "personPhone")
+        .option("--email <s>", "personEmail (optional)")
+        .option("--asiakas <id>", "Owner asiakasId (defaults to your active company)", Number)
+        .option("--body <json>", "Raw JSON body (merged under typed flags)");
+    addWriteFlagsToCommand(createCmd).action(async (opts) => {
         if (!opts.reason) {
             writeError(new Error("Missing required flag: --reason"));
             process.exit(4);
         }
-        let body;
-        try {
-            body = JSON.parse(opts.body);
-        }
-        catch {
-            writeError(new Error("--body must be valid JSON"));
-            process.exit(4);
-        }
-        for (const required of ["personFirstName", "personLastName", "personEmail"]) {
-            if (!(required in body)) {
-                writeError(new Error(`Body missing required field: ${required}`));
+        let parsed = {};
+        if (opts.body) {
+            try {
+                parsed = JSON.parse(opts.body);
+            }
+            catch {
+                writeError(new Error("--body must be valid JSON"));
                 process.exit(4);
             }
         }
+        const body = buildPersonCreateBody(parsed, {
+            first: opts.first,
+            last: opts.last,
+            phone: opts.phone,
+            email: opts.email,
+            asiakas: opts.asiakas,
+        });
+        const missing = missingPersonCreateFields(body);
+        if (missing.length > 0) {
+            writeError(new Error(`create requires: ${missing.join(", ")}`));
+            process.exit(4);
+        }
         try {
             const client = await getClient();
+            // ownerAsiakasId is needed by person_add; default it to the active company
+            // when neither --asiakas nor --body supplied one.
+            if (body.ownerAsiakasId === undefined || body.ownerAsiakasId === null) {
+                body.ownerAsiakasId = await resolveOwnerAsiakasId(client);
+            }
             const result = await runPersonCreate(client, body, opts);
             writeJson(result);
         }
@@ -361,8 +416,21 @@ export function registerPersonCommands(parent, getClient) {
     });
 }
 /**
+ * Resolve the caller's active ownerAsiakasId via the existing
+ * /api/company-selection/available route (same pattern as customer/sijainti
+ * create). Throws a clear error if no active company resolves.
+ */
+async function resolveOwnerAsiakasId(client) {
+    const available = await client.get("/api/company-selection/available");
+    if (typeof available.currentCompanyId !== "number" || available.currentCompanyId <= 0) {
+        throw new Error("could not resolve active company — run `ib auth switch` or pass --asiakas / ownerAsiakasId in --body");
+    }
+    return available.currentCompanyId;
+}
+/**
  * POST /api/person/newPerson — create a new person record.
- * Body must include personFirstName, personLastName, personEmail.
+ * Body needs personFirstName + personLastName (+ ownerAsiakasId); personEmail
+ * is optional (the column is nullable and the backend only dedupes when given).
  *
  * Response shape note: the backend wraps the result as
  * `{ status: "ok", data: { recordsets, output, rowsAffected, returnValue } }`.

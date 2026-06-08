@@ -1,5 +1,11 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { runPersonCreate, runPersonUpdate, runPersonDelete } from "../../src/commands/person/index.js";
+import {
+  runPersonCreate,
+  runPersonUpdate,
+  runPersonDelete,
+  buildPersonCreateBody,
+  missingPersonCreateFields,
+} from "../../src/commands/person/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
 const mockClient = {
@@ -22,6 +28,43 @@ describe("runPersonCreate", () => {
       body,
       { headers: { "X-Action-Reason": "lifecycle", "Idempotency-Key": "k1" } }
     );
+  });
+});
+
+describe("buildPersonCreateBody (typed-flag merge)", () => {
+  test("maps typed flags to backend column names", () => {
+    expect(
+      buildPersonCreateBody({}, { first: "Matti", last: "Virtanen", phone: "+358501234567", asiakas: 8 })
+    ).toEqual({
+      personFirstName: "Matti",
+      personLastName: "Virtanen",
+      personPhone: "+358501234567",
+      ownerAsiakasId: 8,
+    });
+  });
+
+  test("omits personEmail entirely when --email not given (phone-only contact)", () => {
+    const body = buildPersonCreateBody({}, { first: "Matti", last: "Virtanen" });
+    expect("personEmail" in body).toBe(false);
+  });
+
+  test("typed flags win over --body keys; untouched body keys preserved", () => {
+    expect(
+      buildPersonCreateBody({ personFirstName: "Old", personMemo: "keep" }, { first: "New" })
+    ).toEqual({ personFirstName: "New", personMemo: "keep" });
+  });
+});
+
+describe("missingPersonCreateFields", () => {
+  test("requires first + last, but NOT email", () => {
+    expect(missingPersonCreateFields({ personFirstName: "Matti", personLastName: "Virtanen" })).toEqual([]);
+  });
+
+  test("flags missing first/last (null/empty count as missing)", () => {
+    expect(missingPersonCreateFields({ personFirstName: "", personLastName: null })).toEqual([
+      "--first (personFirstName)",
+      "--last (personLastName)",
+    ]);
   });
 });
 
