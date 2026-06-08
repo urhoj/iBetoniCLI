@@ -1,4 +1,3 @@
-import open from "open";
 import { generatePkcePair, generateState } from "./pkce.js";
 import { startCallbackServer } from "./callbackServer.js";
 import { createStore } from "./store.js";
@@ -50,6 +49,7 @@ export async function performLogin(opts: LoginOptions): Promise<void> {
   authorizeUrl.searchParams.set("state", state);
 
   // 3. Launch browser.
+  const { default: open } = await import("open");
   await open(authorizeUrl.toString());
 
   // 4. Wait for callback then tear down listener regardless of outcome.
