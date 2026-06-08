@@ -1630,17 +1630,32 @@ export const COMMAND_SPECS: CommandSpec[] = [
   },
   {
     command: "ib customer person list",
-    description: "List persons attached to a customer. Optional --role filter.",
+    description:
+      "List persons attached to a customer. `--role` filters by role name; the per-row `roleTypeId` only echoes that filter (null when unfiltered — the base membership row), so it is NOT the person's role set. For the FULL per-company roles pass `--include-roles` (adds permissionRoles[]) or use `ib person role list`.",
     permissions: ["auth.page.asiakas.read"],
     flags: [
       { name: "role", type: "string", description: "Filter by role name (e.g. keikkaHandler)" },
+      { name: "include-roles", type: "boolean", description: "Add permissionRoles[] (full per-company role names) to each person — N extra GETs, opt-in" },
     ],
-    outputShape: "ListEnvelope<{ personId, name, email, role }>",
+    outputShape: "ListEnvelope<{ personId, name, email, roleTypeId: number|null, permissionRoles?: string[] }>",
     errors: [
       { code: 400, meaning: "Unknown role name", remedy: "see ROLE_TYPEID_BY_NAME in @ibetoni/constants" },
       ...permErrors("auth.page.asiakas.read"),
     ],
-    examples: ["ib customer person list 26", "ib customer person list 26 --role keikkaHandler"],
+    examples: ["ib customer person list 26", "ib customer person list 26 --role keikkaHandler", "ib customer person list 27 --include-roles"],
+  },
+  {
+    command: "ib role explain",
+    description:
+      "Explain a role NAME offline (from @ibetoni/constants): its asiakasPersonSettingTypeId, human display name, the access tiers it grants (anyAdmin/anyWorker/anyViewer/laskuRead/requestOffer/adminCompanySelection), and whether it is deprecated. No network or auth — pure constants lookup. Use it to disambiguate the role names accepted by `person role grant/revoke` and `customer person list --role`.",
+    flags: [
+      { name: "name", type: "string", description: "Positional — role name (e.g. asiakasAdmin, keikkaHandler, lomaseurannassa)" },
+    ],
+    outputShape: "{ role, typeId, displayName: string|null, tiers: string[], deprecated: boolean }",
+    errors: [
+      { code: 400, meaning: "Unknown role name", remedy: "see ROLE_TYPEID_BY_NAME in @ibetoni/constants" },
+    ],
+    examples: ["ib role explain asiakasAdmin", "ib role explain lomaseurannassa"],
   },
   {
     command: "ib worksite delete",

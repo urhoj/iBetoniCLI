@@ -3,6 +3,7 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFla
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveRoleTypeId } from "../../roles.js";
+import { runPersonRoleList } from "../person/index.js";
 /**
  * GET /api/cli/customer/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`. `--full` returns the
@@ -1004,10 +1005,11 @@ export function registerCustomerCommands(parent, getClient) {
         .command("list <asiakasId>")
         .description("List persons attached to a customer. Optional --role filter.")
         .option("--role <name>", "Filter by role name (e.g. keikkaHandler)")
+        .option("--include-roles", "Add permissionRoles[] (full per-company role names) to each person — N extra GETs")
         .action(async (asiakasIdStr, opts) => {
         try {
             const client = await getClient();
-            const result = await runCustomerPersonList(client, Number(asiakasIdStr), opts.role);
+            const result = await runCustomerPersonList(client, Number(asiakasIdStr), opts.role, opts.includeRoles);
             writeJson(result);
         }
         catch (e) {
@@ -1038,7 +1040,7 @@ const cjsRequire = createRequire(import.meta.url);
  * accepts any of the three. The flat result is wrapped in the universal
  * `ListEnvelope` so output formatters can render it.
  */
-export async function runCustomerPersonList(client, asiakasId, roleName) {
+export async function runCustomerPersonList(client, asiakasId, roleName, includeRoles = false) {
     const typeId = resolveRoleTypeId(roleName);
     // Backend `getAsiakasPersonList` sometimes returns the raw mssql result
     // wrapper `{ recordset, recordsets, ... }` instead of an unwrapped array
@@ -1057,8 +1059,20 @@ export async function runCustomerPersonList(client, asiakasId, roleName) {
         personId: r.personId,
         name: `${r.personFirstName || ""} ${r.personLastName || ""}`.trim(),
         email: r.personEmail || null,
-        role: r.asiakasPersonSettingTypeId || null,
+        roleTypeId: r.asiakasPersonSettingTypeId || null,
     }));
+    // --include-roles: each list row carries only ONE filter-echo typeId, so to
+    // get every person's FULL per-company role set we fan out (in parallel) to
+    // the same endpoint `person role list` uses. Opt-in because it is N extra
+    // GETs. Unknown/unnamed typeIds resolve to null and are dropped.
+    if (includeRoles && items.length > 0) {
+        await Promise.all(items.map(async (item) => {
+            const roles = await runPersonRoleList(client, item.personId, asiakasId);
+            item.permissionRoles = roles.items
+                .map((r) => r.role)
+                .filter((name) => Boolean(name));
+        }));
+    }
     return { items, nextCursor: null, count: items.length };
 }
 //# sourceMappingURL=index.js.map

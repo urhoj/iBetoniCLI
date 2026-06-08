@@ -35,4 +35,35 @@ export function resolveRoleTypeId(roleName) {
 export function roleNameForTypeId(typeId) {
     return roleMaps().ROLE_NAME_BY_TYPEID[typeId] ?? null;
 }
+// tier label → the @ibetoni/constants grouping array that confers it.
+const TIER_GROUPS = [
+    { tier: "anyAdmin", key: "ASIAKAS_ANY_ADMIN_ROLE_TYPE_IDS" },
+    { tier: "anyWorker", key: "ASIAKAS_ANY_WORKER_ROLE_TYPE_IDS" },
+    { tier: "anyViewer", key: "ASIAKAS_ANY_VIEWER_ROLE_TYPE_IDS" },
+    { tier: "laskuRead", key: "ASIAKAS_LASKU_READ_ROLE_TYPE_IDS" },
+    { tier: "requestOffer", key: "ASIAKAS_REQUEST_OFFER_ROLE_TYPE_IDS" },
+    { tier: "adminCompanySelection", key: "ADMIN_COMPANY_ROLE_TYPE_IDS" },
+];
+/** OBSOLETE typeIds kept only for legacy data round-trip (pumppuHandler/Viewer). */
+const DEPRECATED_ROLE_TYPEIDS = [20, 21];
+/**
+ * Explain a role NAME: its typeId, human display name, which access tiers it
+ * grants, and whether it is deprecated — all derived from @ibetoni/constants
+ * (no hand-maintained prose). Pure/offline. Throws the same descriptive
+ * "unknown role: …" error as {@link resolveRoleTypeId} for an unknown name.
+ */
+export function explainRole(roleName) {
+    const typeId = resolveRoleTypeId(roleName);
+    if (!typeId)
+        throw new Error(`unknown role: ${roleName}`);
+    const maps = roleMaps();
+    const tiers = TIER_GROUPS.filter(({ key }) => maps[key].includes(typeId)).map(({ tier }) => tier);
+    return {
+        role: roleName,
+        typeId,
+        displayName: maps.TYPE_ID_TO_ROLE_NAME[typeId] ?? null,
+        tiers,
+        deprecated: DEPRECATED_ROLE_TYPEIDS.includes(typeId),
+    };
+}
 //# sourceMappingURL=roles.js.map

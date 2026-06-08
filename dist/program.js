@@ -16,6 +16,7 @@ import { registerKeikkaCommands } from "./commands/keikka/index.js";
 import { registerCustomerCommands } from "./commands/customer/index.js";
 import { registerWorksiteCommands } from "./commands/worksite/index.js";
 import { registerPersonCommands } from "./commands/person/index.js";
+import { registerRoleCommands } from "./commands/role/index.js";
 import { registerVehicleCommands } from "./commands/vehicle/index.js";
 import { registerSijaintiCommands } from "./commands/sijainti/index.js";
 import { registerOhjeCommands } from "./commands/ohje/index.js";
@@ -72,6 +73,8 @@ export function buildProgram() {
     // `auth` manages credential-store access directly (login/logout/whoami/etc.)
     // and so doesn't take a `getClient` factory.
     registerAuthCommands(program);
+    // `role` is offline (reads @ibetoni/constants only) — like `auth`, no client.
+    registerRoleCommands(program);
     registerCompanyCommands(program, getClient);
     registerKeikkaCommands(program, getClient);
     registerCustomerCommands(program, getClient);

@@ -10,6 +10,7 @@ import {
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveRoleTypeId } from "../../roles.js";
+import { runPersonRoleList } from "../person/index.js";
 
 export interface CustomerListFilter {
   limit?: number;
@@ -1377,10 +1378,11 @@ export function registerCustomerCommands(
     .command("list <asiakasId>")
     .description("List persons attached to a customer. Optional --role filter.")
     .option("--role <name>", "Filter by role name (e.g. keikkaHandler)")
-    .action(async (asiakasIdStr: string, opts: { role?: string }) => {
+    .option("--include-roles", "Add permissionRoles[] (full per-company role names) to each person — N extra GETs")
+    .action(async (asiakasIdStr: string, opts: { role?: string; includeRoles?: boolean }) => {
       try {
         const client = await getClient();
-        const result = await runCustomerPersonList(client, Number(asiakasIdStr), opts.role);
+        const result = await runCustomerPersonList(client, Number(asiakasIdStr), opts.role, opts.includeRoles);
         writeJson(result);
       } catch (e) {
         exitWithError(e);
@@ -1416,7 +1418,19 @@ export interface CustomerPersonListItem {
   personId: number;
   name: string;
   email: string | null;
-  role: number | null;
+  /**
+   * The single asiakasPersonSettingTypeId echoing the `--role` filter (null
+   * when listed unfiltered — the base membership row). This is NOT the
+   * person's role set: for that pass `--include-roles` (→ `permissionRoles`)
+   * or use `ib person role list <personId> --asiakas <id>`.
+   */
+  roleTypeId: number | null;
+  /**
+   * Full per-company role NAMES, present only with `--include-roles`.
+   * Unknown/unnamed typeIds (e.g. 3/4/7/23, absent from ROLE_NAME_BY_TYPEID)
+   * resolve to null and are omitted.
+   */
+  permissionRoles?: string[];
 }
 
 /**
@@ -1433,7 +1447,8 @@ export interface CustomerPersonListItem {
 export async function runCustomerPersonList(
   client: ApiClient,
   asiakasId: number,
-  roleName?: string
+  roleName?: string,
+  includeRoles = false
 ): Promise<ListEnvelope<CustomerPersonListItem>> {
   const typeId = resolveRoleTypeId(roleName);
   // Backend `getAsiakasPersonList` sometimes returns the raw mssql result
@@ -1450,11 +1465,25 @@ export async function runCustomerPersonList(
     const wrapper = raw as { personList?: PersonRow[]; recordset?: PersonRow[]; recordsets?: PersonRow[][] };
     rows = wrapper.personList || wrapper.recordset || wrapper.recordsets?.[0] || [];
   }
-  const items = rows.map((r) => ({
+  const items: CustomerPersonListItem[] = rows.map((r) => ({
     personId: r.personId,
     name: `${r.personFirstName || ""} ${r.personLastName || ""}`.trim(),
     email: r.personEmail || null,
-    role: r.asiakasPersonSettingTypeId || null,
+    roleTypeId: r.asiakasPersonSettingTypeId || null,
   }));
+  // --include-roles: each list row carries only ONE filter-echo typeId, so to
+  // get every person's FULL per-company role set we fan out (in parallel) to
+  // the same endpoint `person role list` uses. Opt-in because it is N extra
+  // GETs. Unknown/unnamed typeIds resolve to null and are dropped.
+  if (includeRoles && items.length > 0) {
+    await Promise.all(
+      items.map(async (item) => {
+        const roles = await runPersonRoleList(client, item.personId, asiakasId);
+        item.permissionRoles = roles.items
+          .map((r) => r.role)
+          .filter((name): name is string => Boolean(name));
+      })
+    );
+  }
   return { items, nextCursor: null, count: items.length };
 }

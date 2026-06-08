@@ -66,14 +66,15 @@ describe("runCustomerPersonList", () => {
     (mockClient.get as ReturnType<typeof vi.fn>).mockReset();
   });
 
-  test("GETs /api/asiakas/person/list/<asiakasId>/0 when no role filter", async () => {
+  test("GETs /api/asiakas/person/list/<asiakasId>/0 when no role filter; roleTypeId null", async () => {
     (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
       { personId: 5351, personFirstName: "Juha", personLastName: "Urho", personEmail: "j@example.com" },
     ]);
     const result = await runCustomerPersonList(mockClient, 26);
     expect(mockClient.get).toHaveBeenCalledWith("/api/asiakas/person/list/26/0");
     expect(result.items).toHaveLength(1);
-    expect(result.items[0]).toMatchObject({ personId: 5351, name: "Juha Urho" });
+    expect(result.items[0]).toMatchObject({ personId: 5351, name: "Juha Urho", roleTypeId: null });
+    expect(result.items[0].permissionRoles).toBeUndefined();
     expect(result.nextCursor).toBeNull();
     expect(result.count).toBe(1);
   });
@@ -86,5 +87,23 @@ describe("runCustomerPersonList", () => {
 
   test("throws on unknown role", async () => {
     await expect(runCustomerPersonList(mockClient, 26, "notArole")).rejects.toThrow(/unknown role/i);
+  });
+
+  test("--include-roles fans out per person and resolves permissionRoles (unnamed typeIds dropped)", async () => {
+    const get = mockClient.get as ReturnType<typeof vi.fn>;
+    // 1st GET = the person list; 2nd GET = that person's asiakasPersonSettings.
+    get
+      .mockResolvedValueOnce([
+        { personId: 63, personFirstName: "Sami", personLastName: "Urho", personEmail: "sami@example.com" },
+      ])
+      .mockResolvedValueOnce([
+        { asiakasPersonSettingId: 10, asiakasPersonSettingTypeId: 2 }, // asiakasAdmin
+        { asiakasPersonSettingId: 14, asiakasPersonSettingTypeId: 9 }, // tyosuhteessa
+        { asiakasPersonSettingId: 18, asiakasPersonSettingTypeId: 3 }, // unnamed → dropped
+      ]);
+    const result = await runCustomerPersonList(mockClient, 27, undefined, true);
+    expect(get).toHaveBeenNthCalledWith(1, "/api/asiakas/person/list/27/0");
+    expect(get).toHaveBeenNthCalledWith(2, "/api/asiakasPersonSettings/get/27/63");
+    expect(result.items[0].permissionRoles).toEqual(["asiakasAdmin", "tyosuhteessa"]);
   });
 });
