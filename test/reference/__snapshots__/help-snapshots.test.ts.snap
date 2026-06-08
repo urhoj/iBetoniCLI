@@ -285,7 +285,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  { ...flat customer, action: 'created'|'updated' } (or { action: 'would-*', dryRun } on --dry-run)
+  { ...flat customer, action: 'created'|'updated' } (action 'updated' also carries changed:boolean|null) · { action: 'would-*', dryRun } on --dry-run
 
 ERRORS (stderr, exit non-zero)
   400  No ytunnus key, or >1 customers share the ytunnus (ambiguous) → provide --ytunnus/--from-prh; for an ambiguous match use \`ib customer update <id>\`
@@ -406,12 +406,13 @@ FLAGS
   --cursor STRING    Pagination cursor
   --full BOOLEAN    Return full customer fields + companyDescription (not just id/name/ytunnus/type)
   --ids STRING    Comma-separated asiakasIds to return ALL of (max 1000) — preferred for targeted/incremental fetches
+  --include STRING    Expand each row with per-customer arrays: contacts and/or sijainnit (CSV; best with --full)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ asiakasId, name, yTunnus, type }> + truncated:boolean · with --full the items are { ...flat customer (address, postalCode, city, email, contactPersonId, shortName, comment), companyDescription }
+  ListEnvelope<{ asiakasId, name, yTunnus, type }> + truncated:boolean · with --full the items add { address, postalCode, city, email, contactPersonId, shortName, comment, companyDescription } · with --include each item adds contacts:[{personId,name,phone,email,contactPersonTypeId}] and/or sijainnit:[{sijaintiId,name,lyh,address,sijaintiTypeId,maxDeliveryDistance,jerryActiveUntil}] · with --ids the response adds missing:[{asiakasId, reason:'not_owned'|'not_found'}] for requested ids that didn't return
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
@@ -423,6 +424,7 @@ EXAMPLES
   ib customer list --limit 50 --pretty
   ib customer list --full
   ib customer list --ids 26,42,1349 --full
+  ib customer list --ids 26,42 --full --include contacts,sijainnit
 "
 `;
 
@@ -740,7 +742,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  flat customer shape (or wouldUpdate on --dry-run)
+  flat customer shape + changed:boolean|null (whether anything actually changed vs an idempotent no-op; null = undetermined) · wouldUpdate on --dry-run
 
 ERRORS (stderr, exit non-zero)
   404  Customer not found     → verify asiakasId
@@ -1037,7 +1039,7 @@ exports[`Help snapshots — contract stability > help for ib jerry provider-sett
   ib jerry provider-settings set [flags]
 
 DESCRIPTION
-  Upsert a provider company's BetoniJerry settings (PUT /api/jerry-provider-settings). Partial-payload-safe: only the body keys present are written (omit a key to preserve it). jerryPersonId must belong to the target company. --asiakas targets another company. Requires --reason.
+  Upsert a provider company's BetoniJerry settings (PUT /api/jerry-provider-settings). Partial-payload-safe: only the body keys present are written (omit a key to preserve it). jerryPersonId must belong to the target company. --asiakas targets another company. Returns the FULL saved settings (no follow-up GET needed) plus changed:boolean (whether anything actually changed vs an idempotent no-op). companyDescription is nvarchar — ä/ö are preserved. Requires --reason.
   Permissions: requires edit-tier on the target company (tarjousAdmin / company admin).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -1055,7 +1057,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  { asiakasId } or { dryRun: true, wouldUpdate: {...} }
+  { asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, openingHours, companyDescription, maintainsOrderInfo, changed } · { dryRun: true, wouldUpdate: {...} } on --dry-run
 
 ERRORS (stderr, exit non-zero)
   400  Invalid field / contact not in company → check jerryPersonId belongs to the company

@@ -334,15 +334,17 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "cursor", type: "string", description: "Pagination cursor" },
       { name: "full", type: "boolean", description: "Return full customer fields + companyDescription (not just id/name/ytunnus/type)" },
       { name: "ids", type: "string", description: "Comma-separated asiakasIds to return ALL of (max 1000) — preferred for targeted/incremental fetches" },
+      { name: "include", type: "string", description: "Expand each row with per-customer arrays: contacts and/or sijainnit (CSV; best with --full)" },
     ],
     outputShape:
-      "ListEnvelope<{ asiakasId, name, yTunnus, type }> + truncated:boolean · with --full the items are { ...flat customer (address, postalCode, city, email, contactPersonId, shortName, comment), companyDescription }",
+      "ListEnvelope<{ asiakasId, name, yTunnus, type }> + truncated:boolean · with --full the items add { address, postalCode, city, email, contactPersonId, shortName, comment, companyDescription } · with --include each item adds contacts:[{personId,name,phone,email,contactPersonTypeId}] and/or sijainnit:[{sijaintiId,name,lyh,address,sijaintiTypeId,maxDeliveryDistance,jerryActiveUntil}] · with --ids the response adds missing:[{asiakasId, reason:'not_owned'|'not_found'}] for requested ids that didn't return",
     errors: permErrors("auth.page.asiakas.read"),
     examples: [
       "ib customer list",
       "ib customer list --limit 50 --pretty",
       "ib customer list --full",
       "ib customer list --ids 26,42,1349 --full",
+      "ib customer list --ids 26,42 --full --include contacts,sijainnit",
     ],
   },
   {
@@ -424,7 +426,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "body", type: "json", description: "Raw JSON body (overrides typed flags)" },
     ],
     writeFlags: true,
-    outputShape: "flat customer shape (or wouldUpdate on --dry-run)",
+    outputShape: "flat customer shape + changed:boolean|null (whether anything actually changed vs an idempotent no-op; null = undetermined) · wouldUpdate on --dry-run",
     errors: [
       { code: 404, meaning: "Customer not found", remedy: "verify asiakasId" },
       ...permErrors("auth.page.asiakas.edit"),
@@ -454,7 +456,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "body", type: "json", description: "Raw JSON body (overrides typed flags)" },
     ],
     writeFlags: true,
-    outputShape: "{ ...flat customer, action: 'created'|'updated' } (or { action: 'would-*', dryRun } on --dry-run)",
+    outputShape: "{ ...flat customer, action: 'created'|'updated' } (action 'updated' also carries changed:boolean|null) · { action: 'would-*', dryRun } on --dry-run",
     errors: [
       { code: 400, meaning: "No ytunnus key, or >1 customers share the ytunnus (ambiguous)", remedy: "provide --ytunnus/--from-prh; for an ambiguous match use `ib customer update <id>`" },
       ...permErrors("auth.page.asiakas.edit"),
@@ -1827,7 +1829,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib jerry provider-settings set",
     description:
-      "Upsert a provider company's BetoniJerry settings (PUT /api/jerry-provider-settings). Partial-payload-safe: only the body keys present are written (omit a key to preserve it). jerryPersonId must belong to the target company. --asiakas targets another company. Requires --reason.",
+      "Upsert a provider company's BetoniJerry settings (PUT /api/jerry-provider-settings). Partial-payload-safe: only the body keys present are written (omit a key to preserve it). jerryPersonId must belong to the target company. --asiakas targets another company. Returns the FULL saved settings (no follow-up GET needed) plus changed:boolean (whether anything actually changed vs an idempotent no-op). companyDescription is nvarchar — ä/ö are preserved. Requires --reason.",
     permissions: ["edit-tier on the target company (tarjousAdmin / company admin)"],
     flags: [
       { name: "body", type: "json", description: "JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo? }" },
@@ -1835,7 +1837,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
     ],
     writeFlags: true,
-    outputShape: "{ asiakasId } or { dryRun: true, wouldUpdate: {...} }",
+    outputShape: "{ asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, openingHours, companyDescription, maintainsOrderInfo, changed } · { dryRun: true, wouldUpdate: {...} } on --dry-run",
     errors: [
       { code: 400, meaning: "Invalid field / contact not in company", remedy: "check jerryPersonId belongs to the company" },
       { code: 403, meaning: "No edit rights on company", remedy: "use a tarjousAdmin/admin token for that company" },

@@ -57,6 +57,16 @@ describe("ib customer list/get/search", () => {
     );
   });
 
+  test("runCustomerList: appends include (contacts,sijainnit) when set", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [], nextCursor: null, count: 0,
+    });
+    await runCustomerList(mockClient, { full: true, ids: [1], include: ["contacts", "sijainnit"] });
+    expect(mockClient.get).toHaveBeenCalledWith(
+      "/api/cli/customer/list?full=1&ids=1&include=contacts%2Csijainnit"
+    );
+  });
+
   test("runCustomerGet: GET /api/cli/customer/get/1349", async () => {
     (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       asiakasId: 1349,

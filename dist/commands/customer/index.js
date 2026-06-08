@@ -19,6 +19,8 @@ export async function runCustomerList(client, opts) {
         params.set("full", "1");
     if (opts.ids && opts.ids.length > 0)
         params.set("ids", opts.ids.join(","));
+    if (opts.include && opts.include.length > 0)
+        params.set("include", opts.include.join(","));
     const qs = params.toString();
     return client.get(`/api/cli/customer/list${qs ? `?${qs}` : ""}`);
 }
@@ -85,7 +87,8 @@ export async function runCustomerUpsert(client, opts, flags) {
         const res = await runCustomerUpdate(client, current.asiakasId, updateBody, flags);
         if (flags.dryRun)
             return { action: "would-update", asiakasId: current.asiakasId, dryRun: res };
-        return { ...(await runCustomerGet(client, current.asiakasId)), action: "updated" };
+        const changed = res?.changed ?? null;
+        return { ...(await runCustomerGet(client, current.asiakasId)), action: "updated", changed };
     }
     // No match → create. PRH is fetched only here (not on update).
     const ownerAsiakasId = await resolveCurrentOwnerAsiakasId(client);
@@ -616,17 +619,22 @@ export function registerCustomerCommands(parent, getClient) {
         .option("--cursor <c>", "Pagination cursor")
         .option("--full", "Return full customer fields + companyDescription (not just id/name/ytunnus/type)")
         .option("--ids <csv>", "Comma-separated asiakasIds to return (e.g. 1,2,3)")
+        .option("--include <csv>", "Expand each row with per-customer arrays: contacts and/or sijainnit (best with --full)")
         .action(async (opts) => {
         try {
             const client = await getClient();
             const ids = typeof opts.ids === "string"
                 ? opts.ids.split(",").map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0)
                 : undefined;
+            const include = typeof opts.include === "string"
+                ? opts.include.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
+                : undefined;
             const result = await runCustomerList(client, {
                 limit: opts.limit,
                 cursor: opts.cursor,
                 full: opts.full,
                 ids,
+                include,
             });
             writeJson(result);
         }
@@ -879,7 +887,10 @@ export function registerCustomerCommands(parent, getClient) {
                 writeJson(res);
                 return;
             }
-            writeJson(await runCustomerGet(client, asiakasId));
+            // Surface whether the write actually changed anything (vs an idempotent
+            // no-op) alongside the re-fetched record.
+            const changed = res?.changed ?? null;
+            writeJson({ ...(await runCustomerGet(client, asiakasId)), changed });
         }
         catch (e) {
             exitWithError(e);
