@@ -108,6 +108,9 @@ export function registerVersionCommand(
       const endpoint = await getEndpoint();
       const report = await runVersion({ endpoint, cliVersion });
       writeJson(report);
-      if (!report.reachable) process.exit(7);
+      // Unreachable → exit 7 (network). Set the code and RETURN (don't
+      // process.exit) so the JSON on stdout drains first — a hard exit truncates
+      // piped output on Windows, and piped stdout is this CLI's primary mode.
+      if (!report.reachable) process.exitCode = 7;
     });
 }
