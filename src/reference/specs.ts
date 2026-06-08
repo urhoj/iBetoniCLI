@@ -1102,7 +1102,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "asiakas", type: "number", description: "Owning asiakasId" },
     ],
     writeFlags: true,
-    outputShape: "{ vehicleId } | { dryRun, wouldUpdate }",
+    outputShape: "On write: the saved vehicle record. With --dry-run: { dryRun: true, wouldUpdate } (previewed client-side; /api/vehicle/save does not honour X-Dry-Run).",
     errors: [
       { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
       ...permErrors("auth.page.vehicle.edit"),

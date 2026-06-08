@@ -3083,7 +3083,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  { vehicleId } | { dryRun, wouldUpdate }
+  On write: the saved vehicle record. With --dry-run: { dryRun: true, wouldUpdate } (previewed client-side; /api/vehicle/save does not honour X-Dry-Run).
 
 ERRORS (stderr, exit non-zero)
   404  Vehicle not found      → verify vehicleId

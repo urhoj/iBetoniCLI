@@ -168,6 +168,42 @@ describe("runVehicleUpdate", () => {
       runVehicleUpdate(c, 999, { memo: "x" }, {})
     ).rejects.toMatchObject({ exitCode: 5 });
   });
+
+  test("dryRun: does not POST and returns merged preview", async () => {
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      {
+        vehicleId: 53,
+        asiakasId: 1349,
+        vehicleNimi: "Truck",
+        vehicleRegNo: "OLD-5",
+        vehicleTypeId: 1,
+        vehiclePuomi: 0,
+        memo: null,
+        showInGrid: true,
+        hasGpsTracking: false,
+        vehicleM3: 8,
+        defaultKuski_personId: null,
+        sortNo: 1,
+        showInReports: true,
+        useNoDriverBar: false,
+        tuoteId: null,
+        isRestricted: false,
+        multiTenantVisibility: false,
+        defaultVisibilityAsiakasIds: null,
+        firstDate: null,
+        lastDate: null,
+        vehicleNo: 1,
+      },
+    ]);
+    const out = await runVehicleUpdate(
+      c,
+      53,
+      { vehicleM3: 9 },
+      { dryRun: true, reason: "test" }
+    );
+    expect(c.post).not.toHaveBeenCalled();
+    expect(out).toMatchObject({ dryRun: true, wouldUpdate: expect.objectContaining({ vehicleId: 53, vehicleM3: 9 }) });
+  });
 });
 
 describe("ib vehicle dates", () => {
