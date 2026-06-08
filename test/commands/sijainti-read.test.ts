@@ -237,9 +237,8 @@ describe("ib sijainti distance", () => {
       "60.17,24.94",
       "61.49,23.78"
     );
-    expect(get).toHaveBeenNthCalledWith(1, "/api/company-selection/available");
-    expect(get).toHaveBeenNthCalledWith(
-      2,
+    expect(get).toHaveBeenCalledWith("/api/company-selection/available");
+    expect(get).toHaveBeenCalledWith(
       "/api/geocode/getDrivingDistance/60.17/24.94/61.49/23.78/1349"
     );
     expect(result).toMatchObject({ matkaM: 12345, matkaMin: 18 });
@@ -251,9 +250,8 @@ describe("ib sijainti distance", () => {
       .mockResolvedValueOnce({ currentCompanyId: 26 }) // available
       .mockResolvedValueOnce({ matkaM: 500, matkaAika: 2 });
     const result = await runSijaintiDistance(mockClient, "7", "60.0,24.0");
-    expect(get).toHaveBeenNthCalledWith(1, "/api/geocode/sijainti/get/7");
-    expect(get).toHaveBeenNthCalledWith(
-      3,
+    expect(get).toHaveBeenCalledWith("/api/geocode/sijainti/get/7");
+    expect(get).toHaveBeenCalledWith(
       "/api/geocode/getDrivingDistance/60.17/24.94/60/24/26"
     );
     expect((result as { matkaM: number }).matkaM).toBe(500);

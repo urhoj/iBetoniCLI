@@ -212,12 +212,14 @@ export interface PersonMeOutput {
  */
 export async function runPersonMe(client: ApiClient): Promise<PersonMeOutput> {
   const claims = decodeJwtPayload(client.getCurrentToken());
-  const profile = await client.get<{
-    personId: number; name: string | null; email: string | null; phone: string | null; roles: number[];
-  }>(`/api/cli/person/get/${claims.personId}`);
-  const available = await client.get<{
-    companies: { asiakasId: number; asiakasNimi?: string; name?: string }[]; currentCompanyId: number;
-  }>(`/api/company-selection/available`);
+  const [profile, available] = await Promise.all([
+    client.get<{
+      personId: number; name: string | null; email: string | null; phone: string | null; roles: number[];
+    }>(`/api/cli/person/get/${claims.personId}`),
+    client.get<{
+      companies: { asiakasId: number; asiakasNimi?: string; name?: string }[]; currentCompanyId: number;
+    }>(`/api/company-selection/available`),
+  ]);
   const companies = available.companies || [];
   const active = companies.find((c) => c.asiakasId === available.currentCompanyId);
   return {

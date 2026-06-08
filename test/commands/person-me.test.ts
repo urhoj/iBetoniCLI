@@ -32,8 +32,8 @@ describe("runPersonMe", () => {
         currentCompanyId: 1349,
       });
     const result = await runPersonMe(mockClient);
-    expect((mockClient.get as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe("/api/cli/person/get/6233");
-    expect((mockClient.get as ReturnType<typeof vi.fn>).mock.calls[1][0]).toBe("/api/company-selection/available");
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/person/get/6233");
+    expect(mockClient.get).toHaveBeenCalledWith("/api/company-selection/available");
     expect(result.personId).toBe(6233);
     expect(result.activeCompany).toEqual({ asiakasId: 1349, name: "BetoniJerry" });
     expect(result.roles).toEqual([

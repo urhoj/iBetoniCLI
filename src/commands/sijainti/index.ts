@@ -367,6 +367,21 @@ function parseCoordToken(token: string): { lat: number; lng: number } | null {
 }
 
 /**
+ * Synchronously validate a distance point token. Returns the coords if it is a
+ * "lat,lng" string, returns the integer sijaintiId if it is a bare id, or
+ * throws a validation error (caller exits 4) if it is neither.
+ */
+function parseDistanceToken(token: string): { lat: number; lng: number } | number {
+  const coord = parseCoordToken(token);
+  if (coord) return coord;
+  const id = Number(token);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error(`invalid point '${token}' — use 'lat,lng' or a sijaintiId`);
+  }
+  return id;
+}
+
+/**
  * Resolve a distance endpoint token to coordinates. Accepts "lat,lng" or a
  * bare sijaintiId (resolved via runSijaintiGet → its lat/lng). Throws a
  * validation error (caller exits 4) on a malformed token or a sijainti with
@@ -376,15 +391,11 @@ async function resolveDistancePoint(
   client: ApiClient,
   token: string
 ): Promise<{ lat: number; lng: number }> {
-  const coord = parseCoordToken(token);
-  if (coord) return coord;
-  const id = Number(token);
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new Error(`invalid point '${token}' — use 'lat,lng' or a sijaintiId`);
-  }
-  const row = (await runSijaintiGet(client, id)) as { lat?: number; lng?: number };
+  const parsed = parseDistanceToken(token);
+  if (typeof parsed === "object") return parsed;
+  const row = (await runSijaintiGet(client, parsed)) as { lat?: number; lng?: number };
   if (typeof row.lat !== "number" || typeof row.lng !== "number") {
-    throw new Error(`sijainti ${id} has no coordinates`);
+    throw new Error(`sijainti ${parsed} has no coordinates`);
   }
   return { lat: row.lat, lng: row.lng };
 }
@@ -405,10 +416,15 @@ export async function runSijaintiDistance(
   from: { lat: number; lng: number };
   to: { lat: number; lng: number };
 }> {
-  // Resolve sequentially so the mocked call order in tests is deterministic.
-  const from = await resolveDistancePoint(client, fromToken);
-  const to = await resolveDistancePoint(client, toToken);
-  const ownerAsiakasId = await resolveOwnerAsiakasId(client);
+  // Validate tokens synchronously before issuing any network calls so that a
+  // malformed token rejects immediately without touching the API.
+  parseDistanceToken(fromToken);
+  parseDistanceToken(toToken);
+  const [from, to, ownerAsiakasId] = await Promise.all([
+    resolveDistancePoint(client, fromToken),
+    resolveDistancePoint(client, toToken),
+    resolveOwnerAsiakasId(client),
+  ]);
   const raw = await client.get<{ matkaM?: number; matkaAika?: number }>(
     `/api/geocode/getDrivingDistance/${from.lat}/${from.lng}/${to.lat}/${to.lng}/${ownerAsiakasId}`
   );
