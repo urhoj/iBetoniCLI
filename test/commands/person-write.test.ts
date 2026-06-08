@@ -5,7 +5,11 @@ import {
   runPersonDelete,
   buildPersonCreateBody,
   missingPersonCreateFields,
+  extractPersonId,
+  isDuplicateEmailError,
+  runPersonByEmail,
 } from "../../src/commands/person/index.js";
+import { CliError } from "../../src/api/errors.js";
 import type { ApiClient } from "../../src/api/client.js";
 
 const mockClient = {
@@ -65,6 +69,47 @@ describe("missingPersonCreateFields", () => {
       "--first (personFirstName)",
       "--last (personLastName)",
     ]);
+  });
+});
+
+describe("extractPersonId", () => {
+  test("reads returnValue at top level and nested under data", () => {
+    expect(extractPersonId({ returnValue: 6263 })).toBe(6263);
+    expect(extractPersonId({ status: "ok", data: { returnValue: 6263 } })).toBe(6263);
+  });
+  test("falls back to recordset[0].personId", () => {
+    expect(extractPersonId({ data: { recordset: [{ personId: 42 }] } })).toBe(42);
+  });
+  test("returns null when no id is present", () => {
+    expect(extractPersonId({ status: "ok", data: {} })).toBeNull();
+    expect(extractPersonId(null)).toBeNull();
+  });
+});
+
+describe("isDuplicateEmailError", () => {
+  test("true for a 400 CliError saying the email is already in use", () => {
+    const e = new CliError("Bad Request", 400, { error: "Sähköpostiosoite on jo käytössä." }, 4);
+    expect(isDuplicateEmailError(e)).toBe(true);
+  });
+  test("false for other 400s and non-CliErrors", () => {
+    expect(isDuplicateEmailError(new CliError("Bad Request", 400, { error: "Missing field" }, 4))).toBe(false);
+    expect(isDuplicateEmailError(new Error("boom"))).toBe(false);
+  });
+});
+
+describe("runPersonByEmail", () => {
+  beforeEach(() => { (mockClient.get as ReturnType<typeof vi.fn>).mockReset(); });
+  test("returns a tidy person from the by-email recordset", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      { personId: 6263, personFirstName: "Matti", personLastName: "Virtanen", personEmail: "m@x.com" },
+    ]);
+    const r = await runPersonByEmail(mockClient, "m@x.com");
+    expect(mockClient.get).toHaveBeenCalledWith("/api/person/getPersonByEmail/m%40x.com");
+    expect(r).toEqual({ personId: 6263, name: "Matti Virtanen", email: "m@x.com" });
+  });
+  test("returns null on an empty result", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    expect(await runPersonByEmail(mockClient, "x@y.com")).toBeNull();
   });
 });
 

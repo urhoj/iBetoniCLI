@@ -9,6 +9,7 @@ import {
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { roleNameForTypeId, resolveRoleTypeId } from "../../roles.js";
+import { CliError } from "../../api/errors.js";
 
 export interface PersonListFilter {
   role?: string;
@@ -323,16 +324,22 @@ export function registerPersonCommands(
     .description(
       "Create a person. Required: --first, --last. --email is OPTIONAL (phone-only " +
         "contacts are fine; add the email later). --asiakas defaults to your active " +
-        "company. Use typed flags or --body JSON (typed flags win). Requires --reason."
+        "company. Returns the created person record (clean {personId, ...}). With " +
+        "--get-or-create a duplicate email returns the existing person (reused:true) " +
+        "instead of failing. Use typed flags or --body JSON (typed flags win). Requires --reason."
     )
     .option("--first <s>", "personFirstName (required)")
     .option("--last <s>", "personLastName (required)")
     .option("--phone <s>", "personPhone")
     .option("--email <s>", "personEmail (optional)")
     .option("--asiakas <id>", "Owner asiakasId (defaults to your active company)", Number)
+    .option(
+      "--get-or-create",
+      "On a duplicate email, return the existing person (reused:true) instead of failing"
+    )
     .option("--body <json>", "Raw JSON body (merged under typed flags)");
   addWriteFlagsToCommand(createCmd).action(
-    async (opts: WriteFlags & PersonCreateFlags & { body?: string }) => {
+    async (opts: WriteFlags & PersonCreateFlags & { getOrCreate?: boolean; body?: string }) => {
       if (!opts.reason) {
         writeError(new Error("Missing required flag: --reason"));
         process.exit(4);
@@ -365,8 +372,35 @@ export function registerPersonCommands(
         if (body.ownerAsiakasId === undefined || body.ownerAsiakasId === null) {
           body.ownerAsiakasId = await resolveOwnerAsiakasId(client);
         }
-        const result = await runPersonCreate(client, body, opts);
-        writeJson(result);
+        let res: unknown;
+        try {
+          res = await runPersonCreate(client, body, opts);
+        } catch (e) {
+          // --get-or-create: a duplicate email isn't a failure — return the
+          // person that already owns it (so bulk onboarding is idempotent).
+          if (opts.getOrCreate && body.personEmail && isDuplicateEmailError(e)) {
+            const existing = await runPersonByEmail(client, String(body.personEmail));
+            if (existing) {
+              writeJson({ ...existing, reused: true });
+              return;
+            }
+          }
+          throw e;
+        }
+        // Dry-run returns the backend's wouldCreate echo verbatim.
+        if (opts.dryRun) {
+          writeJson(res);
+          return;
+        }
+        // Return a clean person record (re-fetched) instead of the raw SQL
+        // recordset (returnValue:N) the create proc emits.
+        const newId = extractPersonId(res);
+        if (!newId) {
+          writeJson(res);
+          return;
+        }
+        const created = await runPersonGet(client, newId);
+        writeJson(opts.getOrCreate ? { ...created, reused: false } : created);
       } catch (e) {
         exitWithError(e);
       }
@@ -548,6 +582,61 @@ async function resolveOwnerAsiakasId(client: ApiClient): Promise<number> {
     );
   }
   return available.currentCompanyId;
+}
+
+/** Pull the new personId out of newPerson's response (tolerant of legacy shapes). */
+export function extractPersonId(res: unknown): number | null {
+  const r = res as Record<string, unknown> | null;
+  if (!r || typeof r !== "object") return null;
+  const data = r.data as Record<string, unknown> | undefined;
+  const candidates = [
+    r.returnValue,
+    data?.returnValue,
+    r.personId,
+    (r.recordset as Array<Record<string, unknown>> | undefined)?.[0]?.personId,
+    (data?.recordset as Array<Record<string, unknown>> | undefined)?.[0]?.personId,
+  ];
+  for (const c of candidates) {
+    const n = Number(c);
+    if (Number.isInteger(n) && n > 0) return n;
+  }
+  return null;
+}
+
+/** True when an error is the backend's "email already in use" 400 from newPerson. */
+export function isDuplicateEmailError(e: unknown): boolean {
+  if (!(e instanceof CliError) || e.statusCode !== 400) return false;
+  const hay = `${e.message} ${JSON.stringify(e.body ?? "")}`.toLowerCase();
+  return hay.includes("käytössä") || hay.includes("already in use") || hay.includes("duplicate");
+}
+
+interface PersonByEmailRow {
+  personId: number;
+  personFirstName?: string;
+  personLastName?: string;
+  personEmail?: string;
+}
+
+/**
+ * GET /api/person/getPersonByEmail/:email — look up a person by exact email
+ * (proc person_getByEmail; email is globally unique, so NOT tenant-scoped).
+ * Used by `person create --get-or-create` to recover the person that already
+ * owns an email. Returns a tidy {personId,name,email} or null.
+ */
+export async function runPersonByEmail(
+  client: ApiClient,
+  email: string
+): Promise<{ personId: number; name: string | null; email: string | null } | null> {
+  const rows = await client.get<PersonByEmailRow[]>(
+    `/api/person/getPersonByEmail/${encodeURIComponent(email)}`
+  );
+  const row = Array.isArray(rows) ? rows[0] : undefined;
+  if (!row || !row.personId) return null;
+  return {
+    personId: row.personId,
+    name: `${row.personFirstName || ""} ${row.personLastName || ""}`.trim() || null,
+    email: row.personEmail || null,
+  };
 }
 
 /**

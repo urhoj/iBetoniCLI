@@ -6,6 +6,7 @@ import {
   runSijaintiUndelete,
   buildSijaintiBody,
   applySijaintiCreateDefaults,
+  extractGeocodeLatLng,
 } from "../../src/commands/sijainti/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -142,6 +143,22 @@ describe("applySijaintiCreateDefaults", () => {
   test("reports missing required name and type", () => {
     const { missing } = applySijaintiCreateDefaults({});
     expect(missing).toEqual(["--name (sijaintiNimi)", "--type (sijaintiTypeId)"]);
+  });
+});
+
+describe("extractGeocodeLatLng", () => {
+  test("reads results[0].geometry.location (raw Google shape)", () => {
+    expect(
+      extractGeocodeLatLng({ status: "OK", results: [{ geometry: { location: { lat: 60.17, lng: 24.94 } } }] })
+    ).toEqual({ lat: 60.17, lng: 24.94 });
+  });
+  test("falls back to a top-level lat/lng", () => {
+    expect(extractGeocodeLatLng({ lat: 60.1, lng: 24.9 })).toEqual({ lat: 60.1, lng: 24.9 });
+  });
+  test("returns null for ZERO_RESULTS / missing / 0,0", () => {
+    expect(extractGeocodeLatLng({ status: "ZERO_RESULTS" })).toBeNull();
+    expect(extractGeocodeLatLng({ lat: 0, lng: 0 })).toBeNull();
+    expect(extractGeocodeLatLng(null)).toBeNull();
   });
 });
 

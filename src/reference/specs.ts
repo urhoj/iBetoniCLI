@@ -1224,6 +1224,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "lyh", type: "string", description: "sijaintiLyh — short code/abbreviation, ≤50 chars (defaults to --name)" },
       { name: "max-distance", type: "number", description: "maxDeliveryDistance in km (default 50)" },
       { name: "asiakas", type: "number", description: "Owner asiakasId (defaults to your active company)" },
+      { name: "geocode", type: "boolean", description: "Auto-fill lat/lng from the address via Google Maps when coordinates are not given" },
     ],
     writeFlags: true,
     outputShape: "{ sijaintiId, ... } (raw backend response)",
@@ -1233,6 +1234,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     examples: [
       'ib sijainti create --name "Depot A" --type 1',
+      'ib sijainti create --name "Depot A" --address "Industrial St 1, Helsinki" --type 1 --geocode',
       'ib sijainti create --name "Depot A" --address "Industrial St 1" --type 1 --lat 60.17 --lng 24.94 --lyh "DEP-A" --max-distance 80',
       "ib sijainti create --body '{\"sijaintiNimi\":\"Depot A\",\"sijaintiTypeId\":1}'",
     ],
@@ -1606,7 +1608,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib person create",
     description:
-      "Create a person. REQUIRED: --first, --last. --email is OPTIONAL (personEmail is nullable; phone-only contacts are fine and the email can be added later via `ib person update`). --asiakas defaults to your active company. Use typed flags or --body JSON (typed flags win). Requires --reason.",
+      "Create a person. REQUIRED: --first, --last. --email is OPTIONAL (personEmail is nullable; phone-only contacts are fine and the email can be added later via `ib person update`). --asiakas defaults to your active company. Returns the created person record (clean {personId, ...}), NOT the raw SQL recordset. With --get-or-create a duplicate email returns the existing person (reused:true) instead of failing — useful for idempotent bulk onboarding. Use typed flags or --body JSON (typed flags win). Requires --reason.",
     permissions: ["auth.page.person.edit"],
     flags: [
       { name: "first", type: "string", description: "personFirstName (REQUIRED)" },
@@ -1614,18 +1616,19 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "phone", type: "string", description: "personPhone" },
       { name: "email", type: "string", description: "personEmail (optional)" },
       { name: "asiakas", type: "number", description: "Owner asiakasId (defaults to your active company)" },
+      { name: "get-or-create", type: "boolean", description: "On a duplicate email, return the existing person (reused:true) instead of failing" },
       { name: "body", type: "json", description: "Raw JSON body, merged under typed flags (optional)" },
       { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
     ],
     writeFlags: true,
-    outputShape: "{ personId: number, ... } or { dryRun: true, wouldCreate: ... }",
+    outputShape: "{ personId, name, email, ... } (re-fetched) · with --get-or-create adds reused:boolean · dry-run: { dryRun: true, wouldCreate: ... }",
     errors: [
-      { code: 400, meaning: "Missing required field", remedy: "provide --first and --last (email is optional)" },
+      { code: 400, meaning: "Missing required field, or duplicate email without --get-or-create", remedy: "provide --first and --last (email is optional); add --get-or-create to reuse an existing email" },
       ...permErrors("auth.page.person.edit"),
     ],
     examples: [
       'ib person create --first Matti --last Virtanen --phone "+358501234567" --reason "phone contact"',
-      'ib person create --first Matti --last Virtanen --email m@x.com --reason "onboard"',
+      'ib person create --first Matti --last Virtanen --email m@x.com --get-or-create --reason "onboard"',
       'ib person create --body \'{"personFirstName":"Matti","personLastName":"M"}\' --reason "onboard"',
     ],
   },

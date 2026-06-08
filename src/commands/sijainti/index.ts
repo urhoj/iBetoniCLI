@@ -89,6 +89,25 @@ export function applySijaintiCreateDefaults(body: Record<string, unknown>): {
   return { body, missing };
 }
 
+/**
+ * Pull {lat,lng} out of the /api/geocode/getLatLng response — the raw Google
+ * Geocoding payload (`results[0].geometry.location`), with a top-level
+ * {lat,lng} fallback. Returns null for ZERO_RESULTS / error / 0,0 shapes.
+ */
+export function extractGeocodeLatLng(geo: unknown): { lat: number; lng: number } | null {
+  const g = geo as Record<string, unknown> | null;
+  if (!g || typeof g !== "object") return null;
+  const loc =
+    (g.results as Array<{ geometry?: { location?: { lat?: unknown; lng?: unknown } } }> | undefined)?.[0]
+      ?.geometry?.location ?? { lat: g.lat, lng: g.lng };
+  const lat = Number(loc?.lat);
+  const lng = Number(loc?.lng);
+  if (Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0)) {
+    return { lat, lng };
+  }
+  return null;
+}
+
 export interface SijaintiListFilter {
   type?: string;
   limit?: number;
@@ -452,6 +471,7 @@ export function registerSijaintiCommands(
     .description(
       "Create a new sijainti (POST /api/geocode/sijainti/add). Required: --name, --type. " +
         "--lyh defaults to --name (≤50 chars), --max-distance to 50, --asiakas to your active company. " +
+        "--geocode auto-fills lat/lng from the address when coordinates are not given. " +
         "Use typed flags or --body JSON (typed flags win)."
     )
     .option("--body <json>", "JSON object forwarded as the request body")
@@ -462,7 +482,11 @@ export function registerSijaintiCommands(
     .option("--lng <n>", "Longitude", Number)
     .option("--lyh <s>", "sijaintiLyh — short code/abbreviation (≤50 chars; defaults to --name)")
     .option("--max-distance <n>", "maxDeliveryDistance in km (default 50)", Number)
-    .option("--asiakas <id>", "Owner asiakasId (defaults to your active company)", Number);
+    .option("--asiakas <id>", "Owner asiakasId (defaults to your active company)", Number)
+    .option(
+      "--geocode",
+      "Auto-fill lat/lng from the address via Google Maps when coordinates are not given"
+    );
   addWriteFlagsToCommand(createCmd).action(
     async (opts: {
       body?: string;
@@ -474,6 +498,7 @@ export function registerSijaintiCommands(
       lyh?: string;
       maxDistance?: number;
       asiakas?: number;
+      geocode?: boolean;
       dryRun?: boolean;
       idempotencyKey?: string;
       reason?: string;
@@ -505,6 +530,24 @@ export function registerSijaintiCommands(
         if (missing.length > 0) {
           writeError(new Error(`create requires: ${missing.join(", ")}`));
           process.exit(4);
+        }
+        // --geocode: eagerly resolve lat/lng from the address (otherwise the row
+        // is created without coordinates and a nightly job backfills them later).
+        if (opts.geocode && (body.lat === undefined || body.lat === null || body.lng === undefined || body.lng === null)) {
+          const address = typeof body.sijaintiOsoite1 === "string" ? body.sijaintiOsoite1 : "";
+          if (!address) {
+            writeError(new Error("--geocode requires --address (or sijaintiOsoite1 in --body)"));
+            process.exit(4);
+          }
+          const geo = await runSijaintiGeocode(client, address);
+          const coords = extractGeocodeLatLng(geo);
+          if (!coords) {
+            const status = (geo as { status?: string } | null)?.status ?? "no match";
+            writeError(new Error(`could not geocode address "${address}" (status: ${status})`));
+            process.exit(4);
+          }
+          body.lat = coords.lat;
+          body.lng = coords.lng;
         }
         const result = await runSijaintiCreate(client, body, {
           dryRun: opts.dryRun,
