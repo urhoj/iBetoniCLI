@@ -1,1 +1,1 @@
-{"version":3,"file":"envelopes.js","sourceRoot":"","sources":["../../src/api/envelopes.ts"],"names":[],"mappings":"AAMA,MAAM,UAAU,cAAc,CAAC,KAAc;IAC3C,OAAO,CACL,CAAC,CAAC,KAAK;QACP,OAAO,KAAK,KAAK,QAAQ;QACzB,KAAK,CAAC,OAAO,CAAE,KAA6B,CAAC,KAAK,CAAC,CACpD,CAAC;AACJ,CAAC"}
+{"version":3,"file":"envelopes.js","sourceRoot":"","sources":["../../src/api/envelopes.ts"],"names":[],"mappings":"AAQA,MAAM,UAAU,cAAc,CAAC,KAAc;IAC3C,OAAO,CACL,CAAC,CAAC,KAAK;QACP,OAAO,KAAK,KAAK,QAAQ;QACzB,KAAK,CAAC,OAAO,CAAE,KAA6B,CAAC,KAAK,CAAC,CACpD,CAAC;AACJ,CAAC"}

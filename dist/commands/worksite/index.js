@@ -1,6 +1,7 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
+import { parseJsonBodyFlag } from "../../api/parseBody.js";
 /**
  * GET /api/cli/worksite/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
@@ -11,6 +12,8 @@ export async function runWorksiteList(client, opts) {
         params.set("limit", String(opts.limit));
     if (opts.cursor)
         params.set("cursor", opts.cursor);
+    if (opts.customer !== undefined)
+        params.set("customer", String(opts.customer));
     const qs = params.toString();
     return client.get(`/api/cli/worksite/list${qs ? `?${qs}` : ""}`);
 }
@@ -27,8 +30,11 @@ export async function runWorksiteGet(client, tyomaaId) {
  * ownerAsiakasId is in the body, so the CLI sends only searchString. Result
  * shape is whatever the backend returns (typically an array of tyomaa records).
  */
-export async function runWorksiteSearch(client, query) {
-    return client.post("/api/tyomaa/search", { searchString: query });
+export async function runWorksiteSearch(client, query, limit) {
+    const body = { searchString: query };
+    if (limit !== undefined)
+        body.limit = limit;
+    return client.post("/api/tyomaa/search", body);
 }
 /**
  * POST /api/tyomaa/new with a free-form body forwarded to the existing BE
@@ -196,10 +202,11 @@ export function registerWorksiteCommands(parent, getClient) {
         .description("List worksites")
         .option("--limit <n>", "Max rows", (v) => Math.min(Number(v), 500))
         .option("--cursor <c>", "Pagination cursor")
+        .option("--customer <n>", "Filter by parent asiakasId", (v) => Number(v))
         .action(async (opts) => {
         try {
             const client = await getClient();
-            const result = await runWorksiteList(client, opts);
+            const result = await runWorksiteList(client, { limit: opts.limit, cursor: opts.cursor, customer: opts.customer });
             writeJson(result);
         }
         catch (e) {
@@ -258,10 +265,11 @@ export function registerWorksiteCommands(parent, getClient) {
     });
     w.command("search <query>")
         .description("Free-text search for worksites")
-        .action(async (query) => {
+        .option("--limit <n>", "Max results", (v) => Math.min(Number(v), 500))
+        .action(async (query, opts) => {
         try {
             const client = await getClient();
-            const result = await runWorksiteSearch(client, query);
+            const result = await runWorksiteSearch(client, query, opts.limit);
             writeJson(result);
         }
         catch (e) {
@@ -275,7 +283,7 @@ export function registerWorksiteCommands(parent, getClient) {
     addWriteFlagsToCommand(createCmd).action(async (opts) => {
         try {
             const client = await getClient();
-            const parsed = JSON.parse(opts.body);
+            const parsed = parseJsonBodyFlag(opts.body);
             const result = await runWorksiteCreate(client, parsed, {
                 dryRun: opts.dryRun,
                 idempotencyKey: opts.idempotencyKey,
@@ -296,7 +304,7 @@ export function registerWorksiteCommands(parent, getClient) {
         try {
             const client = await getClient();
             const ownerAsiakasId = resolveOwnerAsiakasId(client);
-            const parsed = JSON.parse(opts.body);
+            const parsed = parseJsonBodyFlag(opts.body);
             const result = await runWorksiteUpdate(client, { tyomaaId: Number(idStr), ownerAsiakasId, yyyymmdd: opts.yyyymmdd }, parsed, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason });
             writeJson(result);
         }

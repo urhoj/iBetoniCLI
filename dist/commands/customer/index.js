@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveRoleTypeId } from "../../roles.js";
 /**
  * GET /api/cli/customer/list with the universal list envelope shape.
@@ -352,9 +353,11 @@ export async function runCustomerWorksites(client, asiakasId) {
  * so the CLI sends only searchString. Result shape is whatever the backend
  * returns (typically an array of asiakas records).
  */
-export async function runCustomerSearch(client, query) {
-    const qs = new URLSearchParams({ searchString: query }).toString();
-    return client.get(`/api/asiakas/search?${qs}`);
+export async function runCustomerSearch(client, query, limit) {
+    const params = new URLSearchParams({ searchString: query });
+    if (limit !== undefined)
+        params.set("limit", String(limit));
+    return client.get(`/api/asiakas/search?${params.toString()}`);
 }
 /**
  * POST /api/asiakas/createY with a free-form body forwarded to the existing
@@ -494,7 +497,7 @@ export function buildAsiakasCreateBody(flags, ownerAsiakasId, prh) {
         body.asiakasShortNimi = flags.shortName;
     applyBillingFlags(body, flags);
     if (flags.body)
-        Object.assign(body, JSON.parse(flags.body));
+        Object.assign(body, parseJsonBodyFlag(flags.body));
     return body;
 }
 /**
@@ -585,7 +588,7 @@ export function buildAsiakasUpdateBody(current, flags, prh) {
         body.asiakasTypeId = flags.type;
     applyBillingFlags(body, flags);
     if (flags.body)
-        Object.assign(body, JSON.parse(flags.body));
+        Object.assign(body, parseJsonBodyFlag(flags.body));
     return body;
 }
 /**
@@ -764,10 +767,11 @@ export function registerCustomerCommands(parent, getClient) {
     });
     c.command("search <query>")
         .description("Free-text search for customers")
-        .action(async (query) => {
+        .option("--limit <n>", "Max results", (v) => Math.min(Number(v), 500))
+        .action(async (query, opts) => {
         try {
             const client = await getClient();
-            const result = await runCustomerSearch(client, query);
+            const result = await runCustomerSearch(client, query, opts.limit);
             writeJson(result);
         }
         catch (e) {

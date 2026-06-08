@@ -1,5 +1,6 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { parseJsonBodyFlag } from "../../api/parseBody.js";
 /**
  * Wrap a backend array into the universal `{ items, nextCursor, count }` list
  * envelope. The BetoniJerry endpoints return bare arrays (sendSuccess sends raw
@@ -367,7 +368,7 @@ export function registerJerryCommands(parent, getClient) {
         requireReason(opts);
         try {
             const client = await getClient();
-            const parsed = JSON.parse(opts.body);
+            const parsed = parseJsonBodyFlag(opts.body);
             writeJson(await runJerryProviderSettingsSet(client, parsed, opts.asiakas, opts));
         }
         catch (e) {

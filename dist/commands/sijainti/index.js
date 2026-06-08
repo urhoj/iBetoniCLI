@@ -1,6 +1,7 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
+import { parseJsonBodyFlag } from "../../api/parseBody.js";
 /**
  * Sentinel `jerryActiveUntil` value meaning "enrolled in BetoniJerry, no end
  * date" — matches the EditSijainti toggle (a future/sentinel datetime = active,
@@ -258,12 +259,11 @@ function parseCoordToken(token) {
     return null;
 }
 /**
- * Resolve a distance endpoint token to coordinates. Accepts "lat,lng" or a
- * bare sijaintiId (resolved via runSijaintiGet → its lat/lng). Throws a
- * validation error (caller exits 4) on a malformed token or a sijainti with
- * no coordinates.
+ * Synchronously validate a distance point token. Returns the coords if it is a
+ * "lat,lng" string, returns the integer sijaintiId if it is a bare id, or
+ * throws a validation error (caller exits 4) if it is neither.
  */
-async function resolveDistancePoint(client, token) {
+function parseDistanceToken(token) {
     const coord = parseCoordToken(token);
     if (coord)
         return coord;
@@ -271,9 +271,21 @@ async function resolveDistancePoint(client, token) {
     if (!Number.isInteger(id) || id <= 0) {
         throw new Error(`invalid point '${token}' — use 'lat,lng' or a sijaintiId`);
     }
-    const row = (await runSijaintiGet(client, id));
+    return id;
+}
+/**
+ * Resolve a distance endpoint token to coordinates. Accepts "lat,lng" or a
+ * bare sijaintiId (resolved via runSijaintiGet → its lat/lng). Throws a
+ * validation error (caller exits 4) on a malformed token or a sijainti with
+ * no coordinates.
+ */
+async function resolveDistancePoint(client, token) {
+    const parsed = parseDistanceToken(token);
+    if (typeof parsed === "object")
+        return parsed;
+    const row = (await runSijaintiGet(client, parsed));
     if (typeof row.lat !== "number" || typeof row.lng !== "number") {
-        throw new Error(`sijainti ${id} has no coordinates`);
+        throw new Error(`sijainti ${parsed} has no coordinates`);
     }
     return { lat: row.lat, lng: row.lng };
 }
@@ -284,10 +296,15 @@ async function resolveDistancePoint(client, token) {
  * backend `{matkaM, matkaAika, ...}` to `{ matkaM, matkaMin, from, to }`.
  */
 export async function runSijaintiDistance(client, fromToken, toToken) {
-    // Resolve sequentially so the mocked call order in tests is deterministic.
-    const from = await resolveDistancePoint(client, fromToken);
-    const to = await resolveDistancePoint(client, toToken);
-    const ownerAsiakasId = await resolveOwnerAsiakasId(client);
+    // Validate tokens synchronously before issuing any network calls so that a
+    // malformed token rejects immediately without touching the API.
+    parseDistanceToken(fromToken);
+    parseDistanceToken(toToken);
+    const [from, to, ownerAsiakasId] = await Promise.all([
+        resolveDistancePoint(client, fromToken),
+        resolveDistancePoint(client, toToken),
+        resolveOwnerAsiakasId(client),
+    ]);
     const raw = await client.get(`/api/geocode/getDrivingDistance/${from.lat}/${from.lng}/${to.lat}/${to.lng}/${ownerAsiakasId}`);
     return {
         matkaM: raw.matkaM ?? null,
@@ -370,7 +387,7 @@ export function registerSijaintiCommands(parent, getClient) {
         try {
             const client = await getClient();
             const parsed = opts.body
-                ? JSON.parse(opts.body)
+                ? parseJsonBodyFlag(opts.body)
                 : {};
             const body = buildSijaintiBody(parsed, {
                 name: opts.name,
@@ -440,7 +457,7 @@ export function registerSijaintiCommands(parent, getClient) {
         try {
             const client = await getClient();
             const parsed = opts.body
-                ? JSON.parse(opts.body)
+                ? parseJsonBodyFlag(opts.body)
                 : {};
             const body = buildSijaintiBody(parsed, {
                 id: opts.id,

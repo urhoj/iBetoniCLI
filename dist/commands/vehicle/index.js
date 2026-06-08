@@ -172,6 +172,11 @@ export async function runVehicleUpdate(client, vehicleId, changes, flags) {
         hasGpsTracking: current.hasGpsTracking,
         vehicleM3: changes.vehicleM3 ?? current.vehicleM3,
     };
+    // The /api/vehicle/save route does not honour X-Dry-Run server-side, so
+    // preview the merged record client-side instead of risking a real write.
+    if (flags.dryRun) {
+        return { dryRun: true, wouldUpdate: body };
+    }
     return client.post("/api/vehicle/save", body, {
         headers: writeFlagsToHeaders(flags),
     });

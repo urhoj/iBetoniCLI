@@ -1,6 +1,6 @@
 import { writeJson, exitWithError } from "../../output/json.js";
 import { runKeikkaList } from "../keikka/index.js";
-import { todayHelsinki } from "../../dates.js";
+import { todayHelsinki, resolveDate } from "../../dates.js";
 /**
  * Add `days` to an ISO `YYYY-MM-DD` date and return the same ISO format.
  * Used for the `week` command's `start..start+6` range.
@@ -21,15 +21,17 @@ export async function runScheduleToday(client) {
  * `ib schedule day <date>` — runKeikkaList with from=to=date (ISO YYYY-MM-DD).
  */
 export async function runScheduleDay(client, date) {
-    return runKeikkaList(client, { from: date, to: date });
+    const d = resolveDate(date) ?? date;
+    return runKeikkaList(client, { from: d, to: d });
 }
 /**
  * `ib schedule week <start>` — runKeikkaList covering the 7-day window
  * [start, start+6]. `start` is an ISO YYYY-MM-DD date.
  */
 export async function runScheduleWeek(client, start) {
-    const end = addDaysISO(start, 6);
-    return runKeikkaList(client, { from: start, to: end });
+    const from = resolveDate(start) ?? start;
+    const end = addDaysISO(from, 6);
+    return runKeikkaList(client, { from, to: end });
 }
 /**
  * Register `ib schedule` subcommands on the parent commander instance:

@@ -65,8 +65,11 @@ export async function runPersonGet(client, personId) {
  * ownerAsiakasId is in the body, so the CLI sends only searchString. Result
  * shape is whatever the backend returns (typically an array of person records).
  */
-export async function runPersonSearch(client, query) {
-    return client.post("/api/person/search", { searchString: query });
+export async function runPersonSearch(client, query, limit) {
+    const body = { searchString: query };
+    if (limit !== undefined)
+        body.limit = limit;
+    return client.post("/api/person/search", body);
 }
 /**
  * GET /api/asiakasPersonSettings/get/:asiakasId/:personId — the per-company
@@ -125,8 +128,10 @@ export async function runPersonRoleRevoke(client, personId, asiakasId, roleTypeI
  */
 export async function runPersonMe(client) {
     const claims = decodeJwtPayload(client.getCurrentToken());
-    const profile = await client.get(`/api/cli/person/get/${claims.personId}`);
-    const available = await client.get(`/api/company-selection/available`);
+    const [profile, available] = await Promise.all([
+        client.get(`/api/cli/person/get/${claims.personId}`),
+        client.get(`/api/company-selection/available`),
+    ]);
     const companies = available.companies || [];
     const active = companies.find((c) => c.asiakasId === available.currentCompanyId);
     return {
@@ -203,10 +208,11 @@ export function registerPersonCommands(parent, getClient) {
     });
     p.command("search <query>")
         .description("Free-text search for persons")
-        .action(async (query) => {
+        .option("--limit <n>", "Max results", (v) => Math.min(Number(v), 500))
+        .action(async (query, opts) => {
         try {
             const client = await getClient();
-            const result = await runPersonSearch(client, query);
+            const result = await runPersonSearch(client, query, opts.limit);
             writeJson(result);
         }
         catch (e) {

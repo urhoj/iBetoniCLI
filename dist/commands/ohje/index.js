@@ -1,5 +1,6 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { parseJsonBodyFlag } from "../../api/parseBody.js";
 /** Charset the backend sanitizer (helps.get / helps.update) accepts for a helpId. */
 const HELP_ID_RE = /^[A-Za-z0-9_-]+$/;
 /**
@@ -31,7 +32,7 @@ export async function runOhjeList(client, limit) {
  * spawning the CLI.
  */
 export function buildOhjeFields(opts) {
-    const parsed = opts.body ? JSON.parse(opts.body) : {};
+    const parsed = opts.body ? parseJsonBodyFlag(opts.body) : {};
     const img = opts.img ?? parsed.img;
     return {
         title: opts.title ?? parsed.title,
