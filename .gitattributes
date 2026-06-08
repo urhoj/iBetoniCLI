@@ -1,0 +1,6 @@
+# Normalize all text files to LF in the repository to prevent CRLF<->LF churn on
+# Windows. This is important because the built dist/ output is committed: without
+# this, every `npm run build` on a Windows checkout (core.autocrlf=true) marks
+# ~35 dist files modified with pure line-ending flips. `text=auto` lets git
+# detect binary files and leave them untouched.
+* text=auto eol=lf
