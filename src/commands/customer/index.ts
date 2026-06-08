@@ -8,6 +8,7 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveRoleTypeId } from "../../roles.js";
 
 export interface CustomerListFilter {
@@ -790,7 +791,7 @@ export function buildAsiakasCreateBody(
   if (flags.email !== undefined) body.email = flags.email;
   if (flags.shortName !== undefined) body.asiakasShortNimi = flags.shortName;
   applyBillingFlags(body, flags);
-  if (flags.body) Object.assign(body, JSON.parse(flags.body));
+  if (flags.body) Object.assign(body, parseJsonBodyFlag(flags.body));
   return body;
 }
 
@@ -889,7 +890,7 @@ export function buildAsiakasUpdateBody(
   if (flags.contactPerson !== undefined) body.asiakasContactPersonId = flags.contactPerson;
   if (flags.type !== undefined) body.asiakasTypeId = flags.type;
   applyBillingFlags(body, flags);
-  if (flags.body) Object.assign(body, JSON.parse(flags.body));
+  if (flags.body) Object.assign(body, parseJsonBodyFlag(flags.body));
   return body;
 }
 

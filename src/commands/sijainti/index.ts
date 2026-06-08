@@ -8,6 +8,7 @@ import {
 } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
+import { parseJsonBodyFlag } from "../../api/parseBody.js";
 
 /**
  * Sentinel `jerryActiveUntil` value meaning "enrolled in BetoniJerry, no end
@@ -527,7 +528,7 @@ export function registerSijaintiCommands(
       try {
         const client = await getClient();
         const parsed = opts.body
-          ? (JSON.parse(opts.body) as Record<string, unknown>)
+          ? parseJsonBodyFlag(opts.body)
           : {};
         const body = buildSijaintiBody(parsed, {
           name: opts.name,
@@ -614,7 +615,7 @@ export function registerSijaintiCommands(
       try {
         const client = await getClient();
         const parsed = opts.body
-          ? (JSON.parse(opts.body) as Record<string, unknown>)
+          ? parseJsonBodyFlag(opts.body)
           : {};
         const body = buildSijaintiBody(parsed, {
           id: opts.id,

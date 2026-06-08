@@ -8,6 +8,7 @@ import {
 } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
+import { parseJsonBodyFlag } from "../../api/parseBody.js";
 
 export interface WorksiteListFilter {
   limit?: number;
@@ -416,7 +417,7 @@ export function registerWorksiteCommands(
     }) => {
       try {
         const client = await getClient();
-        const parsed = JSON.parse(opts.body) as Record<string, unknown>;
+        const parsed = parseJsonBodyFlag(opts.body);
         const result = await runWorksiteCreate(client, parsed, {
           dryRun: opts.dryRun,
           idempotencyKey: opts.idempotencyKey,
@@ -451,7 +452,7 @@ export function registerWorksiteCommands(
       try {
         const client = await getClient();
         const ownerAsiakasId = resolveOwnerAsiakasId(client);
-        const parsed = JSON.parse(opts.body) as Record<string, unknown>;
+        const parsed = parseJsonBodyFlag(opts.body);
         const result = await runWorksiteUpdate(
           client,
           { tyomaaId: Number(idStr), ownerAsiakasId, yyyymmdd: opts.yyyymmdd },

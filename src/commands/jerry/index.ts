@@ -7,6 +7,7 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { parseJsonBodyFlag } from "../../api/parseBody.js";
 
 type Row = Record<string, unknown>;
 
@@ -546,7 +547,7 @@ export function registerJerryCommands(
     requireReason(opts);
     try {
       const client = await getClient();
-      const parsed = JSON.parse(opts.body) as Row;
+      const parsed = parseJsonBodyFlag(opts.body) as Row;
       writeJson(
         await runJerryProviderSettingsSet(client, parsed, opts.asiakas, opts)
       );
