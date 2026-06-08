@@ -1445,7 +1445,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib ohje get",
     description:
-      "Get one UI help-text entry by helpId — the title/shorttext/htmltext shown in a HelperIcon '(?)' modal in the web UI. This is end-user help CONTENT, distinct from `ib --help` (CLI usage). Returns null when the helpId has no entry yet.",
+      "Get one UI help-text entry by helpId — the title/shorttext/htmltext shown in a HelperIcon '(?)' modal in the web UI. This is end-user help CONTENT, distinct from `ib --help` (CLI usage). Returns null when the helpId has no entry yet. Read is public (no auth on the route).",
     flags: [
       {
         name: "helpId",
@@ -1460,18 +1460,20 @@ export const COMMAND_SPECS: CommandSpec[] = [
         meaning: "Invalid helpId",
         remedy: "helpId may contain only [A-Za-z0-9_-]",
       },
-      ...COMMON_AUTH_ERRORS,
+      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
     ],
     examples: ["ib ohje get LaskupohjaTilaus", "ib ohje get LaskupohjaTilaus --pretty"],
   },
   {
     command: "ib ohje list",
     description:
-      "List every UI help-text entry (the whole helps table). Useful to discover helpIds before `ib ohje get`/`update`.",
-    flags: [],
+      "List every UI help-text entry (the whole helps table). Useful to discover helpIds before `ib ohje get`/`update`. Reads are public (no auth required on the route).",
+    flags: [
+      { name: "limit", type: "number", description: "Max rows to return (client-side cap)" },
+    ],
     outputShape: "ListEnvelope<{ helpId, title, shorttext, htmltext, img }>",
-    errors: [...COMMON_AUTH_ERRORS],
-    examples: ["ib ohje list", "ib ohje list --pretty"],
+    errors: [{ code: 500, meaning: "Backend error", remedy: "retry with --verbose" }],
+    examples: ["ib ohje list", "ib ohje list --limit 10 --pretty"],
   },
   {
     command: "ib ohje update",

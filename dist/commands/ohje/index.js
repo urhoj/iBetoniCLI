@@ -13,11 +13,14 @@ export async function runOhjeGet(client, helpId) {
 }
 /**
  * GET /api/helps/getAll — every UI help entry, projected into the universal
- * list envelope so `--pretty` renders it as a table.
+ * list envelope so `--pretty` renders it as a table. The route returns no limit
+ * param, so `limit` (when set) caps the rows CLIENT-SIDE — handy to preview a
+ * few entries without dumping every (potentially large) htmltext.
  */
-export async function runOhjeList(client) {
+export async function runOhjeList(client, limit) {
     const rows = await client.get("/api/helps/getAll");
-    const items = Array.isArray(rows) ? rows : [];
+    const all = Array.isArray(rows) ? rows : [];
+    const items = limit && limit > 0 ? all.slice(0, limit) : all;
     return { items, nextCursor: null, count: items.length };
 }
 /**
@@ -106,11 +109,12 @@ export function registerOhjeCommands(parent, getClient) {
         }
     });
     o.command("list")
-        .description("List every UI help entry (GET /api/helps/getAll)")
-        .action(async () => {
+        .description("List every UI help entry (GET /api/helps/getAll). Reads are public.")
+        .option("--limit <n>", "Max rows to return (client-side cap)", (v) => Number(v))
+        .action(async (opts) => {
         try {
             const client = await getClient();
-            const result = await runOhjeList(client);
+            const result = await runOhjeList(client, opts.limit);
             writeJson(result);
         }
         catch (e) {

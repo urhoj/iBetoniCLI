@@ -54,6 +54,16 @@ describe("ib ohje get/list", () => {
       count: 2,
     });
   });
+
+  test("runOhjeList caps rows client-side when limit is set", async () => {
+    asGet().mockResolvedValueOnce([{ helpId: "A" }, { helpId: "B" }, { helpId: "C" }]);
+    const res = await runOhjeList(mockClient, 2);
+    expect(res).toEqual({
+      items: [{ helpId: "A" }, { helpId: "B" }],
+      nextCursor: null,
+      count: 2,
+    });
+  });
 });
 
 describe("buildOhjeBody (GET-merge so omitted fields survive)", () => {
