@@ -11,9 +11,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # @ibetoni/auth and @ibetoni/constants are private workspace packages (not
+      # published to npmjs), declared as "*" so they resolve via npm-workspace
+      # symlinks inside the betoni-online monorepo. A standalone checkout of this
+      # repo can't fetch them, so check out the shared-packages repo and resolve
+      # the two deps from it via file: (CI-only — the committed package.json keeps
+      # "*"). Mirrors how puminet4/puminet5api consume the shared packages.
+      # Requires a GH_PAT secret with read access to urhoj/ibetoni_packages.
+      - uses: actions/checkout@v4
+        with:
+          repository: urhoj/ibetoni_packages
+          path: ibetoni_packages
+          token: ${{ secrets.GH_PAT }}
+
       - uses: actions/setup-node@v4
-        with: { node-version: "20.10.0", cache: "npm" }
-      - run: npm ci
+        with:
+          node-version: "20.10.0"
+
+      - name: Resolve private @ibetoni packages from the checkout (CI only)
+        run: |
+          node -e "const fs=require('fs');const p=require('./package.json');p.dependencies['@ibetoni/auth']='file:./ibetoni_packages/auth';p.dependencies['@ibetoni/constants']='file:./ibetoni_packages/constants';fs.writeFileSync('./package.json',JSON.stringify(p,null,2)+'\n');"
+
+      - run: npm install
       - run: npm run type-check
       - run: npm run lint
       - run: npm test
