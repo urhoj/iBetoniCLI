@@ -84,6 +84,89 @@ export async function runJerryRequestOffers(
   );
 }
 
+// ─── offer writes ─────────────────────────────────────────────────────────────
+
+export interface JerryOfferCreateBody {
+  priceCents: number;
+  vatPercent?: number;
+  validUntil?: string;
+  availableFrom?: string;
+  extraNotes?: string;
+  cancellationTerms?: string;
+  maintainsOrderInfo?: boolean;
+}
+
+/**
+ * Create or update (upsert) the caller's offer on a request
+ * (POST /api/pumppuRequests/:id/offers). Provider-only. A new offer starts as
+ * 'draft' (invisible to the customer) — transition it with `offer send`.
+ * Re-running while still draft/pending edits the existing offer.
+ */
+export async function runJerryOfferCreate(
+  client: ApiClient,
+  id: number,
+  body: JerryOfferCreateBody,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>(`/api/pumppuRequests/${id}/offers`, body, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/**
+ * Send a draft offer (draft → pending; POST /:id/offers/:offerId/send) — makes
+ * it visible to the customer. Provider-only; you must own the offer.
+ */
+export async function runJerryOfferSend(
+  client: ApiClient,
+  id: number,
+  offerId: number,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>(
+    `/api/pumppuRequests/${id}/offers/${offerId}/send`,
+    {},
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
+ * Accept an offer (customer-side; POST /:id/offers/:offerId/accept). Flips this
+ * offer to 'accepted', sibling offers to 'rejected', and the request to
+ * 'accepted'. Caller must own the request.
+ */
+export async function runJerryOfferAccept(
+  client: ApiClient,
+  id: number,
+  offerId: number,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>(
+    `/api/pumppuRequests/${id}/offers/${offerId}/accept`,
+    {},
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
+ * Confirm an accepted offer (provider-side; POST /:id/offers/:offerId/confirm).
+ * Heavyweight: builds a keikka in the provider's grid. `scheduledAt` (future
+ * ISO) is required; `pumppuId` optionally pins one of your vehicles.
+ */
+export async function runJerryOfferConfirm(
+  client: ApiClient,
+  id: number,
+  offerId: number,
+  body: { scheduledAt: string; pumppuId?: number },
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>(
+    `/api/pumppuRequests/${id}/offers/${offerId}/confirm`,
+    body,
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
 /**
  * Lifecycle counts. Default is the customer view (GET /api/pumppuRequests/mine/counts:
  * draft/open/pending_verification/accepted/cancelled/expired/no_supply).
@@ -222,6 +305,11 @@ function requireReason(opts: WriteOpts): void {
   }
 }
 
+/** Parse a tri-state boolean flag value ("true"/"1" → true, else false). */
+function parseBool(v: string): boolean {
+  return v === "true" || v === "1";
+}
+
 /**
  * Register the `ib jerry` command group — the BetoniJerry marketplace surface:
  *   request list/get/offers   read tarjouspyynnöt + their offers
@@ -287,6 +375,107 @@ export function registerJerryCommands(
         exitWithError(e);
       }
     });
+
+  // offer ──────────────────────────────────────────────────────────────────────
+  const offer = j.command("offer").description("Act on offers (create/send/accept/confirm)");
+
+  addWriteFlagsToCommand(
+    offer
+      .command("create <requestId>")
+      .description("Create/update your draft offer on a request (provider). Requires --reason.")
+      .requiredOption("--price-cents <n>", "Offer price in cents (integer 1..99999900)", Number)
+      .option("--vat-percent <n>", "VAT percent (default 25.5)", Number)
+      .option("--valid-until <iso>", "Offer valid-until (ISO datetime)")
+      .option("--available-from <iso>", "Earliest availability (ISO datetime)")
+      .option("--extra-notes <s>", "Free-text notes shown to the customer")
+      .option("--cancellation-terms <s>", "Cancellation terms shown to the customer")
+      .option("--maintains-order-info <bool>", "Override provider default (true|false)", parseBool)
+  ).action(
+    async (
+      idStr: string,
+      opts: WriteOpts & {
+        priceCents: number;
+        vatPercent?: number;
+        validUntil?: string;
+        availableFrom?: string;
+        extraNotes?: string;
+        cancellationTerms?: string;
+        maintainsOrderInfo?: boolean;
+      }
+    ) => {
+      requireReason(opts);
+      const priceCents = Number(opts.priceCents);
+      if (!Number.isInteger(priceCents) || priceCents < 1 || priceCents > 99_999_900) {
+        writeError(new Error("--price-cents must be an integer in 1..99999900"));
+        process.exit(4);
+      }
+      const body: JerryOfferCreateBody = { priceCents };
+      if (opts.vatPercent !== undefined) body.vatPercent = opts.vatPercent;
+      if (opts.validUntil) body.validUntil = opts.validUntil;
+      if (opts.availableFrom) body.availableFrom = opts.availableFrom;
+      if (opts.extraNotes) body.extraNotes = opts.extraNotes;
+      if (opts.cancellationTerms) body.cancellationTerms = opts.cancellationTerms;
+      if (opts.maintainsOrderInfo !== undefined) body.maintainsOrderInfo = opts.maintainsOrderInfo;
+      try {
+        const client = await getClient();
+        writeJson(await runJerryOfferCreate(client, Number(idStr), body, opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
+
+  addWriteFlagsToCommand(
+    offer
+      .command("send <requestId> <offerId>")
+      .description("Send a draft offer to the customer (draft → pending; provider). Requires --reason.")
+  ).action(async (idStr: string, offerIdStr: string, opts: WriteOpts) => {
+    requireReason(opts);
+    try {
+      const client = await getClient();
+      writeJson(await runJerryOfferSend(client, Number(idStr), Number(offerIdStr), opts));
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
+
+  addWriteFlagsToCommand(
+    offer
+      .command("accept <requestId> <offerId>")
+      .description("Accept an offer (customer-side). Rejects siblings + closes the request. Requires --reason.")
+  ).action(async (idStr: string, offerIdStr: string, opts: WriteOpts) => {
+    requireReason(opts);
+    try {
+      const client = await getClient();
+      writeJson(await runJerryOfferAccept(client, Number(idStr), Number(offerIdStr), opts));
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
+
+  addWriteFlagsToCommand(
+    offer
+      .command("confirm <requestId> <offerId>")
+      .description("Confirm an accepted offer → builds a keikka (provider). Requires --scheduled-at + --reason.")
+      .requiredOption("--scheduled-at <iso>", "Scheduled keikka start (future ISO datetime)")
+      .option("--pumppu <vehicleId>", "Pin one of your vehicles to the keikka", Number)
+  ).action(
+    async (
+      idStr: string,
+      offerIdStr: string,
+      opts: WriteOpts & { scheduledAt: string; pumppu?: number }
+    ) => {
+      requireReason(opts);
+      const body: { scheduledAt: string; pumppuId?: number } = { scheduledAt: opts.scheduledAt };
+      if (opts.pumppu !== undefined) body.pumppuId = opts.pumppu;
+      try {
+        const client = await getClient();
+        writeJson(await runJerryOfferConfirm(client, Number(idStr), Number(offerIdStr), body, opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
 
   // counts ─────────────────────────────────────────────────────────────────────
   j.command("counts")

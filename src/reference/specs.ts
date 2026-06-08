@@ -1796,7 +1796,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ['ib person delete 5351 --reason "departed"'],
   },
 
-  // ─── jerry (12) — BetoniJerry marketplace ──────────────────────────────────
+  // ─── jerry (16) — BetoniJerry marketplace ──────────────────────────────────
   {
     command: "ib jerry request list",
     description:
@@ -1852,6 +1852,105 @@ export const COMMAND_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ["ib jerry request offers 4012", "ib jerry request offers 4012 --pretty"],
+  },
+  {
+    command: "ib jerry offer create",
+    description:
+      "Create or update (upsert) YOUR offer on a request (POST /api/pumppuRequests/:id/offers). Provider company only (isPumppuToimittaja). A new offer starts as 'draft' (invisible to the customer) — make it visible with `ib jerry offer send`. Re-running while the offer is still draft/pending edits it in place; once accepted/rejected/withdrawn it is final (409). --price-cents is the canonical price (integer cents, 1..99999900) matching exactly what the API stores; --maintains-order-info (true|false) overrides the provider default for this offer only (omit to inherit). Requires --reason.",
+    permissions: ["provider company (isPumppuToimittaja)"],
+    flags: [
+      { name: "requestId", type: "number", description: "Positional — pumppuRequestId" },
+      { name: "price-cents", type: "number", description: "Offer price in cents (REQUIRED; integer 1..99999900)" },
+      { name: "vat-percent", type: "number", default: "25.5", description: "VAT percent" },
+      { name: "valid-until", type: "string", description: "Offer valid-until (ISO datetime; server default +7d)" },
+      { name: "available-from", type: "string", description: "Earliest availability (ISO datetime)" },
+      { name: "extra-notes", type: "string", description: "Free-text notes shown to the customer" },
+      { name: "cancellation-terms", type: "string", description: "Cancellation terms shown to the customer" },
+      { name: "maintains-order-info", type: "string", description: "Override provider default (true|false); omit to inherit" },
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape:
+      "{ pumppuOfferId, status:'draft', created, messageThreadId } · { dryRun:true, wouldUpsert:{ pumppuRequestId, priceCents, vatPercent, validUntil, availableFrom, extraNotes, cancellationTerms, maintainsOrderInfo } } on --dry-run",
+    errors: [
+      { code: 400, meaning: "priceCents missing / out of range", remedy: "pass --price-cents as an integer 1..99999900" },
+      { code: 403, meaning: "Not a provider", remedy: "switch to a provider company (company switch)" },
+      { code: 404, meaning: "Request not found", remedy: "verify requestId" },
+      { code: 409, meaning: "Request not open / expired, or offer no longer editable", remedy: "the request was closed, or your offer is already accepted/rejected" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: [
+      'ib jerry offer create 4012 --price-cents 45000 --reason "tarjous"',
+      'ib jerry offer create 4012 --price-cents 45000 --vat-percent 25.5 --maintains-order-info false --extra-notes "sis. siirtymat" --reason "tarjous"',
+      'ib jerry offer create 4012 --price-cents 45000 --dry-run --reason "preview"',
+    ],
+  },
+  {
+    command: "ib jerry offer send",
+    description:
+      "Send a draft offer to the customer (draft → 'pending'; POST /api/pumppuRequests/:id/offers/:offerId/send). Provider company only; you must own the offer. Two-stage by design: create the draft, attach files, then send. Requires --reason.",
+    permissions: ["provider company (isPumppuToimittaja); owns the offer"],
+    flags: [
+      { name: "requestId", type: "number", description: "Positional — pumppuRequestId" },
+      { name: "offerId", type: "number", description: "Positional — pumppuOfferId you own" },
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape:
+      "{ pumppuOfferId, status:'pending' } · { dryRun:true, wouldUpdate:{ pumppuRequestId, pumppuOfferId, status:'pending' } } on --dry-run",
+    errors: [
+      { code: 403, meaning: "Not a provider", remedy: "switch to a provider company (company switch)" },
+      { code: 409, meaning: "Offer not in draft / not owned", remedy: "only a draft offer you own can be sent" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ['ib jerry offer send 4012 55 --reason "lahetä tarjous"', "ib jerry offer send 4012 55 --dry-run --reason preview"],
+  },
+  {
+    command: "ib jerry offer accept",
+    description:
+      "Accept an offer (CUSTOMER side; POST /api/pumppuRequests/:id/offers/:offerId/accept). Flips this offer to 'accepted', sibling offers to 'rejected', and the parent request to 'accepted' in one transaction. Caller must own the request (its personId) — this is NOT a provider action. Requires --reason.",
+    permissions: ["owns the request (customer personId)"],
+    flags: [
+      { name: "requestId", type: "number", description: "Positional — pumppuRequestId you own" },
+      { name: "offerId", type: "number", description: "Positional — pumppuOfferId to accept" },
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape:
+      "{ pumppuRequestId, pumppuOfferId, keikkaId:null, status:'accepted' } · { dryRun:true, wouldAccept:{ pumppuRequestId, pumppuOfferId, status:'accepted' } } on --dry-run",
+    errors: [
+      { code: 404, meaning: "Request not found / not yours", remedy: "verify requestId and that you own it" },
+      { code: 409, meaning: "Offer no longer acceptable", remedy: "a sibling was already accepted, or the offer expired" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ['ib jerry offer accept 4012 55 --reason "valittu toimittaja"'],
+  },
+  {
+    command: "ib jerry offer confirm",
+    description:
+      "Confirm an accepted offer (PROVIDER side; POST /api/pumppuRequests/:id/offers/:offerId/confirm). Heavyweight: flips the offer accepted → 'confirmed' and BUILDS A KEIKKA in your grid (real side effects — broadcasts keikka:created, notifies the customer, inherits the vehicle's day driver). Call after the customer accepts and you've agreed a date by phone. --scheduled-at (future ISO datetime) is required; --pumppu optionally pins one of your vehicles. Requires --reason.",
+    permissions: ["provider company (isPumppuToimittaja); owns the offer"],
+    flags: [
+      { name: "requestId", type: "number", description: "Positional — pumppuRequestId" },
+      { name: "offerId", type: "number", description: "Positional — pumppuOfferId you own (must be 'accepted')" },
+      { name: "scheduled-at", type: "string", description: "Scheduled keikka start (REQUIRED; future ISO datetime)" },
+      { name: "pumppu", type: "number", description: "vehicleId to pin to the keikka (must be yours)" },
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape:
+      "{ pumppuRequestId, pumppuOfferId, status:'confirmed', keikkaId, scheduledAt } · { dryRun:true, wouldConfirm:{ pumppuRequestId, pumppuOfferId, status:'confirmed', scheduledAt, pumppuId } } on --dry-run",
+    errors: [
+      { code: 400, meaning: "scheduledAt missing/invalid/in the past, or pumppuId not yours", remedy: "pass --scheduled-at as a future ISO datetime; --pumppu must be your vehicleId" },
+      { code: 403, meaning: "Not a provider / offer not yours", remedy: "switch to the owning provider company" },
+      { code: 404, meaning: "Request / offer not found", remedy: "verify requestId + offerId" },
+      { code: 409, meaning: "Offer not in 'accepted' state", remedy: "the customer must accept the offer before you confirm" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: [
+      "ib jerry offer confirm 4012 55 --scheduled-at 2026-06-15T08:00:00Z --reason vahvistettu",
+      "ib jerry offer confirm 4012 55 --scheduled-at 2026-06-15T08:00:00Z --pumppu 7 --dry-run --reason preview",
+    ],
   },
   {
     command: "ib jerry counts",

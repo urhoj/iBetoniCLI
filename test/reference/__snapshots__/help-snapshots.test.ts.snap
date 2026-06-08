@@ -1005,6 +1005,166 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib jerry offer accept matches snapshot 1`] = `
+"USAGE
+  ib jerry offer accept [flags]
+
+DESCRIPTION
+  Accept an offer (CUSTOMER side; POST /api/pumppuRequests/:id/offers/:offerId/accept). Flips this offer to 'accepted', sibling offers to 'rejected', and the parent request to 'accepted' in one transaction. Caller must own the request (its personId) — this is NOT a provider action. Requires --reason.
+  Permissions: requires owns the request (customer personId).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --requestId NUMBER    Positional — pumppuRequestId you own
+  --offerId NUMBER    Positional — pumppuOfferId to accept
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { pumppuRequestId, pumppuOfferId, keikkaId:null, status:'accepted' } · { dryRun:true, wouldAccept:{ pumppuRequestId, pumppuOfferId, status:'accepted' } } on --dry-run
+
+ERRORS (stderr, exit non-zero)
+  404  Request not found / not yours → verify requestId and that you own it
+  409  Offer no longer acceptable → a sibling was already accepted, or the offer expired
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry offer accept 4012 55 --reason "valittu toimittaja"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry offer confirm matches snapshot 1`] = `
+"USAGE
+  ib jerry offer confirm [flags]
+
+DESCRIPTION
+  Confirm an accepted offer (PROVIDER side; POST /api/pumppuRequests/:id/offers/:offerId/confirm). Heavyweight: flips the offer accepted → 'confirmed' and BUILDS A KEIKKA in your grid (real side effects — broadcasts keikka:created, notifies the customer, inherits the vehicle's day driver). Call after the customer accepts and you've agreed a date by phone. --scheduled-at (future ISO datetime) is required; --pumppu optionally pins one of your vehicles. Requires --reason.
+  Permissions: requires provider company (isPumppuToimittaja); owns the offer.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --requestId NUMBER    Positional — pumppuRequestId
+  --offerId NUMBER    Positional — pumppuOfferId you own (must be 'accepted')
+  --scheduled-at STRING    Scheduled keikka start (REQUIRED; future ISO datetime)
+  --pumppu NUMBER    vehicleId to pin to the keikka (must be yours)
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { pumppuRequestId, pumppuOfferId, status:'confirmed', keikkaId, scheduledAt } · { dryRun:true, wouldConfirm:{ pumppuRequestId, pumppuOfferId, status:'confirmed', scheduledAt, pumppuId } } on --dry-run
+
+ERRORS (stderr, exit non-zero)
+  400  scheduledAt missing/invalid/in the past, or pumppuId not yours → pass --scheduled-at as a future ISO datetime; --pumppu must be your vehicleId
+  403  Not a provider / offer not yours → switch to the owning provider company
+  404  Request / offer not found → verify requestId + offerId
+  409  Offer not in 'accepted' state → the customer must accept the offer before you confirm
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry offer confirm 4012 55 --scheduled-at 2026-06-15T08:00:00Z --reason vahvistettu
+  ib jerry offer confirm 4012 55 --scheduled-at 2026-06-15T08:00:00Z --pumppu 7 --dry-run --reason preview
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry offer create matches snapshot 1`] = `
+"USAGE
+  ib jerry offer create [flags]
+
+DESCRIPTION
+  Create or update (upsert) YOUR offer on a request (POST /api/pumppuRequests/:id/offers). Provider company only (isPumppuToimittaja). A new offer starts as 'draft' (invisible to the customer) — make it visible with \`ib jerry offer send\`. Re-running while the offer is still draft/pending edits it in place; once accepted/rejected/withdrawn it is final (409). --price-cents is the canonical price (integer cents, 1..99999900) matching exactly what the API stores; --maintains-order-info (true|false) overrides the provider default for this offer only (omit to inherit). Requires --reason.
+  Permissions: requires provider company (isPumppuToimittaja).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --requestId NUMBER    Positional — pumppuRequestId
+  --price-cents NUMBER    Offer price in cents (REQUIRED; integer 1..99999900)
+  --vat-percent NUMBER    VAT percent (default: 25.5)
+  --valid-until STRING    Offer valid-until (ISO datetime; server default +7d)
+  --available-from STRING    Earliest availability (ISO datetime)
+  --extra-notes STRING    Free-text notes shown to the customer
+  --cancellation-terms STRING    Cancellation terms shown to the customer
+  --maintains-order-info STRING    Override provider default (true|false); omit to inherit
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { pumppuOfferId, status:'draft', created, messageThreadId } · { dryRun:true, wouldUpsert:{ pumppuRequestId, priceCents, vatPercent, validUntil, availableFrom, extraNotes, cancellationTerms, maintainsOrderInfo } } on --dry-run
+
+ERRORS (stderr, exit non-zero)
+  400  priceCents missing / out of range → pass --price-cents as an integer 1..99999900
+  403  Not a provider         → switch to a provider company (company switch)
+  404  Request not found      → verify requestId
+  409  Request not open / expired, or offer no longer editable → the request was closed, or your offer is already accepted/rejected
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry offer create 4012 --price-cents 45000 --reason "tarjous"
+  ib jerry offer create 4012 --price-cents 45000 --vat-percent 25.5 --maintains-order-info false --extra-notes "sis. siirtymat" --reason "tarjous"
+  ib jerry offer create 4012 --price-cents 45000 --dry-run --reason "preview"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry offer send matches snapshot 1`] = `
+"USAGE
+  ib jerry offer send [flags]
+
+DESCRIPTION
+  Send a draft offer to the customer (draft → 'pending'; POST /api/pumppuRequests/:id/offers/:offerId/send). Provider company only; you must own the offer. Two-stage by design: create the draft, attach files, then send. Requires --reason.
+  Permissions: requires provider company (isPumppuToimittaja); owns the offer.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --requestId NUMBER    Positional — pumppuRequestId
+  --offerId NUMBER    Positional — pumppuOfferId you own
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { pumppuOfferId, status:'pending' } · { dryRun:true, wouldUpdate:{ pumppuRequestId, pumppuOfferId, status:'pending' } } on --dry-run
+
+ERRORS (stderr, exit non-zero)
+  403  Not a provider         → switch to a provider company (company switch)
+  409  Offer not in draft / not owned → only a draft offer you own can be sent
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry offer send 4012 55 --reason "lahetä tarjous"
+  ib jerry offer send 4012 55 --dry-run --reason preview
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib jerry provider-settings get matches snapshot 1`] = `
 "USAGE
   ib jerry provider-settings get [flags]

@@ -11,6 +11,10 @@ import {
   runJerryAdminSearch,
   runJerryAdminDetail,
   runJerryAdminToggle,
+  runJerryOfferCreate,
+  runJerryOfferSend,
+  runJerryOfferAccept,
+  runJerryOfferConfirm,
 } from "../../src/commands/jerry/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -219,6 +223,74 @@ describe("ib jerry admin", () => {
       "/api/admin/jerry-companies/1402/disable",
       {},
       { headers: { "X-Dry-Run": "1" } }
+    );
+  });
+});
+
+describe("ib jerry offer", () => {
+  test("create posts the body and forwards the reason header", async () => {
+    post.mockResolvedValueOnce({ pumppuOfferId: 55, status: "draft" });
+    await runJerryOfferCreate(
+      mockClient,
+      4012,
+      { priceCents: 45000, vatPercent: 25.5, maintainsOrderInfo: false },
+      { reason: "tarjous" }
+    );
+    expect(post).toHaveBeenCalledWith(
+      "/api/pumppuRequests/4012/offers",
+      { priceCents: 45000, vatPercent: 25.5, maintainsOrderInfo: false },
+      { headers: { "X-Action-Reason": "tarjous" } }
+    );
+  });
+
+  test("create forwards --dry-run as X-Dry-Run", async () => {
+    post.mockResolvedValueOnce({ dryRun: true });
+    await runJerryOfferCreate(
+      mockClient,
+      4012,
+      { priceCents: 1 },
+      { dryRun: true, reason: "preview" }
+    );
+    expect(post).toHaveBeenCalledWith(
+      "/api/pumppuRequests/4012/offers",
+      { priceCents: 1 },
+      { headers: { "X-Dry-Run": "1", "X-Action-Reason": "preview" } }
+    );
+  });
+
+  test("send posts to /send with an empty body + reason header", async () => {
+    post.mockResolvedValueOnce({ status: "pending" });
+    await runJerryOfferSend(mockClient, 4012, 55, { reason: "send" });
+    expect(post).toHaveBeenCalledWith(
+      "/api/pumppuRequests/4012/offers/55/send",
+      {},
+      { headers: { "X-Action-Reason": "send" } }
+    );
+  });
+
+  test("accept posts to /accept", async () => {
+    post.mockResolvedValueOnce({ status: "accepted" });
+    await runJerryOfferAccept(mockClient, 4012, 55, { reason: "accept" });
+    expect(post).toHaveBeenCalledWith(
+      "/api/pumppuRequests/4012/offers/55/accept",
+      {},
+      { headers: { "X-Action-Reason": "accept" } }
+    );
+  });
+
+  test("confirm posts scheduledAt + pumppuId with the reason header", async () => {
+    post.mockResolvedValueOnce({ status: "confirmed", keikkaId: 9 });
+    await runJerryOfferConfirm(
+      mockClient,
+      4012,
+      55,
+      { scheduledAt: "2026-06-15T08:00:00Z", pumppuId: 7 },
+      { reason: "confirm" }
+    );
+    expect(post).toHaveBeenCalledWith(
+      "/api/pumppuRequests/4012/offers/55/confirm",
+      { scheduledAt: "2026-06-15T08:00:00Z", pumppuId: 7 },
+      { headers: { "X-Action-Reason": "confirm" } }
     );
   });
 });
