@@ -169,32 +169,32 @@ describe("runVehicleUpdate", () => {
     ).rejects.toMatchObject({ exitCode: 5 });
   });
 
-  test("dryRun: does not POST and returns merged preview", async () => {
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
-      {
-        vehicleId: 53,
-        asiakasId: 1349,
-        vehicleNimi: "Truck",
-        vehicleRegNo: "OLD-5",
-        vehicleTypeId: 1,
-        vehiclePuomi: 0,
-        memo: null,
-        showInGrid: true,
-        hasGpsTracking: false,
-        vehicleM3: 8,
-        defaultKuski_personId: null,
-        sortNo: 1,
-        showInReports: true,
-        useNoDriverBar: false,
-        tuoteId: null,
-        isRestricted: false,
-        multiTenantVisibility: false,
-        defaultVisibilityAsiakasIds: null,
-        firstDate: null,
-        lastDate: null,
-        vehicleNo: 1,
-      },
-    ]);
+  const CURRENT_53 = {
+    vehicleId: 53,
+    asiakasId: 1349,
+    vehicleNimi: "Truck",
+    vehicleRegNo: "OLD-5",
+    vehicleTypeId: 1,
+    vehiclePuomi: 0,
+    memo: null,
+    showInGrid: true,
+    hasGpsTracking: false,
+    vehicleM3: 8,
+    defaultKuski_personId: null,
+    sortNo: 1,
+    showInReports: true,
+    useNoDriverBar: false,
+    tuoteId: null,
+    isRestricted: false,
+    multiTenantVisibility: false,
+    defaultVisibilityAsiakasIds: null,
+    firstDate: null,
+    lastDate: null,
+    vehicleNo: 1,
+  };
+
+  test("dryRun: does not POST and returns the field-level diff", async () => {
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([CURRENT_53]);
     const out = await runVehicleUpdate(
       c,
       53,
@@ -202,7 +202,61 @@ describe("runVehicleUpdate", () => {
       { dryRun: true, reason: "test" }
     );
     expect(c.post).not.toHaveBeenCalled();
-    expect(out).toMatchObject({ dryRun: true, wouldUpdate: expect.objectContaining({ vehicleId: 53, vehicleM3: 9 }) });
+    expect(out).toEqual({
+      dryRun: true,
+      vehicleId: 53,
+      wouldChange: { vehicleM3: { from: 8, to: 9 } },
+    });
+  });
+
+  test("dryRun: empty diff when nothing changes (vehicleM3 '8' vs 8)", async () => {
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([CURRENT_53]);
+    // String "8" must not read as a change vs the DB's numeric 8.
+    const out = await runVehicleUpdate(
+      c,
+      53,
+      { vehicleM3: "8" as unknown as number },
+      { dryRun: true }
+    );
+    expect(out).toEqual({ dryRun: true, vehicleId: 53, wouldChange: {} });
+  });
+
+  test("dryRun: diffs showInGrid and lastDate", async () => {
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([CURRENT_53]);
+    const out = await runVehicleUpdate(
+      c,
+      53,
+      { showInGrid: false, lastDate: "2026-12-31" },
+      { dryRun: true }
+    );
+    expect(out).toEqual({
+      dryRun: true,
+      vehicleId: 53,
+      wouldChange: {
+        showInGrid: { from: true, to: false },
+        lastDate: { from: null, to: "2026-12-31" },
+      },
+    });
+  });
+
+  test("real write: showInGrid/lastDate land in the saved body", async () => {
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([CURRENT_53]);
+    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ vehicleId: 53 });
+    await runVehicleUpdate(
+      c,
+      53,
+      { showInGrid: false, lastDate: "2026-12-31" },
+      { reason: "retiring" }
+    );
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/vehicle/save",
+      expect.objectContaining({
+        vehicleId: 53,
+        showInGrid: false,
+        lastDate: "2026-12-31",
+      }),
+      { headers: { "X-Action-Reason": "retiring" } }
+    );
   });
 });
 

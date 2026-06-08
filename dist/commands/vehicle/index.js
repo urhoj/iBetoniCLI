@@ -3,6 +3,14 @@ import { resolveDate } from "../../dates.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { CliError } from "../../api/errors.js";
+import { diffFields } from "../../diff.js";
+/**
+ * Parse a CLI boolean flag value. Accepts true/1/yes/on (case-insensitive) as
+ * true; everything else is false. Used by `--show-in-grid <bool>`.
+ */
+function parseBoolFlag(s) {
+    return /^(true|1|yes|on)$/i.test(s.trim());
+}
 const VISIT_FILTER_TYPES = ["tyomaa", "sijainti"];
 /**
  * GET /api/cli/vehicle/list with the universal list envelope shape.
@@ -101,6 +109,25 @@ export async function runVehicleDatesExpiring(client, days) {
     return client.get(`/api/cli/vehicle/dates/expiring${qs}`);
 }
 /**
+ * Writable columns compared for the `vehicle update --dry-run` field-level diff.
+ * Read-only / system columns (sortNo, isRestricted, visibility, etc.) are
+ * intentionally excluded — they are carried through unchanged and are not
+ * settable from the CLI.
+ */
+const VEHICLE_DIFF_FIELDS = [
+    "asiakasId",
+    "vehicleNo",
+    "vehicleNimi",
+    "vehicleRegNo",
+    "firstDate",
+    "lastDate",
+    "vehicleTypeId",
+    "memo",
+    "showInGrid",
+    "defaultKuski_personId",
+    "vehicleM3",
+];
+/**
  * Create a vehicle. The backend `vehicle_save` proc is UPDATE-only, so creation
  * is two-step: `POST /api/vehicle/new/:ownerAsiakasId` inserts a blank stub and
  * returns its `vehicleId`, then `POST /api/vehicle/save` populates it.
@@ -140,6 +167,12 @@ export async function runVehicleCreate(client, fields, flags) {
  * `changes`, and POST the complete body to `/api/vehicle/save` (the proc expects
  * every column). Throws a 404 {@link CliError} (exit 5) when the vehicle is
  * absent so the caller surfaces "not found" rather than a malformed save.
+ *
+ * `--dry-run` is resolved entirely client-side (the save route ignores
+ * `X-Dry-Run`): it returns `{ dryRun: true, vehicleId, wouldChange:{ field:{
+ * from, to } } }` — the field-level diff of what would change — and never
+ * POSTs. Because no write leaves the process the preview cannot persist; the
+ * trade-off is it skips backend-side validation (the real save still validates).
  */
 export async function runVehicleUpdate(client, vehicleId, changes, flags) {
     const rows = await client.get(`/api/vehicle/get/${vehicleId}`);
@@ -156,12 +189,12 @@ export async function runVehicleUpdate(client, vehicleId, changes, flags) {
         vehicleNimi: changes.vehicleNimi ?? current.vehicleNimi,
         vehicleRegNo: changes.vehicleRegNo ?? current.vehicleRegNo,
         vehiclePuomi: current.vehiclePuomi,
-        firstDate: current.firstDate,
-        lastDate: current.lastDate,
+        firstDate: changes.firstDate ?? current.firstDate,
+        lastDate: changes.lastDate ?? current.lastDate,
         vehicleTypeId: changes.vehicleTypeId ?? current.vehicleTypeId,
         memo: changes.memo ?? current.memo,
         sortNo: current.sortNo,
-        showInGrid: current.showInGrid,
+        showInGrid: changes.showInGrid ?? current.showInGrid,
         defaultKuski_personId: changes.defaultKuski_personId ?? current.defaultKuski_personId,
         useNoDriverBar: current.useNoDriverBar,
         showInReports: current.showInReports,
@@ -172,10 +205,15 @@ export async function runVehicleUpdate(client, vehicleId, changes, flags) {
         hasGpsTracking: current.hasGpsTracking,
         vehicleM3: changes.vehicleM3 ?? current.vehicleM3,
     };
-    // The /api/vehicle/save route does not honour X-Dry-Run server-side, so
-    // preview the merged record client-side instead of risking a real write.
+    // The /api/vehicle/save route does not honour X-Dry-Run server-side, so the
+    // preview is computed entirely client-side — it cannot persist. Report the
+    // field-level diff (what would actually change) rather than the whole body.
     if (flags.dryRun) {
-        return { dryRun: true, wouldUpdate: body };
+        return {
+            dryRun: true,
+            vehicleId,
+            wouldChange: diffFields(current, body, VEHICLE_DIFF_FIELDS),
+        };
     }
     return client.post("/api/vehicle/save", body, {
         headers: writeFlagsToHeaders(flags),
@@ -352,7 +390,10 @@ export function registerVehicleCommands(parent, getClient) {
         .option("--memo <s>", "Free-text memo")
         .option("--default-driver <pid>", "Default driver personId", (s) => Number(s))
         .option("--capacity <m3>", "Concrete capacity in m3 (vehicleM3)", (s) => Number(s))
-        .option("--asiakas <id>", "Owning asiakasId", (s) => Number(s));
+        .option("--asiakas <id>", "Owning asiakasId", (s) => Number(s))
+        .option("--show-in-grid <bool>", "Whether the vehicle appears in the grid (true/false)", parseBoolFlag)
+        .option("--first-date <date>", "Start of validity window YYYY-MM-DD (firstDate; or today/yesterday/tomorrow)")
+        .option("--last-date <date>", "End of validity window YYYY-MM-DD (lastDate; or today/yesterday/tomorrow)");
     addWriteFlagsToCommand(updateCmd).action(async (idStr, opts) => {
         try {
             const result = await runVehicleUpdate(await getClient(), Number(idStr), {
@@ -364,6 +405,9 @@ export function registerVehicleCommands(parent, getClient) {
                 defaultKuski_personId: opts.defaultDriver,
                 vehicleM3: opts.capacity,
                 asiakasId: opts.asiakas,
+                showInGrid: opts.showInGrid,
+                firstDate: resolveDate(opts.firstDate),
+                lastDate: resolveDate(opts.lastDate),
             }, {
                 dryRun: opts.dryRun,
                 idempotencyKey: opts.idempotencyKey,

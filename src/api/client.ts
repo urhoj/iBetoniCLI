@@ -13,6 +13,13 @@ interface ApiClientOptions {
    * `getCurrentToken()`).
    */
   onRefresh?: (currentJwt: string) => Promise<string>;
+  /**
+   * Session write-lock (`--read-only` / `IB_READ_ONLY`). When true, any non-GET
+   * request is refused before a fetch is issued — the single client-side
+   * chokepoint guaranteeing no create/update/delete leaves the process. GETs
+   * (including the read half of a read-merge-write) are unaffected.
+   */
+  readOnly?: boolean;
 }
 
 interface FetchOptions {
@@ -25,6 +32,7 @@ export function createApiClient({
   version,
   requestId,
   onRefresh,
+  readOnly = false,
 }: ApiClientOptions) {
   const platform = `${process.platform} node-${process.versions.node}`;
   const userAgent = `ib-cli/${version} (${platform})`;
@@ -82,6 +90,18 @@ export function createApiClient({
     body?: unknown,
     opts: FetchOptions = {}
   ): Promise<T> {
+    // Read-only write-lock: refuse every mutation before it leaves the process.
+    // Mapped to exit 3 (forbidden) — the closest documented contract code for a
+    // refused write. GETs pass through, so reads (and the read half of a
+    // read-merge-write) still work.
+    if (readOnly && method !== "GET") {
+      throw new CliError(
+        `Refused: '${method} ${path}' is a write and read-only mode is active (--read-only / IB_READ_ONLY).`,
+        0,
+        null,
+        3
+      );
+    }
     let res = await fetchOrNetworkError(method, path, body, opts);
 
     // Single-retry refresh path: only the first 401 triggers a refresh+retry.

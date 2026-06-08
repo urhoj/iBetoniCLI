@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { CliError, exitCodeFromStatus } from "./errors.js";
-export function createApiClient({ endpoint, token, version, requestId, onRefresh, }) {
+export function createApiClient({ endpoint, token, version, requestId, onRefresh, readOnly = false, }) {
     const platform = `${process.platform} node-${process.versions.node}`;
     const userAgent = `ib-cli/${version} (${platform})`;
     let currentToken = token;
@@ -36,6 +36,13 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
         }
     }
     async function request(method, path, body, opts = {}) {
+        // Read-only write-lock: refuse every mutation before it leaves the process.
+        // Mapped to exit 3 (forbidden) — the closest documented contract code for a
+        // refused write. GETs pass through, so reads (and the read half of a
+        // read-merge-write) still work.
+        if (readOnly && method !== "GET") {
+            throw new CliError(`Refused: '${method} ${path}' is a write and read-only mode is active (--read-only / IB_READ_ONLY).`, 0, null, 3);
+        }
         let res = await fetchOrNetworkError(method, path, body, opts);
         // Single-retry refresh path: only the first 401 triggers a refresh+retry.
         // A second consecutive 401 (post-refresh) falls through to the normal

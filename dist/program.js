@@ -25,9 +25,11 @@ import { registerSchemaCommands } from "./commands/schema/index.js";
 import { registerWeatherCommands } from "./commands/weather/index.js";
 import { registerVersionCommand } from "./commands/version/index.js";
 import { runReferenceDump } from "./reference/dump.js";
+import { buildCommandsList } from "./reference/commandsList.js";
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
+import { writeJson, exitWithError } from "./output/json.js";
 /**
  * Construct the `ib` program with all subcommands registered and rich
  * (`CommandSpec`-driven) `--help` attached. Does not parse argv.
@@ -91,6 +93,27 @@ export function buildProgram() {
         .description("Emit the full command surface as JSON on stdout")
         .action(() => {
         runReferenceDump();
+    });
+    // `ib commands` — filtered, offline discovery over the same spec catalogue.
+    // Note: the filter is `--reads` (not `--read-only`) because `--read-only` is
+    // a GLOBAL write-lock flag; reusing the name here would be ambiguous.
+    program
+        .command("commands")
+        .description("Filtered list of ib commands from the spec catalogue (offline)")
+        .option("--mutations", "Only commands that write (carry write-safety flags)")
+        .option("--reads", "Only read-only commands (no writes)")
+        .option("--permission <substr>", "Only commands whose required permissions contain this substring")
+        .action((opts) => {
+        try {
+            writeJson(buildCommandsList({
+                mutations: opts.mutations,
+                reads: opts.reads,
+                permission: opts.permission,
+            }));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
     });
     // Replace each subcommand's `--help` with its rich CommandSpec rendering.
     attachRichHelp(program, COMMAND_SPECS);

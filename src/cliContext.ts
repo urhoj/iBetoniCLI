@@ -55,6 +55,7 @@ export async function createCliContext(opts: {
     token: auth.token,
     version: opts.version,
     requestId: opts.global.requestId ?? undefined,
+    readOnly: opts.global.readOnly,
     onRefresh: auth.refreshable
       ? async (currentJwt: string) => {
           const fresh = await refreshToken({ endpoint, currentJwt });

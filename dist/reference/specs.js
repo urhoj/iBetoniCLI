@@ -1004,16 +1004,20 @@ export const COMMAND_SPECS = [
             { name: "default-driver", type: "number", description: "Default driver personId" },
             { name: "capacity", type: "number", description: "Concrete capacity in m3" },
             { name: "asiakas", type: "number", description: "Owning asiakasId" },
+            { name: "show-in-grid", type: "boolean", description: "Whether the vehicle appears in the grid (true/false)" },
+            { name: "first-date", type: "date", description: "Start of validity window (firstDate); YYYY-MM-DD or today/yesterday/tomorrow" },
+            { name: "last-date", type: "date", description: "End of validity window (lastDate); YYYY-MM-DD or today/yesterday/tomorrow" },
         ],
         writeFlags: true,
-        outputShape: "On write: the saved vehicle record. With --dry-run: { dryRun: true, wouldUpdate } (previewed client-side; /api/vehicle/save does not honour X-Dry-Run).",
+        outputShape: "On write: the saved vehicle record. With --dry-run: { dryRun: true, vehicleId, wouldChange: { field: { from, to } } } — the field-level diff, computed client-side without POSTing (the save route ignores X-Dry-Run, so the preview cannot persist).",
         errors: [
             { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
             ...permErrors("auth.page.vehicle.edit"),
         ],
         examples: [
             "ib vehicle update 70 --capacity 8 --reason 'remeasured'",
-            "ib vehicle update 70 --reg NEW-9 --dry-run",
+            "ib vehicle update 70 --show-in-grid false --dry-run",
+            "ib vehicle update 70 --last-date 2026-12-31 --reason 'retiring'",
         ],
     },
     {
@@ -2183,6 +2187,42 @@ export const COMMAND_SPECS = [
             { code: 1, meaning: "I/O error", remedy: "retry; check stdout pipe" },
         ],
         examples: ["ib reference dump", "ib reference dump | jq .version"],
+    },
+    {
+        command: "ib commands",
+        description: "Filtered, offline list of ib commands from the spec catalogue: which write, which are read-only, which require a given permission. Lighter than `ib reference dump` (the full surface) — returns just { command, description, permissions, writeFlags } per match. No auth, no network.",
+        flags: [
+            {
+                name: "mutations",
+                type: "boolean",
+                description: "Only commands that write (carry write-safety flags)",
+            },
+            {
+                name: "reads",
+                type: "boolean",
+                description: "Only read-only commands (no writes)",
+            },
+            {
+                name: "permission",
+                type: "string",
+                description: "Only commands whose required permissions contain this substring",
+            },
+        ],
+        outputShape: "{ items: [{ command, description, permissions: string[], writeFlags: boolean }], nextCursor: null, count }",
+        errors: [
+            {
+                code: 4,
+                meaning: "Bad flag combo",
+                remedy: "--mutations and --reads are mutually exclusive",
+            },
+        ],
+        examples: [
+            "ib commands",
+            "ib commands --mutations",
+            "ib commands --reads",
+            "ib commands --permission auth.page.vehicle",
+            "ib commands --mutations | jq '.items[].command'",
+        ],
     },
     // ─── version (1) ─────────────────────────────────────────────────────────
     {

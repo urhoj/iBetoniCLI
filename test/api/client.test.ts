@@ -105,6 +105,43 @@ describe("ApiClient", () => {
     });
   });
 
+  test("readOnly refuses POST/PUT/DELETE before any fetch (exit 3)", async () => {
+    const client = createApiClient({
+      endpoint: "https://api.example.com",
+      token: "x",
+      version: "1.0.0",
+      readOnly: true,
+    });
+    for (const call of [
+      () => client.post("/api/x", { a: 1 }),
+      () => client.put("/api/x", { a: 1 }),
+      () => client.delete("/api/x"),
+    ]) {
+      await expect(call()).rejects.toMatchObject({
+        name: "CliError",
+        exitCode: 3,
+      });
+    }
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  test("readOnly still allows GET", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })
+    );
+    const client = createApiClient({
+      endpoint: "https://api.example.com",
+      token: "x",
+      version: "1.0.0",
+      readOnly: true,
+    });
+    await expect(client.get("/api/x")).resolves.toEqual({ ok: true });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
   test("explicit headers override", async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({}), {

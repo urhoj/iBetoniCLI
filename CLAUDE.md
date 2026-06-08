@@ -60,6 +60,16 @@ Anything list-shaped returns `ListEnvelope<T> = { items, nextCursor, count }` (`
 
 Every mutation command attaches the three universal flags via `addWriteFlagsToCommand`, mapped to headers by `writeFlagsToHeaders`: `--dry-run` → `X-Dry-Run: 1`, `--idempotency-key` → `Idempotency-Key`, `--reason` → `X-Action-Reason` (audit log). Pass the resulting headers into `client.post(..., { headers })`. Several v1.0.1 lifecycle commands (delete/person add-remove) make `--reason` effectively required — check the spec.
 
+`--dry-run` is **server-side per handler** (the backend skips persistence when it honours `X-Dry-Run`) — so a `--dry-run` against an endpoint whose guard is not deployed will still persist. Read-merge-write commands instead resolve `--dry-run` **client-side** (e.g. `vehicle update` returns a `wouldChange` field-level diff via `src/diff.ts` and never POSTs) — safe-by-construction, but skips backend validation.
+
+### Read-only mode (`--read-only` / `IB_READ_ONLY`)
+
+A session write-lock for AI/CI use. Set the `--read-only` global flag or `IB_READ_ONLY=1`; `getGlobalOptions` resolves it into `GlobalOptions.readOnly`, `cliContext` passes it to `createApiClient`, and the client refuses every **non-GET** request (exit `3`) before any fetch — the single chokepoint guaranteeing no create/update/delete leaves the process. GETs (including the read half of a read-merge-write) still work.
+
+### Command discovery (`ib commands`)
+
+`ib commands` is an **offline** filtered view over `COMMAND_SPECS` (`src/reference/commandsList.ts`) — lighter than `ib reference dump`. Flags: `--mutations` (writes only), `--reads` (read-only only; named `--reads` not `--read-only` to avoid colliding with the global write-lock), `--permission <substr>`. Returns the `{ items, nextCursor, count }` envelope.
+
 ### Auth & credentials (`src/auth/`)
 
 - `resolve.ts` — `IB_TOKEN` env var wins (CI, non-refreshable); else the credentials file. Returns `null` if neither exists.

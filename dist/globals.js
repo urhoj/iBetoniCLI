@@ -1,3 +1,5 @@
+/** Truthy spellings accepted for the IB_READ_ONLY environment variable. */
+const READ_ONLY_ENV_TRUE = new Set(["1", "true", "yes", "on"]);
 export function addGlobalOptions(cmd) {
     return cmd
         .option("--endpoint <url>", "Override the API base URL")
@@ -5,10 +7,12 @@ export function addGlobalOptions(cmd) {
         .option("--quiet", "Suppress non-data output to stderr")
         .option("--verbose", "Print extra diagnostic lines to stderr")
         .option("--pretty", "Human-readable output (default is JSON)")
-        .option("--json", "Force JSON output (default)");
+        .option("--json", "Force JSON output (default)")
+        .option("--read-only", "Block all writes this session (also via IB_READ_ONLY=1)");
 }
 export function getGlobalOptions(cmd) {
     const o = cmd.opts();
+    const envReadOnly = READ_ONLY_ENV_TRUE.has((process.env.IB_READ_ONLY ?? "").trim().toLowerCase());
     return {
         endpoint: o.endpoint ?? null,
         requestId: o.requestId ?? null,
@@ -16,6 +20,7 @@ export function getGlobalOptions(cmd) {
         verbose: !!o.verbose,
         pretty: !!o.pretty,
         json: !!o.json,
+        readOnly: !!o.readOnly || envReadOnly,
     };
 }
 export function resolveEndpoint(g, profileEndpoint) {
