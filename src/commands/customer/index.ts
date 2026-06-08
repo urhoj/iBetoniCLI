@@ -1206,7 +1206,7 @@ export function registerCustomerCommands(
     .option("--email <s>", "Invoicing email (laskutusEmail)")
     .option("--short-name <s>", "Short display name (asiakasShortNimi)")
     .option("--comment <s>", "Comment (kommentti)")
-    .option("--contact-person <id>", "Contact person id (asiakasContactPersonId)", (v: string) => Number(v))
+    .option("--contact-person <id>", "Single PRIMARY contact personId (asiakasContactPersonId) — for memberships use `customer person add`", (v: string) => Number(v))
     .option("--type <id>", "Customer type id (asiakasTypeId)", (v: string) => Number(v))
     .option("--address <s>", "Billing street address (laskutusOsoite)")
     .option("--postal-code <s>", "Billing postal code (laskutusPostinumero)")
@@ -1300,7 +1300,11 @@ export function registerCustomerCommands(
 
   const customerPerson = c
     .command("person")
-    .description("Manage persons attached to a customer");
+    .description(
+      "Manage a customer's person MEMBERSHIPS (asiakasPerson) — distinct from the " +
+        "single primary contact set via `customer update --contact-person`, and from " +
+        "RBAC roles managed via `person role`. See docs: asiakas-contact-person-model."
+    );
 
   addWriteFlagsToCommand(
     customerPerson
@@ -1308,7 +1312,7 @@ export function registerCustomerCommands(
       .description("Attach a person to a customer (asiakasPerson). Requires --reason.")
       .requiredOption("--asiakas <id>", "Target asiakasId", Number)
       .requiredOption("--person <id>", "Target personId", Number)
-      .option("--contact-type <id>", "contactPersonTypeId (default 1 = pumppari)", Number, 1)
+      .option("--contact-type <id>", "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)", Number, 1)
   ).action(async (opts: WriteFlags & { asiakas: number; person: number; contactType: number }) => {
     if (!opts.reason) {
       writeError(new Error("Missing required flag: --reason"));
@@ -1333,7 +1337,7 @@ export function registerCustomerCommands(
       .description("Detach a person from a customer (asiakasPerson). Requires --reason.")
       .requiredOption("--asiakas <id>", "Target asiakasId", Number)
       .requiredOption("--person <id>", "Target personId", Number)
-      .option("--contact-type <id>", "contactPersonTypeId (default 1 = pumppari)", Number, 1)
+      .option("--contact-type <id>", "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)", Number, 1)
   ).action(async (opts: WriteFlags & { asiakas: number; person: number; contactType: number }) => {
     if (!opts.reason) {
       writeError(new Error("Missing required flag: --reason"));

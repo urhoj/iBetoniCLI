@@ -516,7 +516,7 @@ DESCRIPTION
 FLAGS
   --asiakas NUMBER    Target asiakasId (REQUIRED)
   --person NUMBER    Target personId (REQUIRED)
-  --contact-type NUMBER    contactPersonTypeId (1 = pumppari) (default: 1)
+  --contact-type NUMBER    contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka) (default: 1)
   --reason STRING    Audit-log reason (REQUIRED)
 
 WRITE-SAFETY FLAGS
@@ -583,7 +583,7 @@ DESCRIPTION
 FLAGS
   --asiakas NUMBER    Target asiakasId (REQUIRED)
   --person NUMBER    Target personId (REQUIRED)
-  --contact-type NUMBER    contactPersonTypeId (default: 1)
+  --contact-type NUMBER    contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka) (default: 1)
   --reason STRING    Audit-log reason (REQUIRED)
 
 WRITE-SAFETY FLAGS
@@ -723,7 +723,7 @@ FLAGS
   --email STRING    Invoicing email (laskutusEmail)
   --short-name STRING    Short display name (asiakasShortNimi)
   --comment STRING    Comment (kommentti)
-  --contact-person NUMBER    Contact person id (asiakasContactPersonId)
+  --contact-person NUMBER    Single PRIMARY contact personId (asiakasContactPersonId) — for memberships use \`customer person add\` (see docs: asiakas-contact-person-model)
   --type NUMBER    Customer type id (asiakasTypeId)
   --address STRING    Billing street address (laskutusOsoite)
   --postal-code STRING    Billing postal code (laskutusPostinumero)
@@ -3133,7 +3133,7 @@ DESCRIPTION
 FLAGS
   --worksite NUMBER    Target tyomaaId (REQUIRED)
   --person NUMBER    Target personId (REQUIRED)
-  --contact-type NUMBER    contactPersonTypeId (default: 1)
+  --contact-type NUMBER    contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka) (default: 1)
   --reason STRING    Audit-log reason (REQUIRED)
 
 WRITE-SAFETY FLAGS
@@ -3197,7 +3197,7 @@ DESCRIPTION
 FLAGS
   --worksite NUMBER    Target tyomaaId (REQUIRED)
   --person NUMBER    Target personId (REQUIRED)
-  --contact-type NUMBER    contactPersonTypeId (default: 1)
+  --contact-type NUMBER    contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka) (default: 1)
   --reason STRING    Audit-log reason (REQUIRED)
 
 WRITE-SAFETY FLAGS

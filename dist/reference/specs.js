@@ -366,7 +366,7 @@ export const COMMAND_SPECS = [
             { name: "email", type: "string", description: "Invoicing email (laskutusEmail)" },
             { name: "short-name", type: "string", description: "Short display name (asiakasShortNimi)" },
             { name: "comment", type: "string", description: "Comment (kommentti)" },
-            { name: "contact-person", type: "number", description: "Contact person id (asiakasContactPersonId)" },
+            { name: "contact-person", type: "number", description: "Single PRIMARY contact personId (asiakasContactPersonId) — for memberships use `customer person add` (see docs: asiakas-contact-person-model)" },
             { name: "type", type: "number", description: "Customer type id (asiakasTypeId)" },
             { name: "address", type: "string", description: "Billing street address (laskutusOsoite)" },
             { name: "postal-code", type: "string", description: "Billing postal code (laskutusPostinumero)" },
@@ -1382,7 +1382,7 @@ export const COMMAND_SPECS = [
         flags: [
             { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
             { name: "person", type: "number", description: "Target personId (REQUIRED)" },
-            { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId (1 = pumppari)" },
+            { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)" },
             { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
         ],
         writeFlags: true,
@@ -1400,7 +1400,7 @@ export const COMMAND_SPECS = [
         flags: [
             { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
             { name: "person", type: "number", description: "Target personId (REQUIRED)" },
-            { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId" },
+            { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)" },
             { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
         ],
         writeFlags: true,
@@ -1489,7 +1489,7 @@ export const COMMAND_SPECS = [
         flags: [
             { name: "worksite", type: "number", description: "Target tyomaaId (REQUIRED)" },
             { name: "person", type: "number", description: "Target personId (REQUIRED)" },
-            { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId" },
+            { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)" },
             { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
         ],
         writeFlags: true,
@@ -1504,7 +1504,7 @@ export const COMMAND_SPECS = [
         flags: [
             { name: "worksite", type: "number", description: "Target tyomaaId (REQUIRED)" },
             { name: "person", type: "number", description: "Target personId (REQUIRED)" },
-            { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId" },
+            { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)" },
             { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
         ],
         writeFlags: true,
