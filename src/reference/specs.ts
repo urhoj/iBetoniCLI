@@ -351,7 +351,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     outputShape:
-      "{ asiakasId, name, yTunnus, type, address, city, email, phone, contactPersonId, shortName, comment }",
+      "{ asiakasId, name, yTunnus, type, address, postalCode, city, email, phone, contactPersonId, shortName, comment }",
     errors: [
       { code: 404, meaning: "Customer not found", remedy: "verify asiakasId" },
       ...permErrors("auth.page.asiakas.read"),
@@ -370,18 +370,21 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib customer create",
     description:
-      "Create a customer. Typed flags assemble the createY body (yTunnus REQUIRED); --from-prh prefills name+yTunnus from the PRH registry; --body raw JSON overrides flags. Returns the flat customer shape via re-fetch.",
+      "Create a customer. Typed flags assemble the createY body (yTunnus REQUIRED); --from-prh prefills name+yTunnus+billing address from the PRH registry; --address/--postal-code/--city set the billing postal address; --body raw JSON overrides flags. Returns the flat customer shape via re-fetch.",
     permissions: ["auth.page.asiakas.edit"],
     flags: [
       { name: "name", type: "string", description: "Customer name (asiakasNimi)" },
       { name: "ytunnus", type: "string", description: "Business ID (yTunnus) — required unless --from-prh/--body supplies it" },
       { name: "email", type: "string", description: "Invoicing email (laskutusEmail)" },
       { name: "short-name", type: "string", description: "Short display name (asiakasShortNimi)" },
-      { name: "from-prh", type: "string", description: "Prefill name + yTunnus from PRH for this business ID" },
+      { name: "from-prh", type: "string", description: "Prefill name + yTunnus + billing address from PRH for this business ID" },
+      { name: "address", type: "string", description: "Billing street address (laskutusOsoite)" },
+      { name: "postal-code", type: "string", description: "Billing postal code (laskutusPostinumero)" },
+      { name: "city", type: "string", description: "Billing city (laskutusKaupunki)" },
       { name: "body", type: "json", description: "Raw JSON body (overrides typed flags)" },
     ],
     writeFlags: true,
-    outputShape: "flat customer { asiakasId, name, yTunnus, type, address, city, email, contactPersonId, shortName, comment } (or wouldCreate on --dry-run)",
+    outputShape: "flat customer { asiakasId, name, yTunnus, type, address, postalCode, city, email, contactPersonId, shortName, comment } (or wouldCreate on --dry-run)",
     errors: [
       { code: 400, meaning: "Missing yTunnus / validation", remedy: "pass --ytunnus or --from-prh" },
       ...permErrors("auth.page.asiakas.edit"),
@@ -394,7 +397,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib customer update",
     description:
-      "Update a customer via read-merge-write: reads the current record, overlays the provided flags (preserving everything else — no contact-person clobber), writes back with saveGlobalAsiakas. --body raw JSON overrides flags.",
+      "Update a customer via read-merge-write: reads the current record, overlays the provided flags (preserving everything else — no contact-person clobber), writes back with saveGlobalAsiakas. Billing postal address (--address/--postal-code/--city) is writable; pass an empty string to clear a field. --body raw JSON overrides flags.",
     permissions: ["auth.page.asiakas.edit"],
     flags: [
       { name: "asiakasId", type: "number", description: "Positional — asiakasId to update" },
@@ -405,6 +408,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "comment", type: "string", description: "Comment (kommentti)" },
       { name: "contact-person", type: "number", description: "Contact person id (asiakasContactPersonId)" },
       { name: "type", type: "number", description: "Customer type id (asiakasTypeId)" },
+      { name: "address", type: "string", description: "Billing street address (laskutusOsoite)" },
+      { name: "postal-code", type: "string", description: "Billing postal code (laskutusPostinumero)" },
+      { name: "city", type: "string", description: "Billing city (laskutusKaupunki)" },
       { name: "body", type: "json", description: "Raw JSON body (overrides typed flags)" },
     ],
     writeFlags: true,
@@ -432,6 +438,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "comment", type: "string", description: "Comment (kommentti) — applied on update" },
       { name: "contact-person", type: "number", description: "Contact person id — applied on update" },
       { name: "type", type: "number", description: "Customer type id — applied on update" },
+      { name: "address", type: "string", description: "Billing street address (laskutusOsoite)" },
+      { name: "postal-code", type: "string", description: "Billing postal code (laskutusPostinumero)" },
+      { name: "city", type: "string", description: "Billing city (laskutusKaupunki)" },
       { name: "body", type: "json", description: "Raw JSON body (overrides typed flags)" },
     ],
     writeFlags: true,

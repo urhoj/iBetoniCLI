@@ -44,6 +44,28 @@ describe("buildAsiakasCreateBody", () => {
     expect(body.yTunnus).toBe("0145937-9");
     expect("asiakasNimi" in body).toBe(false);
   });
+
+  test("prefills billing address from PRH; explicit flags override", () => {
+    const prh = {
+      businessId: "0145937-9", name: "PRH Oy", tradeNames: [],
+      address: { street: "Tehtaankatu 1", postCode: "00150", city: "Helsinki", full: "..." },
+      companyForm: null, status: "active",
+    };
+    const body = buildAsiakasCreateBody({ city: "Espoo" }, 1349, prh);
+    expect(body.laskutusOsoite).toBe("Tehtaankatu 1");
+    expect(body.laskutusPostinumero).toBe("00150");
+    expect(body.laskutusKaupunki).toBe("Espoo"); // flag wins over PRH city
+  });
+
+  test("maps --address/--postal-code/--city to laskutus columns", () => {
+    const body = buildAsiakasCreateBody(
+      { name: "Acme Oy", ytunnus: "1234567-8", address: "A St 2", postalCode: "02100", city: "Espoo" },
+      1349
+    );
+    expect(body.laskutusOsoite).toBe("A St 2");
+    expect(body.laskutusPostinumero).toBe("02100");
+    expect(body.laskutusKaupunki).toBe("Espoo");
+  });
 });
 
 describe("extractAsiakasId", () => {
@@ -59,11 +81,11 @@ describe("extractAsiakasId", () => {
 describe("buildAsiakasUpdateBody (read-merge-write, no clobber)", () => {
   const current = {
     asiakasId: 26, name: "Old Oy", yTunnus: "1111111-1", type: 1,
-    address: "A St", city: "Espoo", email: "old@x.fi", phone: null,
+    address: "A St", postalCode: "02100", city: "Espoo", email: "old@x.fi", phone: null,
     contactPersonId: 777, shortName: "OldOy", comment: "note",
   };
 
-  test("seeds every setData field from current + sets saveGlobalAsiakas", () => {
+  test("seeds every setData field from current (incl. billing address) + saveGlobalAsiakas", () => {
     const body = buildAsiakasUpdateBody(current, {});
     expect(body).toEqual({
       ytunnus: "1111111-1",
@@ -73,8 +95,18 @@ describe("buildAsiakasUpdateBody (read-merge-write, no clobber)", () => {
       asiakasContactPersonId: 777,
       asiakasShortNimi: "OldOy",
       kommentti: "note",
+      laskutusOsoite: "A St",
+      laskutusPostinumero: "02100",
+      laskutusKaupunki: "Espoo",
       saveGlobalAsiakas: true,
     });
+  });
+
+  test("billing address flags override the seeded values", () => {
+    const body = buildAsiakasUpdateBody(current, { address: "B St 9", postalCode: "00100", city: "Helsinki" });
+    expect(body.laskutusOsoite).toBe("B St 9");
+    expect(body.laskutusPostinumero).toBe("00100");
+    expect(body.laskutusKaupunki).toBe("Helsinki");
   });
 
   test("provided flags override; --body wins last", () => {

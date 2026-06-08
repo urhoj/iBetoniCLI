@@ -213,7 +213,7 @@ exports[`Help snapshots — contract stability > help for ib customer create mat
   ib customer create [flags]
 
 DESCRIPTION
-  Create a customer. Typed flags assemble the createY body (yTunnus REQUIRED); --from-prh prefills name+yTunnus from the PRH registry; --body raw JSON overrides flags. Returns the flat customer shape via re-fetch.
+  Create a customer. Typed flags assemble the createY body (yTunnus REQUIRED); --from-prh prefills name+yTunnus+billing address from the PRH registry; --address/--postal-code/--city set the billing postal address; --body raw JSON overrides flags. Returns the flat customer shape via re-fetch.
   Permissions: requires auth.page.asiakas.edit.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -222,7 +222,10 @@ FLAGS
   --ytunnus STRING    Business ID (yTunnus) — required unless --from-prh/--body supplies it
   --email STRING    Invoicing email (laskutusEmail)
   --short-name STRING    Short display name (asiakasShortNimi)
-  --from-prh STRING    Prefill name + yTunnus from PRH for this business ID
+  --from-prh STRING    Prefill name + yTunnus + billing address from PRH for this business ID
+  --address STRING    Billing street address (laskutusOsoite)
+  --postal-code STRING    Billing postal code (laskutusPostinumero)
+  --city STRING    Billing city (laskutusKaupunki)
   --body JSON    Raw JSON body (overrides typed flags)
 
 WRITE-SAFETY FLAGS
@@ -234,7 +237,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  flat customer { asiakasId, name, yTunnus, type, address, city, email, contactPersonId, shortName, comment } (or wouldCreate on --dry-run)
+  flat customer { asiakasId, name, yTunnus, type, address, postalCode, city, email, contactPersonId, shortName, comment } (or wouldCreate on --dry-run)
 
 ERRORS (stderr, exit non-zero)
   400  Missing yTunnus / validation → pass --ytunnus or --from-prh
@@ -266,6 +269,9 @@ FLAGS
   --comment STRING    Comment (kommentti) — applied on update
   --contact-person NUMBER    Contact person id — applied on update
   --type NUMBER    Customer type id — applied on update
+  --address STRING    Billing street address (laskutusOsoite)
+  --postal-code STRING    Billing postal code (laskutusPostinumero)
+  --city STRING    Billing city (laskutusKaupunki)
   --body JSON    Raw JSON body (overrides typed flags)
 
 WRITE-SAFETY FLAGS
@@ -341,7 +347,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  { asiakasId, name, yTunnus, type, address, city, email, phone, contactPersonId, shortName, comment }
+  { asiakasId, name, yTunnus, type, address, postalCode, city, email, phone, contactPersonId, shortName, comment }
 
 ERRORS (stderr, exit non-zero)
   404  Customer not found     → verify asiakasId
@@ -700,7 +706,7 @@ exports[`Help snapshots — contract stability > help for ib customer update mat
   ib customer update [flags]
 
 DESCRIPTION
-  Update a customer via read-merge-write: reads the current record, overlays the provided flags (preserving everything else — no contact-person clobber), writes back with saveGlobalAsiakas. --body raw JSON overrides flags.
+  Update a customer via read-merge-write: reads the current record, overlays the provided flags (preserving everything else — no contact-person clobber), writes back with saveGlobalAsiakas. Billing postal address (--address/--postal-code/--city) is writable; pass an empty string to clear a field. --body raw JSON overrides flags.
   Permissions: requires auth.page.asiakas.edit.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -713,6 +719,9 @@ FLAGS
   --comment STRING    Comment (kommentti)
   --contact-person NUMBER    Contact person id (asiakasContactPersonId)
   --type NUMBER    Customer type id (asiakasTypeId)
+  --address STRING    Billing street address (laskutusOsoite)
+  --postal-code STRING    Billing postal code (laskutusPostinumero)
+  --city STRING    Billing city (laskutusKaupunki)
   --body JSON    Raw JSON body (overrides typed flags)
 
 WRITE-SAFETY FLAGS

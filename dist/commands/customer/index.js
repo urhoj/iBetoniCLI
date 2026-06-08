@@ -70,6 +70,9 @@ export async function runCustomerUpsert(client, opts, flags) {
             comment: opts.comment,
             contactPerson: opts.contactPerson,
             type: opts.type,
+            address: opts.address,
+            postalCode: opts.postalCode,
+            city: opts.city,
             body: opts.body,
         });
         const res = await runCustomerUpdate(client, current.asiakasId, updateBody, flags);
@@ -86,6 +89,9 @@ export async function runCustomerUpsert(client, opts, flags) {
         email: opts.email,
         shortName: opts.shortName,
         fromPrh: prhYt,
+        address: opts.address,
+        postalCode: opts.postalCode,
+        city: opts.city,
         body: opts.body,
     }, ownerAsiakasId, prh);
     if (createBody.yTunnus === undefined || createBody.yTunnus === null || createBody.yTunnus === "") {
@@ -444,10 +450,10 @@ export async function runCustomerPersonRemove(client, body, flags) {
 }
 /**
  * Assemble the POST /api/asiakas/createY body from typed flags (+ optional PRH
- * prefill). createY accepts only yTunnus(camelCase,REQUIRED) / email /
- * asiakasNimi / asiakasShortNimi / ownerAsiakasId(REQUIRED); it ignores
- * asiakasTypeId and cannot write billing address/city. Precedence (low→high):
- * PRH prefill < explicit flags < raw --body.
+ * prefill). createY accepts yTunnus(camelCase,REQUIRED) / email / asiakasNimi /
+ * asiakasShortNimi / ownerAsiakasId(REQUIRED) + the billing address
+ * (laskutusOsoite / laskutusPostinumero / laskutusKaupunki); it ignores
+ * asiakasTypeId. Precedence (low→high): PRH prefill < explicit flags < raw --body.
  */
 export function buildAsiakasCreateBody(flags, ownerAsiakasId, prh) {
     const body = { ownerAsiakasId };
@@ -458,6 +464,13 @@ export function buildAsiakasCreateBody(flags, ownerAsiakasId, prh) {
             body.asiakasNimi = prh.name;
         if (prh.businessId)
             body.yTunnus = prh.businessId;
+        // PRH carries the registered address — persist it as the billing address.
+        if (prh.address?.street)
+            body.laskutusOsoite = prh.address.street;
+        if (prh.address?.postCode)
+            body.laskutusPostinumero = prh.address.postCode;
+        if (prh.address?.city)
+            body.laskutusKaupunki = prh.address.city;
     }
     if (flags.name !== undefined)
         body.asiakasNimi = flags.name;
@@ -469,6 +482,12 @@ export function buildAsiakasCreateBody(flags, ownerAsiakasId, prh) {
         body.email = flags.email;
     if (flags.shortName !== undefined)
         body.asiakasShortNimi = flags.shortName;
+    if (flags.address !== undefined)
+        body.laskutusOsoite = flags.address;
+    if (flags.postalCode !== undefined)
+        body.laskutusPostinumero = flags.postalCode;
+    if (flags.city !== undefined)
+        body.laskutusKaupunki = flags.city;
     if (flags.body)
         Object.assign(body, JSON.parse(flags.body));
     return body;
@@ -499,10 +518,11 @@ export function extractAsiakasId(res) {
  */
 export function buildAsiakasUpdateBody(current, flags) {
     // Seed every field setData writes from the current record (read-merge-write).
-    // Note: address/city/phone on CustomerFlat are intentionally NOT seeded —
-    // setData has no laskutusOsoite/laskutusKaupunki inputs, so they are read-only.
-    // asiakasTypeId ?? 1 mirrors setData's own `req.body.asiakasTypeId || 1` default;
-    // a real non-null type (incl. 0) is preserved.
+    // Billing address (laskutusOsoite/laskutusPostinumero/laskutusKaupunki) is now
+    // writable; seeding the current value means the COALESCE in asiakas_save just
+    // re-writes it unchanged unless a flag overrides. phone is still read-only
+    // (no asiakas phone column). asiakasTypeId ?? 1 mirrors setData's own
+    // `req.body.asiakasTypeId || 1` default; a real non-null type (incl. 0) is preserved.
     const body = {
         ytunnus: current.yTunnus ?? null,
         asiakasNimi: current.name ?? null,
@@ -511,6 +531,9 @@ export function buildAsiakasUpdateBody(current, flags) {
         asiakasContactPersonId: current.contactPersonId ?? 0,
         asiakasShortNimi: current.shortName ?? null,
         kommentti: current.comment ?? null,
+        laskutusOsoite: current.address ?? null,
+        laskutusPostinumero: current.postalCode ?? null,
+        laskutusKaupunki: current.city ?? null,
         saveGlobalAsiakas: true,
     };
     if (flags.name !== undefined)
@@ -527,6 +550,12 @@ export function buildAsiakasUpdateBody(current, flags) {
         body.asiakasContactPersonId = flags.contactPerson;
     if (flags.type !== undefined)
         body.asiakasTypeId = flags.type;
+    if (flags.address !== undefined)
+        body.laskutusOsoite = flags.address;
+    if (flags.postalCode !== undefined)
+        body.laskutusPostinumero = flags.postalCode;
+    if (flags.city !== undefined)
+        body.laskutusKaupunki = flags.city;
     if (flags.body)
         Object.assign(body, JSON.parse(flags.body));
     return body;
@@ -740,7 +769,10 @@ export function registerCustomerCommands(parent, getClient) {
         .option("--ytunnus <s>", "Business ID (yTunnus) — REQUIRED unless --from-prh/--body supplies it")
         .option("--email <s>", "Invoicing email (laskutusEmail)")
         .option("--short-name <s>", "Short display name (asiakasShortNimi)")
-        .option("--from-prh <ytunnus>", "Prefill name + yTunnus from PRH for this business ID")
+        .option("--from-prh <ytunnus>", "Prefill name + yTunnus + billing address from PRH for this business ID")
+        .option("--address <s>", "Billing street address (laskutusOsoite)")
+        .option("--postal-code <s>", "Billing postal code (laskutusPostinumero)")
+        .option("--city <s>", "Billing city (laskutusKaupunki)")
         .option("--body <json>", "Raw JSON body forwarded verbatim (overrides typed flags)");
     addWriteFlagsToCommand(createCmd).action(async (opts) => {
         try {
@@ -776,6 +808,9 @@ export function registerCustomerCommands(parent, getClient) {
         .option("--comment <s>", "Comment (kommentti)")
         .option("--contact-person <id>", "Contact person id (asiakasContactPersonId)", (v) => Number(v))
         .option("--type <id>", "Customer type id (asiakasTypeId)", (v) => Number(v))
+        .option("--address <s>", "Billing street address (laskutusOsoite)")
+        .option("--postal-code <s>", "Billing postal code (laskutusPostinumero)")
+        .option("--city <s>", "Billing city (laskutusKaupunki)")
         .option("--body <json>", "Raw JSON body forwarded verbatim (overrides typed flags)");
     addWriteFlagsToCommand(updateCmd).action(async (idStr, opts) => {
         try {
@@ -809,6 +844,9 @@ export function registerCustomerCommands(parent, getClient) {
         .option("--comment <s>", "Comment (kommentti) — applied on update")
         .option("--contact-person <id>", "Contact person id — applied on update", (v) => Number(v))
         .option("--type <id>", "Customer type id — applied on update", (v) => Number(v))
+        .option("--address <s>", "Billing street address (laskutusOsoite)")
+        .option("--postal-code <s>", "Billing postal code (laskutusPostinumero)")
+        .option("--city <s>", "Billing city (laskutusKaupunki)")
         .option("--body <json>", "Raw JSON body forwarded verbatim (overrides typed flags)");
     addWriteFlagsToCommand(upsertCmd).action(async (opts) => {
         try {
