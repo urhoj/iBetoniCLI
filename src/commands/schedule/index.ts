@@ -3,7 +3,7 @@ import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 import { runKeikkaList } from "../keikka/index.js";
-import { todayHelsinki } from "../../dates.js";
+import { todayHelsinki, resolveDate } from "../../dates.js";
 
 /**
  * Add `days` to an ISO `YYYY-MM-DD` date and return the same ISO format.
@@ -32,7 +32,8 @@ export async function runScheduleDay(
   client: ApiClient,
   date: string
 ): Promise<ListEnvelope<Record<string, unknown>>> {
-  return runKeikkaList(client, { from: date, to: date });
+  const d = resolveDate(date) ?? date;
+  return runKeikkaList(client, { from: d, to: d });
 }
 
 /**
@@ -43,8 +44,9 @@ export async function runScheduleWeek(
   client: ApiClient,
   start: string
 ): Promise<ListEnvelope<Record<string, unknown>>> {
-  const end = addDaysISO(start, 6);
-  return runKeikkaList(client, { from: start, to: end });
+  const from = resolveDate(start) ?? start;
+  const end = addDaysISO(from, 6);
+  return runKeikkaList(client, { from, to: end });
 }
 
 /**
