@@ -82,6 +82,12 @@ One aggregated health report (`src/commands/doctor/index.ts`). Derives identity 
 
 Rows are self-describing — each carries `showInGrid`/`firstDate`/`lastDate`/`deletedTime` alongside `{ vehicleId, plate, type, capacity }`. **Default scope is unchanged**: non-deleted, no narrowing — grid-hidden AND expired vehicles ARE included; only soft-deleted are excluded. Opt-in narrowing: `--deleted` (reveal soft-deleted), `--grid-only` (`showInGrid=1`), `--valid-on <date>` (validity window covers the day), `--type <id>`. The backend half (params + projection + cache-key compatibility) lives in `puminet5api` `listVehiclesForCli` / `vehicleCliRoutes.js` — **deploy-gated** (flags no-op until that backend deploys).
 
+### `ib feedback` (AI self-service proposals / trouble reports)
+
+`src/commands/feedback/` — when the AI hits friction using `ib`, it files a freetext note so the CLI can be improved. `create` (any user) `list`/`get`/`resolve` (developer-only) over `puminet5api` `/api/feedback` (a **silent** sink: no GitHub issue, no email, no notification — deliberately separate from `bugReport`). A developer-gated analyzer skill (`code/.claude/skills/analyze-cli-feedback`) reads them back and closes the loop.
+
+**`meta` read-only exemption:** `create` is sent with `client.post(..., { meta: true })`. In `src/api/client.ts` the read-only write-lock and the acting-as diagnostic both skip `meta` requests — so an agent running `--read-only` / `IB_READ_ONLY` can *still* file feedback (it's not a domain mutation). `meta` is the ONLY write-lock bypass; use it only for non-mutating diagnostics. `resolve` is a real write (PUT, blocked under read-only). `--dry-run` on `create`/`resolve` resolves **client-side** (prints the payload, never sends) — not the server `X-Dry-Run`. Specs keep `writeFlags:false` (custom semantics; the standard write-safety block would mis-document them) — so `ib commands --reads` lists them. **Deploy-gated**: `/api/feedback` + the `cliFeedback` table must deploy first.
+
 ### Auth & credentials (`src/auth/`)
 
 - `resolve.ts` — `IB_TOKEN` env var wins (CI, non-refreshable); else the credentials file. Returns `null` if neither exists.

@@ -24,6 +24,7 @@ import { registerJerryCommands } from "./commands/jerry/index.js";
 import { registerScheduleCommands } from "./commands/schedule/index.js";
 import { registerSchemaCommands } from "./commands/schema/index.js";
 import { registerWeatherCommands } from "./commands/weather/index.js";
+import { registerFeedbackCommands } from "./commands/feedback/index.js";
 import { registerVersionCommand } from "./commands/version/index.js";
 import { registerDoctorCommand } from "./commands/doctor/index.js";
 import { runReferenceDump } from "./reference/dump.js";
@@ -88,6 +89,7 @@ export function buildProgram() {
     registerScheduleCommands(program, getClient);
     registerSchemaCommands(program, getClient);
     registerWeatherCommands(program, getClient);
+    registerFeedbackCommands(program, getClient);
     registerVersionCommand(program, packageJson.version, getEndpoint);
     registerDoctorCommand(program, getClient, getEndpoint, packageJson.version, () => getGlobalOptions(program).readOnly);
     const reference = program

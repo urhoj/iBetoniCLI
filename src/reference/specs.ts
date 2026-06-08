@@ -2512,4 +2512,88 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     examples: ["ib doctor", "ib doctor --endpoint https://api-staging.ibetoni.fi"],
   },
+  // ─── feedback (4) ────────────────────────────────────────────────────────
+  // NOTE on classification: feedback commands carry custom write semantics
+  // (meta-exempt create, client-side --dry-run, no idempotency/reason), so they
+  // keep writeFlags:false — the standard write-safety block would mis-document
+  // them. Consequence: `ib commands --reads` lists them and `--mutations` does
+  // not; the per-command help/description below is the authoritative contract.
+  {
+    command: "ib feedback create",
+    description:
+      "File a CLI improvement proposal or trouble report. Stored SILENTLY server-side (no GitHub issue, no email, no notification — distinct from bug reports) for later developer triage. Sent as a META request, so it is EXEMPT from the read-only write-lock: you can file feedback even with --read-only / IB_READ_ONLY active. --dry-run resolves client-side (prints the payload, never sends).",
+    flags: [
+      { name: "kind", type: "string", default: "improvement", description: "improvement | bug" },
+      { name: "command", type: "string", description: "The ib command/argv that triggered the friction" },
+      { name: "error", type: "string", description: "Error message you hit, if any" },
+      { name: "dry-run", type: "boolean", description: "Print the payload without sending (client-side)" },
+    ],
+    outputShape:
+      "{ feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
+    errors: [
+      { code: 4, meaning: "Validation", remedy: "description is required; --kind must be improvement|bug" },
+      { code: 2, meaning: "Token expired", remedy: "ib auth refresh" },
+      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+    ],
+    examples: [
+      'ib feedback create "schema table output should include row counts"',
+      'ib feedback create "keikka list --pvm rejected my date" --kind bug --command "keikka list --pvm 1.6." --error "invalid date format"',
+      'ib feedback create "idea: ib customer search --email" --dry-run',
+    ],
+  },
+  {
+    command: "ib feedback list",
+    description:
+      "List filed feedback for triage. Developer-only (isSystemAdmin / isDeveloper); global across tenants. Newest first, paginated (default 50, cap 200).",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    flags: [
+      { name: "status", type: "string", description: "open | reviewed | applied | dismissed" },
+      { name: "kind", type: "string", description: "improvement | bug" },
+      { name: "limit", type: "number", default: "50", description: "Max rows (cap 200)" },
+      { name: "offset", type: "number", default: "0", description: "Pagination offset" },
+    ],
+    outputShape: "{ items: FeedbackRow[], nextCursor: null, count }",
+    errors: [
+      { code: 3, meaning: "Permission denied", remedy: "requires a developer token (isSystemAdmin/isDeveloper)" },
+      { code: 2, meaning: "Token expired", remedy: "ib auth refresh" },
+      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+    ],
+    examples: ["ib feedback list --status open", "ib feedback list --kind bug --limit 20"],
+  },
+  {
+    command: "ib feedback get",
+    description:
+      "Fetch one feedback row by id (developer-only). Usage: ib feedback get <id>.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    flags: [],
+    outputShape: "The full feedback row { feedbackId, kind, status, description, command, errorText, cliVersion, context, resolution, createdAt, ... }",
+    errors: [
+      { code: 3, meaning: "Permission denied", remedy: "requires a developer token" },
+      { code: 5, meaning: "Not found", remedy: "check the id via `ib feedback list`" },
+      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+    ],
+    examples: ["ib feedback get 42"],
+  },
+  {
+    command: "ib feedback resolve",
+    description:
+      "Triage a feedback row: set its status and/or attach a resolution note (developer-only). Usage: ib feedback resolve <id>. This IS a real write — blocked under --read-only (exit 3). --dry-run previews the update body client-side without sending.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    flags: [
+      { name: "status", type: "string", description: "open | reviewed | applied | dismissed" },
+      { name: "note", type: "string", description: "Resolution note stored on the row" },
+      { name: "dry-run", type: "boolean", description: "Print the update body without sending (client-side)" },
+    ],
+    outputShape: "The updated feedback row. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
+    errors: [
+      { code: 4, meaning: "Validation", remedy: "provide --status and/or --note; status must be a known value" },
+      { code: 3, meaning: "Permission denied", remedy: "requires a developer token; also refused under --read-only" },
+      { code: 5, meaning: "Not found", remedy: "check the id via `ib feedback list`" },
+      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+    ],
+    examples: [
+      'ib feedback resolve 42 --status applied --note "added row counts in CLI v1.3"',
+      'ib feedback resolve 42 --status dismissed --note "by design"',
+    ],
+  },
 ];

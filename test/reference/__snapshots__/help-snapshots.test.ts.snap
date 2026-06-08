@@ -844,6 +844,130 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib feedback create matches snapshot 1`] = `
+"USAGE
+  ib feedback create [flags]
+
+DESCRIPTION
+  File a CLI improvement proposal or trouble report. Stored SILENTLY server-side (no GitHub issue, no email, no notification — distinct from bug reports) for later developer triage. Sent as a META request, so it is EXEMPT from the read-only write-lock: you can file feedback even with --read-only / IB_READ_ONLY active. --dry-run resolves client-side (prints the payload, never sends).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --kind STRING    improvement | bug (default: improvement)
+  --command STRING    The ib command/argv that triggered the friction
+  --error STRING    Error message you hit, if any
+  --dry-run BOOLEAN    Print the payload without sending (client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only
+
+OUTPUT (JSON, stdout)
+  { feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
+
+ERRORS (stderr, exit non-zero)
+  4  Validation             → description is required; --kind must be improvement|bug
+  2  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib feedback create "schema table output should include row counts"
+  ib feedback create "keikka list --pvm rejected my date" --kind bug --command "keikka list --pvm 1.6." --error "invalid date format"
+  ib feedback create "idea: ib customer search --email" --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib feedback get matches snapshot 1`] = `
+"USAGE
+  ib feedback get [flags]
+
+DESCRIPTION
+  Fetch one feedback row by id (developer-only). Usage: ib feedback get <id>.
+  Permissions: requires isSystemAdmin or isDeveloper.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only
+
+OUTPUT (JSON, stdout)
+  The full feedback row { feedbackId, kind, status, description, command, errorText, cliVersion, context, resolution, createdAt, ... }
+
+ERRORS (stderr, exit non-zero)
+  3  Permission denied      → requires a developer token
+  5  Not found              → check the id via \`ib feedback list\`
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib feedback get 42
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib feedback list matches snapshot 1`] = `
+"USAGE
+  ib feedback list [flags]
+
+DESCRIPTION
+  List filed feedback for triage. Developer-only (isSystemAdmin / isDeveloper); global across tenants. Newest first, paginated (default 50, cap 200).
+  Permissions: requires isSystemAdmin or isDeveloper.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --status STRING    open | reviewed | applied | dismissed
+  --kind STRING    improvement | bug
+  --limit NUMBER    Max rows (cap 200) (default: 50)
+  --offset NUMBER    Pagination offset (default: 0)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only
+
+OUTPUT (JSON, stdout)
+  { items: FeedbackRow[], nextCursor: null, count }
+
+ERRORS (stderr, exit non-zero)
+  3  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
+  2  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib feedback list --status open
+  ib feedback list --kind bug --limit 20
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib feedback resolve matches snapshot 1`] = `
+"USAGE
+  ib feedback resolve [flags]
+
+DESCRIPTION
+  Triage a feedback row: set its status and/or attach a resolution note (developer-only). Usage: ib feedback resolve <id>. This IS a real write — blocked under --read-only (exit 3). --dry-run previews the update body client-side without sending.
+  Permissions: requires isSystemAdmin or isDeveloper.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --status STRING    open | reviewed | applied | dismissed
+  --note STRING    Resolution note stored on the row
+  --dry-run BOOLEAN    Print the update body without sending (client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only
+
+OUTPUT (JSON, stdout)
+  The updated feedback row. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
+
+ERRORS (stderr, exit non-zero)
+  4  Validation             → provide --status and/or --note; status must be a known value
+  3  Permission denied      → requires a developer token; also refused under --read-only
+  5  Not found              → check the id via \`ib feedback list\`
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib feedback resolve 42 --status applied --note "added row counts in CLI v1.3"
+  ib feedback resolve 42 --status dismissed --note "by design"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib jerry admin detail matches snapshot 1`] = `
 "USAGE
   ib jerry admin detail [flags]

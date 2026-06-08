@@ -41,6 +41,13 @@ interface ApiClientOptions {
 
 interface FetchOptions {
   headers?: Record<string, string>;
+  /**
+   * Marks a request as a META call (feedback/diagnostics), not a domain
+   * mutation. A meta non-GET is EXEMPT from the read-only write-lock and skips
+   * the acting-as write diagnostic — so an agent running `--read-only` can still
+   * file `ib feedback`. Use ONLY for endpoints that don't mutate tenant data.
+   */
+  meta?: boolean;
 }
 
 export function createApiClient({
@@ -131,7 +138,9 @@ export function createApiClient({
     // Mapped to exit 3 (forbidden) — the closest documented contract code for a
     // refused write. GETs pass through, so reads (and the read half of a
     // read-merge-write) still work.
-    if (readOnly && method !== "GET") {
+    // `meta` requests (e.g. `ib feedback`) are not domain mutations — they are
+    // whitelisted past the lock so feedback can be filed even under read-only.
+    if (readOnly && method !== "GET" && !opts.meta) {
       throw new CliError(
         `Refused: '${method} ${path}' is a write and read-only mode is active (--read-only / IB_READ_ONLY).`,
         0,
@@ -141,7 +150,8 @@ export function createApiClient({
     }
     // Announce the write target once, after the read-only gate (a refused write
     // must not claim to have acted) and before the request leaves the process.
-    if (method !== "GET") announceActingAs();
+    // Meta requests skip this — they don't write tenant data under any company lens.
+    if (method !== "GET" && !opts.meta) announceActingAs();
     let res = await fetchOrNetworkError(method, path, body, opts);
 
     // Single-retry refresh path: only the first 401 triggers a refresh+retry.
