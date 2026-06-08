@@ -18,6 +18,7 @@ import { registerWorksiteCommands } from "./commands/worksite/index.js";
 import { registerPersonCommands } from "./commands/person/index.js";
 import { registerVehicleCommands } from "./commands/vehicle/index.js";
 import { registerSijaintiCommands } from "./commands/sijainti/index.js";
+import { registerOhjeCommands } from "./commands/ohje/index.js";
 import { registerJerryCommands } from "./commands/jerry/index.js";
 import { registerScheduleCommands } from "./commands/schedule/index.js";
 import { registerSchemaCommands } from "./commands/schema/index.js";
@@ -62,6 +63,7 @@ export function buildProgram() {
     registerPersonCommands(program, getClient);
     registerVehicleCommands(program, getClient);
     registerSijaintiCommands(program, getClient);
+    registerOhjeCommands(program, getClient);
     registerJerryCommands(program, getClient);
     registerScheduleCommands(program, getClient);
     registerSchemaCommands(program, getClient);

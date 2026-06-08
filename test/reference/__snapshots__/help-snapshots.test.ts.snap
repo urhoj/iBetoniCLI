@@ -1336,6 +1336,103 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib ohje get matches snapshot 1`] = `
+"USAGE
+  ib ohje get [flags]
+
+DESCRIPTION
+  Get one UI help-text entry by helpId — the title/shorttext/htmltext shown in a HelperIcon '(?)' modal in the web UI. This is end-user help CONTENT, distinct from \`ib --help\` (CLI usage). Returns null when the helpId has no entry yet.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --helpId STRING    Positional — the helpId (e.g. LaskupohjaTilaus)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { helpId, title, shorttext, htmltext, img } | null
+
+ERRORS (stderr, exit non-zero)
+  400  Invalid helpId         → helpId may contain only [A-Za-z0-9_-]
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib ohje get LaskupohjaTilaus
+  ib ohje get LaskupohjaTilaus --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib ohje list matches snapshot 1`] = `
+"USAGE
+  ib ohje list [flags]
+
+DESCRIPTION
+  List every UI help-text entry (the whole helps table). Useful to discover helpIds before \`ib ohje get\`/\`update\`.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ helpId, title, shorttext, htmltext, img }>
+
+ERRORS (stderr, exit non-zero)
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib ohje list
+  ib ohje list --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib ohje update matches snapshot 1`] = `
+"USAGE
+  ib ohje update [flags]
+
+DESCRIPTION
+  Update a UI help-text entry (PUT /api/helps/update). The CLI GET-merges the current row first, so fields you omit are PRESERVED (helps_save overwrites the whole row). Provide typed flags or --body JSON; typed flags win. --reason is required for a write. --dry-run previews the merged row CLIENT-SIDE without writing — the backend does not honour X-Dry-Run on this route. Mirrors the HelperIcon in-place editor.
+  Permissions: requires isHelperEditor (or system-admin/developer).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --helpId STRING    Positional — the helpId to update (created if it does not exist)
+  --body JSON    JSON with any of title/shorttext/htmltext/img (typed flags win)
+  --title STRING    Help title (otsikko)
+  --shorttext STRING    Short text
+  --htmltext STRING    HTML body shown in the modal
+  --img STRING    Image reference
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { success: true, message } (raw backend response) or { dryRun: true, helpId, current, proposed }
+
+ERRORS (stderr, exit non-zero)
+  4  Missing --reason       → pass --reason (required for writes)
+  400  Validation failed      → title ≤500, htmltext ≤10000, helpId [A-Za-z0-9_-]
+  403  Permission denied      → needs isHelperEditor or system-admin/developer
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib ohje update LaskupohjaTilaus --title "Laskupohja" --htmltext "<p>Ohje…</p>" --reason "content fix"
+  ib ohje update LaskupohjaTilaus --dry-run --title "New title"
+  ib ohje update LaskupohjaTilaus --body '{"title":"X","htmltext":"<p>Y</p>"}' --reason edit
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib person companies matches snapshot 1`] = `
 "USAGE
   ib person companies [flags]

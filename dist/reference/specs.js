@@ -1321,6 +1321,82 @@ export const COMMAND_SPECS = [
             'ib sijainti distance --from "60.17,24.94" --to 42',
         ],
     },
+    // ─── ohje (3) — UI help-text content (helps table behind HelperIcon) ──────
+    {
+        command: "ib ohje get",
+        description: "Get one UI help-text entry by helpId — the title/shorttext/htmltext shown in a HelperIcon '(?)' modal in the web UI. This is end-user help CONTENT, distinct from `ib --help` (CLI usage). Returns null when the helpId has no entry yet.",
+        flags: [
+            {
+                name: "helpId",
+                type: "string",
+                description: "Positional — the helpId (e.g. LaskupohjaTilaus)",
+            },
+        ],
+        outputShape: "{ helpId, title, shorttext, htmltext, img } | null",
+        errors: [
+            {
+                code: 400,
+                meaning: "Invalid helpId",
+                remedy: "helpId may contain only [A-Za-z0-9_-]",
+            },
+            ...COMMON_AUTH_ERRORS,
+        ],
+        examples: ["ib ohje get LaskupohjaTilaus", "ib ohje get LaskupohjaTilaus --pretty"],
+    },
+    {
+        command: "ib ohje list",
+        description: "List every UI help-text entry (the whole helps table). Useful to discover helpIds before `ib ohje get`/`update`.",
+        flags: [],
+        outputShape: "ListEnvelope<{ helpId, title, shorttext, htmltext, img }>",
+        errors: [...COMMON_AUTH_ERRORS],
+        examples: ["ib ohje list", "ib ohje list --pretty"],
+    },
+    {
+        command: "ib ohje update",
+        description: "Update a UI help-text entry (PUT /api/helps/update). The CLI GET-merges the current row first, so fields you omit are PRESERVED (helps_save overwrites the whole row). Provide typed flags or --body JSON; typed flags win. --reason is required for a write. --dry-run previews the merged row CLIENT-SIDE without writing — the backend does not honour X-Dry-Run on this route. Mirrors the HelperIcon in-place editor.",
+        permissions: ["isHelperEditor (or system-admin/developer)"],
+        flags: [
+            {
+                name: "helpId",
+                type: "string",
+                description: "Positional — the helpId to update (created if it does not exist)",
+            },
+            {
+                name: "body",
+                type: "json",
+                description: "JSON with any of title/shorttext/htmltext/img (typed flags win)",
+            },
+            { name: "title", type: "string", description: "Help title (otsikko)" },
+            { name: "shorttext", type: "string", description: "Short text" },
+            { name: "htmltext", type: "string", description: "HTML body shown in the modal" },
+            { name: "img", type: "string", description: "Image reference" },
+        ],
+        writeFlags: true,
+        outputShape: "{ success: true, message } (raw backend response) or { dryRun: true, helpId, current, proposed }",
+        errors: [
+            {
+                code: 4,
+                meaning: "Missing --reason",
+                remedy: "pass --reason (required for writes)",
+            },
+            {
+                code: 400,
+                meaning: "Validation failed",
+                remedy: "title ≤500, htmltext ≤10000, helpId [A-Za-z0-9_-]",
+            },
+            {
+                code: 403,
+                meaning: "Permission denied",
+                remedy: "needs isHelperEditor or system-admin/developer",
+            },
+            ...COMMON_AUTH_ERRORS,
+        ],
+        examples: [
+            'ib ohje update LaskupohjaTilaus --title "Laskupohja" --htmltext "<p>Ohje…</p>" --reason "content fix"',
+            'ib ohje update LaskupohjaTilaus --dry-run --title "New title"',
+            "ib ohje update LaskupohjaTilaus --body '{\"title\":\"X\",\"htmltext\":\"<p>Y</p>\"}' --reason edit",
+        ],
+    },
     // ─── schedule (3) ────────────────────────────────────────────────────────
     {
         command: "ib schedule today",
