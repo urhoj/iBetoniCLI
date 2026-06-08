@@ -5,6 +5,7 @@ import {
   runSijaintiDelete,
   runSijaintiUndelete,
   buildSijaintiBody,
+  applySijaintiCreateDefaults,
 } from "../../src/commands/sijainti/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -96,6 +97,51 @@ describe("buildSijaintiBody (typed-flag merge)", () => {
       sijaintiId: 42,
       sijaintiNimi: "X",
     });
+  });
+
+  test("maps lyh/maxDeliveryDistance/asiakasId to backend column names", () => {
+    expect(
+      buildSijaintiBody({}, { name: "Depot", lyh: "DEP", maxDeliveryDistance: 80, asiakasId: 8 })
+    ).toEqual({
+      sijaintiNimi: "Depot",
+      sijaintiLyh: "DEP",
+      maxDeliveryDistance: 80,
+      asiakasId: 8,
+    });
+  });
+});
+
+describe("applySijaintiCreateDefaults", () => {
+  test("defaults sijaintiLyh from sijaintiNimi (≤50 chars) and maxDeliveryDistance to 50", () => {
+    const { body, missing } = applySijaintiCreateDefaults({
+      sijaintiNimi: "Depot A",
+      sijaintiTypeId: 1,
+    });
+    expect(missing).toEqual([]);
+    expect(body.sijaintiLyh).toBe("Depot A");
+    expect(body.maxDeliveryDistance).toBe(50);
+  });
+
+  test("truncates a long sijaintiNimi to 50 chars for the lyh default", () => {
+    const name = "x".repeat(80);
+    const { body } = applySijaintiCreateDefaults({ sijaintiNimi: name, sijaintiTypeId: 1 });
+    expect(body.sijaintiLyh).toBe("x".repeat(50));
+  });
+
+  test("preserves an explicit lyh and maxDeliveryDistance", () => {
+    const { body } = applySijaintiCreateDefaults({
+      sijaintiNimi: "Depot A",
+      sijaintiTypeId: 1,
+      sijaintiLyh: "DEP-A",
+      maxDeliveryDistance: 120,
+    });
+    expect(body.sijaintiLyh).toBe("DEP-A");
+    expect(body.maxDeliveryDistance).toBe(120);
+  });
+
+  test("reports missing required name and type", () => {
+    const { missing } = applySijaintiCreateDefaults({});
+    expect(missing).toEqual(["--name (sijaintiNimi)", "--type (sijaintiTypeId)"]);
   });
 });
 

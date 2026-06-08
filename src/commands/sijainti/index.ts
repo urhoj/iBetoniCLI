@@ -24,6 +24,12 @@ export interface SijaintiTypedFields {
   type?: number;
   lat?: number;
   lng?: number;
+  /** sijaintiLyh — short code/abbreviation (NOT NULL, ≤50 chars, no DB default). */
+  lyh?: string;
+  /** maxDeliveryDistance — km (NOT NULL; DB default 50 does NOT apply on insert). */
+  maxDeliveryDistance?: number;
+  /** asiakasId — owning company (NOT NULL FK; create defaults to active company). */
+  asiakasId?: number;
 }
 
 /**
@@ -42,7 +48,45 @@ export function buildSijaintiBody(
   if (typed.type !== undefined) body.sijaintiTypeId = typed.type;
   if (typed.lat !== undefined) body.lat = typed.lat;
   if (typed.lng !== undefined) body.lng = typed.lng;
+  if (typed.lyh !== undefined) body.sijaintiLyh = typed.lyh;
+  if (typed.maxDeliveryDistance !== undefined)
+    body.maxDeliveryDistance = typed.maxDeliveryDistance;
+  if (typed.asiakasId !== undefined) body.asiakasId = typed.asiakasId;
   return body;
+}
+
+/** Max length of sijaintiLyh in the DB (nvarchar(50)). */
+const SIJAINTI_LYH_MAX = 50;
+/** maxDeliveryDistance DB default — the value the create proc fails to apply itself. */
+const DEFAULT_MAX_DELIVERY_DISTANCE = 50;
+
+/**
+ * Fill the create-only mandatory columns the `sijainti_add` proc inserts WITHOUT
+ * a COALESCE/default fallback, so a minimal create succeeds instead of hitting a
+ * NOT NULL violation (which `--dry-run` historically did not reveal):
+ *   - sijaintiNimi / sijaintiTypeId — required; reported in `missing` if absent.
+ *   - sijaintiLyh — NOT NULL, no DB default → default to sijaintiNimi (≤50 chars).
+ *   - maxDeliveryDistance — NOT NULL, DB default not applied on insert → default 50.
+ * Pure (no asiakasId resolution — that needs the client); mutates+returns `body`.
+ */
+export function applySijaintiCreateDefaults(body: Record<string, unknown>): {
+  body: Record<string, unknown>;
+  missing: string[];
+} {
+  const missing: string[] = [];
+  const name = body.sijaintiNimi;
+  if (name === undefined || name === null || name === "") missing.push("--name (sijaintiNimi)");
+  if (body.sijaintiTypeId === undefined || body.sijaintiTypeId === null)
+    missing.push("--type (sijaintiTypeId)");
+
+  const lyh = body.sijaintiLyh;
+  if ((lyh === undefined || lyh === null || lyh === "") && typeof name === "string") {
+    body.sijaintiLyh = name.slice(0, SIJAINTI_LYH_MAX);
+  }
+  if (body.maxDeliveryDistance === undefined || body.maxDeliveryDistance === null) {
+    body.maxDeliveryDistance = DEFAULT_MAX_DELIVERY_DISTANCE;
+  }
+  return { body, missing };
 }
 
 export interface SijaintiListFilter {
@@ -343,7 +387,8 @@ export async function runSijaintiDistance(
  *   - geocode   address → coords via Google Maps
  *   - closest   nearest sijainti of a type to a worksite
  *   - distance  driving distance/time between two points
- *   - create    POST /api/geocode/sijainti/add (typed flags or --body JSON)
+ *   - create    POST /api/geocode/sijainti/add — required --name/--type; --lyh,
+ *               --max-distance, --asiakas auto-default (typed flags or --body JSON)
  *   - update    POST /api/geocode/updateSijainti (typed flags or --body JSON)
  *   - delete    soft-delete (requires --reason)
  *   - undelete  restore a soft-deleted sijainti (requires --reason)
@@ -405,14 +450,19 @@ export function registerSijaintiCommands(
   const createCmd = s
     .command("create")
     .description(
-      "Create a new sijainti (POST /api/geocode/sijainti/add). Use typed flags or --body JSON (typed flags win)."
+      "Create a new sijainti (POST /api/geocode/sijainti/add). Required: --name, --type. " +
+        "--lyh defaults to --name (≤50 chars), --max-distance to 50, --asiakas to your active company. " +
+        "Use typed flags or --body JSON (typed flags win)."
     )
     .option("--body <json>", "JSON object forwarded as the request body")
-    .option("--name <n>", "sijaintiNimi")
+    .option("--name <n>", "sijaintiNimi (required)")
     .option("--address <a>", "sijaintiOsoite1 (street)")
-    .option("--type <id>", "sijaintiTypeId", Number)
+    .option("--type <id>", "sijaintiTypeId (required; see `ib sijainti types`)", Number)
     .option("--lat <n>", "Latitude", Number)
-    .option("--lng <n>", "Longitude", Number);
+    .option("--lng <n>", "Longitude", Number)
+    .option("--lyh <s>", "sijaintiLyh — short code/abbreviation (≤50 chars; defaults to --name)")
+    .option("--max-distance <n>", "maxDeliveryDistance in km (default 50)", Number)
+    .option("--asiakas <id>", "Owner asiakasId (defaults to your active company)", Number);
   addWriteFlagsToCommand(createCmd).action(
     async (opts: {
       body?: string;
@@ -421,6 +471,9 @@ export function registerSijaintiCommands(
       type?: number;
       lat?: number;
       lng?: number;
+      lyh?: string;
+      maxDistance?: number;
+      asiakas?: number;
       dryRun?: boolean;
       idempotencyKey?: string;
       reason?: string;
@@ -436,11 +489,21 @@ export function registerSijaintiCommands(
           type: opts.type,
           lat: opts.lat,
           lng: opts.lng,
+          lyh: opts.lyh,
+          maxDeliveryDistance: opts.maxDistance,
+          asiakasId: opts.asiakas,
         });
-        if (Object.keys(body).length === 0) {
-          writeError(
-            new Error("provide --body or at least one field flag (--name/--address/--type/--lat/--lng)")
-          );
+        // asiakasId is a NOT NULL FK the add proc inserts directly — default it
+        // to the caller's active company when neither --asiakas nor --body gave one.
+        if (body.asiakasId === undefined || body.asiakasId === null) {
+          body.asiakasId = await resolveOwnerAsiakasId(client);
+        }
+        // Fill sijaintiLyh / maxDeliveryDistance defaults and check the required
+        // fields the add proc inserts without a fallback (so we fail fast with a
+        // clear message instead of a NOT NULL 500 that --dry-run used to miss).
+        const { missing } = applySijaintiCreateDefaults(body);
+        if (missing.length > 0) {
+          writeError(new Error(`create requires: ${missing.join(", ")}`));
           process.exit(4);
         }
         const result = await runSijaintiCreate(client, body, {
@@ -466,7 +529,9 @@ export function registerSijaintiCommands(
     .option("--address <a>", "sijaintiOsoite1 (street)")
     .option("--type <id>", "sijaintiTypeId", Number)
     .option("--lat <n>", "Latitude", Number)
-    .option("--lng <n>", "Longitude", Number);
+    .option("--lng <n>", "Longitude", Number)
+    .option("--lyh <s>", "sijaintiLyh — short code/abbreviation (≤50 chars)")
+    .option("--max-distance <n>", "maxDeliveryDistance in km", Number);
   addWriteFlagsToCommand(updateCmd).action(
     async (opts: {
       body?: string;
@@ -476,6 +541,8 @@ export function registerSijaintiCommands(
       type?: number;
       lat?: number;
       lng?: number;
+      lyh?: string;
+      maxDistance?: number;
       dryRun?: boolean;
       idempotencyKey?: string;
       reason?: string;
@@ -492,6 +559,8 @@ export function registerSijaintiCommands(
           type: opts.type,
           lat: opts.lat,
           lng: opts.lng,
+          lyh: opts.lyh,
+          maxDeliveryDistance: opts.maxDistance,
         });
         if (body.sijaintiId === undefined) {
           writeError(

@@ -1981,17 +1981,20 @@ exports[`Help snapshots — contract stability > help for ib sijainti create mat
   ib sijainti create [flags]
 
 DESCRIPTION
-  Create a new sijainti (POST /api/geocode/sijainti/add). Provide typed flags (--name/--address/--type/--lat/--lng) or --body JSON; typed flags win over --body.
+  Create a new sijainti (POST /api/geocode/sijainti/add). REQUIRED: --name (sijaintiNimi) and --type (sijaintiTypeId). The CLI auto-fills the other NOT NULL columns the add proc needs: --lyh defaults to --name (truncated to 50 chars), --max-distance to 50, and --asiakas to your active company. Provide typed flags or --body JSON; typed flags win over --body.
   Permissions: requires auth.page.sijainnit.edit.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --body JSON    JSON object with the new sijainti fields (optional if typed flags given)
-  --name STRING    sijaintiNimi
+  --name STRING    sijaintiNimi (REQUIRED)
   --address STRING    sijaintiOsoite1 (street)
-  --type NUMBER    sijaintiTypeId (see \`ib sijainti types\`)
+  --type NUMBER    sijaintiTypeId (REQUIRED; see \`ib sijainti types\`)
   --lat NUMBER    Latitude
   --lng NUMBER    Longitude
+  --lyh STRING    sijaintiLyh — short code/abbreviation, ≤50 chars (defaults to --name)
+  --max-distance NUMBER    maxDeliveryDistance in km (default 50)
+  --asiakas NUMBER    Owner asiakasId (defaults to your active company)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -2011,7 +2014,8 @@ ERRORS (stderr, exit non-zero)
   500  Backend error          → retry with --verbose
 
 EXAMPLES
-  ib sijainti create --name "Depot A" --address "Industrial St 1" --type 1 --lat 60.17 --lng 24.94
+  ib sijainti create --name "Depot A" --type 1
+  ib sijainti create --name "Depot A" --address "Industrial St 1" --type 1 --lat 60.17 --lng 24.94 --lyh "DEP-A" --max-distance 80
   ib sijainti create --body '{"sijaintiNimi":"Depot A","sijaintiTypeId":1}'
 "
 `;
@@ -2291,6 +2295,8 @@ FLAGS
   --type NUMBER    sijaintiTypeId
   --lat NUMBER    Latitude
   --lng NUMBER    Longitude
+  --lyh STRING    sijaintiLyh — short code/abbreviation (≤50 chars)
+  --max-distance NUMBER    maxDeliveryDistance in km
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
