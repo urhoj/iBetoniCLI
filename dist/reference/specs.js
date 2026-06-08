@@ -1952,5 +1952,31 @@ export const COMMAND_SPECS = [
         ],
         examples: ["ib reference dump", "ib reference dump | jq .version"],
     },
+    // ─── version (1) ─────────────────────────────────────────────────────────
+    {
+        command: "ib version",
+        description: "Show the local CLI version AND the deployed iB version at the active endpoint (server commit SHA + slot). Unauthenticated — works logged out, against any --endpoint. The whole deployable iB surface (the /api/cli routes + the vendored CLI) ships inside puminet5api, so the server `commit` is the single source of truth for which build is live; it changes on every deployed commit, letting you tell staging from prod without manual version bumps.",
+        flags: [
+            {
+                name: "endpoint",
+                type: "url",
+                default: "active profile, else https://api.ibetoni.fi",
+                description: "Which deployment to query (global flag)",
+            },
+        ],
+        outputShape: "{ cli, endpoint, reachable, server: { app, version, commit, release, slot } | null, error? }",
+        errors: [
+            {
+                code: 7,
+                meaning: "Endpoint unreachable",
+                remedy: "check --endpoint / network; the report (cli version + error) still prints",
+            },
+        ],
+        examples: [
+            "ib version",
+            "ib version --endpoint https://api.ibetoni.fi",
+            "ib version --endpoint https://api-staging.ibetoni.fi",
+        ],
+    },
 ];
 //# sourceMappingURL=specs.js.map

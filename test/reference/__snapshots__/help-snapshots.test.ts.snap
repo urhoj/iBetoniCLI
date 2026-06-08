@@ -2972,6 +2972,33 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib version matches snapshot 1`] = `
+"USAGE
+  ib version [flags]
+
+DESCRIPTION
+  Show the local CLI version AND the deployed iB version at the active endpoint (server commit SHA + slot). Unauthenticated — works logged out, against any --endpoint. The whole deployable iB surface (the /api/cli routes + the vendored CLI) ships inside puminet5api, so the server \`commit\` is the single source of truth for which build is live; it changes on every deployed commit, letting you tell staging from prod without manual version bumps.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --endpoint URL    Which deployment to query (global flag) (default: active profile, else https://api.ibetoni.fi)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { cli, endpoint, reachable, server: { app, version, commit, release, slot } | null, error? }
+
+ERRORS (stderr, exit non-zero)
+  7  Endpoint unreachable   → check --endpoint / network; the report (cli version + error) still prints
+
+EXAMPLES
+  ib version
+  ib version --endpoint https://api.ibetoni.fi
+  ib version --endpoint https://api-staging.ibetoni.fi
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib worksite create matches snapshot 1`] = `
 "USAGE
   ib worksite create [flags]

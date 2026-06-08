@@ -23,6 +23,7 @@ import { registerOhjeCommands } from "./commands/ohje/index.js";
 import { registerJerryCommands } from "./commands/jerry/index.js";
 import { registerScheduleCommands } from "./commands/schedule/index.js";
 import { registerSchemaCommands } from "./commands/schema/index.js";
+import { registerVersionCommand } from "./commands/version/index.js";
 import { runReferenceDump } from "./reference/dump.js";
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp } from "./output/help.js";
@@ -57,6 +58,19 @@ export function buildProgram(): Command {
     return ctx.client;
   }
 
+  // Resolve the active endpoint WITHOUT requiring auth — `createCliContext`
+  // returns a usable `endpoint` (--endpoint → active profile → default) even
+  // when no credentials resolve. Powers `ib version`, which queries the public
+  // `/api/version` and so must work logged out.
+  async function getEndpoint(): Promise<string> {
+    const ctx = await createCliContext({
+      credentialsPath: defaultCredentialsPath(),
+      version: packageJson.version,
+      global: getGlobalOptions(program),
+    });
+    return ctx.endpoint;
+  }
+
   // `auth` manages credential-store access directly (login/logout/whoami/etc.)
   // and so doesn't take a `getClient` factory.
   registerAuthCommands(program);
@@ -72,6 +86,7 @@ export function buildProgram(): Command {
   registerJerryCommands(program, getClient);
   registerScheduleCommands(program, getClient);
   registerSchemaCommands(program, getClient);
+  registerVersionCommand(program, packageJson.version, getEndpoint);
 
   const reference = program
     .command("reference")
