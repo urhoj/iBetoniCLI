@@ -47,6 +47,16 @@ describe("ib customer list/get/search", () => {
     expect(result.count).toBe(1);
   });
 
+  test("runCustomerList: appends full=1 and ids when set", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [], nextCursor: null, count: 0,
+    });
+    await runCustomerList(mockClient, { full: true, ids: [26, 42, 1349] });
+    expect(mockClient.get).toHaveBeenCalledWith(
+      "/api/cli/customer/list?full=1&ids=26%2C42%2C1349"
+    );
+  });
+
   test("runCustomerGet: GET /api/cli/customer/get/1349", async () => {
     (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       asiakasId: 1349,

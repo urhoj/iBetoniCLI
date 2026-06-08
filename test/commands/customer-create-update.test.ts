@@ -109,6 +109,20 @@ describe("buildAsiakasUpdateBody (read-merge-write, no clobber)", () => {
     expect(body.laskutusKaupunki).toBe("Helsinki");
   });
 
+  test("--from-prh refreshes name/yTunnus/address from the registry; explicit flags still win", () => {
+    const prh = {
+      businessId: "9999999-9", name: "PRH Refreshed Oy", tradeNames: [],
+      address: { street: "Uusi katu 5", postCode: "33100", city: "Tampere", full: "..." },
+      companyForm: null, status: "active",
+    };
+    const body = buildAsiakasUpdateBody(current, { city: "Override City" }, prh);
+    expect(body.asiakasNimi).toBe("PRH Refreshed Oy");
+    expect(body.ytunnus).toBe("9999999-9");
+    expect(body.laskutusOsoite).toBe("Uusi katu 5");
+    expect(body.laskutusPostinumero).toBe("33100");
+    expect(body.laskutusKaupunki).toBe("Override City"); // explicit flag wins over PRH
+  });
+
   test("provided flags override; --body wins last", () => {
     const body = buildAsiakasUpdateBody(current, {
       name: "New Oy", email: "new@x.fi", body: '{"kommentti":"forced"}',

@@ -4,7 +4,10 @@ import { writeJson, writeError, exitWithError } from "../../output/json.js";
 import { resolveRoleTypeId } from "../../roles.js";
 /**
  * GET /api/cli/customer/list with the universal list envelope shape.
- * Query parameters are appended only when set on `opts`.
+ * Query parameters are appended only when set on `opts`. `--full` returns the
+ * full flat-customer fields + companyDescription; `--ids` restricts to specific
+ * asiakasIds — together they make incremental "diff only what changed" runs a
+ * single call instead of N×`customer get`.
  */
 export async function runCustomerList(client, opts) {
     const params = new URLSearchParams();
@@ -12,6 +15,10 @@ export async function runCustomerList(client, opts) {
         params.set("limit", String(opts.limit));
     if (opts.cursor)
         params.set("cursor", opts.cursor);
+    if (opts.full)
+        params.set("full", "1");
+    if (opts.ids && opts.ids.length > 0)
+        params.set("ids", opts.ids.join(","));
     const qs = params.toString();
     return client.get(`/api/cli/customer/list${qs ? `?${qs}` : ""}`);
 }
@@ -482,15 +489,23 @@ export function buildAsiakasCreateBody(flags, ownerAsiakasId, prh) {
         body.email = flags.email;
     if (flags.shortName !== undefined)
         body.asiakasShortNimi = flags.shortName;
+    applyBillingFlags(body, flags);
+    if (flags.body)
+        Object.assign(body, JSON.parse(flags.body));
+    return body;
+}
+/**
+ * Overlay the billing-address flags (--address/--postal-code/--city → the
+ * laskutus* columns) onto a body. Shared by the create and update builders so
+ * the mapping lives in one place. Only sets a field when the flag was provided.
+ */
+function applyBillingFlags(body, flags) {
     if (flags.address !== undefined)
         body.laskutusOsoite = flags.address;
     if (flags.postalCode !== undefined)
         body.laskutusPostinumero = flags.postalCode;
     if (flags.city !== undefined)
         body.laskutusKaupunki = flags.city;
-    if (flags.body)
-        Object.assign(body, JSON.parse(flags.body));
-    return body;
 }
 /** Pull the new asiakasId out of createY's response (tolerant of legacy shapes). */
 export function extractAsiakasId(res) {
@@ -516,7 +531,7 @@ export function extractAsiakasId(res) {
  * unconditionally) are preserved, then overlay provided flags, then raw --body.
  * Always sets saveGlobalAsiakas:true (else setData no-ops on the global row).
  */
-export function buildAsiakasUpdateBody(current, flags) {
+export function buildAsiakasUpdateBody(current, flags, prh) {
     // Seed every field setData writes from the current record (read-merge-write).
     // Billing address (laskutusOsoite/laskutusPostinumero/laskutusKaupunki) is now
     // writable; seeding the current value means the COALESCE in asiakas_save just
@@ -536,6 +551,21 @@ export function buildAsiakasUpdateBody(current, flags) {
         laskutusKaupunki: current.city ?? null,
         saveGlobalAsiakas: true,
     };
+    // --from-prh refresh: overlay the registry values between the current-record
+    // seed and the explicit flags, so name/yTunnus/address are refreshed from PRH
+    // but an explicit --flag still wins. (setData's ytunnus key is lowercase.)
+    if (prh) {
+        if (prh.name && prh.name !== "Unknown")
+            body.asiakasNimi = prh.name;
+        if (prh.businessId)
+            body.ytunnus = prh.businessId;
+        if (prh.address?.street)
+            body.laskutusOsoite = prh.address.street;
+        if (prh.address?.postCode)
+            body.laskutusPostinumero = prh.address.postCode;
+        if (prh.address?.city)
+            body.laskutusKaupunki = prh.address.city;
+    }
     if (flags.name !== undefined)
         body.asiakasNimi = flags.name;
     if (flags.ytunnus !== undefined)
@@ -550,12 +580,7 @@ export function buildAsiakasUpdateBody(current, flags) {
         body.asiakasContactPersonId = flags.contactPerson;
     if (flags.type !== undefined)
         body.asiakasTypeId = flags.type;
-    if (flags.address !== undefined)
-        body.laskutusOsoite = flags.address;
-    if (flags.postalCode !== undefined)
-        body.laskutusPostinumero = flags.postalCode;
-    if (flags.city !== undefined)
-        body.laskutusKaupunki = flags.city;
+    applyBillingFlags(body, flags);
     if (flags.body)
         Object.assign(body, JSON.parse(flags.body));
     return body;
@@ -584,13 +609,25 @@ export function buildAsiakasUpdateBody(current, flags) {
 export function registerCustomerCommands(parent, getClient) {
     const c = parent.command("customer").description("Customer commands");
     c.command("list")
-        .description("List customers")
+        .description("List customers. --full returns every flat-customer field + jerry " +
+        "companyDescription in one call (for diffing a whole tenant); --ids " +
+        "1,2,3 restricts to specific asiakasIds (refresh only what changed).")
         .option("--limit <n>", "Max rows", (v) => Math.min(Number(v), 500))
         .option("--cursor <c>", "Pagination cursor")
+        .option("--full", "Return full customer fields + companyDescription (not just id/name/ytunnus/type)")
+        .option("--ids <csv>", "Comma-separated asiakasIds to return (e.g. 1,2,3)")
         .action(async (opts) => {
         try {
             const client = await getClient();
-            const result = await runCustomerList(client, opts);
+            const ids = typeof opts.ids === "string"
+                ? opts.ids.split(",").map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0)
+                : undefined;
+            const result = await runCustomerList(client, {
+                limit: opts.limit,
+                cursor: opts.cursor,
+                full: opts.full,
+                ids,
+            });
             writeJson(result);
         }
         catch (e) {
@@ -773,6 +810,7 @@ export function registerCustomerCommands(parent, getClient) {
         .option("--address <s>", "Billing street address (laskutusOsoite)")
         .option("--postal-code <s>", "Billing postal code (laskutusPostinumero)")
         .option("--city <s>", "Billing city (laskutusKaupunki)")
+        .option("--get-or-create", "If a customer with this yTunnus already exists, return it (reused:true) instead of creating a duplicate")
         .option("--body <json>", "Raw JSON body forwarded verbatim (overrides typed flags)");
     addWriteFlagsToCommand(createCmd).action(async (opts) => {
         try {
@@ -786,13 +824,29 @@ export function registerCustomerCommands(parent, getClient) {
                 writeError(new Error("create requires --ytunnus (or --from-prh / --body with yTunnus)"));
                 process.exit(4);
             }
+            // --get-or-create: an existing yTunnus isn't a duplicate to recreate —
+            // return it (so onboarding is idempotent). >1 match is ambiguous.
+            if (opts.getOrCreate) {
+                const existing = await runCustomerByYtunnus(client, String(body.yTunnus));
+                if (existing.length > 1) {
+                    writeError(new Error(`ambiguous: ${existing.length} customers share ytunnus ${body.yTunnus} (ids: ${existing
+                        .map((m) => m.asiakasId)
+                        .join(", ")}). Use \`ib customer get <id>\`.`));
+                    process.exit(4);
+                }
+                if (existing.length === 1) {
+                    writeJson({ ...existing[0], reused: true });
+                    return;
+                }
+            }
             const res = await runCustomerCreate(client, body, opts);
             if (opts.dryRun) {
                 writeJson(res);
                 return;
             }
             const newId = extractAsiakasId(res);
-            writeJson(newId ? await runCustomerGet(client, newId) : res);
+            const created = newId ? await runCustomerGet(client, newId) : res;
+            writeJson(opts.getOrCreate ? { ...created, reused: false } : created);
         }
         catch (e) {
             exitWithError(e);
@@ -800,7 +854,7 @@ export function registerCustomerCommands(parent, getClient) {
     });
     const updateCmd = c
         .command("update <asiakasId>")
-        .description("Update a customer. Reads the current record, overlays the provided flags (preserving everything else — no contact-person clobber), and writes back. --body raw JSON overrides flags.")
+        .description("Update a customer. Reads the current record, overlays the provided flags (preserving everything else — no contact-person clobber), and writes back. --from-prh refreshes name+yTunnus+billing address from the registry (explicit flags still win). --body raw JSON overrides flags.")
         .option("--name <s>", "Customer name (asiakasNimi)")
         .option("--ytunnus <s>", "Business ID (ytunnus)")
         .option("--email <s>", "Invoicing email (laskutusEmail)")
@@ -811,13 +865,15 @@ export function registerCustomerCommands(parent, getClient) {
         .option("--address <s>", "Billing street address (laskutusOsoite)")
         .option("--postal-code <s>", "Billing postal code (laskutusPostinumero)")
         .option("--city <s>", "Billing city (laskutusKaupunki)")
+        .option("--from-prh <ytunnus>", "Refresh name + yTunnus + billing address from PRH (explicit flags still win)")
         .option("--body <json>", "Raw JSON body forwarded verbatim (overrides typed flags)");
     addWriteFlagsToCommand(updateCmd).action(async (idStr, opts) => {
         try {
             const client = await getClient();
             const asiakasId = Number(idStr);
             const current = await runCustomerGet(client, asiakasId);
-            const body = buildAsiakasUpdateBody(current, opts);
+            const prh = opts.fromPrh ? await runCustomerPrhById(client, opts.fromPrh) : undefined;
+            const body = buildAsiakasUpdateBody(current, opts, prh);
             const res = await runCustomerUpdate(client, asiakasId, body, opts);
             if (opts.dryRun) {
                 writeJson(res);
@@ -835,7 +891,7 @@ export function registerCustomerCommands(parent, getClient) {
         .description("Upsert a customer keyed by business ID (ytunnus). Looks it up in your tenant " +
         "(system admins: across tenants), then 1 match → update (read-merge with your " +
         "flags), 0 → create, >1 → error. --from-prh <yt> uses that business ID as the key " +
-        "AND prefills name+yTunnus from PRH on create. Returns { ...customer, action }.")
+        "AND prefills name+yTunnus+billing address from PRH on create. Returns { ...customer, action }.")
         .option("--ytunnus <s>", "Business ID key (yTunnus) — required unless --from-prh/--body supplies it")
         .option("--from-prh <ytunnus>", "Use this business ID as the key AND prefill from PRH on create")
         .option("--name <s>", "Customer name (asiakasNimi)")

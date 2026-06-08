@@ -226,6 +226,7 @@ FLAGS
   --address STRING    Billing street address (laskutusOsoite)
   --postal-code STRING    Billing postal code (laskutusPostinumero)
   --city STRING    Billing city (laskutusKaupunki)
+  --get-or-create BOOLEAN    If a customer with this yTunnus already exists, return it (reused:true) instead of creating a duplicate
   --body JSON    Raw JSON body (overrides typed flags)
 
 WRITE-SAFETY FLAGS
@@ -237,10 +238,10 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  flat customer { asiakasId, name, yTunnus, type, address, postalCode, city, email, contactPersonId, shortName, comment } (or wouldCreate on --dry-run)
+  flat customer { asiakasId, name, yTunnus, type, address, postalCode, city, email, contactPersonId, shortName, comment } (or wouldCreate on --dry-run; with --get-or-create adds reused:boolean)
 
 ERRORS (stderr, exit non-zero)
-  400  Missing yTunnus / validation → pass --ytunnus or --from-prh
+  400  Missing yTunnus / validation, or >1 customer shares the yTunnus with --get-or-create → pass --ytunnus or --from-prh; for an ambiguous match use \`ib customer get <id>\`
   401  Token expired          → ib auth refresh
   403  Permission denied      → check auth.page.asiakas.edit
   500  Backend error          → retry with --verbose
@@ -248,6 +249,7 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib customer create --from-prh 0145937-9 --email billing@x.fi --reason onboard
   ib customer create --name 'Example Oy' --ytunnus 1234567-8
+  ib customer create --from-prh 0145937-9 --get-or-create --reason onboard
 "
 `;
 
@@ -262,7 +264,7 @@ DESCRIPTION
 
 FLAGS
   --ytunnus STRING    Business ID key (yTunnus) — required unless --from-prh/--body supplies it
-  --from-prh STRING    Use this business ID as the key AND prefill from PRH on create
+  --from-prh STRING    Use this business ID as the key AND prefill name+yTunnus+billing address from PRH on create
   --name STRING    Customer name (asiakasNimi)
   --email STRING    Invoicing email (laskutusEmail)
   --short-name STRING    Short display name (asiakasShortNimi)
@@ -395,19 +397,21 @@ exports[`Help snapshots — contract stability > help for ib customer list match
   ib customer list [flags]
 
 DESCRIPTION
-  List customers (asiakkaat) visible to the active company. ownerAsiakasId derived from JWT.
+  List customers (asiakkaat) visible to the active company. ownerAsiakasId derived from JWT. --full returns every flat-customer field + the jerry companyDescription in one call (diff a whole tenant without N×\`customer get\`); --ids 1,2,3 restricts to specific asiakasIds (refresh only what changed).
   Permissions: requires auth.page.asiakas.read.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --limit NUMBER    Max rows (capped at 500) (default: 100)
   --cursor STRING    Pagination cursor
+  --full BOOLEAN    Return full customer fields + companyDescription (not just id/name/ytunnus/type)
+  --ids STRING    Comma-separated asiakasIds to return (e.g. 1,2,3)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ asiakasId, name, yTunnus, type }>
+  ListEnvelope<{ asiakasId, name, yTunnus, type }> · with --full: ListEnvelope<{ ...flat customer (address, postalCode, city, email, contactPersonId, shortName, comment), companyDescription }>
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
@@ -417,6 +421,8 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib customer list
   ib customer list --limit 50 --pretty
+  ib customer list --full
+  ib customer list --ids 26,42,1349 --full
 "
 `;
 
@@ -706,7 +712,7 @@ exports[`Help snapshots — contract stability > help for ib customer update mat
   ib customer update [flags]
 
 DESCRIPTION
-  Update a customer via read-merge-write: reads the current record, overlays the provided flags (preserving everything else — no contact-person clobber), writes back with saveGlobalAsiakas. Billing postal address (--address/--postal-code/--city) is writable; pass an empty string to clear a field. --body raw JSON overrides flags.
+  Update a customer via read-merge-write: reads the current record, overlays the provided flags (preserving everything else — no contact-person clobber), writes back with saveGlobalAsiakas. --from-prh refreshes name+yTunnus+billing address from the registry (explicit flags still win). Billing postal address (--address/--postal-code/--city) is writable; pass an empty string to clear a field. --body raw JSON overrides flags.
   Permissions: requires auth.page.asiakas.edit.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -722,6 +728,7 @@ FLAGS
   --address STRING    Billing street address (laskutusOsoite)
   --postal-code STRING    Billing postal code (laskutusPostinumero)
   --city STRING    Billing city (laskutusKaupunki)
+  --from-prh STRING    Refresh name + yTunnus + billing address from PRH (explicit flags still win)
   --body JSON    Raw JSON body (overrides typed flags)
 
 WRITE-SAFETY FLAGS

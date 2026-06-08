@@ -278,7 +278,7 @@ export const COMMAND_SPECS = [
     // ─── customer (7) ────────────────────────────────────────────────────────
     {
         command: "ib customer list",
-        description: "List customers (asiakkaat) visible to the active company. ownerAsiakasId derived from JWT.",
+        description: "List customers (asiakkaat) visible to the active company. ownerAsiakasId derived from JWT. --full returns every flat-customer field + the jerry companyDescription in one call (diff a whole tenant without N×`customer get`); --ids 1,2,3 restricts to specific asiakasIds (refresh only what changed).",
         permissions: ["auth.page.asiakas.read"],
         flags: [
             {
@@ -288,10 +288,17 @@ export const COMMAND_SPECS = [
                 description: "Max rows (capped at 500)",
             },
             { name: "cursor", type: "string", description: "Pagination cursor" },
+            { name: "full", type: "boolean", description: "Return full customer fields + companyDescription (not just id/name/ytunnus/type)" },
+            { name: "ids", type: "string", description: "Comma-separated asiakasIds to return (e.g. 1,2,3)" },
         ],
-        outputShape: "ListEnvelope<{ asiakasId, name, yTunnus, type }>",
+        outputShape: "ListEnvelope<{ asiakasId, name, yTunnus, type }> · with --full: ListEnvelope<{ ...flat customer (address, postalCode, city, email, contactPersonId, shortName, comment), companyDescription }>",
         errors: permErrors("auth.page.asiakas.read"),
-        examples: ["ib customer list", "ib customer list --limit 50 --pretty"],
+        examples: [
+            "ib customer list",
+            "ib customer list --limit 50 --pretty",
+            "ib customer list --full",
+            "ib customer list --ids 26,42,1349 --full",
+        ],
     },
     {
         command: "ib customer get",
@@ -333,22 +340,24 @@ export const COMMAND_SPECS = [
             { name: "address", type: "string", description: "Billing street address (laskutusOsoite)" },
             { name: "postal-code", type: "string", description: "Billing postal code (laskutusPostinumero)" },
             { name: "city", type: "string", description: "Billing city (laskutusKaupunki)" },
+            { name: "get-or-create", type: "boolean", description: "If a customer with this yTunnus already exists, return it (reused:true) instead of creating a duplicate" },
             { name: "body", type: "json", description: "Raw JSON body (overrides typed flags)" },
         ],
         writeFlags: true,
-        outputShape: "flat customer { asiakasId, name, yTunnus, type, address, postalCode, city, email, contactPersonId, shortName, comment } (or wouldCreate on --dry-run)",
+        outputShape: "flat customer { asiakasId, name, yTunnus, type, address, postalCode, city, email, contactPersonId, shortName, comment } (or wouldCreate on --dry-run; with --get-or-create adds reused:boolean)",
         errors: [
-            { code: 400, meaning: "Missing yTunnus / validation", remedy: "pass --ytunnus or --from-prh" },
+            { code: 400, meaning: "Missing yTunnus / validation, or >1 customer shares the yTunnus with --get-or-create", remedy: "pass --ytunnus or --from-prh; for an ambiguous match use `ib customer get <id>`" },
             ...permErrors("auth.page.asiakas.edit"),
         ],
         examples: [
             "ib customer create --from-prh 0145937-9 --email billing@x.fi --reason onboard",
             "ib customer create --name 'Example Oy' --ytunnus 1234567-8",
+            "ib customer create --from-prh 0145937-9 --get-or-create --reason onboard",
         ],
     },
     {
         command: "ib customer update",
-        description: "Update a customer via read-merge-write: reads the current record, overlays the provided flags (preserving everything else — no contact-person clobber), writes back with saveGlobalAsiakas. Billing postal address (--address/--postal-code/--city) is writable; pass an empty string to clear a field. --body raw JSON overrides flags.",
+        description: "Update a customer via read-merge-write: reads the current record, overlays the provided flags (preserving everything else — no contact-person clobber), writes back with saveGlobalAsiakas. --from-prh refreshes name+yTunnus+billing address from the registry (explicit flags still win). Billing postal address (--address/--postal-code/--city) is writable; pass an empty string to clear a field. --body raw JSON overrides flags.",
         permissions: ["auth.page.asiakas.edit"],
         flags: [
             { name: "asiakasId", type: "number", description: "Positional — asiakasId to update" },
@@ -362,6 +371,7 @@ export const COMMAND_SPECS = [
             { name: "address", type: "string", description: "Billing street address (laskutusOsoite)" },
             { name: "postal-code", type: "string", description: "Billing postal code (laskutusPostinumero)" },
             { name: "city", type: "string", description: "Billing city (laskutusKaupunki)" },
+            { name: "from-prh", type: "string", description: "Refresh name + yTunnus + billing address from PRH (explicit flags still win)" },
             { name: "body", type: "json", description: "Raw JSON body (overrides typed flags)" },
         ],
         writeFlags: true,
@@ -381,7 +391,7 @@ export const COMMAND_SPECS = [
         permissions: ["auth.page.asiakas.edit"],
         flags: [
             { name: "ytunnus", type: "string", description: "Business ID key (yTunnus) — required unless --from-prh/--body supplies it" },
-            { name: "from-prh", type: "string", description: "Use this business ID as the key AND prefill from PRH on create" },
+            { name: "from-prh", type: "string", description: "Use this business ID as the key AND prefill name+yTunnus+billing address from PRH on create" },
             { name: "name", type: "string", description: "Customer name (asiakasNimi)" },
             { name: "email", type: "string", description: "Invoicing email (laskutusEmail)" },
             { name: "short-name", type: "string", description: "Short display name (asiakasShortNimi)" },
