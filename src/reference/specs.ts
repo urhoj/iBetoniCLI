@@ -2199,6 +2199,158 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ];
   })(),
 
+  // ─── weather (7) ─────────────────────────────────────────────────────────
+  {
+    command: "ib weather forecast",
+    description:
+      "Single-point FMI weather forecast for a lat/lng at a given time. Coordinates must be within Finland (lat 59.5–70.1, lng 19.0–31.6). Time must be within now..+240h. Requires the company weather module (asiakasPersonSettingTypeId 18); 403 if disabled.",
+    permissions: ["company weather module (asiakasPersonSettingTypeId 18)"],
+    flags: [
+      { name: "lat", type: "number", description: "Latitude (Finland 59.5–70.1)" },
+      { name: "lng", type: "number", description: "Longitude (Finland 19.0–31.6)" },
+      { name: "time", type: "string", description: "Forecast time, ISO 8601 or 'now'" },
+    ],
+    outputShape:
+      "{ temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }",
+    errors: [
+      { code: 403, meaning: "Weather module off or permission denied", remedy: "enable via 'ib weather toggle --on' (admin) or contact an admin" },
+      { code: 400, meaning: "Bad coords/time", remedy: "use Finland coords and a time within now..+240h" },
+      { code: 401, meaning: "Not authenticated", remedy: "run 'ib auth login'" },
+      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+    ],
+    examples: [
+      "ib weather forecast --lat 60.1699 --lng 24.9384 --time now",
+      "ib weather forecast --lat 60.1699 --lng 24.9384 --time 2026-06-09T14:00:00Z",
+    ],
+  },
+  {
+    command: "ib weather day",
+    description:
+      "Daily aggregate weather forecast (min/max/avg temperature, wind, precipitation) for a lat/lng on a calendar date. Accepts relative date aliases: today, tomorrow, yesterday. Coordinates must be within Finland. Requires the company weather module.",
+    permissions: ["company weather module (asiakasPersonSettingTypeId 18)"],
+    flags: [
+      { name: "lat", type: "number", description: "Latitude (Finland 59.5–70.1)" },
+      { name: "lng", type: "number", description: "Longitude (Finland 19.0–31.6)" },
+      { name: "date", type: "string", description: "Date (YYYY-MM-DD, or today/tomorrow/yesterday)" },
+    ],
+    outputShape:
+      "{ date, minTemp, maxTemp, avgTemp, windSpeed, precipitation, weatherSymbol, source, coordinates }",
+    errors: [
+      { code: 403, meaning: "Weather module off or permission denied", remedy: "enable via 'ib weather toggle --on'" },
+      { code: 400, meaning: "Bad coords/date", remedy: "use Finland coords and a valid date" },
+      { code: 401, meaning: "Not authenticated", remedy: "run 'ib auth login'" },
+      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+    ],
+    examples: [
+      "ib weather day --lat 60.17 --lng 24.94 --date today",
+      "ib weather day --lat 60.17 --lng 24.94 --date 2026-06-10",
+    ],
+  },
+  {
+    command: "ib weather pumping",
+    description:
+      "Weather analysis over a concrete-pumping window: hourly conditions for the entire duration starting at --start. The backend can correlate with a keikka via --keikka for error reporting. Requires the company weather module.",
+    permissions: ["company weather module (asiakasPersonSettingTypeId 18)"],
+    flags: [
+      { name: "lat", type: "number", description: "Latitude (Finland 59.5–70.1)" },
+      { name: "lng", type: "number", description: "Longitude (Finland 19.0–31.6)" },
+      { name: "start", type: "string", description: "Pumping start time (ISO 8601 or 'now')" },
+      { name: "duration", type: "number", description: "Pumping duration in minutes" },
+      { name: "keikka", type: "number", description: "Keikka id (optional, for backend error correlation only)" },
+    ],
+    outputShape:
+      "{ hourly: [{ time, temperature, windSpeed, precipitation, weatherSymbol }], summary, coordinates }",
+    errors: [
+      { code: 403, meaning: "Weather module off or permission denied", remedy: "enable via 'ib weather toggle --on'" },
+      { code: 400, meaning: "Bad coords/time/duration", remedy: "use Finland coords, valid ISO time, positive duration" },
+      { code: 401, meaning: "Not authenticated", remedy: "run 'ib auth login'" },
+      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+    ],
+    examples: [
+      "ib weather pumping --lat 60.17 --lng 24.94 --start now --duration 120",
+      "ib weather pumping --lat 60.17 --lng 24.94 --start 2026-06-10T08:00:00Z --duration 90 --keikka 1234",
+    ],
+  },
+  {
+    command: "ib weather worksite",
+    description:
+      "Forecast for a worksite identified by tyomaaId. The backend resolves the coordinates from the tyomaa record internally — no lat/lng needed. Use --force-refresh to bypass the cache. Requires the company weather module.",
+    permissions: ["company weather module (asiakasPersonSettingTypeId 18)"],
+    flags: [
+      { name: "force-refresh", type: "boolean", description: "Bypass the cache and refetch from FMI" },
+    ],
+    outputShape:
+      "{ temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }",
+    errors: [
+      { code: 403, meaning: "Weather module off or permission denied", remedy: "enable via 'ib weather toggle --on'" },
+      { code: 404, meaning: "Tyomaa not found or has no coordinates", remedy: "check tyomaaId; ensure the worksite has been geocoded" },
+      { code: 401, meaning: "Not authenticated", remedy: "run 'ib auth login'" },
+      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+    ],
+    examples: [
+      "ib weather worksite 1234",
+      "ib weather worksite 1234 --force-refresh",
+    ],
+  },
+  {
+    command: "ib weather address",
+    description:
+      "Point forecast for a street address: geocodes the address via Google Maps (POST /api/geocode/getLatLng), then calls FMI for the forecast. Requires the company weather module. Fails with exit 5 (not-found) if the address returns ZERO_RESULTS from Google.",
+    permissions: ["company weather module (asiakasPersonSettingTypeId 18)"],
+    flags: [
+      { name: "address", type: "string", description: "Street address (min 5 chars)" },
+      { name: "time", type: "string", description: "Forecast time (ISO 8601 or 'now')" },
+    ],
+    outputShape:
+      "{ temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }",
+    errors: [
+      { code: 403, meaning: "Weather module off or permission denied", remedy: "enable via 'ib weather toggle --on'" },
+      { code: 5, meaning: "Address not found (ZERO_RESULTS)", remedy: "try a more specific Finnish address" },
+      { code: 401, meaning: "Not authenticated", remedy: "run 'ib auth login'" },
+      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+    ],
+    examples: [
+      "ib weather address --address 'Mannerheimintie 1, Helsinki' --time now",
+      "ib weather address --address 'Tampereen valtatie 5, Tampere' --time 2026-06-10T10:00:00Z",
+    ],
+  },
+  {
+    command: "ib weather status",
+    description:
+      "Check whether the weather module is enabled for the active company. Does not require the weather module itself to be enabled (no circular dependency). Returns the enabled/disabled status and related settings.",
+    flags: [],
+    outputShape: "{ enabled: boolean, ... }",
+    errors: [
+      { code: 401, meaning: "Not authenticated", remedy: "run 'ib auth login'" },
+      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+    ],
+    examples: ["ib weather status"],
+  },
+  {
+    command: "ib weather toggle",
+    description:
+      "Enable or disable the weather module for the active company. Pass exactly one of --on or --off. Admin-scoped operation. Supports --dry-run, --idempotency-key, and --reason for audit trail.",
+    writeFlags: true,
+    flags: [
+      { name: "on", type: "boolean", description: "Enable the module" },
+      { name: "off", type: "boolean", description: "Disable the module" },
+      { name: "dry-run", type: "boolean", description: "Preview the write without persisting (X-Dry-Run)" },
+      { name: "idempotency-key", type: "string", description: "Dedupe retries of the same logical write (Idempotency-Key)" },
+      { name: "reason", type: "string", description: "Human-readable why-string stored in audit logs (X-Action-Reason)" },
+    ],
+    outputShape: "{ success: boolean, enabled: boolean, ... }",
+    errors: [
+      { code: 4, meaning: "Neither --on nor --off passed, or both passed", remedy: "pass exactly one of --on / --off" },
+      { code: 403, meaning: "Permission denied (admin required)", remedy: "requires admin role on the company" },
+      { code: 401, meaning: "Not authenticated", remedy: "run 'ib auth login'" },
+      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+    ],
+    examples: [
+      "ib weather toggle --on --reason 'enabling for summer season'",
+      "ib weather toggle --off --dry-run",
+    ],
+  },
+
   // ─── reference (1) ───────────────────────────────────────────────────────
   {
     command: "ib reference dump",

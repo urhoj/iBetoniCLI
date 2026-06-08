@@ -3157,6 +3157,229 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib weather address matches snapshot 1`] = `
+"USAGE
+  ib weather address [flags]
+
+DESCRIPTION
+  Point forecast for a street address: geocodes the address via Google Maps (POST /api/geocode/getLatLng), then calls FMI for the forecast. Requires the company weather module. Fails with exit 5 (not-found) if the address returns ZERO_RESULTS from Google.
+  Permissions: requires company weather module (asiakasPersonSettingTypeId 18).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --address STRING    Street address (min 5 chars)
+  --time STRING    Forecast time (ISO 8601 or 'now')
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }
+
+ERRORS (stderr, exit non-zero)
+  403  Weather module off or permission denied → enable via 'ib weather toggle --on'
+  5  Address not found (ZERO_RESULTS) → try a more specific Finnish address
+  401  Not authenticated      → run 'ib auth login'
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib weather address --address 'Mannerheimintie 1, Helsinki' --time now
+  ib weather address --address 'Tampereen valtatie 5, Tampere' --time 2026-06-10T10:00:00Z
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib weather day matches snapshot 1`] = `
+"USAGE
+  ib weather day [flags]
+
+DESCRIPTION
+  Daily aggregate weather forecast (min/max/avg temperature, wind, precipitation) for a lat/lng on a calendar date. Accepts relative date aliases: today, tomorrow, yesterday. Coordinates must be within Finland. Requires the company weather module.
+  Permissions: requires company weather module (asiakasPersonSettingTypeId 18).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --lat NUMBER    Latitude (Finland 59.5–70.1)
+  --lng NUMBER    Longitude (Finland 19.0–31.6)
+  --date STRING    Date (YYYY-MM-DD, or today/tomorrow/yesterday)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { date, minTemp, maxTemp, avgTemp, windSpeed, precipitation, weatherSymbol, source, coordinates }
+
+ERRORS (stderr, exit non-zero)
+  403  Weather module off or permission denied → enable via 'ib weather toggle --on'
+  400  Bad coords/date        → use Finland coords and a valid date
+  401  Not authenticated      → run 'ib auth login'
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib weather day --lat 60.17 --lng 24.94 --date today
+  ib weather day --lat 60.17 --lng 24.94 --date 2026-06-10
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib weather forecast matches snapshot 1`] = `
+"USAGE
+  ib weather forecast [flags]
+
+DESCRIPTION
+  Single-point FMI weather forecast for a lat/lng at a given time. Coordinates must be within Finland (lat 59.5–70.1, lng 19.0–31.6). Time must be within now..+240h. Requires the company weather module (asiakasPersonSettingTypeId 18); 403 if disabled.
+  Permissions: requires company weather module (asiakasPersonSettingTypeId 18).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --lat NUMBER    Latitude (Finland 59.5–70.1)
+  --lng NUMBER    Longitude (Finland 19.0–31.6)
+  --time STRING    Forecast time, ISO 8601 or 'now'
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }
+
+ERRORS (stderr, exit non-zero)
+  403  Weather module off or permission denied → enable via 'ib weather toggle --on' (admin) or contact an admin
+  400  Bad coords/time        → use Finland coords and a time within now..+240h
+  401  Not authenticated      → run 'ib auth login'
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib weather forecast --lat 60.1699 --lng 24.9384 --time now
+  ib weather forecast --lat 60.1699 --lng 24.9384 --time 2026-06-09T14:00:00Z
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib weather pumping matches snapshot 1`] = `
+"USAGE
+  ib weather pumping [flags]
+
+DESCRIPTION
+  Weather analysis over a concrete-pumping window: hourly conditions for the entire duration starting at --start. The backend can correlate with a keikka via --keikka for error reporting. Requires the company weather module.
+  Permissions: requires company weather module (asiakasPersonSettingTypeId 18).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --lat NUMBER    Latitude (Finland 59.5–70.1)
+  --lng NUMBER    Longitude (Finland 19.0–31.6)
+  --start STRING    Pumping start time (ISO 8601 or 'now')
+  --duration NUMBER    Pumping duration in minutes
+  --keikka NUMBER    Keikka id (optional, for backend error correlation only)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { hourly: [{ time, temperature, windSpeed, precipitation, weatherSymbol }], summary, coordinates }
+
+ERRORS (stderr, exit non-zero)
+  403  Weather module off or permission denied → enable via 'ib weather toggle --on'
+  400  Bad coords/time/duration → use Finland coords, valid ISO time, positive duration
+  401  Not authenticated      → run 'ib auth login'
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib weather pumping --lat 60.17 --lng 24.94 --start now --duration 120
+  ib weather pumping --lat 60.17 --lng 24.94 --start 2026-06-10T08:00:00Z --duration 90 --keikka 1234
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib weather status matches snapshot 1`] = `
+"USAGE
+  ib weather status [flags]
+
+DESCRIPTION
+  Check whether the weather module is enabled for the active company. Does not require the weather module itself to be enabled (no circular dependency). Returns the enabled/disabled status and related settings.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { enabled: boolean, ... }
+
+ERRORS (stderr, exit non-zero)
+  401  Not authenticated      → run 'ib auth login'
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib weather status
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib weather toggle matches snapshot 1`] = `
+"USAGE
+  ib weather toggle [flags]
+
+DESCRIPTION
+  Enable or disable the weather module for the active company. Pass exactly one of --on or --off. Admin-scoped operation. Supports --dry-run, --idempotency-key, and --reason for audit trail.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --on BOOLEAN    Enable the module
+  --off BOOLEAN    Disable the module
+  --dry-run BOOLEAN    Preview the write without persisting (X-Dry-Run)
+  --idempotency-key STRING    Dedupe retries of the same logical write (Idempotency-Key)
+  --reason STRING    Human-readable why-string stored in audit logs (X-Action-Reason)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { success: boolean, enabled: boolean, ... }
+
+ERRORS (stderr, exit non-zero)
+  4  Neither --on nor --off passed, or both passed → pass exactly one of --on / --off
+  403  Permission denied (admin required) → requires admin role on the company
+  401  Not authenticated      → run 'ib auth login'
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib weather toggle --on --reason 'enabling for summer season'
+  ib weather toggle --off --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib weather worksite matches snapshot 1`] = `
+"USAGE
+  ib weather worksite [flags]
+
+DESCRIPTION
+  Forecast for a worksite identified by tyomaaId. The backend resolves the coordinates from the tyomaa record internally — no lat/lng needed. Use --force-refresh to bypass the cache. Requires the company weather module.
+  Permissions: requires company weather module (asiakasPersonSettingTypeId 18).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --force-refresh BOOLEAN    Bypass the cache and refetch from FMI
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json
+
+OUTPUT (JSON, stdout)
+  { temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }
+
+ERRORS (stderr, exit non-zero)
+  403  Weather module off or permission denied → enable via 'ib weather toggle --on'
+  404  Tyomaa not found or has no coordinates → check tyomaaId; ensure the worksite has been geocoded
+  401  Not authenticated      → run 'ib auth login'
+  500  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib weather worksite 1234
+  ib weather worksite 1234 --force-refresh
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib worksite create matches snapshot 1`] = `
 "USAGE
   ib worksite create [flags]

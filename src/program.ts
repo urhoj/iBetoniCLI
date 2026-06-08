@@ -23,6 +23,7 @@ import { registerOhjeCommands } from "./commands/ohje/index.js";
 import { registerJerryCommands } from "./commands/jerry/index.js";
 import { registerScheduleCommands } from "./commands/schedule/index.js";
 import { registerSchemaCommands } from "./commands/schema/index.js";
+import { registerWeatherCommands } from "./commands/weather/index.js";
 import { registerVersionCommand } from "./commands/version/index.js";
 import { runReferenceDump } from "./reference/dump.js";
 import { renderDomainHelp } from "./reference/domain.js";
@@ -86,6 +87,7 @@ export function buildProgram(): Command {
   registerJerryCommands(program, getClient);
   registerScheduleCommands(program, getClient);
   registerSchemaCommands(program, getClient);
+  registerWeatherCommands(program, getClient);
   registerVersionCommand(program, packageJson.version, getEndpoint);
 
   const reference = program
