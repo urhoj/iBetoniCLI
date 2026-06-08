@@ -28,17 +28,17 @@ describe("ib version — runVersion", () => {
     );
     const report = await runVersion({
       endpoint: "https://api.ibetoni.fi/",
-      cliVersion: "1.0.0",
+      cliVersion: "1.0.1",
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
     expect(fetchImpl).toHaveBeenCalledWith(
       "https://api.ibetoni.fi/api/version",
       expect.objectContaining({
-        headers: expect.objectContaining({ "User-Agent": "ib-cli/1.0.0" }),
+        headers: expect.objectContaining({ "User-Agent": "ib-cli/1.0.1" }),
       })
     );
     expect(report).toEqual({
-      cli: "1.0.0",
+      cli: "1.0.1",
       endpoint: "https://api.ibetoni.fi/",
       reachable: true,
       server: {

@@ -9,7 +9,7 @@
  * out of sync — there is exactly one source of truth (`./specs.ts`).
  */
 import { COMMAND_SPECS } from "./specs.js";
-import { DOMAIN_OVERVIEW, GLOSSARY } from "./domain.js";
+import { DOMAIN_OVERVIEW, GLOSSARY, FEEDBACK_GUIDANCE } from "./domain.js";
 import packageJson from "../../package.json" with { type: "json" };
 /**
  * Build the reference object. Pure — no I/O — so tests can assert on it
@@ -22,6 +22,7 @@ export function buildReference() {
         generatedAt: new Date().toISOString(),
         overview: DOMAIN_OVERVIEW,
         glossary: GLOSSARY,
+        feedbackGuidance: FEEDBACK_GUIDANCE,
         commands: Object.fromEntries(COMMAND_SPECS.map((spec) => [spec.command, spec])),
     };
 }
