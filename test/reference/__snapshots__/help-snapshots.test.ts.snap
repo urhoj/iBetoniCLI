@@ -3248,6 +3248,44 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib stats matches snapshot 1`] = `
+"USAGE
+  ib stats [flags]
+
+DESCRIPTION
+  Aggregated delivery statistics for a date range: m³ volume, order counts, and breakdowns by customer/vehicle/driver/worksite/status/day. Read-only; scoped to what the caller can see in the grid.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --from DATE    Start date (YYYY-MM-DD or today/yesterday/tomorrow)
+  --to DATE    End date (YYYY-MM-DD or today/yesterday/tomorrow)
+  --today BOOLEAN    Shortcut for --from today --to today
+  --month STRING    Whole calendar month YYYY-MM (expands to first→last day)
+  --week DATE    7-day window starting <start>
+  --by STRING    Single breakdown: customer|vehicle|driver|worksite|status|day (omit for full bundle)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  No --by: { period, totals:{orders,m3,activeVehicles,activeDrivers}, byStatus, byCustomer, byVehicle, byDriver, byWorksite, byDay }. With --by: ListEnvelope of that one breakdown.
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Default range is today. Exactly one of --today/--month/--week/(--from & --to).
+  - Deploy-gated: returns 404 until GET /api/cli/stats is deployed.
+  - Revenue and driver hours are out of scope (v1).
+
+EXAMPLES
+  ib stats --month 2026-06
+  ib stats --from 2026-06-01 --to 2026-06-07 --by driver
+  ib stats --today --pretty
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib vehicle create matches snapshot 1`] = `
 "USAGE
   ib vehicle create [flags]
