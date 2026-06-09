@@ -1,34 +1,7 @@
 import { describe, test, expect, vi } from "vitest";
 import {
-  extractPersonRows,
   runPersonSearchMyCompanies,
 } from "../../src/commands/person/index.js";
-
-describe("extractPersonRows", () => {
-  test("passes a bare array through", () => {
-    const rows = [{ personId: 1 }, { personId: 2 }];
-    expect(extractPersonRows(rows)).toEqual(rows);
-  });
-
-  test("unwraps an mssql { recordset } result", () => {
-    const rows = [{ personId: 7 }];
-    expect(extractPersonRows({ recordset: rows })).toEqual(rows);
-  });
-
-  test("unwraps a nested { recordsets: [[...]] } result", () => {
-    const rows = [{ personId: 9 }];
-    expect(extractPersonRows({ recordsets: [rows] })).toEqual(rows);
-  });
-
-  test("empty recordset → []", () => {
-    expect(extractPersonRows({ recordsets: [[]], recordset: [] })).toEqual([]);
-  });
-
-  test("null / unrecognised shape → []", () => {
-    expect(extractPersonRows(null)).toEqual([]);
-    expect(extractPersonRows({ output: {}, returnValue: 0 })).toEqual([]);
-  });
-});
 
 describe("runPersonSearchMyCompanies", () => {
   test("searches every company and tags each hit with its company", async () => {

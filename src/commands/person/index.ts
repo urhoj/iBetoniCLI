@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { unwrapRows, type ListEnvelope } from "../../api/envelopes.js";
 import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
@@ -121,25 +121,6 @@ export interface MyCompanyPersonHit {
 }
 
 /**
- * /api/person/search returns either a bare array of person rows or a raw mssql
- * result wrapper ({ recordset } / { recordsets: [[...]] }) depending on cache
- * warmth. Normalise both to a flat array of row objects.
- */
-export function extractPersonRows(raw: unknown): Record<string, unknown>[] {
-  if (Array.isArray(raw)) return raw as Record<string, unknown>[];
-  if (raw && typeof raw === "object") {
-    const obj = raw as { recordset?: unknown; recordsets?: unknown };
-    if (Array.isArray(obj.recordset)) {
-      return obj.recordset as Record<string, unknown>[];
-    }
-    if (Array.isArray(obj.recordsets) && Array.isArray(obj.recordsets[0])) {
-      return obj.recordsets[0] as Record<string, unknown>[];
-    }
-  }
-  return [];
-}
-
-/**
  * Fan a person search out across the caller's companies (`--my-companies`).
  * `listCompanies` yields the companies to sweep; `searchIn(asiakasId)` runs the
  * search in one company (the caller binds the query + an ephemeral per-company
@@ -154,7 +135,7 @@ export async function runPersonSearchMyCompanies(
   const items: MyCompanyPersonHit[] = [];
   for (const c of companies) {
     const raw = await searchIn(c.asiakasId);
-    for (const row of extractPersonRows(raw)) {
+    for (const row of unwrapRows(raw)) {
       const first = (row.personFirstName as string) ?? "";
       const last = (row.personLastName as string) ?? "";
       items.push({
