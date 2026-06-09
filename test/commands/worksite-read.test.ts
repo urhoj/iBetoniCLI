@@ -59,22 +59,26 @@ describe("ib worksite list/get/search", () => {
     expect((result as { tyomaaId: number }).tyomaaId).toBe(42);
   });
 
-  test("runWorksiteSearch: POSTs /api/tyomaa/search with {searchString} body", async () => {
+  test("runWorksiteSearch: POSTs /api/tyomaa/search with {searchString} body as a read", async () => {
     (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
       { tyomaaId: 42, name: "Helsinki Site" },
     ]);
     await runWorksiteSearch(mockClient, "Helsinki");
-    expect(mockClient.post).toHaveBeenCalledWith("/api/tyomaa/search", {
-      searchString: "Helsinki",
-    });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/tyomaa/search",
+      { searchString: "Helsinki" },
+      { read: true }
+    );
   });
 
   test("runWorksiteSearch: forwards raw query untouched (no encoding)", async () => {
     (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
     await runWorksiteSearch(mockClient, "Acme & Co");
-    expect(mockClient.post).toHaveBeenCalledWith("/api/tyomaa/search", {
-      searchString: "Acme & Co",
-    });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/tyomaa/search",
+      { searchString: "Acme & Co" },
+      { read: true }
+    );
   });
 
   test("runWorksiteList forwards --customer", async () => {
@@ -89,9 +93,11 @@ describe("ib worksite list/get/search", () => {
   test("runWorksiteSearch forwards limit in the body", async () => {
     (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
     await runWorksiteSearch(mockClient, "Main", 30);
-    expect(mockClient.post).toHaveBeenCalledWith("/api/tyomaa/search", {
-      searchString: "Main", limit: 30,
-    });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/tyomaa/search",
+      { searchString: "Main", limit: 30 },
+      { read: true }
+    );
   });
 
   test("runWorksiteMetrics: GET /api/cli/worksite/metrics/42", async () => {

@@ -107,7 +107,7 @@ export async function runPersonSearch(
 ): Promise<unknown> {
   const body: Record<string, unknown> = { searchString: query };
   if (limit !== undefined) body.limit = limit;
-  return client.post<unknown>("/api/person/search", body);
+  return client.post<unknown>("/api/person/search", body, { read: true });
 }
 
 /** A person hit from the cross-company search, tagged with its company. */
