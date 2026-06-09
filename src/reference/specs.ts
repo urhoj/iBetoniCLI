@@ -897,8 +897,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     outputShape:
-      "Default: the backend's raw person rows (array, or an mssql { recordset } wrapper). " +
-      "With --my-companies: ListEnvelope<{ personId, name, email, phone, asiakasId, asiakasName }>",
+      "ListEnvelope<{ personId, name, email, phone, asiakasId }>. " +
+      "With --my-companies each row also carries asiakasName.",
     errors: permErrors("auth.page.person.read"),
     examples: [
       "ib person search 'Matti'",

@@ -2159,7 +2159,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
 
 OUTPUT (JSON, stdout)
-  Default: the backend's raw person rows (array, or an mssql { recordset } wrapper). With --my-companies: ListEnvelope<{ personId, name, email, phone, asiakasId, asiakasName }>
+  ListEnvelope<{ personId, name, email, phone, asiakasId }>. With --my-companies each row also carries asiakasName.
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
