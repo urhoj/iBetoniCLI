@@ -24,9 +24,9 @@ export interface CommandSummary {
 
 /** Filter inputs for {@link filterCommandSpecs}. */
 export interface CommandsListFilter {
-  /** Keep only mutating commands (`writeFlags === true`). */
+  /** Keep only mutating commands (mutates:true, or writeFlags:true when mutates is absent). */
   mutations?: boolean;
-  /** Keep only read-only commands (no write-safety flags). */
+  /** Keep only non-mutating (read-only) commands. */
   reads?: boolean;
   /** Keep only commands whose permission strings contain this substring. */
   permission?: string;
