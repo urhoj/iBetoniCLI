@@ -726,9 +726,10 @@ export const COMMAND_SPECS = [
     {
         command: "ib person search",
         description: "Free-text search across person names / emails. POST /api/person/search. " +
-            "Scoped to your active company. With --my-companies the search fans out " +
-            "across every company you belong to (an ephemeral per-company switch each) " +
-            "and returns one flat list tagged with the asiakasId/name of each hit. " +
+            "Scoped to your active company. With --my-companies the search runs across " +
+            "every company you belong to in one server-side call (with a per-company " +
+            "client-sweep fallback if that endpoint isn't deployed yet) and returns one " +
+            "flat list tagged with the asiakasId/name of each hit. " +
             "Global persons (ownerAsiakasId=null) are included in every company's results.",
         permissions: ["auth.page.person.read"],
         args: [{ name: "query", type: "string", description: "search string" }],

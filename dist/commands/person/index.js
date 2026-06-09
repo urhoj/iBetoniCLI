@@ -94,13 +94,35 @@ export async function runPersonSearch(client, query, limit) {
     return { items, nextCursor: null, count: items.length };
 }
 /**
- * Fan a person search out across the caller's companies (`--my-companies`).
- * `listCompanies` yields the companies to sweep; `searchIn(asiakasId)` runs the
- * search in one company (the caller binds the query + an ephemeral per-company
- * client). Each hit is projected to a clean, company-tagged row and merged into
- * one ListEnvelope so cross-company results are disambiguable.
+ * Search persons across the caller's companies (`--my-companies`) via the
+ * server-side endpoint `GET /api/cli/person/search` — ONE round-trip, no
+ * per-company switching. If that endpoint isn't deployed yet (404/405), falls
+ * back to the legacy client-side fan-out so the command works pre- and
+ * post-deploy. `opts.fallback` supplies the fan-out; `opts.limit` is forwarded.
  */
-export async function runPersonSearchMyCompanies(listCompanies, searchIn) {
+export async function runPersonSearchMyCompanies(client, query, opts) {
+    const qs = new URLSearchParams({ q: query });
+    if (opts.limit !== undefined)
+        qs.set("limit", String(opts.limit));
+    try {
+        return await client.get(`/api/cli/person/search?${qs.toString()}`);
+    }
+    catch (e) {
+        // Endpoint not deployed yet → fall back to the client-side fan-out.
+        if (e instanceof CliError && (e.statusCode === 404 || e.statusCode === 405)) {
+            return opts.fallback();
+        }
+        throw e;
+    }
+}
+/**
+ * Legacy client-side fan-out for `--my-companies` (the fallback when the
+ * server endpoint isn't deployed). `listCompanies` yields the companies to
+ * sweep; `searchIn(asiakasId)` runs the search in one company (the caller binds
+ * the query + an ephemeral per-company client). Each hit is tagged with its
+ * authoritative company and merged into one ListEnvelope.
+ */
+export async function runPersonSearchMyCompaniesFanout(listCompanies, searchIn) {
     const companies = await listCompanies();
     const items = [];
     for (const c of companies) {
@@ -254,10 +276,14 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         try {
             const client = await getClient();
             if (opts.myCompanies) {
-                const result = await runPersonSearchMyCompanies(async () => (await runCompanyList(client)).items.map((c) => ({
-                    asiakasId: c.asiakasId,
-                    name: c.name,
-                })), async (asiakasId) => runPersonSearch(await getClientForAsiakas(asiakasId), query, opts.limit));
+                const result = await runPersonSearchMyCompanies(client, query, {
+                    limit: opts.limit,
+                    // Fallback used only if the server endpoint isn't deployed yet.
+                    fallback: () => runPersonSearchMyCompaniesFanout(async () => (await runCompanyList(client)).items.map((c) => ({
+                        asiakasId: c.asiakasId,
+                        name: c.name,
+                    })), async (asiakasId) => runPersonSearch(await getClientForAsiakas(asiakasId), query, opts.limit)),
+                });
                 writeJson(result);
                 return;
             }

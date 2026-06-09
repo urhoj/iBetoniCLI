@@ -2436,7 +2436,7 @@ exports[`Help snapshots — contract stability > help for ib person search match
   ib person search <query> [flags]
 
 DESCRIPTION
-  Free-text search across person names / emails. POST /api/person/search. Scoped to your active company. With --my-companies the search fans out across every company you belong to (an ephemeral per-company switch each) and returns one flat list tagged with the asiakasId/name of each hit. Global persons (ownerAsiakasId=null) are included in every company's results.
+  Free-text search across person names / emails. POST /api/person/search. Scoped to your active company. With --my-companies the search runs across every company you belong to in one server-side call (with a per-company client-sweep fallback if that endpoint isn't deployed yet) and returns one flat list tagged with the asiakasId/name of each hit. Global persons (ownerAsiakasId=null) are included in every company's results.
   Permissions: requires auth.page.person.read.
 
 ARGUMENTS
