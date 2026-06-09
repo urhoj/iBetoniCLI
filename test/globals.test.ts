@@ -1,4 +1,4 @@
-import { describe, test, expect } from "vitest";
+import { describe, test, expect, vi } from "vitest";
 import {
   addGlobalOptions,
   GlobalOptions,
@@ -71,6 +71,27 @@ describe("global options", () => {
     cmd.parse(["node", "test"]);
     expect(getGlobalOptions(cmd).asiakas).toBeNull();
   });
+
+  test.each([["abc"], ["0"], ["-3"], ["1.5"]])(
+    "--asiakas %s (not a positive integer) exits 4 with a clear message",
+    (bad) => {
+      const cmd = new Command();
+      addGlobalOptions(cmd);
+      cmd.parse(["node", "test", "--asiakas", bad]);
+      const exitSpy = vi
+        .spyOn(process, "exit")
+        .mockImplementation(((code?: number) => {
+          throw new Error(`EXIT_${code}`);
+        }) as never);
+      const errSpy = vi
+        .spyOn(process.stderr, "write")
+        .mockReturnValue(true);
+      expect(() => getGlobalOptions(cmd)).toThrow("EXIT_4");
+      expect(String(errSpy.mock.calls[0][0])).toMatch(/--asiakas/);
+      exitSpy.mockRestore();
+      errSpy.mockRestore();
+    }
+  );
 
   test("getGlobalOptions reads flags from a parsed Command", () => {
     const cmd = new Command();

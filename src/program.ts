@@ -7,7 +7,7 @@
  */
 import { Command } from "commander";
 import packageJson from "../package.json" with { type: "json" };
-import { addGlobalOptions, getGlobalOptions } from "./globals.js";
+import { addGlobalOptions, getGlobalOptions, type GlobalOptions } from "./globals.js";
 import { defaultCredentialsPath } from "./auth/store.js";
 import { createCliContext } from "./cliContext.js";
 import type { ApiClient } from "./api/client.js";
@@ -52,11 +52,15 @@ export function buildProgram(): Command {
   program.addHelpText("after", renderDomainHelp());
   addGlobalOptions(program);
 
-  async function getClient(): Promise<ApiClient> {
+  // Build an authenticated client from a resolved set of global options. Exits 2
+  // with "Not logged in" when no auth resolves — so command actions never deal
+  // with the unauthenticated case. The two factories below differ only in the
+  // global options they pass in.
+  async function clientFrom(global: GlobalOptions): Promise<ApiClient> {
     const ctx = await createCliContext({
       credentialsPath: defaultCredentialsPath(),
       version: packageJson.version,
-      global: getGlobalOptions(program),
+      global,
     });
     if (!ctx.client) {
       process.stderr.write("Not logged in. Run `ib auth login` first.\n");
@@ -65,22 +69,14 @@ export function buildProgram(): Command {
     return ctx.client;
   }
 
+  const getClient = (): Promise<ApiClient> =>
+    clientFrom(getGlobalOptions(program));
+
   // A client bound to a SPECIFIC company via an ephemeral switch (never
-  // persisted). Reuses `createCliContext` with `asiakas` overridden, so it goes
-  // through the same tested switch path and inherits read-only/endpoint/version.
-  // Powers `person search --my-companies` fan-out across the caller's companies.
-  async function getClientForAsiakas(asiakasId: number): Promise<ApiClient> {
-    const ctx = await createCliContext({
-      credentialsPath: defaultCredentialsPath(),
-      version: packageJson.version,
-      global: { ...getGlobalOptions(program), asiakas: asiakasId },
-    });
-    if (!ctx.client) {
-      process.stderr.write("Not logged in. Run `ib auth login` first.\n");
-      process.exit(2);
-    }
-    return ctx.client;
-  }
+  // persisted). Reuses the same tested switch path and inherits
+  // read-only/endpoint/version. Powers `person search --my-companies` fan-out.
+  const getClientForAsiakas = (asiakasId: number): Promise<ApiClient> =>
+    clientFrom({ ...getGlobalOptions(program), asiakas: asiakasId });
 
   // Resolve the active endpoint WITHOUT requiring auth — `createCliContext`
   // returns a usable `endpoint` (--endpoint → active profile → default) even

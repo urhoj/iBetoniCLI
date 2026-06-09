@@ -78,8 +78,12 @@ export function projectPersonHit(row) {
  * POST /api/person/search — existing (non-/api/cli/) route used by the FE
  * person typeahead. Body is `{ searchString: <query> }`. The backend scopes
  * results to the caller's company (req.user.ownerAsiakasId) when no
- * ownerAsiakasId is in the body, so the CLI sends only searchString. Result
- * shape is whatever the backend returns (typically an array of person records).
+ * ownerAsiakasId is in the body, so the CLI sends only searchString. Sent with
+ * `{ read: true }` so this read-over-POST is exempt from the `--read-only`
+ * write-lock and the acting-as diagnostic. The raw backend rows (a bare array
+ * or an mssql `{ recordset }` wrapper) are normalised via `unwrapRows` and
+ * projected by `projectPersonHit` into the documented
+ * `ListEnvelope<PersonSearchHit>`.
  */
 export async function runPersonSearch(client, query, limit) {
     const body = { searchString: query };

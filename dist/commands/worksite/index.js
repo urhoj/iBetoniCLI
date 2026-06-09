@@ -44,11 +44,12 @@ export async function runWorksiteGet(client, tyomaaId, opts = {}) {
  * caller's company (req.user.ownerAsiakasId) when no ownerAsiakasId is in the
  * body, so the CLI sends only searchString (+ optional limit).
  *
- * Sent as a `meta` request: search is a non-mutating POST, so `meta:true`
- * exempts it from the `--read-only` write-lock and the acting-as write
- * diagnostic (it neither creates nor updates tenant data). The raw Finnish-
- * named recordset is projected into the universal `ListEnvelope` with the same
- * camelCase keys as `worksite get` for a consistent AI-facing shape.
+ * Sent as a `read` request: search is a tenant-scoped non-mutating POST, so
+ * `read:true` exempts it from the `--read-only` write-lock and the acting-as
+ * write diagnostic (it neither creates nor updates tenant data). Distinct from
+ * `meta` (which is for non-tenant diagnostics such as `ib feedback`). The raw
+ * Finnish-named recordset is projected into the universal `ListEnvelope` with
+ * the same camelCase keys as `worksite get` for a consistent AI-facing shape.
  */
 export async function runWorksiteSearch(client, query, limit) {
     const body = { searchString: query };

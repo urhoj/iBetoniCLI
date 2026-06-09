@@ -14,6 +14,18 @@ export function addGlobalOptions(cmd) {
 export function getGlobalOptions(cmd) {
     const o = cmd.opts();
     const envReadOnly = READ_ONLY_ENV_TRUE.has((process.env.IB_READ_ONLY ?? "").trim().toLowerCase());
+    // --asiakas must be a positive integer; fail fast (exit 4 = validation) with a
+    // clear message rather than sending NaN→null to the backend and surfacing a
+    // cryptic "newAsiakasId is required" HTTP 400.
+    let asiakas = null;
+    if (o.asiakas !== undefined) {
+        const n = Number(o.asiakas);
+        if (!Number.isInteger(n) || n < 1) {
+            process.stderr.write(`Error: --asiakas must be a positive integer (got '${o.asiakas}').\n`);
+            process.exit(4);
+        }
+        asiakas = n;
+    }
     return {
         endpoint: o.endpoint ?? null,
         requestId: o.requestId ?? null,
@@ -22,7 +34,7 @@ export function getGlobalOptions(cmd) {
         pretty: !!o.pretty,
         json: !!o.json,
         readOnly: !!o.readOnly || envReadOnly,
-        asiakas: o.asiakas !== undefined ? Number(o.asiakas) : null,
+        asiakas,
     };
 }
 export function resolveEndpoint(g, profileEndpoint) {

@@ -49,11 +49,15 @@ export function buildProgram() {
     // embeds. Sourced from reference/domain.ts — one source of truth, no drift.
     program.addHelpText("after", renderDomainHelp());
     addGlobalOptions(program);
-    async function getClient() {
+    // Build an authenticated client from a resolved set of global options. Exits 2
+    // with "Not logged in" when no auth resolves — so command actions never deal
+    // with the unauthenticated case. The two factories below differ only in the
+    // global options they pass in.
+    async function clientFrom(global) {
         const ctx = await createCliContext({
             credentialsPath: defaultCredentialsPath(),
             version: packageJson.version,
-            global: getGlobalOptions(program),
+            global,
         });
         if (!ctx.client) {
             process.stderr.write("Not logged in. Run `ib auth login` first.\n");
@@ -61,22 +65,11 @@ export function buildProgram() {
         }
         return ctx.client;
     }
+    const getClient = () => clientFrom(getGlobalOptions(program));
     // A client bound to a SPECIFIC company via an ephemeral switch (never
-    // persisted). Reuses `createCliContext` with `asiakas` overridden, so it goes
-    // through the same tested switch path and inherits read-only/endpoint/version.
-    // Powers `person search --my-companies` fan-out across the caller's companies.
-    async function getClientForAsiakas(asiakasId) {
-        const ctx = await createCliContext({
-            credentialsPath: defaultCredentialsPath(),
-            version: packageJson.version,
-            global: { ...getGlobalOptions(program), asiakas: asiakasId },
-        });
-        if (!ctx.client) {
-            process.stderr.write("Not logged in. Run `ib auth login` first.\n");
-            process.exit(2);
-        }
-        return ctx.client;
-    }
+    // persisted). Reuses the same tested switch path and inherits
+    // read-only/endpoint/version. Powers `person search --my-companies` fan-out.
+    const getClientForAsiakas = (asiakasId) => clientFrom({ ...getGlobalOptions(program), asiakas: asiakasId });
     // Resolve the active endpoint WITHOUT requiring auth — `createCliContext`
     // returns a usable `endpoint` (--endpoint → active profile → default) even
     // when no credentials resolve. Powers `ib version`, which queries the public
