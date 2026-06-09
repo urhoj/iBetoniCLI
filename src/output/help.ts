@@ -80,6 +80,17 @@ export interface CommandSpec {
   outputShape: string;
   /** Documented error codes with their meaning and remedy. */
   errors: CommandError[];
+  /**
+   * Preconditions, side-effects, gotchas, or flag-behaviour caveats that don't
+   * fit in a single-sentence description. Rendered as a bulleted NOTES block
+   * immediately before EXAMPLES. Each entry should be one distinct point.
+   */
+  notes?: string[];
+  /**
+   * Related command paths the caller should know about (e.g. the command to
+   * run before/after this one). Rendered as a SEE ALSO line after NOTES.
+   */
+  seeAlso?: string[];
   /** Copy-paste-ready invocation examples. */
   examples: string[];
 }
@@ -170,6 +181,17 @@ export function formatHelp(spec: CommandSpec): string {
     lines.push(`  exit ${e.exit}${http}  ${e.meaning.padEnd(22)} → ${e.remedy}`);
   }
   lines.push("");
+
+  if (spec.notes?.length) {
+    lines.push("NOTES");
+    for (const n of spec.notes) lines.push(`  - ${n}`);
+    lines.push("");
+  }
+  if (spec.seeAlso?.length) {
+    lines.push("SEE ALSO");
+    lines.push(`  ${spec.seeAlso.join(", ")}`);
+    lines.push("");
+  }
 
   lines.push("EXAMPLES");
   for (const ex of spec.examples) {

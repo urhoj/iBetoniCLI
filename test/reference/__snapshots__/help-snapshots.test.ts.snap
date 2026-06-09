@@ -431,7 +431,7 @@ exports[`Help snapshots — contract stability > help for ib customer list match
   ib customer list [flags]
 
 DESCRIPTION
-  List customers (asiakkaat). Scope: regular users see their own tenant + their own company row; SYSTEM ADMINS list across ALL tenants (incl. cross-tenant --ids). --full returns every flat-customer field + the jerry companyDescription in one call (diff a whole tenant without N×\`customer get\`); --ids 1,2,3 restricts to specific asiakasIds and returns ALL of them (NOT capped at the default 100 — bounded by the ids list, max 1000) — the efficient way to refresh only the rows you care about. Without --ids the list is capped (default 100 / max 500) and \`truncated:true\` flags when you hit the cap (narrow with --ids or raise --limit).
+  List customers (asiakkaat).
   Permissions: requires auth.page.asiakas.read.
 
 FLAGS
@@ -452,6 +452,12 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - Scope: regular users see their own tenant + their own company row; SYSTEM ADMINS list across ALL tenants (incl. cross-tenant --ids).
+  - --full returns every flat-customer field + the jerry companyDescription in one call (diff a whole tenant without N×\`customer get\`).
+  - --ids 1,2,3 restricts to specific asiakasIds and returns ALL of them (NOT capped at the default 100 — bounded by the ids list, max 1000) — the efficient way to refresh only the rows you care about.
+  - Without --ids the list is capped (default 100 / max 500) and \`truncated:true\` flags when you hit the cap (narrow with --ids or raise --limit).
+
 EXAMPLES
   ib customer list
   ib customer list --limit 50 --pretty
@@ -466,7 +472,7 @@ exports[`Help snapshots — contract stability > help for ib customer modules ma
   ib customer modules <asiakasId> [flags]
 
 DESCRIPTION
-  Report or toggle a customer's roolit + module flags. Field keys: pumppu (isPumppuToimittaja), jerry, henkilot, sijainnit, ajoneuvot, tiedostot, weather, lomaseuranta, shareorders. Without --set/--unset it is a read-only report (GET /api/cli/customer/modules/:asiakasId); with them it routes pumppu → POST /api/asiakas/setRoolit and modules → POST /api/asiakas/settings/save.
+  Report or toggle a customer's roolit + module flags.
   Permissions: requires company admin on the target tenant (system admin = any tenant).
 
 ARGUMENTS
@@ -493,6 +499,10 @@ ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Customer not found     → verify asiakasId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Field keys: pumppu (isPumppuToimittaja), jerry, henkilot, sijainnit, ajoneuvot, tiedostot, weather, lomaseuranta, shareorders.
+  - Without --set/--unset it is a read-only report (GET /api/cli/customer/modules/:asiakasId); with them it routes pumppu → POST /api/asiakas/setRoolit and modules → POST /api/asiakas/settings/save.
 
 EXAMPLES
   ib customer modules 1349
@@ -603,6 +613,9 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib person role list
 
 EXAMPLES
   ib customer person list 26
@@ -1252,7 +1265,7 @@ exports[`Help snapshots — contract stability > help for ib jerry offer confirm
   ib jerry offer confirm <requestId> <offerId> [flags]
 
 DESCRIPTION
-  Confirm an accepted offer (PROVIDER side; POST /api/pumppuRequests/:id/offers/:offerId/confirm). Heavyweight: flips the offer accepted → 'confirmed' and BUILDS A KEIKKA in your grid (real side effects — broadcasts keikka:created, notifies the customer, inherits the vehicle's day driver). Call after the customer accepts and you've agreed a date by phone. --scheduled-at (future ISO datetime) is required; --pumppu optionally pins one of your vehicles. Requires --reason.
+  Confirm an accepted offer (PROVIDER side; POST /api/pumppuRequests/:id/offers/:offerId/confirm).
   Permissions: requires provider company (isPumppuToimittaja); owns the offer.
 
 ARGUMENTS
@@ -1282,6 +1295,14 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 409)  Offer not in 'accepted' state → the customer must accept the offer before you confirm
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Heavyweight, real side effects: flips the offer accepted → 'confirmed' AND builds a keikka in your grid (broadcasts keikka:created, notifies the customer, inherits the vehicle's day driver).
+  - Call only after the customer accepts and you've agreed a date by phone.
+  - --scheduled-at (future ISO datetime) is required; --pumppu optionally pins one of your vehicles.
+
+SEE ALSO
+  ib jerry offer accept, ib jerry request get
 
 EXAMPLES
   ib jerry offer confirm 4012 55 --scheduled-at 2026-06-15T08:00:00Z --reason vahvistettu
@@ -2306,6 +2327,9 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+SEE ALSO
+  ib person role grant, ib person role revoke, ib customer person list
+
 EXAMPLES
   ib role explain asiakasAdmin
   ib role explain lomaseurannassa
@@ -2851,7 +2875,7 @@ exports[`Help snapshots — contract stability > help for ib sijainti set-jerry 
   ib sijainti set-jerry <sijaintiId> [flags]
 
 DESCRIPTION
-  Enrol or unenrol a varikko (location) in BetoniJerry by setting sijainti.jerryActiveUntil. --on writes the permanent sentinel; --off clears it to null. IMPORTANT: BetoniJerry coverage keys on the delivery radius maxDeliveryDistance (KM) — NOT geofenceRadius (metres, a GPS depot detector) — so --on ALSO sets that radius: --radius <km>, or a 50 km default when the varikko has none (otherwise it would be enrolled but cover nothing). Replicates the EditSijainti toggle: reads the row, overrides the fields, and writes back via POST /api/geocode/updateSijainti (lat/lng etc. preserved). Matching also requires the company's isPumppuToimittaja flag.
+  Enrol or unenrol a varikko (location) in BetoniJerry by setting sijainti.jerryActiveUntil (POST /api/geocode/updateSijainti).
   Permissions: requires auth.page.sijainnit.edit.
 
 ARGUMENTS
@@ -2879,6 +2903,12 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - --on writes the permanent sentinel; --off clears it to null.
+  - IMPORTANT: BetoniJerry coverage keys on the delivery radius maxDeliveryDistance (KM) — NOT geofenceRadius (metres, a GPS depot detector) — so --on ALSO sets that radius: --radius <km>, or a 50 km default when the varikko has none (otherwise it would be enrolled but cover nothing).
+  - Replicates the EditSijainti toggle: reads the row, overrides the fields, and writes back (lat/lng etc. preserved).
+  - Matching also requires the company's isPumppuToimittaja flag.
 
 EXAMPLES
   ib sijainti set-jerry 42 --on --radius 60 --reason 'pilot varikko, 60 km radius'
@@ -3222,6 +3252,9 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib vehicle types
 
 EXAMPLES
   ib vehicle list

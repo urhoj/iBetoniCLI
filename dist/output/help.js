@@ -85,6 +85,17 @@ export function formatHelp(spec) {
         lines.push(`  exit ${e.exit}${http}  ${e.meaning.padEnd(22)} → ${e.remedy}`);
     }
     lines.push("");
+    if (spec.notes?.length) {
+        lines.push("NOTES");
+        for (const n of spec.notes)
+            lines.push(`  - ${n}`);
+        lines.push("");
+    }
+    if (spec.seeAlso?.length) {
+        lines.push("SEE ALSO");
+        lines.push(`  ${spec.seeAlso.join(", ")}`);
+        lines.push("");
+    }
     lines.push("EXAMPLES");
     for (const ex of spec.examples) {
         lines.push(`  ${ex}`);

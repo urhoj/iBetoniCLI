@@ -79,3 +79,22 @@ describe("formatHelp AUTH + timezone", () => {
       .toContain("Timezone:");
   });
 });
+
+describe("formatHelp NOTES + SEE ALSO", () => {
+  test("renders notes bullets and see-also list", () => {
+    const out = formatHelp({
+      ...base,
+      notes: ["Side effect: builds a keikka.", "Provider only."],
+      seeAlso: ["ib jerry offer accept", "ib jerry request get"],
+    });
+    expect(out).toContain("NOTES");
+    expect(out).toContain("- Side effect: builds a keikka.");
+    expect(out).toContain("SEE ALSO");
+    expect(out).toContain("ib jerry offer accept, ib jerry request get");
+  });
+  test("omits NOTES/SEE ALSO sections when absent", () => {
+    const out = formatHelp({ ...base });
+    expect(out).not.toContain("NOTES");
+    expect(out).not.toContain("SEE ALSO");
+  });
+});

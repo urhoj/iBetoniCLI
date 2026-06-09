@@ -256,7 +256,13 @@ export const COMMAND_SPECS = [
     // ─── customer (7) ────────────────────────────────────────────────────────
     {
         command: "ib customer list",
-        description: "List customers (asiakkaat). Scope: regular users see their own tenant + their own company row; SYSTEM ADMINS list across ALL tenants (incl. cross-tenant --ids). --full returns every flat-customer field + the jerry companyDescription in one call (diff a whole tenant without N×`customer get`); --ids 1,2,3 restricts to specific asiakasIds and returns ALL of them (NOT capped at the default 100 — bounded by the ids list, max 1000) — the efficient way to refresh only the rows you care about. Without --ids the list is capped (default 100 / max 500) and `truncated:true` flags when you hit the cap (narrow with --ids or raise --limit).",
+        description: "List customers (asiakkaat).",
+        notes: [
+            "Scope: regular users see their own tenant + their own company row; SYSTEM ADMINS list across ALL tenants (incl. cross-tenant --ids).",
+            "--full returns every flat-customer field + the jerry companyDescription in one call (diff a whole tenant without N×`customer get`).",
+            "--ids 1,2,3 restricts to specific asiakasIds and returns ALL of them (NOT capped at the default 100 — bounded by the ids list, max 1000) — the efficient way to refresh only the rows you care about.",
+            "Without --ids the list is capped (default 100 / max 500) and `truncated:true` flags when you hit the cap (narrow with --ids or raise --limit).",
+        ],
         permissions: ["auth.page.asiakas.read"],
         flags: [
             {
@@ -409,7 +415,11 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib customer modules",
-        description: "Report or toggle a customer's roolit + module flags. Field keys: pumppu (isPumppuToimittaja), jerry, henkilot, sijainnit, ajoneuvot, tiedostot, weather, lomaseuranta, shareorders. Without --set/--unset it is a read-only report (GET /api/cli/customer/modules/:asiakasId); with them it routes pumppu → POST /api/asiakas/setRoolit and modules → POST /api/asiakas/settings/save.",
+        description: "Report or toggle a customer's roolit + module flags.",
+        notes: [
+            "Field keys: pumppu (isPumppuToimittaja), jerry, henkilot, sijainnit, ajoneuvot, tiedostot, weather, lomaseuranta, shareorders.",
+            "Without --set/--unset it is a read-only report (GET /api/cli/customer/modules/:asiakasId); with them it routes pumppu → POST /api/asiakas/setRoolit and modules → POST /api/asiakas/settings/save.",
+        ],
         permissions: ["company admin on the target tenant (system admin = any tenant)"],
         args: [{ name: "asiakasId", type: "number", description: "asiakasId to report/modify" }],
         flags: [
@@ -819,6 +829,7 @@ export const COMMAND_SPECS = [
         command: "ib vehicle list",
         description: "List vehicles visible to the active company. ownerAsiakasId derived from JWT. Rows are self-describing (showInGrid/firstDate/lastDate/deletedTime). Default scope = non-deleted with no narrowing, so grid-hidden AND expired vehicles ARE included; only soft-deleted are excluded. Use the flags to narrow or to reveal deleted rows.",
         permissions: ["auth.page.vehicle.read"],
+        seeAlso: ["ib vehicle types"],
         flags: [
             {
                 name: "limit",
@@ -1173,7 +1184,13 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib sijainti set-jerry",
-        description: "Enrol or unenrol a varikko (location) in BetoniJerry by setting sijainti.jerryActiveUntil. --on writes the permanent sentinel; --off clears it to null. IMPORTANT: BetoniJerry coverage keys on the delivery radius maxDeliveryDistance (KM) — NOT geofenceRadius (metres, a GPS depot detector) — so --on ALSO sets that radius: --radius <km>, or a 50 km default when the varikko has none (otherwise it would be enrolled but cover nothing). Replicates the EditSijainti toggle: reads the row, overrides the fields, and writes back via POST /api/geocode/updateSijainti (lat/lng etc. preserved). Matching also requires the company's isPumppuToimittaja flag.",
+        description: "Enrol or unenrol a varikko (location) in BetoniJerry by setting sijainti.jerryActiveUntil (POST /api/geocode/updateSijainti).",
+        notes: [
+            "--on writes the permanent sentinel; --off clears it to null.",
+            "IMPORTANT: BetoniJerry coverage keys on the delivery radius maxDeliveryDistance (KM) — NOT geofenceRadius (metres, a GPS depot detector) — so --on ALSO sets that radius: --radius <km>, or a 50 km default when the varikko has none (otherwise it would be enrolled but cover nothing).",
+            "Replicates the EditSijainti toggle: reads the row, overrides the fields, and writes back (lat/lng etc. preserved).",
+            "Matching also requires the company's isPumppuToimittaja flag.",
+        ],
         permissions: ["auth.page.sijainnit.edit"],
         args: [{ name: "sijaintiId", type: "number", description: "sijaintiId to toggle" }],
         flags: [
@@ -1424,6 +1441,7 @@ export const COMMAND_SPECS = [
         command: "ib customer person list",
         description: "List persons attached to a customer. `--role` filters by role name; the per-row `roleTypeId` only echoes that filter (null when unfiltered — the base membership row), so it is NOT the person's role set. For the FULL per-company roles pass `--include-roles` (adds permissionRoles[]) or use `ib person role list`.",
         permissions: ["auth.page.asiakas.read"],
+        seeAlso: ["ib person role list"],
         args: [{ name: "asiakasId", type: "number", description: "asiakasId" }],
         flags: [
             { name: "role", type: "string", description: "Filter by role name (e.g. keikkaHandler)" },
@@ -1440,6 +1458,7 @@ export const COMMAND_SPECS = [
         command: "ib role explain",
         description: "Explain a role NAME: its asiakasPersonSettingTypeId, human display name, the access tiers it grants (anyAdmin/anyWorker/anyViewer/laskuRead/requestOffer/adminCompanySelection), and whether it is deprecated — all from @ibetoni/constants. Enriched with the LIVE DB `description` (internal flag name, e.g. isAsiakasAdmin) and `comment` (rich Finnish text) read from GET /api/asiakasPersonSettings/getAllTypes, so the prose never drifts from dbo.asiakasPersonSettingTypes. Requires auth (any logged-in user); description/comment are null for roles the endpoint omits (soft-deleted pumppuHandler/Viewer). Use it to disambiguate the role names accepted by `person role grant/revoke` and `customer person list --role`.",
         auth: "any",
+        seeAlso: ["ib person role grant", "ib person role revoke", "ib customer person list"],
         args: [{ name: "name", type: "string", description: "role name (e.g. asiakasAdmin, keikkaHandler, lomaseurannassa)" }],
         flags: [],
         outputShape: "{ role, typeId, displayName: string|null, description: string|null, comment: string|null, tiers: string[], deprecated: boolean }",
@@ -1763,7 +1782,13 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib jerry offer confirm",
-        description: "Confirm an accepted offer (PROVIDER side; POST /api/pumppuRequests/:id/offers/:offerId/confirm). Heavyweight: flips the offer accepted → 'confirmed' and BUILDS A KEIKKA in your grid (real side effects — broadcasts keikka:created, notifies the customer, inherits the vehicle's day driver). Call after the customer accepts and you've agreed a date by phone. --scheduled-at (future ISO datetime) is required; --pumppu optionally pins one of your vehicles. Requires --reason.",
+        description: "Confirm an accepted offer (PROVIDER side; POST /api/pumppuRequests/:id/offers/:offerId/confirm).",
+        notes: [
+            "Heavyweight, real side effects: flips the offer accepted → 'confirmed' AND builds a keikka in your grid (broadcasts keikka:created, notifies the customer, inherits the vehicle's day driver).",
+            "Call only after the customer accepts and you've agreed a date by phone.",
+            "--scheduled-at (future ISO datetime) is required; --pumppu optionally pins one of your vehicles.",
+        ],
+        seeAlso: ["ib jerry offer accept", "ib jerry request get"],
         permissions: ["provider company (isPumppuToimittaja); owns the offer"],
         args: [
             { name: "requestId", type: "number", description: "pumppuRequestId" },
