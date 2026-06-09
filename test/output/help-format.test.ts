@@ -56,3 +56,26 @@ describe("formatHelp ARGUMENTS", () => {
     expect(out).toMatch(/--asiakas NUMBER.*\(required\)/);
   });
 });
+
+describe("formatHelp AUTH + timezone", () => {
+  test("auth:any prints an explicit login line", () => {
+    const out = formatHelp({ ...base, auth: "any" });
+    expect(out).toContain("Auth: requires login (any authenticated user).");
+  });
+  test("auth:none prints a public line", () => {
+    const out = formatHelp({ ...base, auth: "none" });
+    expect(out).toContain("Auth: none (public).");
+  });
+  test("permissions take precedence over auth", () => {
+    const out = formatHelp({ ...base, permissions: ["auth.page.x.read"] });
+    expect(out).toContain("Permissions: requires auth.page.x.read.");
+    expect(out).not.toContain("Auth:");
+  });
+  test("timezone line only when a date arg/flag exists", () => {
+    expect(formatHelp(base)).not.toContain("Timezone:");
+    expect(formatHelp({ ...base, flags: [{ name: "from", type: "date", description: "d" }] }))
+      .toContain("Timezone:");
+    expect(formatHelp({ ...base, args: [{ name: "d", type: "date", description: "day" }] }))
+      .toContain("Timezone:");
+  });
+});

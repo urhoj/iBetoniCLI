@@ -6,7 +6,7 @@ exports[`Help snapshots — contract stability > help for ib auth login matches 
 
 DESCRIPTION
   Open the system browser to authorize this CLI via OAuth 2.1 + PKCE and persist credentials to ~/.ibetoni/credentials.json (mode 0600).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: none (public).
 
 FLAGS
   --endpoint URL    API endpoint to authorize against (default: https://api.ibetoni.fi)
@@ -33,7 +33,7 @@ exports[`Help snapshots — contract stability > help for ib auth logout matches
 
 DESCRIPTION
   Revoke the refresh token server-side (best-effort) and delete the local credentials file.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: requires login (any authenticated user).
 
 FLAGS
   (none)
@@ -58,7 +58,7 @@ exports[`Help snapshots — contract stability > help for ib auth refresh matche
 
 DESCRIPTION
   Manually refresh the JWT against /api/auth/refresh-token. Automatic refresh-on-401 also happens in the API client.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: requires login (any authenticated user).
 
 FLAGS
   (none)
@@ -83,7 +83,7 @@ exports[`Help snapshots — contract stability > help for ib auth switch matches
 
 DESCRIPTION
   Switch the active company. Issues a new JWT bound to the target ownerAsiakasId and persists it.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: requires login (any authenticated user).
 
 FLAGS
   --to NUMBER    Target asiakasId to switch to
@@ -109,7 +109,7 @@ exports[`Help snapshots — contract stability > help for ib auth whoami matches
 
 DESCRIPTION
   Print the current authenticated user's personId, active company, and endpoint.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: requires login (any authenticated user).
 
 FLAGS
   (none)
@@ -134,7 +134,7 @@ exports[`Help snapshots — contract stability > help for ib commands matches sn
 
 DESCRIPTION
   Filtered, offline list of ib commands from the spec catalogue: which write, which are read-only, which require a given permission. Lighter than \`ib reference dump\` (the full surface) — returns just { command, description, permissions, writeFlags } per match. No auth, no network.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: none (public).
 
 FLAGS
   --mutations BOOLEAN    Only commands that write (carry write-safety flags)
@@ -165,7 +165,7 @@ exports[`Help snapshots — contract stability > help for ib company current mat
 
 DESCRIPTION
   Return the record of the active company (the one bound to the current JWT).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: requires login (any authenticated user).
 
 FLAGS
   (none)
@@ -191,7 +191,7 @@ exports[`Help snapshots — contract stability > help for ib company list matche
 
 DESCRIPTION
   List the companies the current user can act on, with the active one marked \`current: true\`.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: requires login (any authenticated user).
 
 FLAGS
   (none)
@@ -218,7 +218,7 @@ exports[`Help snapshots — contract stability > help for ib company switch matc
 
 DESCRIPTION
   Switch the active company. Alias of \`ib auth switch\`. Persists the rotated JWT.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: requires login (any authenticated user).
 
 FLAGS
   --to NUMBER    Target asiakasId to switch to
@@ -246,7 +246,6 @@ exports[`Help snapshots — contract stability > help for ib customer create mat
 DESCRIPTION
   Create a customer. Typed flags assemble the createY body (yTunnus REQUIRED); --from-prh prefills name+yTunnus+billing address from the PRH registry; --address/--postal-code/--city set the billing postal address; --body raw JSON overrides flags. Returns the flat customer shape via re-fetch.
   Permissions: requires auth.page.asiakas.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --name STRING    Customer name (asiakasNimi)
@@ -291,7 +290,6 @@ exports[`Help snapshots — contract stability > help for ib customer create-or-
 DESCRIPTION
   Upsert a customer keyed by business ID (ytunnus) — removes the search-then-create dance for idempotent onboarding. Looks the ytunnus up in your tenant (system admins: across tenants); 1 match → update (read-merge with your flags), 0 → create, >1 → error (exit 4). --from-prh <yt> uses that business ID as the key AND prefills name+yTunnus from PRH on create. Alias: \`ib customer upsert\`.
   Permissions: requires auth.page.asiakas.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --ytunnus STRING    Business ID key (yTunnus) — required unless --from-prh/--body supplies it
@@ -337,7 +335,6 @@ exports[`Help snapshots — contract stability > help for ib customer delete mat
 DESCRIPTION
   Delete a customer (asiakas). Requires --reason; --dry-run available.
   Permissions: requires auth.page.asiakas.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <asiakasId> NUMBER    asiakasId to delete (required)
@@ -374,7 +371,6 @@ exports[`Help snapshots — contract stability > help for ib customer get matche
 DESCRIPTION
   Get a single customer (asiakas) by id with flat contact fields.
   Permissions: requires auth.page.asiakas.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <asiakasId> NUMBER    asiakasId to fetch (required)
@@ -406,7 +402,6 @@ exports[`Help snapshots — contract stability > help for ib customer history ma
 DESCRIPTION
   Change-tracker audit trail for one customer — who changed which field, when, and the --reason. Reads the same log the CLI's writes populate.
   Permissions: requires auth.page.asiakas.read (company member or admin).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <asiakasId> NUMBER    asiakasId (required)
@@ -438,7 +433,6 @@ exports[`Help snapshots — contract stability > help for ib customer list match
 DESCRIPTION
   List customers (asiakkaat). Scope: regular users see their own tenant + their own company row; SYSTEM ADMINS list across ALL tenants (incl. cross-tenant --ids). --full returns every flat-customer field + the jerry companyDescription in one call (diff a whole tenant without N×\`customer get\`); --ids 1,2,3 restricts to specific asiakasIds and returns ALL of them (NOT capped at the default 100 — bounded by the ids list, max 1000) — the efficient way to refresh only the rows you care about. Without --ids the list is capped (default 100 / max 500) and \`truncated:true\` flags when you hit the cap (narrow with --ids or raise --limit).
   Permissions: requires auth.page.asiakas.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --limit NUMBER    Max rows for the unbounded list (capped at 500). Ignored when --ids is given. (default: 100)
@@ -474,7 +468,6 @@ exports[`Help snapshots — contract stability > help for ib customer modules ma
 DESCRIPTION
   Report or toggle a customer's roolit + module flags. Field keys: pumppu (isPumppuToimittaja), jerry, henkilot, sijainnit, ajoneuvot, tiedostot, weather, lomaseuranta, shareorders. Without --set/--unset it is a read-only report (GET /api/cli/customer/modules/:asiakasId); with them it routes pumppu → POST /api/asiakas/setRoolit and modules → POST /api/asiakas/settings/save.
   Permissions: requires company admin on the target tenant (system admin = any tenant).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <asiakasId> NUMBER    asiakasId to report/modify (required)
@@ -515,7 +508,6 @@ exports[`Help snapshots — contract stability > help for ib customer operator m
 DESCRIPTION
   Verify or provision the full operator preset — all 9 operator flags at once (pumppu + the 8 modules). Default (no flag): verify, exit 0 iff every flag is on else exit 1 (CI-gateable). --set turns all 9 on; --reset turns all 9 off. System-admin can run cross-tenant.
   Permissions: requires company admin on the target tenant (system admin = any tenant).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <asiakasId> NUMBER    asiakasId to verify/provision (required)
@@ -556,7 +548,6 @@ exports[`Help snapshots — contract stability > help for ib customer person add
 DESCRIPTION
   Attach a person to a customer (asiakasPerson). Requires --reason.
   Permissions: requires auth.page.asiakas.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --asiakas NUMBER    Target asiakasId (REQUIRED)
@@ -593,7 +584,6 @@ exports[`Help snapshots — contract stability > help for ib customer person lis
 DESCRIPTION
   List persons attached to a customer. \`--role\` filters by role name; the per-row \`roleTypeId\` only echoes that filter (null when unfiltered — the base membership row), so it is NOT the person's role set. For the FULL per-company roles pass \`--include-roles\` (adds permissionRoles[]) or use \`ib person role list\`.
   Permissions: requires auth.page.asiakas.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <asiakasId> NUMBER    asiakasId (required)
@@ -628,7 +618,6 @@ exports[`Help snapshots — contract stability > help for ib customer person rem
 DESCRIPTION
   Detach a person from a customer (asiakasPerson). Requires --reason.
   Permissions: requires auth.page.asiakas.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --asiakas NUMBER    Target asiakasId (REQUIRED)
@@ -664,7 +653,7 @@ exports[`Help snapshots — contract stability > help for ib customer prh matche
 
 DESCRIPTION
   Look up a company in the Finnish business registry (PRH). Pass <ytunnus> for an exact business-ID lookup, or --search <name>. Read-only; any authenticated user.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: requires login (any authenticated user).
 
 ARGUMENTS
   <ytunnus> STRING    business ID (XXXXXXXX-X) (optional)
@@ -698,7 +687,6 @@ exports[`Help snapshots — contract stability > help for ib customer search mat
 DESCRIPTION
   Free-text search across customer names / yTunnus / contacts. GET /api/asiakas/search?searchString=...
   Permissions: requires auth.page.asiakas.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <query> STRING    search string (required)
@@ -730,7 +718,6 @@ exports[`Help snapshots — contract stability > help for ib customer settings m
 DESCRIPTION
   Report or toggle ALL asiakasSettings (every canonical ASIAKAS_SETTING_TYPE_IDS name) plus pumppu. Without --set/--unset it is a read-only report. Names are case-insensitive; the 8 module aliases (jerry, weather, …) and pumppu are also accepted. Superset of \`customer modules\`.
   Permissions: requires company admin on the target tenant (system admin = any tenant).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <asiakasId> NUMBER    asiakasId (required)
@@ -770,7 +757,6 @@ exports[`Help snapshots — contract stability > help for ib customer update mat
 DESCRIPTION
   Update a customer via read-merge-write: reads the current record, overlays the provided flags (preserving everything else — no contact-person clobber), writes back with saveGlobalAsiakas. --from-prh refreshes name+yTunnus+billing address from the registry (explicit flags still win). Billing postal address (--address/--postal-code/--city) is writable; pass an empty string to clear a field. --body raw JSON overrides flags.
   Permissions: requires auth.page.asiakas.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <asiakasId> NUMBER    asiakasId to update (required)
@@ -819,7 +805,6 @@ exports[`Help snapshots — contract stability > help for ib customer worksites 
 DESCRIPTION
   List worksites belonging to a customer (GET /api/tyomaa/asiakasTyomaaList/:asiakasId).
   Permissions: requires auth.page.tyomaa.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <asiakasId> NUMBER    asiakasId (required)
@@ -849,7 +834,7 @@ exports[`Help snapshots — contract stability > help for ib doctor matches snap
 
 DESCRIPTION
   Aggregated 'is my setup working' health check. Derives identity from the active JWT (so it works for both file- and IB_TOKEN-sessions, unlike \`auth whoami\`), reports token expiry, pings the public /api/version for connectivity + which build is live, and does ONE authenticated read to prove the token is accepted by this endpoint. Read-only. Exits 1 when the aggregate \`ok\` is false.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: requires login (any authenticated user).
 
 FLAGS
   (none)
@@ -876,7 +861,7 @@ exports[`Help snapshots — contract stability > help for ib feedback create mat
 
 DESCRIPTION
   File a CLI improvement proposal or trouble report. AI users: file this PROACTIVELY and IMMEDIATELY (no need to ask the user) whenever you hit an error or unexpected exit code, had to try several strategies because the help/docs were unclear/missing/wrong, found something confusing or harder than expected, could not find a command for something the user clearly needs (a capability gap), or saw an inconsistency between commands. Stored quietly server-side (no GitHub issue, no spam to you or the user — distinct from bug reports; the maintainer gets a private heads-up email) for later developer triage. Sent as a META request, so it is EXEMPT from the read-only write-lock: you can file feedback even with --read-only / IB_READ_ONLY active. --dry-run resolves client-side (prints the payload, never sends).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: requires login (any authenticated user).
 
 ARGUMENTS
   <description> STRING    freetext description of the friction, gap, or bug (required)
@@ -912,7 +897,6 @@ exports[`Help snapshots — contract stability > help for ib feedback get matche
 DESCRIPTION
   Fetch one feedback row by id (developer-only).
   Permissions: requires isSystemAdmin or isDeveloper.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <id> NUMBER    feedbackId (required)
@@ -943,7 +927,6 @@ exports[`Help snapshots — contract stability > help for ib feedback list match
 DESCRIPTION
   List filed feedback for triage. Developer-only (isSystemAdmin / isDeveloper); global across tenants. Newest first, paginated (default 50, cap 200).
   Permissions: requires isSystemAdmin or isDeveloper.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --status STRING    open | reviewed | applied | dismissed
@@ -975,7 +958,6 @@ exports[`Help snapshots — contract stability > help for ib feedback resolve ma
 DESCRIPTION
   Triage a feedback row: set its status and/or attach a resolution note (developer-only). This IS a real write — blocked under --read-only (exit 3). --dry-run previews the update body client-side without sending.
   Permissions: requires isSystemAdmin or isDeveloper.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <id> NUMBER    feedbackId (required)
@@ -1010,7 +992,6 @@ exports[`Help snapshots — contract stability > help for ib jerry admin detail 
 DESCRIPTION
   Company Jerry drill-down: people by role (admins/tarjousAdmins/pumpparit), vehicles, and each sijainti's Jerry enrolment status (GET /api/admin/jerry-companies/:asiakasId/detail). System-admin only.
   Permissions: requires isSystemAdmin.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <asiakasId> NUMBER    company asiakasId (required)
@@ -1042,7 +1023,6 @@ exports[`Help snapshots — contract stability > help for ib jerry admin disable
 DESCRIPTION
   Disable the BetoniJerry module for a company — clears BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/disable). System-admin only. Requires --reason.
   Permissions: requires isSystemAdmin.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <asiakasId> NUMBER    company asiakasId (required)
@@ -1080,7 +1060,6 @@ exports[`Help snapshots — contract stability > help for ib jerry admin enable 
 DESCRIPTION
   Enable the BetoniJerry module for a company — the audited toggle that sets BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/enable). Change-tracked via the asiakasSql proc paths. System-admin only. Requires --reason.
   Permissions: requires isSystemAdmin.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <asiakasId> NUMBER    company asiakasId (required)
@@ -1119,7 +1098,6 @@ exports[`Help snapshots — contract stability > help for ib jerry admin list ma
 DESCRIPTION
   List Jerry-active companies (isPumppuToimittaja + HAS_JERRY setting) with per-company counts (admins, tarjousAdmins, pumpparit, vehicles, Jerry/non-Jerry varikot). GET /api/admin/jerry-companies. System-admin only.
   Permissions: requires isSystemAdmin.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   (none)
@@ -1148,7 +1126,6 @@ exports[`Help snapshots — contract stability > help for ib jerry admin search 
 DESCRIPTION
   Search companies NOT yet fully Jerry-enabled, for the Add picker (GET /api/admin/jerry-companies/search?q=). Name LIKE match, min 2 chars, top 20. System-admin only.
   Permissions: requires isSystemAdmin.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <query> STRING    name search (min 2 chars) (required)
@@ -1178,7 +1155,7 @@ exports[`Help snapshots — contract stability > help for ib jerry check-address
 
 DESCRIPTION
   Anonymous geofence feasibility probe (POST /api/pumppuRequests/checkAddress): which provider varikot cover an address. The single best tool for diagnosing 'no offers'. --address is required (the \`osoite\` body field); if --lat/--lng/--place-id are all supplied the server trusts them instead of re-geocoding. Not a mutation, so no write-safety flags. Rate-limited 10/min per IP. The \`providers\` array is only included when the token is a developer/admin.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: none (public).
 
 FLAGS
   --address STRING    Street address to check (REQUIRED; sent as \`osoite\`)
@@ -1211,7 +1188,6 @@ exports[`Help snapshots — contract stability > help for ib jerry counts matche
 DESCRIPTION
   Lifecycle counts. Default --mine returns the customer view (GET /api/pumppuRequests/mine/counts: draft/open/pending_verification/accepted/cancelled/expired/no_supply). --provider returns the provider badge counts (GET /api/pumppuRequests/provider-counts: avoimet/tarjotut/voitetut/voitetutActionRequired/paattyneet) and requires a provider company.
   Permissions: requires --provider: provider company (isPumppuToimittaja).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --provider BOOLEAN    Provider badge counts (provider role)
@@ -1241,7 +1217,6 @@ exports[`Help snapshots — contract stability > help for ib jerry offer accept 
 DESCRIPTION
   Accept an offer (CUSTOMER side; POST /api/pumppuRequests/:id/offers/:offerId/accept). Flips this offer to 'accepted', sibling offers to 'rejected', and the parent request to 'accepted' in one transaction. Caller must own the request (its personId) — this is NOT a provider action. Requires --reason.
   Permissions: requires owns the request (customer personId).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <requestId> NUMBER    pumppuRequestId you own (required)
@@ -1279,7 +1254,6 @@ exports[`Help snapshots — contract stability > help for ib jerry offer confirm
 DESCRIPTION
   Confirm an accepted offer (PROVIDER side; POST /api/pumppuRequests/:id/offers/:offerId/confirm). Heavyweight: flips the offer accepted → 'confirmed' and BUILDS A KEIKKA in your grid (real side effects — broadcasts keikka:created, notifies the customer, inherits the vehicle's day driver). Call after the customer accepts and you've agreed a date by phone. --scheduled-at (future ISO datetime) is required; --pumppu optionally pins one of your vehicles. Requires --reason.
   Permissions: requires provider company (isPumppuToimittaja); owns the offer.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <requestId> NUMBER    pumppuRequestId (required)
@@ -1322,7 +1296,6 @@ exports[`Help snapshots — contract stability > help for ib jerry offer create 
 DESCRIPTION
   Create or update (upsert) YOUR offer on a request (POST /api/pumppuRequests/:id/offers). Provider company only (isPumppuToimittaja). A new offer starts as 'draft' (invisible to the customer) — make it visible with \`ib jerry offer send\`. Re-running while the offer is still draft/pending edits it in place; once accepted/rejected/withdrawn it is final (409). --price-cents is the canonical price (integer cents, 1..99999900) matching exactly what the API stores; --maintains-order-info (true|false) overrides the provider default for this offer only (omit to inherit). Requires --reason.
   Permissions: requires provider company (isPumppuToimittaja).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <requestId> NUMBER    pumppuRequestId (required)
@@ -1370,7 +1343,6 @@ exports[`Help snapshots — contract stability > help for ib jerry offer send ma
 DESCRIPTION
   Send a draft offer to the customer (draft → 'pending'; POST /api/pumppuRequests/:id/offers/:offerId/send). Provider company only; you must own the offer. Two-stage by design: create the draft, attach files, then send. Requires --reason.
   Permissions: requires provider company (isPumppuToimittaja); owns the offer.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <requestId> NUMBER    pumppuRequestId (required)
@@ -1409,7 +1381,6 @@ exports[`Help snapshots — contract stability > help for ib jerry provider-sett
 DESCRIPTION
   Read a provider company's BetoniJerry settings — contact person, opening hours, company description, maintainsOrderInfo (GET /api/jerry-provider-settings). Defaults to the caller's own company; --asiakas targets another company you have edit rights on. Returns defaults when no row exists yet.
   Permissions: requires edit-tier on the target company (tarjousAdmin / company admin).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --asiakas NUMBER    Target company asiakasId (default: your own)
@@ -1438,7 +1409,6 @@ exports[`Help snapshots — contract stability > help for ib jerry provider-sett
 DESCRIPTION
   Upsert a provider company's BetoniJerry settings (PUT /api/jerry-provider-settings). Partial-payload-safe: only the body keys present are written (omit a key to preserve it). jerryPersonId must belong to the target company. --asiakas targets another company. Returns the FULL saved settings (no follow-up GET needed) plus changed:boolean (whether anything actually changed vs an idempotent no-op). companyDescription is nvarchar — ä/ö are preserved. Requires --reason.
   Permissions: requires edit-tier on the target company (tarjousAdmin / company admin).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --body JSON    JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo? }
@@ -1475,7 +1445,6 @@ exports[`Help snapshots — contract stability > help for ib jerry request get m
 DESCRIPTION
   Get one pump request. Default is the customer-owned recap (GET /api/pumppuRequests/:id, scoped to the caller's personId). --provider returns the provider-facing detail (GET /api/pumppuRequests/:id/provider-detail, requires provider role) including your own offer + attachments; customer PII (lat/lng/phone/email) stays masked until your offer is accepted/confirmed.
   Permissions: requires --provider: provider company (isPumppuToimittaja).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <requestId> NUMBER    pumppuRequestId (required)
@@ -1508,7 +1477,6 @@ exports[`Help snapshots — contract stability > help for ib jerry request list 
 DESCRIPTION
   List BetoniJerry pump requests (tarjouspyynnöt). Default --mine returns the caller's own requests (GET /api/pumppuRequests/mine). --open returns the provider inbox of open requests (GET /api/pumppuRequests/open) and requires a provider company (isPumppuToimittaja); customer PII is masked there until your offer is accepted. --status (CSV) and --limit apply to --mine only.
   Permissions: requires --open: provider company (isPumppuToimittaja).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --open BOOLEAN    Provider inbox of open requests (provider role)
@@ -1540,7 +1508,7 @@ exports[`Help snapshots — contract stability > help for ib jerry request offer
 
 DESCRIPTION
   List the offers on a customer-owned request (GET /api/pumppuRequests/:id/offers). Drafts excluded; sorted pending-first then cheapest. Provider contact fields (jerryContactName/Phone, openingHours) are revealed only on the accepted offer.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: requires login (any authenticated user).
 
 ARGUMENTS
   <requestId> NUMBER    pumppuRequestId you own (required)
@@ -1572,7 +1540,6 @@ exports[`Help snapshots — contract stability > help for ib keikka create match
 DESCRIPTION
   Create a new keikka. The body is forwarded verbatim to POST /api/keikka/newKeikka — see the backend route for required fields.
   Permissions: requires auth.page.grid.tilaus.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --body JSON    JSON object with the new keikka fields
@@ -1607,7 +1574,6 @@ exports[`Help snapshots — contract stability > help for ib keikka drivers assi
 DESCRIPTION
   Assign the default driver to a keikka. POST /api/keikka/defaultDriver/assign/:keikkaId; driver is selected by the backend from JWT/keikka context.
   Permissions: requires auth.page.grid.tilaus.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <keikkaId> NUMBER    keikkaId to assign default driver to (required)
@@ -1645,7 +1611,6 @@ exports[`Help snapshots — contract stability > help for ib keikka get matches 
 DESCRIPTION
   Get a single keikka by id with related customer / worksite / vehicle / driver projections.
   Permissions: requires auth.page.grid.tilaus.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <keikkaId> NUMBER    keikkaId to fetch (required)
@@ -1714,7 +1679,6 @@ exports[`Help snapshots — contract stability > help for ib keikka update match
 DESCRIPTION
   Update a keikka. v1.0 supports only \`--status\` (forwarded as \`tila\` to POST /api/keikka/setStatus). Other field-setters land in v1.1.
   Permissions: requires auth.page.grid.tilaus.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <keikkaId> NUMBER    keikkaId to update (required)
@@ -1752,7 +1716,7 @@ exports[`Help snapshots — contract stability > help for ib ohje get matches sn
 
 DESCRIPTION
   Get one UI help-text entry by helpId — the title/shorttext/htmltext shown in a HelperIcon '(?)' modal in the web UI. This is end-user help CONTENT, distinct from \`ib --help\` (CLI usage). Returns null when the helpId has no entry yet. Read is public (no auth on the route).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: none (public).
 
 ARGUMENTS
   <helpId> STRING    the helpId (e.g. LaskupohjaTilaus) (required)
@@ -1782,7 +1746,7 @@ exports[`Help snapshots — contract stability > help for ib ohje list matches s
 
 DESCRIPTION
   List every UI help-text entry (the whole helps table). Useful to discover helpIds before \`ib ohje get\`/\`update\`. Reads are public (no auth required on the route).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: none (public).
 
 FLAGS
   --limit NUMBER    Max rows to return (client-side cap)
@@ -1809,7 +1773,6 @@ exports[`Help snapshots — contract stability > help for ib ohje update matches
 DESCRIPTION
   Update a UI help-text entry (PUT /api/helps/update). The CLI GET-merges the current row first, so fields you omit are PRESERVED (helps_save overwrites the whole row). Provide typed flags or --body JSON; typed flags win. --reason is required for a write. --dry-run previews the merged row CLIENT-SIDE without writing — the backend does not honour X-Dry-Run on this route. Mirrors the HelperIcon in-place editor.
   Permissions: requires isHelperEditor (or system-admin/developer).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <helpId> STRING    the helpId to update (created if it does not exist) (required)
@@ -1852,7 +1815,7 @@ exports[`Help snapshots — contract stability > help for ib person companies ma
 
 DESCRIPTION
   List the companies (asiakkaat) a person belongs to. personId is optional and defaults to the caller. Reverse of \`customer person list\`.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: requires login (any authenticated user).
 
 ARGUMENTS
   <personId> NUMBER    personId (defaults to caller) (optional)
@@ -1883,7 +1846,6 @@ exports[`Help snapshots — contract stability > help for ib person create match
 DESCRIPTION
   Create a person. REQUIRED: --first, --last. --email is OPTIONAL (personEmail is nullable; phone-only contacts are fine and the email can be added later via \`ib person update\`). --asiakas defaults to your active company. Returns the created person record (clean {personId, ...}), NOT the raw SQL recordset. With --get-or-create a duplicate email returns the existing person (reused:true) instead of failing — useful for idempotent bulk onboarding. Use typed flags or --body JSON (typed flags win). Requires --reason. Use --global to create a GLOBAL, self-managing person (ownerAsiakasId=null) discoverable across companies; --global and --asiakas are mutually exclusive.
   Permissions: requires auth.page.person.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --first STRING    personFirstName (REQUIRED)
@@ -1928,7 +1890,6 @@ exports[`Help snapshots — contract stability > help for ib person delete match
 DESCRIPTION
   Delete a person. Requires --reason.
   Permissions: requires auth.page.person.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <personId> NUMBER    personId to delete (required)
@@ -1965,7 +1926,6 @@ exports[`Help snapshots — contract stability > help for ib person get matches 
 DESCRIPTION
   Get a single person by personId. Global persons (ownerAsiakasId=null) are fetchable by anyone.
   Permissions: requires auth.page.person.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <personId> NUMBER    personId to fetch (required)
@@ -1996,7 +1956,7 @@ exports[`Help snapshots — contract stability > help for ib person history matc
 
 DESCRIPTION
   Change-tracker audit trail for one person — who changed what, when, with the \`--reason\` recorded by every write. INCLUDES role grants/revokes (fieldName 'asiakasPersonSetting', e.g. 'Rooli lisätty: asiakasAdmin (Asiakas Admin)'); pass \`--field asiakasPersonSetting\` to see only role changes. GET /api/changes/person/:personId/:ownerAsiakasId; owner defaults to the active company. --field filters client-side.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: requires login (any authenticated user).
 
 ARGUMENTS
   <personId> NUMBER    personId whose history to fetch (required)
@@ -2031,7 +1991,6 @@ exports[`Help snapshots — contract stability > help for ib person list matches
 DESCRIPTION
   List persons (drivers, admins, etc.) visible to the active company. Optional --role uses ROLE_NAME_BY_TYPEID from @ibetoni/constants.
   Permissions: requires auth.page.person.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --role STRING    Filter by role name (e.g. driver, admin, laskuAdmin)
@@ -2062,7 +2021,7 @@ exports[`Help snapshots — contract stability > help for ib person me matches s
 
 DESCRIPTION
   Your own profile, your roles aggregated across all your companies, and the companies you can act on. Derives identity from the JWT (works with IB_TOKEN). For the roles scoped to a single company, use \`person role list --asiakas\`.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: requires login (any authenticated user).
 
 FLAGS
   (none)
@@ -2090,7 +2049,6 @@ exports[`Help snapshots — contract stability > help for ib person owner matche
 DESCRIPTION
   Set or clear a person's owner company (ownerAsiakasId). Provide EXACTLY ONE of --global (make the person GLOBAL/self-managing, ownerAsiakasId=null, discoverable across companies) or --asiakas <id> (assign/move ownership). This is SEPARATE from roles — a global person can still hold roles via \`ib person role grant\`, and from membership via \`ib customer person add\`. Requires --reason.
   Permissions: requires developer/system-admin: any person → any target, self (your own personId): → null always; → a company only if you are a member of it, company-admin: may release a person CURRENTLY owned by your company → global (cannot pull others in).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <personId> NUMBER    personId whose owner to change (required)
@@ -2130,7 +2088,6 @@ exports[`Help snapshots — contract stability > help for ib person role grant m
 DESCRIPTION
   Grant a per-company role to a person. POST /api/asiakasPersonSettings/add/:asiakasId/:personId/:roleTypeId. Admin-gated on the tenant (tier depends on the role). --dry-run previews via the backend ({ dryRun:true, wouldCreate }).
   Permissions: requires company admin on the target tenant (tier per role).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <personId> NUMBER    personId (required)
@@ -2169,7 +2126,6 @@ exports[`Help snapshots — contract stability > help for ib person role list ma
 DESCRIPTION
   List a person's per-company roles (asiakasPersonSettings) for a given asiakas. Role names resolved via ROLE_NAME_BY_TYPEID.
   Permissions: requires company role read on the target tenant.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <personId> NUMBER    personId (required)
@@ -2200,7 +2156,6 @@ exports[`Help snapshots — contract stability > help for ib person role revoke 
 DESCRIPTION
   Revoke a per-company role from a person (idempotent: { removed:0 } when absent). Looks up the asiakasPersonSettingId then DELETEs it. --dry-run previews via the backend ({ dryRun:true, wouldDelete }).
   Permissions: requires company admin on the target tenant (tier per role).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <personId> NUMBER    personId (required)
@@ -2238,7 +2193,6 @@ exports[`Help snapshots — contract stability > help for ib person search match
 DESCRIPTION
   Free-text search across person names / emails. POST /api/person/search. Scoped to your active company. With --my-companies the search fans out across every company you belong to (an ephemeral per-company switch each) and returns one flat list tagged with the asiakasId/name of each hit. Global persons (ownerAsiakasId=null) are included in every company's results.
   Permissions: requires auth.page.person.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <query> STRING    search string (required)
@@ -2271,7 +2225,6 @@ exports[`Help snapshots — contract stability > help for ib person update match
 DESCRIPTION
   Update a person. Body REQUIRED via --body. Requires --reason.
   Permissions: requires auth.page.person.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <personId> NUMBER    personId to update (required)
@@ -2308,7 +2261,7 @@ exports[`Help snapshots — contract stability > help for ib reference dump matc
 
 DESCRIPTION
   Emit the full command surface as JSON (version, generatedAt, commands map). Read by AI assistants for one-shot CLI ingestion.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: none (public).
 
 FLAGS
   (none)
@@ -2334,7 +2287,7 @@ exports[`Help snapshots — contract stability > help for ib role explain matche
 
 DESCRIPTION
   Explain a role NAME: its asiakasPersonSettingTypeId, human display name, the access tiers it grants (anyAdmin/anyWorker/anyViewer/laskuRead/requestOffer/adminCompanySelection), and whether it is deprecated — all from @ibetoni/constants. Enriched with the LIVE DB \`description\` (internal flag name, e.g. isAsiakasAdmin) and \`comment\` (rich Finnish text) read from GET /api/asiakasPersonSettings/getAllTypes, so the prose never drifts from dbo.asiakasPersonSettingTypes. Requires auth (any logged-in user); description/comment are null for roles the endpoint omits (soft-deleted pumppuHandler/Viewer). Use it to disambiguate the role names accepted by \`person role grant/revoke\` and \`customer person list --role\`.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: requires login (any authenticated user).
 
 ARGUMENTS
   <name> STRING    role name (e.g. asiakasAdmin, keikkaHandler, lomaseurannassa) (required)
@@ -2398,7 +2351,6 @@ exports[`Help snapshots — contract stability > help for ib schedule today matc
 DESCRIPTION
   List today's keikkas for the active company. Wrapper around \`ib keikka list --from today --to today\`.
   Permissions: requires auth.page.grid.tilaus.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   (none)
@@ -2459,7 +2411,6 @@ exports[`Help snapshots — contract stability > help for ib schema dump matches
 DESCRIPTION
   Structural map of the whole dbo schema — all tables with column names and types, FK edges, view names, and proc signatures. No proc/view bodies (use \`schema proc\`/\`schema view\` for those). Developer-only.
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   (none)
@@ -2487,7 +2438,6 @@ exports[`Help snapshots — contract stability > help for ib schema proc matches
 DESCRIPTION
   Signature (parameters) and full definition (T-SQL) for one dbo proc/function. Developer-only.
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <name> STRING    bare dbo object name (no schema prefix) (required)
@@ -2520,7 +2470,6 @@ exports[`Help snapshots — contract stability > help for ib schema procs matche
 DESCRIPTION
   List dbo stored procedures and functions (P/FN/TF/IF). Developer-only.
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --search STRING    Filter object names by substring
@@ -2550,7 +2499,6 @@ exports[`Help snapshots — contract stability > help for ib schema table matche
 DESCRIPTION
   Columns (type, nullability, default, key), primary key, foreign keys, and indexes for one dbo table. Developer-only.
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <name> STRING    bare dbo object name (no schema prefix) (required)
@@ -2583,7 +2531,6 @@ exports[`Help snapshots — contract stability > help for ib schema tables match
 DESCRIPTION
   List dbo base tables with column counts. Developer-only.
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --search STRING    Filter object names by substring
@@ -2613,7 +2560,6 @@ exports[`Help snapshots — contract stability > help for ib schema view matches
 DESCRIPTION
   Columns and full definition (T-SQL) for one dbo view. Developer-only.
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <name> STRING    bare dbo object name (no schema prefix) (required)
@@ -2646,7 +2592,6 @@ exports[`Help snapshots — contract stability > help for ib schema views matche
 DESCRIPTION
   List dbo views with column counts. Developer-only.
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --search STRING    Filter object names by substring
@@ -2675,7 +2620,6 @@ exports[`Help snapshots — contract stability > help for ib sijainti closest ma
 DESCRIPTION
   Find the closest sijainti of a given sijaintiTypeId to a worksite (tyomaa), by straight-line distance. asiakasId defaults to the active company.
   Permissions: requires auth.page.sijainnit.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --tyomaa NUMBER    Target tyomaaId (REQUIRED)
@@ -2706,7 +2650,6 @@ exports[`Help snapshots — contract stability > help for ib sijainti create mat
 DESCRIPTION
   Create a new sijainti (POST /api/geocode/sijainti/add). REQUIRED: --name (sijaintiNimi) and --type (sijaintiTypeId). The CLI auto-fills the other NOT NULL columns the add proc needs: --lyh defaults to --name (truncated to 50 chars), --max-distance to 50, and --asiakas to your active company. Provide typed flags or --body JSON; typed flags win over --body.
   Permissions: requires auth.page.sijainnit.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --body JSON    JSON object with the new sijainti fields (optional if typed flags given)
@@ -2752,7 +2695,6 @@ exports[`Help snapshots — contract stability > help for ib sijainti delete mat
 DESCRIPTION
   Soft-delete a sijainti (sets deletedTime). Requires --reason; --dry-run available.
   Permissions: requires auth.page.sijainnit.delete.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <sijaintiId> NUMBER    sijaintiId to soft-delete (required)
@@ -2789,7 +2731,6 @@ exports[`Help snapshots — contract stability > help for ib sijainti distance m
 DESCRIPTION
   Driving distance and time between two points (Google Maps). Each endpoint is either 'lat,lng' or a sijaintiId (resolved to its coordinates). ownerAsiakasId is derived from the active company.
   Permissions: requires auth.page.sijainnit.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --from STRING    Origin: 'lat,lng' or a sijaintiId (REQUIRED)
@@ -2820,7 +2761,6 @@ exports[`Help snapshots — contract stability > help for ib sijainti geocode ma
 DESCRIPTION
   Geocode a free-form address to coordinates via Google Maps. Useful before \`sijainti create\` to obtain lat/lng. ownerAsiakasId is derived from the token.
   Permissions: requires auth.page.sijainnit.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --address STRING    Free-form address (REQUIRED)
@@ -2848,7 +2788,6 @@ exports[`Help snapshots — contract stability > help for ib sijainti get matche
 DESCRIPTION
   Get a single sijainti by id.
   Permissions: requires auth.page.sijainnit.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <sijaintiId> NUMBER    sijaintiId to fetch (required)
@@ -2914,7 +2853,6 @@ exports[`Help snapshots — contract stability > help for ib sijainti set-jerry 
 DESCRIPTION
   Enrol or unenrol a varikko (location) in BetoniJerry by setting sijainti.jerryActiveUntil. --on writes the permanent sentinel; --off clears it to null. IMPORTANT: BetoniJerry coverage keys on the delivery radius maxDeliveryDistance (KM) — NOT geofenceRadius (metres, a GPS depot detector) — so --on ALSO sets that radius: --radius <km>, or a 50 km default when the varikko has none (otherwise it would be enrolled but cover nothing). Replicates the EditSijainti toggle: reads the row, overrides the fields, and writes back via POST /api/geocode/updateSijainti (lat/lng etc. preserved). Matching also requires the company's isPumppuToimittaja flag.
   Permissions: requires auth.page.sijainnit.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <sijaintiId> NUMBER    sijaintiId to toggle (required)
@@ -2956,7 +2894,6 @@ exports[`Help snapshots — contract stability > help for ib sijainti types matc
 DESCRIPTION
   List sijainti type categories (the 'Sijainnin laji' lookup). Resolves the sijaintiTypeId values used by \`sijainti list --type\` and \`create/update --type\`.
   Permissions: requires auth.page.sijainnit.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --jerry BOOLEAN    Use the BetoniJerry type set (useJerry=1)
@@ -2985,7 +2922,6 @@ exports[`Help snapshots — contract stability > help for ib sijainti undelete m
 DESCRIPTION
   Restore a soft-deleted sijainti. Requires --reason.
   Permissions: requires auth.page.sijainnit.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <sijaintiId> NUMBER    sijaintiId to restore (required)
@@ -3022,7 +2958,6 @@ exports[`Help snapshots — contract stability > help for ib sijainti update mat
 DESCRIPTION
   Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Provide typed flags or --body JSON; typed flags win over --body.
   Permissions: requires auth.page.sijainnit.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --body JSON    JSON object with fields to update (optional if typed flags given)
@@ -3066,7 +3001,6 @@ exports[`Help snapshots — contract stability > help for ib vehicle create matc
 DESCRIPTION
   Create a vehicle. Two-step backend flow (POST /api/vehicle/new then /save); ownerAsiakasId from JWT. Dry-run previews via /new without inserting.
   Permissions: requires auth.page.vehicle.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --reg STRING    Registration number (vehicleRegNo)
@@ -3108,7 +3042,6 @@ exports[`Help snapshots — contract stability > help for ib vehicle dates expir
 DESCRIPTION
   List expiring vehicle dates across the fleet within a days-ahead window.
   Permissions: requires auth.page.vehicle.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --days NUMBER    Days-ahead window (default: 30)
@@ -3137,7 +3070,6 @@ exports[`Help snapshots — contract stability > help for ib vehicle dates list 
 DESCRIPTION
   List a vehicle's inspection/certification/insurance dates.
   Permissions: requires auth.page.vehicle.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <vehicleId> NUMBER    vehicleId (required)
@@ -3240,7 +3172,6 @@ exports[`Help snapshots — contract stability > help for ib vehicle get matches
 DESCRIPTION
   Get a single vehicle by id.
   Permissions: requires auth.page.vehicle.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <vehicleId> NUMBER    vehicleId to fetch (required)
@@ -3308,7 +3239,6 @@ exports[`Help snapshots — contract stability > help for ib vehicle locations m
 DESCRIPTION
   Fleet-wide live GPS snapshot for the active company (via Ecofleet, cached 60s). gpsAvailable:false when Ecofleet is not enabled.
   Permissions: requires auth.page.vehicle.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   (none)
@@ -3370,7 +3300,6 @@ exports[`Help snapshots — contract stability > help for ib vehicle search matc
 DESCRIPTION
   Search vehicles by reg-no / name / fleet-number substring (LIKE on vehicleRegNo / vehicleNimi / vehicleNo).
   Permissions: requires auth.page.vehicle.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <query> STRING    substring to match (reg-no, name, or fleet number) (required)
@@ -3403,7 +3332,6 @@ exports[`Help snapshots — contract stability > help for ib vehicle status matc
 DESCRIPTION
   Current operational status for a vehicle: current driver, current keikka, and the latest GPS ping (via the shared Ecofleet cache, best-effort). gpsAvailable:false when Ecofleet is not enabled.
   Permissions: requires auth.page.vehicle.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <vehicleId> NUMBER    vehicleId to inspect (required)
@@ -3469,7 +3397,6 @@ exports[`Help snapshots — contract stability > help for ib vehicle types match
 DESCRIPTION
   List vehicle types (vehicleTypeId + name) for the active company.
   Permissions: requires auth.page.vehicle.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   (none)
@@ -3547,7 +3474,6 @@ exports[`Help snapshots — contract stability > help for ib vehicle visits matc
 DESCRIPTION
   The active company's own vehicles that visited a worksite (tyomaa) or location (sijainti), grouped into visits with arrival/departure/duration (snapshot-based). Results are filtered to the caller's own fleet — other tenants' vehicles at a shared sijainti are not returned; a tyomaa must belong to the active company (else 404).
   Permissions: requires auth.page.vehicle.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <filterType> STRING    'tyomaa' or 'sijainti' (required)
@@ -3581,7 +3507,7 @@ exports[`Help snapshots — contract stability > help for ib version matches sna
 
 DESCRIPTION
   Show the local CLI version AND the deployed iB version at the active endpoint (server commit SHA + slot). Unauthenticated — works logged out, against any --endpoint. The whole deployable iB surface (the /api/cli routes + the vendored CLI) ships inside puminet5api, so the server \`commit\` is the single source of truth for which build is live; it changes on every deployed commit, letting you tell staging from prod without manual version bumps.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: none (public).
 
 FLAGS
   --endpoint URL    Which deployment to query (global flag) (default: active profile, else https://api.ibetoni.fi)
@@ -3609,7 +3535,6 @@ exports[`Help snapshots — contract stability > help for ib weather address mat
 DESCRIPTION
   Point forecast for a street address: geocodes the address via Google Maps (POST /api/geocode/getLatLng), then calls FMI for the forecast. Requires the company weather module. Fails with exit 5 (not-found) if the address returns ZERO_RESULTS from Google.
   Permissions: requires company weather module (asiakasPersonSettingTypeId 18).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --address STRING    Street address (min 5 chars)
@@ -3640,7 +3565,6 @@ exports[`Help snapshots — contract stability > help for ib weather day matches
 DESCRIPTION
   Daily aggregate weather forecast (min/max/avg temperature, wind, precipitation) for a lat/lng on a calendar date. Accepts relative date aliases: today, tomorrow, yesterday. Coordinates must be within Finland. Requires the company weather module.
   Permissions: requires company weather module (asiakasPersonSettingTypeId 18).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --lat NUMBER    Latitude (Finland 59.5–70.1)
@@ -3672,7 +3596,6 @@ exports[`Help snapshots — contract stability > help for ib weather forecast ma
 DESCRIPTION
   Single-point FMI weather forecast for a lat/lng at a given time. Coordinates must be within Finland (lat 59.5–70.1, lng 19.0–31.6). Time must be within now..+240h. Requires the company weather module (asiakasPersonSettingTypeId 18); 403 if disabled.
   Permissions: requires company weather module (asiakasPersonSettingTypeId 18).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --lat NUMBER    Latitude (Finland 59.5–70.1)
@@ -3704,7 +3627,6 @@ exports[`Help snapshots — contract stability > help for ib weather pumping mat
 DESCRIPTION
   Weather analysis over a concrete-pumping window: hourly conditions for the entire duration starting at --start. The backend can correlate with a keikka via --keikka for error reporting. Requires the company weather module.
   Permissions: requires company weather module (asiakasPersonSettingTypeId 18).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --lat NUMBER    Latitude (Finland 59.5–70.1)
@@ -3737,7 +3659,7 @@ exports[`Help snapshots — contract stability > help for ib weather status matc
 
 DESCRIPTION
   Check whether the weather module is enabled for the active company. Does not require the weather module itself to be enabled (no circular dependency). Returns the enabled/disabled status and related settings.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: requires login (any authenticated user).
 
 FLAGS
   (none)
@@ -3763,7 +3685,7 @@ exports[`Help snapshots — contract stability > help for ib weather toggle matc
 
 DESCRIPTION
   Enable or disable the weather module for the active company. Pass exactly one of --on or --off. Admin-scoped operation. Supports --dry-run, --idempotency-key, and --reason for audit trail.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+  Auth: requires login (any authenticated user).
 
 FLAGS
   --on BOOLEAN    Enable the module
@@ -3802,7 +3724,6 @@ exports[`Help snapshots — contract stability > help for ib weather worksite ma
 DESCRIPTION
   Forecast for a worksite identified by tyomaaId. The backend resolves the coordinates from the tyomaa record internally — no lat/lng needed. Use --force-refresh to bypass the cache. Requires the company weather module.
   Permissions: requires company weather module (asiakasPersonSettingTypeId 18).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <tyomaaId> NUMBER    tyomaaId (coordinates resolved server-side) (required)
@@ -3835,7 +3756,6 @@ exports[`Help snapshots — contract stability > help for ib worksite create mat
 DESCRIPTION
   Create a new worksite via POST /api/tyomaa/new. Body forwarded verbatim.
   Permissions: requires auth.page.tyomaa.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --body JSON    JSON object with the new tyomaa fields
@@ -3869,7 +3789,6 @@ exports[`Help snapshots — contract stability > help for ib worksite dates expi
 DESCRIPTION
   Company-wide worksite dates expiring within --days (default 30).
   Permissions: requires auth.page.tyomaa.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --days NUMBER    Look-ahead window (days) (default: 30)
@@ -3897,7 +3816,6 @@ exports[`Help snapshots — contract stability > help for ib worksite dates list
 DESCRIPTION
   List a worksite's compliance/permit dates (read-only).
   Permissions: requires auth.page.tyomaa.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <tyomaaId> NUMBER    tyomaaId (required)
@@ -3929,7 +3847,6 @@ exports[`Help snapshots — contract stability > help for ib worksite delete mat
 DESCRIPTION
   Delete a worksite (tyomaa). Requires --reason.
   Permissions: requires auth.page.tyomaa.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <tyomaaId> NUMBER    tyomaaId to delete (required)
@@ -3966,7 +3883,6 @@ exports[`Help snapshots — contract stability > help for ib worksite get matche
 DESCRIPTION
   Get a single worksite (tyomaa) by id with flat address fields.
   Permissions: requires auth.page.tyomaa.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <tyomaaId> NUMBER    tyomaaId to fetch (required)
@@ -3998,7 +3914,6 @@ exports[`Help snapshots — contract stability > help for ib worksite helsinki-f
 DESCRIPTION
   Refresh Helsinki building data for a worksite (POST /api/tyomaa/helsinki/fetch/:id).
   Permissions: requires auth.page.tyomaa.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <tyomaaId> NUMBER    tyomaaId (required)
@@ -4035,7 +3950,6 @@ exports[`Help snapshots — contract stability > help for ib worksite list match
 DESCRIPTION
   List worksites (tyomaat) visible to the active company. ownerAsiakasId derived from JWT.
   Permissions: requires auth.page.tyomaa.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --customer NUMBER    Filter by parent asiakasId
@@ -4066,7 +3980,6 @@ exports[`Help snapshots — contract stability > help for ib worksite metrics ma
 DESCRIPTION
   Volume / keikka-count metrics for a worksite (GET /api/cli/worksite/metrics/:tyomaaId).
   Permissions: requires auth.page.tyomaa.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <tyomaaId> NUMBER    tyomaaId (required)
@@ -4098,7 +4011,6 @@ exports[`Help snapshots — contract stability > help for ib worksite person add
 DESCRIPTION
   Attach a person to a worksite (tyomaaPerson). Requires --reason.
   Permissions: requires auth.page.tyomaa.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --worksite NUMBER    Target tyomaaId (REQUIRED)
@@ -4134,7 +4046,6 @@ exports[`Help snapshots — contract stability > help for ib worksite person lis
 DESCRIPTION
   List persons attached to a worksite.
   Permissions: requires auth.page.tyomaa.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <tyomaaId> NUMBER    tyomaaId (required)
@@ -4165,7 +4076,6 @@ exports[`Help snapshots — contract stability > help for ib worksite person rem
 DESCRIPTION
   Detach a person from a worksite. Requires --reason.
   Permissions: requires auth.page.tyomaa.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --worksite NUMBER    Target tyomaaId (REQUIRED)
@@ -4202,7 +4112,6 @@ exports[`Help snapshots — contract stability > help for ib worksite refresh-lo
 DESCRIPTION
   Re-geocode a worksite from Google Maps (POST /api/tyomaa/refreshLocation/:id).
   Permissions: requires auth.page.tyomaa.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <tyomaaId> NUMBER    tyomaaId (required)
@@ -4239,7 +4148,6 @@ exports[`Help snapshots — contract stability > help for ib worksite search mat
 DESCRIPTION
   Free-text search across worksite names / addresses. POST /api/tyomaa/search.
   Permissions: requires auth.page.tyomaa.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <query> STRING    search string (required)
@@ -4270,7 +4178,6 @@ exports[`Help snapshots — contract stability > help for ib worksite set-geofen
 DESCRIPTION
   Set a worksite geofence radius in metres (1-10000).
   Permissions: requires auth.page.tyomaa.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <tyomaaId> NUMBER    tyomaaId (required)

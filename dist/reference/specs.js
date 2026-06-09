@@ -24,6 +24,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib auth login",
         description: "Open the system browser to authorize this CLI via OAuth 2.1 + PKCE and persist credentials to ~/.ibetoni/credentials.json (mode 0600).",
+        auth: "none",
         flags: [
             {
                 name: "endpoint",
@@ -45,6 +46,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib auth logout",
         description: "Revoke the refresh token server-side (best-effort) and delete the local credentials file.",
+        auth: "any",
         flags: [],
         outputShape: "no stdout output; exit 0 on success",
         errors: [
@@ -55,6 +57,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib auth whoami",
         description: "Print the current authenticated user's personId, active company, and endpoint.",
+        auth: "any",
         flags: [],
         outputShape: "{ personId, activeCompany: { asiakasId, name }, endpoint }",
         errors: [
@@ -65,6 +68,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib auth switch",
         description: "Switch the active company. Issues a new JWT bound to the target ownerAsiakasId and persists it.",
+        auth: "any",
         flags: [
             {
                 name: "to",
@@ -82,6 +86,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib auth refresh",
         description: "Manually refresh the JWT against /api/auth/refresh-token. Automatic refresh-on-401 also happens in the API client.",
+        auth: "any",
         flags: [],
         outputShape: "{ ok: true }",
         errors: [
@@ -93,6 +98,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib company list",
         description: "List the companies the current user can act on, with the active one marked `current: true`.",
+        auth: "any",
         flags: [],
         outputShape: "ListEnvelope<{ asiakasId, name, current }> = { items, nextCursor, count }",
         errors: [...COMMON_AUTH_ERRORS],
@@ -101,6 +107,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib company current",
         description: "Return the record of the active company (the one bound to the current JWT).",
+        auth: "any",
         flags: [],
         outputShape: "{ asiakasId, name }",
         errors: [...COMMON_AUTH_ERRORS],
@@ -109,6 +116,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib company switch",
         description: "Switch the active company. Alias of `ib auth switch`. Persists the rotated JWT.",
+        auth: "any",
         flags: [
             {
                 name: "to",
@@ -456,6 +464,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib customer prh",
         description: "Look up a company in the Finnish business registry (PRH). Pass <ytunnus> for an exact business-ID lookup, or --search <name>. Read-only; any authenticated user.",
+        auth: "any",
         args: [{ name: "ytunnus", type: "string", required: false, description: "business ID (XXXXXXXX-X)" }],
         flags: [
             { name: "search", type: "string", description: "Search by company name instead" },
@@ -771,6 +780,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib person me",
         description: "Your own profile, your roles aggregated across all your companies, and the companies you can act on. Derives identity from the JWT (works with IB_TOKEN). For the roles scoped to a single company, use `person role list --asiakas`.",
+        auth: "any",
         flags: [],
         outputShape: "{ personId, name, email, phone, activeCompany:{asiakasId,name}, roles:[{roleTypeId,role}], companies:[{asiakasId,name,current}] }",
         errors: [...COMMON_AUTH_ERRORS],
@@ -779,6 +789,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib person companies",
         description: "List the companies (asiakkaat) a person belongs to. personId is optional and defaults to the caller. Reverse of `customer person list`.",
+        auth: "any",
         args: [{ name: "personId", type: "number", required: false, description: "personId (defaults to caller)" }],
         flags: [],
         outputShape: "ListEnvelope<{ asiakasId, name }>",
@@ -788,6 +799,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib person history",
         description: "Change-tracker audit trail for one person — who changed what, when, with the `--reason` recorded by every write. INCLUDES role grants/revokes (fieldName 'asiakasPersonSetting', e.g. 'Rooli lisätty: asiakasAdmin (Asiakas Admin)'); pass `--field asiakasPersonSetting` to see only role changes. GET /api/changes/person/:personId/:ownerAsiakasId; owner defaults to the active company. --field filters client-side.",
+        auth: "any",
         args: [{ name: "personId", type: "number", description: "personId whose history to fetch" }],
         flags: [
             { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
@@ -1274,6 +1286,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib ohje get",
         description: "Get one UI help-text entry by helpId — the title/shorttext/htmltext shown in a HelperIcon '(?)' modal in the web UI. This is end-user help CONTENT, distinct from `ib --help` (CLI usage). Returns null when the helpId has no entry yet. Read is public (no auth on the route).",
+        auth: "none",
         args: [{ name: "helpId", type: "string", description: "the helpId (e.g. LaskupohjaTilaus)" }],
         flags: [],
         outputShape: "{ helpId, title, shorttext, htmltext, img } | null",
@@ -1286,6 +1299,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib ohje list",
         description: "List every UI help-text entry (the whole helps table). Useful to discover helpIds before `ib ohje get`/`update`. Reads are public (no auth required on the route).",
+        auth: "none",
         flags: [
             { name: "limit", type: "number", description: "Max rows to return (client-side cap)" },
         ],
@@ -1425,6 +1439,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib role explain",
         description: "Explain a role NAME: its asiakasPersonSettingTypeId, human display name, the access tiers it grants (anyAdmin/anyWorker/anyViewer/laskuRead/requestOffer/adminCompanySelection), and whether it is deprecated — all from @ibetoni/constants. Enriched with the LIVE DB `description` (internal flag name, e.g. isAsiakasAdmin) and `comment` (rich Finnish text) read from GET /api/asiakasPersonSettings/getAllTypes, so the prose never drifts from dbo.asiakasPersonSettingTypes. Requires auth (any logged-in user); description/comment are null for roles the endpoint omits (soft-deleted pumppuHandler/Viewer). Use it to disambiguate the role names accepted by `person role grant/revoke` and `customer person list --role`.",
+        auth: "any",
         args: [{ name: "name", type: "string", description: "role name (e.g. asiakasAdmin, keikkaHandler, lomaseurannassa)" }],
         flags: [],
         outputShape: "{ role, typeId, displayName: string|null, description: string|null, comment: string|null, tiers: string[], deprecated: boolean }",
@@ -1666,6 +1681,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib jerry request offers",
         description: "List the offers on a customer-owned request (GET /api/pumppuRequests/:id/offers). Drafts excluded; sorted pending-first then cheapest. Provider contact fields (jerryContactName/Phone, openingHours) are revealed only on the accepted offer.",
+        auth: "any",
         args: [{ name: "requestId", type: "number", description: "pumppuRequestId you own" }],
         flags: [],
         outputShape: "ListEnvelope<{ pumppuOfferId, status, priceCents, vatPercent, validUntil, asiakasNimi, ytunnus, providerDistanceKm, companyDescription, jerryContactName?, jerryContactPhone?, openingHours? }>",
@@ -1790,6 +1806,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib jerry check-address",
         description: "Anonymous geofence feasibility probe (POST /api/pumppuRequests/checkAddress): which provider varikot cover an address. The single best tool for diagnosing 'no offers'. --address is required (the `osoite` body field); if --lat/--lng/--place-id are all supplied the server trusts them instead of re-geocoding. Not a mutation, so no write-safety flags. Rate-limited 10/min per IP. The `providers` array is only included when the token is a developer/admin.",
+        auth: "none",
         flags: [
             { name: "address", type: "string", description: "Street address to check (REQUIRED; sent as `osoite`)" },
             { name: "lat", type: "number", description: "Latitude (trusted only with --lng + --place-id)" },
@@ -2109,6 +2126,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib weather status",
         description: "Check whether the weather module is enabled for the active company. Does not require the weather module itself to be enabled (no circular dependency). Returns the enabled/disabled status and related settings.",
+        auth: "any",
         flags: [],
         outputShape: "{ enabled: boolean, ... }",
         errors: [
@@ -2120,6 +2138,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib weather toggle",
         description: "Enable or disable the weather module for the active company. Pass exactly one of --on or --off. Admin-scoped operation. Supports --dry-run, --idempotency-key, and --reason for audit trail.",
+        auth: "any",
         writeFlags: true,
         flags: [
             { name: "on", type: "boolean", description: "Enable the module" },
@@ -2144,6 +2163,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib reference dump",
         description: "Emit the full command surface as JSON (version, generatedAt, commands map). Read by AI assistants for one-shot CLI ingestion.",
+        auth: "none",
         flags: [],
         outputShape: "{ version: string, generatedAt: ISO-8601, commands: { '<command>': CommandSpec } }",
         errors: [
@@ -2154,6 +2174,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib commands",
         description: "Filtered, offline list of ib commands from the spec catalogue: which write, which are read-only, which require a given permission. Lighter than `ib reference dump` (the full surface) — returns just { command, description, permissions, writeFlags } per match. No auth, no network.",
+        auth: "none",
         flags: [
             {
                 name: "mutations",
@@ -2187,6 +2208,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib version",
         description: "Show the local CLI version AND the deployed iB version at the active endpoint (server commit SHA + slot). Unauthenticated — works logged out, against any --endpoint. The whole deployable iB surface (the /api/cli routes + the vendored CLI) ships inside puminet5api, so the server `commit` is the single source of truth for which build is live; it changes on every deployed commit, letting you tell staging from prod without manual version bumps.",
+        auth: "none",
         flags: [
             {
                 name: "endpoint",
@@ -2209,6 +2231,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib doctor",
         description: "Aggregated 'is my setup working' health check. Derives identity from the active JWT (so it works for both file- and IB_TOKEN-sessions, unlike `auth whoami`), reports token expiry, pings the public /api/version for connectivity + which build is live, and does ONE authenticated read to prove the token is accepted by this endpoint. Read-only. Exits 1 when the aggregate `ok` is false.",
+        auth: "any",
         flags: [],
         outputShape: "{ ok:boolean, cli, endpoint, readOnly, auth:{ personId, ownerAsiakasId, ownerAsiakasName, email, issuedFor, tokenExp, tokenExpired }, connectivity:VersionReport, authProbe:{ ok, status?, error? } }",
         errors: [
@@ -2226,6 +2249,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib feedback create",
         description: "File a CLI improvement proposal or trouble report. AI users: file this PROACTIVELY and IMMEDIATELY (no need to ask the user) whenever you hit an error or unexpected exit code, had to try several strategies because the help/docs were unclear/missing/wrong, found something confusing or harder than expected, could not find a command for something the user clearly needs (a capability gap), or saw an inconsistency between commands. Stored quietly server-side (no GitHub issue, no spam to you or the user — distinct from bug reports; the maintainer gets a private heads-up email) for later developer triage. Sent as a META request, so it is EXEMPT from the read-only write-lock: you can file feedback even with --read-only / IB_READ_ONLY active. --dry-run resolves client-side (prints the payload, never sends).",
+        auth: "any",
         args: [{ name: "description", type: "string", description: "freetext description of the friction, gap, or bug" }],
         flags: [
             { name: "kind", type: "string", default: "improvement", description: "improvement | bug" },

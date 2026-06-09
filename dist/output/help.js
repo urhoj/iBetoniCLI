@@ -34,7 +34,17 @@ export function formatHelp(spec) {
     if (spec.permissions?.length) {
         lines.push(`  Permissions: requires ${spec.permissions.join(", ")}.`);
     }
-    lines.push("  Timezone: dates interpreted in active company timezone (Europe/Helsinki).");
+    else if (spec.auth === "any") {
+        lines.push("  Auth: requires login (any authenticated user).");
+    }
+    else if (spec.auth === "none") {
+        lines.push("  Auth: none (public).");
+    }
+    const hasDate = (spec.args ?? []).some((a) => a.type === "date") ||
+        spec.flags.some((f) => f.type === "date");
+    if (hasDate) {
+        lines.push("  Timezone: dates interpreted in active company timezone (Europe/Helsinki).");
+    }
     lines.push("");
     if (spec.args?.length) {
         lines.push("ARGUMENTS");

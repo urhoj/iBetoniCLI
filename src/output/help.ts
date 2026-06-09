@@ -57,6 +57,13 @@ export interface CommandSpec {
   description: string;
   /** Backend permission strings (e.g. `auth.page.grid.tilaus.read`). */
   permissions?: string[];
+  /**
+   * Auth requirement when no specific permissions are listed.
+   * `"none"` = public, no token needed.
+   * `"any"` = any authenticated user (valid login, no specific permission).
+   * Ignored when `permissions` is set (permissions take precedence).
+   */
+  auth?: "none" | "any";
   /** Positional arguments rendered in USAGE and the ARGUMENTS section. */
   args?: CommandArg[];
   /** Command-specific flags rendered in the FLAGS section. */
@@ -89,10 +96,19 @@ export function formatHelp(spec: CommandSpec): string {
   lines.push(`  ${spec.description}`);
   if (spec.permissions?.length) {
     lines.push(`  Permissions: requires ${spec.permissions.join(", ")}.`);
+  } else if (spec.auth === "any") {
+    lines.push("  Auth: requires login (any authenticated user).");
+  } else if (spec.auth === "none") {
+    lines.push("  Auth: none (public).");
   }
-  lines.push(
-    "  Timezone: dates interpreted in active company timezone (Europe/Helsinki)."
-  );
+  const hasDate =
+    (spec.args ?? []).some((a) => a.type === "date") ||
+    spec.flags.some((f) => f.type === "date");
+  if (hasDate) {
+    lines.push(
+      "  Timezone: dates interpreted in active company timezone (Europe/Helsinki)."
+    );
+  }
   lines.push("");
 
   if (spec.args?.length) {
