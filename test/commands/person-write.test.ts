@@ -3,6 +3,7 @@ import {
   runPersonCreate,
   runPersonUpdate,
   runPersonDelete,
+  runPersonSetOwner,
   buildPersonCreateBody,
   missingPersonCreateFields,
   extractPersonId,
@@ -152,5 +153,29 @@ describe("runPersonDelete", () => {
       { headers: { "X-Action-Reason": "cleanup" } }
     );
     expect(result).toEqual({ deleted: 5351 });
+  });
+});
+
+describe("runPersonSetOwner", () => {
+  beforeEach(() => { (mockClient.post as ReturnType<typeof vi.fn>).mockReset(); });
+
+  test("--asiakas: POSTs /api/person/setOwner/<id> with a numeric owner and reason header", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ personId: 5351, ownerAsiakasId: 8 });
+    await runPersonSetOwner(mockClient, 5351, 8, { reason: "claim into company" });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/person/setOwner/5351",
+      { ownerAsiakasId: 8 },
+      { headers: { "X-Action-Reason": "claim into company" } }
+    );
+  });
+
+  test("--global: POSTs ownerAsiakasId null", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ personId: 5351, ownerAsiakasId: null });
+    await runPersonSetOwner(mockClient, 5351, null, { reason: "make global" });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/person/setOwner/5351",
+      { ownerAsiakasId: null },
+      { headers: { "X-Action-Reason": "make global" } }
+    );
   });
 });

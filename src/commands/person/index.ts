@@ -540,6 +540,39 @@ export function registerPersonCommands(
 
   addWriteFlagsToCommand(
     p
+      .command("owner <personId>")
+      .description(
+        "Set or clear a person's owner company (ownerAsiakasId). Provide EXACTLY ONE of " +
+          "--global (make the person global/self-managing, ownerAsiakasId=null) or " +
+          "--asiakas <id> (assign/move ownership). Roles are separate (see `person role`). " +
+          "Requires --reason. Authz: developer=any; self → global always, self → a company you " +
+          "belong to; company-admin may release a person owned by their company → global."
+      )
+      .option("--global", "Make the person GLOBAL (ownerAsiakasId=null)")
+      .option("--asiakas <id>", "Set owner to this asiakasId", Number)
+  ).action(async (personIdStr: string, opts: WriteFlags & { global?: boolean; asiakas?: number }) => {
+    if (!opts.reason) {
+      writeError(new Error("Missing required flag: --reason"));
+      process.exit(4);
+    }
+    const hasGlobal = !!opts.global;
+    const hasAsiakas = opts.asiakas !== undefined;
+    if (hasGlobal === hasAsiakas) {
+      writeError(new Error("provide exactly one of --global or --asiakas <id>"));
+      process.exit(4);
+    }
+    const ownerAsiakasId = hasGlobal ? null : (opts.asiakas as number);
+    try {
+      const client = await getClient();
+      const result = await runPersonSetOwner(client, Number(personIdStr), ownerAsiakasId, opts);
+      writeJson(result);
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
+
+  addWriteFlagsToCommand(
+    p
       .command("delete <personId>")
       .description("Delete a person. Requires --reason.")
   ).action(async (personIdStr: string, opts: WriteFlags) => {
@@ -865,6 +898,27 @@ export async function runPersonUpdate(
   return client.post(
     "/api/person/set",
     { personId, ...patch },
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
+ * POST /api/person/setOwner/:personId — set or clear a person's ownerAsiakasId.
+ * `ownerAsiakasId: null` makes the person GLOBAL (self-managing, cross-tenant
+ * discoverable); a positive id assigns/moves ownership. Server-side authz applies
+ * (developer = any; self → null always / → a company you belong to; company-admin
+ * may release a person owned by their company → global). Write-flag headers
+ * (incl. X-Dry-Run, X-Action-Reason) are forwarded.
+ */
+export async function runPersonSetOwner(
+  client: ApiClient,
+  personId: number,
+  ownerAsiakasId: number | null,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post(
+    `/api/person/setOwner/${personId}`,
+    { ownerAsiakasId },
     { headers: writeFlagsToHeaders(flags) }
   );
 }
