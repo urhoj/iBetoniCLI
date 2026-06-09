@@ -1,5 +1,6 @@
 import { describe, test, expect } from "vitest";
 import { resolveRoleTypeId, roleNameForTypeId } from "../src/roles.js";
+import { CliError } from "../src/api/errors.js";
 
 describe("resolveRoleTypeId", () => {
   test("maps a known role name to its typeId", () => {
@@ -15,6 +16,18 @@ describe("resolveRoleTypeId", () => {
   test("throws on an unknown role, listing valid names", () => {
     expect(() => resolveRoleTypeId("notARole")).toThrow(/unknown role/i);
     expect(() => resolveRoleTypeId("notARole")).toThrow(/keikkaHandler/);
+  });
+
+  test("unknown role is a CliError mapped to validation exit 4 (statusCode 400)", () => {
+    let caught: unknown;
+    try {
+      resolveRoleTypeId("notARole");
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(CliError);
+    expect((caught as CliError).statusCode).toBe(400);
+    expect((caught as CliError).exitCode).toBe(4);
   });
 });
 
