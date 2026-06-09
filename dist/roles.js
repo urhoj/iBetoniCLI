@@ -47,21 +47,31 @@ const TIER_GROUPS = [
 /** OBSOLETE typeIds kept only for legacy data round-trip (pumppuHandler/Viewer). */
 const DEPRECATED_ROLE_TYPEIDS = [20, 21];
 /**
- * Explain a role NAME: its typeId, human display name, which access tiers it
- * grants, and whether it is deprecated — all derived from @ibetoni/constants
- * (no hand-maintained prose). Pure/offline. Throws the same descriptive
- * "unknown role: …" error as {@link resolveRoleTypeId} for an unknown name.
+ * Explain a role NAME: its typeId, human display name, the access tiers it
+ * grants, and whether it is deprecated (all from @ibetoni/constants), enriched
+ * with the live DB description + comment (GET /api/asiakasPersonSettings/getAllTypes).
+ *
+ * The role-name validation runs FIRST (before any network call) so an unknown
+ * name fails cheap/offline with the same descriptive "unknown role: …" error as
+ * {@link resolveRoleTypeId}. description/comment are `null` for roles the
+ * endpoint omits (e.g. soft-deleted pumppuHandler/Viewer 20/21).
  */
-export function explainRole(roleName) {
+export async function explainRole(client, roleName) {
     const typeId = resolveRoleTypeId(roleName);
     if (!typeId)
         throw new Error(`unknown role: ${roleName}`);
     const maps = roleMaps();
     const tiers = TIER_GROUPS.filter(({ key }) => maps[key].includes(typeId)).map(({ tier }) => tier);
+    const types = await client.get("/api/asiakasPersonSettings/getAllTypes");
+    const row = Array.isArray(types)
+        ? types.find((t) => t.asiakasPersonSettingTypeId === typeId)
+        : undefined;
     return {
         role: roleName,
         typeId,
         displayName: maps.TYPE_ID_TO_ROLE_NAME[typeId] ?? null,
+        description: row?.asiakasPersonSettingTypeDescription ?? null,
+        comment: row?.asiakasPersonSettingTypeComment ?? null,
         tiers,
         deprecated: DEPRECATED_ROLE_TYPEIDS.includes(typeId),
     };

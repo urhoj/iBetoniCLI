@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import type { ApiClient } from "./api/client.js";
 
 // `@ibetoni/constants` is CommonJS — pull in via createRequire so the ESM
 // build needs no default-export shim. ROLE_NAME_BY_TYPEID / ROLE_TYPEID_BY_NAME
@@ -51,14 +52,30 @@ export function roleNameForTypeId(typeId: number): string | null {
   return roleMaps().ROLE_NAME_BY_TYPEID[typeId] ?? null;
 }
 
-/** Structured facts about a role, assembled purely from @ibetoni/constants. */
+/**
+ * Structured facts about a role. typeId/displayName/tiers/deprecated come from
+ * @ibetoni/constants (offline); description/comment are read LIVE from the DB
+ * (GET /api/asiakasPersonSettings/getAllTypes) so the user-facing prose never
+ * drifts from dbo.asiakasPersonSettingTypes.
+ */
 export interface RoleExplanation {
   role: string;
   typeId: number;
   displayName: string | null;
+  /** DB asiakasPersonSettingTypeDescription — the internal flag name, e.g. "isAsiakasAdmin". */
+  description: string | null;
+  /** DB asiakasPersonSettingTypeComment — the rich Finnish description shown to users. */
+  comment: string | null;
   /** Access tiers this role grants (membership in the constants groupings). */
   tiers: string[];
   deprecated: boolean;
+}
+
+/** One row of GET /api/asiakasPersonSettings/getAllTypes (active types only). */
+interface SettingTypeRow {
+  asiakasPersonSettingTypeId: number;
+  asiakasPersonSettingTypeDescription: string | null;
+  asiakasPersonSettingTypeComment: string | null;
 }
 
 // tier label → the @ibetoni/constants grouping array that confers it.
@@ -75,22 +92,39 @@ const TIER_GROUPS: { tier: string; key: keyof RoleMaps }[] = [
 const DEPRECATED_ROLE_TYPEIDS = [20, 21];
 
 /**
- * Explain a role NAME: its typeId, human display name, which access tiers it
- * grants, and whether it is deprecated — all derived from @ibetoni/constants
- * (no hand-maintained prose). Pure/offline. Throws the same descriptive
- * "unknown role: …" error as {@link resolveRoleTypeId} for an unknown name.
+ * Explain a role NAME: its typeId, human display name, the access tiers it
+ * grants, and whether it is deprecated (all from @ibetoni/constants), enriched
+ * with the live DB description + comment (GET /api/asiakasPersonSettings/getAllTypes).
+ *
+ * The role-name validation runs FIRST (before any network call) so an unknown
+ * name fails cheap/offline with the same descriptive "unknown role: …" error as
+ * {@link resolveRoleTypeId}. description/comment are `null` for roles the
+ * endpoint omits (e.g. soft-deleted pumppuHandler/Viewer 20/21).
  */
-export function explainRole(roleName: string): RoleExplanation {
+export async function explainRole(
+  client: ApiClient,
+  roleName: string
+): Promise<RoleExplanation> {
   const typeId = resolveRoleTypeId(roleName);
   if (!typeId) throw new Error(`unknown role: ${roleName}`);
   const maps = roleMaps();
   const tiers = TIER_GROUPS.filter(({ key }) =>
     (maps[key] as number[]).includes(typeId)
   ).map(({ tier }) => tier);
+
+  const types = await client.get<SettingTypeRow[]>(
+    "/api/asiakasPersonSettings/getAllTypes"
+  );
+  const row = Array.isArray(types)
+    ? types.find((t) => t.asiakasPersonSettingTypeId === typeId)
+    : undefined;
+
   return {
     role: roleName,
     typeId,
     displayName: maps.TYPE_ID_TO_ROLE_NAME[typeId] ?? null,
+    description: row?.asiakasPersonSettingTypeDescription ?? null,
+    comment: row?.asiakasPersonSettingTypeComment ?? null,
     tiers,
     deprecated: DEPRECATED_ROLE_TYPEIDS.includes(typeId),
   };

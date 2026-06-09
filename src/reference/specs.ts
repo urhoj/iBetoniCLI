@@ -1693,13 +1693,14 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib role explain",
     description:
-      "Explain a role NAME offline (from @ibetoni/constants): its asiakasPersonSettingTypeId, human display name, the access tiers it grants (anyAdmin/anyWorker/anyViewer/laskuRead/requestOffer/adminCompanySelection), and whether it is deprecated. No network or auth — pure constants lookup. Use it to disambiguate the role names accepted by `person role grant/revoke` and `customer person list --role`.",
+      "Explain a role NAME: its asiakasPersonSettingTypeId, human display name, the access tiers it grants (anyAdmin/anyWorker/anyViewer/laskuRead/requestOffer/adminCompanySelection), and whether it is deprecated — all from @ibetoni/constants. Enriched with the LIVE DB `description` (internal flag name, e.g. isAsiakasAdmin) and `comment` (rich Finnish text) read from GET /api/asiakasPersonSettings/getAllTypes, so the prose never drifts from dbo.asiakasPersonSettingTypes. Requires auth (any logged-in user); description/comment are null for roles the endpoint omits (soft-deleted pumppuHandler/Viewer). Use it to disambiguate the role names accepted by `person role grant/revoke` and `customer person list --role`.",
     flags: [
       { name: "name", type: "string", description: "Positional — role name (e.g. asiakasAdmin, keikkaHandler, lomaseurannassa)" },
     ],
-    outputShape: "{ role, typeId, displayName: string|null, tiers: string[], deprecated: boolean }",
+    outputShape: "{ role, typeId, displayName: string|null, description: string|null, comment: string|null, tiers: string[], deprecated: boolean }",
     errors: [
       { code: 400, meaning: "Unknown role name", remedy: "see ROLE_TYPEID_BY_NAME in @ibetoni/constants" },
+      ...COMMON_AUTH_ERRORS,
     ],
     examples: ["ib role explain asiakasAdmin", "ib role explain lomaseurannassa"],
   },

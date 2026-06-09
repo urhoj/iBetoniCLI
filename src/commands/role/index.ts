@@ -1,28 +1,37 @@
 import type { Command } from "commander";
+import type { ApiClient } from "../../api/client.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 import { explainRole } from "../../roles.js";
 
 /**
- * `ib role` — inspect betoni.online role definitions. OFFLINE: every subcommand
- * reads only @ibetoni/constants (no network, no auth), so this registrar takes
- * no `getClient` factory (like the `auth` group). Keeping the transform pure in
- * `explainRole` (src/roles.ts) means the action stays thin and testable.
+ * `ib role` — inspect betoni.online role definitions.
+ *
+ * `explain` resolves typeId/tiers/deprecation OFFLINE from @ibetoni/constants,
+ * then enriches with the LIVE DB description + comment via the authenticated
+ * GET /api/asiakasPersonSettings/getAllTypes — so it now takes the `getClient`
+ * factory and requires auth (exits 2 "Not logged in" when unauthenticated).
+ * The network/transform logic stays in `explainRole` (src/roles.ts), keeping
+ * this action thin and testable against a mock ApiClient.
  */
-export function registerRoleCommands(program: Command): void {
+export function registerRoleCommands(
+  program: Command,
+  getClient: () => Promise<ApiClient>
+): void {
   const role = program
     .command("role")
     .description(
-      "Inspect betoni.online role definitions (offline, from @ibetoni/constants)"
+      "Inspect betoni.online role definitions (tiers from @ibetoni/constants, description/comment from the DB)"
     );
 
   role
     .command("explain <name>")
     .description(
-      "Explain a role name: typeId, display name, access tiers, deprecation"
+      "Explain a role name: typeId, display name, DB description/comment, access tiers, deprecation"
     )
-    .action((name: string) => {
+    .action(async (name: string) => {
       try {
-        writeJson(explainRole(name));
+        const client = await getClient();
+        writeJson(await explainRole(client, name));
       } catch (e) {
         exitWithError(e);
       }

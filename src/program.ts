@@ -81,8 +81,9 @@ export function buildProgram(): Command {
   // and so doesn't take a `getClient` factory.
   registerAuthCommands(program);
 
-  // `role` is offline (reads @ibetoni/constants only) — like `auth`, no client.
-  registerRoleCommands(program);
+  // `role explain` resolves tiers offline (@ibetoni/constants) but reads the DB
+  // description/comment via an authenticated GET, so it needs the client.
+  registerRoleCommands(program, getClient);
 
   registerCompanyCommands(program, getClient);
   registerKeikkaCommands(program, getClient);

@@ -2196,7 +2196,7 @@ exports[`Help snapshots — contract stability > help for ib role explain matche
   ib role explain [flags]
 
 DESCRIPTION
-  Explain a role NAME offline (from @ibetoni/constants): its asiakasPersonSettingTypeId, human display name, the access tiers it grants (anyAdmin/anyWorker/anyViewer/laskuRead/requestOffer/adminCompanySelection), and whether it is deprecated. No network or auth — pure constants lookup. Use it to disambiguate the role names accepted by \`person role grant/revoke\` and \`customer person list --role\`.
+  Explain a role NAME: its asiakasPersonSettingTypeId, human display name, the access tiers it grants (anyAdmin/anyWorker/anyViewer/laskuRead/requestOffer/adminCompanySelection), and whether it is deprecated — all from @ibetoni/constants. Enriched with the LIVE DB \`description\` (internal flag name, e.g. isAsiakasAdmin) and \`comment\` (rich Finnish text) read from GET /api/asiakasPersonSettings/getAllTypes, so the prose never drifts from dbo.asiakasPersonSettingTypes. Requires auth (any logged-in user); description/comment are null for roles the endpoint omits (soft-deleted pumppuHandler/Viewer). Use it to disambiguate the role names accepted by \`person role grant/revoke\` and \`customer person list --role\`.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
@@ -2206,10 +2206,12 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only
 
 OUTPUT (JSON, stdout)
-  { role, typeId, displayName: string|null, tiers: string[], deprecated: boolean }
+  { role, typeId, displayName: string|null, description: string|null, comment: string|null, tiers: string[], deprecated: boolean }
 
 ERRORS (stderr, exit non-zero)
   400  Unknown role name      → see ROLE_TYPEID_BY_NAME in @ibetoni/constants
+  401  Token expired          → ib auth refresh
+  500  Backend error          → retry with --verbose
 
 EXAMPLES
   ib role explain asiakasAdmin
