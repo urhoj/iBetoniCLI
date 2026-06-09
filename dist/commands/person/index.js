@@ -1,3 +1,4 @@
+import { unwrapRows } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
@@ -61,6 +62,18 @@ export async function runPersonList(client, opts) {
 export async function runPersonGet(client, personId) {
     return client.get(`/api/cli/person/get/${personId}`);
 }
+/** Project one raw /api/person/search row to the clean PersonSearchHit shape. */
+export function projectPersonHit(row) {
+    const first = row.personFirstName ?? "";
+    const last = row.personLastName ?? "";
+    return {
+        personId: Number(row.personId),
+        name: `${first} ${last}`.trim(),
+        email: row.personEmail ?? null,
+        phone: row.personPhone ?? null,
+        asiakasId: row.ownerAsiakasId != null ? Number(row.ownerAsiakasId) : null,
+    };
+}
 /**
  * POST /api/person/search — existing (non-/api/cli/) route used by the FE
  * person typeahead. Body is `{ searchString: <query> }`. The backend scopes
@@ -72,26 +85,9 @@ export async function runPersonSearch(client, query, limit) {
     const body = { searchString: query };
     if (limit !== undefined)
         body.limit = limit;
-    return client.post("/api/person/search", body, { read: true });
-}
-/**
- * /api/person/search returns either a bare array of person rows or a raw mssql
- * result wrapper ({ recordset } / { recordsets: [[...]] }) depending on cache
- * warmth. Normalise both to a flat array of row objects.
- */
-export function extractPersonRows(raw) {
-    if (Array.isArray(raw))
-        return raw;
-    if (raw && typeof raw === "object") {
-        const obj = raw;
-        if (Array.isArray(obj.recordset)) {
-            return obj.recordset;
-        }
-        if (Array.isArray(obj.recordsets) && Array.isArray(obj.recordsets[0])) {
-            return obj.recordsets[0];
-        }
-    }
-    return [];
+    const raw = await client.post("/api/person/search", body, { read: true });
+    const items = unwrapRows(raw).map(projectPersonHit);
+    return { items, nextCursor: null, count: items.length };
 }
 /**
  * Fan a person search out across the caller's companies (`--my-companies`).
@@ -104,18 +100,9 @@ export async function runPersonSearchMyCompanies(listCompanies, searchIn) {
     const companies = await listCompanies();
     const items = [];
     for (const c of companies) {
-        const raw = await searchIn(c.asiakasId);
-        for (const row of extractPersonRows(raw)) {
-            const first = row.personFirstName ?? "";
-            const last = row.personLastName ?? "";
-            items.push({
-                personId: Number(row.personId),
-                name: `${first} ${last}`.trim(),
-                email: row.personEmail ?? null,
-                phone: row.personPhone ?? null,
-                asiakasId: c.asiakasId,
-                asiakasName: c.name,
-            });
+        const env = await searchIn(c.asiakasId);
+        for (const hit of env.items) {
+            items.push({ ...hit, asiakasId: c.asiakasId, asiakasName: c.name });
         }
     }
     return { items, nextCursor: null, count: items.length };

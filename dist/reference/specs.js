@@ -813,8 +813,8 @@ export const COMMAND_SPECS = [
                 description: "Search across all companies you belong to; each hit carries its asiakasId/asiakasName",
             },
         ],
-        outputShape: "Default: the backend's raw person rows (array, or an mssql { recordset } wrapper). " +
-            "With --my-companies: ListEnvelope<{ personId, name, email, phone, asiakasId, asiakasName }>",
+        outputShape: "ListEnvelope<{ personId, name, email, phone, asiakasId }>. " +
+            "With --my-companies each row also carries asiakasName.",
         errors: permErrors("auth.page.person.read"),
         examples: [
             "ib person search 'Matti'",
@@ -1033,7 +1033,7 @@ export const COMMAND_SPECS = [
             { name: "query", type: "string", description: "Positional — substring to match (reg-no, name, or fleet number)" },
             { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
         ],
-        outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity }>",
+        outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>",
         errors: permErrors("auth.page.vehicle.read"),
         examples: ["ib vehicle search ABC", "ib vehicle search kuorma --limit 20", "ib vehicle search 82"],
     },
