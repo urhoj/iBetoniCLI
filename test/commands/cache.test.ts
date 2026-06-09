@@ -7,7 +7,7 @@ import {
   runCacheKeys,
   runCacheInvalidate,
   runCacheClear,
-  runCachePattern, // eslint-disable-line @typescript-eslint/no-unused-vars
+  runCachePattern,
 } from "../../src/commands/cache/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -107,6 +107,16 @@ describe("ib cache run* functions", () => {
     (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ dryRun: true, wouldDelete: 1234 });
     await runCacheClear(mockClient, { confirm: false, forceProd: false });
     expect(mockClient.post).toHaveBeenCalledWith("/api/cli/cache/clear", { confirmed: false }, { headers: { "X-Dry-Run": "1" }, read: true });
+  });
+
+  test("runCachePattern --confirm sends pattern + confirmed:true", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ deleted: 4 });
+    await runCachePattern(mockClient, "keikka:*", { confirm: true, forceProd: false });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/cli/cache/pattern",
+      { pattern: "keikka:*", confirmed: true },
+      { headers: {} }
+    );
   });
 
   test("runCacheInvalidate refuses a remote endpoint on execute without forceProd", async () => {
