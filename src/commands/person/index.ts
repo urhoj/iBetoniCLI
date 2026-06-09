@@ -26,6 +26,8 @@ export interface PersonCreateFlags {
   /** Optional — the DB and backend accept a person with no email (phone-only contacts). */
   email?: string;
   asiakas?: number;
+  /** Create a global, self-managing person (ownerAsiakasId=null). Mutually exclusive with asiakas. */
+  global?: boolean;
 }
 
 /**
@@ -45,6 +47,7 @@ export function buildPersonCreateBody(
   if (typed.phone !== undefined) body.personPhone = typed.phone;
   if (typed.email !== undefined) body.personEmail = typed.email;
   if (typed.asiakas !== undefined) body.ownerAsiakasId = typed.asiakas;
+  if (typed.global) body.ownerAsiakasId = null;
   return body;
 }
 
@@ -425,6 +428,10 @@ export function registerPersonCommands(
     .option("--email <s>", "personEmail (optional)")
     .option("--asiakas <id>", "Owner asiakasId (defaults to your active company)", Number)
     .option(
+      "--global",
+      "Create a GLOBAL, self-managing person with no owner (ownerAsiakasId=null), discoverable across companies. Mutually exclusive with --asiakas."
+    )
+    .option(
       "--get-or-create",
       "On a duplicate email, return the existing person (reused:true) instead of failing"
     )
@@ -433,6 +440,11 @@ export function registerPersonCommands(
     async (opts: WriteFlags & PersonCreateFlags & { getOrCreate?: boolean; body?: string }) => {
       if (!opts.reason) {
         writeError(new Error("Missing required flag: --reason"));
+        process.exit(4);
+      }
+      // --global and --asiakas are mutually exclusive owner directives.
+      if (opts.global && opts.asiakas !== undefined) {
+        writeError(new Error("--global and --asiakas are mutually exclusive"));
         process.exit(4);
       }
       let parsed: Record<string, unknown> = {};
@@ -450,6 +462,7 @@ export function registerPersonCommands(
         phone: opts.phone,
         email: opts.email,
         asiakas: opts.asiakas,
+        global: opts.global,
       });
       const missing = missingPersonCreateFields(body);
       if (missing.length > 0) {
@@ -459,8 +472,9 @@ export function registerPersonCommands(
       try {
         const client = await getClient();
         // ownerAsiakasId is needed by person_add; default it to the active company
-        // when neither --asiakas nor --body supplied one.
-        if (body.ownerAsiakasId === undefined || body.ownerAsiakasId === null) {
+        // when neither --asiakas nor --body supplied one — but NOT for --global,
+        // whose null owner is intentional.
+        if (!opts.global && (body.ownerAsiakasId === undefined || body.ownerAsiakasId === null)) {
           body.ownerAsiakasId = await resolveOwnerAsiakasId(client);
         }
         let res: unknown;

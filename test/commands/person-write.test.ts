@@ -57,6 +57,20 @@ describe("buildPersonCreateBody (typed-flag merge)", () => {
       buildPersonCreateBody({ personFirstName: "Old", personMemo: "keep" }, { first: "New" })
     ).toEqual({ personFirstName: "New", personMemo: "keep" });
   });
+
+  test("--global sets ownerAsiakasId to null (explicit global person)", () => {
+    expect(buildPersonCreateBody({}, { first: "Matti", last: "Virtanen", global: true })).toEqual({
+      personFirstName: "Matti",
+      personLastName: "Virtanen",
+      ownerAsiakasId: null,
+    });
+  });
+
+  test("--global wins over a --body ownerAsiakasId", () => {
+    expect(buildPersonCreateBody({ ownerAsiakasId: 8 }, { global: true })).toEqual({
+      ownerAsiakasId: null,
+    });
+  });
 });
 
 describe("missingPersonCreateFields", () => {
