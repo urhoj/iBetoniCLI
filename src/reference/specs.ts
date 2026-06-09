@@ -1414,7 +1414,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     command: "ib ohje get",
     description:
       "Get one UI help-text entry by helpId — the title/shorttext/htmltext shown in a HelperIcon '(?)' modal in the web UI. This is end-user help CONTENT, distinct from `ib --help` (CLI usage). Returns null when the helpId has no entry yet. Read is public (no auth on the route).",
-    auth: "none",
+    auth: "any",
     args: [{ name: "helpId", type: "string", description: "the helpId (e.g. LaskupohjaTilaus)" }],
     flags: [],
     outputShape: "{ helpId, title, shorttext, htmltext, img } | null",
@@ -1428,7 +1428,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     command: "ib ohje list",
     description:
       "List every UI help-text entry (the whole helps table). Useful to discover helpIds before `ib ohje get`/`update`. Reads are public (no auth required on the route).",
-    auth: "none",
+    auth: "any",
     flags: [
       { name: "limit", type: "number", description: "Max rows to return (client-side cap)" },
     ],
@@ -1966,7 +1966,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     command: "ib jerry check-address",
     description:
       "Anonymous geofence feasibility probe (POST /api/pumppuRequests/checkAddress): which provider varikot cover an address. The single best tool for diagnosing 'no offers'. --address is required (the `osoite` body field); if --lat/--lng/--place-id are all supplied the server trusts them instead of re-geocoding. Not a mutation, so no write-safety flags. Rate-limited 10/min per IP. The `providers` array is only included when the token is a developer/admin.",
-    auth: "none",
+    auth: "any",
     flags: [
       { name: "address", type: "string", description: "Street address to check (REQUIRED; sent as `osoite`)" },
       { name: "lat", type: "number", description: "Latitude (trusted only with --lng + --place-id)" },

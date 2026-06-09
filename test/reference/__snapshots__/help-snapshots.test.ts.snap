@@ -1155,7 +1155,7 @@ exports[`Help snapshots — contract stability > help for ib jerry check-address
 
 DESCRIPTION
   Anonymous geofence feasibility probe (POST /api/pumppuRequests/checkAddress): which provider varikot cover an address. The single best tool for diagnosing 'no offers'. --address is required (the \`osoite\` body field); if --lat/--lng/--place-id are all supplied the server trusts them instead of re-geocoding. Not a mutation, so no write-safety flags. Rate-limited 10/min per IP. The \`providers\` array is only included when the token is a developer/admin.
-  Auth: none (public).
+  Auth: requires login (any authenticated user).
 
 FLAGS
   --address STRING    Street address to check (REQUIRED; sent as \`osoite\`)
@@ -1716,7 +1716,7 @@ exports[`Help snapshots — contract stability > help for ib ohje get matches sn
 
 DESCRIPTION
   Get one UI help-text entry by helpId — the title/shorttext/htmltext shown in a HelperIcon '(?)' modal in the web UI. This is end-user help CONTENT, distinct from \`ib --help\` (CLI usage). Returns null when the helpId has no entry yet. Read is public (no auth on the route).
-  Auth: none (public).
+  Auth: requires login (any authenticated user).
 
 ARGUMENTS
   <helpId> STRING    the helpId (e.g. LaskupohjaTilaus) (required)
@@ -1746,7 +1746,7 @@ exports[`Help snapshots — contract stability > help for ib ohje list matches s
 
 DESCRIPTION
   List every UI help-text entry (the whole helps table). Useful to discover helpIds before \`ib ohje get\`/\`update\`. Reads are public (no auth required on the route).
-  Auth: none (public).
+  Auth: requires login (any authenticated user).
 
 FLAGS
   --limit NUMBER    Max rows to return (client-side cap)
