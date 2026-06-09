@@ -225,6 +225,44 @@ describe("ApiClient", () => {
     });
   });
 
+  test("readOnly ALLOWS a POST marked { read: true } (it is a tenant read)", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })
+    );
+    const client = createApiClient({
+      endpoint: "https://api.example.com",
+      token: "x",
+      version: "1.0.0",
+      readOnly: true,
+    });
+    await client.post("/api/person/search", { searchString: "x" }, { read: true });
+    expect(mockFetch).toHaveBeenCalledOnce();
+  });
+
+  test("a { read: true } POST does NOT print the acting-as write line", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })
+    );
+    const stderr = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    const client = createApiClient({
+      endpoint: "https://api.example.com",
+      token: "x",
+      version: "1.0.0",
+      actingAs: { ownerAsiakasId: 26, ownerAsiakasName: "PumiNet Oy" },
+    });
+    await client.post("/api/person/search", { searchString: "x" }, { read: true });
+    expect(stderr).not.toHaveBeenCalled();
+    stderr.mockRestore();
+  });
+
   test("explicit headers override", async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({}), {
