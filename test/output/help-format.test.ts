@@ -88,9 +88,11 @@ describe("formatHelp NOTES + SEE ALSO", () => {
       seeAlso: ["ib jerry offer accept", "ib jerry request get"],
     });
     expect(out).toContain("NOTES");
-    expect(out).toContain("- Side effect: builds a keikka.");
+    expect(out).toContain("  - Side effect: builds a keikka.");
     expect(out).toContain("SEE ALSO");
     expect(out).toContain("ib jerry offer accept, ib jerry request get");
+    expect(out.indexOf("NOTES")).toBeLessThan(out.indexOf("EXAMPLES"));
+    expect(out.indexOf("SEE ALSO")).toBeLessThan(out.indexOf("EXAMPLES"));
   });
   test("omits NOTES/SEE ALSO sections when absent", () => {
     const out = formatHelp({ ...base });

@@ -1299,7 +1299,8 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - Heavyweight, real side effects: flips the offer accepted → 'confirmed' AND builds a keikka in your grid (broadcasts keikka:created, notifies the customer, inherits the vehicle's day driver).
   - Call only after the customer accepts and you've agreed a date by phone.
-  - --scheduled-at (future ISO datetime) is required; --pumppu optionally pins one of your vehicles.
+  - --scheduled-at (future ISO datetime) is required.
+  - --pumppu optionally pins one of your vehicles.
 
 SEE ALSO
   ib jerry offer accept, ib jerry request get
