@@ -128,6 +128,190 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib cache clear matches snapshot 1`] = `
+"USAGE
+  ib cache clear [flags]
+
+DESCRIPTION
+  Flush the entire Redis cache. Previews (X-Dry-Run) unless --confirm. Guard: refuses deployed endpoints unless --force-prod. Developer-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --confirm BOOLEAN    Execute the operation (default is dry-run preview)
+  --force-prod BOOLEAN    Allow execution against a deployed (shared-cache) endpoint
+  --reason STRING    Audit reason (X-Action-Reason)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  preview: { dryRun:true, wouldDelete } | execute: { deleted }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 3  Refused: deployed endpoint without --force-prod → add --force-prod or use a local endpoint
+
+EXAMPLES
+  ib cache clear
+  ib cache clear --confirm --force-prod
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib cache entities matches snapshot 1`] = `
+"USAGE
+  ib cache entities [flags]
+
+DESCRIPTION
+  List the valid cache entity types, their scope params (id/asiakasId), cascade support, and example invalidation commands. Offline — no auth required.
+  Auth: none (public).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  { items: [{ entityType, params[], cascade?, developerOnly?, example }], count }
+
+ERRORS (stderr, exit non-zero)
+  exit 0  Always succeeds (offline static list) → n/a
+
+EXAMPLES
+  ib cache entities
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib cache invalidate matches snapshot 1`] = `
+"USAGE
+  ib cache invalidate <entityType> [flags]
+
+DESCRIPTION
+  Invalidate keys for one entity family. Previews (X-Dry-Run) unless --confirm. --cascade fans out to related families (keikka only). Guard: refuses deployed endpoints unless --force-prod (all slots share Redis DB 3).
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <entityType> STRING    Entity family (see \`ib cache entities\`) (required)
+
+FLAGS
+  --id NUMBER    Entity id (e.g. keikkaId)
+  --asiakas-id NUMBER    Tenant scope (developers may target others; non-devs use their own)
+  --cascade BOOLEAN    Also invalidate related families (keikka only)
+  --confirm BOOLEAN    Execute the operation (default is dry-run preview)
+  --force-prod BOOLEAN    Allow execution against a deployed (shared-cache) endpoint
+  --reason STRING    Audit reason (X-Action-Reason)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  preview: { dryRun:true, wouldDelete, patterns[] } | execute: { dryRun:false, deleted, patterns[] }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Unknown entityType or missing required param → run \`ib cache entities\` to list valid types
+  exit 3  Refused: deployed endpoint without --force-prod → add --force-prod or use a local endpoint
+
+EXAMPLES
+  ib cache invalidate keikka --id 123
+  ib cache invalidate keikka --id 123 --cascade --confirm
+  ib cache invalidate asiakas --asiakas-id 8 --confirm
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib cache keys matches snapshot 1`] = `
+"USAGE
+  ib cache keys [flags]
+
+DESCRIPTION
+  Key counts grouped by prefix pattern (SCAN). Developer-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --pattern STRING    SCAN match glob (default: *) (default: *)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  { totalKeys, groups: [{ prefix, count }] }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib cache keys
+  ib cache keys --pattern 'keikka:*'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib cache pattern matches snapshot 1`] = `
+"USAGE
+  ib cache pattern <glob> [flags]
+
+DESCRIPTION
+  Invalidate keys matching a raw Redis glob. Previews unless --confirm. Guard: refuses deployed endpoints unless --force-prod. Developer-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <glob> STRING    Raw Redis key glob (e.g. 'keikka:*') (required)
+
+FLAGS
+  --confirm BOOLEAN    Execute the operation (default is dry-run preview)
+  --force-prod BOOLEAN    Allow execution against a deployed (shared-cache) endpoint
+  --reason STRING    Audit reason (X-Action-Reason)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  preview: { dryRun:true, wouldDelete, pattern } | execute: { deleted, pattern }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 3  Refused: deployed endpoint without --force-prod → add --force-prod or use a local endpoint
+
+EXAMPLES
+  ib cache pattern 'keikka:*'
+  ib cache pattern 'person:*' --confirm --force-prod
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib cache stats matches snapshot 1`] = `
+"USAGE
+  ib cache stats [flags]
+
+DESCRIPTION
+  Redis connection status, total key count, and hit rate. Developer-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  { connected, totalKeys, hitRate?, usedMemory? }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib cache stats
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib commands matches snapshot 1`] = `
 "USAGE
   ib commands [flags]

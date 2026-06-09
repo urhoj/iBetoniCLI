@@ -2567,6 +2567,101 @@ export const COMMAND_SPECS: CommandSpec[] = [
       'ib feedback resolve 42 --status dismissed --note "by design"',
     ],
   },
+  // ─── cache (6) — Redis inspection and invalidation ───────────────────────
+  ...((): CommandSpec[] => {
+    const DEV_PERMS = ["isSystemAdmin or isDeveloper"];
+    const devErrors: CommandError[] = [
+      apiErr(401, "Token expired", "ib auth refresh"),
+      apiErr(403, "Not a developer", "requires isSystemAdmin or isDeveloper"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ];
+    const writeFlags = [
+      { name: "confirm", type: "boolean", description: "Execute the operation (default is dry-run preview)" },
+      { name: "force-prod", type: "boolean", description: "Allow execution against a deployed (shared-cache) endpoint" },
+      { name: "reason", type: "string", description: "Audit reason (X-Action-Reason)" },
+    ];
+    return [
+      {
+        command: "ib cache stats",
+        description: "Redis connection status, total key count, and hit rate. Developer-only.",
+        permissions: DEV_PERMS,
+        flags: [],
+        outputShape: "{ connected, totalKeys, hitRate?, usedMemory? }",
+        errors: devErrors,
+        examples: ["ib cache stats"],
+      },
+      {
+        command: "ib cache keys",
+        description: "Key counts grouped by prefix pattern (SCAN). Developer-only.",
+        permissions: DEV_PERMS,
+        flags: [{ name: "pattern", type: "string", default: "*", description: "SCAN match glob (default: *)" }],
+        outputShape: "{ totalKeys, groups: [{ prefix, count }] }",
+        errors: devErrors,
+        examples: ["ib cache keys", "ib cache keys --pattern 'keikka:*'"],
+      },
+      {
+        command: "ib cache invalidate",
+        description: "Invalidate keys for one entity family. Previews (X-Dry-Run) unless --confirm. --cascade fans out to related families (keikka only). Guard: refuses deployed endpoints unless --force-prod (all slots share Redis DB 3).",
+        permissions: DEV_PERMS,
+        mutates: true,
+        args: [{ name: "entityType", type: "string", description: "Entity family (see `ib cache entities`)" }],
+        flags: [
+          { name: "id", type: "number", description: "Entity id (e.g. keikkaId)" },
+          { name: "asiakas-id", type: "number", description: "Tenant scope (developers may target others; non-devs use their own)" },
+          { name: "cascade", type: "boolean", description: "Also invalidate related families (keikka only)" },
+          ...writeFlags,
+        ],
+        outputShape: "preview: { dryRun:true, wouldDelete, patterns[] } | execute: { dryRun:false, deleted, patterns[] }",
+        errors: [
+          ...devErrors,
+          apiErr(400, "Unknown entityType or missing required param", "run `ib cache entities` to list valid types"),
+          { exit: 3, meaning: "Refused: deployed endpoint without --force-prod", remedy: "add --force-prod or use a local endpoint" },
+        ],
+        examples: [
+          "ib cache invalidate keikka --id 123",
+          "ib cache invalidate keikka --id 123 --cascade --confirm",
+          "ib cache invalidate asiakas --asiakas-id 8 --confirm",
+        ],
+      },
+      {
+        command: "ib cache clear",
+        description: "Flush the entire Redis cache. Previews (X-Dry-Run) unless --confirm. Guard: refuses deployed endpoints unless --force-prod. Developer-only.",
+        permissions: DEV_PERMS,
+        mutates: true,
+        flags: writeFlags,
+        outputShape: "preview: { dryRun:true, wouldDelete } | execute: { deleted }",
+        errors: [
+          ...devErrors,
+          { exit: 3, meaning: "Refused: deployed endpoint without --force-prod", remedy: "add --force-prod or use a local endpoint" },
+        ],
+        examples: ["ib cache clear", "ib cache clear --confirm --force-prod"],
+      },
+      {
+        command: "ib cache pattern",
+        description: "Invalidate keys matching a raw Redis glob. Previews unless --confirm. Guard: refuses deployed endpoints unless --force-prod. Developer-only.",
+        permissions: DEV_PERMS,
+        mutates: true,
+        args: [{ name: "glob", type: "string", description: "Raw Redis key glob (e.g. 'keikka:*')" }],
+        flags: writeFlags,
+        outputShape: "preview: { dryRun:true, wouldDelete, pattern } | execute: { deleted, pattern }",
+        errors: [
+          ...devErrors,
+          { exit: 3, meaning: "Refused: deployed endpoint without --force-prod", remedy: "add --force-prod or use a local endpoint" },
+        ],
+        examples: ["ib cache pattern 'keikka:*'", "ib cache pattern 'person:*' --confirm --force-prod"],
+      },
+      {
+        command: "ib cache entities",
+        description: "List the valid cache entity types, their scope params (id/asiakasId), cascade support, and example invalidation commands. Offline — no auth required.",
+        auth: "none",
+        flags: [],
+        outputShape: "{ items: [{ entityType, params[], cascade?, developerOnly?, example }], count }",
+        errors: [{ exit: 0, meaning: "Always succeeds (offline static list)", remedy: "n/a" }],
+        examples: ["ib cache entities"],
+      },
+    ];
+  })(),
+
   // ─── help (1) ────────────────────────────────────────────────────────────
   {
     command: "ib help",
