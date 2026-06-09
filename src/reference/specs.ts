@@ -1005,7 +1005,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     outputShape:
-      "ListEnvelope<{ vehicleId, plate, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>",
+      "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>",
     errors: permErrors("auth.page.vehicle.read"),
     examples: [
       "ib vehicle list",
@@ -1026,7 +1026,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
         description: "Positional — vehicleId to fetch",
       },
     ],
-    outputShape: "{ vehicleId, plate, type, typeName, capacity, defaultDriverId }",
+    outputShape:
+      "{ vehicleId, vehicleNo, name, plate, type, typeName, boomLength, capacity, sortNo, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, memo, billingProductId, asiakasId, defaultDriverId, showInGrid:boolean, showInReports:boolean, useNoDriverBar:boolean, isRestricted:boolean, hasGpsTracking:boolean }",
     errors: [
       { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
       ...permErrors("auth.page.vehicle.read"),
@@ -1095,15 +1096,16 @@ export const COMMAND_SPECS: CommandSpec[] = [
   },
   {
     command: "ib vehicle search",
-    description: "Search vehicles by reg-no / name substring (LIKE on vehicleRegNo/vehicleNimi).",
+    description:
+      "Search vehicles by reg-no / name / fleet-number substring (LIKE on vehicleRegNo / vehicleNimi / vehicleNo).",
     permissions: ["auth.page.vehicle.read"],
     flags: [
-      { name: "query", type: "string", description: "Positional — substring to match" },
+      { name: "query", type: "string", description: "Positional — substring to match (reg-no, name, or fleet number)" },
       { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
     ],
-    outputShape: "ListEnvelope<{ vehicleId, plate, type, typeName, capacity }>",
+    outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity }>",
     errors: permErrors("auth.page.vehicle.read"),
-    examples: ["ib vehicle search ABC", "ib vehicle search kuorma --limit 20"],
+    examples: ["ib vehicle search ABC", "ib vehicle search kuorma --limit 20", "ib vehicle search 82"],
   },
   {
     command: "ib vehicle create",

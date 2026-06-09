@@ -3076,7 +3076,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only
 
 OUTPUT (JSON, stdout)
-  { vehicleId, plate, type, typeName, capacity, defaultDriverId }
+  { vehicleId, vehicleNo, name, plate, type, typeName, boomLength, capacity, sortNo, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, memo, billingProductId, asiakasId, defaultDriverId, showInGrid:boolean, showInReports:boolean, useNoDriverBar:boolean, isRestricted:boolean, hasGpsTracking:boolean }
 
 ERRORS (stderr, exit non-zero)
   404  Vehicle not found      → verify vehicleId
@@ -3109,7 +3109,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ vehicleId, plate, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>
+  ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
@@ -3190,19 +3190,19 @@ exports[`Help snapshots — contract stability > help for ib vehicle search matc
   ib vehicle search [flags]
 
 DESCRIPTION
-  Search vehicles by reg-no / name substring (LIKE on vehicleRegNo/vehicleNimi).
+  Search vehicles by reg-no / name / fleet-number substring (LIKE on vehicleRegNo / vehicleNimi / vehicleNo).
   Permissions: requires auth.page.vehicle.read.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
-  --query STRING    Positional — substring to match
+  --query STRING    Positional — substring to match (reg-no, name, or fleet number)
   --limit NUMBER    Max rows (capped at 500) (default: 100)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ vehicleId, plate, type, typeName, capacity }>
+  ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity }>
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
@@ -3212,6 +3212,7 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib vehicle search ABC
   ib vehicle search kuorma --limit 20
+  ib vehicle search 82
 "
 `;
 

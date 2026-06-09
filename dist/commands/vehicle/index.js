@@ -16,8 +16,9 @@ const VISIT_FILTER_TYPES = ["tyomaa", "sijainti"];
  * GET /api/cli/vehicle/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`. Rows are
  * self-describing — each carries showInGrid / firstDate / lastDate /
- * deletedTime alongside { vehicleId, plate, type, typeName, capacity }
- * (typeName ← vehicleTypes.vehicleTypeName, null when unset). Default scope is
+ * deletedTime alongside { vehicleId, plate, name, type, typeName, capacity }
+ * (name ← vehicleNimi, typeName ← vehicleTypes.vehicleTypeName, null when
+ * unset). Default scope is
  * non-deleted with no narrowing (grid-hidden AND expired rows ARE included);
  * `deleted` / `gridOnly` / `validOn` / `type` opt into narrowing.
  */
@@ -39,7 +40,11 @@ export async function runVehicleList(client, opts) {
     return client.get(`/api/cli/vehicle/list${qs ? `?${qs}` : ""}`);
 }
 /**
- * GET /api/cli/vehicle/get/:vehicleId. Returns the flat backend record as-is.
+ * GET /api/cli/vehicle/get/:vehicleId. Returns the full flat "Perustiedot"
+ * record: identity (vehicleNo/name/plate/type/typeName), specs (boomLength ←
+ * vehiclePuomi, capacity ← vehicleM3, sortNo), validity (firstDate/lastDate),
+ * memo, billingProductId, asiakasId, defaultDriverId, and the behaviour toggles
+ * (showInGrid/showInReports/useNoDriverBar/isRestricted/hasGpsTracking).
  */
 export async function runVehicleGet(client, vehicleId) {
     return client.get(`/api/cli/vehicle/get/${vehicleId}`);
@@ -96,8 +101,8 @@ export async function runVehicleTypes(client) {
 }
 /**
  * GET /api/cli/vehicle/list?search=…&limit=… — substring search over the
- * vehicle list (reg-no / name). Reuses the list endpoint with a `search`
- * query param; `limit` is appended only when supplied.
+ * vehicle list (reg-no / name / fleet number). Reuses the list endpoint with a
+ * `search` query param; `limit` is appended only when supplied.
  */
 export async function runVehicleSearch(client, query, limit) {
     const params = new URLSearchParams({ search: query });
