@@ -41,4 +41,20 @@ describe("Rich --help wiring — real command tree", () => {
     expect(group).toBeDefined();
     expect(group!.helpInformation()).toContain("Usage:");
   });
+
+  test("every leaf command has a CommandSpec (no undocumented commands)", () => {
+    const specPaths = new Set(COMMAND_SPECS.map((s) => s.command));
+    const leaves = [...commands.entries()]
+      .filter(([, cmd]) => cmd.commands.length === 0) // leaf = no subcommands
+      .map(([path]) => path)
+      .filter((p) => p !== "ib") // root is not a leaf command
+      // Commander auto-adds a `help` subcommand to each GROUP (e.g. "ib keikka help");
+      // those are framework-generated and legitimately specless. Our own top-level
+      // `ib help` (depth 1) DOES have a spec and must NOT be excluded.
+      .filter((p) => !(p.endsWith(" help") && p !== "ib help"));
+    const missing = leaves.filter((p) => !specPaths.has(p));
+    // Guard against vacuous test: ensure we are actually checking a meaningful number of leaves.
+    expect(leaves.length).toBeGreaterThan(80);
+    expect(missing).toEqual([]);
+  });
 });
