@@ -88,4 +88,33 @@ describe("ib person list/get/search", () => {
       { read: true }
     );
   });
+
+  test("runPersonSearch projects rows to a ListEnvelope with asiakasId from ownerAsiakasId", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      recordset: [
+        {
+          personId: 100,
+          personFirstName: "Mikko",
+          personLastName: "Ikonen",
+          personEmail: "mikko@x.fi",
+          personPhone: "040",
+          ownerAsiakasId: 8,
+        },
+      ],
+    });
+    const res = await runPersonSearch(mockClient, "Ikonen");
+    expect(res).toEqual({
+      items: [
+        {
+          personId: 100,
+          name: "Mikko Ikonen",
+          email: "mikko@x.fi",
+          phone: "040",
+          asiakasId: 8,
+        },
+      ],
+      nextCursor: null,
+      count: 1,
+    });
+  });
 });
