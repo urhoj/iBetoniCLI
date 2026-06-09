@@ -1005,7 +1005,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     outputShape:
-      "ListEnvelope<{ vehicleId, plate, type, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>",
+      "ListEnvelope<{ vehicleId, plate, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>",
     errors: permErrors("auth.page.vehicle.read"),
     examples: [
       "ib vehicle list",
@@ -1026,7 +1026,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
         description: "Positional — vehicleId to fetch",
       },
     ],
-    outputShape: "{ vehicleId, plate, type, capacity }",
+    outputShape: "{ vehicleId, plate, type, typeName, capacity, defaultDriverId }",
     errors: [
       { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
       ...permErrors("auth.page.vehicle.read"),
@@ -1101,7 +1101,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "query", type: "string", description: "Positional — substring to match" },
       { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
     ],
-    outputShape: "ListEnvelope<{ vehicleId, plate, type, capacity }>",
+    outputShape: "ListEnvelope<{ vehicleId, plate, type, typeName, capacity }>",
     errors: permErrors("auth.page.vehicle.read"),
     examples: ["ib vehicle search ABC", "ib vehicle search kuorma --limit 20"],
   },

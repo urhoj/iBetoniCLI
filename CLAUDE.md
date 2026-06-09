@@ -80,7 +80,7 @@ One aggregated health report (`src/commands/doctor/index.ts`). Derives identity 
 
 ### `ib vehicle list` filters
 
-Rows are self-describing — each carries `showInGrid`/`firstDate`/`lastDate`/`deletedTime` alongside `{ vehicleId, plate, type, capacity }`. **Default scope is unchanged**: non-deleted, no narrowing — grid-hidden AND expired vehicles ARE included; only soft-deleted are excluded. Opt-in narrowing: `--deleted` (reveal soft-deleted), `--grid-only` (`showInGrid=1`), `--valid-on <date>` (validity window covers the day), `--type <id>`. The backend half (params + projection + cache-key compatibility) lives in `puminet5api` `listVehiclesForCli` / `vehicleCliRoutes.js` — **deploy-gated** (flags no-op until that backend deploys).
+Rows are self-describing — each carries `showInGrid`/`firstDate`/`lastDate`/`deletedTime` alongside `{ vehicleId, plate, type, typeName, capacity }` (`typeName` ← `vehicleTypes.vehicleTypeName`, null when unset; the numeric `type`/`vehicleTypeId` is retained for the `--type` filter). **Default scope is unchanged**: non-deleted, no narrowing — grid-hidden AND expired vehicles ARE included; only soft-deleted are excluded. Opt-in narrowing: `--deleted` (reveal soft-deleted), `--grid-only` (`showInGrid=1`), `--valid-on <date>` (validity window covers the day), `--type <id>`. The backend half (params + projection + cache-key compatibility) lives in `puminet5api` `listVehiclesForCli` / `vehicleCliRoutes.js` — **deploy-gated** (flags no-op until that backend deploys).
 
 ### `ib feedback` (AI self-service proposals / trouble reports)
 

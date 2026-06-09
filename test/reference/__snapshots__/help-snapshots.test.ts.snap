@@ -3074,7 +3074,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only
 
 OUTPUT (JSON, stdout)
-  { vehicleId, plate, type, capacity }
+  { vehicleId, plate, type, typeName, capacity, defaultDriverId }
 
 ERRORS (stderr, exit non-zero)
   404  Vehicle not found      → verify vehicleId
@@ -3107,7 +3107,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ vehicleId, plate, type, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>
+  ListEnvelope<{ vehicleId, plate, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
@@ -3200,7 +3200,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ vehicleId, plate, type, capacity }>
+  ListEnvelope<{ vehicleId, plate, type, typeName, capacity }>
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh

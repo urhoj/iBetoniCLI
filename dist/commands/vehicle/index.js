@@ -16,7 +16,8 @@ const VISIT_FILTER_TYPES = ["tyomaa", "sijainti"];
  * GET /api/cli/vehicle/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`. Rows are
  * self-describing — each carries showInGrid / firstDate / lastDate /
- * deletedTime alongside { vehicleId, plate, type, capacity }. Default scope is
+ * deletedTime alongside { vehicleId, plate, type, typeName, capacity }
+ * (typeName ← vehicleTypes.vehicleTypeName, null when unset). Default scope is
  * non-deleted with no narrowing (grid-hidden AND expired rows ARE included);
  * `deleted` / `gridOnly` / `validOn` / `type` opt into narrowing.
  */
