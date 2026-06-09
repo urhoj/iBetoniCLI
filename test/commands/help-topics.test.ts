@@ -13,6 +13,9 @@ describe("ib help topics", () => {
     expect(t.body.length).toBeGreaterThan(20);
   });
   test("unknown topic throws (mapped to exit 5)", () => {
-    expect(() => runHelpTopic("nope")).toThrowError(/unknown topic/i);
+    let caught: any;
+    try { runHelpTopic("nope"); } catch (e) { caught = e; }
+    expect(caught).toMatchObject({ exitCode: 5 });
+    expect(String(caught.message)).toMatch(/unknown topic/i);
   });
 });

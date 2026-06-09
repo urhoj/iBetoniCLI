@@ -17,7 +17,7 @@ export function runHelpTopic(id: string): { id: string; title: string; body: str
   const t = TOPICS.find((x) => x.id === id);
   if (!t) {
     const ids = TOPICS.map((x) => x.id).join(", ");
-    throw new CliError(`unknown topic: ${id}. Valid: ${ids}`, 404, null, 5);
+    throw new CliError(`unknown topic: ${id}. Valid: ${ids}`, 0, null, 5);
   }
   return { id: t.id, title: t.title, body: t.body };
 }
