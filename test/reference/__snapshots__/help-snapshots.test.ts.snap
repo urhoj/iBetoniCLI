@@ -133,7 +133,7 @@ exports[`Help snapshots — contract stability > help for ib cache clear matches
   ib cache clear [flags]
 
 DESCRIPTION
-  Flush the entire Redis cache. Previews (X-Dry-Run) unless --confirm. Guard: refuses deployed endpoints unless --force-prod. Developer-only.
+  Flush the entire Redis cache (curated sweep; preserves sessions/locks/metrics). Previews (X-Dry-Run) unless --confirm. Cross-tenant: clears every company's cached data. Guard: refuses deployed endpoints unless --force-prod. Developer-only.
   Permissions: requires isSystemAdmin or isDeveloper.
 
 FLAGS
@@ -151,7 +151,8 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
-  exit 3  Refused: deployed endpoint without --force-prod → add --force-prod or use a local endpoint
+  exit 3  Refused: deployed endpoint without --force-prod → prod and staging share Redis DB 3; add --force-prod or use a local endpoint
+  exit 3  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
 
 EXAMPLES
   ib cache clear
@@ -189,11 +190,11 @@ exports[`Help snapshots — contract stability > help for ib cache invalidate ma
   ib cache invalidate <entityType> [flags]
 
 DESCRIPTION
-  Invalidate keys for one entity family. Previews (X-Dry-Run) unless --confirm. --cascade fans out to related families (keikka only). Guard: refuses deployed endpoints unless --force-prod (all slots share Redis DB 3).
-  Permissions: requires isSystemAdmin or isDeveloper.
+  Invalidate cache for one entity family by domain identifier (no Redis key knowledge needed). Previews (X-Dry-Run) unless --confirm. --cascade fans out to related families (keikka only). Any admin; non-developers are scoped to their own company. Guard: refuses deployed endpoints unless --force-prod (all slots share Redis DB 3).
+  Permissions: requires admin role (SystemAdmin, AsiakasAdmin, or LaskuAdmin) or developer.
 
 ARGUMENTS
-  <entityType> STRING    Entity family (see \`ib cache entities\`) (required)
+  <entityType> STRING    Entity family, e.g. keikka/asiakas/vehicle (see \`ib cache entities\`) (required)
 
 FLAGS
   --id NUMBER    Entity id (e.g. keikkaId)
@@ -207,14 +208,22 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
 
 OUTPUT (JSON, stdout)
-  preview: { dryRun:true, wouldDelete, patterns[] } | execute: { dryRun:false, deleted, patterns[] }
+  preview: { dryRun:true, wouldDelete, patterns[] } | execute: { dryRun:false, deleted }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Unknown entityType or cascade unsupported → run \`ib cache entities\` to list valid types
+  exit 3 (HTTP 403)  Not an admin, or cross-tenant entity needs developer → cross-tenant entities (keikka, grid, stat, attachment) require isSystemAdmin/isDeveloper; others need an admin role
+  exit 3  Refused: deployed endpoint without --force-prod → prod and staging share Redis DB 3; add --force-prod or use a local endpoint
+  exit 3  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
-  exit 4 (HTTP 400)  Unknown entityType or missing required param → run \`ib cache entities\` to list valid types
-  exit 3  Refused: deployed endpoint without --force-prod → add --force-prod or use a local endpoint
+
+NOTES
+  - Without --confirm the command only PREVIEWS (counts keys) and never deletes.
+  - Single-entity invalidate may leave related caches (grid/stepLog/attachments) stale — use --cascade (keikka) or invalidate each family.
+
+SEE ALSO
+  ib cache entities, ib cache keys
 
 EXAMPLES
   ib cache invalidate keikka --id 123
@@ -256,7 +265,7 @@ exports[`Help snapshots — contract stability > help for ib cache pattern match
   ib cache pattern <glob> [flags]
 
 DESCRIPTION
-  Invalidate keys matching a raw Redis glob. Previews unless --confirm. Guard: refuses deployed endpoints unless --force-prod. Developer-only.
+  Invalidate keys matching a raw Redis glob. Previews unless --confirm. Guard: refuses deployed endpoints unless --force-prod. Developer-only. Prefer \`ib cache invalidate\` (domain entity); use \`ib cache keys\` to find the right glob.
   Permissions: requires isSystemAdmin or isDeveloper.
 
 ARGUMENTS
@@ -277,7 +286,8 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
-  exit 3  Refused: deployed endpoint without --force-prod → add --force-prod or use a local endpoint
+  exit 3  Refused: deployed endpoint without --force-prod → prod and staging share Redis DB 3; add --force-prod or use a local endpoint
+  exit 3  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
 
 EXAMPLES
   ib cache pattern 'keikka:*'
