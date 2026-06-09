@@ -29,12 +29,13 @@ Run from the `betonicli/` directory:
 
 ### Single source of truth: `src/reference/specs.ts`
 
-`COMMAND_SPECS` is the canonical catalogue of every subcommand (description, permissions, flags, output shape, errors, examples). It drives **two** consumers that must never drift:
+`COMMAND_SPECS` is the canonical catalogue of every subcommand (`command`, `description`, optional `auth` / `permissions`, positional `args`, `flags`, `writeFlags` / `mutates`, `outputShape`, dual-encoded `errors` (`{ http?, exit }`), optional `notes` / `seeAlso`, `examples`). It drives **three** consumers that must never drift:
 
 1. `src/output/help.ts` `attachRichHelp` — replaces each matching command's `--help` with the rich `formatHelp(spec)` rendering.
 2. `src/reference/dump.ts` — `ib reference dump` emits all specs as one JSON document for one-shot AI ingestion.
+3. `src/reference/commandsList.ts` — `ib commands` filters the catalogue to a compact discovery view (`--mutations` / `--reads` / `--permission`).
 
-**When you add or change a command, update its `CommandSpec` in `specs.ts` in the same change.** Two tests enforce the link: `test/reference/help-wiring.test.ts` (every spec maps to a registered command and its `--help` equals `formatHelp(spec)`) and `test/reference/help-snapshots.test.ts` (snapshot of rendered help — update with `npx vitest run -u` when intentional).
+**When you add or change a command, update its `CommandSpec` in `specs.ts` in the same change.** Tests enforce the link: `test/reference/help-wiring.test.ts` (every spec maps to a registered command, **every leaf command has a spec**, and each `--help` equals `formatHelp(spec)`) and `test/reference/help-snapshots.test.ts` (snapshot of rendered help — update with `npx vitest run -u` when intentional). The `formatHelp` renderer itself is unit-tested in `test/output/help-format.test.ts` and `test/output/help.test.ts`.
 
 ### Command registration
 
@@ -78,6 +79,10 @@ On the **first write** of a process (the first non-GET that passes the read-only
 
 One aggregated health report (`src/commands/doctor/index.ts`). Derives identity from the active JWT (works for both file- and `IB_TOKEN`-sessions, unlike `auth whoami` which reads the credentials file), reports token expiry, reuses `runVersion` for connectivity + deployed build, and does one authenticated read (`runCompanyList`) to prove the token works against the endpoint. Read-only; exits `1` when the aggregate `ok` is false.
 
+### `ib help <topic>`
+
+Offline concept guides (`src/commands/help/index.ts`), distinct from each command's `--help`. Sourced from the `TOPICS` table in `src/reference/domain.ts` (one source of truth) — current topics: `roles`, `jerry-lifecycle`, `write-safety`, `exit-codes`, `multi-tenancy`. No auth, no network: `ib help` returns the list envelope `{ items:[{id,title}], nextCursor, count }`; `ib help <id>` returns `{ id, title, body }` (unknown id → exit 5). `TOPICS` is also embedded in `ib reference dump` under `topics`, and the ids are listed in the `ib --help` footer (via `renderDomainHelp`). The whole group is registered with `program.helpCommand(false)` in `program.ts` — that disables Commander's built-in implicit `help` command so our explicit `help [topic]` action runs; the `-h/--help` option is separate and unaffected.
+
 ### `ib vehicle list` filters
 
 Rows are self-describing — each carries `showInGrid`/`firstDate`/`lastDate`/`deletedTime` alongside `{ vehicleId, plate, name, type, typeName, capacity }` (`name` ← `vehicleNimi`, `typeName` ← `vehicleTypes.vehicleTypeName`, null when unset; the numeric `type`/`vehicleTypeId` is retained for the `--type` filter). `search` matches reg-no / name / `vehicleNo` (fleet number) substrings. `ib vehicle get` returns the full "Perustiedot" record (adds `vehicleNo` (fleet number), `boomLength` ← `vehiclePuomi`, `sortNo`, validity dates, `memo`, `billingProductId`, `asiakasId`, and the behaviour toggles). **Default scope is unchanged**: non-deleted, no narrowing — grid-hidden AND expired vehicles ARE included; only soft-deleted are excluded. Opt-in narrowing: `--deleted` (reveal soft-deleted), `--grid-only` (`showInGrid=1`), `--valid-on <date>` (validity window covers the day), `--type <id>`. The backend half (params + projection + cache-key compatibility) lives in `puminet5api` `listVehiclesForCli` / `vehicleCliRoutes.js` — **deploy-gated** (flags no-op until that backend deploys).
@@ -86,7 +91,7 @@ Rows are self-describing — each carries `showInGrid`/`firstDate`/`lastDate`/`d
 
 `src/commands/feedback/` — when the AI hits friction using `ib`, it files a freetext note so the CLI can be improved. `create` (any user) `list`/`get`/`resolve` (developer-only) over `puminet5api` `/api/feedback` (a **quiet** sink: no GitHub issue, no admin broadcast — deliberately separate from `bugReport`; a private heads-up email goes to the maintainer, personId 10). A developer-gated analyzer skill (`code/.claude/skills/analyze-cli-feedback`) reads them back and closes the loop.
 
-**`meta` read-only exemption:** `create` is sent with `client.post(..., { meta: true })`. In `src/api/client.ts` the read-only write-lock and the acting-as diagnostic both skip `meta` requests — so an agent running `--read-only` / `IB_READ_ONLY` can *still* file feedback (it's not a domain mutation). `meta` is the ONLY write-lock bypass; use it only for non-mutating diagnostics. `resolve` is a real write (PUT, blocked under read-only). `--dry-run` on `create`/`resolve` resolves **client-side** (prints the payload, never sends) — not the server `X-Dry-Run`. Specs keep `writeFlags:false` (custom semantics; the standard write-safety block would mis-document them) — so `ib commands --reads` lists them. **Deploy-gated**: `/api/feedback` + the `cliFeedback` table must deploy first.
+**`meta` read-only exemption:** `create` is sent with `client.post(..., { meta: true })`. In `src/api/client.ts` the read-only write-lock and the acting-as diagnostic both skip `meta` requests — so an agent running `--read-only` / `IB_READ_ONLY` can *still* file feedback (it's not a domain mutation). `meta` is the ONLY write-lock bypass; use it only for non-mutating diagnostics. `resolve` is a real write (PUT, blocked under read-only). `--dry-run` on `create`/`resolve` resolves **client-side** (prints the payload, never sends) — not the server `X-Dry-Run`. Specs keep `writeFlags:false` (custom client-side dry-run; the standard write-safety block would mis-document them) but set `mutates:true`, so `ib commands` classifies them as writes via `mutates ?? !!writeFlags` — `--mutations` lists them and `--reads` excludes them. **Deploy-gated**: `/api/feedback` + the `cliFeedback` table must deploy first.
 
 ### Auth & credentials (`src/auth/`)
 

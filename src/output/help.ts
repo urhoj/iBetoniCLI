@@ -1,13 +1,18 @@
 /**
  * AI-optimized `--help` formatter.
  *
- * Renders a {@link CommandSpec} as a stable, parse-friendly help string with
- * fixed sections (USAGE / DESCRIPTION / FLAGS / WRITE-SAFETY FLAGS / GLOBAL
- * FLAGS / OUTPUT / ERRORS / EXAMPLES). The output is deliberately
- * self-contained so that an AI consumer can ingest a single command's `--help`
- * and know everything needed to invoke it correctly: required permissions,
- * timezone semantics, exhaustive flag list, response shape, error remedies,
- * and copy-paste-ready examples.
+ * Renders a {@link CommandSpec} as a stable, parse-friendly help string. The
+ * sections are emitted in this order, some conditionally: USAGE · DESCRIPTION
+ * (with an optional Permissions/Auth line and a Timezone line when the command
+ * has a date arg/flag) · ARGUMENTS (when `spec.args` is set) · FLAGS ·
+ * WRITE-SAFETY FLAGS (when `spec.writeFlags`) · GLOBAL FLAGS · OUTPUT · ERRORS
+ * (each as `exit N (HTTP M)`) · NOTES (when `spec.notes`) · SEE ALSO (when
+ * `spec.seeAlso`) · EXAMPLES. The output is deliberately self-contained so that
+ * an AI consumer can ingest a single command's `--help` and know everything
+ * needed to invoke it correctly: positional arguments, auth/permissions,
+ * timezone semantics, exhaustive flag list, response shape, error remedies
+ * (with both exit code and HTTP status), related commands, and copy-paste-ready
+ * examples.
  *
  * The same `CommandSpec` shape is also emitted as JSON by
  * `ib reference dump` (see `src/reference/dump.ts`), keeping the human help

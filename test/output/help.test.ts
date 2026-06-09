@@ -29,9 +29,10 @@ const sampleSpec: CommandSpec = {
   outputShape:
     "Keikka[] in universal list envelope { items, nextCursor, count }",
   errors: [
-    { code: 401, meaning: "Token expired", remedy: "ib auth refresh" },
+    { exit: 2, http: 401, meaning: "Token expired", remedy: "ib auth refresh" },
     {
-      code: 403,
+      exit: 3,
+      http: 403,
       meaning: "Permission denied",
       remedy: "check auth.page.grid.tilaus.read",
     },
@@ -54,6 +55,8 @@ describe("formatHelp", () => {
     expect(out).toContain("GLOBAL FLAGS");
     expect(out).toContain("OUTPUT (JSON, stdout)");
     expect(out).toContain("ERRORS");
+    expect(out).toContain("exit 2 (HTTP 401)");
+    expect(out).toContain("exit 3 (HTTP 403)");
     expect(out).toContain("EXAMPLES");
     expect(out).toContain("ib keikka list --from 2026-05-28");
   });
