@@ -3244,7 +3244,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity }>
+  ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>
 
 ERRORS (stderr, exit non-zero)
   401  Token expired          → ib auth refresh
