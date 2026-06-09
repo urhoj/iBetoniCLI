@@ -173,13 +173,8 @@ export const COMMAND_SPECS = [
         command: "ib keikka get",
         description: "Get a single keikka by id with related customer / worksite / vehicle / driver projections.",
         permissions: ["auth.page.grid.tilaus.read"],
-        flags: [
-            {
-                name: "keikkaId",
-                type: "number",
-                description: "Positional argument — the keikkaId to fetch",
-            },
-        ],
+        args: [{ name: "keikkaId", type: "number", description: "the keikkaId to fetch" }],
+        flags: [],
         outputShape: "{ keikkaId, pvm, time, customer:{asiakasId,name}, worksite:{tyomaaId,address}, vehicle:{vehicleId,plate}, driver:{personId,name}, m3, status }",
         errors: [
             apiErr(404, "Keikka not found", "verify keikkaId"),
@@ -213,12 +208,8 @@ export const COMMAND_SPECS = [
         command: "ib keikka update",
         description: "Update a keikka. v1.0 supports only `--status` (forwarded as `tila` to POST /api/keikka/setStatus). Other field-setters land in v1.1.",
         permissions: ["auth.page.grid.tilaus.edit"],
+        args: [{ name: "keikkaId", type: "number", description: "keikkaId to update" }],
         flags: [
-            {
-                name: "keikkaId",
-                type: "number",
-                description: "Positional — keikkaId to update",
-            },
             {
                 name: "status",
                 type: "string",
@@ -241,13 +232,8 @@ export const COMMAND_SPECS = [
         command: "ib keikka drivers assign",
         description: "Assign the default driver to a keikka. POST /api/keikka/defaultDriver/assign/:keikkaId; driver is selected by the backend from JWT/keikka context.",
         permissions: ["auth.page.grid.tilaus.edit"],
-        flags: [
-            {
-                name: "keikkaId",
-                type: "number",
-                description: "Positional — keikkaId to assign default driver to",
-            },
-        ],
+        args: [{ name: "keikkaId", type: "number", description: "keikkaId to assign default driver to" }],
+        flags: [],
         writeFlags: true,
         outputShape: "{ ok: true, driver:{personId,name} } (raw backend response)",
         errors: [
@@ -290,13 +276,8 @@ export const COMMAND_SPECS = [
         command: "ib customer get",
         description: "Get a single customer (asiakas) by id with flat contact fields.",
         permissions: ["auth.page.asiakas.read"],
-        flags: [
-            {
-                name: "asiakasId",
-                type: "number",
-                description: "Positional — asiakasId to fetch",
-            },
-        ],
+        args: [{ name: "asiakasId", type: "number", description: "asiakasId to fetch" }],
+        flags: [],
         outputShape: "{ asiakasId, name, yTunnus, type, address, postalCode, city, email, phone, contactPersonId, shortName, comment }",
         errors: [
             apiErr(404, "Customer not found", "verify asiakasId"),
@@ -308,7 +289,8 @@ export const COMMAND_SPECS = [
         command: "ib customer worksites",
         description: "List worksites belonging to a customer (GET /api/tyomaa/asiakasTyomaaList/:asiakasId).",
         permissions: ["auth.page.tyomaa.read"],
-        flags: [{ name: "asiakasId", type: "number", description: "Positional — asiakasId" }],
+        args: [{ name: "asiakasId", type: "number", description: "asiakasId" }],
+        flags: [],
         outputShape: "ListEnvelope<{ tyomaaId, name, address, city }>",
         errors: [...permErrors("auth.page.tyomaa.read")],
         examples: ["ib customer worksites 1349"],
@@ -345,8 +327,8 @@ export const COMMAND_SPECS = [
         command: "ib customer update",
         description: "Update a customer via read-merge-write: reads the current record, overlays the provided flags (preserving everything else — no contact-person clobber), writes back with saveGlobalAsiakas. --from-prh refreshes name+yTunnus+billing address from the registry (explicit flags still win). Billing postal address (--address/--postal-code/--city) is writable; pass an empty string to clear a field. --body raw JSON overrides flags.",
         permissions: ["auth.page.asiakas.edit"],
+        args: [{ name: "asiakasId", type: "number", description: "asiakasId to update" }],
         flags: [
-            { name: "asiakasId", type: "number", description: "Positional — asiakasId to update" },
             { name: "name", type: "string", description: "Customer name (asiakasNimi)" },
             { name: "ytunnus", type: "string", description: "Business ID (ytunnus)" },
             { name: "email", type: "string", description: "Invoicing email (laskutusEmail)" },
@@ -404,12 +386,8 @@ export const COMMAND_SPECS = [
         command: "ib customer search",
         description: "Free-text search across customer names / yTunnus / contacts. GET /api/asiakas/search?searchString=...",
         permissions: ["auth.page.asiakas.read"],
+        args: [{ name: "query", type: "string", description: "search string" }],
         flags: [
-            {
-                name: "query",
-                type: "string",
-                description: "Positional — search string",
-            },
             {
                 name: "limit",
                 type: "number",
@@ -425,12 +403,8 @@ export const COMMAND_SPECS = [
         command: "ib customer modules",
         description: "Report or toggle a customer's roolit + module flags. Field keys: pumppu (isPumppuToimittaja), jerry, henkilot, sijainnit, ajoneuvot, tiedostot, weather, lomaseuranta, shareorders. Without --set/--unset it is a read-only report (GET /api/cli/customer/modules/:asiakasId); with them it routes pumppu → POST /api/asiakas/setRoolit and modules → POST /api/asiakas/settings/save.",
         permissions: ["company admin on the target tenant (system admin = any tenant)"],
+        args: [{ name: "asiakasId", type: "number", description: "asiakasId to report/modify" }],
         flags: [
-            {
-                name: "asiakasId",
-                type: "number",
-                description: "Positional — asiakasId to report/modify",
-            },
             {
                 name: "set",
                 type: "string",
@@ -460,12 +434,8 @@ export const COMMAND_SPECS = [
         command: "ib customer operator",
         description: "Verify or provision the full operator preset — all 9 operator flags at once (pumppu + the 8 modules). Default (no flag): verify, exit 0 iff every flag is on else exit 1 (CI-gateable). --set turns all 9 on; --reset turns all 9 off. System-admin can run cross-tenant.",
         permissions: ["company admin on the target tenant (system admin = any tenant)"],
+        args: [{ name: "asiakasId", type: "number", description: "asiakasId to verify/provision" }],
         flags: [
-            {
-                name: "asiakasId",
-                type: "number",
-                description: "Positional — asiakasId to verify/provision",
-            },
             { name: "set", type: "boolean", description: "Turn ALL 9 operator flags ON" },
             { name: "reset", type: "boolean", description: "Turn ALL 9 operator flags OFF" },
         ],
@@ -486,8 +456,8 @@ export const COMMAND_SPECS = [
     {
         command: "ib customer prh",
         description: "Look up a company in the Finnish business registry (PRH). Positional <ytunnus> for an exact business-ID lookup, or --search <name>. Read-only; any authenticated user.",
+        args: [{ name: "ytunnus", type: "string", required: false, description: "business ID (XXXXXXXX-X)" }],
         flags: [
-            { name: "ytunnus", type: "string", description: "Positional — business ID (XXXXXXXX-X)" },
             { name: "search", type: "string", description: "Search by company name instead" },
             { name: "page", type: "number", default: "1", description: "Result page for --search" },
         ],
@@ -503,8 +473,8 @@ export const COMMAND_SPECS = [
         command: "ib customer history",
         description: "Change-tracker audit trail for one customer — who changed which field, when, and the --reason. Reads the same log the CLI's writes populate.",
         permissions: ["auth.page.asiakas.read (company member or admin)"],
+        args: [{ name: "asiakasId", type: "number", description: "asiakasId" }],
         flags: [
-            { name: "asiakasId", type: "number", description: "Positional — asiakasId" },
             { name: "limit", type: "number", default: "100", description: "Max rows (cap 500)" },
         ],
         outputShape: "ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>",
@@ -515,8 +485,8 @@ export const COMMAND_SPECS = [
         command: "ib customer settings",
         description: "Report or toggle ALL asiakasSettings (every canonical ASIAKAS_SETTING_TYPE_IDS name) plus pumppu. Without --set/--unset it is a read-only report. Names are case-insensitive; the 8 module aliases (jerry, weather, …) and pumppu are also accepted. Superset of `customer modules`.",
         permissions: ["company admin on the target tenant (system admin = any tenant)"],
+        args: [{ name: "asiakasId", type: "number", description: "asiakasId" }],
         flags: [
-            { name: "asiakasId", type: "number", description: "Positional — asiakasId" },
             { name: "set", type: "string", description: "Comma-separated setting names to turn ON" },
             { name: "unset", type: "string", description: "Comma-separated setting names to turn OFF" },
         ],
@@ -560,13 +530,8 @@ export const COMMAND_SPECS = [
         command: "ib worksite get",
         description: "Get a single worksite (tyomaa) by id with flat address fields.",
         permissions: ["auth.page.tyomaa.read"],
-        flags: [
-            {
-                name: "tyomaaId",
-                type: "number",
-                description: "Positional — tyomaaId to fetch",
-            },
-        ],
+        args: [{ name: "tyomaaId", type: "number", description: "tyomaaId to fetch" }],
+        flags: [],
         outputShape: "{ tyomaaId, name, address, asiakasId, city, comment, coords:{lat,lng} }",
         errors: [
             apiErr(404, "Worksite not found", "verify tyomaaId"),
@@ -578,9 +543,8 @@ export const COMMAND_SPECS = [
         command: "ib worksite metrics",
         description: "Volume / keikka-count metrics for a worksite (GET /api/cli/worksite/metrics/:tyomaaId).",
         permissions: ["auth.page.tyomaa.read"],
-        flags: [
-            { name: "tyomaaId", type: "number", description: "Positional — tyomaaId" },
-        ],
+        args: [{ name: "tyomaaId", type: "number", description: "tyomaaId" }],
+        flags: [],
         outputShape: "{ tyomaaId, summary:{...}, monthlyBreakdown:[...] }",
         errors: [
             apiErr(404, "Worksite not found", "verify tyomaaId"),
@@ -592,7 +556,8 @@ export const COMMAND_SPECS = [
         command: "ib worksite dates list",
         description: "List a worksite's compliance/permit dates (read-only).",
         permissions: ["auth.page.tyomaa.read"],
-        flags: [{ name: "tyomaaId", type: "number", description: "Positional — tyomaaId" }],
+        args: [{ name: "tyomaaId", type: "number", description: "tyomaaId" }],
+        flags: [],
         outputShape: "ListEnvelope<{ tyomaaDateId, typeId, typeName, date, expirationDate, daysUntil, status, quantity }>",
         errors: [
             apiErr(400, "Bad tyomaaId", "use a positive integer"),
@@ -634,12 +599,8 @@ export const COMMAND_SPECS = [
         command: "ib worksite update",
         description: "Update a worksite via POST /api/tyomaa/set (ownerAsiakasId derived from the session JWT; yyyymmdd defaults to today).",
         permissions: ["auth.page.tyomaa.edit"],
+        args: [{ name: "tyomaaId", type: "number", description: "tyomaaId to update" }],
         flags: [
-            {
-                name: "tyomaaId",
-                type: "number",
-                description: "Positional — tyomaaId to update",
-            },
             {
                 name: "body",
                 type: "json",
@@ -667,12 +628,8 @@ export const COMMAND_SPECS = [
         command: "ib worksite search",
         description: "Free-text search across worksite names / addresses. POST /api/tyomaa/search.",
         permissions: ["auth.page.tyomaa.read"],
+        args: [{ name: "query", type: "string", description: "search string" }],
         flags: [
-            {
-                name: "query",
-                type: "string",
-                description: "Positional — search string",
-            },
             {
                 name: "limit",
                 type: "number",
@@ -721,13 +678,8 @@ export const COMMAND_SPECS = [
         command: "ib person get",
         description: "Get a single person by personId. Global persons (ownerAsiakasId=null) are fetchable by anyone.",
         permissions: ["auth.page.person.read"],
-        flags: [
-            {
-                name: "personId",
-                type: "number",
-                description: "Positional — personId to fetch",
-            },
-        ],
+        args: [{ name: "personId", type: "number", description: "personId to fetch" }],
+        flags: [],
         outputShape: "{ personId, name, email, phone, roles:number[] }",
         errors: [
             apiErr(404, "Person not found", "verify personId"),
@@ -743,12 +695,8 @@ export const COMMAND_SPECS = [
             "and returns one flat list tagged with the asiakasId/name of each hit. " +
             "Global persons (ownerAsiakasId=null) are included in every company's results.",
         permissions: ["auth.page.person.read"],
+        args: [{ name: "query", type: "string", description: "search string" }],
         flags: [
-            {
-                name: "query",
-                type: "string",
-                description: "Positional — search string",
-            },
             {
                 name: "limit",
                 type: "number",
@@ -773,8 +721,8 @@ export const COMMAND_SPECS = [
         command: "ib person role list",
         description: "List a person's per-company roles (asiakasPersonSettings) for a given asiakas. Role names resolved via ROLE_NAME_BY_TYPEID.",
         permissions: ["company role read on the target tenant"],
+        args: [{ name: "personId", type: "number", description: "personId" }],
         flags: [
-            { name: "personId", type: "number", description: "Positional — personId" },
             { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
         ],
         outputShape: "ListEnvelope<{ asiakasPersonSettingId, roleTypeId, role: string|null }>",
@@ -785,8 +733,8 @@ export const COMMAND_SPECS = [
         command: "ib person role grant",
         description: "Grant a per-company role to a person. POST /api/asiakasPersonSettings/add/:asiakasId/:personId/:roleTypeId. Admin-gated on the tenant (tier depends on the role). --dry-run previews via the backend ({ dryRun:true, wouldCreate }).",
         permissions: ["company admin on the target tenant (tier per role)"],
+        args: [{ name: "personId", type: "number", description: "personId" }],
         flags: [
-            { name: "personId", type: "number", description: "Positional — personId" },
             { name: "role", type: "string", description: "Role name (REQUIRED), e.g. keikkaHandler, vehicleHandler, hrAdmin" },
             { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
         ],
@@ -806,8 +754,8 @@ export const COMMAND_SPECS = [
         command: "ib person role revoke",
         description: "Revoke a per-company role from a person (idempotent: { removed:0 } when absent). Looks up the asiakasPersonSettingId then DELETEs it. --dry-run previews via the backend ({ dryRun:true, wouldDelete }).",
         permissions: ["company admin on the target tenant (tier per role)"],
+        args: [{ name: "personId", type: "number", description: "personId" }],
         flags: [
-            { name: "personId", type: "number", description: "Positional — personId" },
             { name: "role", type: "string", description: "Role name (REQUIRED)" },
             { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
         ],
@@ -831,9 +779,8 @@ export const COMMAND_SPECS = [
     {
         command: "ib person companies",
         description: "List the companies (asiakkaat) a person belongs to. Positional personId is optional and defaults to you. Reverse of `customer person list`.",
-        flags: [
-            { name: "personId", type: "number", description: "Positional — personId (optional; defaults to caller)" },
-        ],
+        args: [{ name: "personId", type: "number", required: false, description: "personId (defaults to caller)" }],
+        flags: [],
         outputShape: "ListEnvelope<{ asiakasId, name }>",
         errors: [...COMMON_AUTH_ERRORS],
         examples: ["ib person companies", "ib person companies 5351"],
@@ -841,8 +788,8 @@ export const COMMAND_SPECS = [
     {
         command: "ib person history",
         description: "Change-tracker audit trail for one person — who changed what, when, with the `--reason` recorded by every write. INCLUDES role grants/revokes (fieldName 'asiakasPersonSetting', e.g. 'Rooli lisätty: asiakasAdmin (Asiakas Admin)'); pass `--field asiakasPersonSetting` to see only role changes. GET /api/changes/person/:personId/:ownerAsiakasId; owner defaults to the active company. --field filters client-side.",
+        args: [{ name: "personId", type: "number", description: "personId whose history to fetch" }],
         flags: [
-            { name: "personId", type: "number", description: "Positional — personId whose history to fetch" },
             { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
             { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
             { name: "field", type: "string", description: "Filter by changeTracker fieldName (e.g. asiakasPersonSetting for role changes)" },
@@ -902,13 +849,8 @@ export const COMMAND_SPECS = [
         command: "ib vehicle get",
         description: "Get a single vehicle by id.",
         permissions: ["auth.page.vehicle.read"],
-        flags: [
-            {
-                name: "vehicleId",
-                type: "number",
-                description: "Positional — vehicleId to fetch",
-            },
-        ],
+        args: [{ name: "vehicleId", type: "number", description: "vehicleId to fetch" }],
+        flags: [],
         outputShape: "{ vehicleId, vehicleNo, name, plate, type, typeName, boomLength, capacity, sortNo, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, memo, billingProductId, asiakasId, defaultDriverId, showInGrid:boolean, showInReports:boolean, useNoDriverBar:boolean, isRestricted:boolean, hasGpsTracking:boolean }",
         errors: [
             apiErr(404, "Vehicle not found", "verify vehicleId"),
@@ -920,13 +862,8 @@ export const COMMAND_SPECS = [
         command: "ib vehicle status",
         description: "Current operational status for a vehicle: current driver, current keikka, and the latest GPS ping (via the shared Ecofleet cache, best-effort). gpsAvailable:false when Ecofleet is not enabled.",
         permissions: ["auth.page.vehicle.read"],
-        flags: [
-            {
-                name: "vehicleId",
-                type: "number",
-                description: "Positional — vehicleId to inspect",
-            },
-        ],
+        args: [{ name: "vehicleId", type: "number", description: "vehicleId to inspect" }],
+        flags: [],
         outputShape: "{ vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,speed,direction,engineState,address,at}|null, gpsAvailable }",
         errors: [
             apiErr(404, "Vehicle not found", "verify vehicleId"),
@@ -938,12 +875,8 @@ export const COMMAND_SPECS = [
         command: "ib vehicle drivers",
         description: "Driver assignment history for a vehicle within a date range.",
         permissions: ["auth.page.vehicle.read"],
+        args: [{ name: "vehicleId", type: "number", description: "vehicleId to inspect" }],
         flags: [
-            {
-                name: "vehicleId",
-                type: "number",
-                description: "Positional — vehicleId to inspect",
-            },
             {
                 name: "from",
                 type: "date",
@@ -977,8 +910,8 @@ export const COMMAND_SPECS = [
         command: "ib vehicle search",
         description: "Search vehicles by reg-no / name / fleet-number substring (LIKE on vehicleRegNo / vehicleNimi / vehicleNo).",
         permissions: ["auth.page.vehicle.read"],
+        args: [{ name: "query", type: "string", description: "substring to match (reg-no, name, or fleet number)" }],
         flags: [
-            { name: "query", type: "string", description: "Positional — substring to match (reg-no, name, or fleet number)" },
             { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
         ],
         outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity }>",
@@ -1014,8 +947,8 @@ export const COMMAND_SPECS = [
         command: "ib vehicle update",
         description: "Update a vehicle (read-merge-write: only provided flags change; others preserved). POST /api/vehicle/save.",
         permissions: ["auth.page.vehicle.edit"],
+        args: [{ name: "vehicleId", type: "number", description: "vehicleId to update" }],
         flags: [
-            { name: "vehicleId", type: "number", description: "Positional — vehicleId to update" },
             { name: "reg", type: "string", description: "Registration number" },
             { name: "name", type: "string", description: "Display name" },
             { name: "no", type: "number", description: "Fleet number" },
@@ -1044,7 +977,8 @@ export const COMMAND_SPECS = [
         command: "ib vehicle dates list",
         description: "List a vehicle's inspection/certification/insurance dates.",
         permissions: ["auth.page.vehicle.read"],
-        flags: [{ name: "vehicleId", type: "number", description: "Positional — vehicleId" }],
+        args: [{ name: "vehicleId", type: "number", description: "vehicleId" }],
+        flags: [],
         outputShape: "ListEnvelope<{ vehicleDateId, typeId, typeName, dateValue, expirationDate, dismissedUntil, quantity, status, daysUntil }>",
         errors: permErrors("auth.page.vehicle.read"),
         examples: ["ib vehicle dates list 7"],
@@ -1062,8 +996,8 @@ export const COMMAND_SPECS = [
         command: "ib vehicle driver-assign",
         description: "Assign a per-day driver to a vehicle (vehicleDriverDays). POST /api/vehicle/driverDays/save.",
         permissions: ["auth.page.vehicle.edit"],
+        args: [{ name: "vehicleId", type: "number", description: "vehicleId" }],
         flags: [
-            { name: "vehicleId", type: "number", description: "Positional — vehicleId" },
             { name: "person", type: "number", description: "Driver personId (required)" },
             { name: "date", type: "date", default: "today", description: "Day YYYY-MM-DD or today/yesterday/tomorrow" },
         ],
@@ -1091,8 +1025,8 @@ export const COMMAND_SPECS = [
         command: "ib vehicle timeline",
         description: "Per-day GPS timeline for a vehicle (snapshot-based, no external API): named stop segments (sijainti/tyomaa) and travel legs with durations.",
         permissions: ["auth.page.vehicle.read"],
+        args: [{ name: "vehicleId", type: "number", description: "vehicleId to inspect" }],
         flags: [
-            { name: "vehicleId", type: "number", description: "Positional — vehicleId to inspect" },
             { name: "date", type: "date", default: "today", description: "Day (YYYY-MM-DD or today/yesterday/tomorrow); Europe/Helsinki" },
         ],
         outputShape: "ListEnvelope<{ type, locationType?, locationId?, locationName?, locationAddress?, sijaintiTypeName?, asiakasNimi?, arrived, departed, durationMin, distanceKm? }> & { gpsAvailable }",
@@ -1106,8 +1040,8 @@ export const COMMAND_SPECS = [
         command: "ib vehicle route",
         description: "Per-day ordered GPS track points (polyline) for a vehicle (snapshot-based, no external API).",
         permissions: ["auth.page.vehicle.read"],
+        args: [{ name: "vehicleId", type: "number", description: "vehicleId to inspect" }],
         flags: [
-            { name: "vehicleId", type: "number", description: "Positional — vehicleId to inspect" },
             { name: "date", type: "date", default: "today", description: "Day (YYYY-MM-DD or today/yesterday/tomorrow); Europe/Helsinki" },
         ],
         outputShape: "ListEnvelope<{ lat, lng }> & { gpsAvailable }",
@@ -1121,9 +1055,11 @@ export const COMMAND_SPECS = [
         command: "ib vehicle visits",
         description: "The active company's own vehicles that visited a worksite (tyomaa) or location (sijainti), grouped into visits with arrival/departure/duration (snapshot-based). Results are filtered to the caller's own fleet — other tenants' vehicles at a shared sijainti are not returned; a tyomaa must belong to the active company (else 404).",
         permissions: ["auth.page.vehicle.read"],
+        args: [
+            { name: "filterType", type: "string", description: "'tyomaa' or 'sijainti'" },
+            { name: "id", type: "number", description: "tyomaaId or sijaintiId" },
+        ],
         flags: [
-            { name: "filterType", type: "string", description: "Positional — 'tyomaa' or 'sijainti'" },
-            { name: "id", type: "number", description: "Positional — tyomaaId or sijaintiId" },
             { name: "days", type: "number", description: "Look-back window in days (omit for all-time)" },
         ],
         outputShape: "ListEnvelope<{ vehicleId, plate, objectName, arrived, departed, durationMin }> & { gpsAvailable }",
@@ -1158,13 +1094,8 @@ export const COMMAND_SPECS = [
         command: "ib sijainti get",
         description: "Get a single sijainti by id.",
         permissions: ["auth.page.sijainnit.read"],
-        flags: [
-            {
-                name: "sijaintiId",
-                type: "number",
-                description: "Positional — sijaintiId to fetch",
-            },
-        ],
+        args: [{ name: "sijaintiId", type: "number", description: "sijaintiId to fetch" }],
+        flags: [],
         outputShape: "{ sijaintiId, name, address, coords:{lat,lng}, type, jerryActiveUntil, ... } (raw row)",
         errors: [
             apiErr(404, "Sijainti not found", "verify sijaintiId"),
@@ -1232,12 +1163,8 @@ export const COMMAND_SPECS = [
         command: "ib sijainti set-jerry",
         description: "Enrol or unenrol a varikko (location) in BetoniJerry by setting sijainti.jerryActiveUntil. --on writes the permanent sentinel; --off clears it to null. IMPORTANT: BetoniJerry coverage keys on the delivery radius maxDeliveryDistance (KM) — NOT geofenceRadius (metres, a GPS depot detector) — so --on ALSO sets that radius: --radius <km>, or a 50 km default when the varikko has none (otherwise it would be enrolled but cover nothing). Replicates the EditSijainti toggle: reads the row, overrides the fields, and writes back via POST /api/geocode/updateSijainti (lat/lng etc. preserved). Matching also requires the company's isPumppuToimittaja flag.",
         permissions: ["auth.page.sijainnit.edit"],
+        args: [{ name: "sijaintiId", type: "number", description: "sijaintiId to toggle" }],
         flags: [
-            {
-                name: "sijaintiId",
-                type: "number",
-                description: "Positional — sijaintiId to toggle",
-            },
             { name: "on", type: "boolean", description: "Enrol (jerryActiveUntil = sentinel) + ensure a delivery radius" },
             { name: "off", type: "boolean", description: "Unenrol (jerryActiveUntil = null)" },
             { name: "radius", type: "number", description: "Delivery radius in km (maxDeliveryDistance) to set when enrolling; defaults to 50 when the varikko has none" },
@@ -1259,6 +1186,7 @@ export const COMMAND_SPECS = [
         command: "ib sijainti delete",
         description: "Soft-delete a sijainti (sets deletedTime). Requires --reason; --dry-run available.",
         permissions: ["auth.page.sijainnit.delete"],
+        args: [{ name: "sijaintiId", type: "number", description: "sijaintiId to soft-delete" }],
         flags: [
             { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
         ],
@@ -1274,6 +1202,7 @@ export const COMMAND_SPECS = [
         command: "ib sijainti undelete",
         description: "Restore a soft-deleted sijainti. Requires --reason.",
         permissions: ["auth.page.sijainnit.edit"],
+        args: [{ name: "sijaintiId", type: "number", description: "sijaintiId to restore" }],
         flags: [
             { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
         ],
@@ -1345,13 +1274,8 @@ export const COMMAND_SPECS = [
     {
         command: "ib ohje get",
         description: "Get one UI help-text entry by helpId — the title/shorttext/htmltext shown in a HelperIcon '(?)' modal in the web UI. This is end-user help CONTENT, distinct from `ib --help` (CLI usage). Returns null when the helpId has no entry yet. Read is public (no auth on the route).",
-        flags: [
-            {
-                name: "helpId",
-                type: "string",
-                description: "Positional — the helpId (e.g. LaskupohjaTilaus)",
-            },
-        ],
+        args: [{ name: "helpId", type: "string", description: "the helpId (e.g. LaskupohjaTilaus)" }],
+        flags: [],
         outputShape: "{ helpId, title, shorttext, htmltext, img } | null",
         errors: [
             { exit: 4, meaning: "Invalid helpId", remedy: "helpId may contain only [A-Za-z0-9_-]" },
@@ -1373,12 +1297,8 @@ export const COMMAND_SPECS = [
         command: "ib ohje update",
         description: "Update a UI help-text entry (PUT /api/helps/update). The CLI GET-merges the current row first, so fields you omit are PRESERVED (helps_save overwrites the whole row). Provide typed flags or --body JSON; typed flags win. --reason is required for a write. --dry-run previews the merged row CLIENT-SIDE without writing — the backend does not honour X-Dry-Run on this route. Mirrors the HelperIcon in-place editor.",
         permissions: ["isHelperEditor (or system-admin/developer)"],
+        args: [{ name: "helpId", type: "string", description: "the helpId to update (created if it does not exist)" }],
         flags: [
-            {
-                name: "helpId",
-                type: "string",
-                description: "Positional — the helpId to update (created if it does not exist)",
-            },
             {
                 name: "body",
                 type: "json",
@@ -1417,13 +1337,8 @@ export const COMMAND_SPECS = [
         command: "ib schedule day",
         description: "List keikkas for a specific day.",
         permissions: ["auth.page.grid.tilaus.read"],
-        flags: [
-            {
-                name: "date",
-                type: "date",
-                description: "Positional — date (YYYY-MM-DD or today/yesterday/tomorrow)",
-            },
-        ],
+        args: [{ name: "date", type: "date", description: "date (YYYY-MM-DD or today/yesterday/tomorrow)" }],
+        flags: [],
         outputShape: "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }>",
         errors: permErrors("auth.page.grid.tilaus.read"),
         examples: ["ib schedule day 2026-06-01", "ib schedule day tomorrow"],
@@ -1432,13 +1347,8 @@ export const COMMAND_SPECS = [
         command: "ib schedule week",
         description: "List keikkas for a 7-day window starting at the given date.",
         permissions: ["auth.page.grid.tilaus.read"],
-        flags: [
-            {
-                name: "start",
-                type: "date",
-                description: "Positional — week start date (YYYY-MM-DD or today/yesterday/tomorrow)",
-            },
-        ],
+        args: [{ name: "start", type: "date", description: "week start date (YYYY-MM-DD or today/yesterday/tomorrow)" }],
+        flags: [],
         outputShape: "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }>",
         errors: permErrors("auth.page.grid.tilaus.read"),
         examples: ["ib schedule week 2026-06-01", "ib schedule week today"],
@@ -1448,6 +1358,7 @@ export const COMMAND_SPECS = [
         command: "ib customer delete",
         description: "Delete a customer (asiakas). Requires --reason; --dry-run available.",
         permissions: ["auth.page.asiakas.edit"],
+        args: [{ name: "asiakasId", type: "number", description: "asiakasId to delete" }],
         flags: [
             { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
         ],
@@ -1499,6 +1410,7 @@ export const COMMAND_SPECS = [
         command: "ib customer person list",
         description: "List persons attached to a customer. `--role` filters by role name; the per-row `roleTypeId` only echoes that filter (null when unfiltered — the base membership row), so it is NOT the person's role set. For the FULL per-company roles pass `--include-roles` (adds permissionRoles[]) or use `ib person role list`.",
         permissions: ["auth.page.asiakas.read"],
+        args: [{ name: "asiakasId", type: "number", description: "asiakasId" }],
         flags: [
             { name: "role", type: "string", description: "Filter by role name (e.g. keikkaHandler)" },
             { name: "include-roles", type: "boolean", description: "Add permissionRoles[] (full per-company role names) to each person — N extra GETs, opt-in" },
@@ -1513,9 +1425,8 @@ export const COMMAND_SPECS = [
     {
         command: "ib role explain",
         description: "Explain a role NAME: its asiakasPersonSettingTypeId, human display name, the access tiers it grants (anyAdmin/anyWorker/anyViewer/laskuRead/requestOffer/adminCompanySelection), and whether it is deprecated — all from @ibetoni/constants. Enriched with the LIVE DB `description` (internal flag name, e.g. isAsiakasAdmin) and `comment` (rich Finnish text) read from GET /api/asiakasPersonSettings/getAllTypes, so the prose never drifts from dbo.asiakasPersonSettingTypes. Requires auth (any logged-in user); description/comment are null for roles the endpoint omits (soft-deleted pumppuHandler/Viewer). Use it to disambiguate the role names accepted by `person role grant/revoke` and `customer person list --role`.",
-        flags: [
-            { name: "name", type: "string", description: "Positional — role name (e.g. asiakasAdmin, keikkaHandler, lomaseurannassa)" },
-        ],
+        args: [{ name: "name", type: "string", description: "role name (e.g. asiakasAdmin, keikkaHandler, lomaseurannassa)" }],
+        flags: [],
         outputShape: "{ role, typeId, displayName: string|null, description: string|null, comment: string|null, tiers: string[], deprecated: boolean }",
         errors: [
             apiErr(400, "Unknown role name", "see ROLE_TYPEID_BY_NAME in @ibetoni/constants"),
@@ -1527,6 +1438,7 @@ export const COMMAND_SPECS = [
         command: "ib worksite delete",
         description: "Delete a worksite (tyomaa). Requires --reason.",
         permissions: ["auth.page.tyomaa.edit"],
+        args: [{ name: "tyomaaId", type: "number", description: "tyomaaId to delete" }],
         flags: [
             { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
         ],
@@ -1542,7 +1454,8 @@ export const COMMAND_SPECS = [
         command: "ib worksite refresh-location",
         description: "Re-geocode a worksite from Google Maps (POST /api/tyomaa/refreshLocation/:id).",
         permissions: ["auth.page.tyomaa.edit"],
-        flags: [{ name: "tyomaaId", type: "number", description: "Positional — tyomaaId" }],
+        args: [{ name: "tyomaaId", type: "number", description: "tyomaaId" }],
+        flags: [],
         writeFlags: true,
         outputShape: "{ success: true, tyomaa, message } (raw backend response)",
         errors: [
@@ -1555,8 +1468,8 @@ export const COMMAND_SPECS = [
         command: "ib worksite set-geofence",
         description: "Set a worksite geofence radius in metres (1-10000).",
         permissions: ["auth.page.tyomaa.edit"],
+        args: [{ name: "tyomaaId", type: "number", description: "tyomaaId" }],
         flags: [
-            { name: "tyomaaId", type: "number", description: "Positional — tyomaaId" },
             { name: "radius", type: "number", description: "Geofence radius in metres (1-10000)" },
         ],
         writeFlags: true,
@@ -1571,7 +1484,8 @@ export const COMMAND_SPECS = [
         command: "ib worksite helsinki-fetch",
         description: "Refresh Helsinki building data for a worksite (POST /api/tyomaa/helsinki/fetch/:id).",
         permissions: ["auth.page.tyomaa.edit"],
-        flags: [{ name: "tyomaaId", type: "number", description: "Positional — tyomaaId" }],
+        args: [{ name: "tyomaaId", type: "number", description: "tyomaaId" }],
+        flags: [],
         writeFlags: true,
         outputShape: "{ success, ... } (raw backend response)",
         errors: [
@@ -1617,6 +1531,7 @@ export const COMMAND_SPECS = [
         command: "ib worksite person list",
         description: "List persons attached to a worksite.",
         permissions: ["auth.page.tyomaa.read"],
+        args: [{ name: "tyomaaId", type: "number", description: "worksite id" }],
         flags: [],
         outputShape: "ListEnvelope<{ personId, name, email, contactType }>",
         errors: permErrors("auth.page.tyomaa.read"),
@@ -1654,6 +1569,7 @@ export const COMMAND_SPECS = [
         command: "ib person update",
         description: "Update a person. Body REQUIRED via --body. Requires --reason.",
         permissions: ["auth.page.person.edit"],
+        args: [{ name: "personId", type: "number", description: "personId to update" }],
         flags: [
             { name: "body", type: "json", description: "Patch body (JSON)" },
             { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
@@ -1674,8 +1590,8 @@ export const COMMAND_SPECS = [
             "self (your own personId): → null always; → a company only if you are a member of it",
             "company-admin: may release a person CURRENTLY owned by your company → global (cannot pull others in)",
         ],
+        args: [{ name: "personId", type: "number", description: "personId whose owner to change" }],
         flags: [
-            { name: "personId", type: "number", description: "Positional — personId whose owner to change" },
             { name: "global", type: "boolean", description: "Make the person global (ownerAsiakasId=null)" },
             { name: "asiakas", type: "number", description: "Set owner to this asiakasId" },
             { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
@@ -1697,6 +1613,7 @@ export const COMMAND_SPECS = [
         command: "ib person delete",
         description: "Delete a person. Requires --reason.",
         permissions: ["auth.page.person.edit"],
+        args: [{ name: "personId", type: "number", description: "personId to delete" }],
         flags: [
             { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
         ],
@@ -1734,8 +1651,8 @@ export const COMMAND_SPECS = [
         command: "ib jerry request get",
         description: "Get one pump request. Default is the customer-owned recap (GET /api/pumppuRequests/:id, scoped to the caller's personId). --provider returns the provider-facing detail (GET /api/pumppuRequests/:id/provider-detail, requires provider role) including your own offer + attachments; customer PII (lat/lng/phone/email) stays masked until your offer is accepted/confirmed.",
         permissions: ["--provider: provider company (isPumppuToimittaja)"],
+        args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
         flags: [
-            { name: "requestId", type: "number", description: "Positional — pumppuRequestId" },
             { name: "provider", type: "boolean", description: "Provider-facing detail view (provider role)" },
         ],
         outputShape: "default: { pumppuRequestId, status, asiakasId, maaraM3, osoite, lat, lng, ... } | --provider: { request:{...}, ownOffer:{...}|null, ownAttachments:[…], requestAttachments:[…], messageThreadId }",
@@ -1749,9 +1666,8 @@ export const COMMAND_SPECS = [
     {
         command: "ib jerry request offers",
         description: "List the offers on a customer-owned request (GET /api/pumppuRequests/:id/offers). Drafts excluded; sorted pending-first then cheapest. Provider contact fields (jerryContactName/Phone, openingHours) are revealed only on the accepted offer.",
-        flags: [
-            { name: "requestId", type: "number", description: "Positional — pumppuRequestId you own" },
-        ],
+        args: [{ name: "requestId", type: "number", description: "pumppuRequestId you own" }],
+        flags: [],
         outputShape: "ListEnvelope<{ pumppuOfferId, status, priceCents, vatPercent, validUntil, asiakasNimi, ytunnus, providerDistanceKm, companyDescription, jerryContactName?, jerryContactPhone?, openingHours? }>",
         errors: [
             apiErr(404, "Request not found / not yours", "verify requestId"),
@@ -1763,8 +1679,8 @@ export const COMMAND_SPECS = [
         command: "ib jerry offer create",
         description: "Create or update (upsert) YOUR offer on a request (POST /api/pumppuRequests/:id/offers). Provider company only (isPumppuToimittaja). A new offer starts as 'draft' (invisible to the customer) — make it visible with `ib jerry offer send`. Re-running while the offer is still draft/pending edits it in place; once accepted/rejected/withdrawn it is final (409). --price-cents is the canonical price (integer cents, 1..99999900) matching exactly what the API stores; --maintains-order-info (true|false) overrides the provider default for this offer only (omit to inherit). Requires --reason.",
         permissions: ["provider company (isPumppuToimittaja)"],
+        args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
         flags: [
-            { name: "requestId", type: "number", description: "Positional — pumppuRequestId" },
             { name: "price-cents", type: "number", description: "Offer price in cents (REQUIRED; integer 1..99999900)" },
             { name: "vat-percent", type: "number", default: "25.5", description: "VAT percent" },
             { name: "valid-until", type: "string", description: "Offer valid-until (ISO datetime; server default +7d)" },
@@ -1793,9 +1709,11 @@ export const COMMAND_SPECS = [
         command: "ib jerry offer send",
         description: "Send a draft offer to the customer (draft → 'pending'; POST /api/pumppuRequests/:id/offers/:offerId/send). Provider company only; you must own the offer. Two-stage by design: create the draft, attach files, then send. Requires --reason.",
         permissions: ["provider company (isPumppuToimittaja); owns the offer"],
+        args: [
+            { name: "requestId", type: "number", description: "pumppuRequestId" },
+            { name: "offerId", type: "number", description: "pumppuOfferId you own" },
+        ],
         flags: [
-            { name: "requestId", type: "number", description: "Positional — pumppuRequestId" },
-            { name: "offerId", type: "number", description: "Positional — pumppuOfferId you own" },
             { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
         ],
         writeFlags: true,
@@ -1811,9 +1729,11 @@ export const COMMAND_SPECS = [
         command: "ib jerry offer accept",
         description: "Accept an offer (CUSTOMER side; POST /api/pumppuRequests/:id/offers/:offerId/accept). Flips this offer to 'accepted', sibling offers to 'rejected', and the parent request to 'accepted' in one transaction. Caller must own the request (its personId) — this is NOT a provider action. Requires --reason.",
         permissions: ["owns the request (customer personId)"],
+        args: [
+            { name: "requestId", type: "number", description: "pumppuRequestId you own" },
+            { name: "offerId", type: "number", description: "pumppuOfferId to accept" },
+        ],
         flags: [
-            { name: "requestId", type: "number", description: "Positional — pumppuRequestId you own" },
-            { name: "offerId", type: "number", description: "Positional — pumppuOfferId to accept" },
             { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
         ],
         writeFlags: true,
@@ -1829,9 +1749,11 @@ export const COMMAND_SPECS = [
         command: "ib jerry offer confirm",
         description: "Confirm an accepted offer (PROVIDER side; POST /api/pumppuRequests/:id/offers/:offerId/confirm). Heavyweight: flips the offer accepted → 'confirmed' and BUILDS A KEIKKA in your grid (real side effects — broadcasts keikka:created, notifies the customer, inherits the vehicle's day driver). Call after the customer accepts and you've agreed a date by phone. --scheduled-at (future ISO datetime) is required; --pumppu optionally pins one of your vehicles. Requires --reason.",
         permissions: ["provider company (isPumppuToimittaja); owns the offer"],
+        args: [
+            { name: "requestId", type: "number", description: "pumppuRequestId" },
+            { name: "offerId", type: "number", description: "pumppuOfferId you own (must be 'accepted')" },
+        ],
         flags: [
-            { name: "requestId", type: "number", description: "Positional — pumppuRequestId" },
-            { name: "offerId", type: "number", description: "Positional — pumppuOfferId you own (must be 'accepted')" },
             { name: "scheduled-at", type: "string", description: "Scheduled keikka start (REQUIRED; future ISO datetime)" },
             { name: "pumppu", type: "number", description: "vehicleId to pin to the keikka (must be yours)" },
             { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
@@ -1937,9 +1859,8 @@ export const COMMAND_SPECS = [
         command: "ib jerry admin search",
         description: "Search companies NOT yet fully Jerry-enabled, for the Add picker (GET /api/admin/jerry-companies/search?q=). Name LIKE match, min 2 chars, top 20. System-admin only.",
         permissions: ["isSystemAdmin"],
-        flags: [
-            { name: "query", type: "string", description: "Positional — name search (min 2 chars)" },
-        ],
+        args: [{ name: "query", type: "string", description: "name search (min 2 chars)" }],
+        flags: [],
         outputShape: "ListEnvelope<{ asiakasId, name }>",
         errors: [
             apiErr(403, "Not a system admin", "use a system-admin token"),
@@ -1951,9 +1872,8 @@ export const COMMAND_SPECS = [
         command: "ib jerry admin detail",
         description: "Company Jerry drill-down: people by role (admins/tarjousAdmins/pumpparit), vehicles, and each sijainti's Jerry enrolment status (GET /api/admin/jerry-companies/:asiakasId/detail). System-admin only.",
         permissions: ["isSystemAdmin"],
-        flags: [
-            { name: "asiakasId", type: "number", description: "Positional — company asiakasId" },
-        ],
+        args: [{ name: "asiakasId", type: "number", description: "company asiakasId" }],
+        flags: [],
         outputShape: "{ admins:[{personId,name}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,isJerry}] }",
         errors: [
             apiErr(400, "Invalid asiakasId", "pass a numeric asiakasId"),
@@ -1966,8 +1886,8 @@ export const COMMAND_SPECS = [
         command: "ib jerry admin enable",
         description: "Enable the BetoniJerry module for a company — the audited toggle that sets BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/enable). Change-tracked via the asiakasSql proc paths. System-admin only. Requires --reason.",
         permissions: ["isSystemAdmin"],
+        args: [{ name: "asiakasId", type: "number", description: "company asiakasId" }],
         flags: [
-            { name: "asiakasId", type: "number", description: "Positional — company asiakasId" },
             { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
         ],
         writeFlags: true,
@@ -1984,8 +1904,8 @@ export const COMMAND_SPECS = [
         command: "ib jerry admin disable",
         description: "Disable the BetoniJerry module for a company — clears BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/disable). System-admin only. Requires --reason.",
         permissions: ["isSystemAdmin"],
+        args: [{ name: "asiakasId", type: "number", description: "company asiakasId" }],
         flags: [
-            { name: "asiakasId", type: "number", description: "Positional — company asiakasId" },
             { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
         ],
         writeFlags: true,
@@ -2025,6 +1945,7 @@ export const COMMAND_SPECS = [
                 command: "ib schema table",
                 description: "Columns (type, nullability, default, key), primary key, foreign keys, and indexes for one dbo table. Developer-only.",
                 permissions: DEV_PERMS,
+                args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix)" }],
                 flags: [],
                 outputShape: "{ name, columns:[{name,dataType,maxLength,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], indexes:[{name,columns,unique}] }",
                 errors: [...devErrors, invalidNameErr, apiErr(404, "Table not found", "check the name via `ib schema tables`")],
@@ -2043,6 +1964,7 @@ export const COMMAND_SPECS = [
                 command: "ib schema view",
                 description: "Columns and full definition (T-SQL) for one dbo view. Developer-only.",
                 permissions: DEV_PERMS,
+                args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix)" }],
                 flags: [],
                 outputShape: "{ name, columns:[{name,dataType,maxLength,nullable,default,key}], definition:'<T-SQL>' }",
                 errors: [...devErrors, invalidNameErr, apiErr(404, "View not found", "check the name via `ib schema views`")],
@@ -2061,6 +1983,7 @@ export const COMMAND_SPECS = [
                 command: "ib schema proc",
                 description: "Signature (parameters) and full definition (T-SQL) for one dbo proc/function. Developer-only.",
                 permissions: DEV_PERMS,
+                args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix)" }],
                 flags: [],
                 outputShape: "{ name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }",
                 errors: [...devErrors, invalidNameErr, apiErr(404, "Proc/function not found", "check the name via `ib schema procs`")],
@@ -2147,6 +2070,7 @@ export const COMMAND_SPECS = [
         command: "ib weather worksite",
         description: "Forecast for a worksite identified by tyomaaId. The backend resolves the coordinates from the tyomaa record internally — no lat/lng needed. Use --force-refresh to bypass the cache. Requires the company weather module.",
         permissions: ["company weather module (asiakasPersonSettingTypeId 18)"],
+        args: [{ name: "tyomaaId", type: "number", description: "worksite id (coordinates resolved server-side)" }],
         flags: [
             { name: "force-refresh", type: "boolean", description: "Bypass the cache and refetch from FMI" },
         ],
@@ -2302,6 +2226,7 @@ export const COMMAND_SPECS = [
     {
         command: "ib feedback create",
         description: "File a CLI improvement proposal or trouble report. AI users: file this PROACTIVELY and IMMEDIATELY (no need to ask the user) whenever you hit an error or unexpected exit code, had to try several strategies because the help/docs were unclear/missing/wrong, found something confusing or harder than expected, could not find a command for something the user clearly needs (a capability gap), or saw an inconsistency between commands. Stored quietly server-side (no GitHub issue, no spam to you or the user — distinct from bug reports; the maintainer gets a private heads-up email) for later developer triage. Sent as a META request, so it is EXEMPT from the read-only write-lock: you can file feedback even with --read-only / IB_READ_ONLY active. --dry-run resolves client-side (prints the payload, never sends).",
+        args: [{ name: "description", type: "string", description: "freetext description of the friction, gap, or bug" }],
         flags: [
             { name: "kind", type: "string", default: "improvement", description: "improvement | bug" },
             { name: "command", type: "string", description: "The ib command/argv that triggered the friction" },
@@ -2340,8 +2265,9 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib feedback get",
-        description: "Fetch one feedback row by id (developer-only). Usage: ib feedback get <id>.",
+        description: "Fetch one feedback row by id (developer-only).",
         permissions: ["isSystemAdmin or isDeveloper"],
+        args: [{ name: "id", type: "number", description: "feedbackId" }],
         flags: [],
         outputShape: "The full feedback row { feedbackId, kind, status, description, command, errorText, cliVersion, context, resolution, createdAt, ... }",
         errors: [
@@ -2353,8 +2279,9 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib feedback resolve",
-        description: "Triage a feedback row: set its status and/or attach a resolution note (developer-only). Usage: ib feedback resolve <id>. This IS a real write — blocked under --read-only (exit 3). --dry-run previews the update body client-side without sending.",
+        description: "Triage a feedback row: set its status and/or attach a resolution note (developer-only). This IS a real write — blocked under --read-only (exit 3). --dry-run previews the update body client-side without sending.",
         permissions: ["isSystemAdmin or isDeveloper"],
+        args: [{ name: "id", type: "number", description: "feedbackId" }],
         flags: [
             { name: "status", type: "string", description: "open | reviewed | applied | dismissed" },
             { name: "note", type: "string", description: "Resolution note stored on the row" },
