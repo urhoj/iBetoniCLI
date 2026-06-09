@@ -57,29 +57,64 @@ describe("ib person list/get/search", () => {
     expect((result as { personId: number }).personId).toBe(6233);
   });
 
-  test("runPersonSearch: POSTs /api/person/search with {searchString} body", async () => {
+  test("runPersonSearch: POSTs /api/person/search with {searchString} body as a read", async () => {
     (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
       { personId: 6233, name: "Jerry" },
     ]);
     await runPersonSearch(mockClient, "Jerry");
-    expect(mockClient.post).toHaveBeenCalledWith("/api/person/search", {
-      searchString: "Jerry",
-    });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/person/search",
+      { searchString: "Jerry" },
+      { read: true }
+    );
   });
 
   test("runPersonSearch: forwards raw query untouched (no encoding)", async () => {
     (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
     await runPersonSearch(mockClient, "Doe & Sons");
-    expect(mockClient.post).toHaveBeenCalledWith("/api/person/search", {
-      searchString: "Doe & Sons",
-    });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/person/search",
+      { searchString: "Doe & Sons" },
+      { read: true }
+    );
   });
 
   test("runPersonSearch forwards limit in the body", async () => {
     (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
     await runPersonSearch(mockClient, "Matti", 10);
-    expect(mockClient.post).toHaveBeenCalledWith("/api/person/search", {
-      searchString: "Matti", limit: 10,
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/person/search",
+      { searchString: "Matti", limit: 10 },
+      { read: true }
+    );
+  });
+
+  test("runPersonSearch projects rows to a ListEnvelope with asiakasId from ownerAsiakasId", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      recordset: [
+        {
+          personId: 100,
+          personFirstName: "Mikko",
+          personLastName: "Ikonen",
+          personEmail: "mikko@x.fi",
+          personPhone: "040",
+          ownerAsiakasId: 8,
+        },
+      ],
+    });
+    const res = await runPersonSearch(mockClient, "Ikonen");
+    expect(res).toEqual({
+      items: [
+        {
+          personId: 100,
+          name: "Mikko Ikonen",
+          email: "mikko@x.fi",
+          phone: "040",
+          asiakasId: 8,
+        },
+      ],
+      nextCursor: null,
+      count: 1,
     });
   });
 });

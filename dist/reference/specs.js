@@ -547,16 +547,30 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib worksite get",
-        description: "Get a single worksite (tyomaa) by id with flat address fields.",
+        description: "Get a single worksite (tyomaa) by id with every user-relevant field in camelCase: name, tyomaaNum, the full address (address/address2/postalCode/city + formattedAddress), coords, drivingInstructions (ajo-ohje), comment (memo), invoiceRef (laskuViite), contactPersonId, geofenceRadius, the live customer (asiakasId/asiakasNimi, derived from the most recent keikka), ownerAsiakasId and created/modified timestamps. Two heavy JSON blobs are opt-in via flags; without them the record still reports cameraCount and hasBuildingData so you know whether to ask for the detail.",
         permissions: ["auth.page.tyomaa.read"],
         args: [{ name: "tyomaaId", type: "number", description: "tyomaaId to fetch" }],
-        flags: [],
-        outputShape: "{ tyomaaId, name, address, asiakasId, city, comment, coords:{lat,lng} }",
+        flags: [
+            {
+                name: "include-building",
+                type: "boolean",
+                description: "Attach parsed Helsinki building registry data as rakennusData (heavy; default off)",
+            },
+            {
+                name: "include-cameras",
+                type: "boolean",
+                description: "Attach nearby traffic cameras as cameras[] (heavy; default off)",
+            },
+        ],
+        outputShape: "{ tyomaaId, name, tyomaaNum, address, address2, postalCode, city, formattedAddress, coords:{lat,lng}|null, drivingInstructions, comment, invoiceRef, contactPersonId, geofenceRadius, asiakasId, asiakasNimi, ownerAsiakasId, createdTime, modifiedTime, cameraCount, hasBuildingData } (+ rakennusData with --include-building, + cameras[] with --include-cameras)",
         errors: [
             apiErr(404, "Worksite not found", "verify tyomaaId"),
             ...permErrors("auth.page.tyomaa.read"),
         ],
-        examples: ["ib worksite get 99"],
+        examples: [
+            "ib worksite get 99",
+            "ib worksite get 99 --include-building --include-cameras",
+        ],
     },
     {
         command: "ib worksite metrics",
@@ -645,7 +659,7 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib worksite search",
-        description: "Free-text search across worksite names / addresses. POST /api/tyomaa/search.",
+        description: "Free-text worksite search (POST /api/tyomaa/search). The query full-text-matches the worksite name, ALL FOUR address lines (street / line 2 / postal code / city), driving instructions, memo, formatted address, worksite number AND the contact person's name / phone / email — so a street fragment like 'Mannerheimintie' finds the worksite. Scoped to the active company. Safe under --read-only (sent as a non-mutating meta request, so it does NOT trip the read-only lock or the acting-as write line).",
         permissions: ["auth.page.tyomaa.read"],
         args: [{ name: "query", type: "string", description: "search string" }],
         flags: [
@@ -653,12 +667,15 @@ export const COMMAND_SPECS = [
                 name: "limit",
                 type: "number",
                 default: "50",
-                description: "Max results",
+                description: "Max results (backend caps at 100)",
             },
         ],
-        outputShape: "ListEnvelope<{ tyomaaId, name, address, asiakasId, score }>",
+        outputShape: "ListEnvelope<{ tyomaaId, name, tyomaaNum, address, address2, postalCode, city, formattedAddress, coords:{lat,lng}|null, drivingInstructions, comment }>",
         errors: permErrors("auth.page.tyomaa.read"),
-        examples: ["ib worksite search 'Main St'"],
+        examples: [
+            "ib worksite search Mannerheimintie",
+            "ib worksite search 'Jokiniementie 13' --limit 10",
+        ],
     },
     // ─── person (3) ──────────────────────────────────────────────────────────
     {
@@ -728,8 +745,8 @@ export const COMMAND_SPECS = [
                 description: "Search across all companies you belong to; each hit carries its asiakasId/asiakasName",
             },
         ],
-        outputShape: "Default: the backend's raw person rows (array, or an mssql { recordset } wrapper). " +
-            "With --my-companies: ListEnvelope<{ personId, name, email, phone, asiakasId, asiakasName }>",
+        outputShape: "ListEnvelope<{ personId, name, email, phone, asiakasId }>. " +
+            "With --my-companies each row also carries asiakasName.",
         errors: permErrors("auth.page.person.read"),
         examples: [
             "ib person search 'Matti'",
@@ -937,7 +954,7 @@ export const COMMAND_SPECS = [
         flags: [
             { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
         ],
-        outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity }>",
+        outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>",
         errors: permErrors("auth.page.vehicle.read"),
         examples: ["ib vehicle search ABC", "ib vehicle search kuorma --limit 20", "ib vehicle search 82"],
     },

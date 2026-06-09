@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { unwrapRows, type ListEnvelope } from "../../api/envelopes.js";
 import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
@@ -93,6 +93,28 @@ export async function runPersonGet(
   );
 }
 
+/** A projected person search hit (the documented ListEnvelope row). */
+export interface PersonSearchHit {
+  personId: number;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  asiakasId: number | null;
+}
+
+/** Project one raw /api/person/search row to the clean PersonSearchHit shape. */
+export function projectPersonHit(row: Record<string, unknown>): PersonSearchHit {
+  const first = (row.personFirstName as string) ?? "";
+  const last = (row.personLastName as string) ?? "";
+  return {
+    personId: Number(row.personId),
+    name: `${first} ${last}`.trim(),
+    email: (row.personEmail as string) ?? null,
+    phone: (row.personPhone as string) ?? null,
+    asiakasId: row.ownerAsiakasId != null ? Number(row.ownerAsiakasId) : null,
+  };
+}
+
 /**
  * POST /api/person/search — existing (non-/api/cli/) route used by the FE
  * person typeahead. Body is `{ searchString: <query> }`. The backend scopes
@@ -104,39 +126,17 @@ export async function runPersonSearch(
   client: ApiClient,
   query: string,
   limit?: number
-): Promise<unknown> {
+): Promise<ListEnvelope<PersonSearchHit>> {
   const body: Record<string, unknown> = { searchString: query };
   if (limit !== undefined) body.limit = limit;
-  return client.post<unknown>("/api/person/search", body);
+  const raw = await client.post<unknown>("/api/person/search", body, { read: true });
+  const items = unwrapRows(raw).map(projectPersonHit);
+  return { items, nextCursor: null, count: items.length };
 }
 
-/** A person hit from the cross-company search, tagged with its company. */
-export interface MyCompanyPersonHit {
-  personId: number;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  asiakasId: number;
+/** A cross-company search hit: a PersonSearchHit plus its authoritative company. */
+export interface MyCompanyPersonHit extends PersonSearchHit {
   asiakasName: string;
-}
-
-/**
- * /api/person/search returns either a bare array of person rows or a raw mssql
- * result wrapper ({ recordset } / { recordsets: [[...]] }) depending on cache
- * warmth. Normalise both to a flat array of row objects.
- */
-export function extractPersonRows(raw: unknown): Record<string, unknown>[] {
-  if (Array.isArray(raw)) return raw as Record<string, unknown>[];
-  if (raw && typeof raw === "object") {
-    const obj = raw as { recordset?: unknown; recordsets?: unknown };
-    if (Array.isArray(obj.recordset)) {
-      return obj.recordset as Record<string, unknown>[];
-    }
-    if (Array.isArray(obj.recordsets) && Array.isArray(obj.recordsets[0])) {
-      return obj.recordsets[0] as Record<string, unknown>[];
-    }
-  }
-  return [];
 }
 
 /**
@@ -148,23 +148,14 @@ export function extractPersonRows(raw: unknown): Record<string, unknown>[] {
  */
 export async function runPersonSearchMyCompanies(
   listCompanies: () => Promise<{ asiakasId: number; name: string }[]>,
-  searchIn: (asiakasId: number) => Promise<unknown>
+  searchIn: (asiakasId: number) => Promise<ListEnvelope<PersonSearchHit>>
 ): Promise<ListEnvelope<MyCompanyPersonHit>> {
   const companies = await listCompanies();
   const items: MyCompanyPersonHit[] = [];
   for (const c of companies) {
-    const raw = await searchIn(c.asiakasId);
-    for (const row of extractPersonRows(raw)) {
-      const first = (row.personFirstName as string) ?? "";
-      const last = (row.personLastName as string) ?? "";
-      items.push({
-        personId: Number(row.personId),
-        name: `${first} ${last}`.trim(),
-        email: (row.personEmail as string) ?? null,
-        phone: (row.personPhone as string) ?? null,
-        asiakasId: c.asiakasId,
-        asiakasName: c.name,
-      });
+    const env = await searchIn(c.asiakasId);
+    for (const hit of env.items) {
+      items.push({ ...hit, asiakasId: c.asiakasId, asiakasName: c.name });
     }
   }
   return { items, nextCursor: null, count: items.length };
