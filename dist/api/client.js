@@ -104,6 +104,12 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
         return parsed;
     }
     return {
+        /**
+         * The base URL this client targets. Exposed so callers can mint sibling
+         * clients for the same endpoint with a different (e.g. ephemeral, per-
+         * company) token — used by the `person search --my-companies` fan-out.
+         */
+        endpoint,
         get: (path, opts) => request("GET", path, undefined, opts),
         post: (path, body, opts) => request("POST", path, body, opts),
         put: (path, body, opts) => request("PUT", path, body, opts),

@@ -64,6 +64,23 @@ export function buildProgram(): Command {
     return ctx.client;
   }
 
+  // A client bound to a SPECIFIC company via an ephemeral switch (never
+  // persisted). Reuses `createCliContext` with `asiakas` overridden, so it goes
+  // through the same tested switch path and inherits read-only/endpoint/version.
+  // Powers `person search --my-companies` fan-out across the caller's companies.
+  async function getClientForAsiakas(asiakasId: number): Promise<ApiClient> {
+    const ctx = await createCliContext({
+      credentialsPath: defaultCredentialsPath(),
+      version: packageJson.version,
+      global: { ...getGlobalOptions(program), asiakas: asiakasId },
+    });
+    if (!ctx.client) {
+      process.stderr.write("Not logged in. Run `ib auth login` first.\n");
+      process.exit(2);
+    }
+    return ctx.client;
+  }
+
   // Resolve the active endpoint WITHOUT requiring auth — `createCliContext`
   // returns a usable `endpoint` (--endpoint → active profile → default) even
   // when no credentials resolve. Powers `ib version`, which queries the public
@@ -89,7 +106,7 @@ export function buildProgram(): Command {
   registerKeikkaCommands(program, getClient);
   registerCustomerCommands(program, getClient);
   registerWorksiteCommands(program, getClient);
-  registerPersonCommands(program, getClient);
+  registerPersonCommands(program, getClient, getClientForAsiakas);
   registerVehicleCommands(program, getClient);
   registerSijaintiCommands(program, getClient);
   registerOhjeCommands(program, getClient);

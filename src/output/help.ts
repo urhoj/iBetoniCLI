@@ -100,7 +100,7 @@ export function formatHelp(spec: CommandSpec): string {
   lines.push("");
   lines.push("GLOBAL FLAGS");
   lines.push(
-    "  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only"
+    "  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID"
   );
   lines.push("");
 

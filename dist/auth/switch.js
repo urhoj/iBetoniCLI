@@ -1,3 +1,4 @@
+import { CliError, exitCodeFromStatus } from "../api/errors.js";
 /**
  * Switch the active company by POSTing the target `newAsiakasId` to
  * `/api/company-selection/switch`. The backend re-issues a JWT bound to
@@ -19,7 +20,7 @@ export async function performSwitch(opts) {
     });
     if (!res.ok) {
         const detail = await res.text().catch(() => "");
-        throw new Error(`Company switch failed: HTTP ${res.status}${detail ? ` ${detail}` : ""}`);
+        throw new CliError(`Company switch failed: HTTP ${res.status}${detail ? ` ${detail}` : ""}`, res.status, detail || null, exitCodeFromStatus(res.status));
     }
     const body = (await res.json());
     return {

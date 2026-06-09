@@ -14,6 +14,14 @@ export interface GlobalOptions {
    * read but never create/update/delete.
    */
   readOnly: boolean;
+  /**
+   * Per-invocation company context. When set, the command runs as if the active
+   * company were this `asiakasId` — `cliContext` performs an EPHEMERAL switch
+   * (mints a JWT bound to it, uses it for this one command, and never persists
+   * it). `null` = use the credentials' active company. Access is enforced by the
+   * switch endpoint; no access → exit 3.
+   */
+  asiakas: number | null;
 }
 
 /** Truthy spellings accepted for the IB_READ_ONLY environment variable. */
@@ -30,6 +38,10 @@ export function addGlobalOptions(cmd: Command): Command {
     .option(
       "--read-only",
       "Block all writes this session (also via IB_READ_ONLY=1)"
+    )
+    .option(
+      "--asiakas <id>",
+      "Run this one command in another company's context (ephemeral switch, not persisted)"
     );
 }
 
@@ -42,6 +54,7 @@ export function getGlobalOptions(cmd: Command): GlobalOptions {
     pretty?: boolean;
     json?: boolean;
     readOnly?: boolean;
+    asiakas?: string;
   }>();
   const envReadOnly = READ_ONLY_ENV_TRUE.has(
     (process.env.IB_READ_ONLY ?? "").trim().toLowerCase()
@@ -54,6 +67,7 @@ export function getGlobalOptions(cmd: Command): GlobalOptions {
     pretty: !!o.pretty,
     json: !!o.json,
     readOnly: !!o.readOnly || envReadOnly,
+    asiakas: o.asiakas !== undefined ? Number(o.asiakas) : null,
   };
 }
 

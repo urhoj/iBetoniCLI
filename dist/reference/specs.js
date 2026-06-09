@@ -773,7 +773,10 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib person search",
-        description: "Free-text search across person names / emails. POST /api/person/search.",
+        description: "Free-text search across person names / emails. POST /api/person/search. " +
+            "Scoped to your active company. With --my-companies the search fans out " +
+            "across every company you belong to (an ephemeral per-company switch each) " +
+            "and returns one flat list tagged with the asiakasId/name of each hit.",
         permissions: ["auth.page.person.read"],
         flags: [
             {
@@ -787,10 +790,19 @@ export const COMMAND_SPECS = [
                 default: "50",
                 description: "Max results",
             },
+            {
+                name: "my-companies",
+                type: "boolean",
+                description: "Search across all companies you belong to; each hit carries its asiakasId/asiakasName",
+            },
         ],
-        outputShape: "ListEnvelope<{ personId, name, email, score }>",
+        outputShape: "Default: the backend's raw person rows (array, or an mssql { recordset } wrapper). " +
+            "With --my-companies: ListEnvelope<{ personId, name, email, phone, asiakasId, asiakasName }>",
         errors: permErrors("auth.page.person.read"),
-        examples: ["ib person search 'Matti'"],
+        examples: [
+            "ib person search 'Matti'",
+            "ib person search 'Ikonen' --my-companies",
+        ],
     },
     {
         command: "ib person role list",

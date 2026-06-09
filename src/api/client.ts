@@ -191,6 +191,12 @@ export function createApiClient({
   }
 
   return {
+    /**
+     * The base URL this client targets. Exposed so callers can mint sibling
+     * clients for the same endpoint with a different (e.g. ephemeral, per-
+     * company) token — used by the `person search --my-companies` fan-out.
+     */
+    endpoint,
     get: <T = unknown>(path: string, opts?: FetchOptions) =>
       request<T>("GET", path, undefined, opts),
     post: <T = unknown>(path: string, body: unknown, opts?: FetchOptions) =>

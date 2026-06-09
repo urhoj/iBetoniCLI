@@ -2,6 +2,7 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFla
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { roleNameForTypeId, resolveRoleTypeId } from "../../roles.js";
+import { runCompanyList } from "../company/index.js";
 import { CliError } from "../../api/errors.js";
 /**
  * Merge typed create flags over a parsed --body object (typed flags win) into the
@@ -70,6 +71,52 @@ export async function runPersonSearch(client, query, limit) {
     if (limit !== undefined)
         body.limit = limit;
     return client.post("/api/person/search", body);
+}
+/**
+ * /api/person/search returns either a bare array of person rows or a raw mssql
+ * result wrapper ({ recordset } / { recordsets: [[...]] }) depending on cache
+ * warmth. Normalise both to a flat array of row objects.
+ */
+export function extractPersonRows(raw) {
+    if (Array.isArray(raw))
+        return raw;
+    if (raw && typeof raw === "object") {
+        const obj = raw;
+        if (Array.isArray(obj.recordset)) {
+            return obj.recordset;
+        }
+        if (Array.isArray(obj.recordsets) && Array.isArray(obj.recordsets[0])) {
+            return obj.recordsets[0];
+        }
+    }
+    return [];
+}
+/**
+ * Fan a person search out across the caller's companies (`--my-companies`).
+ * `listCompanies` yields the companies to sweep; `searchIn(asiakasId)` runs the
+ * search in one company (the caller binds the query + an ephemeral per-company
+ * client). Each hit is projected to a clean, company-tagged row and merged into
+ * one ListEnvelope so cross-company results are disambiguable.
+ */
+export async function runPersonSearchMyCompanies(listCompanies, searchIn) {
+    const companies = await listCompanies();
+    const items = [];
+    for (const c of companies) {
+        const raw = await searchIn(c.asiakasId);
+        for (const row of extractPersonRows(raw)) {
+            const first = row.personFirstName ?? "";
+            const last = row.personLastName ?? "";
+            items.push({
+                personId: Number(row.personId),
+                name: `${first} ${last}`.trim(),
+                email: row.personEmail ?? null,
+                phone: row.personPhone ?? null,
+                asiakasId: c.asiakasId,
+                asiakasName: c.name,
+            });
+        }
+    }
+    return { items, nextCursor: null, count: items.length };
 }
 /**
  * GET /api/asiakasPersonSettings/get/:asiakasId/:personId — the per-company
@@ -177,7 +224,7 @@ export async function runPersonCompanies(client, personId) {
  *
  * Exit codes: 1 = generic API/runtime failure.
  */
-export function registerPersonCommands(parent, getClient) {
+export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     const p = parent.command("person").description("Person commands");
     p.command("list")
         .description("List persons")
@@ -209,9 +256,18 @@ export function registerPersonCommands(parent, getClient) {
     p.command("search <query>")
         .description("Free-text search for persons")
         .option("--limit <n>", "Max results", (v) => Math.min(Number(v), 500))
+        .option("--my-companies", "Search across every company you belong to (each hit tagged with its asiakasId)")
         .action(async (query, opts) => {
         try {
             const client = await getClient();
+            if (opts.myCompanies) {
+                const result = await runPersonSearchMyCompanies(async () => (await runCompanyList(client)).items.map((c) => ({
+                    asiakasId: c.asiakasId,
+                    name: c.name,
+                })), async (asiakasId) => runPersonSearch(await getClientForAsiakas(asiakasId), query, opts.limit));
+                writeJson(result);
+                return;
+            }
             const result = await runPersonSearch(client, query, opts.limit);
             writeJson(result);
         }

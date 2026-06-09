@@ -30,6 +30,15 @@ describe("ApiClient", () => {
     expect(init.headers["X-Request-ID"]).toMatch(/^[0-9a-f-]{36}$/);
   });
 
+  test("exposes its endpoint so callers can build sibling clients", () => {
+    const client = createApiClient({
+      endpoint: "https://api.example.com",
+      token: "x",
+      version: "1.0.0",
+    });
+    expect(client.endpoint).toBe("https://api.example.com");
+  });
+
   test("POST sends JSON body and content-type", async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ created: true }), {

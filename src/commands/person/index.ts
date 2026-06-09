@@ -9,6 +9,7 @@ import {
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { roleNameForTypeId, resolveRoleTypeId } from "../../roles.js";
+import { runCompanyList } from "../company/index.js";
 import { CliError } from "../../api/errors.js";
 
 export interface PersonListFilter {
@@ -104,6 +105,66 @@ export async function runPersonSearch(
   const body: Record<string, unknown> = { searchString: query };
   if (limit !== undefined) body.limit = limit;
   return client.post<unknown>("/api/person/search", body);
+}
+
+/** A person hit from the cross-company search, tagged with its company. */
+export interface MyCompanyPersonHit {
+  personId: number;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  asiakasId: number;
+  asiakasName: string;
+}
+
+/**
+ * /api/person/search returns either a bare array of person rows or a raw mssql
+ * result wrapper ({ recordset } / { recordsets: [[...]] }) depending on cache
+ * warmth. Normalise both to a flat array of row objects.
+ */
+export function extractPersonRows(raw: unknown): Record<string, unknown>[] {
+  if (Array.isArray(raw)) return raw as Record<string, unknown>[];
+  if (raw && typeof raw === "object") {
+    const obj = raw as { recordset?: unknown; recordsets?: unknown };
+    if (Array.isArray(obj.recordset)) {
+      return obj.recordset as Record<string, unknown>[];
+    }
+    if (Array.isArray(obj.recordsets) && Array.isArray(obj.recordsets[0])) {
+      return obj.recordsets[0] as Record<string, unknown>[];
+    }
+  }
+  return [];
+}
+
+/**
+ * Fan a person search out across the caller's companies (`--my-companies`).
+ * `listCompanies` yields the companies to sweep; `searchIn(asiakasId)` runs the
+ * search in one company (the caller binds the query + an ephemeral per-company
+ * client). Each hit is projected to a clean, company-tagged row and merged into
+ * one ListEnvelope so cross-company results are disambiguable.
+ */
+export async function runPersonSearchMyCompanies(
+  listCompanies: () => Promise<{ asiakasId: number; name: string }[]>,
+  searchIn: (asiakasId: number) => Promise<unknown>
+): Promise<ListEnvelope<MyCompanyPersonHit>> {
+  const companies = await listCompanies();
+  const items: MyCompanyPersonHit[] = [];
+  for (const c of companies) {
+    const raw = await searchIn(c.asiakasId);
+    for (const row of extractPersonRows(raw)) {
+      const first = (row.personFirstName as string) ?? "";
+      const last = (row.personLastName as string) ?? "";
+      items.push({
+        personId: Number(row.personId),
+        name: `${first} ${last}`.trim(),
+        email: (row.personEmail as string) ?? null,
+        phone: (row.personPhone as string) ?? null,
+        asiakasId: c.asiakasId,
+        asiakasName: c.name,
+      });
+    }
+  }
+  return { items, nextCursor: null, count: items.length };
 }
 
 /** One person↔company role row, with the role name resolved. */
@@ -281,7 +342,8 @@ export async function runPersonCompanies(
  */
 export function registerPersonCommands(
   parent: Command,
-  getClient: () => Promise<ApiClient>
+  getClient: () => Promise<ApiClient>,
+  getClientForAsiakas: (asiakasId: number) => Promise<ApiClient>
 ): void {
   const p = parent.command("person").description("Person commands");
 
@@ -315,15 +377,38 @@ export function registerPersonCommands(
   p.command("search <query>")
     .description("Free-text search for persons")
     .option("--limit <n>", "Max results", (v: string) => Math.min(Number(v), 500))
-    .action(async (query: string, opts: { limit?: number }) => {
-      try {
-        const client = await getClient();
-        const result = await runPersonSearch(client, query, opts.limit);
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
+    .option(
+      "--my-companies",
+      "Search across every company you belong to (each hit tagged with its asiakasId)"
+    )
+    .action(
+      async (query: string, opts: { limit?: number; myCompanies?: boolean }) => {
+        try {
+          const client = await getClient();
+          if (opts.myCompanies) {
+            const result = await runPersonSearchMyCompanies(
+              async () =>
+                (await runCompanyList(client)).items.map((c) => ({
+                  asiakasId: c.asiakasId,
+                  name: c.name,
+                })),
+              async (asiakasId) =>
+                runPersonSearch(
+                  await getClientForAsiakas(asiakasId),
+                  query,
+                  opts.limit
+                )
+            );
+            writeJson(result);
+            return;
+          }
+          const result = await runPersonSearch(client, query, opts.limit);
+          writeJson(result);
+        } catch (e) {
+          exitWithError(e);
+        }
       }
-    });
+    );
 
   const createCmd = p
     .command("create")

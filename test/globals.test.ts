@@ -58,6 +58,20 @@ describe("global options", () => {
     }
   });
 
+  test("--asiakas <id> parses to a number", () => {
+    const cmd = new Command();
+    addGlobalOptions(cmd);
+    cmd.parse(["node", "test", "--asiakas", "26"]);
+    expect(getGlobalOptions(cmd).asiakas).toBe(26);
+  });
+
+  test("asiakas defaults to null when --asiakas is absent", () => {
+    const cmd = new Command();
+    addGlobalOptions(cmd);
+    cmd.parse(["node", "test"]);
+    expect(getGlobalOptions(cmd).asiakas).toBeNull();
+  });
+
   test("getGlobalOptions reads flags from a parsed Command", () => {
     const cmd = new Command();
     addGlobalOptions(cmd);

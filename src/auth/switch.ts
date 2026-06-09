@@ -1,3 +1,5 @@
+import { CliError, exitCodeFromStatus } from "../api/errors.js";
+
 export interface SwitchOptions {
   endpoint: string;
   jwt: string;
@@ -37,8 +39,11 @@ export async function performSwitch(opts: SwitchOptions): Promise<SwitchResult> 
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    throw new Error(
-      `Company switch failed: HTTP ${res.status}${detail ? ` ${detail}` : ""}`
+    throw new CliError(
+      `Company switch failed: HTTP ${res.status}${detail ? ` ${detail}` : ""}`,
+      res.status,
+      detail || null,
+      exitCodeFromStatus(res.status)
     );
   }
   const body = (await res.json()) as SwitchResponseBody;
