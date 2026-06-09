@@ -663,7 +663,7 @@ exports[`Help snapshots — contract stability > help for ib customer prh matche
   ib customer prh [<ytunnus>] [flags]
 
 DESCRIPTION
-  Look up a company in the Finnish business registry (PRH). Positional <ytunnus> for an exact business-ID lookup, or --search <name>. Read-only; any authenticated user.
+  Look up a company in the Finnish business registry (PRH). Pass <ytunnus> for an exact business-ID lookup, or --search <name>. Read-only; any authenticated user.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
@@ -1648,7 +1648,7 @@ DESCRIPTION
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
-  <keikkaId> NUMBER    the keikkaId to fetch (required)
+  <keikkaId> NUMBER    keikkaId to fetch (required)
 
 FLAGS
   (none)
@@ -1851,7 +1851,7 @@ exports[`Help snapshots — contract stability > help for ib person companies ma
   ib person companies [<personId>] [flags]
 
 DESCRIPTION
-  List the companies (asiakkaat) a person belongs to. Positional personId is optional and defaults to you. Reverse of \`customer person list\`.
+  List the companies (asiakkaat) a person belongs to. personId is optional and defaults to the caller. Reverse of \`customer person list\`.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
@@ -3805,7 +3805,7 @@ DESCRIPTION
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
-  <tyomaaId> NUMBER    worksite id (coordinates resolved server-side) (required)
+  <tyomaaId> NUMBER    tyomaaId (coordinates resolved server-side) (required)
 
 FLAGS
   --force-refresh BOOLEAN    Bypass the cache and refetch from FMI
@@ -4137,7 +4137,7 @@ DESCRIPTION
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
-  <tyomaaId> NUMBER    worksite id (required)
+  <tyomaaId> NUMBER    tyomaaId (required)
 
 FLAGS
   (none)

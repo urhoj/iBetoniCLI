@@ -173,7 +173,7 @@ export const COMMAND_SPECS = [
         command: "ib keikka get",
         description: "Get a single keikka by id with related customer / worksite / vehicle / driver projections.",
         permissions: ["auth.page.grid.tilaus.read"],
-        args: [{ name: "keikkaId", type: "number", description: "the keikkaId to fetch" }],
+        args: [{ name: "keikkaId", type: "number", description: "keikkaId to fetch" }],
         flags: [],
         outputShape: "{ keikkaId, pvm, time, customer:{asiakasId,name}, worksite:{tyomaaId,address}, vehicle:{vehicleId,plate}, driver:{personId,name}, m3, status }",
         errors: [
@@ -455,7 +455,7 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib customer prh",
-        description: "Look up a company in the Finnish business registry (PRH). Positional <ytunnus> for an exact business-ID lookup, or --search <name>. Read-only; any authenticated user.",
+        description: "Look up a company in the Finnish business registry (PRH). Pass <ytunnus> for an exact business-ID lookup, or --search <name>. Read-only; any authenticated user.",
         args: [{ name: "ytunnus", type: "string", required: false, description: "business ID (XXXXXXXX-X)" }],
         flags: [
             { name: "search", type: "string", description: "Search by company name instead" },
@@ -778,7 +778,7 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib person companies",
-        description: "List the companies (asiakkaat) a person belongs to. Positional personId is optional and defaults to you. Reverse of `customer person list`.",
+        description: "List the companies (asiakkaat) a person belongs to. personId is optional and defaults to the caller. Reverse of `customer person list`.",
         args: [{ name: "personId", type: "number", required: false, description: "personId (defaults to caller)" }],
         flags: [],
         outputShape: "ListEnvelope<{ asiakasId, name }>",
@@ -1531,7 +1531,7 @@ export const COMMAND_SPECS = [
         command: "ib worksite person list",
         description: "List persons attached to a worksite.",
         permissions: ["auth.page.tyomaa.read"],
-        args: [{ name: "tyomaaId", type: "number", description: "worksite id" }],
+        args: [{ name: "tyomaaId", type: "number", description: "tyomaaId" }],
         flags: [],
         outputShape: "ListEnvelope<{ personId, name, email, contactType }>",
         errors: permErrors("auth.page.tyomaa.read"),
@@ -2070,7 +2070,7 @@ export const COMMAND_SPECS = [
         command: "ib weather worksite",
         description: "Forecast for a worksite identified by tyomaaId. The backend resolves the coordinates from the tyomaa record internally — no lat/lng needed. Use --force-refresh to bypass the cache. Requires the company weather module.",
         permissions: ["company weather module (asiakasPersonSettingTypeId 18)"],
-        args: [{ name: "tyomaaId", type: "number", description: "worksite id (coordinates resolved server-side)" }],
+        args: [{ name: "tyomaaId", type: "number", description: "tyomaaId (coordinates resolved server-side)" }],
         flags: [
             { name: "force-refresh", type: "boolean", description: "Bypass the cache and refetch from FMI" },
         ],
