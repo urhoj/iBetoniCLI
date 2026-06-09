@@ -29,6 +29,14 @@ export interface CommandError {
   remedy: string;
 }
 
+export interface CommandArg {
+  name: string;
+  type: string;
+  /** Defaults to true; set false for an optional positional. */
+  required?: boolean;
+  description: string;
+}
+
 export interface CommandFlag {
   /** Flag name without leading dashes, e.g. `from`, `idempotency-key`. */
   name: string;
@@ -38,6 +46,8 @@ export interface CommandFlag {
   default?: string;
   /** One-line human description of the flag's purpose. */
   description: string;
+  /** When true, a (required) suffix is appended in the FLAGS section. */
+  required?: boolean;
 }
 
 export interface CommandSpec {
@@ -47,6 +57,8 @@ export interface CommandSpec {
   description: string;
   /** Backend permission strings (e.g. `auth.page.grid.tilaus.read`). */
   permissions?: string[];
+  /** Positional arguments rendered in USAGE and the ARGUMENTS section. */
+  args?: CommandArg[];
   /** Command-specific flags rendered in the FLAGS section. */
   flags: CommandFlag[];
   /** When true, the WRITE-SAFETY FLAGS block is included. */
@@ -67,7 +79,10 @@ export function formatHelp(spec: CommandSpec): string {
   const lines: string[] = [];
 
   lines.push("USAGE");
-  lines.push(`  ${spec.command} [flags]`);
+  const argSig = (spec.args ?? [])
+    .map((a) => (a.required === false ? `[<${a.name}>]` : `<${a.name}>`))
+    .join(" ");
+  lines.push(`  ${spec.command}${argSig ? " " + argSig : ""} [flags]`);
   lines.push("");
 
   lines.push("DESCRIPTION");
@@ -80,14 +95,24 @@ export function formatHelp(spec: CommandSpec): string {
   );
   lines.push("");
 
+  if (spec.args?.length) {
+    lines.push("ARGUMENTS");
+    for (const a of spec.args) {
+      const req = a.required === false ? "(optional)" : "(required)";
+      lines.push(`  <${a.name}> ${a.type.toUpperCase()}    ${a.description} ${req}`);
+    }
+    lines.push("");
+  }
+
   lines.push("FLAGS");
   if (spec.flags.length === 0) {
     lines.push("  (none)");
   } else {
     for (const f of spec.flags) {
       const def = f.default ? ` (default: ${f.default})` : "";
+      const req = f.required ? " (required)" : "";
       lines.push(
-        `  --${f.name} ${f.type.toUpperCase()}    ${f.description}${def}`
+        `  --${f.name} ${f.type.toUpperCase()}    ${f.description}${def}${req}`
       );
     }
   }

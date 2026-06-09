@@ -24,3 +24,35 @@ describe("formatHelp ERRORS", () => {
     expect(out).not.toContain("404  Not found");
   });
 });
+
+describe("formatHelp ARGUMENTS", () => {
+  test("renders positionals in USAGE and an ARGUMENTS section", () => {
+    const out = formatHelp({
+      ...base,
+      command: "ib keikka get",
+      args: [{ name: "keikkaId", type: "number", description: "the keikkaId to fetch" }],
+    });
+    expect(out).toContain("ib keikka get <keikkaId> [flags]");
+    expect(out).toContain("ARGUMENTS");
+    expect(out).toContain("<keikkaId> NUMBER");
+    expect(out).toContain("(required)");
+  });
+
+  test("optional positional is bracketed in USAGE", () => {
+    const out = formatHelp({
+      ...base,
+      command: "ib person companies",
+      args: [{ name: "personId", type: "number", required: false, description: "defaults to caller" }],
+    });
+    expect(out).toContain("ib person companies [<personId>] [flags]");
+    expect(out).toContain("(optional)");
+  });
+
+  test("flag marked required gets a (required) suffix", () => {
+    const out = formatHelp({
+      ...base,
+      flags: [{ name: "asiakas", type: "number", required: true, description: "target" }],
+    });
+    expect(out).toMatch(/--asiakas NUMBER.*\(required\)/);
+  });
+});

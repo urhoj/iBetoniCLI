@@ -24,7 +24,10 @@
 export function formatHelp(spec) {
     const lines = [];
     lines.push("USAGE");
-    lines.push(`  ${spec.command} [flags]`);
+    const argSig = (spec.args ?? [])
+        .map((a) => (a.required === false ? `[<${a.name}>]` : `<${a.name}>`))
+        .join(" ");
+    lines.push(`  ${spec.command}${argSig ? " " + argSig : ""} [flags]`);
     lines.push("");
     lines.push("DESCRIPTION");
     lines.push(`  ${spec.description}`);
@@ -33,6 +36,14 @@ export function formatHelp(spec) {
     }
     lines.push("  Timezone: dates interpreted in active company timezone (Europe/Helsinki).");
     lines.push("");
+    if (spec.args?.length) {
+        lines.push("ARGUMENTS");
+        for (const a of spec.args) {
+            const req = a.required === false ? "(optional)" : "(required)";
+            lines.push(`  <${a.name}> ${a.type.toUpperCase()}    ${a.description} ${req}`);
+        }
+        lines.push("");
+    }
     lines.push("FLAGS");
     if (spec.flags.length === 0) {
         lines.push("  (none)");
@@ -40,7 +51,8 @@ export function formatHelp(spec) {
     else {
         for (const f of spec.flags) {
             const def = f.default ? ` (default: ${f.default})` : "";
-            lines.push(`  --${f.name} ${f.type.toUpperCase()}    ${f.description}${def}`);
+            const req = f.required ? " (required)" : "";
+            lines.push(`  --${f.name} ${f.type.toUpperCase()}    ${f.description}${def}${req}`);
         }
     }
     if (spec.writeFlags) {
