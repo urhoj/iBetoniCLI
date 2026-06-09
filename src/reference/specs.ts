@@ -16,24 +16,29 @@
  *   400 = validation
  *   500 = backend error
  */
-import type { CommandSpec } from "../output/help.js";
+import type { CommandError, CommandSpec } from "../output/help.js";
+import { exitCodeFromStatus } from "../api/errors.js";
+
+/** API error row: derive the exit code from the HTTP status. */
+const apiErr = (http: number, meaning: string, remedy: string): CommandError => ({
+  http,
+  exit: exitCodeFromStatus(http),
+  meaning,
+  remedy,
+});
 
 /** Errors that apply to every authenticated command. */
-const COMMON_AUTH_ERRORS = [
-  { code: 401, meaning: "Token expired", remedy: "ib auth refresh" },
-  { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
-] as const;
+const COMMON_AUTH_ERRORS: CommandError[] = [
+  apiErr(401, "Token expired", "ib auth refresh"),
+  apiErr(500, "Backend error", "retry with --verbose"),
+];
 
 /** Errors that apply to every authenticated command with permission gating. */
-function permErrors(page: string) {
+function permErrors(page: string): CommandError[] {
   return [
-    { code: 401, meaning: "Token expired", remedy: "ib auth refresh" },
-    {
-      code: 403,
-      meaning: "Permission denied",
-      remedy: `check ${page}`,
-    },
-    { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+    apiErr(401, "Token expired", "ib auth refresh"),
+    apiErr(403, "Permission denied", `check ${page}`),
+    apiErr(500, "Backend error", "retry with --verbose"),
   ];
 }
 
@@ -54,12 +59,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "stderr: 'Logged in as <email> at <company>.'; credentials file written",
     errors: [
-      {
-        code: 2,
-        meaning: "OAuth flow failed",
-        remedy: "retry; check network / browser",
-      },
-      { code: 500, meaning: "Backend error", remedy: "retry later" },
+      { exit: 2, meaning: "OAuth flow failed", remedy: "retry; check network / browser" },
+      apiErr(500, "Backend error", "retry later"),
     ],
     examples: [
       "ib auth login",
@@ -73,7 +74,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     flags: [],
     outputShape: "no stdout output; exit 0 on success",
     errors: [
-      { code: 1, meaning: "I/O error", remedy: "check file permissions" },
+      { exit: 1, meaning: "I/O error", remedy: "check file permissions" },
     ],
     examples: ["ib auth logout"],
   },
@@ -85,11 +86,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ personId, activeCompany: { asiakasId, name }, endpoint }",
     errors: [
-      {
-        code: 2,
-        meaning: "Not logged in",
-        remedy: "ib auth login first",
-      },
+      { exit: 2, meaning: "Not logged in", remedy: "ib auth login first" },
     ],
     examples: ["ib auth whoami"],
   },
@@ -106,12 +103,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "{ ok: true, activeCompany: { asiakasId, name } }",
     errors: [
-      { code: 2, meaning: "Not logged in", remedy: "ib auth login" },
-      {
-        code: 403,
-        meaning: "No access to target",
-        remedy: "verify ownership via `ib company list`",
-      },
+      { exit: 2, meaning: "Not logged in", remedy: "ib auth login" },
+      apiErr(403, "No access to target", "verify ownership via `ib company list`"),
     ],
     examples: ["ib auth switch --to 1349"],
   },
@@ -122,11 +115,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     flags: [],
     outputShape: "{ ok: true }",
     errors: [
-      {
-        code: 2,
-        meaning: "Refresh failed",
-        remedy: "ib auth login to re-authenticate",
-      },
+      { exit: 2, meaning: "Refresh failed", remedy: "ib auth login to re-authenticate" },
     ],
     examples: ["ib auth refresh"],
   },
@@ -164,11 +153,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "{ ok: true, activeCompany: { asiakasId, name } }",
     errors: [
-      {
-        code: 403,
-        meaning: "No access to target",
-        remedy: "verify via `ib company list`",
-      },
+      apiErr(403, "No access to target", "verify via `ib company list`"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ["ib company switch --to 1349"],
@@ -237,7 +222,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ keikkaId, pvm, time, customer:{asiakasId,name}, worksite:{tyomaaId,address}, vehicle:{vehicleId,plate}, driver:{personId,name}, m3, status }",
     errors: [
-      { code: 404, meaning: "Keikka not found", remedy: "verify keikkaId" },
+      apiErr(404, "Keikka not found", "verify keikkaId"),
       ...permErrors("auth.page.grid.tilaus.read"),
     ],
     examples: ["ib keikka get 9001"],
@@ -257,7 +242,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ keikkaId, ...echoed fields } (raw backend response)",
     errors: [
-      { code: 400, meaning: "Validation failed", remedy: "fix --body fields" },
+      apiErr(400, "Validation failed", "fix --body fields"),
       ...permErrors("auth.page.grid.tilaus.edit"),
     ],
     examples: [
@@ -285,8 +270,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ ok: true } or backend response",
     errors: [
-      { code: 400, meaning: "Validation failed", remedy: "check --status" },
-      { code: 404, meaning: "Keikka not found", remedy: "verify keikkaId" },
+      apiErr(400, "Validation failed", "check --status"),
+      apiErr(404, "Keikka not found", "verify keikkaId"),
       ...permErrors("auth.page.grid.tilaus.edit"),
     ],
     examples: [
@@ -309,7 +294,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ ok: true, driver:{personId,name} } (raw backend response)",
     errors: [
-      { code: 404, meaning: "Keikka not found", remedy: "verify keikkaId" },
+      apiErr(404, "Keikka not found", "verify keikkaId"),
       ...permErrors("auth.page.grid.tilaus.edit"),
     ],
     examples: [
@@ -362,7 +347,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ asiakasId, name, yTunnus, type, address, postalCode, city, email, phone, contactPersonId, shortName, comment }",
     errors: [
-      { code: 404, meaning: "Customer not found", remedy: "verify asiakasId" },
+      apiErr(404, "Customer not found", "verify asiakasId"),
       ...permErrors("auth.page.asiakas.read"),
     ],
     examples: ["ib customer get 1349"],
@@ -396,7 +381,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "flat customer { asiakasId, name, yTunnus, type, address, postalCode, city, email, contactPersonId, shortName, comment } (or wouldCreate on --dry-run; with --get-or-create adds reused:boolean)",
     errors: [
-      { code: 400, meaning: "Missing yTunnus / validation, or >1 customer shares the yTunnus with --get-or-create", remedy: "pass --ytunnus or --from-prh; for an ambiguous match use `ib customer get <id>`" },
+      apiErr(400, "Missing yTunnus / validation, or >1 customer shares the yTunnus with --get-or-create", "pass --ytunnus or --from-prh; for an ambiguous match use `ib customer get <id>`"),
       ...permErrors("auth.page.asiakas.edit"),
     ],
     examples: [
@@ -428,7 +413,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "flat customer shape + changed:boolean|null (whether anything actually changed vs an idempotent no-op; null = undetermined) · wouldUpdate on --dry-run",
     errors: [
-      { code: 404, meaning: "Customer not found", remedy: "verify asiakasId" },
+      apiErr(404, "Customer not found", "verify asiakasId"),
       ...permErrors("auth.page.asiakas.edit"),
     ],
     examples: [
@@ -458,7 +443,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ ...flat customer, action: 'created'|'updated' } (action 'updated' also carries changed:boolean|null) · { action: 'would-*', dryRun } on --dry-run",
     errors: [
-      { code: 400, meaning: "No ytunnus key, or >1 customers share the ytunnus (ambiguous)", remedy: "provide --ytunnus/--from-prh; for an ambiguous match use `ib customer update <id>`" },
+      apiErr(400, "No ytunnus key, or >1 customers share the ytunnus (ambiguous)", "provide --ytunnus/--from-prh; for an ambiguous match use `ib customer update <id>`"),
       ...permErrors("auth.page.asiakas.edit"),
     ],
     examples: [
@@ -515,17 +500,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "report: { asiakasId, roolit:{...}, modules:{...} } | write: { asiakasId, applied:{ set, unset, dryRun }, state:{ roolit, modules } }",
     errors: [
-      {
-        code: 400,
-        meaning: "Unknown field key, or key in both --set and --unset",
-        remedy: "use only: pumppu/jerry/henkilot/sijainnit/ajoneuvot/tiedostot/weather/lomaseuranta/shareorders",
-      },
-      {
-        code: 403,
-        meaning: "Not an admin of this tenant",
-        remedy: "use a system-admin token, or an admin of the owner company",
-      },
-      { code: 404, meaning: "Customer not found", remedy: "verify asiakasId" },
+      apiErr(400, "Unknown field key, or key in both --set and --unset", "use only: pumppu/jerry/henkilot/sijainnit/ajoneuvot/tiedostot/weather/lomaseuranta/shareorders"),
+      apiErr(403, "Not an admin of this tenant", "use a system-admin token, or an admin of the owner company"),
+      apiErr(404, "Customer not found", "verify asiakasId"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: [
@@ -552,17 +529,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "verify: { asiakasId, allSet, flags:{ pumppu, jerry, … }, missing:[…] } (exit 1 when allSet=false) | set/reset: { asiakasId, applied:{ set, unset, dryRun }, state }",
     errors: [
-      {
-        code: 400,
-        meaning: "--set and --reset both given",
-        remedy: "pass at most one of --set / --reset",
-      },
-      {
-        code: 403,
-        meaning: "Not an admin of this tenant",
-        remedy: "use a system-admin token, or an admin of the owner company",
-      },
-      { code: 404, meaning: "Customer not found", remedy: "verify asiakasId" },
+      apiErr(400, "--set and --reset both given", "pass at most one of --set / --reset"),
+      apiErr(403, "Not an admin of this tenant", "use a system-admin token, or an admin of the owner company"),
+      apiErr(404, "Customer not found", "verify asiakasId"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: [
@@ -584,8 +553,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "by-id: { businessId, name, tradeNames, address:{street,postCode,city,full}, companyForm, status } | search: ListEnvelope<{ businessId, name, city }>",
     errors: [
-      { code: 404, meaning: "Business ID not found", remedy: "verify the Y-tunnus" },
-      { code: 400, meaning: "Invalid Y-tunnus format", remedy: "use XXXXXXXX-X" },
+      apiErr(404, "Business ID not found", "verify the Y-tunnus"),
+      apiErr(400, "Invalid Y-tunnus format", "use XXXXXXXX-X"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ["ib customer prh 0145937-9", "ib customer prh --search Betoni"],
@@ -618,9 +587,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "report: { asiakasId, roolit:{…}, settings:{ HAS_FENNOA:bool, ALV:bool, … every setting } } | write: { asiakasId, applied:{set,unset,dryRun}, state }",
     errors: [
-      { code: 400, meaning: "Unknown setting name, or name in both --set/--unset", remedy: "use a canonical ASIAKAS_SETTING_TYPE_IDS name, an alias, or pumppu" },
-      { code: 403, meaning: "Not an admin of this tenant", remedy: "use a system-admin token, or an admin of the owner company" },
-      { code: 404, meaning: "Customer not found", remedy: "verify asiakasId" },
+      apiErr(400, "Unknown setting name, or name in both --set/--unset", "use a canonical ASIAKAS_SETTING_TYPE_IDS name, an alias, or pumppu"),
+      apiErr(403, "Not an admin of this tenant", "use a system-admin token, or an admin of the owner company"),
+      apiErr(404, "Customer not found", "verify asiakasId"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: [
@@ -669,7 +638,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ tyomaaId, name, address, asiakasId, city, comment, coords:{lat,lng} }",
     errors: [
-      { code: 404, meaning: "Worksite not found", remedy: "verify tyomaaId" },
+      apiErr(404, "Worksite not found", "verify tyomaaId"),
       ...permErrors("auth.page.tyomaa.read"),
     ],
     examples: ["ib worksite get 99"],
@@ -684,7 +653,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "{ tyomaaId, summary:{...}, monthlyBreakdown:[...] }",
     errors: [
-      { code: 404, meaning: "Worksite not found", remedy: "verify tyomaaId" },
+      apiErr(404, "Worksite not found", "verify tyomaaId"),
       ...permErrors("auth.page.tyomaa.read"),
     ],
     examples: ["ib worksite metrics 99"],
@@ -697,7 +666,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ tyomaaDateId, typeId, typeName, date, expirationDate, daysUntil, status, quantity }>",
     errors: [
-      { code: 400, meaning: "Bad tyomaaId", remedy: "use a positive integer" },
+      apiErr(400, "Bad tyomaaId", "use a positive integer"),
       ...permErrors("auth.page.tyomaa.read"),
     ],
     examples: ["ib worksite dates list 99"],
@@ -727,7 +696,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ tyomaaId, ... } (raw backend response)",
     errors: [
-      { code: 400, meaning: "Validation failed", remedy: "fix --body fields" },
+      apiErr(400, "Validation failed", "fix --body fields"),
       ...permErrors("auth.page.tyomaa.edit"),
     ],
     examples: [
@@ -760,8 +729,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ ok: true, ... } (raw backend response)",
     errors: [
-      { code: 400, meaning: "Validation failed", remedy: "fix --body fields" },
-      { code: 404, meaning: "Worksite not found", remedy: "verify tyomaaId" },
+      apiErr(400, "Validation failed", "fix --body fields"),
+      apiErr(404, "Worksite not found", "verify tyomaaId"),
       ...permErrors("auth.page.tyomaa.edit"),
     ],
     examples: [
@@ -819,11 +788,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ personId, name, email, roles:number[] }>",
     errors: [
-      {
-        code: 400,
-        meaning: "Unknown role",
-        remedy: "use a role from @ibetoni/constants ROLE_TYPEID_BY_NAME",
-      },
+      apiErr(400, "Unknown role", "use a role from @ibetoni/constants ROLE_TYPEID_BY_NAME"),
       ...permErrors("auth.page.person.read"),
     ],
     examples: [
@@ -845,7 +810,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ personId, name, email, phone, roles:number[] }",
     errors: [
-      { code: 404, meaning: "Person not found", remedy: "verify personId" },
+      apiErr(404, "Person not found", "verify personId"),
       ...permErrors("auth.page.person.read"),
     ],
     examples: ["ib person get 6233"],
@@ -914,8 +879,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "raw backend success | { dryRun:true, wouldCreate:{ personId, asiakasId, personSettingTypeId, personSettingString }, validation }",
     errors: [
-      { code: 400, meaning: "Unknown role / company limit reached", remedy: "use a name from ROLE_TYPEID_BY_NAME" },
-      { code: 403, meaning: "Not a tenant admin", remedy: "use a system-admin token or a tenant admin" },
+      apiErr(400, "Unknown role / company limit reached", "use a name from ROLE_TYPEID_BY_NAME"),
+      apiErr(403, "Not a tenant admin", "use a system-admin token or a tenant admin"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: [
@@ -936,8 +901,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ removed: 1 } | { removed: 0 } (absent) | { dryRun:true, wouldDelete:{ asiakasPersonSettingId }, validation }",
     errors: [
-      { code: 400, meaning: "Unknown role", remedy: "use a name from ROLE_TYPEID_BY_NAME" },
-      { code: 403, meaning: "Not a tenant admin", remedy: "use a system-admin token or a tenant admin" },
+      apiErr(400, "Unknown role", "use a name from ROLE_TYPEID_BY_NAME"),
+      apiErr(403, "Not a tenant admin", "use a system-admin token or a tenant admin"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ["ib person role revoke 5351 --role keikkaHandler --asiakas 26 --reason rotation"],
@@ -976,9 +941,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>",
     errors: [
-      { code: 401, meaning: "Token expired", remedy: "ib auth refresh" },
-      { code: 403, meaning: "Not a member of that company (and not admin)", remedy: "ib company switch to that owner, or use an admin token" },
-      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+      apiErr(401, "Token expired", "ib auth refresh"),
+      apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token"),
+      apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: ["ib person history 63", "ib person history 63 --field asiakasPersonSetting", "ib person history 63 --owner 27 --limit 50"],
   },
@@ -1043,7 +1008,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ vehicleId, vehicleNo, name, plate, type, typeName, boomLength, capacity, sortNo, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, memo, billingProductId, asiakasId, defaultDriverId, showInGrid:boolean, showInReports:boolean, useNoDriverBar:boolean, isRestricted:boolean, hasGpsTracking:boolean }",
     errors: [
-      { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
+      apiErr(404, "Vehicle not found", "verify vehicleId"),
       ...permErrors("auth.page.vehicle.read"),
     ],
     examples: ["ib vehicle get 7"],
@@ -1063,7 +1028,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,speed,direction,engineState,address,at}|null, gpsAvailable }",
     errors: [
-      { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
+      apiErr(404, "Vehicle not found", "verify vehicleId"),
       ...permErrors("auth.page.vehicle.read"),
     ],
     examples: ["ib vehicle status 7", "ib vehicle status 7 --pretty"],
@@ -1094,7 +1059,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ pvm, driverId, driverName, shiftStart, shiftEnd }>",
     errors: [
-      { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
+      apiErr(404, "Vehicle not found", "verify vehicleId"),
       ...permErrors("auth.page.vehicle.read"),
     ],
     examples: ["ib vehicle drivers 7 --from 2026-05-01 --to 2026-05-31"],
@@ -1139,7 +1104,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ vehicleId, ... } (raw backend save response) | { dryRun, wouldCreate }",
     errors: [
-      { code: 400, meaning: "Validation failed", remedy: "fix the field flags" },
+      apiErr(400, "Validation failed", "fix the field flags"),
       ...permErrors("auth.page.vehicle.edit"),
     ],
     examples: [
@@ -1169,7 +1134,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "On write: the saved vehicle record. With --dry-run: { dryRun: true, vehicleId, wouldChange: { field: { from, to } } } — the field-level diff, computed client-side without POSTing (the save route ignores X-Dry-Run, so the preview cannot persist).",
     errors: [
-      { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
+      apiErr(404, "Vehicle not found", "verify vehicleId"),
       ...permErrors("auth.page.vehicle.edit"),
     ],
     examples: [
@@ -1210,7 +1175,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "raw backend response | { dryRun, wouldUpdate }",
     errors: [
-      { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
+      apiErr(404, "Vehicle not found", "verify vehicleId"),
       ...permErrors("auth.page.vehicle.edit"),
     ],
     examples: [
@@ -1241,7 +1206,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ type, locationType?, locationId?, locationName?, locationAddress?, sijaintiTypeName?, asiakasNimi?, arrived, departed, durationMin, distanceKm? }> & { gpsAvailable }",
     errors: [
-      { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
+      apiErr(404, "Vehicle not found", "verify vehicleId"),
       ...permErrors("auth.page.vehicle.read"),
     ],
     examples: ["ib vehicle timeline 7", "ib vehicle timeline 7 --date yesterday"],
@@ -1257,7 +1222,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "ListEnvelope<{ lat, lng }> & { gpsAvailable }",
     errors: [
-      { code: 404, meaning: "Vehicle not found", remedy: "verify vehicleId" },
+      apiErr(404, "Vehicle not found", "verify vehicleId"),
       ...permErrors("auth.page.vehicle.read"),
     ],
     examples: ["ib vehicle route 7", "ib vehicle route 7 --date 2026-05-31"],
@@ -1275,8 +1240,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ vehicleId, plate, objectName, arrived, departed, durationMin }> & { gpsAvailable }",
     errors: [
-      { code: 400, meaning: "Invalid filterType", remedy: "use tyomaa or sijainti" },
-      { code: 404, meaning: "tyomaa not found / not owned", remedy: "verify tyomaaId belongs to the active company" },
+      apiErr(400, "Invalid filterType", "use tyomaa or sijainti"),
+      apiErr(404, "tyomaa not found / not owned", "verify tyomaaId belongs to the active company"),
       ...permErrors("auth.page.vehicle.read"),
     ],
     examples: ["ib vehicle visits tyomaa 17 --days 30", "ib vehicle visits sijainti 3"],
@@ -1318,7 +1283,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ sijaintiId, name, address, coords:{lat,lng}, type, jerryActiveUntil, ... } (raw row)",
     errors: [
-      { code: 404, meaning: "Sijainti not found", remedy: "verify sijaintiId" },
+      apiErr(404, "Sijainti not found", "verify sijaintiId"),
       ...permErrors("auth.page.sijainnit.read"),
     ],
     examples: ["ib sijainti get 42"],
@@ -1343,7 +1308,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ sijaintiId, ... } (raw backend response)",
     errors: [
-      { code: 400, meaning: "Validation failed", remedy: "fix --body fields" },
+      apiErr(400, "Validation failed", "fix --body fields"),
       ...permErrors("auth.page.sijainnit.edit"),
     ],
     examples: [
@@ -1372,8 +1337,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ ok: true, ... } (raw backend response)",
     errors: [
-      { code: 400, meaning: "Validation failed", remedy: "fix --body fields" },
-      { code: 404, meaning: "Sijainti not found", remedy: "verify sijaintiId" },
+      apiErr(400, "Validation failed", "fix --body fields"),
+      apiErr(404, "Sijainti not found", "verify sijaintiId"),
       ...permErrors("auth.page.sijainnit.edit"),
     ],
     examples: [
@@ -1400,12 +1365,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ ok: true, ... } (raw backend response) or { dryRun: true, wouldUpdate: {...} }",
     errors: [
-      {
-        code: 400,
-        meaning: "Neither/both of --on/--off given, or --radius not a positive number",
-        remedy: "pass exactly one of --on / --off; --radius is km > 0",
-      },
-      { code: 404, meaning: "Sijainti not found", remedy: "verify sijaintiId" },
+      apiErr(400, "Neither/both of --on/--off given, or --radius not a positive number", "pass exactly one of --on / --off; --radius is km > 0"),
+      apiErr(404, "Sijainti not found", "verify sijaintiId"),
       ...permErrors("auth.page.sijainnit.edit"),
     ],
     examples: [
@@ -1425,7 +1386,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ success: true }",
     errors: [
-      { code: 404, meaning: "Sijainti not found", remedy: "verify sijaintiId" },
+      apiErr(404, "Sijainti not found", "verify sijaintiId"),
       ...permErrors("auth.page.sijainnit.delete"),
     ],
     examples: ['ib sijainti delete 42 --reason "decommissioned depot"'],
@@ -1440,7 +1401,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ success: true }",
     errors: [
-      { code: 404, meaning: "Sijainti not found", remedy: "verify sijaintiId" },
+      apiErr(404, "Sijainti not found", "verify sijaintiId"),
       ...permErrors("auth.page.sijainnit.edit"),
     ],
     examples: ['ib sijainti undelete 42 --reason "restored after review"'],
@@ -1482,7 +1443,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "{ closestSijainti: {...}|null, closestDistance: number|null }",
     errors: [
-      { code: 400, meaning: "Invalid tyomaaId or missing coordinates", remedy: "verify the worksite has lat/lng" },
+      apiErr(400, "Invalid tyomaaId or missing coordinates", "verify the worksite has lat/lng"),
       ...permErrors("auth.page.sijainnit.read"),
     ],
     examples: ["ib sijainti closest --tyomaa 555 --type 1"],
@@ -1498,7 +1459,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "{ matkaM: number|null, matkaMin: number|null, from:{lat,lng}, to:{lat,lng} }",
     errors: [
-      { code: 400, meaning: "Bad point or sijainti without coordinates", remedy: "use 'lat,lng' or a sijaintiId that has coords" },
+      apiErr(400, "Bad point or sijainti without coordinates", "use 'lat,lng' or a sijaintiId that has coords"),
       ...permErrors("auth.page.sijainnit.read"),
     ],
     examples: [
@@ -1521,12 +1482,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "{ helpId, title, shorttext, htmltext, img } | null",
     errors: [
-      {
-        code: 4,
-        meaning: "Invalid helpId",
-        remedy: "helpId may contain only [A-Za-z0-9_-]",
-      },
-      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+      { exit: 4, meaning: "Invalid helpId", remedy: "helpId may contain only [A-Za-z0-9_-]" },
+      apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: ["ib ohje get LaskupohjaTilaus", "ib ohje get LaskupohjaTilaus --pretty"],
   },
@@ -1538,7 +1495,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "limit", type: "number", description: "Max rows to return (client-side cap)" },
     ],
     outputShape: "ListEnvelope<{ helpId, title, shorttext, htmltext, img }>",
-    errors: [{ code: 500, meaning: "Backend error", remedy: "retry with --verbose" }],
+    errors: [apiErr(500, "Backend error", "retry with --verbose")],
     examples: ["ib ohje list", "ib ohje list --limit 10 --pretty"],
   },
   {
@@ -1566,21 +1523,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ success: true, message } (raw backend response) or { dryRun: true, helpId, current, proposed }",
     errors: [
-      {
-        code: 4,
-        meaning: "Missing --reason / invalid helpId",
-        remedy: "pass --reason; helpId may contain only [A-Za-z0-9_-]",
-      },
-      {
-        code: 400,
-        meaning: "Validation failed",
-        remedy: "title ≤500, htmltext ≤10000, helpId [A-Za-z0-9_-]",
-      },
-      {
-        code: 403,
-        meaning: "Permission denied",
-        remedy: "needs isHelperEditor or system-admin/developer",
-      },
+      { exit: 4, meaning: "Missing --reason / invalid helpId", remedy: "pass --reason; helpId may contain only [A-Za-z0-9_-]" },
+      apiErr(400, "Validation failed", "title ≤500, htmltext ≤10000, helpId [A-Za-z0-9_-]"),
+      apiErr(403, "Permission denied", "needs isHelperEditor or system-admin/developer"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: [
@@ -1649,7 +1594,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: number }",
     errors: [
-      { code: 404, meaning: "Customer not found", remedy: "verify asiakasId" },
+      apiErr(404, "Customer not found", "verify asiakasId"),
       ...permErrors("auth.page.asiakas.edit"),
     ],
     examples: ['ib customer delete 9001 --reason "lifecycle cleanup"'],
@@ -1667,7 +1612,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ added: { asiakasId, personId } } or { dryRun: true, wouldCreate: { asiakasId, personId, contactPersonTypeId } }",
     errors: [
-      { code: 400, meaning: "Company limit (26) reached", remedy: "remove an existing link first" },
+      apiErr(400, "Company limit (26) reached", "remove an existing link first"),
       ...permErrors("auth.page.asiakas.edit"),
     ],
     examples: ['ib customer person add --asiakas 26 --person 5351 --contact-type 1 --reason "onboard driver"'],
@@ -1685,7 +1630,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ removed: { asiakasId, personId } } or { dryRun: true, wouldDelete: { asiakasId, personId } }",
     errors: [
-      { code: 404, meaning: "Link not found", remedy: "verify asiakasId+personId combination" },
+      apiErr(404, "Link not found", "verify asiakasId+personId combination"),
       ...permErrors("auth.page.asiakas.edit"),
     ],
     examples: ['ib customer person remove --asiakas 26 --person 5351 --reason "offboard driver"'],
@@ -1701,7 +1646,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "ListEnvelope<{ personId, name, email, roleTypeId: number|null, permissionRoles?: string[] }>",
     errors: [
-      { code: 400, meaning: "Unknown role name", remedy: "see ROLE_TYPEID_BY_NAME in @ibetoni/constants" },
+      apiErr(400, "Unknown role name", "see ROLE_TYPEID_BY_NAME in @ibetoni/constants"),
       ...permErrors("auth.page.asiakas.read"),
     ],
     examples: ["ib customer person list 26", "ib customer person list 26 --role keikkaHandler", "ib customer person list 27 --include-roles"],
@@ -1715,7 +1660,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "{ role, typeId, displayName: string|null, description: string|null, comment: string|null, tiers: string[], deprecated: boolean }",
     errors: [
-      { code: 400, meaning: "Unknown role name", remedy: "see ROLE_TYPEID_BY_NAME in @ibetoni/constants" },
+      apiErr(400, "Unknown role name", "see ROLE_TYPEID_BY_NAME in @ibetoni/constants"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ["ib role explain asiakasAdmin", "ib role explain lomaseurannassa"],
@@ -1730,7 +1675,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: { tyomaaId } }",
     errors: [
-      { code: 404, meaning: "Worksite not found", remedy: "verify tyomaaId" },
+      apiErr(404, "Worksite not found", "verify tyomaaId"),
       ...permErrors("auth.page.tyomaa.edit"),
     ],
     examples: ['ib worksite delete 99 --reason "lifecycle cleanup"'],
@@ -1743,7 +1688,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ success: true, tyomaa, message } (raw backend response)",
     errors: [
-      { code: 404, meaning: "Worksite not found", remedy: "verify tyomaaId" },
+      apiErr(404, "Worksite not found", "verify tyomaaId"),
       ...permErrors("auth.page.tyomaa.edit"),
     ],
     examples: ['ib worksite refresh-location 99 --reason "address corrected"'],
@@ -1759,7 +1704,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ success: true }",
     errors: [
-      { code: 400, meaning: "Radius out of range", remedy: "use 1-10000" },
+      apiErr(400, "Radius out of range", "use 1-10000"),
       ...permErrors("auth.page.tyomaa.edit"),
     ],
     examples: ["ib worksite set-geofence 99 --radius 300"],
@@ -1772,7 +1717,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ success, ... } (raw backend response)",
     errors: [
-      { code: 400, meaning: "Missing coordinates", remedy: "run refresh-location first" },
+      apiErr(400, "Missing coordinates", "run refresh-location first"),
       ...permErrors("auth.page.tyomaa.edit"),
     ],
     examples: ["ib worksite helsinki-fetch 99"],
@@ -1805,7 +1750,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ removed: { tyomaaId, personId } } or { dryRun: true, wouldDelete: { tyomaaId, personId } }",
     errors: [
-      { code: 404, meaning: "Link not found", remedy: "verify tyomaaId+personId combination" },
+      apiErr(404, "Link not found", "verify tyomaaId+personId combination"),
       ...permErrors("auth.page.tyomaa.edit"),
     ],
     examples: ['ib worksite person remove --worksite 99 --person 5351 --reason "rotation"'],
@@ -1838,7 +1783,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ personId, name, email, ... } (re-fetched) · with --get-or-create adds reused:boolean · dry-run: { dryRun: true, wouldCreate: ... }",
     errors: [
-      { code: 400, meaning: "Missing required field, or duplicate email without --get-or-create", remedy: "provide --first and --last (email is optional); add --get-or-create to reuse an existing email" },
+      apiErr(400, "Missing required field, or duplicate email without --get-or-create", "provide --first and --last (email is optional); add --get-or-create to reuse an existing email"),
       ...permErrors("auth.page.person.edit"),
     ],
     examples: [
@@ -1859,7 +1804,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ ok: true, updated: { personId } } or { dryRun: true, wouldUpdate: { personId, ... } }",
     errors: [
-      { code: 404, meaning: "Person not found", remedy: "verify personId" },
+      apiErr(404, "Person not found", "verify personId"),
       ...permErrors("auth.page.person.edit"),
     ],
     examples: ['ib person update 5351 --body \'{"personPhone":"+358501234567"}\' --reason "phone change"'],
@@ -1882,9 +1827,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ personId, ownerAsiakasId } or { dryRun: true, wouldSetOwner: { personId, from, to } }",
     errors: [
-      { code: 403, meaning: "Not allowed to change this person's owner", remedy: "see the authz rules above (developer/self/company-admin)" },
-      { code: 404, meaning: "Person not found", remedy: "verify personId" },
-      { code: 4, meaning: "Bad flags", remedy: "provide exactly one of --global / --asiakas and a --reason" },
+      apiErr(403, "Not allowed to change this person's owner", "see the authz rules above (developer/self/company-admin)"),
+      apiErr(404, "Person not found", "verify personId"),
+      { exit: 4, meaning: "Bad flags", remedy: "provide exactly one of --global / --asiakas and a --reason" },
     ],
     examples: [
       "ib person owner 5351 --global --reason 'make self-managing'",
@@ -1902,7 +1847,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: { personId } }",
     errors: [
-      { code: 404, meaning: "Person not found", remedy: "verify personId" },
+      apiErr(404, "Person not found", "verify personId"),
       ...permErrors("auth.page.person.edit"),
     ],
     examples: ['ib person delete 5351 --reason "departed"'],
@@ -1923,7 +1868,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ pumppuRequestId, status, createdAt, sentAt?, osoite, formattedAddress, totalM3|maaraM3, ... }> (fields differ between --mine and --open; --open is PII-masked)",
     errors: [
-      { code: 403, meaning: "Not a provider (for --open)", remedy: "switch to a provider company, or use --mine" },
+      apiErr(403, "Not a provider (for --open)", "switch to a provider company, or use --mine"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: [
@@ -1944,8 +1889,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "default: { pumppuRequestId, status, asiakasId, maaraM3, osoite, lat, lng, ... } | --provider: { request:{...}, ownOffer:{...}|null, ownAttachments:[…], requestAttachments:[…], messageThreadId }",
     errors: [
-      { code: 404, meaning: "Request not found / not yours", remedy: "verify requestId (and that you own it, or use --provider)" },
-      { code: 403, meaning: "Not a provider (for --provider)", remedy: "switch to a provider company" },
+      apiErr(404, "Request not found / not yours", "verify requestId (and that you own it, or use --provider)"),
+      apiErr(403, "Not a provider (for --provider)", "switch to a provider company"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ["ib jerry request get 4012", "ib jerry request get 4012 --provider"],
@@ -1960,7 +1905,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ pumppuOfferId, status, priceCents, vatPercent, validUntil, asiakasNimi, ytunnus, providerDistanceKm, companyDescription, jerryContactName?, jerryContactPhone?, openingHours? }>",
     errors: [
-      { code: 404, meaning: "Request not found / not yours", remedy: "verify requestId" },
+      apiErr(404, "Request not found / not yours", "verify requestId"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ["ib jerry request offers 4012", "ib jerry request offers 4012 --pretty"],
@@ -1985,10 +1930,10 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ pumppuOfferId, status:'draft', created, messageThreadId } · { dryRun:true, wouldUpsert:{ pumppuRequestId, priceCents, vatPercent, validUntil, availableFrom, extraNotes, cancellationTerms, maintainsOrderInfo } } on --dry-run",
     errors: [
-      { code: 400, meaning: "priceCents missing / out of range", remedy: "pass --price-cents as an integer 1..99999900" },
-      { code: 403, meaning: "Not a provider", remedy: "switch to a provider company (company switch)" },
-      { code: 404, meaning: "Request not found", remedy: "verify requestId" },
-      { code: 409, meaning: "Request not open / expired, or offer no longer editable", remedy: "the request was closed, or your offer is already accepted/rejected" },
+      apiErr(400, "priceCents missing / out of range", "pass --price-cents as an integer 1..99999900"),
+      apiErr(403, "Not a provider", "switch to a provider company (company switch)"),
+      apiErr(404, "Request not found", "verify requestId"),
+      apiErr(409, "Request not open / expired, or offer no longer editable", "the request was closed, or your offer is already accepted/rejected"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: [
@@ -2011,8 +1956,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ pumppuOfferId, status:'pending' } · { dryRun:true, wouldUpdate:{ pumppuRequestId, pumppuOfferId, status:'pending' } } on --dry-run",
     errors: [
-      { code: 403, meaning: "Not a provider", remedy: "switch to a provider company (company switch)" },
-      { code: 409, meaning: "Offer not in draft / not owned", remedy: "only a draft offer you own can be sent" },
+      apiErr(403, "Not a provider", "switch to a provider company (company switch)"),
+      apiErr(409, "Offer not in draft / not owned", "only a draft offer you own can be sent"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ['ib jerry offer send 4012 55 --reason "lahetä tarjous"', "ib jerry offer send 4012 55 --dry-run --reason preview"],
@@ -2031,8 +1976,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ pumppuRequestId, pumppuOfferId, keikkaId:null, status:'accepted' } · { dryRun:true, wouldAccept:{ pumppuRequestId, pumppuOfferId, status:'accepted' } } on --dry-run",
     errors: [
-      { code: 404, meaning: "Request not found / not yours", remedy: "verify requestId and that you own it" },
-      { code: 409, meaning: "Offer no longer acceptable", remedy: "a sibling was already accepted, or the offer expired" },
+      apiErr(404, "Request not found / not yours", "verify requestId and that you own it"),
+      apiErr(409, "Offer no longer acceptable", "a sibling was already accepted, or the offer expired"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ['ib jerry offer accept 4012 55 --reason "valittu toimittaja"'],
@@ -2053,10 +1998,10 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ pumppuRequestId, pumppuOfferId, status:'confirmed', keikkaId, scheduledAt } · { dryRun:true, wouldConfirm:{ pumppuRequestId, pumppuOfferId, status:'confirmed', scheduledAt, pumppuId } } on --dry-run",
     errors: [
-      { code: 400, meaning: "scheduledAt missing/invalid/in the past, or pumppuId not yours", remedy: "pass --scheduled-at as a future ISO datetime; --pumppu must be your vehicleId" },
-      { code: 403, meaning: "Not a provider / offer not yours", remedy: "switch to the owning provider company" },
-      { code: 404, meaning: "Request / offer not found", remedy: "verify requestId + offerId" },
-      { code: 409, meaning: "Offer not in 'accepted' state", remedy: "the customer must accept the offer before you confirm" },
+      apiErr(400, "scheduledAt missing/invalid/in the past, or pumppuId not yours", "pass --scheduled-at as a future ISO datetime; --pumppu must be your vehicleId"),
+      apiErr(403, "Not a provider / offer not yours", "switch to the owning provider company"),
+      apiErr(404, "Request / offer not found", "verify requestId + offerId"),
+      apiErr(409, "Offer not in 'accepted' state", "the customer must accept the offer before you confirm"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: [
@@ -2076,7 +2021,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "--mine: { draft, open, pending_verification, accepted, cancelled, expired, no_supply } | --provider: { avoimet, tarjotut, voitetut, voitetutActionRequired, paattyneet }",
     errors: [
-      { code: 403, meaning: "Not a provider (for --provider)", remedy: "switch to a provider company, or use --mine" },
+      apiErr(403, "Not a provider (for --provider)", "switch to a provider company, or use --mine"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ["ib jerry counts", "ib jerry counts --provider"],
@@ -2095,9 +2040,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ geocoded: boolean, deliverable?: boolean, lat?, lng?, placeId?, formattedAddress?, providerCount?, nearestVarikkoKm?, providers?: [{ asiakasId, asiakasNimi, distanceKm }] }",
     errors: [
-      { code: 400, meaning: "osoite missing", remedy: "pass --address" },
-      { code: 429, meaning: "Rate limit (10/min/IP)", remedy: "wait and retry" },
-      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+      apiErr(400, "osoite missing", "pass --address"),
+      apiErr(429, "Rate limit (10/min/IP)", "wait and retry"),
+      apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: [
       "ib jerry check-address --address 'Mannerheimintie 1, Helsinki'",
@@ -2115,7 +2060,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, openingHours, companyDescription, maintainsOrderInfo }",
     errors: [
-      { code: 403, meaning: "No edit rights on company", remedy: "use a tarjousAdmin/admin token for that company" },
+      apiErr(403, "No edit rights on company", "use a tarjousAdmin/admin token for that company"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ["ib jerry provider-settings get", "ib jerry provider-settings get --asiakas 1402"],
@@ -2133,8 +2078,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, openingHours, companyDescription, maintainsOrderInfo, changed } · { dryRun: true, wouldUpdate: {...} } on --dry-run",
     errors: [
-      { code: 400, meaning: "Invalid field / contact not in company", remedy: "check jerryPersonId belongs to the company" },
-      { code: 403, meaning: "No edit rights on company", remedy: "use a tarjousAdmin/admin token for that company" },
+      apiErr(400, "Invalid field / contact not in company", "check jerryPersonId belongs to the company"),
+      apiErr(403, "No edit rights on company", "use a tarjousAdmin/admin token for that company"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: [
@@ -2151,7 +2096,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, sijaintiNonJerryCount }>",
     errors: [
-      { code: 403, meaning: "Not a system admin", remedy: "use a system-admin token" },
+      apiErr(403, "Not a system admin", "use a system-admin token"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ["ib jerry admin list", "ib jerry admin list --pretty"],
@@ -2166,7 +2111,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "ListEnvelope<{ asiakasId, name }>",
     errors: [
-      { code: 403, meaning: "Not a system admin", remedy: "use a system-admin token" },
+      apiErr(403, "Not a system admin", "use a system-admin token"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ["ib jerry admin search Betoni"],
@@ -2182,8 +2127,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ admins:[{personId,name}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,isJerry}] }",
     errors: [
-      { code: 400, meaning: "Invalid asiakasId", remedy: "pass a numeric asiakasId" },
-      { code: 403, meaning: "Not a system admin", remedy: "use a system-admin token" },
+      apiErr(400, "Invalid asiakasId", "pass a numeric asiakasId"),
+      apiErr(403, "Not a system admin", "use a system-admin token"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ["ib jerry admin detail 1402"],
@@ -2200,9 +2145,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: true } }",
     errors: [
-      { code: 400, meaning: "Invalid asiakasId", remedy: "pass a numeric asiakasId" },
-      { code: 403, meaning: "Not a system admin", remedy: "use a system-admin token" },
-      { code: 404, meaning: "Company not found", remedy: "verify asiakasId" },
+      apiErr(400, "Invalid asiakasId", "pass a numeric asiakasId"),
+      apiErr(403, "Not a system admin", "use a system-admin token"),
+      apiErr(404, "Company not found", "verify asiakasId"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ['ib jerry admin enable 1402 --reason "onboard provider"', "ib jerry admin enable 1402 --dry-run"],
@@ -2219,9 +2164,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: false } }",
     errors: [
-      { code: 400, meaning: "Invalid asiakasId", remedy: "pass a numeric asiakasId" },
-      { code: 403, meaning: "Not a system admin", remedy: "use a system-admin token" },
-      { code: 404, meaning: "Company not found", remedy: "verify asiakasId" },
+      apiErr(400, "Invalid asiakasId", "pass a numeric asiakasId"),
+      apiErr(403, "Not a system admin", "use a system-admin token"),
+      apiErr(404, "Company not found", "verify asiakasId"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ['ib jerry admin disable 1402 --reason "offboard provider"'],
@@ -2230,20 +2175,16 @@ export const COMMAND_SPECS: CommandSpec[] = [
   // ─── schema (7) — developer-only SQL introspection ─────────────────────────
   ...((): CommandSpec[] => {
     const DEV_PERMS = ["developer access (isSystemAdmin or isDeveloper)"];
-    const devErrors = [
-      { code: 401, meaning: "Token expired", remedy: "ib auth refresh" },
-      { code: 403, meaning: "Not a developer", remedy: "run `ib auth whoami`; if not a developer, `ib auth login` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed." },
-      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+    const devErrors: CommandError[] = [
+      apiErr(401, "Token expired", "ib auth refresh"),
+      apiErr(403, "Not a developer", "run `ib auth whoami`; if not a developer, `ib auth login` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed."),
+      apiErr(500, "Backend error", "retry with --verbose"),
     ];
     const listFlags = [
       { name: "search", type: "string", description: "Filter object names by substring" },
       { name: "limit", type: "number", default: "200", description: "Max rows (max 1000)" },
     ];
-    const invalidNameErr = {
-      code: 400,
-      meaning: "Invalid name (letters/digits/underscore only)",
-      remedy: "use the bare object name, no schema prefix",
-    };
+    const invalidNameErr = apiErr(400, "Invalid name (letters/digits/underscore only)", "use the bare object name, no schema prefix");
     return [
       {
         command: "ib schema tables",
@@ -2260,7 +2201,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
         permissions: DEV_PERMS,
         flags: [],
         outputShape: "{ name, columns:[{name,dataType,maxLength,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], indexes:[{name,columns,unique}] }",
-        errors: [...devErrors, invalidNameErr, { code: 404, meaning: "Table not found", remedy: "check the name via `ib schema tables`" }],
+        errors: [...devErrors, invalidNameErr, apiErr(404, "Table not found", "check the name via `ib schema tables`")],
         examples: ["ib schema table keikka"],
       },
       {
@@ -2278,7 +2219,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
         permissions: DEV_PERMS,
         flags: [],
         outputShape: "{ name, columns:[{name,dataType,maxLength,nullable,default,key}], definition:'<T-SQL>' }",
-        errors: [...devErrors, invalidNameErr, { code: 404, meaning: "View not found", remedy: "check the name via `ib schema views`" }],
+        errors: [...devErrors, invalidNameErr, apiErr(404, "View not found", "check the name via `ib schema views`")],
         examples: ["ib schema view keikkaBetoniView"],
       },
       {
@@ -2296,7 +2237,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
         permissions: DEV_PERMS,
         flags: [],
         outputShape: "{ name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }",
-        errors: [...devErrors, invalidNameErr, { code: 404, meaning: "Proc/function not found", remedy: "check the name via `ib schema procs`" }],
+        errors: [...devErrors, invalidNameErr, apiErr(404, "Proc/function not found", "check the name via `ib schema procs`")],
         examples: ["ib schema proc asiakas_find"],
       },
       {
@@ -2325,10 +2266,10 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }",
     errors: [
-      { code: 403, meaning: "Weather module off or permission denied", remedy: "enable via 'ib weather toggle --on' (admin) or contact an admin" },
-      { code: 400, meaning: "Bad coords/time", remedy: "use Finland coords and a time within now..+240h" },
-      { code: 401, meaning: "Not authenticated", remedy: "run 'ib auth login'" },
-      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+      apiErr(403, "Weather module off or permission denied", "enable via 'ib weather toggle --on' (admin) or contact an admin"),
+      apiErr(400, "Bad coords/time", "use Finland coords and a time within now..+240h"),
+      apiErr(401, "Not authenticated", "run 'ib auth login'"),
+      apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: [
       "ib weather forecast --lat 60.1699 --lng 24.9384 --time now",
@@ -2348,10 +2289,10 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ date, minTemp, maxTemp, avgTemp, windSpeed, precipitation, weatherSymbol, source, coordinates }",
     errors: [
-      { code: 403, meaning: "Weather module off or permission denied", remedy: "enable via 'ib weather toggle --on'" },
-      { code: 400, meaning: "Bad coords/date", remedy: "use Finland coords and a valid date" },
-      { code: 401, meaning: "Not authenticated", remedy: "run 'ib auth login'" },
-      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+      apiErr(403, "Weather module off or permission denied", "enable via 'ib weather toggle --on'"),
+      apiErr(400, "Bad coords/date", "use Finland coords and a valid date"),
+      apiErr(401, "Not authenticated", "run 'ib auth login'"),
+      apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: [
       "ib weather day --lat 60.17 --lng 24.94 --date today",
@@ -2373,10 +2314,10 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ hourly: [{ time, temperature, windSpeed, precipitation, weatherSymbol }], summary, coordinates }",
     errors: [
-      { code: 403, meaning: "Weather module off or permission denied", remedy: "enable via 'ib weather toggle --on'" },
-      { code: 400, meaning: "Bad coords/time/duration", remedy: "use Finland coords, valid ISO time, positive duration" },
-      { code: 401, meaning: "Not authenticated", remedy: "run 'ib auth login'" },
-      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+      apiErr(403, "Weather module off or permission denied", "enable via 'ib weather toggle --on'"),
+      apiErr(400, "Bad coords/time/duration", "use Finland coords, valid ISO time, positive duration"),
+      apiErr(401, "Not authenticated", "run 'ib auth login'"),
+      apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: [
       "ib weather pumping --lat 60.17 --lng 24.94 --start now --duration 120",
@@ -2394,10 +2335,10 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }",
     errors: [
-      { code: 403, meaning: "Weather module off or permission denied", remedy: "enable via 'ib weather toggle --on'" },
-      { code: 404, meaning: "Tyomaa not found or has no coordinates", remedy: "check tyomaaId; ensure the worksite has been geocoded" },
-      { code: 401, meaning: "Not authenticated", remedy: "run 'ib auth login'" },
-      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+      apiErr(403, "Weather module off or permission denied", "enable via 'ib weather toggle --on'"),
+      apiErr(404, "Tyomaa not found or has no coordinates", "check tyomaaId; ensure the worksite has been geocoded"),
+      apiErr(401, "Not authenticated", "run 'ib auth login'"),
+      apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: [
       "ib weather worksite 1234",
@@ -2416,10 +2357,10 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }",
     errors: [
-      { code: 403, meaning: "Weather module off or permission denied", remedy: "enable via 'ib weather toggle --on'" },
-      { code: 5, meaning: "Address not found (ZERO_RESULTS)", remedy: "try a more specific Finnish address" },
-      { code: 401, meaning: "Not authenticated", remedy: "run 'ib auth login'" },
-      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+      apiErr(403, "Weather module off or permission denied", "enable via 'ib weather toggle --on'"),
+      { exit: 5, meaning: "Address not found (ZERO_RESULTS)", remedy: "try a more specific Finnish address" },
+      apiErr(401, "Not authenticated", "run 'ib auth login'"),
+      apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: [
       "ib weather address --address 'Mannerheimintie 1, Helsinki' --time now",
@@ -2433,8 +2374,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
     flags: [],
     outputShape: "{ enabled: boolean, ... }",
     errors: [
-      { code: 401, meaning: "Not authenticated", remedy: "run 'ib auth login'" },
-      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+      apiErr(401, "Not authenticated", "run 'ib auth login'"),
+      apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: ["ib weather status"],
   },
@@ -2452,10 +2393,10 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "{ success: boolean, enabled: boolean, ... }",
     errors: [
-      { code: 4, meaning: "Neither --on nor --off passed, or both passed", remedy: "pass exactly one of --on / --off" },
-      { code: 403, meaning: "Permission denied (admin required)", remedy: "requires admin role on the company" },
-      { code: 401, meaning: "Not authenticated", remedy: "run 'ib auth login'" },
-      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+      { exit: 4, meaning: "Neither --on nor --off passed, or both passed", remedy: "pass exactly one of --on / --off" },
+      apiErr(403, "Permission denied (admin required)", "requires admin role on the company"),
+      apiErr(401, "Not authenticated", "run 'ib auth login'"),
+      apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: [
       "ib weather toggle --on --reason 'enabling for summer season'",
@@ -2472,7 +2413,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ version: string, generatedAt: ISO-8601, commands: { '<command>': CommandSpec } }",
     errors: [
-      { code: 1, meaning: "I/O error", remedy: "retry; check stdout pipe" },
+      { exit: 1, meaning: "I/O error", remedy: "retry; check stdout pipe" },
     ],
     examples: ["ib reference dump", "ib reference dump | jq .version"],
   },
@@ -2501,11 +2442,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ items: [{ command, description, permissions: string[], writeFlags: boolean }], nextCursor: null, count }",
     errors: [
-      {
-        code: 4,
-        meaning: "Bad flag combo",
-        remedy: "--mutations and --reads are mutually exclusive",
-      },
+      { exit: 4, meaning: "Bad flag combo", remedy: "--mutations and --reads are mutually exclusive" },
     ],
     examples: [
       "ib commands",
@@ -2532,11 +2469,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ cli, endpoint, reachable, server: { app, version, commit, release, slot } | null, error? }",
     errors: [
-      {
-        code: 7,
-        meaning: "Endpoint unreachable",
-        remedy: "check --endpoint / network; the report (cli version + error) still prints",
-      },
+      { exit: 7, meaning: "Endpoint unreachable", remedy: "check --endpoint / network; the report (cli version + error) still prints" },
     ],
     examples: [
       "ib version",
@@ -2554,8 +2487,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ ok:boolean, cli, endpoint, readOnly, auth:{ personId, ownerAsiakasId, ownerAsiakasName, email, issuedFor, tokenExp, tokenExpired }, connectivity:VersionReport, authProbe:{ ok, status?, error? } }",
     errors: [
-      { code: 1, meaning: "Not healthy", remedy: "inspect connectivity / authProbe / tokenExpired in the report" },
-      { code: 2, meaning: "Not logged in", remedy: "ib auth login (or set IB_TOKEN)" },
+      { exit: 1, meaning: "Not healthy", remedy: "inspect connectivity / authProbe / tokenExpired in the report" },
+      { exit: 2, meaning: "Not logged in", remedy: "ib auth login (or set IB_TOKEN)" },
     ],
     examples: ["ib doctor", "ib doctor --endpoint https://api-staging.ibetoni.fi"],
   },
@@ -2578,9 +2511,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
     errors: [
-      { code: 4, meaning: "Validation", remedy: "description is required; --kind must be improvement|bug" },
-      { code: 2, meaning: "Token expired", remedy: "ib auth refresh" },
-      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+      { exit: 4, meaning: "Validation", remedy: "description is required; --kind must be improvement|bug" },
+      { exit: 2, meaning: "Token expired", remedy: "ib auth refresh" },
+      apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: [
       'ib feedback create "schema table output should include row counts"',
@@ -2601,9 +2534,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "{ items: FeedbackRow[], nextCursor: null, count }",
     errors: [
-      { code: 3, meaning: "Permission denied", remedy: "requires a developer token (isSystemAdmin/isDeveloper)" },
-      { code: 2, meaning: "Token expired", remedy: "ib auth refresh" },
-      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+      { exit: 3, meaning: "Permission denied", remedy: "requires a developer token (isSystemAdmin/isDeveloper)" },
+      { exit: 2, meaning: "Token expired", remedy: "ib auth refresh" },
+      apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: ["ib feedback list --status open", "ib feedback list --kind bug --limit 20"],
   },
@@ -2615,9 +2548,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
     flags: [],
     outputShape: "The full feedback row { feedbackId, kind, status, description, command, errorText, cliVersion, context, resolution, createdAt, ... }",
     errors: [
-      { code: 3, meaning: "Permission denied", remedy: "requires a developer token" },
-      { code: 5, meaning: "Not found", remedy: "check the id via `ib feedback list`" },
-      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+      { exit: 3, meaning: "Permission denied", remedy: "requires a developer token" },
+      { exit: 5, meaning: "Not found", remedy: "check the id via `ib feedback list`" },
+      apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: ["ib feedback get 42"],
   },
@@ -2633,10 +2566,10 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "The updated feedback row. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
     errors: [
-      { code: 4, meaning: "Validation", remedy: "provide --status and/or --note; status must be a known value" },
-      { code: 3, meaning: "Permission denied", remedy: "requires a developer token; also refused under --read-only" },
-      { code: 5, meaning: "Not found", remedy: "check the id via `ib feedback list`" },
-      { code: 500, meaning: "Backend error", remedy: "retry with --verbose" },
+      { exit: 4, meaning: "Validation", remedy: "provide --status and/or --note; status must be a known value" },
+      { exit: 3, meaning: "Permission denied", remedy: "requires a developer token; also refused under --read-only" },
+      { exit: 5, meaning: "Not found", remedy: "check the id via `ib feedback list`" },
+      apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: [
       'ib feedback resolve 42 --status applied --note "added row counts in CLI v1.3"',

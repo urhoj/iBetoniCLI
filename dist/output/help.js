@@ -59,7 +59,8 @@ export function formatHelp(spec) {
     lines.push("");
     lines.push("ERRORS (stderr, exit non-zero)");
     for (const e of spec.errors) {
-        lines.push(`  ${e.code}  ${e.meaning.padEnd(22)} → ${e.remedy}`);
+        const http = e.http ? ` (HTTP ${e.http})` : "";
+        lines.push(`  exit ${e.exit}${http}  ${e.meaning.padEnd(22)} → ${e.remedy}`);
     }
     lines.push("");
     lines.push("EXAMPLES");

@@ -18,8 +18,8 @@ OUTPUT (JSON, stdout)
   stderr: 'Logged in as <email> at <company>.'; credentials file written
 
 ERRORS (stderr, exit non-zero)
-  2  OAuth flow failed      → retry; check network / browser
-  500  Backend error          → retry later
+  exit 2  OAuth flow failed      → retry; check network / browser
+  exit 6 (HTTP 500)  Backend error          → retry later
 
 EXAMPLES
   ib auth login
@@ -45,7 +45,7 @@ OUTPUT (JSON, stdout)
   no stdout output; exit 0 on success
 
 ERRORS (stderr, exit non-zero)
-  1  I/O error              → check file permissions
+  exit 1  I/O error              → check file permissions
 
 EXAMPLES
   ib auth logout
@@ -70,7 +70,7 @@ OUTPUT (JSON, stdout)
   { ok: true }
 
 ERRORS (stderr, exit non-zero)
-  2  Refresh failed         → ib auth login to re-authenticate
+  exit 2  Refresh failed         → ib auth login to re-authenticate
 
 EXAMPLES
   ib auth refresh
@@ -95,8 +95,8 @@ OUTPUT (JSON, stdout)
   { ok: true, activeCompany: { asiakasId, name } }
 
 ERRORS (stderr, exit non-zero)
-  2  Not logged in          → ib auth login
-  403  No access to target    → verify ownership via \`ib company list\`
+  exit 2  Not logged in          → ib auth login
+  exit 3 (HTTP 403)  No access to target    → verify ownership via \`ib company list\`
 
 EXAMPLES
   ib auth switch --to 1349
@@ -121,7 +121,7 @@ OUTPUT (JSON, stdout)
   { personId, activeCompany: { asiakasId, name }, endpoint }
 
 ERRORS (stderr, exit non-zero)
-  2  Not logged in          → ib auth login first
+  exit 2  Not logged in          → ib auth login first
 
 EXAMPLES
   ib auth whoami
@@ -148,7 +148,7 @@ OUTPUT (JSON, stdout)
   { items: [{ command, description, permissions: string[], writeFlags: boolean }], nextCursor: null, count }
 
 ERRORS (stderr, exit non-zero)
-  4  Bad flag combo         → --mutations and --reads are mutually exclusive
+  exit 4  Bad flag combo         → --mutations and --reads are mutually exclusive
 
 EXAMPLES
   ib commands
@@ -177,8 +177,8 @@ OUTPUT (JSON, stdout)
   { asiakasId, name }
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib company current
@@ -203,8 +203,8 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasId, name, current }> = { items, nextCursor, count }
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib company list
@@ -230,9 +230,9 @@ OUTPUT (JSON, stdout)
   { ok: true, activeCompany: { asiakasId, name } }
 
 ERRORS (stderr, exit non-zero)
-  403  No access to target    → verify via \`ib company list\`
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 3 (HTTP 403)  No access to target    → verify via \`ib company list\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib company switch --to 1349
@@ -272,10 +272,10 @@ OUTPUT (JSON, stdout)
   flat customer { asiakasId, name, yTunnus, type, address, postalCode, city, email, contactPersonId, shortName, comment } (or wouldCreate on --dry-run; with --get-or-create adds reused:boolean)
 
 ERRORS (stderr, exit non-zero)
-  400  Missing yTunnus / validation, or >1 customer shares the yTunnus with --get-or-create → pass --ytunnus or --from-prh; for an ambiguous match use \`ib customer get <id>\`
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.asiakas.edit
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Missing yTunnus / validation, or >1 customer shares the yTunnus with --get-or-create → pass --ytunnus or --from-prh; for an ambiguous match use \`ib customer get <id>\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib customer create --from-prh 0145937-9 --email billing@x.fi --reason onboard
@@ -319,10 +319,10 @@ OUTPUT (JSON, stdout)
   { ...flat customer, action: 'created'|'updated' } (action 'updated' also carries changed:boolean|null) · { action: 'would-*', dryRun } on --dry-run
 
 ERRORS (stderr, exit non-zero)
-  400  No ytunnus key, or >1 customers share the ytunnus (ambiguous) → provide --ytunnus/--from-prh; for an ambiguous match use \`ib customer update <id>\`
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.asiakas.edit
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  No ytunnus key, or >1 customers share the ytunnus (ambiguous) → provide --ytunnus/--from-prh; for an ambiguous match use \`ib customer update <id>\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib customer create-or-update --from-prh 1234567-8 --reason 'PRH onboarding'
@@ -354,10 +354,10 @@ OUTPUT (JSON, stdout)
   { deleted: number } or { dryRun: true, wouldDelete: number }
 
 ERRORS (stderr, exit non-zero)
-  404  Customer not found     → verify asiakasId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.asiakas.edit
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Customer not found     → verify asiakasId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib customer delete 9001 --reason "lifecycle cleanup"
@@ -383,10 +383,10 @@ OUTPUT (JSON, stdout)
   { asiakasId, name, yTunnus, type, address, postalCode, city, email, phone, contactPersonId, shortName, comment }
 
 ERRORS (stderr, exit non-zero)
-  404  Customer not found     → verify asiakasId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.asiakas.read
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Customer not found     → verify asiakasId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib customer get 1349
@@ -413,9 +413,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.asiakas.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib customer history 26
@@ -446,9 +446,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasId, name, yTunnus, type }> + truncated:boolean · with --full the items add { address, postalCode, city, email, contactPersonId, shortName, comment, companyDescription } · with --include each item adds contacts:[{personId,name,phone,email,contactPersonTypeId}] and/or sijainnit:[{sijaintiId,name,lyh,address,sijaintiTypeId,maxDeliveryDistance,jerryActiveUntil}] · with --ids the response adds missing:[{asiakasId, reason:'not_owned'|'not_found'}] for requested ids that didn't return
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.asiakas.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib customer list
@@ -485,11 +485,11 @@ OUTPUT (JSON, stdout)
   report: { asiakasId, roolit:{...}, modules:{...} } | write: { asiakasId, applied:{ set, unset, dryRun }, state:{ roolit, modules } }
 
 ERRORS (stderr, exit non-zero)
-  400  Unknown field key, or key in both --set and --unset → use only: pumppu/jerry/henkilot/sijainnit/ajoneuvot/tiedostot/weather/lomaseuranta/shareorders
-  403  Not an admin of this tenant → use a system-admin token, or an admin of the owner company
-  404  Customer not found     → verify asiakasId
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Unknown field key, or key in both --set and --unset → use only: pumppu/jerry/henkilot/sijainnit/ajoneuvot/tiedostot/weather/lomaseuranta/shareorders
+  exit 3 (HTTP 403)  Not an admin of this tenant → use a system-admin token, or an admin of the owner company
+  exit 5 (HTTP 404)  Customer not found     → verify asiakasId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib customer modules 1349
@@ -524,11 +524,11 @@ OUTPUT (JSON, stdout)
   verify: { asiakasId, allSet, flags:{ pumppu, jerry, … }, missing:[…] } (exit 1 when allSet=false) | set/reset: { asiakasId, applied:{ set, unset, dryRun }, state }
 
 ERRORS (stderr, exit non-zero)
-  400  --set and --reset both given → pass at most one of --set / --reset
-  403  Not an admin of this tenant → use a system-admin token, or an admin of the owner company
-  404  Customer not found     → verify asiakasId
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  --set and --reset both given → pass at most one of --set / --reset
+  exit 3 (HTTP 403)  Not an admin of this tenant → use a system-admin token, or an admin of the owner company
+  exit 5 (HTTP 404)  Customer not found     → verify asiakasId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib customer operator 1349
@@ -564,10 +564,10 @@ OUTPUT (JSON, stdout)
   { added: { asiakasId, personId } } or { dryRun: true, wouldCreate: { asiakasId, personId, contactPersonTypeId } }
 
 ERRORS (stderr, exit non-zero)
-  400  Company limit (26) reached → remove an existing link first
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.asiakas.edit
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Company limit (26) reached → remove an existing link first
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib customer person add --asiakas 26 --person 5351 --contact-type 1 --reason "onboard driver"
@@ -594,10 +594,10 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ personId, name, email, roleTypeId: number|null, permissionRoles?: string[] }>
 
 ERRORS (stderr, exit non-zero)
-  400  Unknown role name      → see ROLE_TYPEID_BY_NAME in @ibetoni/constants
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.asiakas.read
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Unknown role name      → see ROLE_TYPEID_BY_NAME in @ibetoni/constants
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib customer person list 26
@@ -633,10 +633,10 @@ OUTPUT (JSON, stdout)
   { removed: { asiakasId, personId } } or { dryRun: true, wouldDelete: { asiakasId, personId } }
 
 ERRORS (stderr, exit non-zero)
-  404  Link not found         → verify asiakasId+personId combination
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.asiakas.edit
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Link not found         → verify asiakasId+personId combination
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib customer person remove --asiakas 26 --person 5351 --reason "offboard driver"
@@ -663,10 +663,10 @@ OUTPUT (JSON, stdout)
   by-id: { businessId, name, tradeNames, address:{street,postCode,city,full}, companyForm, status } | search: ListEnvelope<{ businessId, name, city }>
 
 ERRORS (stderr, exit non-zero)
-  404  Business ID not found  → verify the Y-tunnus
-  400  Invalid Y-tunnus format → use XXXXXXXX-X
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Business ID not found  → verify the Y-tunnus
+  exit 4 (HTTP 400)  Invalid Y-tunnus format → use XXXXXXXX-X
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib customer prh 0145937-9
@@ -694,9 +694,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasId, name, yTunnus, score }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.asiakas.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib customer search Example
@@ -730,11 +730,11 @@ OUTPUT (JSON, stdout)
   report: { asiakasId, roolit:{…}, settings:{ HAS_FENNOA:bool, ALV:bool, … every setting } } | write: { asiakasId, applied:{set,unset,dryRun}, state }
 
 ERRORS (stderr, exit non-zero)
-  400  Unknown setting name, or name in both --set/--unset → use a canonical ASIAKAS_SETTING_TYPE_IDS name, an alias, or pumppu
-  403  Not an admin of this tenant → use a system-admin token, or an admin of the owner company
-  404  Customer not found     → verify asiakasId
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Unknown setting name, or name in both --set/--unset → use a canonical ASIAKAS_SETTING_TYPE_IDS name, an alias, or pumppu
+  exit 3 (HTTP 403)  Not an admin of this tenant → use a system-admin token, or an admin of the owner company
+  exit 5 (HTTP 404)  Customer not found     → verify asiakasId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib customer settings 1349
@@ -778,10 +778,10 @@ OUTPUT (JSON, stdout)
   flat customer shape + changed:boolean|null (whether anything actually changed vs an idempotent no-op; null = undetermined) · wouldUpdate on --dry-run
 
 ERRORS (stderr, exit non-zero)
-  404  Customer not found     → verify asiakasId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.asiakas.edit
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Customer not found     → verify asiakasId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib customer update 26 --email new@x.fi --reason 'email change'
@@ -808,9 +808,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ tyomaaId, name, address, city }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.tyomaa.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib customer worksites 1349
@@ -835,8 +835,8 @@ OUTPUT (JSON, stdout)
   { ok:boolean, cli, endpoint, readOnly, auth:{ personId, ownerAsiakasId, ownerAsiakasName, email, issuedFor, tokenExp, tokenExpired }, connectivity:VersionReport, authProbe:{ ok, status?, error? } }
 
 ERRORS (stderr, exit non-zero)
-  1  Not healthy            → inspect connectivity / authProbe / tokenExpired in the report
-  2  Not logged in          → ib auth login (or set IB_TOKEN)
+  exit 1  Not healthy            → inspect connectivity / authProbe / tokenExpired in the report
+  exit 2  Not logged in          → ib auth login (or set IB_TOKEN)
 
 EXAMPLES
   ib doctor
@@ -865,9 +865,9 @@ OUTPUT (JSON, stdout)
   { feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
-  4  Validation             → description is required; --kind must be improvement|bug
-  2  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 4  Validation             → description is required; --kind must be improvement|bug
+  exit 2  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib feedback create "schema table output should include row counts"
@@ -895,9 +895,9 @@ OUTPUT (JSON, stdout)
   The full feedback row { feedbackId, kind, status, description, command, errorText, cliVersion, context, resolution, createdAt, ... }
 
 ERRORS (stderr, exit non-zero)
-  3  Permission denied      → requires a developer token
-  5  Not found              → check the id via \`ib feedback list\`
-  500  Backend error          → retry with --verbose
+  exit 3  Permission denied      → requires a developer token
+  exit 5  Not found              → check the id via \`ib feedback list\`
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib feedback get 42
@@ -926,9 +926,9 @@ OUTPUT (JSON, stdout)
   { items: FeedbackRow[], nextCursor: null, count }
 
 ERRORS (stderr, exit non-zero)
-  3  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
-  2  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 3  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
+  exit 2  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib feedback list --status open
@@ -957,10 +957,10 @@ OUTPUT (JSON, stdout)
   The updated feedback row. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
-  4  Validation             → provide --status and/or --note; status must be a known value
-  3  Permission denied      → requires a developer token; also refused under --read-only
-  5  Not found              → check the id via \`ib feedback list\`
-  500  Backend error          → retry with --verbose
+  exit 4  Validation             → provide --status and/or --note; status must be a known value
+  exit 3  Permission denied      → requires a developer token; also refused under --read-only
+  exit 5  Not found              → check the id via \`ib feedback list\`
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib feedback resolve 42 --status applied --note "added row counts in CLI v1.3"
@@ -987,10 +987,10 @@ OUTPUT (JSON, stdout)
   { admins:[{personId,name}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,isJerry}] }
 
 ERRORS (stderr, exit non-zero)
-  400  Invalid asiakasId      → pass a numeric asiakasId
-  403  Not a system admin     → use a system-admin token
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Invalid asiakasId      → pass a numeric asiakasId
+  exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib jerry admin detail 1402
@@ -1022,11 +1022,11 @@ OUTPUT (JSON, stdout)
   { success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: false } }
 
 ERRORS (stderr, exit non-zero)
-  400  Invalid asiakasId      → pass a numeric asiakasId
-  403  Not a system admin     → use a system-admin token
-  404  Company not found      → verify asiakasId
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Invalid asiakasId      → pass a numeric asiakasId
+  exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
+  exit 5 (HTTP 404)  Company not found      → verify asiakasId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib jerry admin disable 1402 --reason "offboard provider"
@@ -1058,11 +1058,11 @@ OUTPUT (JSON, stdout)
   { success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: true } }
 
 ERRORS (stderr, exit non-zero)
-  400  Invalid asiakasId      → pass a numeric asiakasId
-  403  Not a system admin     → use a system-admin token
-  404  Company not found      → verify asiakasId
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Invalid asiakasId      → pass a numeric asiakasId
+  exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
+  exit 5 (HTTP 404)  Company not found      → verify asiakasId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib jerry admin enable 1402 --reason "onboard provider"
@@ -1089,9 +1089,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, sijaintiNonJerryCount }>
 
 ERRORS (stderr, exit non-zero)
-  403  Not a system admin     → use a system-admin token
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib jerry admin list
@@ -1118,9 +1118,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasId, name }>
 
 ERRORS (stderr, exit non-zero)
-  403  Not a system admin     → use a system-admin token
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib jerry admin search Betoni
@@ -1149,9 +1149,9 @@ OUTPUT (JSON, stdout)
   { geocoded: boolean, deliverable?: boolean, lat?, lng?, placeId?, formattedAddress?, providerCount?, nearestVarikkoKm?, providers?: [{ asiakasId, asiakasNimi, distanceKm }] }
 
 ERRORS (stderr, exit non-zero)
-  400  osoite missing         → pass --address
-  429  Rate limit (10/min/IP) → wait and retry
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  osoite missing         → pass --address
+  exit 4 (HTTP 429)  Rate limit (10/min/IP) → wait and retry
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib jerry check-address --address 'Mannerheimintie 1, Helsinki'
@@ -1179,9 +1179,9 @@ OUTPUT (JSON, stdout)
   --mine: { draft, open, pending_verification, accepted, cancelled, expired, no_supply } | --provider: { avoimet, tarjotut, voitetut, voitetutActionRequired, paattyneet }
 
 ERRORS (stderr, exit non-zero)
-  403  Not a provider (for --provider) → switch to a provider company, or use --mine
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 3 (HTTP 403)  Not a provider (for --provider) → switch to a provider company, or use --mine
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib jerry counts
@@ -1215,10 +1215,10 @@ OUTPUT (JSON, stdout)
   { pumppuRequestId, pumppuOfferId, keikkaId:null, status:'accepted' } · { dryRun:true, wouldAccept:{ pumppuRequestId, pumppuOfferId, status:'accepted' } } on --dry-run
 
 ERRORS (stderr, exit non-zero)
-  404  Request not found / not yours → verify requestId and that you own it
-  409  Offer no longer acceptable → a sibling was already accepted, or the offer expired
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Request not found / not yours → verify requestId and that you own it
+  exit 4 (HTTP 409)  Offer no longer acceptable → a sibling was already accepted, or the offer expired
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib jerry offer accept 4012 55 --reason "valittu toimittaja"
@@ -1253,12 +1253,12 @@ OUTPUT (JSON, stdout)
   { pumppuRequestId, pumppuOfferId, status:'confirmed', keikkaId, scheduledAt } · { dryRun:true, wouldConfirm:{ pumppuRequestId, pumppuOfferId, status:'confirmed', scheduledAt, pumppuId } } on --dry-run
 
 ERRORS (stderr, exit non-zero)
-  400  scheduledAt missing/invalid/in the past, or pumppuId not yours → pass --scheduled-at as a future ISO datetime; --pumppu must be your vehicleId
-  403  Not a provider / offer not yours → switch to the owning provider company
-  404  Request / offer not found → verify requestId + offerId
-  409  Offer not in 'accepted' state → the customer must accept the offer before you confirm
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  scheduledAt missing/invalid/in the past, or pumppuId not yours → pass --scheduled-at as a future ISO datetime; --pumppu must be your vehicleId
+  exit 3 (HTTP 403)  Not a provider / offer not yours → switch to the owning provider company
+  exit 5 (HTTP 404)  Request / offer not found → verify requestId + offerId
+  exit 4 (HTTP 409)  Offer not in 'accepted' state → the customer must accept the offer before you confirm
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib jerry offer confirm 4012 55 --scheduled-at 2026-06-15T08:00:00Z --reason vahvistettu
@@ -1298,12 +1298,12 @@ OUTPUT (JSON, stdout)
   { pumppuOfferId, status:'draft', created, messageThreadId } · { dryRun:true, wouldUpsert:{ pumppuRequestId, priceCents, vatPercent, validUntil, availableFrom, extraNotes, cancellationTerms, maintainsOrderInfo } } on --dry-run
 
 ERRORS (stderr, exit non-zero)
-  400  priceCents missing / out of range → pass --price-cents as an integer 1..99999900
-  403  Not a provider         → switch to a provider company (company switch)
-  404  Request not found      → verify requestId
-  409  Request not open / expired, or offer no longer editable → the request was closed, or your offer is already accepted/rejected
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  priceCents missing / out of range → pass --price-cents as an integer 1..99999900
+  exit 3 (HTTP 403)  Not a provider         → switch to a provider company (company switch)
+  exit 5 (HTTP 404)  Request not found      → verify requestId
+  exit 4 (HTTP 409)  Request not open / expired, or offer no longer editable → the request was closed, or your offer is already accepted/rejected
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib jerry offer create 4012 --price-cents 45000 --reason "tarjous"
@@ -1338,10 +1338,10 @@ OUTPUT (JSON, stdout)
   { pumppuOfferId, status:'pending' } · { dryRun:true, wouldUpdate:{ pumppuRequestId, pumppuOfferId, status:'pending' } } on --dry-run
 
 ERRORS (stderr, exit non-zero)
-  403  Not a provider         → switch to a provider company (company switch)
-  409  Offer not in draft / not owned → only a draft offer you own can be sent
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 3 (HTTP 403)  Not a provider         → switch to a provider company (company switch)
+  exit 4 (HTTP 409)  Offer not in draft / not owned → only a draft offer you own can be sent
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib jerry offer send 4012 55 --reason "lahetä tarjous"
@@ -1368,9 +1368,9 @@ OUTPUT (JSON, stdout)
   { asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, openingHours, companyDescription, maintainsOrderInfo }
 
 ERRORS (stderr, exit non-zero)
-  403  No edit rights on company → use a tarjousAdmin/admin token for that company
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 3 (HTTP 403)  No edit rights on company → use a tarjousAdmin/admin token for that company
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib jerry provider-settings get
@@ -1404,10 +1404,10 @@ OUTPUT (JSON, stdout)
   { asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, openingHours, companyDescription, maintainsOrderInfo, changed } · { dryRun: true, wouldUpdate: {...} } on --dry-run
 
 ERRORS (stderr, exit non-zero)
-  400  Invalid field / contact not in company → check jerryPersonId belongs to the company
-  403  No edit rights on company → use a tarjousAdmin/admin token for that company
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Invalid field / contact not in company → check jerryPersonId belongs to the company
+  exit 3 (HTTP 403)  No edit rights on company → use a tarjousAdmin/admin token for that company
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib jerry provider-settings set --body '{"openingHours":"ma-pe 7-16","maintainsOrderInfo":true}' --reason "update opening hours"
@@ -1435,10 +1435,10 @@ OUTPUT (JSON, stdout)
   default: { pumppuRequestId, status, asiakasId, maaraM3, osoite, lat, lng, ... } | --provider: { request:{...}, ownOffer:{...}|null, ownAttachments:[…], requestAttachments:[…], messageThreadId }
 
 ERRORS (stderr, exit non-zero)
-  404  Request not found / not yours → verify requestId (and that you own it, or use --provider)
-  403  Not a provider (for --provider) → switch to a provider company
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Request not found / not yours → verify requestId (and that you own it, or use --provider)
+  exit 3 (HTTP 403)  Not a provider (for --provider) → switch to a provider company
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib jerry request get 4012
@@ -1468,9 +1468,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ pumppuRequestId, status, createdAt, sentAt?, osoite, formattedAddress, totalM3|maaraM3, ... }> (fields differ between --mine and --open; --open is PII-masked)
 
 ERRORS (stderr, exit non-zero)
-  403  Not a provider (for --open) → switch to a provider company, or use --mine
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 3 (HTTP 403)  Not a provider (for --open) → switch to a provider company, or use --mine
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib jerry request list
@@ -1497,9 +1497,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ pumppuOfferId, status, priceCents, vatPercent, validUntil, asiakasNimi, ytunnus, providerDistanceKm, companyDescription, jerryContactName?, jerryContactPhone?, openingHours? }>
 
 ERRORS (stderr, exit non-zero)
-  404  Request not found / not yours → verify requestId
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Request not found / not yours → verify requestId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib jerry request offers 4012
@@ -1531,10 +1531,10 @@ OUTPUT (JSON, stdout)
   { keikkaId, ...echoed fields } (raw backend response)
 
 ERRORS (stderr, exit non-zero)
-  400  Validation failed      → fix --body fields
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.grid.tilaus.edit
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Validation failed      → fix --body fields
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib keikka create --body '{"asiakasId":1349,"pvm":"2026-06-01"}' --reason 'manual booking'
@@ -1566,10 +1566,10 @@ OUTPUT (JSON, stdout)
   { ok: true, driver:{personId,name} } (raw backend response)
 
 ERRORS (stderr, exit non-zero)
-  404  Keikka not found       → verify keikkaId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.grid.tilaus.edit
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Keikka not found       → verify keikkaId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib keikka drivers assign 9001
@@ -1596,10 +1596,10 @@ OUTPUT (JSON, stdout)
   { keikkaId, pvm, time, customer:{asiakasId,name}, worksite:{tyomaaId,address}, vehicle:{vehicleId,plate}, driver:{personId,name}, m3, status }
 
 ERRORS (stderr, exit non-zero)
-  404  Keikka not found       → verify keikkaId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.grid.tilaus.read
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Keikka not found       → verify keikkaId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib keikka get 9001
@@ -1632,9 +1632,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.grid.tilaus.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib keikka list --from 2026-05-28 --to 2026-05-30
@@ -1668,11 +1668,11 @@ OUTPUT (JSON, stdout)
   { ok: true } or backend response
 
 ERRORS (stderr, exit non-zero)
-  400  Validation failed      → check --status
-  404  Keikka not found       → verify keikkaId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.grid.tilaus.edit
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Validation failed      → check --status
+  exit 5 (HTTP 404)  Keikka not found       → verify keikkaId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib keikka update 9001 --status done
@@ -1698,8 +1698,8 @@ OUTPUT (JSON, stdout)
   { helpId, title, shorttext, htmltext, img } | null
 
 ERRORS (stderr, exit non-zero)
-  4  Invalid helpId         → helpId may contain only [A-Za-z0-9_-]
-  500  Backend error          → retry with --verbose
+  exit 4  Invalid helpId         → helpId may contain only [A-Za-z0-9_-]
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib ohje get LaskupohjaTilaus
@@ -1725,7 +1725,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ helpId, title, shorttext, htmltext, img }>
 
 ERRORS (stderr, exit non-zero)
-  500  Backend error          → retry with --verbose
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib ohje list
@@ -1762,11 +1762,11 @@ OUTPUT (JSON, stdout)
   { success: true, message } (raw backend response) or { dryRun: true, helpId, current, proposed }
 
 ERRORS (stderr, exit non-zero)
-  4  Missing --reason / invalid helpId → pass --reason; helpId may contain only [A-Za-z0-9_-]
-  400  Validation failed      → title ≤500, htmltext ≤10000, helpId [A-Za-z0-9_-]
-  403  Permission denied      → needs isHelperEditor or system-admin/developer
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 4  Missing --reason / invalid helpId → pass --reason; helpId may contain only [A-Za-z0-9_-]
+  exit 4 (HTTP 400)  Validation failed      → title ≤500, htmltext ≤10000, helpId [A-Za-z0-9_-]
+  exit 3 (HTTP 403)  Permission denied      → needs isHelperEditor or system-admin/developer
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib ohje update LaskupohjaTilaus --title "Laskupohja" --htmltext "<p>Ohje…</p>" --reason "content fix"
@@ -1793,8 +1793,8 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasId, name }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib person companies
@@ -1834,10 +1834,10 @@ OUTPUT (JSON, stdout)
   { personId, name, email, ... } (re-fetched) · with --get-or-create adds reused:boolean · dry-run: { dryRun: true, wouldCreate: ... }
 
 ERRORS (stderr, exit non-zero)
-  400  Missing required field, or duplicate email without --get-or-create → provide --first and --last (email is optional); add --get-or-create to reuse an existing email
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.person.edit
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Missing required field, or duplicate email without --get-or-create → provide --first and --last (email is optional); add --get-or-create to reuse an existing email
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.person.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib person create --first Matti --last Virtanen --phone "+358501234567" --reason "phone contact"
@@ -1871,10 +1871,10 @@ OUTPUT (JSON, stdout)
   { deleted: number } or { dryRun: true, wouldDelete: { personId } }
 
 ERRORS (stderr, exit non-zero)
-  404  Person not found       → verify personId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.person.edit
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Person not found       → verify personId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.person.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib person delete 5351 --reason "departed"
@@ -1900,10 +1900,10 @@ OUTPUT (JSON, stdout)
   { personId, name, email, phone, roles:number[] }
 
 ERRORS (stderr, exit non-zero)
-  404  Person not found       → verify personId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.person.read
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Person not found       → verify personId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.person.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib person get 6233
@@ -1931,9 +1931,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib person history 63
@@ -1963,10 +1963,10 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ personId, name, email, roles:number[] }>
 
 ERRORS (stderr, exit non-zero)
-  400  Unknown role           → use a role from @ibetoni/constants ROLE_TYPEID_BY_NAME
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.person.read
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Unknown role           → use a role from @ibetoni/constants ROLE_TYPEID_BY_NAME
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.person.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib person list --role driver
@@ -1992,8 +1992,8 @@ OUTPUT (JSON, stdout)
   { personId, name, email, phone, activeCompany:{asiakasId,name}, roles:[{roleTypeId,role}], companies:[{asiakasId,name,current}] }
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib person me
@@ -2028,9 +2028,9 @@ OUTPUT (JSON, stdout)
   { personId, ownerAsiakasId } or { dryRun: true, wouldSetOwner: { personId, from, to } }
 
 ERRORS (stderr, exit non-zero)
-  403  Not allowed to change this person's owner → see the authz rules above (developer/self/company-admin)
-  404  Person not found       → verify personId
-  4  Bad flags              → provide exactly one of --global / --asiakas and a --reason
+  exit 3 (HTTP 403)  Not allowed to change this person's owner → see the authz rules above (developer/self/company-admin)
+  exit 5 (HTTP 404)  Person not found       → verify personId
+  exit 4  Bad flags              → provide exactly one of --global / --asiakas and a --reason
 
 EXAMPLES
   ib person owner 5351 --global --reason 'make self-managing'
@@ -2065,10 +2065,10 @@ OUTPUT (JSON, stdout)
   raw backend success | { dryRun:true, wouldCreate:{ personId, asiakasId, personSettingTypeId, personSettingString }, validation }
 
 ERRORS (stderr, exit non-zero)
-  400  Unknown role / company limit reached → use a name from ROLE_TYPEID_BY_NAME
-  403  Not a tenant admin     → use a system-admin token or a tenant admin
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Unknown role / company limit reached → use a name from ROLE_TYPEID_BY_NAME
+  exit 3 (HTTP 403)  Not a tenant admin     → use a system-admin token or a tenant admin
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib person role grant 5351 --role keikkaHandler --asiakas 26 --reason 'onboard handler'
@@ -2096,9 +2096,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasPersonSettingId, roleTypeId, role: string|null }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check company role access on the tenant
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check company role access on the tenant
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib person role list 5351 --asiakas 26
@@ -2131,10 +2131,10 @@ OUTPUT (JSON, stdout)
   { removed: 1 } | { removed: 0 } (absent) | { dryRun:true, wouldDelete:{ asiakasPersonSettingId }, validation }
 
 ERRORS (stderr, exit non-zero)
-  400  Unknown role           → use a name from ROLE_TYPEID_BY_NAME
-  403  Not a tenant admin     → use a system-admin token or a tenant admin
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Unknown role           → use a name from ROLE_TYPEID_BY_NAME
+  exit 3 (HTTP 403)  Not a tenant admin     → use a system-admin token or a tenant admin
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib person role revoke 5351 --role keikkaHandler --asiakas 26 --reason rotation
@@ -2162,9 +2162,9 @@ OUTPUT (JSON, stdout)
   Default: the backend's raw person rows (array, or an mssql { recordset } wrapper). With --my-companies: ListEnvelope<{ personId, name, email, phone, asiakasId, asiakasName }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.person.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.person.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib person search 'Matti'
@@ -2197,10 +2197,10 @@ OUTPUT (JSON, stdout)
   { ok: true, updated: { personId } } or { dryRun: true, wouldUpdate: { personId, ... } }
 
 ERRORS (stderr, exit non-zero)
-  404  Person not found       → verify personId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.person.edit
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Person not found       → verify personId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.person.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib person update 5351 --body '{"personPhone":"+358501234567"}' --reason "phone change"
@@ -2225,7 +2225,7 @@ OUTPUT (JSON, stdout)
   { version: string, generatedAt: ISO-8601, commands: { '<command>': CommandSpec } }
 
 ERRORS (stderr, exit non-zero)
-  1  I/O error              → retry; check stdout pipe
+  exit 1  I/O error              → retry; check stdout pipe
 
 EXAMPLES
   ib reference dump
@@ -2251,9 +2251,9 @@ OUTPUT (JSON, stdout)
   { role, typeId, displayName: string|null, description: string|null, comment: string|null, tiers: string[], deprecated: boolean }
 
 ERRORS (stderr, exit non-zero)
-  400  Unknown role name      → see ROLE_TYPEID_BY_NAME in @ibetoni/constants
-  401  Token expired          → ib auth refresh
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Unknown role name      → see ROLE_TYPEID_BY_NAME in @ibetoni/constants
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib role explain asiakasAdmin
@@ -2280,9 +2280,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.grid.tilaus.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib schedule day 2026-06-01
@@ -2309,9 +2309,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.grid.tilaus.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib schedule today
@@ -2338,9 +2338,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.grid.tilaus.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib schedule week 2026-06-01
@@ -2367,9 +2367,9 @@ OUTPUT (JSON, stdout)
   { tables:[{name,columns}], foreignKeys:[{table,column,refTable,refColumn}], views:[{name}], procs:[{name,type,parameters}] }
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib schema dump
@@ -2395,11 +2395,11 @@ OUTPUT (JSON, stdout)
   { name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
-  500  Backend error          → retry with --verbose
-  400  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
-  404  Proc/function not found → check the name via \`ib schema procs\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
+  exit 5 (HTTP 404)  Proc/function not found → check the name via \`ib schema procs\`
 
 EXAMPLES
   ib schema proc asiakas_find
@@ -2426,9 +2426,9 @@ OUTPUT (JSON, stdout)
   { items: [{ name, type:'P'|'FN'|'TF'|'IF' }], nextCursor: null, count }
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib schema procs
@@ -2455,11 +2455,11 @@ OUTPUT (JSON, stdout)
   { name, columns:[{name,dataType,maxLength,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], indexes:[{name,columns,unique}] }
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
-  500  Backend error          → retry with --verbose
-  400  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
-  404  Table not found        → check the name via \`ib schema tables\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
+  exit 5 (HTTP 404)  Table not found        → check the name via \`ib schema tables\`
 
 EXAMPLES
   ib schema table keikka
@@ -2486,9 +2486,9 @@ OUTPUT (JSON, stdout)
   { items: [{ name, type:'table', columnCount }], nextCursor: null, count }
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib schema tables
@@ -2515,11 +2515,11 @@ OUTPUT (JSON, stdout)
   { name, columns:[{name,dataType,maxLength,nullable,default,key}], definition:'<T-SQL>' }
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
-  500  Backend error          → retry with --verbose
-  400  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
-  404  View not found         → check the name via \`ib schema views\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
+  exit 5 (HTTP 404)  View not found         → check the name via \`ib schema views\`
 
 EXAMPLES
   ib schema view keikkaBetoniView
@@ -2546,9 +2546,9 @@ OUTPUT (JSON, stdout)
   { items: [{ name, type:'view', columnCount }], nextCursor: null, count }
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib schema views
@@ -2576,10 +2576,10 @@ OUTPUT (JSON, stdout)
   { closestSijainti: {...}|null, closestDistance: number|null }
 
 ERRORS (stderr, exit non-zero)
-  400  Invalid tyomaaId or missing coordinates → verify the worksite has lat/lng
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.sijainnit.read
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Invalid tyomaaId or missing coordinates → verify the worksite has lat/lng
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib sijainti closest --tyomaa 555 --type 1
@@ -2619,10 +2619,10 @@ OUTPUT (JSON, stdout)
   { sijaintiId, ... } (raw backend response)
 
 ERRORS (stderr, exit non-zero)
-  400  Validation failed      → fix --body fields
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.sijainnit.edit
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Validation failed      → fix --body fields
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib sijainti create --name "Depot A" --type 1
@@ -2656,10 +2656,10 @@ OUTPUT (JSON, stdout)
   { success: true }
 
 ERRORS (stderr, exit non-zero)
-  404  Sijainti not found     → verify sijaintiId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.sijainnit.delete
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Sijainti not found     → verify sijaintiId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.delete
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib sijainti delete 42 --reason "decommissioned depot"
@@ -2686,10 +2686,10 @@ OUTPUT (JSON, stdout)
   { matkaM: number|null, matkaMin: number|null, from:{lat,lng}, to:{lat,lng} }
 
 ERRORS (stderr, exit non-zero)
-  400  Bad point or sijainti without coordinates → use 'lat,lng' or a sijaintiId that has coords
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.sijainnit.read
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Bad point or sijainti without coordinates → use 'lat,lng' or a sijaintiId that has coords
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib sijainti distance --from 7 --to 42
@@ -2716,9 +2716,9 @@ OUTPUT (JSON, stdout)
   { status, lat, lng, ... } (raw Google geocode result; { status: 'ZERO_RESULTS' } when no match)
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.sijainnit.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib sijainti geocode --address "Mannerheimintie 1, Helsinki"
@@ -2744,10 +2744,10 @@ OUTPUT (JSON, stdout)
   { sijaintiId, name, address, coords:{lat,lng}, type, jerryActiveUntil, ... } (raw row)
 
 ERRORS (stderr, exit non-zero)
-  404  Sijainti not found     → verify sijaintiId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.sijainnit.read
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Sijainti not found     → verify sijaintiId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib sijainti get 42
@@ -2776,9 +2776,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, jerryActiveUntil }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.sijainnit.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib sijainti list
@@ -2815,11 +2815,11 @@ OUTPUT (JSON, stdout)
   { ok: true, ... } (raw backend response) or { dryRun: true, wouldUpdate: {...} }
 
 ERRORS (stderr, exit non-zero)
-  400  Neither/both of --on/--off given, or --radius not a positive number → pass exactly one of --on / --off; --radius is km > 0
-  404  Sijainti not found     → verify sijaintiId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.sijainnit.edit
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Neither/both of --on/--off given, or --radius not a positive number → pass exactly one of --on / --off; --radius is km > 0
+  exit 5 (HTTP 404)  Sijainti not found     → verify sijaintiId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib sijainti set-jerry 42 --on --radius 60 --reason 'pilot varikko, 60 km radius'
@@ -2847,9 +2847,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ sijaintiTypeId, selite }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.sijainnit.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib sijainti types
@@ -2881,10 +2881,10 @@ OUTPUT (JSON, stdout)
   { success: true }
 
 ERRORS (stderr, exit non-zero)
-  404  Sijainti not found     → verify sijaintiId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.sijainnit.edit
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Sijainti not found     → verify sijaintiId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib sijainti undelete 42 --reason "restored after review"
@@ -2923,11 +2923,11 @@ OUTPUT (JSON, stdout)
   { ok: true, ... } (raw backend response)
 
 ERRORS (stderr, exit non-zero)
-  400  Validation failed      → fix --body fields
-  404  Sijainti not found     → verify sijaintiId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.sijainnit.edit
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Validation failed      → fix --body fields
+  exit 5 (HTTP 404)  Sijainti not found     → verify sijaintiId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib sijainti update --id 42 --name "Renamed depot"
@@ -2966,10 +2966,10 @@ OUTPUT (JSON, stdout)
   { vehicleId, ... } (raw backend save response) | { dryRun, wouldCreate }
 
 ERRORS (stderr, exit non-zero)
-  400  Validation failed      → fix the field flags
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.vehicle.edit
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Validation failed      → fix the field flags
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib vehicle create --reg ABC-123 --type 1 --capacity 7.5 --reason 'new truck'
@@ -2996,9 +2996,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleDateId, vehicleId, typeName, dateValue, expirationDate, daysUntil, urgency }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.vehicle.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib vehicle dates expiring
@@ -3025,9 +3025,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleDateId, typeId, typeName, dateValue, expirationDate, dismissedUntil, quantity, status, daysUntil }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.vehicle.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib vehicle dates list 7
@@ -3060,10 +3060,10 @@ OUTPUT (JSON, stdout)
   raw backend response | { dryRun, wouldUpdate }
 
 ERRORS (stderr, exit non-zero)
-  404  Vehicle not found      → verify vehicleId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.vehicle.edit
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Vehicle not found      → verify vehicleId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib vehicle driver-assign 7 --person 555 --date 2026-06-02 --reason 'cover shift'
@@ -3092,10 +3092,10 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ pvm, driverId, driverName, shiftStart, shiftEnd }>
 
 ERRORS (stderr, exit non-zero)
-  404  Vehicle not found      → verify vehicleId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.vehicle.read
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Vehicle not found      → verify vehicleId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib vehicle drivers 7 --from 2026-05-01 --to 2026-05-31
@@ -3121,10 +3121,10 @@ OUTPUT (JSON, stdout)
   { vehicleId, vehicleNo, name, plate, type, typeName, boomLength, capacity, sortNo, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, memo, billingProductId, asiakasId, defaultDriverId, showInGrid:boolean, showInReports:boolean, useNoDriverBar:boolean, isRestricted:boolean, hasGpsTracking:boolean }
 
 ERRORS (stderr, exit non-zero)
-  404  Vehicle not found      → verify vehicleId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.vehicle.read
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Vehicle not found      → verify vehicleId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib vehicle get 7
@@ -3154,9 +3154,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.vehicle.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib vehicle list
@@ -3186,9 +3186,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleId|null, plate, objectName, lat, lng, speed, direction, engineState, address, at }> & { gpsAvailable }
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.vehicle.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib vehicle locations
@@ -3216,10 +3216,10 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ lat, lng }> & { gpsAvailable }
 
 ERRORS (stderr, exit non-zero)
-  404  Vehicle not found      → verify vehicleId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.vehicle.read
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Vehicle not found      → verify vehicleId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib vehicle route 7
@@ -3247,9 +3247,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.vehicle.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib vehicle search ABC
@@ -3277,10 +3277,10 @@ OUTPUT (JSON, stdout)
   { vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,speed,direction,engineState,address,at}|null, gpsAvailable }
 
 ERRORS (stderr, exit non-zero)
-  404  Vehicle not found      → verify vehicleId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.vehicle.read
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Vehicle not found      → verify vehicleId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib vehicle status 7
@@ -3308,10 +3308,10 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ type, locationType?, locationId?, locationName?, locationAddress?, sijaintiTypeName?, asiakasNimi?, arrived, departed, durationMin, distanceKm? }> & { gpsAvailable }
 
 ERRORS (stderr, exit non-zero)
-  404  Vehicle not found      → verify vehicleId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.vehicle.read
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Vehicle not found      → verify vehicleId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib vehicle timeline 7
@@ -3338,9 +3338,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleTypeId, name }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.vehicle.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib vehicle types
@@ -3383,10 +3383,10 @@ OUTPUT (JSON, stdout)
   On write: the saved vehicle record. With --dry-run: { dryRun: true, vehicleId, wouldChange: { field: { from, to } } } — the field-level diff, computed client-side without POSTing (the save route ignores X-Dry-Run, so the preview cannot persist).
 
 ERRORS (stderr, exit non-zero)
-  404  Vehicle not found      → verify vehicleId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.vehicle.edit
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Vehicle not found      → verify vehicleId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib vehicle update 70 --capacity 8 --reason 'remeasured'
@@ -3416,11 +3416,11 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleId, plate, objectName, arrived, departed, durationMin }> & { gpsAvailable }
 
 ERRORS (stderr, exit non-zero)
-  400  Invalid filterType     → use tyomaa or sijainti
-  404  tyomaa not found / not owned → verify tyomaaId belongs to the active company
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.vehicle.read
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Invalid filterType     → use tyomaa or sijainti
+  exit 5 (HTTP 404)  tyomaa not found / not owned → verify tyomaaId belongs to the active company
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib vehicle visits tyomaa 17 --days 30
@@ -3446,7 +3446,7 @@ OUTPUT (JSON, stdout)
   { cli, endpoint, reachable, server: { app, version, commit, release, slot } | null, error? }
 
 ERRORS (stderr, exit non-zero)
-  7  Endpoint unreachable   → check --endpoint / network; the report (cli version + error) still prints
+  exit 7  Endpoint unreachable   → check --endpoint / network; the report (cli version + error) still prints
 
 EXAMPLES
   ib version
@@ -3475,10 +3475,10 @@ OUTPUT (JSON, stdout)
   { temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }
 
 ERRORS (stderr, exit non-zero)
-  403  Weather module off or permission denied → enable via 'ib weather toggle --on'
-  5  Address not found (ZERO_RESULTS) → try a more specific Finnish address
-  401  Not authenticated      → run 'ib auth login'
-  500  Backend error          → retry with --verbose
+  exit 3 (HTTP 403)  Weather module off or permission denied → enable via 'ib weather toggle --on'
+  exit 5  Address not found (ZERO_RESULTS) → try a more specific Finnish address
+  exit 2 (HTTP 401)  Not authenticated      → run 'ib auth login'
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib weather address --address 'Mannerheimintie 1, Helsinki' --time now
@@ -3507,10 +3507,10 @@ OUTPUT (JSON, stdout)
   { date, minTemp, maxTemp, avgTemp, windSpeed, precipitation, weatherSymbol, source, coordinates }
 
 ERRORS (stderr, exit non-zero)
-  403  Weather module off or permission denied → enable via 'ib weather toggle --on'
-  400  Bad coords/date        → use Finland coords and a valid date
-  401  Not authenticated      → run 'ib auth login'
-  500  Backend error          → retry with --verbose
+  exit 3 (HTTP 403)  Weather module off or permission denied → enable via 'ib weather toggle --on'
+  exit 4 (HTTP 400)  Bad coords/date        → use Finland coords and a valid date
+  exit 2 (HTTP 401)  Not authenticated      → run 'ib auth login'
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib weather day --lat 60.17 --lng 24.94 --date today
@@ -3539,10 +3539,10 @@ OUTPUT (JSON, stdout)
   { temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }
 
 ERRORS (stderr, exit non-zero)
-  403  Weather module off or permission denied → enable via 'ib weather toggle --on' (admin) or contact an admin
-  400  Bad coords/time        → use Finland coords and a time within now..+240h
-  401  Not authenticated      → run 'ib auth login'
-  500  Backend error          → retry with --verbose
+  exit 3 (HTTP 403)  Weather module off or permission denied → enable via 'ib weather toggle --on' (admin) or contact an admin
+  exit 4 (HTTP 400)  Bad coords/time        → use Finland coords and a time within now..+240h
+  exit 2 (HTTP 401)  Not authenticated      → run 'ib auth login'
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib weather forecast --lat 60.1699 --lng 24.9384 --time now
@@ -3573,10 +3573,10 @@ OUTPUT (JSON, stdout)
   { hourly: [{ time, temperature, windSpeed, precipitation, weatherSymbol }], summary, coordinates }
 
 ERRORS (stderr, exit non-zero)
-  403  Weather module off or permission denied → enable via 'ib weather toggle --on'
-  400  Bad coords/time/duration → use Finland coords, valid ISO time, positive duration
-  401  Not authenticated      → run 'ib auth login'
-  500  Backend error          → retry with --verbose
+  exit 3 (HTTP 403)  Weather module off or permission denied → enable via 'ib weather toggle --on'
+  exit 4 (HTTP 400)  Bad coords/time/duration → use Finland coords, valid ISO time, positive duration
+  exit 2 (HTTP 401)  Not authenticated      → run 'ib auth login'
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib weather pumping --lat 60.17 --lng 24.94 --start now --duration 120
@@ -3602,8 +3602,8 @@ OUTPUT (JSON, stdout)
   { enabled: boolean, ... }
 
 ERRORS (stderr, exit non-zero)
-  401  Not authenticated      → run 'ib auth login'
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Not authenticated      → run 'ib auth login'
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib weather status
@@ -3637,10 +3637,10 @@ OUTPUT (JSON, stdout)
   { success: boolean, enabled: boolean, ... }
 
 ERRORS (stderr, exit non-zero)
-  4  Neither --on nor --off passed, or both passed → pass exactly one of --on / --off
-  403  Permission denied (admin required) → requires admin role on the company
-  401  Not authenticated      → run 'ib auth login'
-  500  Backend error          → retry with --verbose
+  exit 4  Neither --on nor --off passed, or both passed → pass exactly one of --on / --off
+  exit 3 (HTTP 403)  Permission denied (admin required) → requires admin role on the company
+  exit 2 (HTTP 401)  Not authenticated      → run 'ib auth login'
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib weather toggle --on --reason 'enabling for summer season'
@@ -3667,10 +3667,10 @@ OUTPUT (JSON, stdout)
   { temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }
 
 ERRORS (stderr, exit non-zero)
-  403  Weather module off or permission denied → enable via 'ib weather toggle --on'
-  404  Tyomaa not found or has no coordinates → check tyomaaId; ensure the worksite has been geocoded
-  401  Not authenticated      → run 'ib auth login'
-  500  Backend error          → retry with --verbose
+  exit 3 (HTTP 403)  Weather module off or permission denied → enable via 'ib weather toggle --on'
+  exit 5 (HTTP 404)  Tyomaa not found or has no coordinates → check tyomaaId; ensure the worksite has been geocoded
+  exit 2 (HTTP 401)  Not authenticated      → run 'ib auth login'
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib weather worksite 1234
@@ -3702,10 +3702,10 @@ OUTPUT (JSON, stdout)
   { tyomaaId, ... } (raw backend response)
 
 ERRORS (stderr, exit non-zero)
-  400  Validation failed      → fix --body fields
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.tyomaa.edit
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Validation failed      → fix --body fields
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib worksite create --body '{"name":"Site A","address":"Main St 1","asiakasId":1349}'
@@ -3731,9 +3731,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ tyomaaDateId, tyomaaId, tyomaaName, typeName, expirationDate, daysUntil, urgency }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.tyomaa.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib worksite dates expiring --days 14
@@ -3759,10 +3759,10 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ tyomaaDateId, typeId, typeName, date, expirationDate, daysUntil, status, quantity }>
 
 ERRORS (stderr, exit non-zero)
-  400  Bad tyomaaId           → use a positive integer
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.tyomaa.read
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Bad tyomaaId           → use a positive integer
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib worksite dates list 99
@@ -3793,10 +3793,10 @@ OUTPUT (JSON, stdout)
   { deleted: number } or { dryRun: true, wouldDelete: { tyomaaId } }
 
 ERRORS (stderr, exit non-zero)
-  404  Worksite not found     → verify tyomaaId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.tyomaa.edit
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Worksite not found     → verify tyomaaId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib worksite delete 99 --reason "lifecycle cleanup"
@@ -3822,10 +3822,10 @@ OUTPUT (JSON, stdout)
   { tyomaaId, name, address, asiakasId, city, comment, coords:{lat,lng} }
 
 ERRORS (stderr, exit non-zero)
-  404  Worksite not found     → verify tyomaaId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.tyomaa.read
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Worksite not found     → verify tyomaaId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib worksite get 99
@@ -3856,10 +3856,10 @@ OUTPUT (JSON, stdout)
   { success, ... } (raw backend response)
 
 ERRORS (stderr, exit non-zero)
-  400  Missing coordinates    → run refresh-location first
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.tyomaa.edit
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Missing coordinates    → run refresh-location first
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib worksite helsinki-fetch 99
@@ -3887,9 +3887,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ tyomaaId, name, address, asiakasId, city }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.tyomaa.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib worksite list
@@ -3916,10 +3916,10 @@ OUTPUT (JSON, stdout)
   { tyomaaId, summary:{...}, monthlyBreakdown:[...] }
 
 ERRORS (stderr, exit non-zero)
-  404  Worksite not found     → verify tyomaaId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.tyomaa.read
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Worksite not found     → verify tyomaaId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib worksite metrics 99
@@ -3953,9 +3953,9 @@ OUTPUT (JSON, stdout)
   { added: { tyomaaId, personId } } or { dryRun: true, wouldCreate: { tyomaaId, personId, contactPersonTypeId } }
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.tyomaa.edit
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib worksite person add --worksite 99 --person 5351 --reason "assign foreman"
@@ -3981,9 +3981,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ personId, name, email, contactType }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.tyomaa.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib worksite person list 99
@@ -4017,10 +4017,10 @@ OUTPUT (JSON, stdout)
   { removed: { tyomaaId, personId } } or { dryRun: true, wouldDelete: { tyomaaId, personId } }
 
 ERRORS (stderr, exit non-zero)
-  404  Link not found         → verify tyomaaId+personId combination
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.tyomaa.edit
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Link not found         → verify tyomaaId+personId combination
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib worksite person remove --worksite 99 --person 5351 --reason "rotation"
@@ -4051,10 +4051,10 @@ OUTPUT (JSON, stdout)
   { success: true, tyomaa, message } (raw backend response)
 
 ERRORS (stderr, exit non-zero)
-  404  Worksite not found     → verify tyomaaId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.tyomaa.edit
-  500  Backend error          → retry with --verbose
+  exit 5 (HTTP 404)  Worksite not found     → verify tyomaaId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib worksite refresh-location 99 --reason "address corrected"
@@ -4081,9 +4081,9 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ tyomaaId, name, address, asiakasId, score }>
 
 ERRORS (stderr, exit non-zero)
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.tyomaa.read
-  500  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib worksite search 'Main St'
@@ -4115,10 +4115,10 @@ OUTPUT (JSON, stdout)
   { success: true }
 
 ERRORS (stderr, exit non-zero)
-  400  Radius out of range    → use 1-10000
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.tyomaa.edit
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Radius out of range    → use 1-10000
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib worksite set-geofence 99 --radius 300
@@ -4151,11 +4151,11 @@ OUTPUT (JSON, stdout)
   { ok: true, ... } (raw backend response)
 
 ERRORS (stderr, exit non-zero)
-  400  Validation failed      → fix --body fields
-  404  Worksite not found     → verify tyomaaId
-  401  Token expired          → ib auth refresh
-  403  Permission denied      → check auth.page.tyomaa.edit
-  500  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Validation failed      → fix --body fields
+  exit 5 (HTTP 404)  Worksite not found     → verify tyomaaId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib worksite update 99 --body '{"comment":"Pickup at gate B"}'

@@ -20,6 +20,15 @@
 
 import type { Command } from "commander";
 
+export interface CommandError {
+  /** HTTP status when API-originated (401/403/404/409/429/400/500). */
+  http?: number;
+  /** Process exit code per the documented contract (0/2/3/4/5/6/7). Always present. */
+  exit: number;
+  meaning: string;
+  remedy: string;
+}
+
 export interface CommandFlag {
   /** Flag name without leading dashes, e.g. `from`, `idempotency-key`. */
   name: string;
@@ -45,7 +54,7 @@ export interface CommandSpec {
   /** One-line description of the JSON response shape on stdout. */
   outputShape: string;
   /** Documented error codes with their meaning and remedy. */
-  errors: { code: number; meaning: string; remedy: string }[];
+  errors: CommandError[];
   /** Copy-paste-ready invocation examples. */
   examples: string[];
 }
@@ -110,7 +119,8 @@ export function formatHelp(spec: CommandSpec): string {
 
   lines.push("ERRORS (stderr, exit non-zero)");
   for (const e of spec.errors) {
-    lines.push(`  ${e.code}  ${e.meaning.padEnd(22)} → ${e.remedy}`);
+    const http = e.http ? ` (HTTP ${e.http})` : "";
+    lines.push(`  exit ${e.exit}${http}  ${e.meaning.padEnd(22)} → ${e.remedy}`);
   }
   lines.push("");
 
