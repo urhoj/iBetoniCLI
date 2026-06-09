@@ -64,13 +64,14 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
         // read-merge-write) still work.
         // `meta` requests (e.g. `ib feedback`) are not domain mutations — they are
         // whitelisted past the lock so feedback can be filed even under read-only.
-        if (readOnly && method !== "GET" && !opts.meta) {
+        if (readOnly && method !== "GET" && !opts.meta && !opts.read) {
             throw new CliError(`Refused: '${method} ${path}' is a write and read-only mode is active (--read-only / IB_READ_ONLY).`, 0, null, 3);
         }
         // Announce the write target once, after the read-only gate (a refused write
         // must not claim to have acted) and before the request leaves the process.
         // Meta requests skip this — they don't write tenant data under any company lens.
-        if (method !== "GET" && !opts.meta)
+        // Read-over-POST requests skip this — they don't mutate tenant data.
+        if (method !== "GET" && !opts.meta && !opts.read)
             announceActingAs();
         let res = await fetchOrNetworkError(method, path, body, opts);
         // Single-retry refresh path: only the first 401 triggers a refresh+retry.

@@ -72,7 +72,7 @@ export async function runPersonSearch(client, query, limit) {
     const body = { searchString: query };
     if (limit !== undefined)
         body.limit = limit;
-    return client.post("/api/person/search", body);
+    return client.post("/api/person/search", body, { read: true });
 }
 /**
  * /api/person/search returns either a bare array of person rows or a raw mssql

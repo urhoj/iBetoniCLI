@@ -590,7 +590,7 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib worksite get",
-        description: "Get a single worksite (tyomaa) by id with flat address fields.",
+        description: "Get a single worksite (tyomaa) by id with every user-relevant field in camelCase: name, tyomaaNum, the full address (address/address2/postalCode/city + formattedAddress), coords, drivingInstructions (ajo-ohje), comment (memo), invoiceRef (laskuViite), contactPersonId, geofenceRadius, the live customer (asiakasId/asiakasNimi, derived from the most recent keikka), ownerAsiakasId and created/modified timestamps. Two heavy JSON blobs are opt-in via flags; without them the record still reports cameraCount and hasBuildingData so you know whether to ask for the detail.",
         permissions: ["auth.page.tyomaa.read"],
         flags: [
             {
@@ -598,13 +598,26 @@ export const COMMAND_SPECS = [
                 type: "number",
                 description: "Positional — tyomaaId to fetch",
             },
+            {
+                name: "include-building",
+                type: "boolean",
+                description: "Attach parsed Helsinki building registry data as rakennusData (heavy; default off)",
+            },
+            {
+                name: "include-cameras",
+                type: "boolean",
+                description: "Attach nearby traffic cameras as cameras[] (heavy; default off)",
+            },
         ],
-        outputShape: "{ tyomaaId, name, address, asiakasId, city, comment, coords:{lat,lng} }",
+        outputShape: "{ tyomaaId, name, tyomaaNum, address, address2, postalCode, city, formattedAddress, coords:{lat,lng}|null, drivingInstructions, comment, invoiceRef, contactPersonId, geofenceRadius, asiakasId, asiakasNimi, ownerAsiakasId, createdTime, modifiedTime, cameraCount, hasBuildingData } (+ rakennusData with --include-building, + cameras[] with --include-cameras)",
         errors: [
             { code: 404, meaning: "Worksite not found", remedy: "verify tyomaaId" },
             ...permErrors("auth.page.tyomaa.read"),
         ],
-        examples: ["ib worksite get 99"],
+        examples: [
+            "ib worksite get 99",
+            "ib worksite get 99 --include-building --include-cameras",
+        ],
     },
     {
         command: "ib worksite metrics",
@@ -697,24 +710,27 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib worksite search",
-        description: "Free-text search across worksite names / addresses. POST /api/tyomaa/search.",
+        description: "Free-text worksite search (POST /api/tyomaa/search). The query full-text-matches the worksite name, ALL FOUR address lines (street / line 2 / postal code / city), driving instructions, memo, formatted address, worksite number AND the contact person's name / phone / email — so a street fragment like 'Mannerheimintie' finds the worksite. Scoped to the active company. Safe under --read-only (sent as a non-mutating meta request, so it does NOT trip the read-only lock or the acting-as write line).",
         permissions: ["auth.page.tyomaa.read"],
         flags: [
             {
                 name: "query",
                 type: "string",
-                description: "Positional — search string",
+                description: "Positional — search string (matched against street, city, name, contact, …)",
             },
             {
                 name: "limit",
                 type: "number",
                 default: "50",
-                description: "Max results",
+                description: "Max results (backend caps at 100)",
             },
         ],
-        outputShape: "ListEnvelope<{ tyomaaId, name, address, asiakasId, score }>",
+        outputShape: "ListEnvelope<{ tyomaaId, name, tyomaaNum, address, address2, postalCode, city, formattedAddress, coords:{lat,lng}|null, drivingInstructions, comment }>",
         errors: permErrors("auth.page.tyomaa.read"),
-        examples: ["ib worksite search 'Main St'"],
+        examples: [
+            "ib worksite search Mannerheimintie",
+            "ib worksite search 'Jokiniementie 13' --limit 10",
+        ],
     },
     // ─── person (3) ──────────────────────────────────────────────────────────
     {

@@ -18,23 +18,57 @@ export async function runWorksiteList(client, opts) {
     return client.get(`/api/cli/worksite/list${qs ? `?${qs}` : ""}`);
 }
 /**
- * GET /api/cli/worksite/get/:tyomaaId. Returns the flat backend record as-is.
+ * GET /api/cli/worksite/get/:tyomaaId. Returns the flat, enriched backend
+ * record as-is (every user-relevant field in camelCase; see the spec for the
+ * shape). The two heavy JSON blobs are opt-in: `includeBuilding` →
+ * `?includeBuilding` (attaches `rakennusData`), `includeCameras` →
+ * `?includeCameras` (attaches `cameras[]`). Omitted by default — the lean
+ * record still carries `cameraCount` + `hasBuildingData` presence signals.
  */
-export async function runWorksiteGet(client, tyomaaId) {
-    return client.get(`/api/cli/worksite/get/${tyomaaId}`);
+export async function runWorksiteGet(client, tyomaaId, opts = {}) {
+    const params = new URLSearchParams();
+    if (opts.includeBuilding)
+        params.set("includeBuilding", "1");
+    if (opts.includeCameras)
+        params.set("includeCameras", "1");
+    const qs = params.toString();
+    return client.get(`/api/cli/worksite/get/${tyomaaId}${qs ? `?${qs}` : ""}`);
 }
 /**
- * POST /api/tyomaa/search — existing (non-/api/cli/) route used by the FE
- * worksite typeahead. Body is `{ searchString: <query> }`. The backend scopes
- * results to the caller's company (req.user.ownerAsiakasId) when no
- * ownerAsiakasId is in the body, so the CLI sends only searchString. Result
- * shape is whatever the backend returns (typically an array of tyomaa records).
+ * POST /api/tyomaa/search — the existing (non-/api/cli/) route that also backs
+ * the FE worksite typeahead. Body is `{ searchString: <query> }`; the backend
+ * full-text-matches `searchString` against the worksite NAME, ALL FOUR ADDRESS
+ * LINES (street / line 2 / postal code / city), driving instructions, memo,
+ * formatted address, worksite number AND the contact person's name / phone /
+ * email — so a street fragment finds the worksite. Results are scoped to the
+ * caller's company (req.user.ownerAsiakasId) when no ownerAsiakasId is in the
+ * body, so the CLI sends only searchString (+ optional limit).
+ *
+ * Sent as a `meta` request: search is a non-mutating POST, so `meta:true`
+ * exempts it from the `--read-only` write-lock and the acting-as write
+ * diagnostic (it neither creates nor updates tenant data). The raw Finnish-
+ * named recordset is projected into the universal `ListEnvelope` with the same
+ * camelCase keys as `worksite get` for a consistent AI-facing shape.
  */
 export async function runWorksiteSearch(client, query, limit) {
     const body = { searchString: query };
     if (limit !== undefined)
         body.limit = limit;
-    return client.post("/api/tyomaa/search", body);
+    const rows = await client.post("/api/tyomaa/search", body, { read: true });
+    const items = (rows || []).map((r) => ({
+        tyomaaId: r.tyomaaId,
+        name: r.tyomaaNimi || null,
+        tyomaaNum: r.tyomaaNum || null,
+        address: r.tyomaaOsoite1 || null,
+        address2: r.tyomaaOsoite2 || null,
+        postalCode: r.tyomaaOsoite3 || null,
+        city: r.tyomaaOsoite4 || null,
+        formattedAddress: r.formattedAddress || null,
+        coords: r.lat != null && r.lng != null ? { lat: r.lat, lng: r.lng } : null,
+        drivingInstructions: r.tyomaaAjoOhje || null,
+        comment: r.tyomaaMemo || null,
+    }));
+    return { items, nextCursor: null, count: items.length };
 }
 /**
  * POST /api/tyomaa/new with a free-form body forwarded to the existing BE
@@ -215,10 +249,15 @@ export function registerWorksiteCommands(parent, getClient) {
     });
     w.command("get <tyomaaId>")
         .description("Get a single worksite by tyomaaId")
-        .action(async (idStr) => {
+        .option("--include-building", "Attach the parsed Helsinki building data (rakennusData)")
+        .option("--include-cameras", "Attach the nearby traffic cameras (cameras[])")
+        .action(async (idStr, opts) => {
         try {
             const client = await getClient();
-            const result = await runWorksiteGet(client, Number(idStr));
+            const result = await runWorksiteGet(client, Number(idStr), {
+                includeBuilding: opts.includeBuilding,
+                includeCameras: opts.includeCameras,
+            });
             writeJson(result);
         }
         catch (e) {
