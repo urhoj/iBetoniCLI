@@ -3,17 +3,9 @@ import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 import { runKeikkaList } from "../keikka/index.js";
-import { todayHelsinki, resolveDate } from "../../dates.js";
+import { todayHelsinki, resolveDate, addDaysISO } from "../../dates.js";
 
-/**
- * Add `days` to an ISO `YYYY-MM-DD` date and return the same ISO format.
- * Used for the `week` command's `start..start+6` range.
- */
-export function addDaysISO(isoDate: string, days: number): string {
-  const d = new Date(`${isoDate}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
+export { addDaysISO };
 
 /**
  * `ib schedule today` — thin wrapper around runKeikkaList with from=to=today.
