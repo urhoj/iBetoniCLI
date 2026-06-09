@@ -9,8 +9,8 @@
  * out of sync — there is exactly one source of truth (`./specs.ts`).
  */
 import { COMMAND_SPECS } from "./specs.js";
-import { DOMAIN_OVERVIEW, GLOSSARY, FEEDBACK_GUIDANCE } from "./domain.js";
-import type { GlossaryEntry } from "./domain.js";
+import { DOMAIN_OVERVIEW, GLOSSARY, FEEDBACK_GUIDANCE, TOPICS } from "./domain.js";
+import type { GlossaryEntry, Topic } from "./domain.js";
 import type { CommandSpec } from "../output/help.js";
 import packageJson from "../../package.json" with { type: "json" };
 
@@ -23,6 +23,8 @@ export interface ReferenceDump {
   glossary: GlossaryEntry[];
   /** When an AI consuming this CLI should proactively file `ib feedback`. */
   feedbackGuidance: typeof FEEDBACK_GUIDANCE;
+  /** Offline concept guides for cross-cutting knowledge (`ib help <id>`). */
+  topics: Topic[];
   commands: Record<string, CommandSpec>;
 }
 
@@ -38,6 +40,7 @@ export function buildReference(): ReferenceDump {
     overview: DOMAIN_OVERVIEW,
     glossary: GLOSSARY,
     feedbackGuidance: FEEDBACK_GUIDANCE,
+    topics: TOPICS,
     commands: Object.fromEntries(
       COMMAND_SPECS.map((spec) => [spec.command, spec])
     ),

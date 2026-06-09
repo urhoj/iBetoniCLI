@@ -998,6 +998,35 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib help matches snapshot 1`] = `
+"USAGE
+  ib help [<topic>] [flags]
+
+DESCRIPTION
+  Concept guides for AI users (offline, no auth). No arg lists topic ids; \`ib help <topic>\` prints one guide.
+  Auth: none (public).
+
+ARGUMENTS
+  <topic> STRING    topic id (roles, jerry-lifecycle, write-safety, exit-codes, multi-tenancy) (optional)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  no arg: { items:[{id,title}], nextCursor:null, count } | with topic: { id, title, body }
+
+ERRORS (stderr, exit non-zero)
+  exit 5  Unknown topic          → run \`ib help\` to list valid topic ids
+
+EXAMPLES
+  ib help
+  ib help write-safety
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib jerry admin detail matches snapshot 1`] = `
 "USAGE
   ib jerry admin detail <asiakasId> [flags]

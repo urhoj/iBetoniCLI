@@ -26,6 +26,7 @@ import { registerScheduleCommands } from "./commands/schedule/index.js";
 import { registerSchemaCommands } from "./commands/schema/index.js";
 import { registerWeatherCommands } from "./commands/weather/index.js";
 import { registerFeedbackCommands } from "./commands/feedback/index.js";
+import { registerHelpCommands } from "./commands/help/index.js";
 import { registerVersionCommand } from "./commands/version/index.js";
 import { registerDoctorCommand } from "./commands/doctor/index.js";
 import { runReferenceDump } from "./reference/dump.js";
@@ -94,9 +95,19 @@ export function buildProgram(): Command {
     return ctx.endpoint;
   }
 
+  // Disable Commander's built-in `help` command so `ib help [topic]` can
+  // register our own offline concept-guide action without conflict.
+  // `ib --help` (the --help OPTION) is unaffected and still renders the domain
+  // primer via `program.addHelpText("after", renderDomainHelp())` above.
+  program.helpCommand(false);
+
   // `auth` manages credential-store access directly (login/logout/whoami/etc.)
   // and so doesn't take a `getClient` factory.
   registerAuthCommands(program);
+
+  // `help` — offline concept guides, no auth. Registered before authenticated
+  // commands so the spec catalogue and wiring tests can find it.
+  registerHelpCommands(program);
 
   // `role explain` resolves tiers offline (@ibetoni/constants) but reads the DB
   // description/comment via an authenticated GET, so it needs the client.

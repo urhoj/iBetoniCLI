@@ -2348,5 +2348,16 @@ export const COMMAND_SPECS = [
             'ib feedback resolve 42 --status dismissed --note "by design"',
         ],
     },
+    // ─── help (1) ────────────────────────────────────────────────────────────
+    {
+        command: "ib help",
+        description: "Concept guides for AI users (offline, no auth). No arg lists topic ids; `ib help <topic>` prints one guide.",
+        auth: "none",
+        args: [{ name: "topic", type: "string", required: false, description: "topic id (roles, jerry-lifecycle, write-safety, exit-codes, multi-tenancy)" }],
+        flags: [],
+        outputShape: "no arg: { items:[{id,title}], nextCursor:null, count } | with topic: { id, title, body }",
+        errors: [{ exit: 5, meaning: "Unknown topic", remedy: "run `ib help` to list valid topic ids" }],
+        examples: ["ib help", "ib help write-safety"],
+    },
 ];
 //# sourceMappingURL=specs.js.map

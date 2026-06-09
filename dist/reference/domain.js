@@ -106,6 +106,34 @@ export const FEEDBACK_GUIDANCE = {
     how: "Use --kind bug for breakage, --kind improvement for gaps/ideas. Attach " +
         "--command (what you ran) and --error (the message) so it can be reproduced.",
 };
+/** Concept guides for cross-cutting knowledge, surfaced by `ib help <id>` and embedded in `ib reference dump`. */
+export const TOPICS = [
+    {
+        id: "roles",
+        title: "Role model (two layers)",
+        body: "`customer person list` row `roleTypeId` only echoes the --role FILTER (null = base membership), NOT the person's role set. For the full per-company roles use `ib person role list <personId> --asiakas <id>`. One `person role grant` adds exactly ONE setting (no bundle). Resolve role NAME<->typeId and see access tiers with `ib role explain <name>`.",
+    },
+    {
+        id: "jerry-lifecycle",
+        title: "BetoniJerry RFQ lifecycle",
+        body: "Request: draft -> open (provider inbox). Offer: draft -> pending (provider `offer send`) -> accepted (CUSTOMER `offer accept`, siblings rejected) -> confirmed (PROVIDER `offer confirm`, which BUILDS a keikka). Customer PII is masked to providers until their offer is accepted. Use `ib jerry check-address` to debug 'no offers'.",
+    },
+    {
+        id: "write-safety",
+        title: "Write safety: dry-run, idempotency, reason, read-only",
+        body: "--dry-run is SERVER-side on most writes (sends X-Dry-Run; if the handler doesn't honour it the write PERSISTS — never dry-run against an endpoint whose guard isn't deployed). It is CLIENT-side (never sends) on `vehicle update`, `ohje update`, `feedback create/resolve`. --idempotency-key dedupes retries (24h). --reason is written to the audit log (required by delete/grant/revoke). --read-only / IB_READ_ONLY blocks every non-GET (exit 3); `feedback create` is exempt (meta request).",
+    },
+    {
+        id: "exit-codes",
+        title: "Process exit codes",
+        body: "0 ok; 2 auth (HTTP 401); 3 permission (403); 4 validation (4xx incl. 400/409/429); 5 not-found (404); 6 server (5xx); 7 network. Each command's --help ERRORS section lists exit code + HTTP status.",
+    },
+    {
+        id: "multi-tenancy",
+        title: "Multi-tenancy & company context",
+        body: "Every read/write is scoped to the active company's ownerAsiakasId, derived from your JWT. `ib company switch --to <id>` persists a new active company; the global `--asiakas <id>` runs ONE command in another company's context via an ephemeral (non-persisted) switch. BetoniJerry is the umbrella tenant asiakasId 1349.",
+    },
+];
 /**
  * Render the primer as a fixed-section text block for `ib --help`. Mirrors the
  * parse-friendly style of `formatHelp` (uppercase section headers, two-space
@@ -130,6 +158,8 @@ export function renderDomainHelp() {
         lines.push(`    - ${t}`);
     }
     lines.push(`  ${FEEDBACK_GUIDANCE.how}`);
+    lines.push("");
+    lines.push("  Concept guides: `ib help <topic>` — " + TOPICS.map((t) => t.id).join(", ") + ".");
     lines.push("");
     lines.push("  Run `ib reference dump` for the full machine-readable command catalogue.");
     return lines.join("\n");
