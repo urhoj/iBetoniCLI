@@ -1807,7 +1807,7 @@ exports[`Help snapshots — contract stability > help for ib person create match
   ib person create [flags]
 
 DESCRIPTION
-  Create a person. REQUIRED: --first, --last. --email is OPTIONAL (personEmail is nullable; phone-only contacts are fine and the email can be added later via \`ib person update\`). --asiakas defaults to your active company. Returns the created person record (clean {personId, ...}), NOT the raw SQL recordset. With --get-or-create a duplicate email returns the existing person (reused:true) instead of failing — useful for idempotent bulk onboarding. Use typed flags or --body JSON (typed flags win). Requires --reason.
+  Create a person. REQUIRED: --first, --last. --email is OPTIONAL (personEmail is nullable; phone-only contacts are fine and the email can be added later via \`ib person update\`). --asiakas defaults to your active company. Returns the created person record (clean {personId, ...}), NOT the raw SQL recordset. With --get-or-create a duplicate email returns the existing person (reused:true) instead of failing — useful for idempotent bulk onboarding. Use typed flags or --body JSON (typed flags win). Requires --reason. Use --global to create a GLOBAL, self-managing person (ownerAsiakasId=null) discoverable across companies; --global and --asiakas are mutually exclusive.
   Permissions: requires auth.page.person.edit.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -1817,6 +1817,7 @@ FLAGS
   --phone STRING    personPhone
   --email STRING    personEmail (optional)
   --asiakas NUMBER    Owner asiakasId (defaults to your active company)
+  --global BOOLEAN    Create a global, owner-less person (ownerAsiakasId=null). Mutually exclusive with --asiakas.
   --get-or-create BOOLEAN    On a duplicate email, return the existing person (reused:true) instead of failing
   --body JSON    Raw JSON body, merged under typed flags (optional)
   --reason STRING    Audit-log reason (REQUIRED)
@@ -1842,6 +1843,7 @@ EXAMPLES
   ib person create --first Matti --last Virtanen --phone "+358501234567" --reason "phone contact"
   ib person create --first Matti --last Virtanen --email m@x.com --get-or-create --reason "onboard"
   ib person create --body '{"personFirstName":"Matti","personLastName":"M"}' --reason "onboard"
+  ib person create --first Matti --last Virtanen --global --reason "global self-managing person"
 "
 `;
 
@@ -1884,7 +1886,7 @@ exports[`Help snapshots — contract stability > help for ib person get matches 
   ib person get [flags]
 
 DESCRIPTION
-  Get a single person by personId.
+  Get a single person by personId. Global persons (ownerAsiakasId=null) are fetchable by anyone.
   Permissions: requires auth.page.person.read.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -1999,6 +2001,44 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib person owner matches snapshot 1`] = `
+"USAGE
+  ib person owner [flags]
+
+DESCRIPTION
+  Set or clear a person's owner company (ownerAsiakasId). Provide EXACTLY ONE of --global (make the person GLOBAL/self-managing, ownerAsiakasId=null, discoverable across companies) or --asiakas <id> (assign/move ownership). This is SEPARATE from roles — a global person can still hold roles via \`ib person role grant\`, and from membership via \`ib customer person add\`. Requires --reason.
+  Permissions: requires developer/system-admin: any person → any target, self (your own personId): → null always; → a company only if you are a member of it, company-admin: may release a person CURRENTLY owned by your company → global (cannot pull others in).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --personId NUMBER    Positional — personId whose owner to change
+  --global BOOLEAN    Make the person global (ownerAsiakasId=null)
+  --asiakas NUMBER    Set owner to this asiakasId
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  { personId, ownerAsiakasId } or { dryRun: true, wouldSetOwner: { personId, from, to } }
+
+ERRORS (stderr, exit non-zero)
+  403  Not allowed to change this person's owner → see the authz rules above (developer/self/company-admin)
+  404  Person not found       → verify personId
+  4  Bad flags              → provide exactly one of --global / --asiakas and a --reason
+
+EXAMPLES
+  ib person owner 5351 --global --reason 'make self-managing'
+  ib person owner 5351 --asiakas 26 --reason 'assign to company 26'
+  ib person owner 5351 --global --reason preview --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib person role grant matches snapshot 1`] = `
 "USAGE
   ib person role grant [flags]
@@ -2106,7 +2146,7 @@ exports[`Help snapshots — contract stability > help for ib person search match
   ib person search [flags]
 
 DESCRIPTION
-  Free-text search across person names / emails. POST /api/person/search. Scoped to your active company. With --my-companies the search fans out across every company you belong to (an ephemeral per-company switch each) and returns one flat list tagged with the asiakasId/name of each hit.
+  Free-text search across person names / emails. POST /api/person/search. Scoped to your active company. With --my-companies the search fans out across every company you belong to (an ephemeral per-company switch each) and returns one flat list tagged with the asiakasId/name of each hit. Global persons (ownerAsiakasId=null) are included in every company's results.
   Permissions: requires auth.page.person.read.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
