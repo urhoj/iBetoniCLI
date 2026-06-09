@@ -23,6 +23,8 @@ export function buildPersonCreateBody(parsedBody, typed) {
         body.personEmail = typed.email;
     if (typed.asiakas !== undefined)
         body.ownerAsiakasId = typed.asiakas;
+    if (typed.global)
+        body.ownerAsiakasId = null;
     return body;
 }
 /**
@@ -287,11 +289,17 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .option("--phone <s>", "personPhone")
         .option("--email <s>", "personEmail (optional)")
         .option("--asiakas <id>", "Owner asiakasId (defaults to your active company)", Number)
+        .option("--global", "Create a GLOBAL, self-managing person with no owner (ownerAsiakasId=null), discoverable across companies. Mutually exclusive with --asiakas.")
         .option("--get-or-create", "On a duplicate email, return the existing person (reused:true) instead of failing")
         .option("--body <json>", "Raw JSON body (merged under typed flags)");
     addWriteFlagsToCommand(createCmd).action(async (opts) => {
         if (!opts.reason) {
             writeError(new Error("Missing required flag: --reason"));
+            process.exit(4);
+        }
+        // --global and --asiakas are mutually exclusive owner directives.
+        if (opts.global && opts.asiakas !== undefined) {
+            writeError(new Error("--global and --asiakas are mutually exclusive"));
             process.exit(4);
         }
         let parsed = {};
@@ -310,6 +318,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
             phone: opts.phone,
             email: opts.email,
             asiakas: opts.asiakas,
+            global: opts.global,
         });
         const missing = missingPersonCreateFields(body);
         if (missing.length > 0) {
@@ -319,8 +328,9 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         try {
             const client = await getClient();
             // ownerAsiakasId is needed by person_add; default it to the active company
-            // when neither --asiakas nor --body supplied one.
-            if (body.ownerAsiakasId === undefined || body.ownerAsiakasId === null) {
+            // when neither --asiakas nor --body supplied one — but NOT for --global,
+            // whose null owner is intentional.
+            if (!opts.global && (body.ownerAsiakasId === undefined || body.ownerAsiakasId === null)) {
                 body.ownerAsiakasId = await resolveOwnerAsiakasId(client);
             }
             let res;
@@ -377,6 +387,35 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         try {
             const client = await getClient();
             const result = await runPersonUpdate(client, Number(personIdStr), patch, opts);
+            writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    addWriteFlagsToCommand(p
+        .command("owner <personId>")
+        .description("Set or clear a person's owner company (ownerAsiakasId). Provide EXACTLY ONE of " +
+        "--global (make the person global/self-managing, ownerAsiakasId=null) or " +
+        "--asiakas <id> (assign/move ownership). Roles are separate (see `person role`). " +
+        "Requires --reason. Authz: developer=any; self → global always, self → a company you " +
+        "belong to; company-admin may release a person owned by their company → global.")
+        .option("--global", "Make the person GLOBAL (ownerAsiakasId=null)")
+        .option("--asiakas <id>", "Set owner to this asiakasId", Number)).action(async (personIdStr, opts) => {
+        if (!opts.reason) {
+            writeError(new Error("Missing required flag: --reason"));
+            process.exit(4);
+        }
+        const hasGlobal = !!opts.global;
+        const hasAsiakas = opts.asiakas !== undefined;
+        if (hasGlobal === hasAsiakas) {
+            writeError(new Error("provide exactly one of --global or --asiakas <id>"));
+            process.exit(4);
+        }
+        const ownerAsiakasId = hasGlobal ? null : opts.asiakas;
+        try {
+            const client = await getClient();
+            const result = await runPersonSetOwner(client, Number(personIdStr), ownerAsiakasId, opts);
             writeJson(result);
         }
         catch (e) {
@@ -635,6 +674,17 @@ export async function runPersonCreate(client, body, flags) {
  */
 export async function runPersonUpdate(client, personId, patch, flags) {
     return client.post("/api/person/set", { personId, ...patch }, { headers: writeFlagsToHeaders(flags) });
+}
+/**
+ * POST /api/person/setOwner/:personId — set or clear a person's ownerAsiakasId.
+ * `ownerAsiakasId: null` makes the person GLOBAL (self-managing, cross-tenant
+ * discoverable); a positive id assigns/moves ownership. Server-side authz applies
+ * (developer = any; self → null always / → a company you belong to; company-admin
+ * may release a person owned by their company → global). Write-flag headers
+ * (incl. X-Dry-Run, X-Action-Reason) are forwarded.
+ */
+export async function runPersonSetOwner(client, personId, ownerAsiakasId, flags) {
+    return client.post(`/api/person/setOwner/${personId}`, { ownerAsiakasId }, { headers: writeFlagsToHeaders(flags) });
 }
 /**
  * DELETE /api/person/delete/:personId — remove a person record.

@@ -755,7 +755,7 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib person get",
-        description: "Get a single person by personId.",
+        description: "Get a single person by personId. Global persons (ownerAsiakasId=null) are fetchable by anyone.",
         permissions: ["auth.page.person.read"],
         flags: [
             {
@@ -776,7 +776,8 @@ export const COMMAND_SPECS = [
         description: "Free-text search across person names / emails. POST /api/person/search. " +
             "Scoped to your active company. With --my-companies the search fans out " +
             "across every company you belong to (an ephemeral per-company switch each) " +
-            "and returns one flat list tagged with the asiakasId/name of each hit.",
+            "and returns one flat list tagged with the asiakasId/name of each hit. " +
+            "Global persons (ownerAsiakasId=null) are included in every company's results.",
         permissions: ["auth.page.person.read"],
         flags: [
             {
@@ -1679,7 +1680,7 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib person create",
-        description: "Create a person. REQUIRED: --first, --last. --email is OPTIONAL (personEmail is nullable; phone-only contacts are fine and the email can be added later via `ib person update`). --asiakas defaults to your active company. Returns the created person record (clean {personId, ...}), NOT the raw SQL recordset. With --get-or-create a duplicate email returns the existing person (reused:true) instead of failing — useful for idempotent bulk onboarding. Use typed flags or --body JSON (typed flags win). Requires --reason.",
+        description: "Create a person. REQUIRED: --first, --last. --email is OPTIONAL (personEmail is nullable; phone-only contacts are fine and the email can be added later via `ib person update`). --asiakas defaults to your active company. Returns the created person record (clean {personId, ...}), NOT the raw SQL recordset. With --get-or-create a duplicate email returns the existing person (reused:true) instead of failing — useful for idempotent bulk onboarding. Use typed flags or --body JSON (typed flags win). Requires --reason. Use --global to create a GLOBAL, self-managing person (ownerAsiakasId=null) discoverable across companies; --global and --asiakas are mutually exclusive.",
         permissions: ["auth.page.person.edit"],
         flags: [
             { name: "first", type: "string", description: "personFirstName (REQUIRED)" },
@@ -1687,6 +1688,7 @@ export const COMMAND_SPECS = [
             { name: "phone", type: "string", description: "personPhone" },
             { name: "email", type: "string", description: "personEmail (optional)" },
             { name: "asiakas", type: "number", description: "Owner asiakasId (defaults to your active company)" },
+            { name: "global", type: "boolean", description: "Create a global, owner-less person (ownerAsiakasId=null). Mutually exclusive with --asiakas." },
             { name: "get-or-create", type: "boolean", description: "On a duplicate email, return the existing person (reused:true) instead of failing" },
             { name: "body", type: "json", description: "Raw JSON body, merged under typed flags (optional)" },
             { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
@@ -1701,6 +1703,7 @@ export const COMMAND_SPECS = [
             'ib person create --first Matti --last Virtanen --phone "+358501234567" --reason "phone contact"',
             'ib person create --first Matti --last Virtanen --email m@x.com --get-or-create --reason "onboard"',
             'ib person create --body \'{"personFirstName":"Matti","personLastName":"M"}\' --reason "onboard"',
+            'ib person create --first Matti --last Virtanen --global --reason "global self-managing person"',
         ],
     },
     {
@@ -1718,6 +1721,33 @@ export const COMMAND_SPECS = [
             ...permErrors("auth.page.person.edit"),
         ],
         examples: ['ib person update 5351 --body \'{"personPhone":"+358501234567"}\' --reason "phone change"'],
+    },
+    {
+        command: "ib person owner",
+        description: "Set or clear a person's owner company (ownerAsiakasId). Provide EXACTLY ONE of --global (make the person GLOBAL/self-managing, ownerAsiakasId=null, discoverable across companies) or --asiakas <id> (assign/move ownership). This is SEPARATE from roles — a global person can still hold roles via `ib person role grant`, and from membership via `ib customer person add`. Requires --reason.",
+        permissions: [
+            "developer/system-admin: any person → any target",
+            "self (your own personId): → null always; → a company only if you are a member of it",
+            "company-admin: may release a person CURRENTLY owned by your company → global (cannot pull others in)",
+        ],
+        flags: [
+            { name: "personId", type: "number", description: "Positional — personId whose owner to change" },
+            { name: "global", type: "boolean", description: "Make the person global (ownerAsiakasId=null)" },
+            { name: "asiakas", type: "number", description: "Set owner to this asiakasId" },
+            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+        ],
+        writeFlags: true,
+        outputShape: "{ personId, ownerAsiakasId } or { dryRun: true, wouldSetOwner: { personId, from, to } }",
+        errors: [
+            { code: 403, meaning: "Not allowed to change this person's owner", remedy: "see the authz rules above (developer/self/company-admin)" },
+            { code: 404, meaning: "Person not found", remedy: "verify personId" },
+            { code: 4, meaning: "Bad flags", remedy: "provide exactly one of --global / --asiakas and a --reason" },
+        ],
+        examples: [
+            "ib person owner 5351 --global --reason 'make self-managing'",
+            "ib person owner 5351 --asiakas 26 --reason 'assign to company 26'",
+            "ib person owner 5351 --global --reason preview --dry-run",
+        ],
     },
     {
         command: "ib person delete",
