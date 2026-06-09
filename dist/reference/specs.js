@@ -2311,7 +2311,7 @@ export const COMMAND_SPECS = [
         outputShape: "{ feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
         errors: [
             { exit: 4, meaning: "Validation", remedy: "description is required; --kind must be improvement|bug" },
-            { exit: 2, meaning: "Token expired", remedy: "ib auth refresh" },
+            apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
         examples: [
@@ -2332,8 +2332,8 @@ export const COMMAND_SPECS = [
         ],
         outputShape: "{ items: FeedbackRow[], nextCursor: null, count }",
         errors: [
-            { exit: 3, meaning: "Permission denied", remedy: "requires a developer token (isSystemAdmin/isDeveloper)" },
-            { exit: 2, meaning: "Token expired", remedy: "ib auth refresh" },
+            apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
+            apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
         examples: ["ib feedback list --status open", "ib feedback list --kind bug --limit 20"],
@@ -2345,8 +2345,8 @@ export const COMMAND_SPECS = [
         flags: [],
         outputShape: "The full feedback row { feedbackId, kind, status, description, command, errorText, cliVersion, context, resolution, createdAt, ... }",
         errors: [
-            { exit: 3, meaning: "Permission denied", remedy: "requires a developer token" },
-            { exit: 5, meaning: "Not found", remedy: "check the id via `ib feedback list`" },
+            apiErr(403, "Permission denied", "requires a developer token"),
+            apiErr(404, "Not found", "check the id via `ib feedback list`"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
         examples: ["ib feedback get 42"],
@@ -2363,8 +2363,8 @@ export const COMMAND_SPECS = [
         outputShape: "The updated feedback row. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
         errors: [
             { exit: 4, meaning: "Validation", remedy: "provide --status and/or --note; status must be a known value" },
-            { exit: 3, meaning: "Permission denied", remedy: "requires a developer token; also refused under --read-only" },
-            { exit: 5, meaning: "Not found", remedy: "check the id via `ib feedback list`" },
+            apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
+            apiErr(404, "Not found", "check the id via `ib feedback list`"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
         examples: [

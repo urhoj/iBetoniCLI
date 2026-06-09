@@ -866,7 +866,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4  Validation             → description is required; --kind must be improvement|bug
-  exit 2  Token expired          → ib auth refresh
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
@@ -895,8 +895,8 @@ OUTPUT (JSON, stdout)
   The full feedback row { feedbackId, kind, status, description, command, errorText, cliVersion, context, resolution, createdAt, ... }
 
 ERRORS (stderr, exit non-zero)
-  exit 3  Permission denied      → requires a developer token
-  exit 5  Not found              → check the id via \`ib feedback list\`
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib feedback list\`
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
@@ -926,8 +926,8 @@ OUTPUT (JSON, stdout)
   { items: FeedbackRow[], nextCursor: null, count }
 
 ERRORS (stderr, exit non-zero)
-  exit 3  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
-  exit 2  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
@@ -958,8 +958,8 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4  Validation             → provide --status and/or --note; status must be a known value
-  exit 3  Permission denied      → requires a developer token; also refused under --read-only
-  exit 5  Not found              → check the id via \`ib feedback list\`
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib feedback list\`
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
