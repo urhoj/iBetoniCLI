@@ -41,4 +41,22 @@ export function resolveDate(input) {
         return shiftIsoDays(todayHelsinki(), 1);
     return input;
 }
+/** Shift an ISO YYYY-MM-DD by whole days (public alias of the internal shift). */
+export function addDaysISO(iso, days) {
+    return shiftIsoDays(iso, days);
+}
+const MONTH_RE = /^\d{4}-\d{2}$/;
+/** Expand `YYYY-MM` to { from: first day, to: last day } (leap-year aware). */
+export function monthRange(month) {
+    if (!MONTH_RE.test(month)) {
+        throw new Error(`--month must be YYYY-MM, got "${month}"`);
+    }
+    const [y, m] = month.split("-").map(Number);
+    const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate(); // day 0 of next month = last day of this
+    return { from: `${month}-01`, to: `${month}-${String(lastDay).padStart(2, "0")}` };
+}
+/** Expand a start date to the 7-day window [start, start+6]. */
+export function weekRange(start) {
+    return { from: start, to: shiftIsoDays(start, 6) };
+}
 //# sourceMappingURL=dates.js.map

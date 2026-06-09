@@ -22,6 +22,7 @@ import { registerSijaintiCommands } from "./commands/sijainti/index.js";
 import { registerOhjeCommands } from "./commands/ohje/index.js";
 import { registerJerryCommands } from "./commands/jerry/index.js";
 import { registerScheduleCommands } from "./commands/schedule/index.js";
+import { registerStatsCommands } from "./commands/stats/index.js";
 import { registerSchemaCommands } from "./commands/schema/index.js";
 import { registerCacheCommands } from "./commands/cache/index.js";
 import { registerWeatherCommands } from "./commands/weather/index.js";
@@ -107,6 +108,7 @@ export function buildProgram() {
     registerOhjeCommands(program, getClient);
     registerJerryCommands(program, getClient);
     registerScheduleCommands(program, getClient);
+    registerStatsCommands(program, getClient);
     registerSchemaCommands(program, getClient);
     registerCacheCommands(program, getClient);
     registerWeatherCommands(program, getClient);

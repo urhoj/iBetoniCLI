@@ -253,6 +253,31 @@ export const COMMAND_SPECS = [
             "ib keikka drivers assign 9001 --dry-run",
         ],
     },
+    // ─── stats (1) ───────────────────────────────────────────────────────────
+    {
+        command: "ib stats",
+        description: "Aggregated delivery statistics for a date range: m³ volume, order counts, and breakdowns by customer/vehicle/driver/worksite/status/day. Read-only; scoped to what the caller can see in the grid.",
+        flags: [
+            { name: "from", type: "date", description: "Start date (YYYY-MM-DD or today/yesterday/tomorrow)" },
+            { name: "to", type: "date", description: "End date (YYYY-MM-DD or today/yesterday/tomorrow)" },
+            { name: "today", type: "boolean", description: "Shortcut for --from today --to today" },
+            { name: "month", type: "string", description: "Whole calendar month YYYY-MM (expands to first→last day)" },
+            { name: "week", type: "date", description: "7-day window starting <start>" },
+            { name: "by", type: "string", description: "Single breakdown: customer|vehicle|driver|worksite|status|day (omit for full bundle)" },
+        ],
+        outputShape: "No --by: { period, totals:{orders,m3,activeVehicles,activeDrivers}, byStatus, byCustomer, byVehicle, byDriver, byWorksite, byDay }. With --by: ListEnvelope of that one breakdown.",
+        errors: COMMON_AUTH_ERRORS,
+        notes: [
+            "Default range is today. Exactly one of --today/--month/--week/(--from & --to).",
+            "Deploy-gated: returns 404 until GET /api/cli/stats is deployed.",
+            "Revenue and driver hours are out of scope (v1).",
+        ],
+        examples: [
+            "ib stats --month 2026-06",
+            "ib stats --from 2026-06-01 --to 2026-06-07 --by driver",
+            "ib stats --today --pretty",
+        ],
+    },
     // ─── customer (7) ────────────────────────────────────────────────────────
     {
         command: "ib customer list",
