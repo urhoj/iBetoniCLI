@@ -18,7 +18,7 @@ export interface CommandSummary {
   command: string;
   description: string;
   permissions: string[];
-  /** True when the command mutates (carries the write-safety flags). */
+  /** True when the command mutates (writes) data. */
   writeFlags: boolean;
 }
 
@@ -60,8 +60,9 @@ export function filterCommandSpecs(
   const needle = filter.permission?.toLowerCase();
   return specs
     .filter((s) => {
-      if (filter.mutations && !s.writeFlags) return false;
-      if (filter.reads && s.writeFlags) return false;
+      const mutates = s.mutates ?? !!s.writeFlags;
+      if (filter.mutations && !mutates) return false;
+      if (filter.reads && mutates) return false;
       if (needle && !s.permissions?.some((p) => p.toLowerCase().includes(needle))) {
         return false;
       }
@@ -71,7 +72,7 @@ export function filterCommandSpecs(
       command: s.command,
       description: s.description,
       permissions: s.permissions ?? [],
-      writeFlags: !!s.writeFlags,
+      writeFlags: s.mutates ?? !!s.writeFlags,
     }));
 }
 

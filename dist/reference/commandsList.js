@@ -13,9 +13,10 @@ export function filterCommandSpecs(specs, filter) {
     const needle = filter.permission?.toLowerCase();
     return specs
         .filter((s) => {
-        if (filter.mutations && !s.writeFlags)
+        const mutates = s.mutates ?? !!s.writeFlags;
+        if (filter.mutations && !mutates)
             return false;
-        if (filter.reads && s.writeFlags)
+        if (filter.reads && mutates)
             return false;
         if (needle && !s.permissions?.some((p) => p.toLowerCase().includes(needle))) {
             return false;
@@ -26,7 +27,7 @@ export function filterCommandSpecs(specs, filter) {
         command: s.command,
         description: s.description,
         permissions: s.permissions ?? [],
-        writeFlags: !!s.writeFlags,
+        writeFlags: s.mutates ?? !!s.writeFlags,
     }));
 }
 /**

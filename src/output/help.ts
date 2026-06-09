@@ -70,6 +70,12 @@ export interface CommandSpec {
   flags: CommandFlag[];
   /** When true, the WRITE-SAFETY FLAGS block is included. */
   writeFlags?: boolean;
+  /**
+   * True when the command mutates data even if it doesn't use the standard
+   * write-safety block (e.g. custom client-side dry-run). Falls back to
+   * writeFlags for ib commands filtering.
+   */
+  mutates?: boolean;
   /** One-line description of the JSON response shape on stdout. */
   outputShape: string;
   /** Documented error codes with their meaning and remedy. */

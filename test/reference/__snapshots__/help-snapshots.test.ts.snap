@@ -3690,9 +3690,6 @@ DESCRIPTION
 FLAGS
   --on BOOLEAN    Enable the module
   --off BOOLEAN    Disable the module
-  --dry-run BOOLEAN    Preview the write without persisting (X-Dry-Run)
-  --idempotency-key STRING    Dedupe retries of the same logical write (Idempotency-Key)
-  --reason STRING    Human-readable why-string stored in audit logs (X-Action-Reason)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.

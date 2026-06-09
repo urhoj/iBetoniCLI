@@ -93,3 +93,14 @@ describe("buildCommandsList", () => {
     expect(env.items.every((c) => c.writeFlags)).toBe(true);
   });
 });
+
+describe("ib commands classification", () => {
+  test("feedback create/resolve are mutations despite writeFlags:false", () => {
+    const muts = filterCommandSpecs(COMMAND_SPECS, { mutations: true }).map((c) => c.command);
+    expect(muts).toContain("ib feedback create");
+    expect(muts).toContain("ib feedback resolve");
+    const reads = filterCommandSpecs(COMMAND_SPECS, { reads: true }).map((c) => c.command);
+    expect(reads).not.toContain("ib feedback create");
+    expect(reads).not.toContain("ib feedback resolve");
+  });
+});

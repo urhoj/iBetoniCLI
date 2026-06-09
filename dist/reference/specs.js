@@ -2143,9 +2143,6 @@ export const COMMAND_SPECS = [
         flags: [
             { name: "on", type: "boolean", description: "Enable the module" },
             { name: "off", type: "boolean", description: "Disable the module" },
-            { name: "dry-run", type: "boolean", description: "Preview the write without persisting (X-Dry-Run)" },
-            { name: "idempotency-key", type: "string", description: "Dedupe retries of the same logical write (Idempotency-Key)" },
-            { name: "reason", type: "string", description: "Human-readable why-string stored in audit logs (X-Action-Reason)" },
         ],
         outputShape: "{ success: boolean, enabled: boolean, ... }",
         errors: [
@@ -2241,15 +2238,16 @@ export const COMMAND_SPECS = [
         examples: ["ib doctor", "ib doctor --endpoint https://api-staging.ibetoni.fi"],
     },
     // ─── feedback (4) ────────────────────────────────────────────────────────
-    // NOTE on classification: feedback commands carry custom write semantics
+    // NOTE on classification: feedback create/resolve carry custom write semantics
     // (meta-exempt create, client-side --dry-run, no idempotency/reason), so they
     // keep writeFlags:false — the standard write-safety block would mis-document
-    // them. Consequence: `ib commands --reads` lists them and `--mutations` does
-    // not; the per-command help/description below is the authoritative contract.
+    // them. mutates:true is set explicitly so `ib commands --mutations` picks them
+    // up and `--reads` excludes them despite writeFlags:false.
     {
         command: "ib feedback create",
         description: "File a CLI improvement proposal or trouble report. AI users: file this PROACTIVELY and IMMEDIATELY (no need to ask the user) whenever you hit an error or unexpected exit code, had to try several strategies because the help/docs were unclear/missing/wrong, found something confusing or harder than expected, could not find a command for something the user clearly needs (a capability gap), or saw an inconsistency between commands. Stored quietly server-side (no GitHub issue, no spam to you or the user — distinct from bug reports; the maintainer gets a private heads-up email) for later developer triage. Sent as a META request, so it is EXEMPT from the read-only write-lock: you can file feedback even with --read-only / IB_READ_ONLY active. --dry-run resolves client-side (prints the payload, never sends).",
         auth: "any",
+        mutates: true,
         args: [{ name: "description", type: "string", description: "freetext description of the friction, gap, or bug" }],
         flags: [
             { name: "kind", type: "string", default: "improvement", description: "improvement | bug" },
@@ -2305,6 +2303,7 @@ export const COMMAND_SPECS = [
         command: "ib feedback resolve",
         description: "Triage a feedback row: set its status and/or attach a resolution note (developer-only). This IS a real write — blocked under --read-only (exit 3). --dry-run previews the update body client-side without sending.",
         permissions: ["isSystemAdmin or isDeveloper"],
+        mutates: true,
         args: [{ name: "id", type: "number", description: "feedbackId" }],
         flags: [
             { name: "status", type: "string", description: "open | reviewed | applied | dismissed" },
