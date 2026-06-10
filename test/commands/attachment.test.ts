@@ -1,4 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
+import { mkdtemp, readFile as fsReadFile, writeFile as fsWriteFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   runAttachmentList,
   runAttachmentGet,
@@ -7,6 +10,10 @@ import {
   resolveEntityTarget,
   mimeFromExtension,
   resolveGroupAndType,
+  runAttachmentUploadUrl,
+  runAttachmentRegister,
+  runAttachmentUpload,
+  runAttachmentDownload,
 } from "../../src/commands/attachment/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -107,5 +114,102 @@ describe("resolveGroupAndType", () => {
       types: [],
     });
     await expect(resolveGroupAndType(c, { group: "nope" })).rejects.toThrowError(CliError);
+  });
+});
+
+describe("ib attachment upload/download", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  test("upload-url posts the bare name", async () => {
+    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ uploadUrl: "u", fileFolder: "8/2026", fileName: "x.jpg" });
+    await runAttachmentUploadUrl(c, "site.jpg");
+    expect(c.post).toHaveBeenCalledWith("/api/cli/attachment/upload-url", { name: "site.jpg" });
+  });
+
+  test("register posts metadata with write-flag headers", async () => {
+    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true, attachmentId: 4711 });
+    await runAttachmentRegister(
+      c,
+      { fileName: "x.jpg", origFileName: "site.jpg", fileFolder: "8/2026", fileType: "image/jpeg", fileSize: 3, entity: "keikka", entityId: 9001, fileComment: "k" },
+      { reason: "test" }
+    );
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/cli/attachment/register",
+      expect.objectContaining({ fileName: "x.jpg", entity: "keikka", entityId: 9001 }),
+      { headers: { "X-Action-Reason": "test" } }
+    );
+  });
+
+  test("upload chains mint → PUT (BlockBlob header) → register", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ib-att-"));
+    const file = join(dir, "photo.jpg");
+    await fsWriteFile(file, Buffer.from([1, 2, 3]));
+    (c.post as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ uploadUrl: "https://blob/up?sas=1", fileFolder: "8/2026", fileName: "uuid.jpg" })
+      .mockResolvedValueOnce({ ok: true, attachmentId: 4711 });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await runAttachmentUpload(c, file, { keikka: 9001 }, {});
+
+    expect(fetchMock).toHaveBeenCalledWith("https://blob/up?sas=1", {
+      method: "PUT",
+      headers: { "x-ms-blob-type": "BlockBlob" },
+      body: expect.anything(),
+    });
+    expect(c.post).toHaveBeenLastCalledWith(
+      "/api/cli/attachment/register",
+      expect.objectContaining({
+        fileName: "uuid.jpg", origFileName: "photo.jpg", fileFolder: "8/2026",
+        fileType: "image/jpeg", fileSize: 3, entity: "keikka", entityId: 9001,
+      }),
+      { headers: {} }
+    );
+    expect(result).toMatchObject({ ok: true, attachmentId: 4711 });
+  });
+
+  test("upload --dry-run makes zero network calls", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ib-att-"));
+    const file = join(dir, "photo.jpg");
+    await fsWriteFile(file, Buffer.from([1, 2, 3]));
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const result = (await runAttachmentUpload(c, file, { keikka: 9001 }, { dryRun: true })) as Record<string, unknown>;
+    expect(result.dryRun).toBe(true);
+    expect(c.post).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test("PUT failure does NOT register metadata", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ib-att-"));
+    const file = join(dir, "photo.jpg");
+    await fsWriteFile(file, Buffer.from([1]));
+    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ uploadUrl: "u", fileFolder: "8/2026", fileName: "x.jpg" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 403 }));
+    await expect(runAttachmentUpload(c, file, { keikka: 9001 }, {})).rejects.toThrowError(CliError);
+    expect(c.post).toHaveBeenCalledTimes(1); // mint only, no register
+  });
+
+  test("download fetches blobUrl and writes the file; refuses overwrite without force", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ib-att-"));
+    const out = join(dir, "saved.jpg");
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      attachmentId: 4711, origFileName: "site.jpg", fileType: "image/jpeg",
+      blobUrl: "https://blob/x?sas=1",
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => Uint8Array.from([9, 9]).buffer,
+    }));
+    const result = (await runAttachmentDownload(c, 4711, out, false)) as Record<string, unknown>;
+    expect(result.bytes).toBe(2);
+    expect(Buffer.from(await fsReadFile(out))).toEqual(Buffer.from([9, 9]));
+    // second run without --force refuses (exit 4)
+    await expect(runAttachmentDownload(c, 4711, out, false)).rejects.toThrowError(CliError);
+    // with force succeeds
+    await expect(runAttachmentDownload(c, 4711, out, true)).resolves.toBeTruthy();
   });
 });

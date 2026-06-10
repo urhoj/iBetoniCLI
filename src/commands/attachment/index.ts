@@ -2,6 +2,11 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { basename, resolve as resolvePath } from "node:path";
+import { type WriteFlags, writeFlagsToHeaders, addWriteFlagsToCommand } from "../../api/writeFlags.js";
+import { CliError } from "../../api/errors.js";
 
 type Row = Record<string, unknown>;
 
@@ -141,6 +146,113 @@ export async function runAttachmentSearch(
   return client.get<ListEnvelope<Row>>(`/api/cli/attachment/search${qs}`);
 }
 
+// ── Upload / download run functions ──────────────────────────────────────────
+
+/** POST /api/cli/attachment/upload-url — authenticated SAS mint (server picks blob path). */
+export async function runAttachmentUploadUrl(client: ApiClient, name: string): Promise<Row> {
+  return client.post<Row>("/api/cli/attachment/upload-url", { name });
+}
+
+/** POST /api/cli/attachment/register — persist metadata after the bytes are in Azure. */
+export async function runAttachmentRegister(
+  client: ApiClient,
+  body: {
+    fileName: string; origFileName: string; fileFolder: string; fileType: string;
+    fileSize: number; entity: string; entityId: number;
+    fileComment?: string; attachmentGroupId?: number; attachmentTypeId?: number; fileETag?: string;
+  },
+  flags: WriteFlags
+): Promise<Row> {
+  return client.post<Row>("/api/cli/attachment/register", body, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/**
+ * LOCAL upload convenience: readFile → upload-url → PUT to Azure → register.
+ * --dry-run is CLIENT-side (validates the file, zero network calls).
+ * DENIED on /api/cli/exec + MCP (server-side filesystem — LFI).
+ */
+export async function runAttachmentUpload(
+  client: ApiClient,
+  filePath: string,
+  opts: Record<string, unknown>,
+  flags: WriteFlags & { comment?: string; mime?: string; groupId?: number; typeId?: number }
+): Promise<unknown> {
+  const target = resolveEntityTarget(opts);
+  let data: Buffer;
+  try {
+    data = await readFile(filePath);
+  } catch {
+    failWith(`Cannot read file: ${filePath}`, 4);
+    return; // unreachable; satisfies TS
+  }
+  const origFileName = basename(filePath);
+  const fileType = flags.mime || mimeFromExtension(origFileName);
+  if (flags.dryRun) {
+    return {
+      dryRun: true,
+      wouldUpload: {
+        file: resolvePath(filePath), bytes: data.length, fileType,
+        entity: target.entity, entityId: target.entityId,
+        comment: flags.comment ?? null, groupId: flags.groupId ?? null, typeId: flags.typeId ?? null,
+      },
+    };
+  }
+  const minted = (await runAttachmentUploadUrl(client, origFileName)) as {
+    uploadUrl: string; fileFolder: string; fileName: string;
+  };
+  const putRes = await fetch(minted.uploadUrl, {
+    method: "PUT",
+    headers: { "x-ms-blob-type": "BlockBlob" },
+    body: data,
+  });
+  if (!putRes.ok) {
+    throw new CliError(`Azure blob upload failed: HTTP ${putRes.status}`, 0, null, 6);
+  }
+  return runAttachmentRegister(
+    client,
+    {
+      fileName: minted.fileName, origFileName, fileFolder: minted.fileFolder,
+      fileType, fileSize: data.length, entity: target.entity, entityId: target.entityId,
+      fileComment: flags.comment, attachmentGroupId: flags.groupId, attachmentTypeId: flags.typeId,
+    },
+    { idempotencyKey: flags.idempotencyKey, reason: flags.reason }
+  );
+}
+
+/**
+ * LOCAL download: get → fetch blobUrl → writeFile. Refuses overwrite without force.
+ * DENIED on /api/cli/exec + MCP (writes the server's disk) — remote callers fetch blobUrl themselves.
+ */
+export async function runAttachmentDownload(
+  client: ApiClient,
+  attachmentId: number,
+  outPath: string | undefined,
+  force: boolean
+): Promise<Row> {
+  const att = (await runAttachmentGet(client, attachmentId)) as {
+    origFileName?: string; fileType?: string; blobUrl?: string;
+  };
+  if (!att.blobUrl) {
+    throw new CliError("Backend returned no blobUrl (deploy gate? old backend?)", 0, null, 6);
+  }
+  const target = outPath || att.origFileName || `attachment-${attachmentId}`;
+  if (!force && existsSync(target)) {
+    failWith(`Refusing to overwrite ${target} (use --force)`, 4);
+  }
+  const res = await fetch(att.blobUrl);
+  if (!res.ok) {
+    throw new CliError(`Blob download failed: HTTP ${res.status}`, 0, null, 6);
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  await writeFile(target, buf);
+  return {
+    ok: true, attachmentId, file: resolvePath(target), bytes: buf.length,
+    fileType: att.fileType ?? null,
+  };
+}
+
 // ── Registration ─────────────────────────────────────────────────────────────
 
 export function registerAttachmentCommands(
@@ -204,7 +316,98 @@ export function registerAttachmentCommands(
       }
     });
 
-  // download / upload / upload-url / register / attach / detach / update / delete
-  // are appended by Tasks 8–9 inside this same register function.
+  a.command("download <attachmentId>")
+    .description("Download the file to local disk (LOCAL ONLY — denied on remote exec/MCP)")
+    .option("--out <path>", "Output path (default: original file name in cwd)")
+    .option("--force", "Overwrite an existing file")
+    .action(async (id: string, opts: { out?: string; force?: boolean }) => {
+      try {
+        writeJson(await runAttachmentDownload(await getClient(), Number(id), opts.out, !!opts.force));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  const uploadCmd = a
+    .command("upload <file>")
+    .description("Upload a local file and link it to ONE entity (LOCAL ONLY — denied on remote exec/MCP)")
+    .option("--comment <text>", "fileComment shown in the UI")
+    .option("--group <g>", "Attachment group (name or id — see `ib attachment types`)")
+    .option("--type <t>", "Attachment type (name or id — see `ib attachment types`)")
+    .option("--mime <mime>", "Override the auto-detected MIME type");
+  addEntityFlags(uploadCmd);
+  addWriteFlagsToCommand(uploadCmd).action(
+    async (file: string, opts: WriteFlags & Record<string, unknown>) => {
+      try {
+        const client = await getClient();
+        const { groupId, typeId } = await resolveGroupAndType(client, {
+          group: opts.group as string | undefined,
+          type: opts.type as string | undefined,
+        });
+        writeJson(
+          await runAttachmentUpload(client, file, opts, {
+            dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
+            comment: opts.comment as string | undefined, mime: opts.mime as string | undefined,
+            groupId, typeId,
+          })
+        );
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
+
+  a.command("upload-url")
+    .description("Mint a 1h write-SAS upload URL (remote-safe primitive; server picks the blob path)")
+    .requiredOption("--name <fileName>", "Original file name WITH extension (server derives the blob name)")
+    .action(async (opts: { name: string }) => {
+      try {
+        writeJson(await runAttachmentUploadUrl(await getClient(), opts.name));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  const registerCmd = a
+    .command("register")
+    .description("Persist metadata AFTER PUTting bytes to an upload-url (remote-safe primitive)")
+    .requiredOption("--name <fileName>", "fileName returned by upload-url")
+    .requiredOption("--orig-name <name>", "Original file name")
+    .requiredOption("--folder <fileFolder>", "fileFolder returned by upload-url")
+    .requiredOption("--size <bytes>", "File size in bytes", (s: string) => Number(s))
+    .requiredOption("--mime <mime>", "MIME type (fileType)")
+    .option("--comment <text>", "fileComment")
+    .option("--group <g>", "Attachment group (name or id)")
+    .option("--type <t>", "Attachment type (name or id)")
+    .option("--etag <etag>", "Azure ETag (optional; defaults to FE-parity sentinel)");
+  addEntityFlags(registerCmd);
+  addWriteFlagsToCommand(registerCmd).action(async (opts: WriteFlags & Record<string, unknown>) => {
+    try {
+      const client = await getClient();
+      const target = resolveEntityTarget(opts);
+      const { groupId, typeId } = await resolveGroupAndType(client, {
+        group: opts.group as string | undefined,
+        type: opts.type as string | undefined,
+      });
+      writeJson(
+        await runAttachmentRegister(
+          client,
+          {
+            fileName: opts.name as string, origFileName: opts.origName as string,
+            fileFolder: opts.folder as string, fileType: opts.mime as string,
+            fileSize: opts.size as number, entity: target.entity, entityId: target.entityId,
+            fileComment: opts.comment as string | undefined,
+            attachmentGroupId: groupId, attachmentTypeId: typeId,
+            fileETag: opts.etag as string | undefined,
+          },
+          { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }
+        )
+      );
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
+
+  // attach / detach / update / delete are appended by Task 9 inside this same register function.
 }
 
