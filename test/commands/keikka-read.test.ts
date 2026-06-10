@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   runKeikkaList,
   runKeikkaGet,
@@ -98,28 +98,34 @@ describe("ib keikka list/get", () => {
 });
 
 describe("resolveDate", () => {
+  // Pin the clock: resolveDate works on the Europe/Helsinki calendar day, so
+  // comparing against a live UTC toISOString() date flakes daily between
+  // 21:00–24:00 UTC (00:00–03:00 Helsinki). 23:30 UTC = 02:30 next day in
+  // Helsinki (DST +3) — deliberately inside the old flake window.
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   test("undefined passes through", () => {
     expect(resolveDate(undefined)).toBeUndefined();
   });
 
-  test("'today' returns ISO date for today", () => {
-    const out = resolveDate("today");
-    const expected = new Date().toISOString().slice(0, 10);
-    expect(out).toBe(expected);
+  test("'today' returns the Helsinki ISO date for today", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-01T23:30:00Z"));
+    expect(resolveDate("today")).toBe("2026-06-02");
   });
 
-  test("'yesterday' returns ISO date for yesterday", () => {
-    const out = resolveDate("yesterday");
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    expect(out).toBe(d.toISOString().slice(0, 10));
+  test("'yesterday' returns the Helsinki ISO date for yesterday", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-01T23:30:00Z"));
+    expect(resolveDate("yesterday")).toBe("2026-06-01");
   });
 
-  test("'tomorrow' returns ISO date for tomorrow", () => {
-    const out = resolveDate("tomorrow");
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    expect(out).toBe(d.toISOString().slice(0, 10));
+  test("'tomorrow' returns the Helsinki ISO date for tomorrow", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-01T23:30:00Z"));
+    expect(resolveDate("tomorrow")).toBe("2026-06-03");
   });
 
   test("explicit ISO date passes through", () => {
