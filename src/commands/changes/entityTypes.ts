@@ -20,7 +20,7 @@ export interface EntityTypeInfo {
   deprecated?: boolean;
 }
 
-export const CHANGE_ENTITY_TYPES: EntityTypeInfo[] = [
+export const CHANGE_ENTITY_TYPES: readonly EntityTypeInfo[] = [
   {
     entityType: "asiakas",
     entityIdMeaning: "asiakasId",
@@ -106,14 +106,18 @@ export const CHANGE_ENTITY_TYPES: EntityTypeInfo[] = [
   },
 ];
 
+export function findEntityType(t: string): EntityTypeInfo | undefined {
+  return CHANGE_ENTITY_TYPES.find((e) => e.entityType === t);
+}
+
 export function isKnownEntityType(t: string): boolean {
-  return CHANGE_ENTITY_TYPES.some((e) => e.entityType === t);
+  return findEntityType(t) !== undefined;
 }
 
 /** `ib changes types` — offline, no network, no auth. */
 export function runChangesTypes(): ListEnvelope<EntityTypeInfo> {
   return {
-    items: CHANGE_ENTITY_TYPES,
+    items: [...CHANGE_ENTITY_TYPES],
     nextCursor: null,
     count: CHANGE_ENTITY_TYPES.length,
   };

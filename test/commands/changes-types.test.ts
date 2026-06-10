@@ -1,12 +1,13 @@
 import { describe, test, expect } from "vitest";
 import {
   CHANGE_ENTITY_TYPES,
+  findEntityType,
   isKnownEntityType,
   runChangesTypes,
 } from "../../src/commands/changes/entityTypes.js";
 
 describe("changes entityType catalog", () => {
-  test("contains all live entityTypes plus pumppuRequest and retired kuski", () => {
+  test("lists entityTypes in alphabetical order", () => {
     const names = CHANGE_ENTITY_TYPES.map((e) => e.entityType);
     expect(names).toEqual([
       "asiakas",
@@ -38,6 +39,11 @@ describe("changes entityType catalog", () => {
     expect(isKnownEntityType("keikka")).toBe(true);
     expect(isKnownEntityType("kuski")).toBe(true);
     expect(isKnownEntityType("banana")).toBe(false);
+  });
+
+  test("findEntityType returns the catalog entry or undefined", () => {
+    expect(findEntityType("kuski")?.deprecated).toBe(true);
+    expect(findEntityType("banana")).toBeUndefined();
   });
 
   test("runChangesTypes returns a ListEnvelope of the catalog", () => {
