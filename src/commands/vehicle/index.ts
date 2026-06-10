@@ -11,6 +11,7 @@ import {
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { CliError } from "../../api/errors.js";
 import { diffFields } from "../../diff.js";
+import { runChangesEntity } from "../changes/index.js";
 
 /**
  * Parse a CLI boolean flag value. Accepts true/1/yes/on (case-insensitive) as
@@ -775,6 +776,25 @@ export function registerVehicleCommands(
       try {
         const client = await getClient();
         writeJson(await runVehicleVisits(client, filterType, Number(idStr), opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  v.command("history <vehicleId>")
+    .description("Change-tracker audit trail for one vehicle. Alias of `ib changes entity vehicle`.")
+    .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))
+    .option("--limit <n>", "Max rows (default 100, cap 500)", (v: string) => Math.min(Number(v), 500), 100)
+    .option("--field <name>", "Filter by changeTracker fieldName")
+    .action(async (idStr: string, opts: { owner?: number; limit: number; field?: string }) => {
+      try {
+        const client = await getClient();
+        writeJson(
+          await runChangesEntity(client, "vehicle", Number(idStr), opts.limit, {
+            owner: opts.owner,
+            field: opts.field,
+          })
+        );
       } catch (e) {
         exitWithError(e);
       }

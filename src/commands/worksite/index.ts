@@ -9,6 +9,7 @@ import {
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
+import { runChangesEntity } from "../changes/index.js";
 
 export interface WorksiteListFilter {
   limit?: number;
@@ -672,6 +673,25 @@ export function registerWorksiteCommands(
         const client = await getClient();
         const result = await runWorksitePersonList(client, Number(tyomaaIdStr));
         writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  w.command("history <tyomaaId>")
+    .description("Change-tracker audit trail for one worksite (tyomaa). Alias of `ib changes entity tyomaa`.")
+    .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))
+    .option("--limit <n>", "Max rows (default 100, cap 500)", (v: string) => Math.min(Number(v), 500), 100)
+    .option("--field <name>", "Filter by changeTracker fieldName")
+    .action(async (idStr: string, opts: { owner?: number; limit: number; field?: string }) => {
+      try {
+        const client = await getClient();
+        writeJson(
+          await runChangesEntity(client, "tyomaa", Number(idStr), opts.limit, {
+            owner: opts.owner,
+            field: opts.field,
+          })
+        );
       } catch (e) {
         exitWithError(e);
       }

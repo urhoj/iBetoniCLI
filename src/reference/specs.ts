@@ -192,7 +192,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib company switch --to 1349"],
   },
 
-  // ─── keikka (5) ──────────────────────────────────────────────────────────
+  // ─── keikka (6) ──────────────────────────────────────────────────────────
   {
     command: "ib keikka list",
     description:
@@ -350,6 +350,27 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "ib keikka search 0401234567",
       "ib keikka search \"As Oy Esimerkki\" --limit 3",
     ],
+  },
+  {
+    command: "ib keikka history",
+    description:
+      "Change-tracker audit trail for one keikka — who changed which field, when, old→new, with --reason. Folds in the keikka's keikkaBetoni (concrete-line) rows. Alias of `ib changes entity keikka`. GET /api/changes/keikka/:keikkaId/:ownerAsiakasId.",
+    auth: "any",
+    args: [{ name: "keikkaId", type: "number", description: "keikkaId" }],
+    flags: [
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+      { name: "field", type: "string", description: "Filter by fieldName (e.g. kuskit, laskuMemo, keikkaTilaId)" },
+    ],
+    outputShape:
+      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>",
+    errors: [
+      apiErr(401, "Token expired", "ib auth refresh"),
+      apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    seeAlso: ["ib changes entity", "ib changes by-entity-date"],
+    examples: ["ib keikka history 12345", "ib keikka history 12345 --field kuskit"],
   },
 
   // ─── stats (1) ───────────────────────────────────────────────────────────
@@ -673,7 +694,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
   },
 
-  // ─── worksite (5) ────────────────────────────────────────────────────────
+  // ─── worksite (6) ────────────────────────────────────────────────────────
   {
     command: "ib worksite list",
     description:
@@ -845,6 +866,27 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "ib worksite search Mannerheimintie",
       "ib worksite search 'Jokiniementie 13' --limit 10",
     ],
+  },
+  {
+    command: "ib worksite history",
+    description:
+      "Change-tracker audit trail for one worksite (tyomaa) — who changed which field, when, old→new, with --reason. Alias of `ib changes entity tyomaa`. GET /api/changes/tyomaa/:tyomaaId/:ownerAsiakasId.",
+    auth: "any",
+    args: [{ name: "tyomaaId", type: "number", description: "tyomaaId" }],
+    flags: [
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+      { name: "field", type: "string", description: "Filter by fieldName" },
+    ],
+    outputShape:
+      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }>",
+    errors: [
+      apiErr(401, "Token expired", "ib auth refresh"),
+      apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    seeAlso: ["ib changes entity"],
+    examples: ["ib worksite history 7"],
   },
 
   // ─── person (3) ──────────────────────────────────────────────────────────
@@ -1116,7 +1158,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib person day clear --person 555 --date 2026-06-10 --reason 'loma peruttu'"],
   },
 
-  // ─── vehicle (15) ─────────────────────────────────────────────────────────
+  // ─── vehicle (16) ─────────────────────────────────────────────────────────
   {
     command: "ib vehicle list",
     description:
@@ -1414,6 +1456,27 @@ export const COMMAND_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.vehicle.read"),
     ],
     examples: ["ib vehicle visits tyomaa 17 --days 30", "ib vehicle visits sijainti 3"],
+  },
+  {
+    command: "ib vehicle history",
+    description:
+      "Change-tracker audit trail for one vehicle — who changed which field, when, old→new, with --reason. Alias of `ib changes entity vehicle`. For DRIVER-assignment history use `ib vehicle drivers` (different data: personPvm assignments). GET /api/changes/vehicle/:vehicleId/:ownerAsiakasId.",
+    auth: "any",
+    args: [{ name: "vehicleId", type: "number", description: "vehicleId" }],
+    flags: [
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+      { name: "field", type: "string", description: "Filter by fieldName (e.g. vehicleRegNo)" },
+    ],
+    outputShape:
+      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }>",
+    errors: [
+      apiErr(401, "Token expired", "ib auth refresh"),
+      apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    seeAlso: ["ib changes entity", "ib vehicle drivers"],
+    examples: ["ib vehicle history 53"],
   },
 
   // ─── driver (5 reads; writes added in Task 9) ────────────────────────────
@@ -3059,7 +3122,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     notes: [
       "personAvailability is admin-gated server-side; every other type needs company membership only.",
-      "Equivalent shortcuts: ib keikka|vehicle|worksite|person|customer history.",
+      "Shortcuts: ib keikka|vehicle|worksite history (same row shape) and ib person|customer history (slimmer rows without entityType/entityId).",
     ],
     seeAlso: ["ib changes types", "ib keikka history", "ib changes latest"],
     examples: [
@@ -3085,12 +3148,13 @@ export const COMMAND_SPECS: CommandSpec[] = [
       apiErr(403, "Not an admin in the owner company", "use an admin token, or per-entity `ib changes entity`"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
+    seeAlso: ["ib changes range", "ib changes by-entity-date"],
     examples: ["ib changes latest", "ib changes latest --entity-type keikka --limit 50"],
   },
   {
     command: "ib changes range",
     description:
-      "All changes MADE within a time window (by change timestamp), optional entityType/person filters — admin forensic view. GET /api/changes/range/:ownerAsiakasId. The backend has no row cap; --limit slices client-side (truncated:true when cut).",
+      "All changes MADE within a time window (by change timestamp), optional entityType/person filters — admin forensic view. GET /api/changes/range/:ownerAsiakasId. The backend has no row cap; --limit slices client-side (truncated:true when cut). NOTE: reason/impersonatedByPersonName are null until the 2026-06 aggregate-procs backend deploy.",
     permissions: ["isAnyAdmin (asiakasAdmin/laskuAdmin/system admin)"],
     flags: [
       { name: "from", type: "date", description: "Window start, YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)", required: true },
@@ -3105,7 +3169,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     errors: [
       apiErr(401, "Token expired", "ib auth refresh"),
       apiErr(403, "Not an admin in the owner company", "use an admin token"),
-      { exit: 4, meaning: "Invalid --from/--to (client-side)", remedy: "use YYYY-MM-DD, full ISO datetime, or today/yesterday/tomorrow" },
+      { exit: 4, meaning: "Invalid --from/--to (client-side)", remedy: "use YYYY-MM-DD or ISO datetime; today/yesterday/tomorrow are also accepted" },
       apiErr(400, "Backend rejected the dates", "use ISO date strings"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
@@ -3118,7 +3182,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib changes by-entity-date",
     description:
-      "Changes affecting deliveries DATED in the window — filters by the entity's own date (keikka.pumppuAika / grid_palkit.starttime), NOT the change timestamp. This is what the grid Muutoshistoria drawer shows: 'everything that touched that day's deliveries, whenever the change was made'. GET /api/changes/by-entity-date/:ownerAsiakasId. Admin only.",
+      "Changes affecting deliveries DATED in the window — filters by the entity's own date (keikka.pumppuAika / grid_palkit.starttime), NOT the change timestamp. This is what the grid Muutoshistoria drawer shows: 'everything that touched that day's deliveries, whenever the change was made'. GET /api/changes/by-entity-date/:ownerAsiakasId. Admin only. NOTE: reason/impersonatedByPersonName are null until the 2026-06 aggregate-procs backend deploy.",
     permissions: ["isAnyAdmin (asiakasAdmin/laskuAdmin/system admin)"],
     flags: [
       { name: "entity-type", type: "string", description: "keikka or palkki", required: true },
@@ -3148,7 +3212,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     flags: [
       { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
-      { name: "limit", type: "number", default: "100", description: "Max rows" },
+      { name: "limit", type: "number", default: "100", description: "Max rows (cap 500)" },
     ],
     outputShape:
       "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, at, description, deviceType, entityDisplayName, reason, impersonatedByPersonName }>",
