@@ -2449,6 +2449,45 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib person day clear matches snapshot 1`] = `
+"USAGE
+  ib person day clear [flags]
+
+DESCRIPTION
+  Delete a person's day row for a date (remove status entry). Requires --reason.
+  Auth: requires login (any authenticated user).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --person NUMBER    personId (required)
+  --date DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  delete result | { dryRun:true, wouldDelete:{ personPvmId, date, status } | null } (with --dry-run)
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Missing --reason       → supply --reason
+  exit 3 (HTTP 403)  Requires Admin or HR Admin on the active company → use an Admin/HR account
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Requires Admin or HR Admin (server-enforced).
+  - --reason is hard-required (exits 4 without it).
+  - --dry-run is CLIENT-side: previews wouldDelete and never deletes.
+  - Resolves the personPvmId via the day list; when no row exists it's a no-op (deleted:false).
+
+SEE ALSO
+  ib person day set, ib person day get
+
+EXAMPLES
+  ib person day clear --person 555 --date 2026-06-10 --reason 'loma peruttu'
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib person day get matches snapshot 1`] = `
 "USAGE
   ib person day get [flags]

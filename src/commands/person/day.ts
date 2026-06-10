@@ -160,6 +160,41 @@ export async function runPersonDaySet(
 }
 
 /**
+ * Delete a person's personPvm row for a date (remove the status entry).
+ * Resolves the personPvmId via the day list first. `--dry-run` is CLIENT-side
+ * (returns wouldDelete, no DELETE). No row → a clean "nothing to delete" result.
+ */
+export async function runPersonDayClear(
+  client: ApiClient,
+  personId: number,
+  date: string,
+  flags: WriteFlags
+): Promise<unknown> {
+  const asiakasId = ownerAsiakasIdOf(client);
+  const existing = await runPersonDayGet(client, personId, date, date);
+  const current = existing.items[0] as Row | undefined;
+
+  if (flags.dryRun) {
+    return {
+      dryRun: true,
+      wouldDelete: current
+        ? {
+            personPvmId: current.personPvmId,
+            date: intToDate(toYyyymmdd(date)),
+            status: (current.statusName as string) ?? (current.status as string) ?? null,
+          }
+        : null,
+    };
+  }
+  if (!current) {
+    return { deleted: false, message: "no personPvm row for that person/date" };
+  }
+  return client.delete(`/api/personPvm/delete/${asiakasId}/${current.personPvmId}`, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/**
  * Register `ib person day` on the existing `person` command.
  * Reads: statuses, get. Writes: set, clear (added in later tasks).
  */
@@ -223,7 +258,29 @@ export function registerPersonDayCommands(
     }
   );
 
-  // clear is added in the next task.
+  const clearCmd = day
+    .command("clear")
+    .description("Delete a person's day row for a date (remove status entry). Requires --reason.")
+    .requiredOption("--person <id>", "personId", (s: string) => Number(s))
+    .requiredOption("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)");
+  addWriteFlagsToCommand(clearCmd).action(
+    async (opts: WriteFlags & { person: number; date: string }) => {
+      if (!opts.reason) {
+        writeError(new Error("Missing required flag: --reason"));
+        process.exit(4);
+      }
+      try {
+        const result = await runPersonDayClear(await getClient(), opts.person, opts.date, {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        });
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
 }
 
 export type { WriteFlags };

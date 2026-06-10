@@ -4,6 +4,7 @@ import {
   runPersonDayGet,
   resolveStatusId,
   runPersonDaySet,
+  runPersonDayClear,
 } from "../../src/commands/person/day.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -137,5 +138,37 @@ describe("runPersonDaySet", () => {
       { personId: 555, pvm: 20260610, personPvmStatusId: 2, personPvmText: null, vehicleId: 53, personPvmId: 91 },
       { headers: { "X-Action-Reason": "vacation" } }
     );
+  });
+});
+
+describe("runPersonDayClear", () => {
+  test("dry-run resolves the row, returns wouldDelete, never DELETEs", async () => {
+    const c = makeClient();
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      { personPvmId: 91, personId: 555, vehicleId: null, pvm: 20260610, personPvmStatusId: 2, personPvmText: null, pois: true, personPvmStatus: "L", personPvmStatusName: "Loma" },
+    ]);
+    const out = await runPersonDayClear(c, 555, "2026-06-10", { dryRun: true, reason: "x" });
+    expect(c.delete).not.toHaveBeenCalled();
+    expect(out).toEqual({ dryRun: true, wouldDelete: { personPvmId: 91, date: "2026-06-10", status: "Loma" } });
+  });
+
+  test("real: existing row → DELETE the resolved id", async () => {
+    const c = makeClient();
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      { personPvmId: 91, personId: 555, vehicleId: null, pvm: 20260610, personPvmStatusId: 2, personPvmText: null, pois: true, personPvmStatus: "L", personPvmStatusName: "Loma" },
+    ]);
+    (c.delete as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ deleted: 1 });
+    await runPersonDayClear(c, 555, "2026-06-10", { reason: "back to work" });
+    expect(c.delete).toHaveBeenCalledWith("/api/personPvm/delete/1349/91", {
+      headers: { "X-Action-Reason": "back to work" },
+    });
+  });
+
+  test("real: no row → no DELETE, returns deleted:false", async () => {
+    const c = makeClient();
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    const out = await runPersonDayClear(c, 555, "2026-06-10", { reason: "x" });
+    expect(c.delete).not.toHaveBeenCalled();
+    expect(out).toEqual({ deleted: false, message: "no personPvm row for that person/date" });
   });
 });

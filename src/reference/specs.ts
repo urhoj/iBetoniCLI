@@ -1053,6 +1053,30 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "ib person day set --person 555 --date 2026-06-10 --status 2 --dry-run --reason preview",
     ],
   },
+  {
+    command: "ib person day clear",
+    description: "Delete a person's day row for a date (remove status entry). Requires --reason.",
+    auth: "any",
+    flags: [
+      { name: "person", type: "number", description: "personId", required: true },
+      { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)", required: true },
+    ],
+    mutates: true,
+    outputShape: "delete result | { dryRun:true, wouldDelete:{ personPvmId, date, status } | null } (with --dry-run)",
+    errors: [
+      apiErr(400, "Missing --reason", "supply --reason"),
+      apiErr(403, "Requires Admin or HR Admin on the active company", "use an Admin/HR account"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Requires Admin or HR Admin (server-enforced).",
+      "--reason is hard-required (exits 4 without it).",
+      "--dry-run is CLIENT-side: previews wouldDelete and never deletes.",
+      "Resolves the personPvmId via the day list; when no row exists it's a no-op (deleted:false).",
+    ],
+    seeAlso: ["ib person day set", "ib person day get"],
+    examples: ["ib person day clear --person 555 --date 2026-06-10 --reason 'loma peruttu'"],
+  },
 
   // ─── vehicle (15) ─────────────────────────────────────────────────────────
   {
