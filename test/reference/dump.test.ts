@@ -1,5 +1,5 @@
-import { describe, test, expect } from "vitest";
-import { buildReference } from "../../src/reference/dump.js";
+import { describe, test, expect, vi } from "vitest";
+import { buildReference, runReferenceDump } from "../../src/reference/dump.js";
 
 describe("ib reference dump", () => {
   test("returns a version string + non-empty commands map", () => {
@@ -40,6 +40,17 @@ describe("ib reference dump", () => {
         `${name} examples non-empty`
       ).toBe(true);
     }
+  });
+
+  test("runReferenceDump emits single-line JSON (stdout one-line contract)", () => {
+    const spy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+    runReferenceDump("keikka");
+    const out = spy.mock.calls[0][0] as string;
+    spy.mockRestore();
+    expect(out.endsWith("\n")).toBe(true);
+    // exactly one line: no interior newlines (pretty-printing regression guard)
+    expect(out.slice(0, -1)).not.toContain("\n");
+    expect(() => JSON.parse(out)).not.toThrow();
   });
 });
 
