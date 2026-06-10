@@ -205,12 +205,12 @@ export function renderDomainHelp(): string {
   lines.push("");
   lines.push("DISCOVER");
   lines.push(
-    "  Commands (cheap, offline): `ib commands` — compact list of every command; `ib commands"
+    "  Commands (cheap, offline): `ib commands` — domain index (~2 KB); `ib commands <domain>`"
   );
   lines.push(
-    "    <domain>` for one group (e.g. `ib commands keikka`); filters --reads / --mutations /"
+    "    for one group's commands (e.g. `ib commands keikka`); `ib commands --all` for the full"
   );
-  lines.push("    --permission <substr>.");
+  lines.push("    flat list; filters --reads / --mutations / --permission <substr>.");
   lines.push(
     "  Full machine-readable specs: `ib reference dump` (entire surface) or `ib reference dump"
   );

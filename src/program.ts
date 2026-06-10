@@ -34,7 +34,7 @@ import { registerHelpCommands } from "./commands/help/index.js";
 import { registerVersionCommand } from "./commands/version/index.js";
 import { registerDoctorCommand } from "./commands/doctor/index.js";
 import { runReferenceDump } from "./reference/dump.js";
-import { buildCommandsList } from "./reference/commandsList.js";
+import { buildCommandsList, buildDomainIndex } from "./reference/commandsList.js";
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
@@ -168,7 +168,7 @@ export function buildProgram(): Command {
   // a GLOBAL write-lock flag; reusing the name here would be ambiguous.
   program
     .command("commands")
-    .description("Filtered list of ib commands from the spec catalogue (offline)")
+    .description("Domain index of ib commands; filters/--all for flat lists (offline)")
     .argument(
       "[domain]",
       "Only commands in this domain — the token after `ib` (e.g. keikka)"
@@ -179,19 +179,26 @@ export function buildProgram(): Command {
       "--permission <substr>",
       "Only commands whose required permissions contain this substring"
     )
+    .option("--all", "Full flat list of every command (default is the domain index)")
     .action(
       (
         domain: string | undefined,
-        opts: { mutations?: boolean; reads?: boolean; permission?: string }
+        opts: { mutations?: boolean; reads?: boolean; permission?: string; all?: boolean }
       ) => {
         try {
+          // Bare `ib commands` = cheap domain index; any narrowing argument
+          // (domain, filter flag, or explicit --all) = flat leaf list.
+          const wantsFlatList =
+            opts.all || domain || opts.mutations || opts.reads || opts.permission;
           writeJson(
-            buildCommandsList({
-              domain,
-              mutations: opts.mutations,
-              reads: opts.reads,
-              permission: opts.permission,
-            })
+            wantsFlatList
+              ? buildCommandsList({
+                  domain,
+                  mutations: opts.mutations,
+                  reads: opts.reads,
+                  permission: opts.permission,
+                })
+              : buildDomainIndex()
           );
         } catch (e) {
           exitWithError(e);

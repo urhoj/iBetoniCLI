@@ -332,7 +332,7 @@ exports[`Help snapshots — contract stability > help for ib commands matches sn
   ib commands [<domain>] [flags]
 
 DESCRIPTION
-  Filtered, offline list of ib commands from the spec catalogue: which write, which are read-only, which require a given permission. Lighter than \`ib reference dump\` (the full surface) — returns just { command, description, permissions, isWrite } per match. No auth, no network.
+  Offline command discovery from the spec catalogue. No args = compact DOMAIN INDEX (~2 KB: every domain with leaf count, glossary blurb, runnable command paths). A domain arg, a filter flag, or --all returns the flat per-command list { command, description, permissions, isWrite }. Lighter than \`ib reference dump\` (the full surface). No auth, no network.
   Auth: none (public).
 
 ARGUMENTS
@@ -342,12 +342,13 @@ FLAGS
   --mutations BOOLEAN    Only commands that write (carry write-safety flags)
   --reads BOOLEAN    Only read-only commands (no writes)
   --permission STRING    Only commands whose required permissions contain this substring
+  --all BOOLEAN    Full flat list of every command (~43 KB at 149 leaves). Default (no args) is the domain index.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { hint?, items: [{ command, description, permissions: string[], isWrite: boolean }], nextCursor: null, count } — \`hint\` (unfiltered list only) advertises the domain-filtered form
+  no args: { hint, items:[{ domain, count, description|null, commands:["keikka list", ...] }], nextCursor:null, count } (domain index) | with <domain> / --all / filters: { items: [{ command, description, permissions: string[], isWrite: boolean }], nextCursor: null, count }
 
 ERRORS (stderr, exit non-zero)
   exit 4  Bad flag combo         → --mutations and --reads are mutually exclusive
@@ -356,6 +357,7 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib commands
   ib commands keikka
+  ib commands --all
   ib commands --mutations
   ib commands --reads
   ib commands --permission auth.page.vehicle
