@@ -128,7 +128,7 @@ describe("ib jerry check-address", () => {
       lat: 60.17,
       lng: 24.94,
       placeId: "ChIJabc",
-    });
+    }, { read: true });
   });
 
   test("address-only body omits coord keys", async () => {
@@ -136,7 +136,7 @@ describe("ib jerry check-address", () => {
     await runJerryCheckAddress(mockClient, { address: "Hämeenkatu 1, Tampere" });
     expect(post).toHaveBeenCalledWith("/api/pumppuRequests/checkAddress", {
       osoite: "Hämeenkatu 1, Tampere",
-    });
+    }, { read: true });
   });
 });
 

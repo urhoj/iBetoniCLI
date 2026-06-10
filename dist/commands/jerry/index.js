@@ -114,7 +114,7 @@ export async function runJerryCheckAddress(client, opts) {
         body.placeId = opts.placeId;
     if (opts.formattedAddress)
         body.formattedAddress = opts.formattedAddress;
-    return client.post("/api/pumppuRequests/checkAddress", body);
+    return client.post("/api/pumppuRequests/checkAddress", body, { read: true });
 }
 // ─── provider settings ──────────────────────────────────────────────────────
 /**

@@ -209,7 +209,7 @@ export async function runJerryCheckAddress(
   if (opts.lng !== undefined) body.lng = opts.lng;
   if (opts.placeId) body.placeId = opts.placeId;
   if (opts.formattedAddress) body.formattedAddress = opts.formattedAddress;
-  return client.post<Row>("/api/pumppuRequests/checkAddress", body);
+  return client.post<Row>("/api/pumppuRequests/checkAddress", body, { read: true });
 }
 
 // ─── provider settings ──────────────────────────────────────────────────────
