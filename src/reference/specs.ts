@@ -1045,7 +1045,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "--status accepts an id or a name (resolved via `ib person day statuses`).",
       "--reason is hard-required (exits 4 without it).",
       "--dry-run is CLIENT-side (the save endpoint has no server X-Dry-Run guard): it previews wouldChange and never writes.",
-      "Read-merges the existing row so a re-set updates in place (no duplicate). Does NOT set the vehicle — use `ib driver assign` for that (atomic).",
+      "Read-merges the existing row so a re-set updates in place (no duplicate) and PRESERVES the existing vehicle assignment. It cannot CHANGE the vehicle — use `ib driver assign` for that (atomic).",
     ],
     seeAlso: ["ib person day statuses", "ib person day clear", "ib driver assign"],
     examples: [

@@ -116,7 +116,10 @@ export interface PersonDaySetFlags extends WriteFlags {
  * person+date (so a re-set UPDATES rather than inserting a duplicate via
  * personPvm_save2's null-id insert path). `--dry-run` is CLIENT-side (the save
  * endpoint has no X-Dry-Run guard) — it returns a wouldChange diff and never POSTs.
- * When --text is omitted the existing text is preserved (not wiped).
+ * When --text is omitted the existing text is preserved (not wiped). The existing
+ * vehicleId is ALWAYS threaded back — the proc's UPDATE branch sets vehicleId
+ * unconditionally, so omitting it would null the day's driver and strip the
+ * person from that day's pump keikkat.
  */
 export async function runPersonDaySet(
   client: ApiClient,
@@ -133,6 +136,7 @@ export async function runPersonDaySet(
   const current = existing.items[0] as Row | undefined;
   const curStatusId = current ? ((current.statusId as number | null) ?? null) : null;
   const curText = current ? ((current.text as string | null) ?? null) : null;
+  const curVehicleId = current ? ((current.vehicleId as number | null) ?? null) : null;
   const nextText = flags.text ?? curText ?? null;
 
   if (flags.dryRun) {
@@ -147,6 +151,7 @@ export async function runPersonDaySet(
     pvm,
     personPvmStatusId: statusId,
     personPvmText: nextText,
+    vehicleId: curVehicleId,
   };
   if (current) body.personPvmId = current.personPvmId;
   return client.post(`/api/personPvm/save/${asiakasId}`, body, {

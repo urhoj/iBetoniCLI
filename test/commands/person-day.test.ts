@@ -108,7 +108,7 @@ describe("runPersonDaySet", () => {
     await runPersonDaySet(c, 555, "2026-06-10", "2", { reason: "vacation" });
     expect(c.post).toHaveBeenCalledWith(
       "/api/personPvm/save/1349",
-      { personId: 555, pvm: 20260610, personPvmStatusId: 2, personPvmText: null, personPvmId: 91 },
+      { personId: 555, pvm: 20260610, personPvmStatusId: 2, personPvmText: null, vehicleId: null, personPvmId: 91 },
       { headers: { "X-Action-Reason": "vacation" } }
     );
   });
@@ -120,7 +120,21 @@ describe("runPersonDaySet", () => {
     await runPersonDaySet(c, 555, "2026-06-10", "2", { reason: "vacation" });
     expect(c.post).toHaveBeenCalledWith(
       "/api/personPvm/save/1349",
-      { personId: 555, pvm: 20260610, personPvmStatusId: 2, personPvmText: null },
+      { personId: 555, pvm: 20260610, personPvmStatusId: 2, personPvmText: null, vehicleId: null },
+      { headers: { "X-Action-Reason": "vacation" } }
+    );
+  });
+
+  test("real write: preserves the existing vehicleId (does not wipe day driver)", async () => {
+    const c = makeClient();
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      { personPvmId: 91, personId: 555, vehicleId: 53, pvm: 20260610, personPvmStatusId: 5, personPvmText: null, pois: false, personPvmStatus: "T", personPvmStatusName: "Töissä" },
+    ]);
+    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ personPvmId: 91 });
+    await runPersonDaySet(c, 555, "2026-06-10", "2", { reason: "vacation" });
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/personPvm/save/1349",
+      { personId: 555, pvm: 20260610, personPvmStatusId: 2, personPvmText: null, vehicleId: 53, personPvmId: 91 },
       { headers: { "X-Action-Reason": "vacation" } }
     );
   });
