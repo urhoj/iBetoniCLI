@@ -2379,19 +2379,40 @@ export const COMMAND_SPECS = [
     // ─── reference (1) ───────────────────────────────────────────────────────
     {
         command: "ib reference dump",
-        description: "Emit the full command surface as JSON (version, generatedAt, commands map). Read by AI assistants for one-shot CLI ingestion.",
+        description: "Emit the full command surface as JSON (version, generatedAt, overview, glossary, topics, feedbackGuidance, commands map). Read by AI assistants for one-shot CLI ingestion. Pass a domain (the token after `ib`, e.g. keikka) to narrow the commands map to one group — the primer (overview/glossary/topics) is always retained, so a filtered dump stays self-contained.",
         auth: "none",
+        args: [
+            {
+                name: "domain",
+                type: "string",
+                required: false,
+                description: "Restrict the commands map to one domain (the token after `ib`, e.g. keikka). Unknown domain exits 4 listing valid domains.",
+            },
+        ],
         flags: [],
-        outputShape: "{ version: string, generatedAt: ISO-8601, commands: { '<command>': CommandSpec } }",
+        outputShape: "{ version, generatedAt, overview, glossary, topics, feedbackGuidance, commands: { '<command>': CommandSpec } }",
         errors: [
+            { exit: 4, meaning: "Unknown domain", remedy: "run `ib commands` to see valid domains" },
             { exit: 1, meaning: "I/O error", remedy: "retry; check stdout pipe" },
         ],
-        examples: ["ib reference dump", "ib reference dump | jq .version"],
+        examples: [
+            "ib reference dump",
+            "ib reference dump keikka",
+            "ib reference dump | jq .version",
+        ],
     },
     {
         command: "ib commands",
         description: "Filtered, offline list of ib commands from the spec catalogue: which write, which are read-only, which require a given permission. Lighter than `ib reference dump` (the full surface) — returns just { command, description, permissions, writeFlags } per match. No auth, no network.",
         auth: "none",
+        args: [
+            {
+                name: "domain",
+                type: "string",
+                required: false,
+                description: "Only commands in this domain (the token after `ib`, e.g. keikka, jerry). Unknown domain exits 4 listing valid domains.",
+            },
+        ],
         flags: [
             {
                 name: "mutations",
@@ -2412,9 +2433,11 @@ export const COMMAND_SPECS = [
         outputShape: "{ items: [{ command, description, permissions: string[], writeFlags: boolean }], nextCursor: null, count }",
         errors: [
             { exit: 4, meaning: "Bad flag combo", remedy: "--mutations and --reads are mutually exclusive" },
+            { exit: 4, meaning: "Unknown domain", remedy: "run `ib commands` (no arg) to see valid domains" },
         ],
         examples: [
             "ib commands",
+            "ib commands keikka",
             "ib commands --mutations",
             "ib commands --reads",
             "ib commands --permission auth.page.vehicle",

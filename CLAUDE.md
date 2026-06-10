@@ -31,9 +31,9 @@ Run from the `betonicli/` directory:
 
 `COMMAND_SPECS` is the canonical catalogue of every subcommand (`command`, `description`, optional `auth` / `permissions`, positional `args`, `flags`, `writeFlags` / `mutates`, `outputShape`, dual-encoded `errors` (`{ http?, exit }`), optional `notes` / `seeAlso`, `examples`). It drives **three** consumers that must never drift:
 
-1. `src/output/help.ts` `attachRichHelp` — replaces each matching command's `--help` with the rich `formatHelp(spec)` rendering.
-2. `src/reference/dump.ts` — `ib reference dump` emits all specs as one JSON document for one-shot AI ingestion.
-3. `src/reference/commandsList.ts` — `ib commands` filters the catalogue to a compact discovery view (`--mutations` / `--reads` / `--permission`).
+1. `src/output/help.ts` `attachRichHelp` — replaces each matching command's `--help` with the rich `formatHelp(spec)` rendering, renders computed `formatGroupHelp` on every non-root GROUP command, and overwrites each leaf's Commander `.description()` with `spec.description` (the spec is the single source for leaf descriptions; `help-wiring.test.ts` asserts the equality).
+2. `src/reference/dump.ts` — `ib reference dump [domain]` emits all specs (or one domain's) as one JSON document for AI ingestion; the primer (overview/glossary/topics/feedbackGuidance) is always retained.
+3. `src/reference/commandsList.ts` — `ib commands [domain]` filters the catalogue to a compact discovery view (`--mutations` / `--reads` / `--permission`). Also exports `commandDomains` / `assertKnownDomain` (unknown domain → exit 4), shared with the dump.
 
 **When you add or change a command, update its `CommandSpec` in `specs.ts` in the same change.** Tests enforce the link: `test/reference/help-wiring.test.ts` (every spec maps to a registered command, **every leaf command has a spec**, and each `--help` equals `formatHelp(spec)`) and `test/reference/help-snapshots.test.ts` (snapshot of rendered help — update with `npx vitest run -u` when intentional). The `formatHelp` renderer itself is unit-tested in `test/output/help-format.test.ts` and `test/output/help.test.ts`.
 
@@ -69,7 +69,11 @@ A session write-lock for AI/CI use. Set the `--read-only` global flag or `IB_REA
 
 ### Command discovery (`ib commands`)
 
-`ib commands` is an **offline** filtered view over `COMMAND_SPECS` (`src/reference/commandsList.ts`) — lighter than `ib reference dump`. Flags: `--mutations` (writes only), `--reads` (read-only only; named `--reads` not `--read-only` to avoid colliding with the global write-lock), `--permission <substr>`. Returns the `{ items, nextCursor, count }` envelope.
+`ib commands [domain]` is an **offline** filtered view over `COMMAND_SPECS` (`src/reference/commandsList.ts`) — lighter than `ib reference dump`. The optional `domain` positional (the token after `ib`, e.g. `keikka`) narrows to one group and composes with the flags: `--mutations` (writes only), `--reads` (read-only only; named `--reads` not `--read-only` to avoid colliding with the global write-lock), `--permission <substr>`. `ib reference dump [domain]` takes the same positional (commands map narrowed, primer always retained). Unknown domain → exit 4 listing valid domains (single validation point: `assertKnownDomain`). Returns the `{ items, nextCursor, count }` envelope. The root `ib --help` DISCOVER block advertises this progressive path: `ib commands` → `ib commands <domain>` → `ib <command> --help` / `ib reference dump <domain>`.
+
+### Group help (computed)
+
+Non-root group commands (`ib keikka`, `ib jerry offer`, …) render `formatGroupHelp` (`src/output/help.ts`) instead of Commander's default: blurb = first `GLOSSARY` entry whose term contains the group's last token (fallback: the Commander description), subcommand table derived by prefix over `COMMAND_SPECS` (leaves show their description's first sentence; subgroups point at their `--help`), DISCOVER footer pointing at `ib reference dump <domain>`. Purely computed — no per-group spec to maintain or drift.
 
 ### Acting-as write diagnostic
 

@@ -22,6 +22,7 @@
  * subcommand's `--help`, so an AI inspecting a single command sees the full
  * spec without having to run `ib reference dump`.
  */
+import { GLOSSARY } from "../reference/domain.js";
 /**
  * Render a {@link CommandSpec} as the AI-optimized `--help` text. Output is a
  * trailing-newline-terminated string suitable for `process.stdout.write`.
@@ -107,15 +108,71 @@ export function formatHelp(spec) {
     }
     return lines.join("\n") + "\n";
 }
+/** First sentence of a description — group listings stay one line per child. */
+function firstSentence(text) {
+    const i = text.indexOf(". ");
+    return i === -1 ? text : text.slice(0, i + 1);
+}
 /**
- * Walk the Commander tree rooted at `root` and replace the `--help` output of
- * every command whose full path (e.g. `ib keikka list`) matches a
- * {@link CommandSpec.command} with the rich {@link formatHelp} rendering.
+ * Render computed help for a GROUP command (e.g. `ib keikka`, `ib jerry offer`).
  *
- * Group commands and any command without a matching spec keep Commander's
- * default auto-generated help. Matching is by exact path so the same
- * `COMMAND_SPECS` catalogue drives both per-command `--help` and
- * `ib reference dump` — there is no second source to drift.
+ * Groups have no CommandSpec of their own; everything here is derived — the
+ * subcommand table from the spec catalogue (children = unique next token after
+ * the group path), the blurb from the first GLOSSARY entry whose term contains
+ * the group's last token (falling back to the Commander description), and the
+ * footer from the group's domain. Mirrors `formatHelp`'s parse-friendly layout
+ * (uppercase sections, two-space indent). No new source of truth → cannot
+ * drift from `--help` / `ib reference dump` / `ib commands`.
+ */
+export function formatGroupHelp(groupPath, fallbackDescription, specs, glossary) {
+    const prefix = groupPath + " ";
+    const depth = groupPath.split(" ").length; // child = token at this index
+    const domain = groupPath.split(" ")[1];
+    const groupName = groupPath.split(" ").at(-1).toLowerCase();
+    const inGroup = specs.filter((s) => s.command.startsWith(prefix));
+    const children = [...new Set(inGroup.map((s) => s.command.split(" ")[depth]))];
+    const byCommand = new Map(specs.map((s) => [s.command, s]));
+    const blurb = glossary.find((g) => g.term.toLowerCase().includes(groupName))?.definition ??
+        fallbackDescription;
+    const lines = [];
+    lines.push("USAGE");
+    lines.push(`  ${groupPath} <command> [flags]`);
+    lines.push("");
+    lines.push("DESCRIPTION");
+    lines.push(`  ${blurb}`);
+    lines.push("");
+    lines.push("SUBCOMMANDS");
+    const pad = Math.max(...children.map((c) => c.length));
+    for (const child of children) {
+        const leaf = byCommand.get(`${groupPath} ${child}`);
+        const desc = leaf
+            ? firstSentence(leaf.description)
+            : `(group) → ${groupPath} ${child} --help`;
+        lines.push(`  ${child.padEnd(pad)}  ${desc}`);
+    }
+    lines.push("");
+    lines.push("DISCOVER");
+    lines.push(`  ib reference dump ${domain}    Full specs for this group (JSON)`);
+    lines.push(`  ${groupPath} <command> --help    Complete spec for one command`);
+    lines.push("  ib help    Concept guides (offline)");
+    return lines.join("\n") + "\n";
+}
+/**
+ * Walk the Commander tree rooted at `root` and wire spec-driven help:
+ *
+ * - A command whose full path (e.g. `ib keikka list`) matches a
+ *   {@link CommandSpec.command} gets the rich {@link formatHelp} rendering,
+ *   AND its Commander description is overwritten with `spec.description` —
+ *   the spec is the single source for leaf descriptions (group listings,
+ *   `ib commands`, and `--help` all show the same string).
+ * - A non-root command with subcommands (a group — no spec of its own) gets
+ *   the computed {@link formatGroupHelp} rendering.
+ * - The root keeps Commander's default help + the domain primer appended via
+ *   `addHelpText` in `program.ts`.
+ *
+ * Matching is by exact path so the same `COMMAND_SPECS` catalogue drives
+ * per-command `--help`, group help, and `ib reference dump` — there is no
+ * second source to drift.
  */
 export function attachRichHelp(root, specs) {
     const byCommand = new Map(specs.map((s) => [s.command, s]));
@@ -123,7 +180,16 @@ export function attachRichHelp(root, specs) {
         const full = [...path, cmd.name()].join(" ");
         const spec = byCommand.get(full);
         if (spec) {
+            // Single source: the Commander listing description IS the spec description.
+            cmd.description(spec.description);
             cmd.configureHelp({ formatHelp: () => formatHelp(spec) });
+        }
+        else if (path.length > 0 && cmd.commands.length > 0) {
+            // Non-root group: computed group help (root keeps the domain primer).
+            const fallback = cmd.description();
+            cmd.configureHelp({
+                formatHelp: () => formatGroupHelp(full, fallback, specs, GLOSSARY),
+            });
         }
         for (const sub of cmd.commands)
             walk(sub, [...path, cmd.name()]);
