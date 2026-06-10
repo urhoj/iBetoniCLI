@@ -97,6 +97,10 @@ export interface WorksiteSearchItem {
  * caller's company (req.user.ownerAsiakasId) when no ownerAsiakasId is in the
  * body, so the CLI sends only searchString (+ optional limit).
  *
+ * When `myCompanies` is true, adds `myCompanies: true` to the body so the
+ * backend fans out across all companies the caller belongs to (rows tagged with
+ * `ownerAsiakasId`).
+ *
  * Sent as a `read` request: search is a tenant-scoped non-mutating POST, so
  * `read:true` exempts it from the `--read-only` write-lock and the acting-as
  * write diagnostic (it neither creates nor updates tenant data). Distinct from
@@ -107,10 +111,12 @@ export interface WorksiteSearchItem {
 export async function runWorksiteSearch(
   client: ApiClient,
   query: string,
-  limit?: number
+  limit?: number,
+  myCompanies = false
 ): Promise<ListEnvelope<WorksiteSearchItem>> {
   const body: Record<string, unknown> = { searchString: query };
   if (limit !== undefined) body.limit = limit;
+  if (myCompanies) body.myCompanies = true;
   const rows = await client.post<WorksiteSearchRow[]>(
     "/api/tyomaa/search",
     body,
@@ -473,10 +479,11 @@ export function registerWorksiteCommands(
   w.command("search <query>")
     .description("Free-text search for worksites")
     .option("--limit <n>", "Max results", (v: string) => Math.min(Number(v), 500))
-    .action(async (query: string, opts: { limit?: number }) => {
+    .option("--my-companies", "Search across every company you belong to (rows tagged with ownerAsiakasId)")
+    .action(async (query: string, opts: { limit?: number; myCompanies?: boolean }) => {
       try {
         const client = await getClient();
-        const result = await runWorksiteSearch(client, query, opts.limit);
+        const result = await runWorksiteSearch(client, query, opts.limit, !!opts.myCompanies);
         writeJson(result);
       } catch (e) {
         exitWithError(e);
