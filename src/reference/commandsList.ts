@@ -63,6 +63,7 @@ export function assertKnownDomain(specs: CommandSpec[], domain: string): void {
 
 /** List-envelope shape (matches the universal `{ items, nextCursor, count }`). */
 export interface CommandsListEnvelope {
+  /** Reserved for shape compatibility; `buildDomainIndex` owns discovery hints. */
   hint?: string;
   items: CommandSummary[];
   nextCursor: null;
