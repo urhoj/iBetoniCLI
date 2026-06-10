@@ -994,6 +994,35 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     examples: ["ib person history 63", "ib person history 63 --field asiakasPersonSetting", "ib person history 63 --owner 27 --limit 50"],
   },
+  {
+    command: "ib person day statuses",
+    description: "List the day-status types (vacation/sick/free/…) for the active company",
+    auth: "any",
+    flags: [],
+    outputShape: "ListEnvelope<{ statusId, code, name, pois, vakioVapaa }>",
+    errors: [...COMMON_AUTH_ERRORS],
+    notes: [
+      "Use to map a status name to its id for `ib person day set --status`.",
+      "pois=true marks an absence (vacation/sick); statuses are company-configurable.",
+    ],
+    seeAlso: ["ib person day set", "ib driver absences"],
+    examples: ["ib person day statuses", "ib person day statuses --pretty"],
+  },
+  {
+    command: "ib person day get",
+    description: "List a person's day rows (status / vehicle / text) over a date range",
+    auth: "any",
+    flags: [
+      { name: "person", type: "number", description: "personId", required: true },
+      { name: "from", type: "date", description: "Start date YYYY-MM-DD (or today/yesterday/tomorrow)", required: true },
+      { name: "to", type: "date", description: "End date YYYY-MM-DD (default: --from)" },
+    ],
+    outputShape: "ListEnvelope<{ personPvmId, date, statusId, status, statusName, pois, vehicleId, text }>",
+    errors: [...COMMON_AUTH_ERRORS],
+    notes: ["Scoped to the active company (same-tenant)."],
+    seeAlso: ["ib person day set", "ib driver who"],
+    examples: ["ib person day get --person 555 --from today", "ib person day get --person 555 --from 2026-06-01 --to 2026-06-30"],
+  },
 
   // ─── vehicle (15) ─────────────────────────────────────────────────────────
   {

@@ -2449,6 +2449,76 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib person day get matches snapshot 1`] = `
+"USAGE
+  ib person day get [flags]
+
+DESCRIPTION
+  List a person's day rows (status / vehicle / text) over a date range
+  Auth: requires login (any authenticated user).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --person NUMBER    personId (required)
+  --from DATE    Start date YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+  --to DATE    End date YYYY-MM-DD (default: --from)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ personPvmId, date, statusId, status, statusName, pois, vehicleId, text }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Scoped to the active company (same-tenant).
+
+SEE ALSO
+  ib person day set, ib driver who
+
+EXAMPLES
+  ib person day get --person 555 --from today
+  ib person day get --person 555 --from 2026-06-01 --to 2026-06-30
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person day statuses matches snapshot 1`] = `
+"USAGE
+  ib person day statuses [flags]
+
+DESCRIPTION
+  List the day-status types (vacation/sick/free/…) for the active company
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ statusId, code, name, pois, vakioVapaa }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Use to map a status name to its id for \`ib person day set --status\`.
+  - pois=true marks an absence (vacation/sick); statuses are company-configurable.
+
+SEE ALSO
+  ib person day set, ib driver absences
+
+EXAMPLES
+  ib person day statuses
+  ib person day statuses --pretty
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib person delete matches snapshot 1`] = `
 "USAGE
   ib person delete <personId> [flags]

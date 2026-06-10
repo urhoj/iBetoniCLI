@@ -11,6 +11,7 @@ import { decodeJwtPayload } from "../../auth/jwt.js";
 import { roleNameForTypeId, resolveRoleTypeId } from "../../roles.js";
 import { runCompanyList } from "../company/index.js";
 import { CliError } from "../../api/errors.js";
+import { registerPersonDayCommands } from "./day.js";
 
 export interface PersonListFilter {
   role?: string;
@@ -374,6 +375,7 @@ export function registerPersonCommands(
   getClientForAsiakas: (asiakasId: number) => Promise<ApiClient>
 ): void {
   const p = parent.command("person").description("Person commands");
+  registerPersonDayCommands(p, getClient);
 
   p.command("list")
     .description("List persons")
