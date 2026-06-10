@@ -43,9 +43,11 @@ describe("ib reference dump", () => {
   });
 
   test("runReferenceDump emits single-line JSON (stdout one-line contract)", () => {
-    const spy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+    const spy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     runReferenceDump("keikka");
+    expect(spy.mock.calls.length).toBe(1);
     const out = spy.mock.calls[0][0] as string;
+    // restore BEFORE the asserts so a failing assertion can't leak the spy
     spy.mockRestore();
     expect(out.endsWith("\n")).toBe(true);
     // exactly one line: no interior newlines (pretty-printing regression guard)
