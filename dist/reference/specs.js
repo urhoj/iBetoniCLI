@@ -80,6 +80,15 @@ export const COMMAND_SPECS = [
         errors: [
             { exit: 2, meaning: "Not logged in", remedy: "ib auth login" },
             apiErr(403, "No access to target", "verify ownership via `ib company list`"),
+            {
+                exit: 3,
+                meaning: "Read-only mode active (--read-only / IB_READ_ONLY)",
+                remedy: "persisted switch is blocked under read-only; use the per-command --asiakas <id> ephemeral context",
+            },
+        ],
+        notes: [
+            "Persists a rotated JWT bound to the target company — blocked under read-only mode (exit 3).",
+            "For a one-command company context that does NOT persist, use the global `--asiakas <id>` flag instead.",
         ],
         examples: ["ib auth switch --to 1349"],
     },
@@ -127,7 +136,16 @@ export const COMMAND_SPECS = [
         outputShape: "{ ok: true, activeCompany: { asiakasId, name } }",
         errors: [
             apiErr(403, "No access to target", "verify via `ib company list`"),
+            {
+                exit: 3,
+                meaning: "Read-only mode active (--read-only / IB_READ_ONLY)",
+                remedy: "persisted switch is blocked under read-only; use the per-command --asiakas <id> ephemeral context",
+            },
             ...COMMON_AUTH_ERRORS,
+        ],
+        notes: [
+            "Persists a rotated JWT bound to the target company — blocked under read-only mode (exit 3).",
+            "For a one-command company context that does NOT persist, use the global `--asiakas <id>` flag instead.",
         ],
         examples: ["ib company switch --to 1349"],
     },
@@ -171,6 +189,10 @@ export const COMMAND_SPECS = [
         ],
         outputShape: "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }>",
         errors: permErrors("auth.page.grid.tilaus.read"),
+        notes: [
+            "`tila` is the numeric keikkaTilaId. Legend: -1 Uusi tilaus · 0 Luonnos (draft) · 1 Kesken · 2 Lähetetty (sent) · 3 Käsittelyssä · 4 Toimitusvalmis · 5 Toimitus meneillään · 6 Toimitus epäonnistui · 7 Epäonnistui · 8 Peruttu (cancelled) · 9/12/13 Toimitettu (delivered) · 10 Poistettu (deleted) · 100 Valmis (complete) · 11/200 Järjestelmätilaus (system, do not edit).",
+            "The same legend is in the GLOSSARY (`tila`) on `ib --help`; source of truth: GET /api/tila/list.",
+        ],
         examples: [
             "ib keikka list --from 2026-05-28 --to 2026-05-30",
             "ib keikka list --customer 1349 --status planned --limit 50",
@@ -230,6 +252,9 @@ export const COMMAND_SPECS = [
             apiErr(400, "Validation failed", "check --status"),
             apiErr(404, "Keikka not found", "verify keikkaId"),
             ...permErrors("auth.page.grid.tilaus.edit"),
+        ],
+        notes: [
+            "Status values are keikkaTilaIds — see the legend on `ib keikka list --help` or the `tila` GLOSSARY entry on `ib --help`.",
         ],
         examples: [
             "ib keikka update 9001 --status done",
@@ -938,6 +963,7 @@ export const COMMAND_SPECS = [
             { name: "status", type: "string", description: "personPvmStatusId or status name (see `ib person day statuses`)", required: true },
             { name: "text", type: "string", description: "Free-text note on the day row" },
         ],
+        writeFlags: true,
         mutates: true,
         outputShape: "personPvm save result | { dryRun:true, personId, date, wouldChange:{ status?, text? } } (with --dry-run)",
         errors: [
@@ -966,6 +992,7 @@ export const COMMAND_SPECS = [
             { name: "person", type: "number", description: "personId", required: true },
             { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)", required: true },
         ],
+        writeFlags: true,
         mutates: true,
         outputShape: "delete result | { dryRun:true, wouldDelete:{ personPvmId, date, status } | null } (with --dry-run)",
         errors: [
@@ -1014,6 +1041,11 @@ export const COMMAND_SPECS = [
                 name: "type",
                 type: "number",
                 description: "Only this vehicleTypeId (see `ib vehicle types`)",
+            },
+            {
+                name: "cursor",
+                type: "string",
+                description: "Pagination cursor (from a previous page's nextCursor)",
             },
         ],
         outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>",
@@ -2499,7 +2531,7 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib commands",
-        description: "Filtered, offline list of ib commands from the spec catalogue: which write, which are read-only, which require a given permission. Lighter than `ib reference dump` (the full surface) — returns just { command, description, permissions, writeFlags } per match. No auth, no network.",
+        description: "Filtered, offline list of ib commands from the spec catalogue: which write, which are read-only, which require a given permission. Lighter than `ib reference dump` (the full surface) — returns just { command, description, permissions, isWrite } per match. No auth, no network.",
         auth: "none",
         args: [
             {
@@ -2526,7 +2558,7 @@ export const COMMAND_SPECS = [
                 description: "Only commands whose required permissions contain this substring",
             },
         ],
-        outputShape: "{ items: [{ command, description, permissions: string[], writeFlags: boolean }], nextCursor: null, count }",
+        outputShape: "{ items: [{ command, description, permissions: string[], isWrite: boolean }], nextCursor: null, count }",
         errors: [
             { exit: 4, meaning: "Bad flag combo", remedy: "--mutations and --reads are mutually exclusive" },
             { exit: 4, meaning: "Unknown domain", remedy: "run `ib commands` (no arg) to see valid domains" },

@@ -65,7 +65,7 @@ describe("filterCommandSpecs", () => {
       command: "ib x read",
       description: "a read",
       permissions: ["auth.page.vehicle.read"],
-      writeFlags: false,
+      isWrite: false,
     });
     // permissions defaults to [] when the spec has none
     expect(out[2].permissions).toEqual([]);
@@ -92,7 +92,7 @@ describe("buildCommandsList", () => {
   test("--mutations over the real catalogue yields only write commands", () => {
     const env = buildCommandsList({ mutations: true });
     expect(env.count).toBeGreaterThan(0);
-    expect(env.items.every((c) => c.writeFlags)).toBe(true);
+    expect(env.items.every((c) => c.isWrite)).toBe(true);
   });
 });
 

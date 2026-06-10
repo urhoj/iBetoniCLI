@@ -5,7 +5,7 @@
  * `ib reference dump` emits the entire surface (every flag, error, example) for
  * one-shot ingestion; `ib commands` is the lightweight discovery counterpart —
  * "which commands write?", "which are read-only?", "which need permission X?" —
- * returning just `{ command, description, permissions, writeFlags }` per match.
+ * returning just `{ command, description, permissions, isWrite }` per match.
  * Pure and offline (no auth, no network); the source of truth is the same
  * `COMMAND_SPECS` so this never drifts from `--help` / `reference dump`.
  */
@@ -18,8 +18,12 @@ export interface CommandSummary {
   command: string;
   description: string;
   permissions: string[];
-  /** True when the command mutates (writes) data. */
-  writeFlags: boolean;
+  /**
+   * True when the command mutates (writes) data: `spec.mutates ?? !!spec.writeFlags`.
+   * Named `isWrite` (not `writeFlags`) because the spec field `writeFlags` means
+   * "renders the standard write-safety block" — a different thing.
+   */
+  isWrite: boolean;
 }
 
 /** Filter inputs for {@link filterCommandSpecs}. */
@@ -98,7 +102,7 @@ export function filterCommandSpecs(
       command: s.command,
       description: s.description,
       permissions: s.permissions ?? [],
-      writeFlags: s.mutates ?? !!s.writeFlags,
+      isWrite: s.mutates ?? !!s.writeFlags,
     }));
 }
 

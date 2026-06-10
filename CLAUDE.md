@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **stdout is JSON, always** — one line, machine-parseable. `--pretty` switches to human tables (cli-table3), `--json` (default) forces JSON.
 - **stderr carries diagnostics and errors** — never mix into stdout.
-- **Exit codes are a documented contract** (`src/api/errors.ts` `exitCodeFromStatus`): `0` success · `2` auth (401) · `3` permission (403) · `4` validation (4xx) · `5` not-found (404) · `6` server (5xx) · `7` network. Preserve this mapping.
+- **Exit codes are a documented contract** (`src/api/errors.ts` `exitCodeFromStatus`): `0` success · `1` generic (usage errors from Commander — plain text, not the JSON envelope — plus `auth login` failure, `doctor` not-ok, unexpected runtime errors) · `2` auth (401) · `3` permission (403) · `4` validation (4xx) · `5` not-found (404) · `6` server (5xx) · `7` network. Preserve this mapping.
 - **`--help` is self-contained** — each command's help lists flags, permissions, output shape, error remedies, and copy-paste examples, so an AI can invoke it correctly from help alone.
 
 ## Commands

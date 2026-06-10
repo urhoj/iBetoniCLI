@@ -1,5 +1,5 @@
 import { createStore, defaultCredentialsPath } from "../../auth/store.js";
-import { performSwitch } from "../../auth/switch.js";
+import { performSwitch, assertPersistedSwitchAllowed, } from "../../auth/switch.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
 function companyName(c) {
     return c.asiakasNimi ?? c.name ?? "";
@@ -35,8 +35,11 @@ export async function runCompanyCurrent(client) {
  *   - switch   change active company and persist the rotated JWT
  *
  * Exit codes: 2 = not logged in; 1 = generic API/runtime failure.
+ *
+ * `isReadOnly` resolves the session write-lock at action time: `company switch`
+ * persists a rotated JWT, so it is refused (exit 3) under read-only mode.
  */
-export function registerCompanyCommands(parent, getClient) {
+export function registerCompanyCommands(parent, getClient, isReadOnly) {
     const company = parent.command("company").description("Company commands");
     company
         .command("list")
@@ -70,6 +73,7 @@ export function registerCompanyCommands(parent, getClient) {
         .requiredOption("--to <asiakasId>", "Target asiakasId", (v) => Number(v))
         .action(async (opts) => {
         try {
+            assertPersistedSwitchAllowed(isReadOnly());
             const store = createStore(defaultCredentialsPath());
             const creds = await store.load();
             if (!creds) {

@@ -46,7 +46,7 @@ export function filterCommandSpecs(specs, filter) {
         command: s.command,
         description: s.description,
         permissions: s.permissions ?? [],
-        writeFlags: s.mutates ?? !!s.writeFlags,
+        isWrite: s.mutates ?? !!s.writeFlags,
     }));
 }
 /**

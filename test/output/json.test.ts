@@ -38,25 +38,43 @@ describe("JSON output", () => {
       error: "denied",
       code: "FORBIDDEN",
       statusCode: 403,
+      hint: expect.stringContaining("PERMISSIONS"),
     });
   });
 
-  test("exitWithError writes the error then exits with the CliError's mapped code", () => {
-    const exitSpy = vi
-      .spyOn(process, "exit")
-      .mockImplementation(() => undefined as never);
-    exitWithError(new CliError("missing", 404, null, 5));
-    expect(stderrSpy).toHaveBeenCalled();
-    expect(exitSpy).toHaveBeenCalledWith(5);
-    exitSpy.mockRestore();
+  test("writeError on a 404 hints at the deploy-gate ambiguity", () => {
+    writeError(new CliError("HTTP 404", 404, null, 5));
+    const parsed = JSON.parse(String(stderrSpy.mock.calls.at(-1)![0]));
+    expect(parsed.hint).toMatch(/deploy-gated/);
+    expect(parsed.hint).toMatch(/ib version/);
   });
 
-  test("exitWithError exits 1 for a non-CliError", () => {
-    const exitSpy = vi
-      .spyOn(process, "exit")
-      .mockImplementation(() => undefined as never);
+  test("writeError omits hint when there is none (read-only refusal)", () => {
+    writeError(new CliError("Refused: read-only", 0, null, 3));
+    const parsed = JSON.parse(String(stderrSpy.mock.calls.at(-1)![0]));
+    expect(parsed).not.toHaveProperty("hint");
+  });
+
+  test("writeError on a network error (exit 7) hints at connectivity", () => {
+    writeError(new CliError("Network error: ECONNREFUSED", 0, null, 7));
+    const parsed = JSON.parse(String(stderrSpy.mock.calls.at(-1)![0]));
+    expect(parsed.hint).toMatch(/connectivity|network/i);
+  });
+
+  // exitWithError sets process.exitCode (natural drain) instead of calling
+  // process.exit() — forced exit after a fetch crashes Node on Windows.
+  test("exitWithError writes the error then sets the CliError's mapped exit code", () => {
+    const prev = process.exitCode;
+    exitWithError(new CliError("missing", 404, null, 5));
+    expect(stderrSpy).toHaveBeenCalled();
+    expect(process.exitCode).toBe(5);
+    process.exitCode = prev;
+  });
+
+  test("exitWithError sets exitCode 1 for a non-CliError", () => {
+    const prev = process.exitCode;
     exitWithError(new Error("plain"));
-    expect(exitSpy).toHaveBeenCalledWith(1);
-    exitSpy.mockRestore();
+    expect(process.exitCode).toBe(1);
+    process.exitCode = prev;
   });
 });

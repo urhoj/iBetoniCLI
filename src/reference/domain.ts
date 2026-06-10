@@ -71,7 +71,14 @@ export const GLOSSARY: GlossaryEntry[] = [
   },
   {
     term: "tila",
-    definition: "Finnish for \"status\" — e.g. a keikka's state.",
+    definition:
+      "Finnish for \"status\" — keikka rows carry the numeric keikkaTilaId: " +
+      "-1 Uusi tilaus (new) · 0 Luonnos (draft) · 1 Kesken (in progress) · " +
+      "2 Lähetetty (sent) · 3 Käsittelyssä (being handled) · 4 Toimitusvalmis (ready for delivery) · " +
+      "5 Toimitus meneillään (delivery ongoing) · 6 Toimitus epäonnistui (delivery failed) · " +
+      "7 Epäonnistui (failed) · 8 Peruttu (cancelled) · 9/12/13 Toimitettu (delivered) · " +
+      "10 Poistettu (deleted) · 100 Valmis (complete/closed) · 11/200 Järjestelmätilaus (system row, do not edit). " +
+      "Source of truth: GET /api/tila/list.",
   },
   {
     term: "ownerAsiakasId",
@@ -155,13 +162,13 @@ export const TOPICS: Topic[] = [
     id: "write-safety",
     title: "Write safety: dry-run, idempotency, reason, read-only",
     body:
-      "--dry-run is SERVER-side on most writes (sends X-Dry-Run; if the handler doesn't honour it the write PERSISTS -- never dry-run against an endpoint whose guard isn't deployed). It is CLIENT-side (never sends) on `vehicle update`, `ohje update`, `feedback create/resolve`. --idempotency-key dedupes retries (24h). --reason is written to the audit log (required by delete/grant/revoke). --read-only / IB_READ_ONLY blocks every non-GET (exit 3); `feedback create` is exempt (meta request).",
+      "--dry-run is SERVER-side on most writes (sends X-Dry-Run; if the handler doesn't honour it the write PERSISTS -- never dry-run against an endpoint whose guard isn't deployed). It is CLIENT-side (never sends) on `vehicle update`, `ohje update`, `feedback create/resolve`. --idempotency-key dedupes retries (24h). --reason is written to the audit log (required by delete/grant/revoke). --read-only / IB_READ_ONLY blocks every non-GET (exit 3) AND the persisted `company switch` / `auth switch` (they rotate+persist the JWT outside the API client); the ephemeral global `--asiakas <id>` stays allowed (nothing persisted). `feedback create` is exempt (meta request).",
   },
   {
     id: "exit-codes",
     title: "Process exit codes",
     body:
-      "0 ok; 2 auth (HTTP 401); 3 permission (403); 4 validation (4xx incl. 400/409/429); 5 not-found (404); 6 server (5xx); 7 network. Each command's --help ERRORS section lists exit code + HTTP status.",
+      "0 ok; 1 generic failure (no HTTP mapping): usage errors (unknown command/flag, missing required arg — printed by the parser as plain text on stderr, NOT the JSON error envelope), `auth login` failure, `doctor` aggregate not-ok, unexpected runtime errors; 2 auth (HTTP 401); 3 permission (403, incl. read-only-mode refusals); 4 validation (4xx incl. 400/409/429); 5 not-found (404); 6 server (5xx); 7 network. Each command's --help ERRORS section lists exit code + HTTP status.",
   },
   {
     id: "multi-tenancy",

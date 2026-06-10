@@ -67,4 +67,38 @@ describe("Rich --help wiring — real command tree", () => {
     expect(leaves.length).toBeGreaterThan(80);
     expect(missing).toEqual([]);
   });
+
+  // Reverse direction (Commander → spec): the tests above catch spec entries
+  // with no command, but not wired options missing from the spec. Without this,
+  // a flag can work at runtime yet be invisible in --help / reference dump
+  // (e.g. `vehicle list --cursor`, `person day set` write-safety block).
+  const WRITE_SAFETY_LONGS = ["--dry-run", "--idempotency-key", "--reason"];
+
+  test("every wired Commander option appears in the spec (flags or write-safety block)", () => {
+    const drift: string[] = [];
+    for (const spec of COMMAND_SPECS) {
+      const cmd = commands.get(spec.command);
+      if (!cmd) continue; // covered by the orphan test above
+      const specFlagLongs = new Set(spec.flags.map((f) => `--${f.name}`));
+      for (const opt of cmd.options) {
+        const long = opt.long;
+        if (!long || long === "--help") continue;
+        if (WRITE_SAFETY_LONGS.includes(long) && spec.writeFlags) continue;
+        if (!specFlagLongs.has(long)) drift.push(`${spec.command} ${long}`);
+      }
+    }
+    expect(drift).toEqual([]);
+  });
+
+  test("commands wiring the full write-safety trio declare writeFlags in their spec", () => {
+    const drift: string[] = [];
+    for (const spec of COMMAND_SPECS) {
+      const cmd = commands.get(spec.command);
+      if (!cmd) continue;
+      const longs = new Set(cmd.options.map((o) => o.long));
+      const hasTrio = WRITE_SAFETY_LONGS.every((l) => longs.has(l));
+      if (hasTrio && !spec.writeFlags) drift.push(spec.command);
+    }
+    expect(drift).toEqual([]);
+  });
 });

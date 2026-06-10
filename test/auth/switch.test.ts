@@ -1,5 +1,8 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { performSwitch } from "../../src/auth/switch.js";
+import {
+  performSwitch,
+  assertPersistedSwitchAllowed,
+} from "../../src/auth/switch.js";
 import { CliError } from "../../src/api/errors.js";
 
 const mockFetch = vi.fn();
@@ -66,5 +69,23 @@ describe("performSwitch", () => {
     }).catch((e) => e);
     expect(err).toBeInstanceOf(CliError);
     expect((err as CliError).exitCode).toBe(2);
+  });
+});
+
+describe("assertPersistedSwitchAllowed (read-only write-lock)", () => {
+  test("read-only mode refuses a persisted switch with a CliError mapped to exit 3", () => {
+    let err: unknown;
+    try {
+      assertPersistedSwitchAllowed(true);
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(CliError);
+    expect((err as CliError).exitCode).toBe(3);
+    expect((err as CliError).message).toMatch(/read-only/i);
+  });
+
+  test("no-op when read-only mode is off", () => {
+    expect(() => assertPersistedSwitchAllowed(false)).not.toThrow();
   });
 });

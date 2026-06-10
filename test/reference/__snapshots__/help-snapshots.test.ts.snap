@@ -97,6 +97,11 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 2  Not logged in          → ib auth login
   exit 3 (HTTP 403)  No access to target    → verify ownership via \`ib company list\`
+  exit 3  Read-only mode active (--read-only / IB_READ_ONLY) → persisted switch is blocked under read-only; use the per-command --asiakas <id> ephemeral context
+
+NOTES
+  - Persists a rotated JWT bound to the target company — blocked under read-only mode (exit 3).
+  - For a one-command company context that does NOT persist, use the global \`--asiakas <id>\` flag instead.
 
 EXAMPLES
   ib auth switch --to 1349
@@ -327,7 +332,7 @@ exports[`Help snapshots — contract stability > help for ib commands matches sn
   ib commands [<domain>] [flags]
 
 DESCRIPTION
-  Filtered, offline list of ib commands from the spec catalogue: which write, which are read-only, which require a given permission. Lighter than \`ib reference dump\` (the full surface) — returns just { command, description, permissions, writeFlags } per match. No auth, no network.
+  Filtered, offline list of ib commands from the spec catalogue: which write, which are read-only, which require a given permission. Lighter than \`ib reference dump\` (the full surface) — returns just { command, description, permissions, isWrite } per match. No auth, no network.
   Auth: none (public).
 
 ARGUMENTS
@@ -342,7 +347,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
 
 OUTPUT (JSON, stdout)
-  { items: [{ command, description, permissions: string[], writeFlags: boolean }], nextCursor: null, count }
+  { items: [{ command, description, permissions: string[], isWrite: boolean }], nextCursor: null, count }
 
 ERRORS (stderr, exit non-zero)
   exit 4  Bad flag combo         → --mutations and --reads are mutually exclusive
@@ -430,8 +435,13 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  No access to target    → verify via \`ib company list\`
+  exit 3  Read-only mode active (--read-only / IB_READ_ONLY) → persisted switch is blocked under read-only; use the per-command --asiakas <id> ephemeral context
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Persists a rotated JWT bound to the target company — blocked under read-only mode (exit 3).
+  - For a one-command company context that does NOT persist, use the global \`--asiakas <id>\` flag instead.
 
 EXAMPLES
   ib company switch --to 1349
@@ -2197,6 +2207,10 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - \`tila\` is the numeric keikkaTilaId. Legend: -1 Uusi tilaus · 0 Luonnos (draft) · 1 Kesken · 2 Lähetetty (sent) · 3 Käsittelyssä · 4 Toimitusvalmis · 5 Toimitus meneillään · 6 Toimitus epäonnistui · 7 Epäonnistui · 8 Peruttu (cancelled) · 9/12/13 Toimitettu (delivered) · 10 Poistettu (deleted) · 100 Valmis (complete) · 11/200 Järjestelmätilaus (system, do not edit).
+  - The same legend is in the GLOSSARY (\`tila\`) on \`ib --help\`; source of truth: GET /api/tila/list.
+
 EXAMPLES
   ib keikka list --from 2026-05-28 --to 2026-05-30
   ib keikka list --customer 1349 --status planned --limit 50
@@ -2269,6 +2283,9 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Status values are keikkaTilaIds — see the legend on \`ib keikka list --help\` or the \`tila\` GLOSSARY entry on \`ib --help\`.
 
 EXAMPLES
   ib keikka update 9001 --status done
@@ -2462,6 +2479,11 @@ FLAGS
   --person NUMBER    personId (required)
   --date DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
 
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
 
@@ -2539,6 +2561,11 @@ FLAGS
   --date DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
   --status STRING    personPvmStatusId or status name (see \`ib person day statuses\`) (required)
   --text STRING    Free-text note on the day row
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
@@ -4031,6 +4058,7 @@ FLAGS
   --grid-only BOOLEAN    Only vehicles shown in the grid (showInGrid=1)
   --valid-on DATE    Only vehicles whose validity window covers this day (YYYY-MM-DD or today/yesterday/tomorrow)
   --type NUMBER    Only this vehicleTypeId (see \`ib vehicle types\`)
+  --cursor STRING    Pagination cursor (from a previous page's nextCursor)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID

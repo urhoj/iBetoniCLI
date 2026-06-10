@@ -1,5 +1,18 @@
 import { CliError, exitCodeFromStatus } from "../api/errors.js";
 /**
+ * Guard for PERSISTED company switches (`ib auth switch` / `ib company switch`)
+ * under the session write-lock. These bypass `createApiClient` (credential-store
+ * path), so the client's non-GET gate never sees them — without this guard,
+ * read-only mode would silently change tenant context and persist a rotated
+ * JWT. The EPHEMERAL `--asiakas <id>` switch stays allowed: it is per-command,
+ * never persisted, and writes made through it still hit the client gate.
+ */
+export function assertPersistedSwitchAllowed(readOnly) {
+    if (!readOnly)
+        return;
+    throw new CliError("Refused: company switch persists a rotated JWT and read-only mode is active (--read-only / IB_READ_ONLY). Use the per-command --asiakas <id> ephemeral context instead.", 0, null, 3);
+}
+/**
  * Switch the active company by POSTing the target `newAsiakasId` to
  * `/api/company-selection/switch`. The backend re-issues a JWT bound to
  * the new tenant; the caller must persist the new token and updated

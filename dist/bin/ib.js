@@ -9,6 +9,8 @@ program.hook("preAction", () => {
 });
 program.parseAsync(process.argv).catch((err) => {
     process.stderr.write(`${err.message || err}\n`);
-    process.exit(1);
+    // exitCode + natural drain, NOT process.exit(): forced exit after a fetch
+    // crashes Node on Windows (libuv UV_HANDLE_CLOSING assert → exit 127).
+    process.exitCode = 1;
 });
 //# sourceMappingURL=ib.js.map

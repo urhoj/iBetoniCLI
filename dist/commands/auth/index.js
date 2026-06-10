@@ -2,9 +2,9 @@ import { createStore, defaultCredentialsPath } from "../../auth/store.js";
 import { performLogin } from "../../auth/login.js";
 import { performLogout } from "../../auth/logout.js";
 import { renderWhoami } from "../../auth/whoami.js";
-import { performSwitch } from "../../auth/switch.js";
+import { performSwitch, assertPersistedSwitchAllowed, } from "../../auth/switch.js";
 import { refreshToken } from "../../auth/refresh.js";
-import { writeJson, writeError } from "../../output/json.js";
+import { writeJson, writeError, exitWithError } from "../../output/json.js";
 /**
  * Register `ib auth` subcommands on the parent commander instance:
  *   - login    OAuth 2.1 + PKCE flow with local 127.0.0.1 callback
@@ -15,8 +15,11 @@ import { writeJson, writeError } from "../../output/json.js";
  *
  * Exit codes: 2 = auth-related failure (not logged in, bad credentials,
  * unrecoverable OAuth flow); 1 = generic failure.
+ *
+ * `isReadOnly` resolves the session write-lock at action time: `auth switch`
+ * persists a rotated JWT, so it is refused (exit 3) under read-only mode.
  */
-export function registerAuthCommands(parent) {
+export function registerAuthCommands(parent, isReadOnly) {
     const auth = parent.command("auth").description("Authentication commands");
     auth
         .command("login")
@@ -30,8 +33,10 @@ export function registerAuthCommands(parent) {
             });
         }
         catch (e) {
+            // exitCode + return, NOT process.exit(): forced exit after the OAuth
+            // fetches crashes Node on Windows (libuv assert → exit 127).
             writeError(e);
-            process.exit(2);
+            process.exitCode = 2;
         }
     });
     auth
@@ -53,8 +58,9 @@ export function registerAuthCommands(parent) {
             });
         }
         catch (e) {
+            // exitCode + return — see `auth login` (Windows libuv crash).
             writeError(e);
-            process.exit(1);
+            process.exitCode = 1;
         }
     });
     auth
@@ -80,6 +86,7 @@ export function registerAuthCommands(parent) {
         .requiredOption("--to <asiakasId>", "Target asiakasId", (v) => Number(v))
         .action(async (opts) => {
         try {
+            assertPersistedSwitchAllowed(isReadOnly());
             const store = createStore(defaultCredentialsPath());
             const creds = await store.load();
             if (!creds) {
@@ -106,8 +113,7 @@ export function registerAuthCommands(parent) {
             });
         }
         catch (e) {
-            writeError(e);
-            process.exit(1);
+            exitWithError(e);
         }
     });
     auth
@@ -129,8 +135,9 @@ export function registerAuthCommands(parent) {
             writeJson({ ok: true });
         }
         catch (e) {
+            // exitCode + return — see `auth login` (Windows libuv crash).
             writeError(e);
-            process.exit(2);
+            process.exitCode = 2;
         }
     });
 }

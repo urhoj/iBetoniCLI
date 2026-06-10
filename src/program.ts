@@ -101,9 +101,14 @@ export function buildProgram(): Command {
   // primer via `program.addHelpText("after", renderDomainHelp())` above.
   program.helpCommand(false);
 
+  // Session write-lock resolver, evaluated at action time (after argv parse).
+  // Passed to commands that mutate OUTSIDE the API client (persisted company
+  // switch) so read-only mode covers them too, and to `doctor` for reporting.
+  const isReadOnly = (): boolean => getGlobalOptions(program).readOnly;
+
   // `auth` manages credential-store access directly (login/logout/whoami/etc.)
   // and so doesn't take a `getClient` factory.
-  registerAuthCommands(program);
+  registerAuthCommands(program, isReadOnly);
 
   // `help` — offline concept guides, no auth. Registered before authenticated
   // commands so the spec catalogue and wiring tests can find it.
@@ -113,7 +118,7 @@ export function buildProgram(): Command {
   // description/comment via an authenticated GET, so it needs the client.
   registerRoleCommands(program, getClient);
 
-  registerCompanyCommands(program, getClient);
+  registerCompanyCommands(program, getClient, isReadOnly);
   registerKeikkaCommands(program, getClient);
   registerCustomerCommands(program, getClient);
   registerWorksiteCommands(program, getClient);
@@ -131,8 +136,12 @@ export function buildProgram(): Command {
   registerFeedbackCommands(program, getClient);
   registerSearchCommands(program, getClient);
   registerVersionCommand(program, packageJson.version, getEndpoint);
-  registerDoctorCommand(program, getClient, getEndpoint, packageJson.version, () =>
-    getGlobalOptions(program).readOnly
+  registerDoctorCommand(
+    program,
+    getClient,
+    getEndpoint,
+    packageJson.version,
+    isReadOnly
   );
 
   const reference = program

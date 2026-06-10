@@ -2,7 +2,10 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { createStore, defaultCredentialsPath } from "../../auth/store.js";
-import { performSwitch } from "../../auth/switch.js";
+import {
+  performSwitch,
+  assertPersistedSwitchAllowed,
+} from "../../auth/switch.js";
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
 
 interface AvailableCompany {
@@ -74,10 +77,14 @@ export async function runCompanyCurrent(
  *   - switch   change active company and persist the rotated JWT
  *
  * Exit codes: 2 = not logged in; 1 = generic API/runtime failure.
+ *
+ * `isReadOnly` resolves the session write-lock at action time: `company switch`
+ * persists a rotated JWT, so it is refused (exit 3) under read-only mode.
  */
 export function registerCompanyCommands(
   parent: Command,
-  getClient: () => Promise<ApiClient>
+  getClient: () => Promise<ApiClient>,
+  isReadOnly: () => boolean
 ): void {
   const company = parent.command("company").description("Company commands");
 
@@ -115,6 +122,7 @@ export function registerCompanyCommands(
     )
     .action(async (opts: { to: number }) => {
       try {
+        assertPersistedSwitchAllowed(isReadOnly());
         const store = createStore(defaultCredentialsPath());
         const creds = await store.load();
         if (!creds) {
