@@ -2,7 +2,8 @@ import { describe, test, expect } from "vitest";
 import type { Command } from "commander";
 import { buildProgram } from "../../src/program.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
-import { formatHelp } from "../../src/output/help.js";
+import { formatHelp, formatGroupHelp } from "../../src/output/help.js";
+import { GLOSSARY } from "../../src/reference/domain.js";
 
 /** Collect every leaf+group command in the tree as its full path → Command. */
 function collectCommands(root: Command): Map<string, Command> {
@@ -34,12 +35,21 @@ describe("Rich --help wiring — real command tree", () => {
     }
   });
 
-  test("group commands without a spec keep Commander's default help", () => {
-    // `ib keikka` is a group with no CommandSpec — its help must NOT be the
-    // rich format (it has no single spec to render).
-    const group = commands.get("ib keikka");
-    expect(group).toBeDefined();
-    expect(group!.helpInformation()).toContain("Usage:");
+  test("non-root group commands render computed group help", () => {
+    for (const [path, cmd] of commands) {
+      if (path === "ib" || cmd.commands.length === 0) continue;
+      expect(cmd.helpInformation(), path).toBe(
+        formatGroupHelp(path, cmd.description(), COMMAND_SPECS, GLOSSARY)
+      );
+    }
+  });
+
+  test("each spec'd command's Commander description equals spec.description", () => {
+    for (const spec of COMMAND_SPECS) {
+      const cmd = commands.get(spec.command);
+      expect(cmd, `command not found: ${spec.command}`).toBeDefined();
+      expect(cmd!.description(), spec.command).toBe(spec.description);
+    }
   });
 
   test("every leaf command has a CommandSpec (no undocumented commands)", () => {

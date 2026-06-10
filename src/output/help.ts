@@ -24,7 +24,7 @@
  */
 
 import type { Command } from "commander";
-import type { GlossaryEntry } from "../reference/domain.js";
+import { GLOSSARY, type GlossaryEntry } from "../reference/domain.js";
 
 export interface CommandError {
   /** HTTP status when API-originated (401/403/404/409/429/400/500). */
@@ -268,14 +268,21 @@ export function formatGroupHelp(
 }
 
 /**
- * Walk the Commander tree rooted at `root` and replace the `--help` output of
- * every command whose full path (e.g. `ib keikka list`) matches a
- * {@link CommandSpec.command} with the rich {@link formatHelp} rendering.
+ * Walk the Commander tree rooted at `root` and wire spec-driven help:
  *
- * Group commands and any command without a matching spec keep Commander's
- * default auto-generated help. Matching is by exact path so the same
- * `COMMAND_SPECS` catalogue drives both per-command `--help` and
- * `ib reference dump` — there is no second source to drift.
+ * - A command whose full path (e.g. `ib keikka list`) matches a
+ *   {@link CommandSpec.command} gets the rich {@link formatHelp} rendering,
+ *   AND its Commander description is overwritten with `spec.description` —
+ *   the spec is the single source for leaf descriptions (group listings,
+ *   `ib commands`, and `--help` all show the same string).
+ * - A non-root command with subcommands (a group — no spec of its own) gets
+ *   the computed {@link formatGroupHelp} rendering.
+ * - The root keeps Commander's default help + the domain primer appended via
+ *   `addHelpText` in `program.ts`.
+ *
+ * Matching is by exact path so the same `COMMAND_SPECS` catalogue drives
+ * per-command `--help`, group help, and `ib reference dump` — there is no
+ * second source to drift.
  */
 export function attachRichHelp(root: Command, specs: CommandSpec[]): void {
   const byCommand = new Map(specs.map((s) => [s.command, s]));
@@ -283,7 +290,15 @@ export function attachRichHelp(root: Command, specs: CommandSpec[]): void {
     const full = [...path, cmd.name()].join(" ");
     const spec = byCommand.get(full);
     if (spec) {
+      // Single source: the Commander listing description IS the spec description.
+      cmd.description(spec.description);
       cmd.configureHelp({ formatHelp: () => formatHelp(spec) });
+    } else if (path.length > 0 && cmd.commands.length > 0) {
+      // Non-root group: computed group help (root keeps the domain primer).
+      const fallback = cmd.description();
+      cmd.configureHelp({
+        formatHelp: () => formatGroupHelp(full, fallback, specs, GLOSSARY),
+      });
     }
     for (const sub of cmd.commands) walk(sub, [...path, cmd.name()]);
   };
