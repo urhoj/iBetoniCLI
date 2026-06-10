@@ -10,7 +10,7 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # @ibetoni/auth and @ibetoni/constants are private workspace packages (not
       # published to npmjs), declared as "*" so they resolve via npm-workspace
@@ -19,13 +19,13 @@ jobs:
       # the two deps from it via file: (CI-only — the committed package.json keeps
       # "*"). Mirrors how puminet4/puminet5api consume the shared packages.
       # Requires a GH_PAT secret with read access to urhoj/ibetoni_packages.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           repository: urhoj/ibetoni_packages
           path: ibetoni_packages
           token: ${{ secrets.GH_PAT }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           # 22.x to match the rest of the monorepo (puminet5api) and because
           # vitest 4 / rolldown imports `styleText` from node:util (Node >= 20.12).
