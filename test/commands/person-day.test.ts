@@ -54,7 +54,7 @@ describe("runPersonDayGet", () => {
       "/api/personPvm/list/1349?startDate=2026-06-10&endDate=2026-06-10&personId=555"
     );
     expect(out.items[0]).toEqual({
-      personPvmId: 91, date: "2026-06-10", statusId: 2, status: "L", statusName: "Loma", pois: true, vehicleId: null, text: "ranta",
+      personPvmId: 91, date: "2026-06-10", statusId: 2, status: "L", pois: true, vehicleId: null, text: "ranta",
     });
     expect(out.count).toBe(1);
   });
@@ -149,7 +149,7 @@ describe("runPersonDayClear", () => {
     ]);
     const out = await runPersonDayClear(c, 555, "2026-06-10", { dryRun: true, reason: "x" });
     expect(c.delete).not.toHaveBeenCalled();
-    expect(out).toEqual({ dryRun: true, wouldDelete: { personPvmId: 91, date: "2026-06-10", status: "Loma" } });
+    expect(out).toEqual({ dryRun: true, wouldDelete: { personPvmId: 91, date: "2026-06-10", status: "L" } });
   });
 
   test("real: existing row → DELETE the resolved id", async () => {

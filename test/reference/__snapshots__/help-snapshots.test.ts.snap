@@ -2506,7 +2506,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ personPvmId, date, statusId, status, statusName, pois, vehicleId, text }>
+  ListEnvelope<{ personPvmId, date, statusId, status, pois, vehicleId, text }>
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -2514,6 +2514,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - Scoped to the active company (same-tenant).
+  - \`status\` is the personPvmStatus code; map statusId→friendly name via \`ib person day statuses\`.
 
 SEE ALSO
   ib person day set, ib driver who

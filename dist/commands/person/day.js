@@ -45,7 +45,6 @@ export async function runPersonDayGet(client, personId, from, to) {
         date: intToDate(Number(r.pvm)),
         statusId: r.personPvmStatusId != null ? Number(r.personPvmStatusId) : null,
         status: r.personPvmStatus ?? null,
-        statusName: r.personPvmStatusName ?? null,
         pois: !!r.pois,
         vehicleId: r.vehicleId != null ? Number(r.vehicleId) : null,
         text: r.personPvmText ?? null,
@@ -130,7 +129,7 @@ export async function runPersonDayClear(client, personId, date, flags) {
                 ? {
                     personPvmId: current.personPvmId,
                     date: intToDate(toYyyymmdd(date)),
-                    status: current.statusName ?? current.status ?? null,
+                    status: current.status ?? null,
                 }
                 : null,
         };
