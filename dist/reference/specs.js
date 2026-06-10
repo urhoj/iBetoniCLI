@@ -83,12 +83,12 @@ export const COMMAND_SPECS = [
             {
                 exit: 3,
                 meaning: "Read-only mode active (--read-only / IB_READ_ONLY)",
-                remedy: "persisted switch is blocked under read-only; use the per-command --asiakas <id> ephemeral context",
+                remedy: "persisted switch is blocked under read-only; use the per-command global --company <id> ephemeral context",
             },
         ],
         notes: [
             "Persists a rotated JWT bound to the target company — blocked under read-only mode (exit 3).",
-            "For a one-command company context that does NOT persist, use the global `--asiakas <id>` flag instead.",
+            "For a one-command company context that does NOT persist, use the global `--company <id>` flag instead.",
         ],
         examples: ["ib auth switch --to 1349"],
     },
@@ -139,13 +139,13 @@ export const COMMAND_SPECS = [
             {
                 exit: 3,
                 meaning: "Read-only mode active (--read-only / IB_READ_ONLY)",
-                remedy: "persisted switch is blocked under read-only; use the per-command --asiakas <id> ephemeral context",
+                remedy: "persisted switch is blocked under read-only; use the per-command global --company <id> ephemeral context",
             },
             ...COMMON_AUTH_ERRORS,
         ],
         notes: [
             "Persists a rotated JWT bound to the target company — blocked under read-only mode (exit 3).",
-            "For a one-command company context that does NOT persist, use the global `--asiakas <id>` flag instead.",
+            "For a one-command company context that does NOT persist, use the global `--company <id>` flag instead.",
         ],
         examples: ["ib company switch --to 1349"],
     },

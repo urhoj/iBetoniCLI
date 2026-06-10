@@ -90,6 +90,26 @@ describe("Rich --help wiring — real command tree", () => {
     expect(drift).toEqual([]);
   });
 
+  test("no subcommand option collides with a root global option", () => {
+    // Commander recognises root options ANYWHERE in argv, so a root global
+    // (e.g. the old global `--asiakas`) SHADOWS any same-named subcommand
+    // option — a required local flag becomes unsatisfiable (usage error even
+    // when supplied). Regression guard for the --asiakas → --company rename.
+    const root = [...commands.values()].find((c) => c.name() === "ib");
+    const rootLongs = new Set(root!.options.map((o) => o.long).filter(Boolean));
+    const collisions: string[] = [];
+    for (const [path, cmd] of commands) {
+      if (path === "ib") continue;
+      for (const opt of cmd.options) {
+        if (opt.long && opt.long !== "--help" && rootLongs.has(opt.long)) {
+          collisions.push(`${path} ${opt.long}`);
+        }
+      }
+    }
+    expect(rootLongs.size).toBeGreaterThan(5); // not vacuous
+    expect(collisions).toEqual([]);
+  });
+
   test("commands wiring the full write-safety trio declare writeFlags in their spec", () => {
     const drift: string[] = [];
     for (const spec of COMMAND_SPECS) {

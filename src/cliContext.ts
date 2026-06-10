@@ -17,7 +17,7 @@ export interface EphemeralSwitchResult {
 
 /**
  * Decide which token a single invocation should act with, given an optional
- * `--asiakas <id>` target. When the target is absent or already the active
+ * global `--company <id>` target. When the target is absent or already the active
  * company, the base token is used unchanged (no network). Otherwise `switchFn`
  * mints a fresh JWT bound to the target tenant — an EPHEMERAL switch the caller
  * must NOT persist. `switchFn` failures (e.g. no access → CliError exit 3)
@@ -90,7 +90,7 @@ export async function createCliContext(opts: {
   const endpoint = opts.global.endpoint ?? auth.endpoint;
   const store = createStore(opts.credentialsPath);
 
-  // Optional per-invocation `--asiakas <id>`: act in another company for this
+  // Optional per-invocation global `--company <id>`: act in another company for this
   // one command without persisting the switch. Mints an ephemeral JWT bound to
   // the target tenant (the switch endpoint enforces access; no access → exit 3)
   // and is never written back to the credentials store.
@@ -135,7 +135,7 @@ export async function createCliContext(opts: {
     actingAs,
     quiet: opts.global.quiet,
     // Refresh-and-persist only for the normal (non-ephemeral) session. An
-    // ephemeral `--asiakas` token is single-command and bound to a different
+    // ephemeral `--company` token is single-command and bound to a different
     // company — persisting a refreshed copy would clobber the saved active
     // company, so it gets no refresh path (a 401 mid-command surfaces).
     onRefresh:

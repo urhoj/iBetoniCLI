@@ -58,26 +58,35 @@ describe("global options", () => {
     }
   });
 
-  test("--asiakas <id> parses to a number", () => {
+  // The global company-context flag is `--company`, NOT `--asiakas`: a root
+  // `--asiakas` would shadow the 14 subcommands with their own local
+  // `--asiakas <id>` flag (Commander recognises root options anywhere).
+  test("--company <id> parses to GlobalOptions.asiakas as a number", () => {
     const cmd = new Command();
     addGlobalOptions(cmd);
-    cmd.parse(["node", "test", "--asiakas", "26"]);
+    cmd.parse(["node", "test", "--company", "26"]);
     expect(getGlobalOptions(cmd).asiakas).toBe(26);
   });
 
-  test("asiakas defaults to null when --asiakas is absent", () => {
+  test("asiakas defaults to null when --company is absent", () => {
     const cmd = new Command();
     addGlobalOptions(cmd);
     cmd.parse(["node", "test"]);
     expect(getGlobalOptions(cmd).asiakas).toBeNull();
   });
 
+  test("--asiakas is NOT a global option (reserved for subcommand-local flags)", () => {
+    const cmd = new Command();
+    addGlobalOptions(cmd);
+    expect(cmd.options.map((o) => o.long)).not.toContain("--asiakas");
+  });
+
   test.each([["abc"], ["0"], ["-3"], ["1.5"]])(
-    "--asiakas %s (not a positive integer) exits 4 with a clear message",
+    "--company %s (not a positive integer) exits 4 with a clear message",
     (bad) => {
       const cmd = new Command();
       addGlobalOptions(cmd);
-      cmd.parse(["node", "test", "--asiakas", bad]);
+      cmd.parse(["node", "test", "--company", bad]);
       const exitSpy = vi
         .spyOn(process, "exit")
         .mockImplementation(((code?: number) => {
@@ -87,7 +96,7 @@ describe("global options", () => {
         .spyOn(process.stderr, "write")
         .mockReturnValue(true);
       expect(() => getGlobalOptions(cmd)).toThrow("EXIT_4");
-      expect(String(errSpy.mock.calls[0][0])).toMatch(/--asiakas/);
+      expect(String(errSpy.mock.calls[0][0])).toMatch(/--company/);
       exitSpy.mockRestore();
       errSpy.mockRestore();
     }

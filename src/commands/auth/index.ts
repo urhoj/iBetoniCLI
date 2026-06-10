@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import { getGlobalOptions } from "../../globals.js";
 import { createStore, defaultCredentialsPath } from "../../auth/store.js";
 import { performLogin } from "../../auth/login.js";
 import { performLogout } from "../../auth/logout.js";
@@ -33,11 +34,15 @@ export function registerAuthCommands(
   auth
     .command("login")
     .description("Open browser to authorize this CLI and persist credentials")
-    .option("--endpoint <url>", "API endpoint", "https://api.ibetoni.fi")
-    .action(async (opts: { endpoint: string }) => {
+    // No LOCAL --endpoint option: the root global `--endpoint` claims the value
+    // during parse (Commander recognises root options anywhere), so a local
+    // duplicate silently fell back to its default — `auth login --endpoint
+    // <staging>` authorized against PROD. Read the global instead.
+    .action(async () => {
       try {
         await performLogin({
-          endpoint: opts.endpoint,
+          endpoint:
+            getGlobalOptions(parent).endpoint ?? "https://api.ibetoni.fi",
           credentialsPath: defaultCredentialsPath(),
         });
       } catch (e) {

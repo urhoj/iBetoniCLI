@@ -15,11 +15,16 @@ export interface GlobalOptions {
    */
   readOnly: boolean;
   /**
-   * Per-invocation company context. When set, the command runs as if the active
-   * company were this `asiakasId` — `cliContext` performs an EPHEMERAL switch
-   * (mints a JWT bound to it, uses it for this one command, and never persists
-   * it). `null` = use the credentials' active company. Access is enforced by the
-   * switch endpoint; no access → exit 3.
+   * Per-invocation company context (`--company <id>`). When set, the command
+   * runs as if the active company were this `asiakasId` — `cliContext` performs
+   * an EPHEMERAL switch (mints a JWT bound to it, uses it for this one command,
+   * and never persists it). `null` = use the credentials' active company.
+   * Access is enforced by the switch endpoint; no access → exit 3.
+   *
+   * Named `--company` on the wire, NOT `--asiakas`: Commander root options are
+   * recognized anywhere in argv, so a root `--asiakas` SHADOWS every
+   * subcommand's local `--asiakas <id>` flag (14 commands, e.g. `person role
+   * grant`, `customer person add`) — their required flag became unsatisfiable.
    */
   asiakas: number | null;
 }
@@ -40,7 +45,7 @@ export function addGlobalOptions(cmd: Command): Command {
       "Block all writes this session (also via IB_READ_ONLY=1)"
     )
     .option(
-      "--asiakas <id>",
+      "--company <id>",
       "Run this one command in another company's context (ephemeral switch, not persisted)"
     );
 }
@@ -54,20 +59,20 @@ export function getGlobalOptions(cmd: Command): GlobalOptions {
     pretty?: boolean;
     json?: boolean;
     readOnly?: boolean;
-    asiakas?: string;
+    company?: string;
   }>();
   const envReadOnly = READ_ONLY_ENV_TRUE.has(
     (process.env.IB_READ_ONLY ?? "").trim().toLowerCase()
   );
-  // --asiakas must be a positive integer; fail fast (exit 4 = validation) with a
+  // --company must be a positive integer; fail fast (exit 4 = validation) with a
   // clear message rather than sending NaN→null to the backend and surfacing a
   // cryptic "newAsiakasId is required" HTTP 400.
   let asiakas: number | null = null;
-  if (o.asiakas !== undefined) {
-    const n = Number(o.asiakas);
+  if (o.company !== undefined) {
+    const n = Number(o.company);
     if (!Number.isInteger(n) || n < 1) {
       process.stderr.write(
-        `Error: --asiakas must be a positive integer (got '${o.asiakas}').\n`
+        `Error: --company must be a positive integer (got '${o.company}').\n`
       );
       process.exit(4);
     }

@@ -162,7 +162,7 @@ export const TOPICS: Topic[] = [
     id: "write-safety",
     title: "Write safety: dry-run, idempotency, reason, read-only",
     body:
-      "--dry-run is SERVER-side on most writes (sends X-Dry-Run; if the handler doesn't honour it the write PERSISTS -- never dry-run against an endpoint whose guard isn't deployed). It is CLIENT-side (never sends) on `vehicle update`, `ohje update`, `feedback create/resolve`. --idempotency-key dedupes retries (24h). --reason is written to the audit log (required by delete/grant/revoke). --read-only / IB_READ_ONLY blocks every non-GET (exit 3) AND the persisted `company switch` / `auth switch` (they rotate+persist the JWT outside the API client); the ephemeral global `--asiakas <id>` stays allowed (nothing persisted). `feedback create` is exempt (meta request).",
+      "--dry-run is SERVER-side on most writes (sends X-Dry-Run; if the handler doesn't honour it the write PERSISTS -- never dry-run against an endpoint whose guard isn't deployed). It is CLIENT-side (never sends) on `vehicle update`, `ohje update`, `feedback create/resolve`. --idempotency-key dedupes retries (24h). --reason is written to the audit log (required by delete/grant/revoke). --read-only / IB_READ_ONLY blocks every non-GET (exit 3) AND the persisted `company switch` / `auth switch` (they rotate+persist the JWT outside the API client); the ephemeral global `--company <id>` stays allowed (nothing persisted). `feedback create` is exempt (meta request).",
   },
   {
     id: "exit-codes",
@@ -174,7 +174,7 @@ export const TOPICS: Topic[] = [
     id: "multi-tenancy",
     title: "Multi-tenancy & company context",
     body:
-      "Every read/write is scoped to the active company's ownerAsiakasId, derived from your JWT. `ib company switch --to <id>` persists a new active company; the global `--asiakas <id>` runs ONE command in another company's context via an ephemeral (non-persisted) switch. BetoniJerry is the umbrella tenant asiakasId 1349.",
+      "Every read/write is scoped to the active company's ownerAsiakasId, derived from your JWT. `ib company switch --to <id>` persists a new active company; the global `--company <id>` runs ONE command in another company's context via an ephemeral (non-persisted) switch (it is named --company because many subcommands have their own --asiakas flag). BetoniJerry is the umbrella tenant asiakasId 1349.",
   },
 ];
 
