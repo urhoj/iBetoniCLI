@@ -156,5 +156,55 @@ export function registerDriverCommands(
       }
     });
 
-  // Writes (assign/clear) are added in Task 9.
+  const assignCmd = d
+    .command("assign")
+    .description("Assign a day driver to a vehicle (atomic: personPvm + keikkat + palkit). Requires --reason.")
+    .requiredOption("--vehicle <id>", "Target vehicleId", (s: string) => Number(s))
+    .requiredOption("--person <pid>", "Driver personId", (s: string) => Number(s))
+    .option("--date <d>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today");
+  addWriteFlagsToCommand(assignCmd).action(
+    async (opts: WriteFlags & { vehicle: number; person: number; date: string }) => {
+      if (!opts.reason) {
+        writeError(new Error("Missing required flag: --reason"));
+        process.exit(4);
+      }
+      try {
+        const result = await runDriverAssign(
+          await getClient(),
+          opts.vehicle,
+          opts.person,
+          opts.date,
+          { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }
+        );
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
+
+  const clearCmd = d
+    .command("clear")
+    .description("Clear the day driver from a vehicle (atomic). Requires --reason.")
+    .requiredOption("--vehicle <id>", "Target vehicleId", (s: string) => Number(s))
+    .option("--date <d>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today");
+  addWriteFlagsToCommand(clearCmd).action(
+    async (opts: WriteFlags & { vehicle: number; date: string }) => {
+      if (!opts.reason) {
+        writeError(new Error("Missing required flag: --reason"));
+        process.exit(4);
+      }
+      try {
+        const result = await runDriverClear(
+          await getClient(),
+          opts.vehicle,
+          opts.date,
+          { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }
+        );
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
 }

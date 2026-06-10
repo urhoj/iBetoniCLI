@@ -1092,6 +1092,52 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib driver assign matches snapshot 1`] = `
+"USAGE
+  ib driver assign [flags]
+
+DESCRIPTION
+  Assign a day driver to a vehicle for a date. ATOMIC: updates personPvm AND the keikkat/palkit on that vehicle that day, and relocates the driver off any vehicle they were previously on. Requires --reason.
+  Permissions: requires auth.page.grid.tilaus.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --vehicle NUMBER    Target vehicleId (required)
+  --person NUMBER    Driver personId (required)
+  --date DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (default: today)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  { success, vehicleId, date, personId, oldPersonId } | { dryRun:true, vehicleId, date, personId, oldPersonId, keikkaIds, palkkiIds, wouldClearFromVehicleId } (with --dry-run)
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Missing/invalid field (no --reason, bad vehicle/person/date) → supply --reason and valid ids
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Requires Admin, HR Admin, or Keikka Handler on the active company.
+  - --reason is hard-required (exits 4 without it).
+  - --dry-run previews the resolved oldPersonId + keikka/palkki ids without writing.
+  - Emits the dayDriver:updated socket so live grids update. Deploy-gated (404 until the backend ships /api/cli/driver/*).
+
+SEE ALSO
+  ib driver gaps, ib driver available, ib driver clear, ib vehicle driver-assign
+
+EXAMPLES
+  ib driver assign --vehicle 53 --person 555 --date tomorrow --reason 'auto-fill'
+  ib driver assign --vehicle 53 --person 555 --dry-run --reason preview
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib driver available matches snapshot 1`] = `
 "USAGE
   ib driver available <date> [flags]
@@ -1151,6 +1197,48 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib driver board today
   ib driver board 2026-06-10
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib driver clear matches snapshot 1`] = `
+"USAGE
+  ib driver clear [flags]
+
+DESCRIPTION
+  Clear the day driver from a vehicle for a date (atomic — also clears the driver from that day's keikkat/palkit on the vehicle). Requires --reason.
+  Permissions: requires auth.page.grid.tilaus.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --vehicle NUMBER    Target vehicleId (required)
+  --date DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (default: today)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  { success, vehicleId, date, personId:null, oldPersonId } | { dryRun:true, ... } (with --dry-run)
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Missing/invalid field (no --reason, bad vehicle/date) → supply --reason and a valid vehicle
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Requires Admin, HR Admin, or Keikka Handler on the active company.
+  - --reason is hard-required (exits 4 without it). Deploy-gated.
+
+SEE ALSO
+  ib driver assign, ib driver who
+
+EXAMPLES
+  ib driver clear --vehicle 53 --date today --reason 'sick leave'
 "
 `;
 

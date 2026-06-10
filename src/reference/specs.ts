@@ -1326,6 +1326,56 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "ib driver absences --from today --to today --person 123",
     ],
   },
+  {
+    command: "ib driver assign",
+    description:
+      "Assign a day driver to a vehicle for a date. ATOMIC: updates personPvm AND the keikkat/palkit on that vehicle that day, and relocates the driver off any vehicle they were previously on. Requires --reason.",
+    permissions: ["auth.page.grid.tilaus.edit"],
+    flags: [
+      { name: "vehicle", type: "number", description: "Target vehicleId", required: true },
+      { name: "person", type: "number", description: "Driver personId", required: true },
+      { name: "date", type: "date", default: "today", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ success, vehicleId, date, personId, oldPersonId } | { dryRun:true, vehicleId, date, personId, oldPersonId, keikkaIds, palkkiIds, wouldClearFromVehicleId } (with --dry-run)",
+    errors: [
+      apiErr(400, "Missing/invalid field (no --reason, bad vehicle/person/date)", "supply --reason and valid ids"),
+      ...permErrors("auth.page.grid.tilaus.edit"),
+    ],
+    notes: [
+      "Requires Admin, HR Admin, or Keikka Handler on the active company.",
+      "--reason is hard-required (exits 4 without it).",
+      "--dry-run previews the resolved oldPersonId + keikka/palkki ids without writing.",
+      "Emits the dayDriver:updated socket so live grids update. Deploy-gated (404 until the backend ships /api/cli/driver/*).",
+    ],
+    seeAlso: ["ib driver gaps", "ib driver available", "ib driver clear", "ib vehicle driver-assign"],
+    examples: [
+      "ib driver assign --vehicle 53 --person 555 --date tomorrow --reason 'auto-fill'",
+      "ib driver assign --vehicle 53 --person 555 --dry-run --reason preview",
+    ],
+  },
+  {
+    command: "ib driver clear",
+    description:
+      "Clear the day driver from a vehicle for a date (atomic — also clears the driver from that day's keikkat/palkit on the vehicle). Requires --reason.",
+    permissions: ["auth.page.grid.tilaus.edit"],
+    flags: [
+      { name: "vehicle", type: "number", description: "Target vehicleId", required: true },
+      { name: "date", type: "date", default: "today", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ success, vehicleId, date, personId:null, oldPersonId } | { dryRun:true, ... } (with --dry-run)",
+    errors: [
+      apiErr(400, "Missing/invalid field (no --reason, bad vehicle/date)", "supply --reason and a valid vehicle"),
+      ...permErrors("auth.page.grid.tilaus.edit"),
+    ],
+    notes: [
+      "Requires Admin, HR Admin, or Keikka Handler on the active company.",
+      "--reason is hard-required (exits 4 without it). Deploy-gated.",
+    ],
+    seeAlso: ["ib driver assign", "ib driver who"],
+    examples: ["ib driver clear --vehicle 53 --date today --reason 'sick leave'"],
+  },
 
   // ─── sijainti (11) ───────────────────────────────────────────────────────
   {
