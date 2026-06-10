@@ -33,7 +33,7 @@ Run from the `betonicli/` directory:
 
 1. `src/output/help.ts` `attachRichHelp` — replaces each matching command's `--help` with the rich `formatHelp(spec)` rendering, renders computed `formatGroupHelp` on every non-root GROUP command, and overwrites each leaf's Commander `.description()` with `spec.description` (the spec is the single source for leaf descriptions; `help-wiring.test.ts` asserts the equality).
 2. `src/reference/dump.ts` — `ib reference dump [domain]` emits all specs (or one domain's) as one JSON document for AI ingestion; the primer (overview/glossary/topics/feedbackGuidance) is always retained.
-3. `src/reference/commandsList.ts` — `ib commands [domain]` filters the catalogue to a compact discovery view (`--mutations` / `--reads` / `--permission`). Also exports `commandDomains` / `assertKnownDomain` (unknown domain → exit 4), shared with the dump.
+3. `src/reference/commandsList.ts` — bare `ib commands` renders the domain index (`buildDomainIndex`); `ib commands <domain>` / `--all` / the filters (`--mutations` / `--reads` / `--permission`) filter the catalogue to flat per-command views. Also exports `commandDomains` / `assertKnownDomain` (unknown domain → exit 4), shared with the dump.
 
 **When you add or change a command, update its `CommandSpec` in `specs.ts` in the same change.** Tests enforce the link: `test/reference/help-wiring.test.ts` (every spec maps to a registered command, **every leaf command has a spec**, and each `--help` equals `formatHelp(spec)`) and `test/reference/help-snapshots.test.ts` (snapshot of rendered help — update with `npx vitest run -u` when intentional). The `formatHelp` renderer itself is unit-tested in `test/output/help-format.test.ts` and `test/output/help.test.ts`.
 
