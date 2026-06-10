@@ -24,6 +24,12 @@ export const CHANGE_ENTITY_TYPES = [
         notes: "Concrete lines of a keikka. Also visible inside `changes entity keikka <keikkaId>`.",
     },
     {
+        entityType: "keikkaLasku",
+        entityIdMeaning: "keikkaLaskuId",
+        gate: "member",
+        notes: "Invoices of a keikka (creation/deletion events). Memo EDITS are tracked under entityType 'keikka' fieldName 'laskuMemo'.",
+    },
+    {
         entityType: "kuski",
         entityIdMeaning: "keikkaId (legacy)",
         gate: "member",

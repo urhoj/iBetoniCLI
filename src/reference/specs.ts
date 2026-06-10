@@ -3382,7 +3382,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: [
       "ib changes entity keikka 12345",
       "ib changes entity vehicle 53 --field kuskit",
-      "ib changes entity pumppuRequest 17 --owner 1349",
+      "ib changes entity pumppuRequest 17",
     ],
   },
   {
