@@ -6,7 +6,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveDate } from "../../dates.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
@@ -282,10 +282,7 @@ export function registerKeikkaCommands(
       }
     ) => {
       if (opts.status === undefined) {
-        writeError(
-          new Error("Nothing to update: pass --status (v1.0 supports --status only)")
-        );
-        process.exit(4);
+        failWith("Nothing to update: pass --status (v1.0 supports --status only)", 4);
       }
       try {
         const client = await getClient();

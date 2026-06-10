@@ -1,9 +1,10 @@
-import { describe, test, expect, vi } from "vitest";
+import { describe, test, expect } from "vitest";
 import {
   addGlobalOptions,
   GlobalOptions,
   getGlobalOptions,
 } from "../src/globals";
+import { CliError } from "../src/api/errors";
 import { Command } from "commander";
 
 describe("global options", () => {
@@ -81,24 +82,24 @@ describe("global options", () => {
     expect(cmd.options.map((o) => o.long)).not.toContain("--asiakas");
   });
 
+  // Invalid --company THROWS a CliError(exit 4) instead of process.exit():
+  // forced exit is Windows-unsafe post-fetch; the action/bin catch emits the
+  // envelope with the mapped code.
   test.each([["abc"], ["0"], ["-3"], ["1.5"]])(
-    "--company %s (not a positive integer) exits 4 with a clear message",
+    "--company %s (not a positive integer) throws CliError exit 4",
     (bad) => {
       const cmd = new Command();
       addGlobalOptions(cmd);
       cmd.parse(["node", "test", "--company", bad]);
-      const exitSpy = vi
-        .spyOn(process, "exit")
-        .mockImplementation(((code?: number) => {
-          throw new Error(`EXIT_${code}`);
-        }) as never);
-      const errSpy = vi
-        .spyOn(process.stderr, "write")
-        .mockReturnValue(true);
-      expect(() => getGlobalOptions(cmd)).toThrow("EXIT_4");
-      expect(String(errSpy.mock.calls[0][0])).toMatch(/--company/);
-      exitSpy.mockRestore();
-      errSpy.mockRestore();
+      let err: unknown;
+      try {
+        getGlobalOptions(cmd);
+      } catch (e) {
+        err = e;
+      }
+      expect(err).toBeInstanceOf(CliError);
+      expect((err as CliError).exitCode).toBe(4);
+      expect((err as CliError).message).toMatch(/--company/);
     }
   );
 

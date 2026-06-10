@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { CliError } from "./api/errors.js";
 
 export interface GlobalOptions {
   endpoint: string | null;
@@ -64,17 +65,21 @@ export function getGlobalOptions(cmd: Command): GlobalOptions {
   const envReadOnly = READ_ONLY_ENV_TRUE.has(
     (process.env.IB_READ_ONLY ?? "").trim().toLowerCase()
   );
-  // --company must be a positive integer; fail fast (exit 4 = validation) with a
-  // clear message rather than sending NaN→null to the backend and surfacing a
-  // cryptic "newAsiakasId is required" HTTP 400.
+  // --company must be a positive integer; fail fast (exit 4 = validation) with
+  // a clear message rather than sending NaN→null to the backend and surfacing a
+  // cryptic "newAsiakasId is required" HTTP 400. Throws (not process.exit —
+  // Windows-unsafe post-fetch); the action catch or the bin catch emits the
+  // envelope with exit 4. (No json.js import here: it would be a cycle.)
   let asiakas: number | null = null;
   if (o.company !== undefined) {
     const n = Number(o.company);
     if (!Number.isInteger(n) || n < 1) {
-      process.stderr.write(
-        `Error: --company must be a positive integer (got '${o.company}').\n`
+      throw new CliError(
+        `--company must be a positive integer (got '${o.company}').`,
+        0,
+        null,
+        4
       );
-      process.exit(4);
     }
     asiakas = n;
   }

@@ -62,4 +62,21 @@ export function exitWithError(err) {
     writeError(err);
     process.exitCode = exitCodeForError(err);
 }
+/**
+ * Terminate a command from a validation/guard check WITHOUT `process.exit()`
+ * (which aborts Node on Windows when called after a completed fetch — libuv
+ * UV_HANDLE_CLOSING assert, exit 127). Throws a {@link CliError} carrying the
+ * exit code: inside an action try-block the tail `exitWithError` catch turns
+ * it into the stderr envelope + mapped exitCode; thrown outside any try it
+ * propagates through Commander's parseAsync to the CliError-aware bin catch —
+ * same envelope, same code, either way. Replaces every
+ * `writeError(...); process.exit(N)` guard pair.
+ */
+export function failWith(message, exitCode) {
+    throw new CliError(message, 0, null, exitCode);
+}
+/** Message extraction for failWith when re-raising a caught unknown. */
+export function errorMessage(err) {
+    return err instanceof Error ? err.message : String(err);
+}
 //# sourceMappingURL=json.js.map

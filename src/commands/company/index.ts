@@ -6,7 +6,7 @@ import {
   performSwitch,
   assertPersistedSwitchAllowed,
 } from "../../auth/switch.js";
-import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { writeJson, exitWithError, failWith } from "../../output/json.js";
 
 interface AvailableCompany {
   asiakasId: number;
@@ -126,8 +126,7 @@ export function registerCompanyCommands(
         const store = createStore(defaultCredentialsPath());
         const creds = await store.load();
         if (!creds) {
-          writeError(new Error("Not logged in. Run `ib auth login` first."));
-          process.exit(2);
+          failWith("Not logged in. Run `ib auth login` first.", 2);
         }
         const next = await performSwitch({
           endpoint: creds.endpoint,

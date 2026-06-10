@@ -1,5 +1,5 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
-import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 /** Charset the backend sanitizer (helps.get / helps.update) accepts for a helpId. */
 const HELP_ID_RE = /^[A-Za-z0-9_-]+$/;
@@ -97,8 +97,7 @@ export function registerOhjeCommands(parent, getClient) {
         .description("Get one UI help entry by helpId (GET /api/helps/get/:helpId)")
         .action(async (helpId) => {
         if (!HELP_ID_RE.test(helpId)) {
-            writeError(new Error(`Invalid helpId "${helpId}" — only [A-Za-z0-9_-] are allowed`));
-            process.exit(4);
+            failWith(`Invalid helpId "${helpId}" — only [A-Za-z0-9_-] are allowed`, 4);
         }
         try {
             const client = await getClient();
@@ -136,14 +135,12 @@ export function registerOhjeCommands(parent, getClient) {
         .option("--img <s>", "Image reference (img)");
     addWriteFlagsToCommand(updateCmd).action(async (helpId, opts) => {
         if (!HELP_ID_RE.test(helpId)) {
-            writeError(new Error(`Invalid helpId "${helpId}" — only [A-Za-z0-9_-] are allowed`));
-            process.exit(4);
+            failWith(`Invalid helpId "${helpId}" — only [A-Za-z0-9_-] are allowed`, 4);
         }
         // --reason is required for an actual write; a --dry-run preview is
         // read-only, so it does not need a justification.
         if (!opts.dryRun && !opts.reason) {
-            writeError(new Error("Missing required flag: --reason"));
-            process.exit(4);
+            failWith("Missing required flag: --reason", 4);
         }
         try {
             const client = await getClient();

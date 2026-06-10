@@ -9,7 +9,12 @@ import {
   assertPersistedSwitchAllowed,
 } from "../../auth/switch.js";
 import { refreshToken } from "../../auth/refresh.js";
-import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import {
+  writeJson,
+  writeError,
+  exitWithError,
+  failWith,
+} from "../../output/json.js";
 
 /**
  * Register `ib auth` subcommands on the parent commander instance:
@@ -84,13 +89,11 @@ export function registerAuthCommands(
       try {
         const creds = await createStore(defaultCredentialsPath()).load();
         if (!creds) {
-          writeError(new Error("Not logged in. Run `ib auth login` first."));
-          process.exit(2);
+          failWith("Not logged in. Run `ib auth login` first.", 2);
         }
         writeJson(renderWhoami(creds));
       } catch (e) {
-        writeError(e);
-        process.exit(1);
+        exitWithError(e);
       }
     });
 
@@ -104,8 +107,7 @@ export function registerAuthCommands(
         const store = createStore(defaultCredentialsPath());
         const creds = await store.load();
         if (!creds) {
-          writeError(new Error("Not logged in. Run `ib auth login` first."));
-          process.exit(2);
+          failWith("Not logged in. Run `ib auth login` first.", 2);
         }
         const next = await performSwitch({
           endpoint: creds.endpoint,
@@ -138,8 +140,7 @@ export function registerAuthCommands(
         const store = createStore(defaultCredentialsPath());
         const creds = await store.load();
         if (!creds) {
-          writeError(new Error("Not logged in. Run `ib auth login` first."));
-          process.exit(2);
+          failWith("Not logged in. Run `ib auth login` first.", 2);
         }
         const fresh = await refreshToken({
           endpoint: creds.endpoint,

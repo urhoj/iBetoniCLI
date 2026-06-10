@@ -6,7 +6,12 @@ import {
   addWriteFlagsToCommand,
   type WriteFlags,
 } from "../../api/writeFlags.js";
-import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import {
+  writeJson,
+  exitWithError,
+  failWith,
+  errorMessage,
+} from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { roleNameForTypeId, resolveRoleTypeId } from "../../roles.js";
 import { runCompanyList } from "../company/index.js";
@@ -471,21 +476,18 @@ export function registerPersonCommands(
   addWriteFlagsToCommand(createCmd).action(
     async (opts: WriteFlags & PersonCreateFlags & { getOrCreate?: boolean; body?: string }) => {
       if (!opts.reason) {
-        writeError(new Error("Missing required flag: --reason"));
-        process.exit(4);
+        failWith("Missing required flag: --reason", 4);
       }
       // --global and --asiakas are mutually exclusive owner directives.
       if (opts.global && opts.asiakas !== undefined) {
-        writeError(new Error("--global and --asiakas are mutually exclusive"));
-        process.exit(4);
+        failWith("--global and --asiakas are mutually exclusive", 4);
       }
       let parsed: Record<string, unknown> = {};
       if (opts.body) {
         try {
           parsed = JSON.parse(opts.body);
         } catch {
-          writeError(new Error("--body must be valid JSON"));
-          process.exit(4);
+          failWith("--body must be valid JSON", 4);
         }
       }
       const body = buildPersonCreateBody(parsed, {
@@ -498,8 +500,7 @@ export function registerPersonCommands(
       });
       const missing = missingPersonCreateFields(body);
       if (missing.length > 0) {
-        writeError(new Error(`create requires: ${missing.join(", ")}`));
-        process.exit(4);
+        failWith(`create requires: ${missing.join(", ")}`, 4);
       }
       try {
         const client = await getClient();
@@ -551,15 +552,13 @@ export function registerPersonCommands(
       .requiredOption("--body <json>", "Patch body (JSON)")
   ).action(async (personIdStr: string, opts: WriteFlags & { body: string }) => {
     if (!opts.reason) {
-      writeError(new Error("Missing required flag: --reason"));
-      process.exit(4);
+      failWith("Missing required flag: --reason", 4);
     }
     let patch: Record<string, unknown>;
     try {
       patch = JSON.parse(opts.body);
     } catch {
-      writeError(new Error("--body must be valid JSON"));
-      process.exit(4);
+      failWith("--body must be valid JSON", 4);
     }
     try {
       const client = await getClient();
@@ -584,14 +583,12 @@ export function registerPersonCommands(
       .option("--asiakas <id>", "Set owner to this asiakasId", Number)
   ).action(async (personIdStr: string, opts: WriteFlags & { global?: boolean; asiakas?: number }) => {
     if (!opts.reason) {
-      writeError(new Error("Missing required flag: --reason"));
-      process.exit(4);
+      failWith("Missing required flag: --reason", 4);
     }
     const hasGlobal = !!opts.global;
     const hasAsiakas = opts.asiakas !== undefined;
     if (hasGlobal === hasAsiakas) {
-      writeError(new Error("provide exactly one of --global or --asiakas <id>"));
-      process.exit(4);
+      failWith("provide exactly one of --global or --asiakas <id>", 4);
     }
     const ownerAsiakasId = hasGlobal ? null : (opts.asiakas as number);
     try {
@@ -609,8 +606,7 @@ export function registerPersonCommands(
       .description("Delete a person. Requires --reason.")
   ).action(async (personIdStr: string, opts: WriteFlags) => {
     if (!opts.reason) {
-      writeError(new Error("Missing required flag: --reason"));
-      process.exit(4);
+      failWith("Missing required flag: --reason", 4);
     }
     try {
       const client = await getClient();
@@ -648,22 +644,19 @@ export function registerPersonCommands(
       .requiredOption("--asiakas <id>", "Target asiakasId", (v: string) => Number(v))
   ).action(async (personIdStr: string, opts: WriteFlags & { role: string; asiakas: number }) => {
     if (!opts.reason) {
-      writeError(new Error("Missing required flag: --reason"));
-      process.exit(4);
+      failWith("Missing required flag: --reason", 4);
     }
     let roleTypeId: number;
     try {
       roleTypeId = resolveRoleTypeId(opts.role);
     } catch (validationErr) {
-      writeError(validationErr);
-      process.exit(4);
+      failWith(errorMessage(validationErr), 4);
     }
     // resolveRoleTypeId returns 0 for an empty/unset name; --role is required and
     // must name a real role, so reject the empty-string case rather than POST a
     // bogus roleTypeId 0 to the backend.
     if (!roleTypeId) {
-      writeError(new Error("--role must not be empty"));
-      process.exit(4);
+      failWith("--role must not be empty", 4);
     }
     try {
       const client = await getClient();
@@ -682,22 +675,19 @@ export function registerPersonCommands(
       .requiredOption("--asiakas <id>", "Target asiakasId", (v: string) => Number(v))
   ).action(async (personIdStr: string, opts: WriteFlags & { role: string; asiakas: number }) => {
     if (!opts.reason) {
-      writeError(new Error("Missing required flag: --reason"));
-      process.exit(4);
+      failWith("Missing required flag: --reason", 4);
     }
     let roleTypeId: number;
     try {
       roleTypeId = resolveRoleTypeId(opts.role);
     } catch (validationErr) {
-      writeError(validationErr);
-      process.exit(4);
+      failWith(errorMessage(validationErr), 4);
     }
     // resolveRoleTypeId returns 0 for an empty/unset name; --role is required and
     // must name a real role, so reject the empty-string case rather than POST a
     // bogus roleTypeId 0 to the backend.
     if (!roleTypeId) {
-      writeError(new Error("--role must not be empty"));
-      process.exit(4);
+      failWith("--role must not be empty", 4);
     }
     try {
       const client = await getClient();

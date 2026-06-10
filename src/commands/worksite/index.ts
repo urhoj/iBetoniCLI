@@ -6,7 +6,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 
@@ -561,8 +561,7 @@ export function registerWorksiteCommands(
       .description("Delete a worksite (tyomaa). Requires --reason.")
   ).action(async (tyomaaIdStr: string, opts: WriteFlags) => {
     if (!opts.reason) {
-      writeError(new Error("Missing required flag: --reason"));
-      process.exit(4);
+      failWith("Missing required flag: --reason", 4);
     }
     try {
       const client = await getClient();
@@ -591,8 +590,7 @@ export function registerWorksiteCommands(
       .requiredOption("--radius <m>", "Geofence radius in metres", Number)
   ).action(async (idStr: string, opts: WriteFlags & { radius: number }) => {
     if (!Number.isInteger(opts.radius) || opts.radius < 1 || opts.radius > 10000) {
-      writeError(new Error("--radius must be an integer between 1 and 10000"));
-      process.exit(4);
+      failWith("--radius must be an integer between 1 and 10000", 4);
     }
     try {
       const client = await getClient();
@@ -627,8 +625,7 @@ export function registerWorksiteCommands(
       .option("--contact-type <id>", "contactPersonTypeId (default 1)", Number, 1)
   ).action(async (opts: WriteFlags & { worksite: number; person: number; contactType: number }) => {
     if (!opts.reason) {
-      writeError(new Error("Missing required flag: --reason"));
-      process.exit(4);
+      failWith("Missing required flag: --reason", 4);
     }
     try {
       const client = await getClient();
@@ -652,8 +649,7 @@ export function registerWorksiteCommands(
       .option("--contact-type <id>", "contactPersonTypeId (default 1)", Number, 1)
   ).action(async (opts: WriteFlags & { worksite: number; person: number; contactType: number }) => {
     if (!opts.reason) {
-      writeError(new Error("Missing required flag: --reason"));
-      process.exit(4);
+      failWith("Missing required flag: --reason", 4);
     }
     try {
       const client = await getClient();

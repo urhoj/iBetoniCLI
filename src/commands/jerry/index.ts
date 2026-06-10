@@ -6,7 +6,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 
 type Row = Record<string, unknown>;
@@ -301,8 +301,7 @@ type WriteOpts = WriteFlags;
 /** Enforce a required --reason at the CLI layer (exit 4), matching the lifecycle commands. */
 function requireReason(opts: WriteOpts): void {
   if (!opts.reason) {
-    writeError(new Error("Missing required flag: --reason"));
-    process.exit(4);
+    failWith("Missing required flag: --reason", 4);
   }
 }
 
@@ -407,8 +406,7 @@ export function registerJerryCommands(
       requireReason(opts);
       const priceCents = Number(opts.priceCents);
       if (!Number.isInteger(priceCents) || priceCents < 1 || priceCents > 99_999_900) {
-        writeError(new Error("--price-cents must be an integer in 1..99999900"));
-        process.exit(4);
+        failWith("--price-cents must be an integer in 1..99999900", 4);
       }
       const body: JerryOfferCreateBody = { priceCents };
       if (opts.vatPercent !== undefined) body.vatPercent = opts.vatPercent;

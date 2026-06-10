@@ -1,5 +1,11 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { writeJson, writeError, exitWithError } from "../../src/output/json";
+import {
+  writeJson,
+  writeError,
+  exitWithError,
+  failWith,
+  errorMessage,
+} from "../../src/output/json";
 import { CliError } from "../../src/api/errors";
 
 describe("JSON output", () => {
@@ -76,5 +82,24 @@ describe("JSON output", () => {
     exitWithError(new Error("plain"));
     expect(process.exitCode).toBe(1);
     process.exitCode = prev;
+  });
+
+  // failWith replaces every `writeError(...); process.exit(N)` guard pair —
+  // it must THROW a CliError carrying the code (never call process.exit).
+  test("failWith throws a CliError with the given message and exit code", () => {
+    let err: unknown;
+    try {
+      failWith("Missing required flag: --reason", 4);
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(CliError);
+    expect((err as CliError).exitCode).toBe(4);
+    expect((err as CliError).message).toBe("Missing required flag: --reason");
+  });
+
+  test("errorMessage extracts Error messages and stringifies the rest", () => {
+    expect(errorMessage(new Error("boom"))).toBe("boom");
+    expect(errorMessage("plain string")).toBe("plain string");
   });
 });

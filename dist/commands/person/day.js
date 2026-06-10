@@ -1,4 +1,4 @@
-import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { resolveDate } from "../../dates.js";
 import { CliError } from "../../api/errors.js";
@@ -183,8 +183,7 @@ export function registerPersonDayCommands(person, getClient) {
         .option("--text <s>", "Free-text note on the day row");
     addWriteFlagsToCommand(setCmd).action(async (opts) => {
         if (!opts.reason) {
-            writeError(new Error("Missing required flag: --reason"));
-            process.exit(4);
+            failWith("Missing required flag: --reason", 4);
         }
         try {
             const result = await runPersonDaySet(await getClient(), opts.person, opts.date, opts.status, {
@@ -206,8 +205,7 @@ export function registerPersonDayCommands(person, getClient) {
         .requiredOption("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)");
     addWriteFlagsToCommand(clearCmd).action(async (opts) => {
         if (!opts.reason) {
-            writeError(new Error("Missing required flag: --reason"));
-            process.exit(4);
+            failWith("Missing required flag: --reason", 4);
         }
         try {
             const result = await runPersonDayClear(await getClient(), opts.person, opts.date, {

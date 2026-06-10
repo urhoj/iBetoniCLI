@@ -6,7 +6,12 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import {
+  writeJson,
+  exitWithError,
+  failWith,
+  errorMessage,
+} from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 
@@ -566,23 +571,20 @@ export function registerSijaintiCommands(
         // clear message instead of a NOT NULL 500 that --dry-run used to miss).
         const { missing } = applySijaintiCreateDefaults(body);
         if (missing.length > 0) {
-          writeError(new Error(`create requires: ${missing.join(", ")}`));
-          process.exit(4);
+          failWith(`create requires: ${missing.join(", ")}`, 4);
         }
         // --geocode: eagerly resolve lat/lng from the address (otherwise the row
         // is created without coordinates and a nightly job backfills them later).
         if (opts.geocode && (body.lat === undefined || body.lat === null || body.lng === undefined || body.lng === null)) {
           const address = typeof body.sijaintiOsoite1 === "string" ? body.sijaintiOsoite1 : "";
           if (!address) {
-            writeError(new Error("--geocode requires --address (or sijaintiOsoite1 in --body)"));
-            process.exit(4);
+            failWith("--geocode requires --address (or sijaintiOsoite1 in --body)", 4);
           }
           const geo = await runSijaintiGeocode(client, address);
           const coords = extractGeocodeLatLng(geo);
           if (!coords) {
             const status = (geo as { status?: string } | null)?.status ?? "no match";
-            writeError(new Error(`could not geocode address "${address}" (status: ${status})`));
-            process.exit(4);
+            failWith(`could not geocode address "${address}" (status: ${status})`, 4);
           }
           body.lat = coords.lat;
           body.lng = coords.lng;
@@ -644,10 +646,7 @@ export function registerSijaintiCommands(
           maxDeliveryDistance: opts.maxDistance,
         });
         if (body.sijaintiId === undefined) {
-          writeError(
-            new Error("update requires sijaintiId — pass --id or include it in --body")
-          );
-          process.exit(4);
+          failWith("update requires sijaintiId — pass --id or include it in --body", 4);
         }
         const result = await runSijaintiUpdate(client, body, {
           dryRun: opts.dryRun,
@@ -687,12 +686,10 @@ export function registerSijaintiCommands(
     ) => {
       if (opts.on === opts.off) {
         // neither or both given — ambiguous
-        writeError(new Error("Pass exactly one of --on / --off"));
-        process.exit(4);
+        failWith("Pass exactly one of --on / --off", 4);
       }
       if (opts.radius !== undefined && (!Number.isFinite(opts.radius) || opts.radius <= 0)) {
-        writeError(new Error("--radius must be a positive number of km"));
-        process.exit(4);
+        failWith("--radius must be a positive number of km", 4);
       }
       try {
         const client = await getClient();
@@ -722,8 +719,7 @@ export function registerSijaintiCommands(
       )
   ).action(async (idStr: string, opts: WriteFlags) => {
     if (!opts.reason) {
-      writeError(new Error("Missing required flag: --reason"));
-      process.exit(4);
+      failWith("Missing required flag: --reason", 4);
     }
     try {
       const client = await getClient();
@@ -742,8 +738,7 @@ export function registerSijaintiCommands(
       )
   ).action(async (idStr: string, opts: WriteFlags) => {
     if (!opts.reason) {
-      writeError(new Error("Missing required flag: --reason"));
-      process.exit(4);
+      failWith("Missing required flag: --reason", 4);
     }
     try {
       const client = await getClient();
@@ -824,8 +819,7 @@ export function registerSijaintiCommands(
           (e.message.startsWith("invalid point") ||
             e.message.includes("has no coordinates"))
         ) {
-          writeError(e);
-          process.exit(4);
+          failWith(errorMessage(e), 4);
         }
         exitWithError(e);
       }

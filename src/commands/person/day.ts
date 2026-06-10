@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
-import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { resolveDate } from "../../dates.js";
 import { CliError } from "../../api/errors.js";
@@ -240,8 +240,7 @@ export function registerPersonDayCommands(
   addWriteFlagsToCommand(setCmd).action(
     async (opts: WriteFlags & { person: number; date: string; status: string; text?: string }) => {
       if (!opts.reason) {
-        writeError(new Error("Missing required flag: --reason"));
-        process.exit(4);
+        failWith("Missing required flag: --reason", 4);
       }
       try {
         const result = await runPersonDaySet(await getClient(), opts.person, opts.date, opts.status, {
@@ -265,8 +264,7 @@ export function registerPersonDayCommands(
   addWriteFlagsToCommand(clearCmd).action(
     async (opts: WriteFlags & { person: number; date: string }) => {
       if (!opts.reason) {
-        writeError(new Error("Missing required flag: --reason"));
-        process.exit(4);
+        failWith("Missing required flag: --reason", 4);
       }
       try {
         const result = await runPersonDayClear(await getClient(), opts.person, opts.date, {

@@ -1,4 +1,4 @@
-import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 /** YYYY-MM-DD (or today/yesterday/tomorrow) → integer yyyymmdd. */
@@ -108,8 +108,7 @@ export function registerDriverCommands(parent, getClient) {
         .option("--date <d>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today");
     addWriteFlagsToCommand(assignCmd).action(async (opts) => {
         if (!opts.reason) {
-            writeError(new Error("Missing required flag: --reason"));
-            process.exit(4);
+            failWith("Missing required flag: --reason", 4);
         }
         try {
             const result = await runDriverAssign(await getClient(), opts.vehicle, opts.person, opts.date, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason });
@@ -126,8 +125,7 @@ export function registerDriverCommands(parent, getClient) {
         .option("--date <d>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today");
     addWriteFlagsToCommand(clearCmd).action(async (opts) => {
         if (!opts.reason) {
-            writeError(new Error("Missing required flag: --reason"));
-            process.exit(4);
+            failWith("Missing required flag: --reason", 4);
         }
         try {
             const result = await runDriverClear(await getClient(), opts.vehicle, opts.date, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason });

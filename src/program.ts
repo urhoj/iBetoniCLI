@@ -38,7 +38,7 @@ import { buildCommandsList } from "./reference/commandsList.js";
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
-import { writeJson, exitWithError } from "./output/json.js";
+import { writeJson, exitWithError, failWith } from "./output/json.js";
 
 /**
  * Construct the `ib` program with all subcommands registered and rich
@@ -67,8 +67,9 @@ export function buildProgram(): Command {
       global,
     });
     if (!ctx.client) {
-      process.stderr.write("Not logged in. Run `ib auth login` first.\n");
-      process.exit(2);
+      // throw (not process.exit) — safe post-fetch on Windows; lands in the
+      // action's exitWithError catch (or the bin catch) as envelope + exit 2.
+      failWith("Not logged in. Run `ib auth login` first.", 2);
     }
     return ctx.client;
   }

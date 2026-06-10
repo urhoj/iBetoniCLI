@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
-import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { writeJson, exitWithError, failWith, errorMessage, } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveRoleTypeId } from "../../roles.js";
 import { runPersonRoleList } from "../person/index.js";
@@ -694,8 +694,7 @@ export function registerCustomerCommands(parent, getClient) {
                 changes = parseModuleChanges(opts.set, opts.unset);
             }
             catch (validationErr) {
-                writeError(validationErr);
-                process.exit(4);
+                failWith(errorMessage(validationErr), 4);
             }
             const result = await runCustomerModulesApply(client, asiakasId, changes, {
                 dryRun: opts.dryRun,
@@ -718,8 +717,7 @@ export function registerCustomerCommands(parent, getClient) {
             const client = await getClient();
             const asiakasId = Number(idStr);
             if (opts.set && opts.reset) {
-                writeError(new Error("--set and --reset are mutually exclusive"));
-                process.exit(4);
+                failWith("--set and --reset are mutually exclusive", 4);
             }
             if (opts.set || opts.reset) {
                 const changes = operatorPresetChanges(!!opts.set);
@@ -759,8 +757,7 @@ export function registerCustomerCommands(parent, getClient) {
                 changes = parseSettingChanges(opts.set, opts.unset);
             }
             catch (validationErr) {
-                writeError(validationErr);
-                process.exit(4);
+                failWith(errorMessage(validationErr), 4);
             }
             writeJson(await runCustomerSettingsApply(client, asiakasId, changes, {
                 dryRun: opts.dryRun,
@@ -798,8 +795,7 @@ export function registerCustomerCommands(parent, getClient) {
                 return;
             }
             if (!ytunnus) {
-                writeError(new Error("provide a business-ID positional or --search <name>"));
-                process.exit(4);
+                failWith("provide a business-ID positional or --search <name>", 4);
             }
             writeJson(await runCustomerPrhById(client, ytunnus));
         }
@@ -841,18 +837,16 @@ export function registerCustomerCommands(parent, getClient) {
                 : undefined;
             const body = buildAsiakasCreateBody(opts, ownerAsiakasId, prh);
             if (body.yTunnus === undefined || body.yTunnus === null || body.yTunnus === "") {
-                writeError(new Error("create requires --ytunnus (or --from-prh / --body with yTunnus)"));
-                process.exit(4);
+                failWith("create requires --ytunnus (or --from-prh / --body with yTunnus)", 4);
             }
             // --get-or-create: an existing yTunnus isn't a duplicate to recreate —
             // return it (so onboarding is idempotent). >1 match is ambiguous.
             if (opts.getOrCreate) {
                 const existing = await runCustomerByYtunnus(client, String(body.yTunnus));
                 if (existing.length > 1) {
-                    writeError(new Error(`ambiguous: ${existing.length} customers share ytunnus ${body.yTunnus} (ids: ${existing
+                    failWith(`ambiguous: ${existing.length} customers share ytunnus ${body.yTunnus} (ids: ${existing
                         .map((m) => m.asiakasId)
-                        .join(", ")}). Use \`ib customer get <id>\`.`));
-                    process.exit(4);
+                        .join(", ")}). Use \`ib customer get <id>\`.`, 4);
                 }
                 if (existing.length === 1) {
                     writeJson({ ...existing[0], reused: true });
@@ -942,8 +936,7 @@ export function registerCustomerCommands(parent, getClient) {
             // errors keep their contract-mapped codes via exitWithError.
             if (e instanceof Error &&
                 (e.message.startsWith("ambiguous:") || e.message.startsWith("create-or-update requires"))) {
-                writeError(e);
-                process.exit(4);
+                failWith(errorMessage(e), 4);
             }
             exitWithError(e);
         }
@@ -952,8 +945,7 @@ export function registerCustomerCommands(parent, getClient) {
         .command("delete <asiakasId>")
         .description("Delete a customer (asiakas). Requires --reason.")).action(async (asiakasIdStr, opts) => {
         if (!opts.reason) {
-            writeError(new Error("Missing required flag: --reason"));
-            process.exit(4);
+            failWith("Missing required flag: --reason", 4);
         }
         try {
             const client = await getClient();
@@ -977,8 +969,7 @@ export function registerCustomerCommands(parent, getClient) {
         .requiredOption("--person <id>", "Target personId", Number)
         .option("--contact-type <id>", "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)", Number, 1)).action(async (opts) => {
         if (!opts.reason) {
-            writeError(new Error("Missing required flag: --reason"));
-            process.exit(4);
+            failWith("Missing required flag: --reason", 4);
         }
         try {
             const client = await getClient();
@@ -996,8 +987,7 @@ export function registerCustomerCommands(parent, getClient) {
         .requiredOption("--person <id>", "Target personId", Number)
         .option("--contact-type <id>", "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)", Number, 1)).action(async (opts) => {
         if (!opts.reason) {
-            writeError(new Error("Missing required flag: --reason"));
-            process.exit(4);
+            failWith("Missing required flag: --reason", 4);
         }
         try {
             const client = await getClient();

@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
-import { writeJson, writeError, exitWithError } from "../../output/json.js";
+import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import {
   type WriteFlags,
@@ -165,8 +165,7 @@ export function registerDriverCommands(
   addWriteFlagsToCommand(assignCmd).action(
     async (opts: WriteFlags & { vehicle: number; person: number; date: string }) => {
       if (!opts.reason) {
-        writeError(new Error("Missing required flag: --reason"));
-        process.exit(4);
+        failWith("Missing required flag: --reason", 4);
       }
       try {
         const result = await runDriverAssign(
@@ -191,8 +190,7 @@ export function registerDriverCommands(
   addWriteFlagsToCommand(clearCmd).action(
     async (opts: WriteFlags & { vehicle: number; date: string }) => {
       if (!opts.reason) {
-        writeError(new Error("Missing required flag: --reason"));
-        process.exit(4);
+        failWith("Missing required flag: --reason", 4);
       }
       try {
         const result = await runDriverClear(
