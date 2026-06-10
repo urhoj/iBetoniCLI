@@ -214,6 +214,8 @@ export function createApiClient({
       request<T>("POST", path, body, opts),
     put: <T = unknown>(path: string, body: unknown, opts?: FetchOptions) =>
       request<T>("PUT", path, body, opts),
+    patch: <T = unknown>(path: string, body: unknown, opts?: FetchOptions) =>
+      request<T>("PATCH", path, body, opts),
     delete: <T = unknown>(path: string, opts?: FetchOptions) =>
       request<T>("DELETE", path, undefined, opts),
     getCurrentToken: () => currentToken,

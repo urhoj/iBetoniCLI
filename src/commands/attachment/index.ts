@@ -258,6 +258,64 @@ export async function runAttachmentDownload(
   };
 }
 
+/** POST /api/cli/attachment/attach — set ONE entity FK (others untouched). */
+export async function runAttachmentAttach(
+  client: ApiClient,
+  attachmentId: number,
+  opts: Record<string, unknown>,
+  flags: WriteFlags
+): Promise<unknown> {
+  const target = resolveEntityTarget(opts);
+  return client.post(
+    "/api/cli/attachment/attach",
+    { attachmentId, entity: target.entity, entityId: target.entityId },
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/** POST /api/cli/attachment/detach — clear ONE entity FK. */
+export async function runAttachmentDetach(
+  client: ApiClient,
+  attachmentId: number,
+  entityWord: string,
+  flags: WriteFlags
+): Promise<unknown> {
+  const entity = normalizeEntityWord(entityWord);
+  return client.post(
+    "/api/cli/attachment/detach",
+    { attachmentId, entity },
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/** PATCH /api/cli/attachment/:id — server read-merges; send only provided fields. */
+export async function runAttachmentUpdate(
+  client: ApiClient,
+  attachmentId: number,
+  fields: { fileComment?: string; liitaLaskuun?: number; attachmentGroupId?: number; attachmentTypeId?: number },
+  flags: WriteFlags
+): Promise<unknown> {
+  const body: Record<string, unknown> = {};
+  if (fields.fileComment !== undefined) body.fileComment = fields.fileComment;
+  if (fields.liitaLaskuun !== undefined) body.liitaLaskuun = fields.liitaLaskuun;
+  if (fields.attachmentGroupId !== undefined) body.attachmentGroupId = fields.attachmentGroupId;
+  if (fields.attachmentTypeId !== undefined) body.attachmentTypeId = fields.attachmentTypeId;
+  return client.patch(`/api/cli/attachment/${attachmentId}`, body, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/** DELETE /api/cli/attachment/:id — --reason REQUIRED; blob hard-delete is irreversible. */
+export async function runAttachmentDelete(
+  client: ApiClient,
+  attachmentId: number,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.delete(`/api/cli/attachment/${attachmentId}`, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
 // ── Registration ─────────────────────────────────────────────────────────────
 
 export function registerAttachmentCommands(
@@ -413,6 +471,77 @@ export function registerAttachmentCommands(
     }
   });
 
-  // attach / detach / update / delete are appended by Task 9 inside this same register function.
+  const attachCmd = a
+    .command("attach <attachmentId>")
+    .description("Link an existing attachment to ONE entity (sets that FK; others untouched)");
+  addEntityFlags(attachCmd);
+  addWriteFlagsToCommand(attachCmd).action(
+    async (id: string, opts: WriteFlags & Record<string, unknown>) => {
+      try {
+        writeJson(await runAttachmentAttach(await getClient(), Number(id), opts, {
+          dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
+        }));
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
+
+  const detachCmd = a
+    .command("detach <attachmentId> <entity>")
+    .description("Unlink an attachment from one entity (keikka|vehicle|person|customer|worksite|sijainti|tuote|bug-report|request|offer). Requires a manager role on the owner company.");
+  addWriteFlagsToCommand(detachCmd).action(
+    async (id: string, entity: string, opts: WriteFlags) => {
+      try {
+        writeJson(await runAttachmentDetach(await getClient(), Number(id), entity, {
+          dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
+        }));
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
+
+  const updateCmd = a
+    .command("update <attachmentId>")
+    .description("Update comment / group / type / invoice-flag (server read-merges unchanged fields)")
+    .option("--comment <text>", "New fileComment")
+    .option("--liita-laskuun <0|1>", "Invoice-attachment flag (lasku/asiakas admin only)", (s: string) => Number(s))
+    .option("--group <g>", "Attachment group (name or id — see `ib attachment types`)")
+    .option("--type <t>", "Attachment type (name or id — see `ib attachment types`)");
+  addWriteFlagsToCommand(updateCmd).action(
+    async (id: string, opts: WriteFlags & Record<string, unknown>) => {
+      try {
+        const client = await getClient();
+        const { groupId, typeId } = await resolveGroupAndType(client, {
+          group: opts.group as string | undefined,
+          type: opts.type as string | undefined,
+        });
+        writeJson(await runAttachmentUpdate(client, Number(id), {
+          fileComment: opts.comment as string | undefined,
+          liitaLaskuun: opts.liitaLaskuun as number | undefined,
+          attachmentGroupId: groupId, attachmentTypeId: typeId,
+        }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
+
+  const deleteCmd = a
+    .command("delete <attachmentId>")
+    .description("Soft-delete the row AND hard-delete the Azure blob (IRREVERSIBLE). Requires --reason.");
+  addWriteFlagsToCommand(deleteCmd).action(async (id: string, opts: WriteFlags) => {
+    if (!opts.reason) {
+      failWith("Missing required flag: --reason (blob deletion is irreversible)", 4);
+    }
+    try {
+      writeJson(await runAttachmentDelete(await getClient(), Number(id), {
+        dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
+      }));
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
 }
 

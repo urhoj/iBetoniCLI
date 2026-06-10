@@ -14,6 +14,10 @@ import {
   runAttachmentRegister,
   runAttachmentUpload,
   runAttachmentDownload,
+  runAttachmentAttach,
+  runAttachmentDetach,
+  runAttachmentUpdate,
+  runAttachmentDelete,
 } from "../../src/commands/attachment/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -22,6 +26,7 @@ const c = {
   get: vi.fn(),
   post: vi.fn(),
   put: vi.fn(),
+  patch: vi.fn(),
   delete: vi.fn(),
   getCurrentToken: vi.fn(),
 } as unknown as ApiClient;
@@ -232,5 +237,48 @@ describe("ib attachment upload/download", () => {
     } finally {
       process.chdir(prevCwd);
     }
+  });
+});
+
+describe("ib attachment link/write commands", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  test("attach posts {attachmentId, entity, entityId} with flags", async () => {
+    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });
+    await runAttachmentAttach(c, 4711, { vehicle: 53 }, { reason: "link" });
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/cli/attachment/attach",
+      { attachmentId: 4711, entity: "vehicle", entityId: 53 },
+      { headers: { "X-Action-Reason": "link" } }
+    );
+  });
+
+  test("detach posts {attachmentId, entity}", async () => {
+    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });
+    await runAttachmentDetach(c, 4711, "bug-report", {});
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/cli/attachment/detach",
+      { attachmentId: 4711, entity: "bugReport" },
+      { headers: {} }
+    );
+  });
+
+  test("update PATCHes only provided fields", async () => {
+    (c.patch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });
+    await runAttachmentUpdate(c, 4711, { fileComment: "x", liitaLaskuun: 1, attachmentGroupId: 2 }, { dryRun: true });
+    expect(c.patch).toHaveBeenCalledWith(
+      "/api/cli/attachment/4711",
+      { fileComment: "x", liitaLaskuun: 1, attachmentGroupId: 2 },
+      { headers: { "X-Dry-Run": "1" } }
+    );
+  });
+
+  test("delete sends DELETE with reason header", async () => {
+    (c.delete as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });
+    await runAttachmentDelete(c, 4711, { reason: "duplicate" });
+    expect(c.delete).toHaveBeenCalledWith(
+      "/api/cli/attachment/4711",
+      { headers: { "X-Action-Reason": "duplicate" } }
+    );
   });
 });
