@@ -3034,6 +3034,142 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ];
   })(),
 
+  // ─── changes (6) ─────────────────────────────────────────────────────────
+  {
+    command: "ib changes entity",
+    description:
+      "Change-tracker audit trail for ONE entity of any type — who changed which field, when, old→new, and the --reason recorded by writes. GET /api/changes/:entityType/:entityId/:ownerAsiakasId; owner defaults to the active company. entityType is validated client-side against the offline catalog (`ib changes types`); 'keikka' folds in the keikka's keikkaBetoni rows; deprecated 'kuski' is accepted with a stderr note. --field filters client-side.",
+    auth: "any",
+    args: [
+      { name: "entityType", type: "string", description: "One of `ib changes types` (e.g. keikka, vehicle, pumppuRequest)" },
+      { name: "entityId", type: "number", description: "The entity's id (see entityIdMeaning in `ib changes types`)" },
+    ],
+    flags: [
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+      { name: "field", type: "string", description: "Filter by changeTracker fieldName (client-side)" },
+    ],
+    outputShape:
+      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>",
+    errors: [
+      apiErr(401, "Token expired", "ib auth refresh"),
+      apiErr(403, "Not a member of that company — or entityType personAvailability without an admin role", "ib company switch to that owner, or use an admin token"),
+      { exit: 4, meaning: "Unknown entityType (client-side validation)", remedy: "ib changes types" },
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    notes: [
+      "personAvailability is admin-gated server-side; every other type needs company membership only.",
+      "Equivalent shortcuts: ib keikka|vehicle|worksite|person|customer history.",
+    ],
+    seeAlso: ["ib changes types", "ib keikka history", "ib changes latest"],
+    examples: [
+      "ib changes entity keikka 12345",
+      "ib changes entity vehicle 53 --field kuskit",
+      "ib changes entity pumppuRequest 17 --owner 1349",
+    ],
+  },
+  {
+    command: "ib changes latest",
+    description:
+      "Newest changes across the whole active company, optionally one entityType — admin view for 'what just happened'. GET /api/changes/latest/:ownerAsiakasId. NOTE: reason/impersonator columns appear only after the 2026-06 aggregate-procs backend deploy; until then they are null.",
+    permissions: ["isAnyAdmin (asiakasAdmin/laskuAdmin/system admin)"],
+    flags: [
+      { name: "entity-type", type: "string", description: "Filter to one entityType" },
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "limit", type: "number", default: "100", description: "Max rows (server cap 500)" },
+    ],
+    outputShape:
+      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>",
+    errors: [
+      apiErr(401, "Token expired", "ib auth refresh"),
+      apiErr(403, "Not an admin in the owner company", "use an admin token, or per-entity `ib changes entity`"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    examples: ["ib changes latest", "ib changes latest --entity-type keikka --limit 50"],
+  },
+  {
+    command: "ib changes range",
+    description:
+      "All changes MADE within a time window (by change timestamp), optional entityType/person filters — admin forensic view. GET /api/changes/range/:ownerAsiakasId. The backend has no row cap; --limit slices client-side (truncated:true when cut).",
+    permissions: ["isAnyAdmin (asiakasAdmin/laskuAdmin/system admin)"],
+    flags: [
+      { name: "from", type: "date", description: "Window start, YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)", required: true },
+      { name: "to", type: "date", description: "Window end, YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)", required: true },
+      { name: "entity-type", type: "string", description: "Filter to one entityType" },
+      { name: "person", type: "number", description: "Filter to one actor personId" },
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "limit", type: "number", default: "200", description: "Max rows kept client-side (cap 2000)" },
+    ],
+    outputShape:
+      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }> (+truncated when --limit cut rows)",
+    errors: [
+      apiErr(401, "Token expired", "ib auth refresh"),
+      apiErr(403, "Not an admin in the owner company", "use an admin token"),
+      { exit: 4, meaning: "Invalid --from/--to (client-side)", remedy: "use YYYY-MM-DD, full ISO datetime, or today/yesterday/tomorrow" },
+      apiErr(400, "Backend rejected the dates", "use ISO date strings"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    seeAlso: ["ib changes by-entity-date"],
+    examples: [
+      "ib changes range --from 2026-06-01 --to 2026-06-10",
+      "ib changes range --from yesterday --to today --entity-type keikka --person 63",
+    ],
+  },
+  {
+    command: "ib changes by-entity-date",
+    description:
+      "Changes affecting deliveries DATED in the window — filters by the entity's own date (keikka.pumppuAika / grid_palkit.starttime), NOT the change timestamp. This is what the grid Muutoshistoria drawer shows: 'everything that touched that day's deliveries, whenever the change was made'. GET /api/changes/by-entity-date/:ownerAsiakasId. Admin only.",
+    permissions: ["isAnyAdmin (asiakasAdmin/laskuAdmin/system admin)"],
+    flags: [
+      { name: "entity-type", type: "string", description: "keikka or palkki", required: true },
+      { name: "from", type: "date", description: "Entity-date window start (or today/yesterday/tomorrow)", required: true },
+      { name: "to", type: "date", description: "Entity-date window end (or today/yesterday/tomorrow)", required: true },
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "limit", type: "number", default: "200", description: "Max rows kept client-side (cap 2000)" },
+    ],
+    outputShape:
+      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personName, at, description, keikkaTilaContext, deviceType, palkkiText, palkkiVehicleRegNo, reason, impersonatedByPersonName }>",
+    errors: [
+      apiErr(401, "Token expired", "ib auth refresh"),
+      apiErr(403, "Not an admin in the owner company", "use an admin token"),
+      { exit: 4, meaning: "entityType not keikka|palkki, or bad dates (client-side)", remedy: "use --entity-type keikka|palkki and ISO dates or today/yesterday/tomorrow" },
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    seeAlso: ["ib changes range"],
+    examples: ["ib changes by-entity-date --entity-type keikka --from today --to today"],
+  },
+  {
+    command: "ib changes user",
+    description:
+      "Changes MADE BY a person. Without personId: your own recent changes (GET /api/changes/user/recent/:owner — any member). With personId: that person's changes (GET /api/changes/user/:personId/:owner — self or admin). Rows carry entityDisplayName (e.g. '12345 - Tilaus') instead of personName (the actor IS the queried person).",
+    auth: "any",
+    args: [
+      { name: "personId", type: "number", required: false, description: "Whose changes (omit = yourself; others need admin)" },
+    ],
+    flags: [
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "limit", type: "number", default: "100", description: "Max rows" },
+    ],
+    outputShape:
+      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, at, description, deviceType, entityDisplayName, reason, impersonatedByPersonName }>",
+    errors: [
+      apiErr(401, "Token expired", "ib auth refresh"),
+      apiErr(403, "Another person's history without an admin role", "omit personId, or use an admin token"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    examples: ["ib changes user", "ib changes user 63 --limit 50"],
+  },
+  {
+    command: "ib changes types",
+    description:
+      "Offline catalog of changeTracker entityTypes: what each entityId means, the server-side read gate, and notes (deprecated kuski, keikka⊃keikkaBetoni fold-in, pumppuRequest two-party rows). No network, no auth.",
+    auth: "none",
+    flags: [],
+    outputShape: "ListEnvelope<{ entityType, entityIdMeaning, gate: 'member'|'admin', notes, deprecated? }>",
+    errors: [{ exit: 0, meaning: "Always succeeds (offline static list)", remedy: "n/a" }],
+    examples: ["ib changes types"],
+  },
+
   // ─── help (1) ────────────────────────────────────────────────────────────
   {
     command: "ib help",
