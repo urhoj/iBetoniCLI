@@ -26,6 +26,7 @@ import { registerScheduleCommands } from "./commands/schedule/index.js";
 import { registerStatsCommands } from "./commands/stats/index.js";
 import { registerChangesCommands } from "./commands/changes/index.js";
 import { registerSearchCommands } from "./commands/search/index.js";
+import { registerAttachmentCommands } from "./commands/attachment/index.js";
 import { registerSchemaCommands } from "./commands/schema/index.js";
 import { registerCacheCommands } from "./commands/cache/index.js";
 import { registerWeatherCommands } from "./commands/weather/index.js";
@@ -125,6 +126,7 @@ export function buildProgram() {
     registerWeatherCommands(program, getClient);
     registerFeedbackCommands(program, getClient);
     registerSearchCommands(program, getClient);
+    registerAttachmentCommands(program, getClient);
     registerVersionCommand(program, packageJson.version, getEndpoint);
     registerDoctorCommand(program, getClient, getEndpoint, packageJson.version, isReadOnly);
     const reference = program

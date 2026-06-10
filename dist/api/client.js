@@ -117,6 +117,7 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
         get: (path, opts) => request("GET", path, undefined, opts),
         post: (path, body, opts) => request("POST", path, body, opts),
         put: (path, body, opts) => request("PUT", path, body, opts),
+        patch: (path, body, opts) => request("PATCH", path, body, opts),
         delete: (path, opts) => request("DELETE", path, undefined, opts),
         getCurrentToken: () => currentToken,
     };
