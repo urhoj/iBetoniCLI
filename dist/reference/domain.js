@@ -166,9 +166,9 @@ export function renderDomainHelp() {
     lines.push(`  ${FEEDBACK_GUIDANCE.how}`);
     lines.push("");
     lines.push("DISCOVER");
-    lines.push("  Commands (cheap, offline): `ib commands` — compact list of every command; `ib commands");
-    lines.push("    <domain>` for one group (e.g. `ib commands keikka`); filters --reads / --mutations /");
-    lines.push("    --permission <substr>.");
+    lines.push("  Commands (cheap, offline): `ib commands` — domain index (~5 KB); `ib commands <domain>`");
+    lines.push("    for one group's commands (e.g. `ib commands keikka`); `ib commands --all` for the full");
+    lines.push("    flat list; filters --reads / --mutations / --permission <substr>.");
     lines.push("  Full machine-readable specs: `ib reference dump` (entire surface) or `ib reference dump");
     lines.push("    <domain>` for one group. Single command: `ib <command> --help`.");
     lines.push("  Concept guides: `ib help <topic>` — " + TOPICS.map((t) => t.id).join(", ") + ".");

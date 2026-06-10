@@ -2526,7 +2526,7 @@ export const COMMAND_SPECS = [
         flags: [],
         outputShape: "{ version, generatedAt, overview, glossary, topics, feedbackGuidance, commands: { '<command>': CommandSpec } }",
         errors: [
-            { exit: 4, meaning: "Unknown domain", remedy: "run `ib commands` to see valid domains" },
+            { exit: 4, meaning: "Unknown domain", remedy: "run `ib commands` (no arg) to see valid domains" },
             { exit: 1, meaning: "I/O error", remedy: "retry; check stdout pipe" },
         ],
         examples: [
@@ -2537,7 +2537,7 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib commands",
-        description: "Filtered, offline list of ib commands from the spec catalogue: which write, which are read-only, which require a given permission. Lighter than `ib reference dump` (the full surface) — returns just { command, description, permissions, isWrite } per match. No auth, no network.",
+        description: "Offline command discovery from the spec catalogue. No args = compact DOMAIN INDEX (~5 KB: every domain with leaf count, glossary blurb, runnable command paths). A domain arg, a filter flag, or --all returns the flat per-command list { command, description, permissions, isWrite }. Lighter than `ib reference dump` (the full surface). No auth, no network.",
         auth: "none",
         args: [
             {
@@ -2563,8 +2563,13 @@ export const COMMAND_SPECS = [
                 type: "string",
                 description: "Only commands whose required permissions contain this substring",
             },
+            {
+                name: "all",
+                type: "boolean",
+                description: "Full flat list of every command (~43 KB at 149 leaves). Default (no args) is the domain index.",
+            },
         ],
-        outputShape: "{ hint?, items: [{ command, description, permissions: string[], isWrite: boolean }], nextCursor: null, count } — `hint` (unfiltered list only) advertises the domain-filtered form",
+        outputShape: "no args: { hint, items:[{ domain, count, description|null, commands:[\"keikka list\", ...] }], nextCursor:null, count } (domain index) | with <domain> / --all / filters: { items: [{ command, description, permissions: string[], isWrite: boolean }], nextCursor: null, count }",
         errors: [
             { exit: 4, meaning: "Bad flag combo", remedy: "--mutations and --reads are mutually exclusive" },
             { exit: 4, meaning: "Unknown domain", remedy: "run `ib commands` (no arg) to see valid domains" },
@@ -2572,6 +2577,7 @@ export const COMMAND_SPECS = [
         examples: [
             "ib commands",
             "ib commands keikka",
+            "ib commands --all",
             "ib commands --mutations",
             "ib commands --reads",
             "ib commands --permission auth.page.vehicle",

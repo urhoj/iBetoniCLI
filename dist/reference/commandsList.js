@@ -1,5 +1,6 @@
 import { COMMAND_SPECS } from "./specs.js";
 import { CliError } from "../api/errors.js";
+import { GLOSSARY } from "./domain.js";
 /** Unique, sorted set of command domains (the token after `ib`), derived from the specs. */
 export function commandDomains(specs) {
     return [...new Set(specs.map((s) => s.command.split(" ")[1]).filter(Boolean))].sort();
@@ -55,14 +56,31 @@ export function filterCommandSpecs(specs, filter) {
  */
 export function buildCommandsList(filter) {
     const items = filterCommandSpecs(COMMAND_SPECS, filter);
-    if (!filter.domain) {
-        return {
-            hint: `narrow with \`ib commands <domain>\` (then \`ib <command> --help\`); domains: ${commandDomains(COMMAND_SPECS).join(", ")}`,
-            items,
-            nextCursor: null,
-            count: items.length,
-        };
-    }
     return { items, nextCursor: null, count: items.length };
+}
+/**
+ * Bare `ib commands` — a ~5 KB domain INDEX instead of the full flat list
+ * (~43 KB at 149 leaves and growing). Progressive-discovery entry point:
+ * index → `ib commands <domain>` → `ib <command> --help`. The flat list moved
+ * behind `--all` (BREAKING, 2026-06-10). Blurbs reuse the GLOSSARY (same
+ * source as group help), so domains without a glossary term get null.
+ */
+export function buildDomainIndex(specs = COMMAND_SPECS) {
+    const items = commandDomains(specs).map((domain) => {
+        const inDomain = specs.filter((s) => s.command.split(" ")[1] === domain);
+        return {
+            domain,
+            count: inDomain.length,
+            description: GLOSSARY.find((g) => g.term.toLowerCase().includes(domain))?.definition ??
+                null,
+            commands: inDomain.map((s) => s.command.replace(/^ib /, "")),
+        };
+    });
+    return {
+        hint: "domain index — one domain's commands: `ib commands <domain>` · full flat list: `ib commands --all` · one command's spec: `ib <command> --help`",
+        items,
+        nextCursor: null,
+        count: items.length,
+    };
 }
 //# sourceMappingURL=commandsList.js.map

@@ -38,11 +38,13 @@ export function buildReference(domain) {
     };
 }
 /**
- * Write the reference dump as pretty-printed JSON to stdout. Used by the
- * `ib reference dump` subcommand (optionally narrowed to one `domain`).
- * Trailing newline so shells / `jq` see a clean line-terminated document.
+ * Write the reference dump as SINGLE-LINE JSON to stdout (the CLI's stdout
+ * contract: one machine-parseable line). Used by the `ib reference dump`
+ * subcommand (optionally narrowed to one `domain`). Pretty-printing was
+ * dropped 2026-06-10: it was ~30% of the dump's bytes (pure indentation) and
+ * pushed the customer domain over the 10k-token audit threshold.
  */
 export function runReferenceDump(domain) {
-    process.stdout.write(JSON.stringify(buildReference(domain), null, 2) + "\n");
+    process.stdout.write(JSON.stringify(buildReference(domain)) + "\n");
 }
 //# sourceMappingURL=dump.js.map
