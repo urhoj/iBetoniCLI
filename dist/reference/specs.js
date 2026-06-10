@@ -961,6 +961,7 @@ export const COMMAND_SPECS = [
             apiErr(404, "Vehicle not found", "verify vehicleId"),
             ...permErrors("auth.page.vehicle.read"),
         ],
+        seeAlso: ["ib driver who", "ib driver board"],
         examples: ["ib vehicle drivers 7 --from 2026-05-01 --to 2026-05-31"],
     },
     {
@@ -1073,6 +1074,10 @@ export const COMMAND_SPECS = [
             apiErr(404, "Vehicle not found", "verify vehicleId"),
             ...permErrors("auth.page.vehicle.edit"),
         ],
+        notes: [
+            "personPvm-only: this sets just the day-driver bar and does NOT update the keikkat/palkit on the vehicle that day. For the atomic equivalent the grid uses, prefer `ib driver assign`.",
+        ],
+        seeAlso: ["ib driver assign", "ib driver gaps"],
         examples: [
             "ib vehicle driver-assign 7 --person 555 --date 2026-06-02 --reason 'cover shift'",
             "ib vehicle driver-assign 7 --person 555 --dry-run",
@@ -1135,6 +1140,133 @@ export const COMMAND_SPECS = [
             ...permErrors("auth.page.vehicle.read"),
         ],
         examples: ["ib vehicle visits tyomaa 17 --days 30", "ib vehicle visits sijainti 3"],
+    },
+    // ─── driver (5 reads; writes added in Task 9) ────────────────────────────
+    {
+        command: "ib driver board",
+        description: "All grid-eligible vehicles for a day with their assigned driver, gap status (Ei kuljettajaa), and keikka load. Person/day-centric complement to `ib vehicle drivers`.",
+        permissions: ["auth.page.grid.read"],
+        args: [
+            { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)" },
+        ],
+        flags: [],
+        outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, driverPersonId, driverName, hasDriver, needsDriver, keikkaCount, m3 }>",
+        errors: permErrors("auth.page.grid.read"),
+        notes: [
+            "needsDriver = the vehicle uses the no-driver bar AND has no day driver (i.e. it's a gap).",
+            "Deploy-gated: 404 until puminet5api ships /api/cli/driver/*.",
+        ],
+        seeAlso: ["ib driver gaps", "ib driver available", "ib driver assign"],
+        examples: ["ib driver board today", "ib driver board 2026-06-10"],
+    },
+    {
+        command: "ib driver gaps",
+        description: "Vehicles needing a driver that day — the 'Ei kuljettajaa' list. Board rows filtered to needsDriver.",
+        permissions: ["auth.page.grid.read"],
+        args: [
+            { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)" },
+        ],
+        flags: [],
+        outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, driverPersonId, driverName, hasDriver, needsDriver, keikkaCount, m3 }>",
+        errors: permErrors("auth.page.grid.read"),
+        notes: ["Pair with `ib driver available <date>` to find drivers to fill these.", "Deploy-gated."],
+        seeAlso: ["ib driver available", "ib driver assign", "ib driver board"],
+        examples: ["ib driver gaps today", "ib driver gaps tomorrow"],
+    },
+    {
+        command: "ib driver available",
+        description: "Assignable drivers (company pumpparit) who are free that day — not assigned to a vehicle and not on vacation/sick.",
+        permissions: ["auth.page.grid.read"],
+        args: [
+            { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)" },
+        ],
+        flags: [],
+        outputShape: "ListEnvelope<{ personId, firstName, lastName, phone }>",
+        errors: permErrors("auth.page.grid.read"),
+        notes: ["Roster = asiakasPersonSettingTypeId 8 (pumppari) minus assigned-that-day minus absent-that-day.", "Deploy-gated."],
+        seeAlso: ["ib driver gaps", "ib driver assign"],
+        examples: ["ib driver available today", "ib driver available tomorrow"],
+    },
+    {
+        command: "ib driver who",
+        description: "The day driver assigned to a single vehicle on a given date (or null when none).",
+        permissions: ["auth.page.grid.read"],
+        args: [
+            { name: "vehicleId", type: "number", description: "Target vehicleId" },
+            { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)" },
+        ],
+        flags: [],
+        outputShape: "{ vehicleId, date, driver: { personId, firstName, lastName, phone } | null }",
+        errors: permErrors("auth.page.grid.read"),
+        notes: ["Returns driver:null (not 404) when no driver is assigned. Deploy-gated."],
+        seeAlso: ["ib driver board", "ib vehicle drivers"],
+        examples: ["ib driver who 53 today", "ib driver who 53 2026-06-10"],
+    },
+    {
+        command: "ib driver absences",
+        description: "Driver absences (vacation/sick leave — personPvm 'pois' rows) in a date range. Optional --person filters to one driver.",
+        permissions: ["auth.page.grid.read"],
+        flags: [
+            { name: "from", type: "date", description: "Start date YYYY-MM-DD (or today/yesterday/tomorrow)", required: true },
+            { name: "to", type: "date", description: "End date YYYY-MM-DD (or today/yesterday/tomorrow)", required: true },
+            { name: "person", type: "number", description: "Filter to one driver personId" },
+        ],
+        outputShape: "ListEnvelope<{ personId, name, date, status, statusName }>",
+        errors: permErrors("auth.page.grid.read"),
+        notes: ["Read-only — setting absence status is not exposed by the CLI in v1. Deploy-gated."],
+        seeAlso: ["ib driver available"],
+        examples: [
+            "ib driver absences --from 2026-06-01 --to 2026-06-30",
+            "ib driver absences --from today --to today --person 123",
+        ],
+    },
+    {
+        command: "ib driver assign",
+        description: "Assign a day driver to a vehicle for a date. ATOMIC: updates personPvm AND the keikkat/palkit on that vehicle that day, and relocates the driver off any vehicle they were previously on. Requires --reason.",
+        permissions: ["auth.page.grid.tilaus.edit"],
+        flags: [
+            { name: "vehicle", type: "number", description: "Target vehicleId", required: true },
+            { name: "person", type: "number", description: "Driver personId", required: true },
+            { name: "date", type: "date", default: "today", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)" },
+        ],
+        writeFlags: true,
+        outputShape: "{ success, vehicleId, date, personId, oldPersonId } | { dryRun:true, vehicleId, date, personId, oldPersonId, keikkaIds, palkkiIds, wouldClearFromVehicleId } (with --dry-run)",
+        errors: [
+            apiErr(400, "Missing/invalid field (no --reason, bad vehicle/person/date)", "supply --reason and valid ids"),
+            ...permErrors("auth.page.grid.tilaus.edit"),
+        ],
+        notes: [
+            "Requires Admin, HR Admin, or Keikka Handler on the active company.",
+            "--reason is hard-required (exits 4 without it).",
+            "--dry-run previews the resolved oldPersonId + keikka/palkki ids without writing.",
+            "Emits the dayDriver:updated socket so live grids update. Deploy-gated (404 until the backend ships /api/cli/driver/*).",
+        ],
+        seeAlso: ["ib driver gaps", "ib driver available", "ib driver clear", "ib vehicle driver-assign"],
+        examples: [
+            "ib driver assign --vehicle 53 --person 555 --date tomorrow --reason 'auto-fill'",
+            "ib driver assign --vehicle 53 --person 555 --dry-run --reason preview",
+        ],
+    },
+    {
+        command: "ib driver clear",
+        description: "Clear the day driver from a vehicle for a date (atomic — also clears the driver from that day's keikkat/palkit on the vehicle). Requires --reason.",
+        permissions: ["auth.page.grid.tilaus.edit"],
+        flags: [
+            { name: "vehicle", type: "number", description: "Target vehicleId", required: true },
+            { name: "date", type: "date", default: "today", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)" },
+        ],
+        writeFlags: true,
+        outputShape: "{ success, vehicleId, date, personId:null, oldPersonId } | { dryRun:true, ... } (with --dry-run)",
+        errors: [
+            apiErr(400, "Missing/invalid field (no --reason, bad vehicle/date)", "supply --reason and a valid vehicle"),
+            ...permErrors("auth.page.grid.tilaus.edit"),
+        ],
+        notes: [
+            "Requires Admin, HR Admin, or Keikka Handler on the active company.",
+            "--reason is hard-required (exits 4 without it). Deploy-gated.",
+        ],
+        seeAlso: ["ib driver assign", "ib driver who"],
+        examples: ["ib driver clear --vehicle 53 --date today --reason 'sick leave'"],
     },
     // ─── sijainti (11) ───────────────────────────────────────────────────────
     {
