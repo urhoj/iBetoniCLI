@@ -2,6 +2,17 @@ import { CliError, exitCodeForError, hintForError } from "../api/errors.js";
 import { isListEnvelope } from "../api/envelopes.js";
 import { renderList, renderRecord } from "./pretty.js";
 let outputMode = "json";
+/**
+ * ERRORS rows of the command currently executing, set by the bin preAction
+ * hook from its CommandSpec. Lets `writeError` echo the command's OWN
+ * documented remedy into the envelope `hint` (feedback #25) instead of only
+ * the generic per-status hint. `null` = no spec context (tests, spec-less
+ * commands) → generic hints only.
+ */
+let activeCommandErrors = null;
+export function setActiveCommandErrors(rows) {
+    activeCommandErrors = rows;
+}
 export function setOutputMode(m) {
     outputMode = m;
 }
@@ -25,7 +36,8 @@ export function writeError(err) {
             : {};
         // `hint` points an agent at the next step without it having to have read
         // the command's --help NOTES beforehand (e.g. 404 = deploy-gated endpoint?).
-        const hint = hintForError(err);
+        // Prefers the running command's own spec remedy when one matches.
+        const hint = hintForError(err, activeCommandErrors);
         process.stderr.write(JSON.stringify({
             success: false,
             error: err.message,

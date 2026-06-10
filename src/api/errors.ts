@@ -1,3 +1,5 @@
+import type { CommandError } from "../output/help.js";
+
 export class CliError extends Error {
   constructor(
     message: string,
@@ -30,14 +32,26 @@ export function exitCodeForError(err: unknown): number {
 }
 
 /**
- * Generic remedy hint for an error class, echoed into the stderr error
- * envelope as `hint`. The per-command spec NOTES/ERRORS carry the precise
- * remedy, but an agent that hasn't read them beforehand only sees the runtime
- * envelope — so the envelope itself must point at the next step (most
- * importantly the 404 deploy-gate ambiguity). `null` = no hint (the message is
- * already self-explanatory, e.g. read-only refusals).
+ * Remedy hint for an error, echoed into the stderr error envelope as `hint`.
+ *
+ * When the running command's spec ERRORS rows are supplied (resolved by the
+ * bin preAction hook), the row matching this error's HTTP status — or, for
+ * client-side errors (statusCode 0), its exit code — wins: the agent gets the
+ * command's OWN documented remedy (e.g. "switch to a provider company")
+ * instead of a generic one. Falls back to the per-status generic hint so an
+ * agent that hasn't read --help beforehand still gets pointed at the next
+ * step (most importantly the 404 deploy-gate ambiguity). `null` = no hint.
  */
-export function hintForError(err: CliError): string | null {
+export function hintForError(
+  err: CliError,
+  specErrors?: CommandError[] | null
+): string | null {
+  const specRow = specErrors?.find(
+    (r) =>
+      (r.http !== undefined && r.http === err.statusCode) ||
+      (r.http === undefined && err.statusCode === 0 && r.exit === err.exitCode)
+  );
+  if (specRow?.remedy) return specRow.remedy;
   if (err.exitCode === 7) {
     return "network failure (DNS/connection/TLS) — check connectivity and the --endpoint URL";
   }

@@ -1,24 +1,34 @@
 #!/usr/bin/env node
-import { buildProgram } from "../program.js";
+import type { Command } from "commander";
+import {
+  buildProgram,
+  enableParserThrow,
+  handleParseRejection,
+} from "../program.js";
 import { getGlobalOptions } from "../globals.js";
-import { setOutputMode, exitWithError } from "../output/json.js";
-import { CliError } from "../api/errors.js";
+import { setOutputMode, setActiveCommandErrors } from "../output/json.js";
+import { COMMAND_SPECS } from "../reference/specs.js";
 
 const program = buildProgram();
 
-program.hook("preAction", () => {
+// Throw-instead-of-exit for the parser (usage errors become the JSON envelope
+// in handleParseRejection; help/version pass through) + capture its stderr.
+const parserText = enableParserThrow(program);
+
+program.hook("preAction", (_thisCommand, actionCommand) => {
   if (getGlobalOptions(program).pretty) setOutputMode("pretty");
+  // Resolve the running command's CommandSpec so error envelopes can echo ITS
+  // documented per-error remedy as `hint` (feedback #25). Spec-less commands
+  // (none today — wiring tests enforce coverage) fall back to generic hints.
+  const parts: string[] = [];
+  for (let c: Command | null = actionCommand; c; c = c.parent) {
+    parts.unshift(c.name());
+  }
+  const path = parts.join(" ");
+  const spec = COMMAND_SPECS.find((s) => s.command === path);
+  setActiveCommandErrors(spec?.errors ?? null);
 });
 
-program.parseAsync(process.argv).catch((err) => {
-  // A CliError thrown outside any action try-block (failWith guards, global
-  // option validation) still gets the stderr envelope + its mapped exit code.
-  if (err instanceof CliError) {
-    exitWithError(err);
-    return;
-  }
-  process.stderr.write(`${err.message || err}\n`);
-  // exitCode + natural drain, NOT process.exit(): forced exit after a fetch
-  // crashes Node on Windows (libuv UV_HANDLE_CLOSING assert → exit 127).
-  process.exitCode = 1;
-});
+program
+  .parseAsync(process.argv)
+  .catch((err) => handleParseRejection(err, parserText));

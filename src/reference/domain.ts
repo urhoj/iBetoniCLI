@@ -168,7 +168,7 @@ export const TOPICS: Topic[] = [
     id: "exit-codes",
     title: "Process exit codes",
     body:
-      "0 ok; 1 generic failure (no HTTP mapping): usage errors (unknown command/flag, missing required arg — printed by the parser as plain text on stderr, NOT the JSON error envelope), `auth login` failure, `doctor` aggregate not-ok, unexpected runtime errors; 2 auth (HTTP 401); 3 permission (403, incl. read-only-mode refusals); 4 validation (4xx incl. 400/409/429); 5 not-found (404); 6 server (5xx); 7 network. Each command's --help ERRORS section lists exit code + HTTP status.",
+      "0 ok (incl. --help/--version); 1 generic failure: bare `ib`/bare group help render, `auth login` failure, `doctor` aggregate not-ok, unexpected runtime errors; 2 auth (HTTP 401); 3 permission (403, incl. read-only-mode refusals — envelope code READ_ONLY_BLOCKED); 4 validation (4xx incl. 400/409/429, AND parser usage errors — unknown command/flag, missing required arg/option — emitted as the JSON error envelope with code USAGE); 5 not-found (404); 6 server (5xx); 7 network. Every error path emits the JSON envelope on stderr. Each command's --help ERRORS section lists exit code + HTTP status.",
   },
   {
     id: "multi-tenancy",

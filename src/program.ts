@@ -39,6 +39,7 @@ import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
 import { writeJson, exitWithError, failWith } from "./output/json.js";
+import { CliError } from "./api/errors.js";
 
 /**
  * Construct the `ib` program with all subcommands registered and rich
@@ -210,4 +211,105 @@ export function buildProgram(): Command {
   attachRichHelp(program, COMMAND_SPECS);
 
   return program;
+}
+
+/**
+ * Make every command in the tree THROW a CommanderError instead of calling
+ * `process.exit()` for usage errors / help / version, and capture the parser's
+ * stderr text (the "error: unknown command …" line, did-you-mean suggestions,
+ * error-triggered help renders). Two reasons:
+ *
+ *  1. Usage errors can then be emitted as the standard JSON error envelope
+ *     by {@link handleParseRejection} instead of parser plain text — the last
+ *     non-envelope error path (feedback #24).
+ *  2. Commander's internal `process.exit()` disappears (Windows-unsafe after
+ *     a completed fetch — libuv UV_HANDLE_CLOSING assert, exit 127).
+ *
+ * Returns a getter for the captured stderr text. Must be called AFTER the
+ * tree is fully built (exitOverride/configureOutput don't propagate to
+ * already-created subcommands via inheritance — we walk explicitly).
+ */
+export function enableParserThrow(program: Command): () => string {
+  let captured = "";
+  const output = {
+    writeErr: (s: string) => {
+      captured += s;
+    },
+  };
+  const walk = (cmd: Command): void => {
+    cmd.exitOverride();
+    cmd.configureOutput(output);
+    cmd.commands.forEach(walk);
+  };
+  walk(program);
+  return () => captured;
+}
+
+/** Commander's error shape under exitOverride (avoid instanceof across copies). */
+interface CommanderErrorLike {
+  code?: string;
+  exitCode?: number;
+  message?: string;
+}
+
+function isCommanderError(err: unknown): err is CommanderErrorLike {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    typeof (err as CommanderErrorLike).code === "string" &&
+    (err as CommanderErrorLike).code!.startsWith("commander.")
+  );
+}
+
+/**
+ * Terminal handler for `program.parseAsync(...).catch(...)`. Never calls
+ * `process.exit()` (Windows-unsafe post-fetch) — sets `process.exitCode` and
+ * lets the loop drain. Routing:
+ *
+ *  - CliError (failWith guards / global-option validation thrown outside any
+ *    action try-block) → stderr envelope + its mapped exit code.
+ *  - Commander help/version display (exitCode 0) → pass any captured text
+ *    through, exit 0.
+ *  - `commander.help` (help auto-rendered for a bare `ib` / bare group, exit
+ *    1) → pass the captured help text through unchanged, keep exit 1 — that
+ *    output is help, not an error.
+ *  - Any other commander.* (unknown command/flag, missing argument/option,
+ *    excess args) → JSON envelope with code "USAGE" and exit 4 (validation):
+ *    usage errors ARE validation errors, and agents get one uniform error
+ *    surface.
+ *  - Anything else → plain message, exit 1 (unexpected runtime failure).
+ */
+export function handleParseRejection(
+  err: unknown,
+  parserText: () => string
+): void {
+  if (err instanceof CliError) {
+    exitWithError(err);
+    return;
+  }
+  if (isCommanderError(err)) {
+    const text = parserText();
+    if (err.exitCode === 0 || err.code === "commander.help") {
+      if (text) process.stderr.write(text);
+      process.exitCode = err.exitCode ?? 0;
+      return;
+    }
+    const detail = (text || err.message || "usage error")
+      .replace(/^error:\s*/gm, "")
+      .trim();
+    process.stderr.write(
+      JSON.stringify({
+        success: false,
+        error: detail,
+        code: "USAGE",
+        statusCode: 0,
+        hint: "usage error — run `ib <command> --help` for the exact arguments and flags, or `ib commands` to discover commands",
+      }) + "\n"
+    );
+    process.exitCode = 4;
+    return;
+  }
+  const message = err instanceof Error ? err.message : String(err);
+  process.stderr.write(`${message}\n`);
+  process.exitCode = 1;
 }

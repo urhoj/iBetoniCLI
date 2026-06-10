@@ -1,10 +1,11 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   writeJson,
   writeError,
   exitWithError,
   failWith,
   errorMessage,
+  setActiveCommandErrors,
 } from "../../src/output/json";
 import { CliError } from "../../src/api/errors";
 
@@ -101,5 +102,39 @@ describe("JSON output", () => {
   test("errorMessage extracts Error messages and stringifies the rest", () => {
     expect(errorMessage(new Error("boom"))).toBe("boom");
     expect(errorMessage("plain string")).toBe("plain string");
+  });
+
+  // Spec-remedy echo (#25): when the running command's spec ERRORS rows are
+  // registered, the row matching the error's HTTP status (or exit code for
+  // client-side statusCode-0 errors) supplies the hint; otherwise generic.
+  describe("hint prefers the active command's spec remedy", () => {
+    afterEach(() => setActiveCommandErrors(null));
+
+    test("HTTP-status match wins over the generic hint", () => {
+      setActiveCommandErrors([
+        { http: 403, exit: 3, meaning: "Not a provider", remedy: "switch to a provider company" },
+      ]);
+      writeError(new CliError("denied", 403, null, 3));
+      const parsed = JSON.parse(String(stderrSpy.mock.calls.at(-1)![0]));
+      expect(parsed.hint).toBe("switch to a provider company");
+    });
+
+    test("statusCode-0 errors match spec rows by exit code", () => {
+      setActiveCommandErrors([
+        { exit: 4, meaning: "Missing --reason", remedy: "supply --reason" },
+      ]);
+      writeError(new CliError("Missing required flag: --reason", 0, null, 4));
+      const parsed = JSON.parse(String(stderrSpy.mock.calls.at(-1)![0]));
+      expect(parsed.hint).toBe("supply --reason");
+    });
+
+    test("no matching spec row falls back to the generic per-status hint", () => {
+      setActiveCommandErrors([
+        { http: 403, exit: 3, meaning: "x", remedy: "y" },
+      ]);
+      writeError(new CliError("HTTP 404", 404, null, 5));
+      const parsed = JSON.parse(String(stderrSpy.mock.calls.at(-1)![0]));
+      expect(parsed.hint).toMatch(/deploy-gated/);
+    });
   });
 });
