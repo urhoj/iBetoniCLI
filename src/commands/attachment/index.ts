@@ -187,6 +187,10 @@ export async function runAttachmentUpload(
     failWith(`Cannot read file: ${filePath}`, 4);
     return; // unreachable; satisfies TS
   }
+  const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
+  if (data.length > MAX_UPLOAD_BYTES) {
+    failWith(`File is ${(data.length / 1024 / 1024).toFixed(1)} MB — max 500 MB for CLI upload`, 4);
+  }
   const origFileName = basename(filePath);
   const fileType = flags.mime || mimeFromExtension(origFileName);
   if (flags.dryRun) {
@@ -237,7 +241,8 @@ export async function runAttachmentDownload(
   if (!att.blobUrl) {
     throw new CliError("Backend returned no blobUrl (deploy gate? old backend?)", 0, null, 6);
   }
-  const target = outPath || att.origFileName || `attachment-${attachmentId}`;
+  const fallbackName = att.origFileName ? basename(att.origFileName) : `attachment-${attachmentId}`;
+  const target = outPath || fallbackName;
   if (!force && existsSync(target)) {
     failWith(`Refusing to overwrite ${target} (use --force)`, 4);
   }

@@ -212,4 +212,25 @@ describe("ib attachment upload/download", () => {
     // with force succeeds
     await expect(runAttachmentDownload(c, 4711, out, true)).resolves.toBeTruthy();
   });
+
+  test("download basenames a traversal origFileName into cwd (no --out)", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ib-att-cwd-"));
+    const prevCwd = process.cwd();
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      attachmentId: 4711, origFileName: "../../evil.jpg", fileType: "image/jpeg",
+      blobUrl: "https://blob/x?sas=1",
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true, arrayBuffer: async () => Uint8Array.from([5]).buffer,
+    }));
+    try {
+      process.chdir(dir);
+      const result = (await runAttachmentDownload(c, 4711, undefined, false)) as Record<string, unknown>;
+      expect(String(result.file).endsWith("evil.jpg")).toBe(true);
+      expect(String(result.file)).not.toContain("..");
+      expect(await fsReadFile(join(dir, "evil.jpg"))).toBeTruthy();
+    } finally {
+      process.chdir(prevCwd);
+    }
+  });
 });
