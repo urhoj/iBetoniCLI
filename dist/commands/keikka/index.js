@@ -3,6 +3,7 @@ import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveDate } from "../../dates.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
+import { registerHistoryAlias } from "../changes/index.js";
 // Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
 export { resolveDate };
 /**
@@ -226,5 +227,6 @@ export function registerKeikkaCommands(parent, getClient) {
             exitWithError(e);
         }
     });
+    registerHistoryAlias(k, getClient, "keikka", "keikkaId", "Change-tracker audit trail for one keikka (folds in its keikkaBetoni rows). Alias of `ib changes entity keikka`.", "Filter by changeTracker fieldName (e.g. kuskit, laskuMemo)");
 }
 //# sourceMappingURL=index.js.map

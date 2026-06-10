@@ -1,0 +1,268 @@
+import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { resolveDate } from "../../dates.js";
+import { CHANGE_ENTITY_TYPES, findEntityType, isKnownEntityType, runChangesTypes, } from "./entityTypes.js";
+function projectRow(r) {
+    const item = {
+        changeId: r.changeId,
+        entityType: r.entityType ?? null,
+        entityId: r.entityId ?? null,
+        field: r.fieldName ?? null,
+        oldValue: r.oldValue ?? null,
+        newValue: r.newValue ?? null,
+        changeType: r.changeType ?? null,
+        personId: r.personId ?? null,
+        personName: r.personFullName ?? null,
+        at: r.timestamp ?? null,
+        description: r.description ?? null,
+        reason: r.reason ?? null,
+        impersonatedByPersonName: r.impersonatedByPersonName ?? null,
+        keikkaTilaContext: r.keikkaTilaContext ?? null,
+        deviceType: r.deviceType ?? null,
+    };
+    if (r.entityDisplayName != null)
+        item.entityDisplayName = r.entityDisplayName;
+    if (r.palkkiText != null)
+        item.palkkiText = r.palkkiText;
+    if (r.palkkiVehicleRegNo != null)
+        item.palkkiVehicleRegNo = r.palkkiVehicleRegNo;
+    return item;
+}
+/** Same owner-resolution contract as `ib person history`. */
+async function resolveOwnerAsiakasId(client) {
+    const available = await client.get("/api/company-selection/available");
+    if (typeof available.currentCompanyId !== "number" || available.currentCompanyId <= 0) {
+        throw new Error("could not resolve active company — run `ib auth switch`, or pass --owner");
+    }
+    return available.currentCompanyId;
+}
+function assertKnownEntityType(entityType) {
+    if (!isKnownEntityType(entityType)) {
+        failWith(`unknown entityType '${entityType}'. Valid: ` +
+            CHANGE_ENTITY_TYPES.map((e) => e.entityType).join(", ") +
+            ". See `ib changes types`.", 4);
+    }
+    const info = findEntityType(entityType);
+    if (info.deprecated) {
+        // Diagnostic on stderr (stdout stays pure JSON data).
+        process.stderr.write(`note: entityType '${entityType}' is deprecated — ${info.notes}\n`);
+    }
+}
+/** Accepts YYYY-MM-DD or a full ISO datetime; anything else is exit 4. */
+function assertIsoDate(value, flag) {
+    if (!/^\d{4}-\d{2}-\d{2}(T[\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/.test(value) ||
+        isNaN(Date.parse(value))) {
+        failWith(`${flag} must be YYYY-MM-DD or an ISO datetime (got '${value}').`, 4);
+    }
+}
+function envelope(items, truncated = false) {
+    const out = { items, nextCursor: null, count: items.length };
+    if (truncated)
+        out.truncated = true;
+    return out;
+}
+/** GET /api/changes/:entityType/:entityId/:owner — generic entity history. */
+export async function runChangesEntity(client, entityType, entityId, limit, opts = {}) {
+    assertKnownEntityType(entityType);
+    const owner = opts.owner ?? (await resolveOwnerAsiakasId(client));
+    const rows = await client.get(`/api/changes/${entityType}/${entityId}/${owner}?limit=${limit}`);
+    let list = Array.isArray(rows) ? rows : [];
+    if (opts.field)
+        list = list.filter((r) => r.fieldName === opts.field);
+    return envelope(list.map(projectRow));
+}
+/** GET /api/changes/latest/:owner — admin-only, newest first, server cap 500. */
+export async function runChangesLatest(client, limit, opts = {}) {
+    if (opts.entityType)
+        assertKnownEntityType(opts.entityType);
+    const owner = opts.owner ?? (await resolveOwnerAsiakasId(client));
+    const qs = new URLSearchParams({ limit: String(limit) });
+    if (opts.entityType)
+        qs.set("entityType", opts.entityType);
+    const rows = await client.get(`/api/changes/latest/${owner}?${qs}`);
+    return envelope((Array.isArray(rows) ? rows : []).map(projectRow));
+}
+/** GET /api/changes/range/:owner — admin-only, by change timestamp. */
+export async function runChangesRange(client, opts) {
+    assertIsoDate(opts.from, "--from");
+    assertIsoDate(opts.to, "--to");
+    if (opts.entityType)
+        assertKnownEntityType(opts.entityType);
+    const owner = opts.owner ?? (await resolveOwnerAsiakasId(client));
+    const qs = new URLSearchParams({ startDate: opts.from, endDate: opts.to });
+    if (opts.entityType)
+        qs.set("entityType", opts.entityType);
+    if (opts.person != null)
+        qs.set("personId", String(opts.person));
+    const rows = await client.get(`/api/changes/range/${owner}?${qs}`);
+    const list = Array.isArray(rows) ? rows : [];
+    // The route/proc has NO row limit — slice client-side to protect AI context.
+    const sliced = list.slice(0, opts.limit);
+    return envelope(sliced.map(projectRow), sliced.length < list.length);
+}
+/**
+ * GET /api/changes/by-entity-date/:owner — admin-only. Filters by the
+ * ENTITY's date (keikka.pumppuAika / grid_palkit.starttime), not the change
+ * timestamp: "changes affecting that day's deliveries".
+ */
+export async function runChangesByEntityDate(client, opts) {
+    if (!["keikka", "palkki"].includes(opts.entityType)) {
+        failWith(`--entity-type must be keikka or palkki for by-entity-date (got '${opts.entityType}').`, 4);
+    }
+    assertIsoDate(opts.from, "--from");
+    assertIsoDate(opts.to, "--to");
+    const owner = opts.owner ?? (await resolveOwnerAsiakasId(client));
+    const qs = new URLSearchParams({
+        startDate: opts.from,
+        endDate: opts.to,
+        entityType: opts.entityType,
+    });
+    const rows = await client.get(`/api/changes/by-entity-date/${owner}?${qs}`);
+    const list = Array.isArray(rows) ? rows : [];
+    const sliced = list.slice(0, opts.limit);
+    return envelope(sliced.map(projectRow), sliced.length < list.length);
+}
+/**
+ * `ib changes user [personId]` — no arg: own recent changes
+ * (GET /api/changes/user/recent/:owner); with personId: that person's changes
+ * (GET /api/changes/user/:personId/:owner — self or admin).
+ */
+export async function runChangesUser(client, personId, limit, opts = {}) {
+    const owner = opts.owner ?? (await resolveOwnerAsiakasId(client));
+    const path = personId == null
+        ? `/api/changes/user/recent/${owner}?limit=${limit}`
+        : `/api/changes/user/${personId}/${owner}?limit=${limit}`;
+    const rows = await client.get(path);
+    return envelope((Array.isArray(rows) ? rows : []).map(projectRow));
+}
+/** Registers a thin `history <id>` alias on an entity group, delegating to runChangesEntity. */
+export function registerHistoryAlias(group, getClient, entityType, idArgName, description, fieldExample = "Filter by changeTracker fieldName") {
+    group
+        .command(`history <${idArgName}>`)
+        .description(description)
+        .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
+        .option("--limit <n>", "Max rows (default 100, cap 500)", (v) => Math.min(Number(v), 500), 100)
+        .option("--field <name>", fieldExample)
+        .action(async (idStr, opts) => {
+        try {
+            const client = await getClient();
+            writeJson(await runChangesEntity(client, entityType, Number(idStr), opts.limit, {
+                owner: opts.owner,
+                field: opts.field,
+            }));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+}
+export function registerChangesCommands(parent, getClient) {
+    const c = parent.command("changes").description("ChangeTracker (audit trail) reads");
+    c.command("entity <entityType> <entityId>")
+        .description("Audit trail for ONE entity — who changed which field, when, old→new, with --reason. " +
+        "Valid entityTypes: `ib changes types`.")
+        .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
+        .option("--limit <n>", "Max rows (default 100, cap 500)", (v) => Math.min(Number(v), 500), 100)
+        .option("--field <name>", "Filter by changeTracker fieldName (client-side)")
+        .action(async (entityType, entityIdStr, opts) => {
+        try {
+            const client = await getClient();
+            writeJson(await runChangesEntity(client, entityType, Number(entityIdStr), opts.limit, {
+                owner: opts.owner,
+                field: opts.field,
+            }));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    c.command("latest")
+        .description("Newest changes across the whole company (admin), optionally one entityType.")
+        .option("--entity-type <type>", "Filter to one entityType")
+        .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
+        .option("--limit <n>", "Max rows (default 100, server cap 500)", (v) => Math.min(Number(v), 500), 100)
+        .action(async (opts) => {
+        try {
+            const client = await getClient();
+            writeJson(await runChangesLatest(client, opts.limit, {
+                entityType: opts.entityType,
+                owner: opts.owner,
+            }));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    c.command("range")
+        .description("Changes MADE within a time window (admin). Filter by entityType/person.")
+        .requiredOption("--from <iso>", "Window start YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)")
+        .requiredOption("--to <iso>", "Window end YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)")
+        .option("--entity-type <type>", "Filter to one entityType")
+        .option("--person <personId>", "Filter to one actor", (v) => Number(v))
+        .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
+        .option("--limit <n>", "Max rows kept client-side (default 200, cap 2000)", (v) => Math.min(Number(v), 2000), 200)
+        .action(async (opts) => {
+        try {
+            const client = await getClient();
+            writeJson(await runChangesRange(client, {
+                from: resolveDate(opts.from) ?? opts.from,
+                to: resolveDate(opts.to) ?? opts.to,
+                entityType: opts.entityType,
+                person: opts.person,
+                owner: opts.owner,
+                limit: opts.limit,
+            }));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    c.command("by-entity-date")
+        .description("Changes affecting deliveries DATED in the window (admin) — filters by " +
+        "keikka.pumppuAika / palkki starttime, not change time.")
+        .requiredOption("--entity-type <type>", "keikka or palkki")
+        .requiredOption("--from <iso>", "Entity-date window start YYYY-MM-DD (or today/yesterday/tomorrow)")
+        .requiredOption("--to <iso>", "Entity-date window end YYYY-MM-DD (or today/yesterday/tomorrow)")
+        .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
+        .option("--limit <n>", "Max rows kept client-side (default 200, cap 2000)", (v) => Math.min(Number(v), 2000), 200)
+        .action(async (opts) => {
+        try {
+            const client = await getClient();
+            writeJson(await runChangesByEntityDate(client, {
+                entityType: opts.entityType,
+                from: resolveDate(opts.from) ?? opts.from,
+                to: resolveDate(opts.to) ?? opts.to,
+                owner: opts.owner,
+                limit: opts.limit,
+            }));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    c.command("user [personId]")
+        .description("Changes MADE BY a person (no arg = yourself; another personId needs admin).")
+        .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
+        .option("--limit <n>", "Max rows (default 100)", (v) => Math.min(Number(v), 500), 100)
+        .action(async (personIdStr, opts) => {
+        try {
+            const client = await getClient();
+            writeJson(await runChangesUser(client, personIdStr ? Number(personIdStr) : null, opts.limit, {
+                owner: opts.owner,
+            }));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    c.command("types")
+        .description("Offline catalog of changeTracker entityTypes (id meaning, read gate, notes).")
+        .action(() => {
+        try {
+            writeJson(runChangesTypes());
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+}
+//# sourceMappingURL=index.js.map
