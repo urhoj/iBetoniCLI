@@ -9,6 +9,7 @@ import {
 import { writeJson, writeError, exitWithError } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveDate } from "../../dates.js";
+import { decodeJwtPayload } from "../../auth/jwt.js";
 
 // Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
 export { resolveDate };
@@ -57,6 +58,59 @@ export async function runKeikkaGet(
   return client.get<Record<string, unknown>>(
     `/api/cli/keikka/get/${keikkaId}`
   );
+}
+
+/** A projected keikka search hit (deduped; the backend returns one row per betoni pour). */
+export interface KeikkaSearchHit {
+  keikkaId: number;
+  title: string | null;
+  pumppuAika: string | null;
+  customerName: string | null;
+  worksiteName: string | null;
+  address: string | null;
+  contactPerson: string | null;
+  contactPhone: string | null;
+}
+
+/**
+ * GET /api/keikka/search — existing deployed route (used by the GPT order
+ * tool). NOTE: ownerAsiakasId comes from the QUERY STRING (no JWT fallback on
+ * this route) — callers supply it from the active token via decodeJwtPayload.
+ * usingFullTextSearch=true mirrors the GPT tool's default path. Rows arrive
+ * one-per-keikkaBetoni; dedupe by keikkaId. `limit` is applied client-side
+ * (the backend caps at TOP 100, no limit param).
+ */
+export async function runKeikkaSearch(
+  client: ApiClient,
+  query: string,
+  ownerAsiakasId: number,
+  limit?: number
+): Promise<ListEnvelope<KeikkaSearchHit>> {
+  const qs = new URLSearchParams({
+    searchString: query,
+    ownerAsiakasId: String(ownerAsiakasId),
+    usingFullTextSearch: "true",
+  });
+  const rows = await client.get<Record<string, unknown>[]>(
+    `/api/keikka/search?${qs.toString()}`
+  );
+  const seen = new Map<number, KeikkaSearchHit>();
+  for (const r of rows || []) {
+    const id = Number(r.keikkaId);
+    if (seen.has(id)) continue;
+    seen.set(id, {
+      keikkaId: id,
+      title: (r.keikkaOtsikko as string) ?? null,
+      pumppuAika: r.pumppuAika != null ? String(r.pumppuAika) : null,
+      customerName: (r.asiakasNimi as string) ?? null,
+      worksiteName: (r.tyomaaNimi as string) ?? null,
+      address: (r.osoite as string) ?? null,
+      contactPerson: (r.contactPerson as string) ?? null,
+      contactPhone: (r.contactPhone as string) ?? null,
+    });
+  }
+  const items = [...seen.values()].slice(0, limit ?? seen.size);
+  return { items, nextCursor: null, count: items.length };
 }
 
 /**
@@ -164,6 +218,20 @@ export function registerKeikkaCommands(
       try {
         const client = await getClient();
         const result = await runKeikkaGet(client, Number(idStr));
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  k.command("search <query>")
+    .description("Search keikkas (full-text: phone, keikkaId, worksite name/number, invoice ref)")
+    .option("--limit <n>", "Max hits (client-side; backend caps at 100)", (v: string) => Number(v))
+    .action(async (query: string, opts: { limit?: number }) => {
+      try {
+        const client = await getClient();
+        const { ownerAsiakasId } = decodeJwtPayload(client.getCurrentToken());
+        const result = await runKeikkaSearch(client, query, ownerAsiakasId, opts.limit);
         writeJson(result);
       } catch (e) {
         exitWithError(e);
