@@ -5,6 +5,8 @@ import {
   runDriverAvailable,
   runDriverWho,
   runDriverAbsences,
+  runDriverAssign,
+  runDriverClear,
 } from "../../src/commands/driver/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -55,5 +57,39 @@ describe("ib driver reads", () => {
     (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce(LIST);
     await runDriverAbsences(c, { from: "2026-06-01", to: "2026-06-30" });
     expect(c.get).toHaveBeenCalledWith("/api/cli/driver/absences?from=2026-06-01&to=2026-06-30");
+  });
+});
+
+describe("ib driver writes", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  test("assign posts {vehicleId,personId,yyyymmdd} with reason header", async () => {
+    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ success: true });
+    await runDriverAssign(c, 53, 555, "2026-06-10", { reason: "auto-fill" });
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/cli/driver/assign",
+      { vehicleId: 53, personId: 555, yyyymmdd: 20260610 },
+      { headers: { "X-Action-Reason": "auto-fill" } }
+    );
+  });
+
+  test("assign --dry-run sends X-Dry-Run", async () => {
+    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ dryRun: true });
+    await runDriverAssign(c, 53, 555, "2026-06-10", { dryRun: true, reason: "preview" });
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/cli/driver/assign",
+      { vehicleId: 53, personId: 555, yyyymmdd: 20260610 },
+      { headers: { "X-Dry-Run": "1", "X-Action-Reason": "preview" } }
+    );
+  });
+
+  test("clear posts {vehicleId,yyyymmdd} with reason header", async () => {
+    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ success: true });
+    await runDriverClear(c, 53, "2026-06-10", { reason: "sick" });
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/cli/driver/clear",
+      { vehicleId: 53, yyyymmdd: 20260610 },
+      { headers: { "X-Action-Reason": "sick" } }
+    );
   });
 });
