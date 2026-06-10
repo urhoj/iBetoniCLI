@@ -107,6 +107,53 @@ export async function resolveStatusId(client: ApiClient, value: string): Promise
   throw new CliError(`Status "${value}" is ambiguous — use the id. Available: ${candidates}`, 400, null, 4);
 }
 
+export interface PersonDaySetFlags extends WriteFlags {
+  text?: string;
+}
+
+/**
+ * Set a person's day availability status. Read-merges the existing row for that
+ * person+date (so a re-set UPDATES rather than inserting a duplicate via
+ * personPvm_save2's null-id insert path). `--dry-run` is CLIENT-side (the save
+ * endpoint has no X-Dry-Run guard) — it returns a wouldChange diff and never POSTs.
+ * When --text is omitted the existing text is preserved (not wiped).
+ */
+export async function runPersonDaySet(
+  client: ApiClient,
+  personId: number,
+  date: string,
+  statusValue: string,
+  flags: PersonDaySetFlags
+): Promise<unknown> {
+  const asiakasId = ownerAsiakasIdOf(client);
+  const pvm = toYyyymmdd(date);
+  const statusId = await resolveStatusId(client, statusValue);
+
+  const existing = await runPersonDayGet(client, personId, date, date);
+  const current = existing.items[0] as Row | undefined;
+  const curStatusId = current ? ((current.statusId as number | null) ?? null) : null;
+  const curText = current ? ((current.text as string | null) ?? null) : null;
+  const nextText = flags.text ?? curText ?? null;
+
+  if (flags.dryRun) {
+    const wouldChange: Record<string, { from: unknown; to: unknown }> = {};
+    if (curStatusId !== statusId) wouldChange.status = { from: curStatusId, to: statusId };
+    if ((curText ?? null) !== (nextText ?? null)) wouldChange.text = { from: curText ?? null, to: nextText ?? null };
+    return { dryRun: true, personId, date: resolveDate(date), wouldChange };
+  }
+
+  const body: Record<string, unknown> = {
+    personId,
+    pvm,
+    personPvmStatusId: statusId,
+    personPvmText: nextText,
+  };
+  if (current) body.personPvmId = current.personPvmId;
+  return client.post(`/api/personPvm/save/${asiakasId}`, body, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
 /**
  * Register `ib person day` on the existing `person` command.
  * Reads: statuses, get. Writes: set, clear (added in later tasks).
@@ -144,11 +191,34 @@ export function registerPersonDayCommands(
       }
     });
 
-  // set + clear are added in later tasks.
-  void writeError;
-  void writeFlagsToHeaders;
-  void addWriteFlagsToCommand;
-  void toYyyymmdd;
+  const setCmd = day
+    .command("set")
+    .description("Set a person's day availability status (vacation/sick/free/…). Requires --reason.")
+    .requiredOption("--person <id>", "personId", (s: string) => Number(s))
+    .requiredOption("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)")
+    .requiredOption("--status <id|name>", "personPvmStatusId or status name (see `ib person day statuses`)")
+    .option("--text <s>", "Free-text note on the day row");
+  addWriteFlagsToCommand(setCmd).action(
+    async (opts: WriteFlags & { person: number; date: string; status: string; text?: string }) => {
+      if (!opts.reason) {
+        writeError(new Error("Missing required flag: --reason"));
+        process.exit(4);
+      }
+      try {
+        const result = await runPersonDaySet(await getClient(), opts.person, opts.date, opts.status, {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+          text: opts.text,
+        });
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
+
+  // clear is added in the next task.
 }
 
 export type { WriteFlags };

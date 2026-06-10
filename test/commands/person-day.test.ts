@@ -3,6 +3,7 @@ import {
   runPersonDayStatuses,
   runPersonDayGet,
   resolveStatusId,
+  runPersonDaySet,
 } from "../../src/commands/person/day.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -79,5 +80,48 @@ describe("resolveStatusId", () => {
       { personPvmStatusId: 2, personPvmStatus: "L", personPvmStatusName: "Loma", pois: true, vakioVapaa: false },
     ]);
     await expect(resolveStatusId(c, "nope")).rejects.toMatchObject({ exitCode: 4 });
+  });
+});
+
+describe("runPersonDaySet", () => {
+  test("dry-run reads current row, computes wouldChange, never POSTs", async () => {
+    const c = makeClient();
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      { personPvmId: 91, personId: 555, vehicleId: null, pvm: 20260610, personPvmStatusId: 5, personPvmText: null, pois: false, personPvmStatus: "T", personPvmStatusName: "Töissä" },
+    ]);
+    const out = await runPersonDaySet(c, 555, "2026-06-10", "2", { dryRun: true, reason: "vacation", text: "ranta" });
+    expect(c.post).not.toHaveBeenCalled();
+    expect(out).toEqual({
+      dryRun: true,
+      personId: 555,
+      date: "2026-06-10",
+      wouldChange: { status: { from: 5, to: 2 }, text: { from: null, to: "ranta" } },
+    });
+  });
+
+  test("real write: existing row → POST includes personPvmId (update, not insert)", async () => {
+    const c = makeClient();
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      { personPvmId: 91, personId: 555, vehicleId: null, pvm: 20260610, personPvmStatusId: 5, personPvmText: null, pois: false, personPvmStatus: "T", personPvmStatusName: "Töissä" },
+    ]);
+    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ personPvmId: 91 });
+    await runPersonDaySet(c, 555, "2026-06-10", "2", { reason: "vacation" });
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/personPvm/save/1349",
+      { personId: 555, pvm: 20260610, personPvmStatusId: 2, personPvmText: null, personPvmId: 91 },
+      { headers: { "X-Action-Reason": "vacation" } }
+    );
+  });
+
+  test("real write: no existing row → POST omits personPvmId (insert)", async () => {
+    const c = makeClient();
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ personPvmId: 200 });
+    await runPersonDaySet(c, 555, "2026-06-10", "2", { reason: "vacation" });
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/personPvm/save/1349",
+      { personId: 555, pvm: 20260610, personPvmStatusId: 2, personPvmText: null },
+      { headers: { "X-Action-Reason": "vacation" } }
+    );
   });
 });

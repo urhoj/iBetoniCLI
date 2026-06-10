@@ -1023,6 +1023,36 @@ export const COMMAND_SPECS: CommandSpec[] = [
     seeAlso: ["ib person day set", "ib driver who"],
     examples: ["ib person day get --person 555 --from today", "ib person day get --person 555 --from 2026-06-01 --to 2026-06-30"],
   },
+  {
+    command: "ib person day set",
+    description: "Set a person's day availability status (vacation/sick/free/…). Requires --reason.",
+    auth: "any",
+    flags: [
+      { name: "person", type: "number", description: "personId", required: true },
+      { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)", required: true },
+      { name: "status", type: "string", description: "personPvmStatusId or status name (see `ib person day statuses`)", required: true },
+      { name: "text", type: "string", description: "Free-text note on the day row" },
+    ],
+    mutates: true,
+    outputShape: "personPvm save result | { dryRun:true, personId, date, wouldChange:{ status?, text? } } (with --dry-run)",
+    errors: [
+      apiErr(400, "Missing --reason or unknown/ambiguous --status", "supply --reason; check `ib person day statuses`"),
+      apiErr(403, "Requires Admin or HR Admin on the active company", "use an Admin/HR account"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Requires Admin or HR Admin (server-enforced) — Keikka Handler is NOT sufficient.",
+      "--status accepts an id or a name (resolved via `ib person day statuses`).",
+      "--reason is hard-required (exits 4 without it).",
+      "--dry-run is CLIENT-side (the save endpoint has no server X-Dry-Run guard): it previews wouldChange and never writes.",
+      "Read-merges the existing row so a re-set updates in place (no duplicate). Does NOT set the vehicle — use `ib driver assign` for that (atomic).",
+    ],
+    seeAlso: ["ib person day statuses", "ib person day clear", "ib driver assign"],
+    examples: [
+      "ib person day set --person 555 --date tomorrow --status loma --reason 'kesäloma'",
+      "ib person day set --person 555 --date 2026-06-10 --status 2 --dry-run --reason preview",
+    ],
+  },
 
   // ─── vehicle (15) ─────────────────────────────────────────────────────────
   {
