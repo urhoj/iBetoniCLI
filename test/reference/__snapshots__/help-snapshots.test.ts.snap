@@ -1,5 +1,553 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`Help snapshots — contract stability > help for ib attachment attach matches snapshot 1`] = `
+"USAGE
+  ib attachment attach <attachmentId> [flags]
+
+DESCRIPTION
+  Link an EXISTING attachment to one entity (sets that FK; an attachment may be linked to several entities at once — other links are untouched).
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <attachmentId> NUMBER    attachments.attachmentId (required)
+
+FLAGS
+  --keikka NUMBER    Target keikkaId
+  --vehicle NUMBER    Target vehicleId
+  --person NUMBER    Target personId
+  --customer NUMBER    Target asiakasId
+  --worksite NUMBER    Target tyomaaId
+  --sijainti NUMBER    Target sijaintiId
+  --tuote NUMBER    Target tuoteId
+  --bug-report NUMBER    Target bugReportId
+  --request NUMBER    Jerry pumppuRequestId (request owner only)
+  --offer NUMBER    Jerry pumppuOfferId (provider company only)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { ok: true, attachmentId, <column>: entityId } | { dryRun: true, wouldAttach: {...} }
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  Attachment not found   → verify attachmentId
+  exit 3 (HTTP 403)  No membership on attachment or target → check active company
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Exactly ONE entity flag selects the target (--keikka | --vehicle | --person | --customer | --worksite | --sijainti | --tuote | --bug-report | --request | --offer).
+  - Audited via ChangeTracker on the target entity's timeline.
+  - Deploy-gated (404 until the backend ships /api/cli/attachment/*).
+
+SEE ALSO
+  ib attachment detach, ib attachment list
+
+EXAMPLES
+  ib attachment attach 4711 --vehicle 53
+  ib attachment attach 4711 --keikka 9002 --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib attachment delete matches snapshot 1`] = `
+"USAGE
+  ib attachment delete <attachmentId> [flags]
+
+DESCRIPTION
+  Soft-delete the DB row AND hard-delete the Azure blob — the blob deletion is IRREVERSIBLE. --reason is hard-required (client exits 4 without it; server 400s without the header). Requires a manager role on the owner company.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <attachmentId> NUMBER    attachments.attachmentId (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { ok: true, attachmentId, deleted: true, blobDeleted } | { dryRun: true, wouldDelete: { attachmentId, blobName, origFileName } }
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Missing --reason       → pass --reason 'why'
+  exit 4 (HTTP 400)  Missing X-Action-Reason header → pass --reason
+  exit 3 (HTTP 403)  Not owner company or missing manager role → switch to the owner company
+  exit 5 (HTTP 404)  Attachment not found or already deleted → verify attachmentId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - ALWAYS preview with --dry-run first.
+  - Audited via ChangeTracker with your --reason.
+  - Deploy-gated (404 until the backend ships /api/cli/attachment/*).
+
+SEE ALSO
+  ib attachment get, ib attachment detach
+
+EXAMPLES
+  ib attachment delete 4711 --dry-run --reason preview
+  ib attachment delete 4711 --reason "duplicate upload"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib attachment detach matches snapshot 1`] = `
+"USAGE
+  ib attachment detach <attachmentId> <entity> [flags]
+
+DESCRIPTION
+  Unlink an attachment from ONE entity (NULLs that FK). Requires a manager role (Admin / KeikkaHandler / AttachmentHandler / Owner) on the attachment's OWNER company — same gate as the web UI. A fully unlinked attachment appears in \`ib attachment search --missing\`.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <attachmentId> NUMBER    attachments.attachmentId (required)
+  <entity> STRING    keikka|vehicle|person|customer|worksite|sijainti|tuote|bug-report|request|offer (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { ok: true, attachmentId, detached: entity } | { dryRun: true, wouldDetach: {...} }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not owner company or missing manager role → switch to the owner company; need Admin/KeikkaHandler/AttachmentHandler/Owner
+  exit 5 (HTTP 404)  Attachment not found   → verify attachmentId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Audited via ChangeTracker on the previously-linked entity's timeline.
+  - Deploy-gated (404 until the backend ships /api/cli/attachment/*).
+
+SEE ALSO
+  ib attachment attach, ib attachment search
+
+EXAMPLES
+  ib attachment detach 4711 keikka
+  ib attachment detach 4711 bug-report --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib attachment download matches snapshot 1`] = `
+"USAGE
+  ib attachment download <attachmentId> [flags]
+
+DESCRIPTION
+  Download the file to LOCAL disk (get + fetch blobUrl + write). Defaults to the original file name in the current directory; refuses to overwrite without --force. LOCAL ONLY — denied on /api/cli/exec and MCP because it would write the SERVER's filesystem.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <attachmentId> NUMBER    attachments.attachmentId (required)
+
+FLAGS
+  --out STRING    Output path (default: origFileName in cwd)
+  --force BOOLEAN    Overwrite an existing file
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { ok: true, attachmentId, file (absolute path), bytes, fileType }
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  Attachment not found   → verify attachmentId
+  exit 4  Output file exists     → pass --force or --out <other path>
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Remote callers: use \`ib attachment get\` and fetch blobUrl yourselves.
+  - Deploy-gated (404 until the backend ships /api/cli/attachment/*).
+
+SEE ALSO
+  ib attachment get
+
+EXAMPLES
+  ib attachment download 4711
+  ib attachment download 4711 --out C:\\temp\\site.jpg --force
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib attachment get matches snapshot 1`] = `
+"USAGE
+  ib attachment get <attachmentId> [flags]
+
+DESCRIPTION
+  One attachment: full metadata, group/type names, and a 1-hour read-SAS blobUrl for downloading the bytes directly from Azure.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <attachmentId> NUMBER    attachments.attachmentId (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { attachmentId, origFileName, fileName, fileType, fileSize, fileComment, attachTime, liitaLaskuun, attachmentGroupId, attachmentGroupName, attachmentTypeId, attachmentTypeName, keikkaId?, vehicleId?, personId?, asiakasId?, tyomaaId?, sijaintiId?, tuoteId?, bugReportId?, pumppuRequestId?, pumppuOfferId?, entryByPersonId, ownerAsiakasId, imageWidth, imageHeight } & { fileFolder, blobUrl }
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  Attachment not found (or deleted) → verify attachmentId
+  exit 3 (HTTP 403)  No membership in the owner company or any keikka party → check the active company
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - blobUrl expires in 1h — fetch it promptly; re-run get for a fresh one.
+  - Remote contexts (exec/MCP): fetch blobUrl yourself — \`download\` is denied there.
+  - Deploy-gated (404 until the backend ships /api/cli/attachment/*).
+
+SEE ALSO
+  ib attachment download, ib attachment list
+
+EXAMPLES
+  ib attachment get 4711
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib attachment list matches snapshot 1`] = `
+"USAGE
+  ib attachment list [flags]
+
+DESCRIPTION
+  List attachments linked to ONE entity, with group/type names on every row. Rows for companies the caller is not a member of are filtered out (keikka lists use the keikka-party check instead).
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --keikka NUMBER    Target keikkaId
+  --vehicle NUMBER    Target vehicleId
+  --person NUMBER    Target personId
+  --customer NUMBER    Target asiakasId
+  --worksite NUMBER    Target tyomaaId
+  --sijainti NUMBER    Target sijaintiId
+  --tuote NUMBER    Target tuoteId
+  --bug-report NUMBER    Target bugReportId
+  --request NUMBER    Jerry pumppuRequestId (request owner only)
+  --offer NUMBER    Jerry pumppuOfferId (provider company only)
+  --group STRING    Filter by group (NAME or id — \`ib attachment types\`)
+  --type STRING    Filter by type (NAME or id — \`ib attachment types\`)
+  --limit NUMBER    Max rows (capped at 500) (default: 100)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ attachmentId, origFileName, fileName, fileType, fileSize, fileComment, attachTime, liitaLaskuun, attachmentGroupId, attachmentGroupName, attachmentTypeId, attachmentTypeName, keikkaId?, vehicleId?, personId?, asiakasId?, tyomaaId?, sijaintiId?, tuoteId?, bugReportId?, pumppuRequestId?, pumppuOfferId?, entryByPersonId, ownerAsiakasId, imageWidth, imageHeight }>
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a member of the target entity's company → check the active company (ib auth whoami)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Exactly ONE entity flag selects the target (--keikka | --vehicle | --person | --customer | --worksite | --sijainti | --tuote | --bug-report | --request | --offer).
+  - No SAS URLs in list rows — use \`ib attachment get\` for a download URL.
+  - Deploy-gated (404 until the backend ships /api/cli/attachment/*).
+
+SEE ALSO
+  ib attachment get, ib attachment types, ib attachment search
+
+EXAMPLES
+  ib attachment list --keikka 9001
+  ib attachment list --vehicle 53 --group kuva
+  ib attachment list --request 1234
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib attachment register matches snapshot 1`] = `
+"USAGE
+  ib attachment register [flags]
+
+DESCRIPTION
+  Persist attachment metadata AFTER the bytes are in Azure (remote-safe primitive; step 3 of the upload flow). Server stamps identity from the JWT (entryByPersonId, ownerAsiakasId) and rejects fileFolder values outside the active company.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --keikka NUMBER    Target keikkaId
+  --vehicle NUMBER    Target vehicleId
+  --person NUMBER    Target personId
+  --customer NUMBER    Target asiakasId
+  --worksite NUMBER    Target tyomaaId
+  --sijainti NUMBER    Target sijaintiId
+  --tuote NUMBER    Target tuoteId
+  --bug-report NUMBER    Target bugReportId
+  --request NUMBER    Jerry pumppuRequestId (request owner only)
+  --offer NUMBER    Jerry pumppuOfferId (provider company only)
+  --name STRING    fileName returned by upload-url (required)
+  --orig-name STRING    Original file name (required)
+  --folder STRING    fileFolder returned by upload-url (required)
+  --size NUMBER    File size in bytes (required)
+  --mime STRING    MIME type (stored as fileType) (required)
+  --comment STRING    fileComment
+  --group STRING    Group (NAME or id; default 1)
+  --type STRING    Type (NAME or id; default 1)
+  --etag STRING    Azure ETag (optional)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { ok: true, attachmentId } | { dryRun: true, wouldCreate: {...} }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  fileFolder outside the active company / not a member of the target → mint via upload-url; check active company
+  exit 4 (HTTP 400)  Missing required field / unknown entity → see required flags
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Exactly ONE entity flag selects the target (--keikka | --vehicle | --person | --customer | --worksite | --sijainti | --tuote | --bug-report | --request | --offer).
+  - Audited via ChangeTracker on the linked entity's timeline (--reason lands in changeTracker.reason).
+  - Deploy-gated (404 until the backend ships /api/cli/attachment/*).
+
+SEE ALSO
+  ib attachment upload-url, ib attachment upload
+
+EXAMPLES
+  ib attachment register --name uuid.jpg --orig-name site.jpg --folder 8/2026 --size 12345 --mime image/jpeg --keikka 9001
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib attachment search matches snapshot 1`] = `
+"USAGE
+  ib attachment search [<text>] [flags]
+
+DESCRIPTION
+  Search attachments in the ACTIVE company by file name / comment, or list orphans (no linked entity) with --missing.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <text> STRING    Search text (optional when --missing) (optional)
+
+FLAGS
+  --missing BOOLEAN    Only attachments with NO linked entity
+  --limit NUMBER    Max rows (capped at 500) (default: 100)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ attachmentId, origFileName, fileName, fileType, fileSize, fileComment, attachTime, liitaLaskuun, attachmentGroupId, attachmentGroupName, attachmentTypeId, attachmentTypeName, keikkaId?, vehicleId?, personId?, asiakasId?, tyomaaId?, sijaintiId?, tuoteId?, bugReportId?, pumppuRequestId?, pumppuOfferId?, entryByPersonId, ownerAsiakasId, imageWidth, imageHeight }>
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Neither text nor --missing given → pass search text or --missing
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Tenant comes from the JWT — there is no company parameter.
+  - Deploy-gated (404 until the backend ships /api/cli/attachment/*).
+
+SEE ALSO
+  ib attachment list, ib attachment detach
+
+EXAMPLES
+  ib attachment search kuormakirja
+  ib attachment search --missing
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib attachment types matches snapshot 1`] = `
+"USAGE
+  ib attachment types [flags]
+
+DESCRIPTION
+  Attachment groups + types legend (id + name + description), tenant-scoped reference data. Use these NAMES or ids in --group/--type flags everywhere in this group.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { groups: [{ attachmentGroupId, attachmentGroupName, attachmentGroupDescription, active }], types: [{ attachmentTypeId, attachmentGroupId, attachmentTypeName, attachmentTypeDescription, active }] }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Cached server-side (~hours); names are the single source of truth (code constants drift).
+  - Deploy-gated (404 until the backend ships /api/cli/attachment/*).
+
+SEE ALSO
+  ib attachment list, ib attachment upload
+
+EXAMPLES
+  ib attachment types
+  ib attachment types --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib attachment update matches snapshot 1`] = `
+"USAGE
+  ib attachment update <attachmentId> [flags]
+
+DESCRIPTION
+  Update comment / group / type / invoice-flag. The server read-merges: fields you do not pass keep their current values (entity links are never touched by update). liitaLaskuun additionally requires lasku or asiakas admin.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <attachmentId> NUMBER    attachments.attachmentId (required)
+
+FLAGS
+  --comment STRING    New fileComment
+  --liita-laskuun NUMBER    0|1 invoice-attachment flag (lasku/asiakas admin only)
+  --group STRING    Group (NAME or id — \`ib attachment types\`)
+  --type STRING    Type (NAME or id — \`ib attachment types\`)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { ok: true, attachmentId } | { dryRun: true, wouldUpdate: { fileComment: {from,to}, liitaLaskuun: {from,to}, ... } }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not owner company / missing manager role / liitaLaskuun without lasku-admin → switch company or use an admin account
+  exit 5 (HTTP 404)  Attachment not found   → verify attachmentId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Comment changes are audited via ChangeTracker.
+  - Deploy-gated (404 until the backend ships /api/cli/attachment/*).
+
+SEE ALSO
+  ib attachment types, ib attachment get
+
+EXAMPLES
+  ib attachment update 4711 --comment "hyväksytty"
+  ib attachment update 4711 --group laskutus --liita-laskuun 1
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib attachment upload matches snapshot 1`] = `
+"USAGE
+  ib attachment upload <file> [flags]
+
+DESCRIPTION
+  Upload a LOCAL file and link it to ONE entity in one step (mint SAS → PUT bytes to Azure → register metadata). --dry-run is CLIENT-side: validates the file and prints the would-be payload with ZERO network calls. LOCAL ONLY — denied on /api/cli/exec and MCP because it would read the SERVER's filesystem.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <file> STRING    Path to the local file (required)
+
+FLAGS
+  --keikka NUMBER    Target keikkaId
+  --vehicle NUMBER    Target vehicleId
+  --person NUMBER    Target personId
+  --customer NUMBER    Target asiakasId
+  --worksite NUMBER    Target tyomaaId
+  --sijainti NUMBER    Target sijaintiId
+  --tuote NUMBER    Target tuoteId
+  --bug-report NUMBER    Target bugReportId
+  --request NUMBER    Jerry pumppuRequestId (request owner only)
+  --offer NUMBER    Jerry pumppuOfferId (provider company only)
+  --comment STRING    fileComment shown in the UI
+  --group STRING    Group (NAME or id — \`ib attachment types\`; default 1)
+  --type STRING    Type (NAME or id — \`ib attachment types\`; default 1)
+  --mime STRING    Override auto-detected MIME (fallback application/octet-stream)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { ok: true, attachmentId } | { dryRun: true, wouldUpload: {...} }
+
+ERRORS (stderr, exit non-zero)
+  exit 4  File unreadable / bad entity flags → check the path and pass exactly one entity flag
+  exit 6  Azure PUT failed       → re-run; SAS expires in 1h
+  exit 3 (HTTP 403)  Not a member of the target entity's company → check active company
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Exactly ONE entity flag selects the target (--keikka | --vehicle | --person | --customer | --worksite | --sijainti | --tuote | --bug-report | --request | --offer).
+  - No image compression — the file uploads as-is (the web UI compresses to ~1MB).
+  - Remote contexts: use upload-url + PUT yourself + register.
+  - Deploy-gated (404 until the backend ships /api/cli/attachment/*).
+
+SEE ALSO
+  ib attachment upload-url, ib attachment register, ib attachment types
+
+EXAMPLES
+  ib attachment upload ./site.jpg --keikka 9001 --comment "pohjakuva"
+  ib attachment upload ./tarjous.pdf --offer 567 --reason "offer docs"
+  ib attachment upload ./x.pdf --vehicle 53 --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib attachment upload-url matches snapshot 1`] = `
+"USAGE
+  ib attachment upload-url [flags]
+
+DESCRIPTION
+  Mint a 1-hour write-SAS upload URL (remote-safe primitive). The SERVER picks the blob path ({ownerAsiakasId}/{year}/{uuid}.{ext}) — callers cannot choose it. PUT your bytes to uploadUrl with header x-ms-blob-type: BlockBlob, then call \`ib attachment register\`.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --name STRING    Original file name WITH extension (required)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { uploadUrl, fileFolder, fileName, putHeaders: { 'x-ms-blob-type': 'BlockBlob' }, expiresInSeconds: 3600 }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Missing/invalid name (needs an extension, no path separators) → pass --name file.ext
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Minting alone creates no DB row — unregistered blobs are orphans.
+  - Deploy-gated (404 until the backend ships /api/cli/attachment/*).
+
+SEE ALSO
+  ib attachment register, ib attachment upload
+
+EXAMPLES
+  ib attachment upload-url --name site.jpg
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib auth login matches snapshot 1`] = `
 "USAGE
   ib auth login [flags]
