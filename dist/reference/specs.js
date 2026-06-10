@@ -1719,21 +1719,31 @@ export const COMMAND_SPECS = [
     // ─── sijainti (11) ───────────────────────────────────────────────────────
     {
         command: "ib sijainti list",
-        description: "List geocoded locations (sijainnit) — depots, plants, customer destinations. Optional --type filters by sijaintiTypeId.",
+        description: "List geocoded locations (sijainnit) — depots, plants, customer destinations. Rows carry a human-readable typeName (joined from the sijaintiTypes lookup). --type filters by sijaintiTypeId OR type name (e.g. betoniasema, jäteasema); --search filters client-side by name/address/typeName substring.",
         permissions: ["auth.page.sijainnit.read"],
         flags: [
-            { name: "type", type: "number", description: "Filter by sijaintiTypeId" },
+            { name: "type", type: "string", description: "Filter by sijaintiTypeId or type name (case-insensitive; exact selite match wins, else unique substring — see `ib sijainti types`)" },
+            { name: "search", type: "string", description: "Client-side filter: case-insensitive substring over name/address/typeName (scans up to 500 rows)" },
             { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
             { name: "valid-at", type: "date", description: "Only sijainnit valid on this date (startDate/endDate window)" },
             { name: "include-deleted", type: "boolean", description: "Include soft-deleted sijainnit" },
         ],
-        outputShape: "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, jerryActiveUntil }>",
-        errors: permErrors("auth.page.sijainnit.read"),
+        outputShape: "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, jerryActiveUntil }>",
+        errors: [
+            { exit: 4, meaning: "Unknown or ambiguous --type name", remedy: "the error lists the valid types; or run `ib sijainti types`" },
+            ...permErrors("auth.page.sijainnit.read"),
+        ],
+        notes: [
+            "typeName is joined client-side from the sijaintiTypes lookup (one extra GET, automatic).",
+            "--search has no backend counterpart: the CLI fetches up to the 500-row cap, filters locally, then applies --limit.",
+            "An unknown numeric --type id is passed through and simply returns zero rows; an unknown type NAME exits 4.",
+        ],
+        seeAlso: ["ib sijainti types", "ib search"],
         examples: [
             "ib sijainti list",
-            "ib sijainti list --type 1",
+            "ib sijainti list --type jäteasema",
+            "ib sijainti list --search varikko",
             "ib sijainti list --valid-at today",
-            "ib sijainti list --include-deleted",
         ],
     },
     {
@@ -1868,7 +1878,7 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib sijainti types",
-        description: "List sijainti type categories (the 'Sijainnin laji' lookup). Resolves the sijaintiTypeId values used by `sijainti list --type` and `create/update --type`.",
+        description: "List sijainti type categories (the 'Sijainnin laji' lookup). Resolves the sijaintiTypeId values used by `sijainti list --type` (which also accepts these names, e.g. betoniasema) and `create/update --type`.",
         permissions: ["auth.page.sijainnit.read"],
         flags: [
             { name: "jerry", type: "boolean", description: "Use the BetoniJerry type set (useJerry=1)" },
@@ -3245,11 +3255,11 @@ export const COMMAND_SPECS = [
     // ─── search (1) ──────────────────────────────────────────────────────────
     {
         command: "ib search",
-        description: "Cross-entity unified search: customers, worksites, persons, vehicles and keikkas in ONE flat ranked list. Client-side parallel fan-out over the per-entity searches — use this to resolve \"who/what is X\" without guessing the entity type.",
+        description: "Cross-entity unified search: customers, worksites, persons, vehicles, keikkas and sijainnit in ONE flat ranked list. Client-side parallel fan-out over the per-entity searches — use this to resolve \"who/what is X\" without guessing the entity type.",
         auth: "any",
         args: [{ name: "query", type: "string", description: "Search string" }],
         flags: [
-            { name: "in", type: "string", description: "Comma-separated subset of: customer,worksite,person,vehicle,keikka" },
+            { name: "in", type: "string", description: "Comma-separated subset of: customer,worksite,person,vehicle,keikka,sijainti" },
             { name: "limit", type: "number", default: "5", description: "Max hits per entity" },
             { name: "my-companies", type: "boolean", description: "Search across every company you belong to (customer/worksite/person)" },
         ],
@@ -3257,15 +3267,17 @@ export const COMMAND_SPECS = [
         errors: COMMON_AUTH_ERRORS,
         notes: [
             "A failing/denied entity degrades gracefully into errors[] — exit 0 if at least one entity succeeded; if ALL fail, exits with the first failure's mapped code.",
-            "Ordering: prefix label matches first, then entity order customer→worksite→person→vehicle→keikka.",
-            "Each hit carries its native id field (asiakasId/tyomaaId/personId/vehicleId/keikkaId) for a follow-up `ib <entity> get <id>`.",
+            "Ordering: prefix label matches first, then entity order customer→worksite→person→vehicle→keikka→sijainti.",
+            "Each hit carries its native id field (asiakasId/tyomaaId/personId/vehicleId/keikkaId/sijaintiId) for a follow-up `ib <entity> get <id>`.",
+            "Sijainti is matched fully client-side (no backend search): name/address/typeName substring over up to 500 rows — type names like \"jäteasema\" match too.",
             "No backend changes — works against current production.",
-            "--my-companies covers customer/worksite/person only; vehicle and keikka stay scoped to the active company.",
+            "--my-companies covers customer/worksite/person only; vehicle, keikka and sijainti stay scoped to the active company.",
         ],
         examples: [
             "ib search kamppi",
             "ib search 0401234567 --in person,keikka",
             "ib search \"Rudus\" --in customer --limit 10",
+            "ib search jäteasema --in sijainti",
         ],
     },
 ];

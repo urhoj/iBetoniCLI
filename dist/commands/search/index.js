@@ -6,8 +6,9 @@ import { runPersonSearch } from "../person/index.js";
 import { runWorksiteSearch } from "../worksite/index.js";
 import { runVehicleSearch } from "../vehicle/index.js";
 import { runKeikkaSearch } from "../keikka/index.js";
+import { runSijaintiListJoined, sijaintiRowMatches, SIJAINTI_SEARCH_SCAN_LIMIT, } from "../sijainti/index.js";
 /** Canonical entity order — also the within-tier sort order of merged hits. */
-export const SEARCH_ENTITIES = ["customer", "worksite", "person", "vehicle", "keikka"];
+export const SEARCH_ENTITIES = ["customer", "worksite", "person", "vehicle", "keikka", "sijainti"];
 const DEFAULT_LIMIT = 5;
 /** Parse `--in customer,person`; undefined → all. Unknown name → exit 4. */
 export function parseEntityFilter(input) {
@@ -77,6 +78,24 @@ function projectKeikkas(items) {
         detail: [k.pumppuAika, k.customerName].filter(Boolean).join(" · ") || null,
     }));
 }
+/**
+ * Sijainti projector — fully client-side: there is no backend sijainti search,
+ * so the source fetches the typeName-joined list at the 500-row cap and the
+ * query filter (name/address/typeName substring, incl. type names like
+ * "betoniasema") + the per-entity limit are applied here.
+ */
+function projectSijainnit(items, query, limit) {
+    return items
+        .filter((s) => sijaintiRowMatches(s, query))
+        .slice(0, limit)
+        .map((s) => ({
+        entity: "sijainti",
+        id: Number(s.sijaintiId),
+        sijaintiId: Number(s.sijaintiId),
+        label: s.name ?? null,
+        detail: [s.typeName, s.address].filter(Boolean).join(" · ") || null,
+    }));
+}
 /* ── fan-out + merge ────────────────────────────────────────────────────── */
 /** Items from a list envelope, defensively. */
 function envItems(env) {
@@ -85,20 +104,23 @@ function envItems(env) {
         : [];
 }
 /** Dispatch a source's raw result to its projector (accepts native row shapes). */
-function projectFor(entity, value, query) {
+function projectFor(entity, value, query, limit) {
     switch (entity) {
         case "customer": return projectCustomer(value);
         case "person": return projectPersons(envItems(value));
         case "worksite": return projectWorksites(envItems(value));
         case "vehicle": return projectVehicles(envItems(value), query);
         case "keikka": return projectKeikkas(envItems(value));
+        case "sijainti": return projectSijainnit(envItems(value), query, limit);
     }
 }
 /**
  * Fan out to the selected entity sources in parallel and merge.
  * Sources return raw entity shapes — `projectFor` is the single projection point.
+ * `limit` only matters to entities filtered client-side (sijainti); the rest
+ * are limited server-side by their source.
  */
-export async function runUnifiedSearch(query, rawSources, entities = [...SEARCH_ENTITIES]) {
+export async function runUnifiedSearch(query, rawSources, entities = [...SEARCH_ENTITIES], limit = Infinity) {
     const selected = SEARCH_ENTITIES.filter((e) => entities.includes(e));
     const settled = await Promise.allSettled(selected.map((e) => rawSources[e]()));
     const items = [];
@@ -115,7 +137,7 @@ export async function runUnifiedSearch(query, rawSources, entities = [...SEARCH_
             });
             return;
         }
-        items.push(...projectFor(entity, res.value, query));
+        items.push(...projectFor(entity, res.value, query, limit));
     });
     if (items.length === 0 && errors.length === selected.length && firstFailure !== null) {
         throw firstFailure; // every entity failed — surface the first error (mapped exit code)
@@ -132,7 +154,7 @@ export async function runUnifiedSearch(query, rawSources, entities = [...SEARCH_
  *
  * When `myCompanies` is true, customer/worksite/person fan out across all
  * companies the caller belongs to (backend-side fan-out or the cross-company
- * person endpoint). Vehicle and keikka are always active-company only.
+ * person endpoint). Vehicle, keikka and sijainti are always active-company only.
  */
 export function buildSearchSources(client, query, limit, myCompanies = false) {
     return {
@@ -150,6 +172,9 @@ export function buildSearchSources(client, query, limit, myCompanies = false) {
             const { ownerAsiakasId } = decodeJwtPayload(client.getCurrentToken());
             return runKeikkaSearch(client, query, ownerAsiakasId, limit); // active company only
         },
+        // No backend sijainti search: fetch the typeName-joined list at the cap;
+        // projectSijainnit applies the query filter + limit. Active company only.
+        sijainti: () => runSijaintiListJoined(client, { limit: SIJAINTI_SEARCH_SCAN_LIMIT }),
     };
 }
 /* ── Commander wiring ───────────────────────────────────────────────────── */
@@ -160,16 +185,16 @@ export function buildSearchSources(client, query, limit, myCompanies = false) {
 export function registerSearchCommands(parent, getClient) {
     parent
         .command("search <query>")
-        .description("Cross-entity search: customers, worksites, persons, vehicles, keikkas (one flat ranked list)")
+        .description("Cross-entity search: customers, worksites, persons, vehicles, keikkas, sijainnit (one flat ranked list)")
         .option("--in <entities>", `Comma-separated subset of: ${SEARCH_ENTITIES.join(",")}`)
         .option("--limit <n>", "Max hits per entity", (v) => Number(v), DEFAULT_LIMIT)
-        .option("--my-companies", "Also search every company you belong to (customer/worksite/person only; vehicle & keikka stay active-company)")
+        .option("--my-companies", "Also search every company you belong to (customer/worksite/person only; vehicle, keikka & sijainti stay active-company)")
         .action(async (query, opts) => {
         try {
             const entities = parseEntityFilter(opts.in);
             const client = await getClient();
             const srcs = buildSearchSources(client, query, opts.limit, !!opts.myCompanies);
-            const result = await runUnifiedSearch(query, srcs, entities);
+            const result = await runUnifiedSearch(query, srcs, entities, opts.limit);
             writeJson(result);
         }
         catch (e) {

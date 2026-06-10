@@ -2,6 +2,7 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFla
 import { writeJson, exitWithError, failWith, errorMessage, } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
+import { CliError } from "../../api/errors.js";
 /**
  * Sentinel `jerryActiveUntil` value meaning "enrolled in BetoniJerry, no end
  * date" — matches the EditSijainti toggle (a future/sentinel datetime = active,
@@ -197,6 +198,75 @@ export async function runSijaintiTypes(client, useJerry) {
     }));
     return { items, nextCursor: null, count: items.length };
 }
+/** Backend list cap — what a client-side `--search` scan fetches to cover the set. */
+export const SIJAINTI_SEARCH_SCAN_LIMIT = 500;
+/** Backend list default, re-applied after a client-side search filter. */
+const DEFAULT_LIST_LIMIT = 100;
+/**
+ * Case-insensitive substring match over a (typeName-joined) list row's
+ * searchable fields: name, address, typeName. Shared by `sijainti list
+ * --search` and the sijainti entity of `ib search`.
+ */
+export function sijaintiRowMatches(row, query) {
+    const q = query.toLowerCase();
+    return [row.name, row.address, row.typeName].some((f) => typeof f === "string" && f.toLowerCase().includes(q));
+}
+/**
+ * Resolve a `--type` value to a numeric sijaintiTypeId against the
+ * sijaintiTypes lookup. Numeric input passes through (an unknown id simply
+ * matches no rows server-side). Names match the selite case-insensitively —
+ * exact match wins, else a unique substring (e.g. "jäte" → Jäteasema); an
+ * unknown or ambiguous name throws a validation error (exit 4) listing the
+ * valid types so the caller can self-correct.
+ */
+export function resolveSijaintiTypeId(types, input) {
+    const n = Number(input);
+    if (Number.isInteger(n) && n > 0)
+        return n;
+    const q = input.trim().toLowerCase();
+    const named = types.filter((t) => !!t.selite);
+    const exact = named.filter((t) => t.selite.toLowerCase() === q);
+    const matches = exact.length > 0 ? exact : named.filter((t) => t.selite.toLowerCase().includes(q));
+    if (matches.length === 1)
+        return matches[0].sijaintiTypeId;
+    const valid = named.map((t) => `${t.sijaintiTypeId}=${t.selite}`).join(", ");
+    throw new CliError(matches.length === 0
+        ? `Unknown sijainti type "${input}" — valid: ${valid}`
+        : `Ambiguous sijainti type "${input}" — matches: ${matches
+            .map((t) => t.selite)
+            .join(", ")}. Valid: ${valid}`, 0, null, 4);
+}
+/**
+ * `ib sijainti list` orchestrator. Fetches the sijaintiTypes lookup first (it
+ * also resolves a type-NAME `--type` to its id), then the list, and joins a
+ * human-readable `typeName` onto every row. There is no backend search for
+ * sijainnit, so `--search` fetches up to the backend cap (500 rows), filters
+ * locally by name/address/typeName substring, then slices to `limit` (default
+ * 100) — deploy-safe, works against current production.
+ */
+export async function runSijaintiListJoined(client, opts) {
+    const types = await runSijaintiTypes(client);
+    const typeId = opts.type !== undefined && opts.type !== ""
+        ? resolveSijaintiTypeId(types.items, opts.type)
+        : undefined;
+    const env = await runSijaintiList(client, {
+        type: typeId !== undefined ? String(typeId) : undefined,
+        limit: opts.search ? SIJAINTI_SEARCH_SCAN_LIMIT : opts.limit,
+        validAt: opts.validAt,
+        includeDeleted: opts.includeDeleted,
+    });
+    const selite = new Map(types.items.map((t) => [t.sijaintiTypeId, t.selite]));
+    let items = env.items.map((r) => ({
+        ...r,
+        typeName: selite.get(Number(r.type)) ?? null,
+    }));
+    if (opts.search) {
+        items = items
+            .filter((r) => sijaintiRowMatches(r, opts.search))
+            .slice(0, opts.limit ?? DEFAULT_LIST_LIMIT);
+    }
+    return { items, nextCursor: null, count: items.length };
+}
 /**
  * POST /api/geocode/getLatLng — geocode a free-form address string to
  * coordinates via Google Maps. The backend derives ownerAsiakasId from the
@@ -315,7 +385,8 @@ export async function runSijaintiDistance(client, fromToken, toToken) {
 }
 /**
  * Register `ib sijainti` subcommands on the parent commander instance:
- *   - list      filterable by --type/--limit/--valid-at/--include-deleted
+ *   - list      typeName-joined rows; filterable by --type (id or name)/--search/
+ *               --limit/--valid-at/--include-deleted
  *   - get       single sijainti by id (existing /api/geocode/sijainti route)
  *   - types     sijainti type lookup (sijaintiTypeId → selite)
  *   - geocode   address → coords via Google Maps
@@ -336,15 +407,17 @@ export function registerSijaintiCommands(parent, getClient) {
     const s = parent.command("sijainti").description("Sijainti (location) commands");
     s.command("list")
         .description("List sijainti (locations)")
-        .option("--type <t>", "Filter by sijainti type")
+        .option("--type <t>", "Filter by sijaintiTypeId or type name (e.g. betoniasema)")
+        .option("--search <text>", "Client-side filter: case-insensitive substring over name/address/typeName")
         .option("--limit <n>", "Max rows", (v) => Math.min(Number(v), 500))
         .option("--valid-at <date>", "Only sijainnit valid on this date (YYYY-MM-DD or today/yesterday/tomorrow)")
         .option("--include-deleted", "Include soft-deleted sijainnit")
         .action(async (opts) => {
         try {
             const client = await getClient();
-            const result = await runSijaintiList(client, {
+            const result = await runSijaintiListJoined(client, {
                 type: opts.type,
+                search: opts.search,
                 limit: opts.limit,
                 validAt: opts.validAt ? resolveDate(opts.validAt) : undefined,
                 includeDeleted: opts.includeDeleted,

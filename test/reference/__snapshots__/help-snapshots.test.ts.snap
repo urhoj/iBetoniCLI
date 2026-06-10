@@ -4209,14 +4209,14 @@ exports[`Help snapshots — contract stability > help for ib search matches snap
   ib search <query> [flags]
 
 DESCRIPTION
-  Cross-entity unified search: customers, worksites, persons, vehicles and keikkas in ONE flat ranked list. Client-side parallel fan-out over the per-entity searches — use this to resolve "who/what is X" without guessing the entity type.
+  Cross-entity unified search: customers, worksites, persons, vehicles, keikkas and sijainnit in ONE flat ranked list. Client-side parallel fan-out over the per-entity searches — use this to resolve "who/what is X" without guessing the entity type.
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
   <query> STRING    Search string (required)
 
 FLAGS
-  --in STRING    Comma-separated subset of: customer,worksite,person,vehicle,keikka
+  --in STRING    Comma-separated subset of: customer,worksite,person,vehicle,keikka,sijainti
   --limit NUMBER    Max hits per entity (default: 5)
   --my-companies BOOLEAN    Search across every company you belong to (customer/worksite/person)
 
@@ -4232,15 +4232,17 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - A failing/denied entity degrades gracefully into errors[] — exit 0 if at least one entity succeeded; if ALL fail, exits with the first failure's mapped code.
-  - Ordering: prefix label matches first, then entity order customer→worksite→person→vehicle→keikka.
-  - Each hit carries its native id field (asiakasId/tyomaaId/personId/vehicleId/keikkaId) for a follow-up \`ib <entity> get <id>\`.
+  - Ordering: prefix label matches first, then entity order customer→worksite→person→vehicle→keikka→sijainti.
+  - Each hit carries its native id field (asiakasId/tyomaaId/personId/vehicleId/keikkaId/sijaintiId) for a follow-up \`ib <entity> get <id>\`.
+  - Sijainti is matched fully client-side (no backend search): name/address/typeName substring over up to 500 rows — type names like "jäteasema" match too.
   - No backend changes — works against current production.
-  - --my-companies covers customer/worksite/person only; vehicle and keikka stay scoped to the active company.
+  - --my-companies covers customer/worksite/person only; vehicle, keikka and sijainti stay scoped to the active company.
 
 EXAMPLES
   ib search kamppi
   ib search 0401234567 --in person,keikka
   ib search "Rudus" --in customer --limit 10
+  ib search jäteasema --in sijainti
 "
 `;
 
@@ -4448,12 +4450,13 @@ exports[`Help snapshots — contract stability > help for ib sijainti list match
   ib sijainti list [flags]
 
 DESCRIPTION
-  List geocoded locations (sijainnit) — depots, plants, customer destinations. Optional --type filters by sijaintiTypeId.
+  List geocoded locations (sijainnit) — depots, plants, customer destinations. Rows carry a human-readable typeName (joined from the sijaintiTypes lookup). --type filters by sijaintiTypeId OR type name (e.g. betoniasema, jäteasema); --search filters client-side by name/address/typeName substring.
   Permissions: requires auth.page.sijainnit.read.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
-  --type NUMBER    Filter by sijaintiTypeId
+  --type STRING    Filter by sijaintiTypeId or type name (case-insensitive; exact selite match wins, else unique substring — see \`ib sijainti types\`)
+  --search STRING    Client-side filter: case-insensitive substring over name/address/typeName (scans up to 500 rows)
   --limit NUMBER    Max rows (capped at 500) (default: 100)
   --valid-at DATE    Only sijainnit valid on this date (startDate/endDate window)
   --include-deleted BOOLEAN    Include soft-deleted sijainnit
@@ -4462,18 +4465,27 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, jerryActiveUntil }>
+  ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, jerryActiveUntil }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4  Unknown or ambiguous --type name → the error lists the valid types; or run \`ib sijainti types\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - typeName is joined client-side from the sijaintiTypes lookup (one extra GET, automatic).
+  - --search has no backend counterpart: the CLI fetches up to the 500-row cap, filters locally, then applies --limit.
+  - An unknown numeric --type id is passed through and simply returns zero rows; an unknown type NAME exits 4.
+
+SEE ALSO
+  ib sijainti types, ib search
+
 EXAMPLES
   ib sijainti list
-  ib sijainti list --type 1
+  ib sijainti list --type jäteasema
+  ib sijainti list --search varikko
   ib sijainti list --valid-at today
-  ib sijainti list --include-deleted
 "
 `;
 
@@ -4529,7 +4541,7 @@ exports[`Help snapshots — contract stability > help for ib sijainti types matc
   ib sijainti types [flags]
 
 DESCRIPTION
-  List sijainti type categories (the 'Sijainnin laji' lookup). Resolves the sijaintiTypeId values used by \`sijainti list --type\` and \`create/update --type\`.
+  List sijainti type categories (the 'Sijainnin laji' lookup). Resolves the sijaintiTypeId values used by \`sijainti list --type\` (which also accepts these names, e.g. betoniasema) and \`create/update --type\`.
   Permissions: requires auth.page.sijainnit.read.
 
 FLAGS

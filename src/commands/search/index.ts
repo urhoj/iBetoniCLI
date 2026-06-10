@@ -8,9 +8,14 @@ import { runPersonSearch, type PersonSearchHit } from "../person/index.js";
 import { runWorksiteSearch } from "../worksite/index.js";
 import { runVehicleSearch } from "../vehicle/index.js";
 import { runKeikkaSearch, type KeikkaSearchHit } from "../keikka/index.js";
+import {
+  runSijaintiListJoined,
+  sijaintiRowMatches,
+  SIJAINTI_SEARCH_SCAN_LIMIT,
+} from "../sijainti/index.js";
 
 /** Canonical entity order — also the within-tier sort order of merged hits. */
-export const SEARCH_ENTITIES = ["customer", "worksite", "person", "vehicle", "keikka"] as const;
+export const SEARCH_ENTITIES = ["customer", "worksite", "person", "vehicle", "keikka", "sijainti"] as const;
 export type SearchEntity = (typeof SEARCH_ENTITIES)[number];
 
 /** Uniform hit core + the entity's native id field (asiakasId/tyomaaId/...). */
@@ -117,6 +122,29 @@ function projectKeikkas(items: KeikkaSearchHit[]): UnifiedHit[] {
   }));
 }
 
+/**
+ * Sijainti projector — fully client-side: there is no backend sijainti search,
+ * so the source fetches the typeName-joined list at the 500-row cap and the
+ * query filter (name/address/typeName substring, incl. type names like
+ * "betoniasema") + the per-entity limit are applied here.
+ */
+function projectSijainnit(
+  items: Record<string, unknown>[],
+  query: string,
+  limit: number
+): UnifiedHit[] {
+  return items
+    .filter((s) => sijaintiRowMatches(s, query))
+    .slice(0, limit)
+    .map((s) => ({
+      entity: "sijainti" as const,
+      id: Number(s.sijaintiId),
+      sijaintiId: Number(s.sijaintiId),
+      label: (s.name as string) ?? null,
+      detail: [s.typeName, s.address].filter(Boolean).join(" · ") || null,
+    }));
+}
+
 /* ── fan-out + merge ────────────────────────────────────────────────────── */
 
 /** Items from a list envelope, defensively. */
@@ -127,24 +155,33 @@ function envItems<T>(env: unknown): T[] {
 }
 
 /** Dispatch a source's raw result to its projector (accepts native row shapes). */
-function projectFor(entity: SearchEntity, value: unknown, query: string): UnifiedHit[] {
+function projectFor(
+  entity: SearchEntity,
+  value: unknown,
+  query: string,
+  limit: number
+): UnifiedHit[] {
   switch (entity) {
     case "customer": return projectCustomer(value);
     case "person": return projectPersons(envItems(value));
     case "worksite": return projectWorksites(envItems(value));
     case "vehicle": return projectVehicles(envItems(value), query);
     case "keikka": return projectKeikkas(envItems(value));
+    case "sijainti": return projectSijainnit(envItems(value), query, limit);
   }
 }
 
 /**
  * Fan out to the selected entity sources in parallel and merge.
  * Sources return raw entity shapes — `projectFor` is the single projection point.
+ * `limit` only matters to entities filtered client-side (sijainti); the rest
+ * are limited server-side by their source.
  */
 export async function runUnifiedSearch(
   query: string,
   rawSources: SearchSources,
-  entities: SearchEntity[] = [...SEARCH_ENTITIES]
+  entities: SearchEntity[] = [...SEARCH_ENTITIES],
+  limit: number = Infinity
 ): Promise<UnifiedSearchEnvelope> {
   const selected = SEARCH_ENTITIES.filter((e) => entities.includes(e));
   const settled = await Promise.allSettled(selected.map((e) => rawSources[e]()));
@@ -163,7 +200,7 @@ export async function runUnifiedSearch(
       });
       return;
     }
-    items.push(...projectFor(entity, res.value, query));
+    items.push(...projectFor(entity, res.value, query, limit));
   });
 
   if (items.length === 0 && errors.length === selected.length && firstFailure !== null) {
@@ -184,7 +221,7 @@ export async function runUnifiedSearch(
  *
  * When `myCompanies` is true, customer/worksite/person fan out across all
  * companies the caller belongs to (backend-side fan-out or the cross-company
- * person endpoint). Vehicle and keikka are always active-company only.
+ * person endpoint). Vehicle, keikka and sijainti are always active-company only.
  */
 export function buildSearchSources(
   client: ApiClient,
@@ -207,6 +244,10 @@ export function buildSearchSources(
       const { ownerAsiakasId } = decodeJwtPayload(client.getCurrentToken());
       return runKeikkaSearch(client, query, ownerAsiakasId, limit); // active company only
     },
+    // No backend sijainti search: fetch the typeName-joined list at the cap;
+    // projectSijainnit applies the query filter + limit. Active company only.
+    sijainti: () =>
+      runSijaintiListJoined(client, { limit: SIJAINTI_SEARCH_SCAN_LIMIT }),
   };
 }
 
@@ -222,16 +263,16 @@ export function registerSearchCommands(
 ): void {
   parent
     .command("search <query>")
-    .description("Cross-entity search: customers, worksites, persons, vehicles, keikkas (one flat ranked list)")
+    .description("Cross-entity search: customers, worksites, persons, vehicles, keikkas, sijainnit (one flat ranked list)")
     .option("--in <entities>", `Comma-separated subset of: ${SEARCH_ENTITIES.join(",")}`)
     .option("--limit <n>", "Max hits per entity", (v: string) => Number(v), DEFAULT_LIMIT)
-    .option("--my-companies", "Also search every company you belong to (customer/worksite/person only; vehicle & keikka stay active-company)")
+    .option("--my-companies", "Also search every company you belong to (customer/worksite/person only; vehicle, keikka & sijainti stay active-company)")
     .action(async (query: string, opts: { in?: string; limit: number; myCompanies?: boolean }) => {
       try {
         const entities = parseEntityFilter(opts.in);
         const client = await getClient();
         const srcs = buildSearchSources(client, query, opts.limit, !!opts.myCompanies);
-        const result = await runUnifiedSearch(query, srcs, entities);
+        const result = await runUnifiedSearch(query, srcs, entities, opts.limit);
         writeJson(result);
       } catch (e) {
         exitWithError(e);

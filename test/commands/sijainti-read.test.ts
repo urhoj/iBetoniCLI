@@ -1,14 +1,18 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import {
   runSijaintiList,
+  runSijaintiListJoined,
   runSijaintiGet,
   runSijaintiSetJerry,
   runSijaintiTypes,
   runSijaintiGeocode,
   runSijaintiClosest,
   runSijaintiDistance,
+  resolveSijaintiTypeId,
+  sijaintiRowMatches,
 } from "../../src/commands/sijainti/index.js";
 import type { ApiClient } from "../../src/api/client.js";
+import { CliError } from "../../src/api/errors.js";
 
 const mockClient = {
   get: vi.fn(),
@@ -262,5 +266,110 @@ describe("ib sijainti distance", () => {
       runSijaintiDistance(mockClient, "60.17,", "1,2")
     ).rejects.toThrow(/invalid point/);
     expect(get).not.toHaveBeenCalled();
+  });
+});
+
+const TYPE_ROWS = [
+  { sijaintiTypeId: 1, sijaintiTypeSelite: "Betoniasema" },
+  { sijaintiTypeId: 2, sijaintiTypeSelite: "Jäteasema" },
+  { sijaintiTypeId: 3, sijaintiTypeSelite: "Varikko" },
+];
+const TYPE_ITEMS = TYPE_ROWS.map((t) => ({
+  sijaintiTypeId: t.sijaintiTypeId,
+  selite: t.sijaintiTypeSelite,
+}));
+
+describe("resolveSijaintiTypeId", () => {
+  test("numeric input passes through", () => {
+    expect(resolveSijaintiTypeId(TYPE_ITEMS, "3")).toBe(3);
+  });
+  test("exact name match, case-insensitive", () => {
+    expect(resolveSijaintiTypeId(TYPE_ITEMS, "betoniasema")).toBe(1);
+  });
+  test("unique substring match (jäte → Jäteasema)", () => {
+    expect(resolveSijaintiTypeId(TYPE_ITEMS, "jäte")).toBe(2);
+  });
+  test("ambiguous substring → CliError exit 4 listing matches", () => {
+    try {
+      resolveSijaintiTypeId(TYPE_ITEMS, "asema");
+      expect.unreachable("should throw");
+    } catch (e) {
+      expect(e).toBeInstanceOf(CliError);
+      expect((e as CliError).exitCode).toBe(4);
+      expect((e as CliError).message).toMatch(/Betoniasema.*Jäteasema/);
+    }
+  });
+  test("unknown name → CliError exit 4 listing valid types", () => {
+    try {
+      resolveSijaintiTypeId(TYPE_ITEMS, "satama");
+      expect.unreachable("should throw");
+    } catch (e) {
+      expect(e).toBeInstanceOf(CliError);
+      expect((e as CliError).exitCode).toBe(4);
+      expect((e as CliError).message).toMatch(/1=Betoniasema/);
+    }
+  });
+});
+
+describe("sijaintiRowMatches", () => {
+  test("matches name/address/typeName case-insensitively; ignores non-strings", () => {
+    const row = { name: "Kamppi varikko", address: "Malminkatu 2", typeName: "Jäteasema", coords: null };
+    expect(sijaintiRowMatches(row, "VARIKKO")).toBe(true);
+    expect(sijaintiRowMatches(row, "malminkatu")).toBe(true);
+    expect(sijaintiRowMatches(row, "jäteasema")).toBe(true);
+    expect(sijaintiRowMatches(row, "betoniasema")).toBe(false);
+    expect(sijaintiRowMatches({ name: null, address: null, typeName: null }, "x")).toBe(false);
+  });
+});
+
+describe("runSijaintiListJoined", () => {
+  const get = mockClient.get as ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    get.mockReset();
+    get.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/geocode/sijaintiTypes")) return TYPE_ROWS;
+      if (path.startsWith("/api/cli/sijainti/list")) {
+        return {
+          items: [
+            { sijaintiId: 1, name: "Helsinki asema", address: "Asemakatu 1", coords: null, type: 1, jerryActiveUntil: null },
+            { sijaintiId: 2, name: "Kaatopaikka", address: "Jätekuja 9", coords: null, type: 2, jerryActiveUntil: null },
+            { sijaintiId: 3, name: "Varikko Itä", address: null, coords: null, type: 99, jerryActiveUntil: null },
+          ],
+          nextCursor: null,
+          count: 3,
+        };
+      }
+      throw new Error(`unexpected GET ${path}`);
+    });
+  });
+
+  test("joins typeName onto every row (null for unknown type ids)", async () => {
+    const result = await runSijaintiListJoined(mockClient, {});
+    expect(get).toHaveBeenCalledWith("/api/geocode/sijaintiTypes");
+    expect(get).toHaveBeenCalledWith("/api/cli/sijainti/list");
+    expect(result.items.map((r) => r.typeName)).toEqual([
+      "Betoniasema",
+      "Jäteasema",
+      null,
+    ]);
+  });
+
+  test("--type NAME resolves to its id in the backend query", async () => {
+    await runSijaintiListJoined(mockClient, { type: "jäteasema" });
+    expect(get).toHaveBeenCalledWith("/api/cli/sijainti/list?type=2");
+  });
+
+  test("--search fetches at the 500 cap and filters by name/address/typeName", async () => {
+    const result = await runSijaintiListJoined(mockClient, { search: "jäte" });
+    expect(get).toHaveBeenCalledWith("/api/cli/sijainti/list?limit=500");
+    // "jäte" hits Kaatopaikka twice (address Jätekuja + typeName Jäteasema) — once
+    expect(result.items.map((r) => r.sijaintiId)).toEqual([2]);
+    expect(result.count).toBe(1);
+  });
+
+  test("--search slices filtered hits to --limit", async () => {
+    const result = await runSijaintiListJoined(mockClient, { search: "a", limit: 2 });
+    expect(get).toHaveBeenCalledWith("/api/cli/sijainti/list?limit=500");
+    expect(result.items).toHaveLength(2);
   });
 });
