@@ -255,11 +255,18 @@ export async function runPersonRoleGrant(
   roleTypeId: number,
   flags: WriteFlags
 ): Promise<unknown> {
-  return client.post(
+  const result = await client.post<unknown>(
     `/api/asiakasPersonSettings/add/${asiakasId}/${personId}/${roleTypeId}`,
     {},
     { headers: writeFlagsToHeaders(flags) }
   );
+  // A real write returns bare/raw backend success (useless to an agent); project
+  // it to `{ granted: { personId, asiakasId, roleTypeId } }` (the ids are the
+  // inputs). A dry-run preview (`{ dryRun, wouldCreate }`) is passed through.
+  if (result && typeof result === "object" && (result as { dryRun?: unknown }).dryRun) {
+    return result;
+  }
+  return { granted: { personId, asiakasId, roleTypeId } };
 }
 
 /**

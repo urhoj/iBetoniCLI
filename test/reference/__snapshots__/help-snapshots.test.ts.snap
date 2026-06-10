@@ -2851,7 +2851,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  raw backend success | { dryRun:true, wouldCreate:{ personId, asiakasId, personSettingTypeId, personSettingString }, validation }
+  { granted: { personId, asiakasId, roleTypeId } } | { dryRun:true, wouldCreate:{ personId, asiakasId, personSettingTypeId, personSettingString }, validation }
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Unknown role / company limit reached → use a name from ROLE_TYPEID_BY_NAME

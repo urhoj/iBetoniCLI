@@ -855,7 +855,7 @@ export const COMMAND_SPECS = [
             { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
         ],
         writeFlags: true,
-        outputShape: "raw backend success | { dryRun:true, wouldCreate:{ personId, asiakasId, personSettingTypeId, personSettingString }, validation }",
+        outputShape: "{ granted: { personId, asiakasId, roleTypeId } } | { dryRun:true, wouldCreate:{ personId, asiakasId, personSettingTypeId, personSettingString }, validation }",
         errors: [
             apiErr(400, "Unknown role / company limit reached", "use a name from ROLE_TYPEID_BY_NAME"),
             apiErr(403, "Not a tenant admin", "use a system-admin token or a tenant admin"),

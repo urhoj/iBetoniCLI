@@ -404,7 +404,14 @@ export async function runCustomerDelete(client, asiakasId, ownerAsiakasId, flags
  * Forwards the universal write-flag headers.
  */
 export async function runCustomerPersonAdd(client, body, flags) {
-    return client.post("/api/asiakas/person/add", body, { headers: writeFlagsToHeaders(flags) });
+    const result = await client.post("/api/asiakas/person/add", body, { headers: writeFlagsToHeaders(flags) });
+    // The backend returns the raw mssql result on a real write; project it to the
+    // documented `{ added: { asiakasId, personId } }` (the ids are the inputs). A
+    // dry-run preview (`{ dryRun, wouldCreate }`) is passed through unchanged.
+    if (result && typeof result === "object" && result.dryRun) {
+        return result;
+    }
+    return { added: { asiakasId: body.asiakasId, personId: body.personId } };
 }
 /**
  * GET /api/prh/company/:businessId — single company from the Finnish business

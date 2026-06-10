@@ -47,21 +47,30 @@ describe("runPersonRoleList", () => {
 describe("runPersonRoleGrant", () => {
   beforeEach(() => { (mockClient.post as ReturnType<typeof vi.fn>).mockReset(); });
 
-  test("POSTs add/<asiakasId>/<personId>/<roleTypeId> with write-flag headers", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ success: true });
-    await runPersonRoleGrant(mockClient, 5351, 26, 11, { reason: "onboard driver" });
+  test("POSTs add/<asiakasId>/<personId>/<roleTypeId> and projects raw success to { granted }", async () => {
+    // Real write returns bare/raw backend success (feedback #16: was useless `null`).
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+    const out = await runPersonRoleGrant(mockClient, 5351, 26, 11, { reason: "onboard driver" });
     expect(mockClient.post).toHaveBeenCalledWith(
       "/api/asiakasPersonSettings/add/26/5351/11",
       {},
       { headers: { "X-Action-Reason": "onboard driver" } }
     );
+    expect(out).toEqual({ granted: { personId: 5351, asiakasId: 26, roleTypeId: 11 } });
   });
 
-  test("forwards --dry-run header", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ dryRun: true });
-    await runPersonRoleGrant(mockClient, 5351, 26, 11, { reason: "x", dryRun: true });
+  test("forwards --dry-run header and passes the dry-run preview through", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      dryRun: true,
+      wouldCreate: { personId: 5351, asiakasId: 26, personSettingTypeId: 11 },
+    });
+    const out = await runPersonRoleGrant(mockClient, 5351, 26, 11, { reason: "x", dryRun: true });
     const call = (mockClient.post as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(call[2].headers["X-Dry-Run"]).toBe("1");
+    expect(out).toEqual({
+      dryRun: true,
+      wouldCreate: { personId: 5351, asiakasId: 26, personSettingTypeId: 11 },
+    });
   });
 });
 

@@ -164,7 +164,14 @@ export async function runPersonRoleList(client, personId, asiakasId) {
  * under dry-run the wrapped backend returns { dryRun:true, wouldCreate }.
  */
 export async function runPersonRoleGrant(client, personId, asiakasId, roleTypeId, flags) {
-    return client.post(`/api/asiakasPersonSettings/add/${asiakasId}/${personId}/${roleTypeId}`, {}, { headers: writeFlagsToHeaders(flags) });
+    const result = await client.post(`/api/asiakasPersonSettings/add/${asiakasId}/${personId}/${roleTypeId}`, {}, { headers: writeFlagsToHeaders(flags) });
+    // A real write returns bare/raw backend success (useless to an agent); project
+    // it to `{ granted: { personId, asiakasId, roleTypeId } }` (the ids are the
+    // inputs). A dry-run preview (`{ dryRun, wouldCreate }`) is passed through.
+    if (result && typeof result === "object" && result.dryRun) {
+        return result;
+    }
+    return { granted: { personId, asiakasId, roleTypeId } };
 }
 /**
  * Revoke a per-company role. Two-step: list the person's roles for the company,

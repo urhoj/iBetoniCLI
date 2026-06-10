@@ -15,9 +15,15 @@ describe("runCustomerPersonAdd", () => {
     (mockClient.post as ReturnType<typeof vi.fn>).mockReset();
   });
 
-  test("POSTs /api/asiakas/person/add with body and reason header", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });
-    await runCustomerPersonAdd(
+  test("POSTs /api/asiakas/person/add and projects raw result to { added }", async () => {
+    // Backend returns the raw mssql result on a real write (feedback #16).
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      recordsets: [],
+      output: {},
+      rowsAffected: [1],
+      returnValue: 0,
+    });
+    const out = await runCustomerPersonAdd(
       mockClient,
       { asiakasId: 26, personId: 5351, contactPersonTypeId: 1 },
       { reason: "test add" }
@@ -27,17 +33,25 @@ describe("runCustomerPersonAdd", () => {
       { asiakasId: 26, personId: 5351, contactPersonTypeId: 1 },
       { headers: { "X-Action-Reason": "test add" } }
     );
+    expect(out).toEqual({ added: { asiakasId: 26, personId: 5351 } });
   });
 
-  test("forwards --dry-run header", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ dryRun: true });
-    await runCustomerPersonAdd(
+  test("forwards --dry-run header and passes the dry-run preview through", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      dryRun: true,
+      wouldCreate: { asiakasId: 26, personId: 5351, contactPersonTypeId: 1 },
+    });
+    const out = await runCustomerPersonAdd(
       mockClient,
       { asiakasId: 26, personId: 5351, contactPersonTypeId: 1 },
       { reason: "test", dryRun: true }
     );
     const call = (mockClient.post as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(call[2].headers["X-Dry-Run"]).toBe("1");
+    expect(out).toEqual({
+      dryRun: true,
+      wouldCreate: { asiakasId: 26, personId: 5351, contactPersonTypeId: 1 },
+    });
   });
 });
 

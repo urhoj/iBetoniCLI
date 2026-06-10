@@ -627,11 +627,18 @@ export async function runCustomerPersonAdd(
   body: CustomerPersonLinkBody,
   flags: WriteFlags
 ): Promise<unknown> {
-  return client.post(
+  const result = await client.post<unknown>(
     "/api/asiakas/person/add",
     body,
     { headers: writeFlagsToHeaders(flags) }
   );
+  // The backend returns the raw mssql result on a real write; project it to the
+  // documented `{ added: { asiakasId, personId } }` (the ids are the inputs). A
+  // dry-run preview (`{ dryRun, wouldCreate }`) is passed through unchanged.
+  if (result && typeof result === "object" && (result as { dryRun?: unknown }).dryRun) {
+    return result;
+  }
+  return { added: { asiakasId: body.asiakasId, personId: body.personId } };
 }
 
 /** Flat PRH company shape (mirrors backend formatCompanyData). */
