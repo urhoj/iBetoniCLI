@@ -13,6 +13,16 @@ function parseBoolFlag(s) {
     return /^(true|1|yes|on)$/i.test(s.trim());
 }
 const VISIT_FILTER_TYPES = ["tyomaa", "sijainti"];
+const VISIT_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+/** UTC ISO timestamp → YYYY-MM-DD in Europe/Helsinki (en-CA locale formats ISO). */
+function helsinkiDate(iso) {
+    return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Europe/Helsinki",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).format(new Date(iso));
+}
 /**
  * GET /api/cli/vehicle/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`. Rows are
@@ -85,13 +95,38 @@ export async function runVehicleRoute(client, vehicleId, opts) {
     const qs = opts.date ? `?date=${opts.date}` : "";
     return client.get(`/api/cli/vehicle/route/${vehicleId}${qs}`);
 }
-/** GET /api/cli/vehicle/visits/:filterType/:filterId?days= — vehicles that visited a site. */
+/**
+ * GET /api/cli/vehicle/visits/:filterType/:filterId?days= — vehicles that
+ * visited a site. `opts.date` filters the visits to one Europe/Helsinki day
+ * CLIENT-side (the backend only supports a days look-back); when `date` is
+ * given without `days`, the look-back is derived to just cover that day so
+ * the server doesn't scan all-time.
+ */
 export async function runVehicleVisits(client, filterType, filterId, opts) {
     if (!VISIT_FILTER_TYPES.includes(filterType)) {
         throw new Error(`filterType must be one of: ${VISIT_FILTER_TYPES.join(", ")}`);
     }
-    const qs = opts.days !== undefined ? `?days=${opts.days}` : "";
-    return client.get(`/api/cli/vehicle/visits/${filterType}/${filterId}${qs}`);
+    let days = opts.days;
+    if (opts.date !== undefined) {
+        if (!VISIT_DATE_RE.test(opts.date)) {
+            throw new Error("date must be YYYY-MM-DD (or today/yesterday/tomorrow)");
+        }
+        if (days === undefined) {
+            // +2 covers the UTC↔Helsinki offset and the partial current day.
+            days = Math.max(1, Math.ceil((Date.now() - Date.parse(opts.date)) / 86_400_000) + 2);
+        }
+    }
+    const qs = days !== undefined ? `?days=${days}` : "";
+    const env = await client.get(`/api/cli/vehicle/visits/${filterType}/${filterId}${qs}`);
+    if (opts.date === undefined)
+        return env;
+    const items = (env.items || []).filter((v) => {
+        const arrived = typeof v.arrived === "string" ? helsinkiDate(v.arrived) : null;
+        const departed = typeof v.departed === "string" ? helsinkiDate(v.departed) : null;
+        // A visit spanning midnight matches on either end.
+        return arrived === opts.date || departed === opts.date;
+    });
+    return { ...env, items, count: items.length };
 }
 /**
  * GET /api/cli/vehicle/types — list selectable vehicle types
@@ -508,10 +543,14 @@ export function registerVehicleCommands(parent, getClient) {
     v.command("visits <filterType> <id>")
         .description("Vehicles that visited a worksite/location. filterType: tyomaa | sijainti")
         .option("--days <n>", "Look-back window in days (omit for all-time)", (val) => Number(val))
+        .option("--date <d>", "Only visits on this day (YYYY-MM-DD or today/yesterday/tomorrow; Europe/Helsinki)")
         .action(async (filterType, idStr, opts) => {
         try {
             const client = await getClient();
-            writeJson(await runVehicleVisits(client, filterType, Number(idStr), opts));
+            writeJson(await runVehicleVisits(client, filterType, Number(idStr), {
+                days: opts.days,
+                date: opts.date ? resolveDate(opts.date) : undefined,
+            }));
         }
         catch (e) {
             exitWithError(e);

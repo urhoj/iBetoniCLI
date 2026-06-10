@@ -172,9 +172,16 @@ export function buildSearchSources(client, query, limit, myCompanies = false) {
             const { ownerAsiakasId } = decodeJwtPayload(client.getCurrentToken());
             return runKeikkaSearch(client, query, ownerAsiakasId, limit); // active company only
         },
-        // No backend sijainti search: fetch the typeName-joined list at the cap;
-        // projectSijainnit applies the query filter + limit. Active company only.
-        sijainti: () => runSijaintiListJoined(client, { limit: SIJAINTI_SEARCH_SCAN_LIMIT }),
+        // Sijainti resolution must see OTHER companies' rows too (supplier
+        // betoniasemat etc. — the rows GPS visits/timeline reference), so the
+        // source asks scope=all and forwards the query for server-side
+        // pre-filtering (newer backends; older ones ignore both params and the
+        // client-side filter in runSijaintiListJoined/projectSijainnit applies).
+        sijainti: () => runSijaintiListJoined(client, {
+            search: query,
+            all: true,
+            limit: SIJAINTI_SEARCH_SCAN_LIMIT,
+        }),
     };
 }
 /* ── Commander wiring ───────────────────────────────────────────────────── */

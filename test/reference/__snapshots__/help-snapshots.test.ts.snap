@@ -4234,9 +4234,8 @@ NOTES
   - A failing/denied entity degrades gracefully into errors[] — exit 0 if at least one entity succeeded; if ALL fail, exits with the first failure's mapped code.
   - Ordering: prefix label matches first, then entity order customer→worksite→person→vehicle→keikka→sijainti.
   - Each hit carries its native id field (asiakasId/tyomaaId/personId/vehicleId/keikkaId/sijaintiId) for a follow-up \`ib <entity> get <id>\`.
-  - Sijainti is matched fully client-side (no backend search): name/address/typeName substring over up to 500 rows — type names like "jäteasema" match too.
-  - No backend changes — works against current production.
-  - --my-companies covers customer/worksite/person only; vehicle, keikka and sijainti stay scoped to the active company.
+  - Sijainti is matched by name/address/typeName substring (type names like "jäteasema" match too) over scope=all — INCLUDING other companies' rows (supplier betoniasemat referenced by GPS visits/timeline). Newer backends pre-filter server-side; older ones return the own+shared 500-row scan and the filter runs client-side.
+  - --my-companies covers customer/worksite/person only; vehicle and keikka stay scoped to the active company (sijainti is already scope=all).
 
 EXAMPLES
   ib search kamppi
@@ -4450,22 +4449,23 @@ exports[`Help snapshots — contract stability > help for ib sijainti list match
   ib sijainti list [flags]
 
 DESCRIPTION
-  List geocoded locations (sijainnit) — depots, plants, customer destinations. Rows carry a human-readable typeName (joined from the sijaintiTypes lookup). --type filters by sijaintiTypeId OR type name (e.g. betoniasema, jäteasema); --search filters client-side by name/address/typeName substring.
+  List geocoded locations (sijainnit) — depots, plants, customer destinations. Rows carry a human-readable typeName. --type filters by sijaintiTypeId OR type name (e.g. betoniasema, jäteasema); --search filters by name/address/typeName substring. Default scope is own company + shared rows; pass --all to also see OTHER companies' sijainnit (e.g. supplier betoniasemat — the rows GPS visits/timeline reference).
   Permissions: requires auth.page.sijainnit.read.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
   --type STRING    Filter by sijaintiTypeId or type name (case-insensitive; exact selite match wins, else unique substring — see \`ib sijainti types\`)
-  --search STRING    Client-side filter: case-insensitive substring over name/address/typeName (scans up to 500 rows)
+  --search STRING    Case-insensitive substring over name/address/typeName (client-side scan up to 500 rows; newer backends also pre-filter server-side)
   --limit NUMBER    Max rows (capped at 500) (default: 100)
   --valid-at DATE    Only sijainnit valid on this date (startDate/endDate window)
   --include-deleted BOOLEAN    Include soft-deleted sijainnit
+  --all BOOLEAN    Include ALL companies' sijainnit, not just own + shared (ownerAsiakasId 0)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, jerryActiveUntil }>
+  ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil }>
 
 ERRORS (stderr, exit non-zero)
   exit 4  Unknown or ambiguous --type name → the error lists the valid types; or run \`ib sijainti types\`
@@ -4474,17 +4474,18 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - typeName is joined client-side from the sijaintiTypes lookup (one extra GET, automatic).
-  - --search has no backend counterpart: the CLI fetches up to the 500-row cap, filters locally, then applies --limit.
+  - typeName is joined client-side from the sijaintiTypes lookup (one extra GET, automatic); newer backends also emit it directly, plus ownerAsiakasId/ownerName.
+  - Supplier locations (betoniasemat, depots) usually belong to ANOTHER company — without --all they are invisible here even though \`ib vehicle visits sijainti <id>\` and the GPS timeline reference them. To resolve such a location by name use --search <name> --all.
+  - --all needs a backend deployed ≥ 2026-06-10; an older backend silently ignores it (returns the own+shared scope). --search works on every backend (client-side fallback).
   - An unknown numeric --type id is passed through and simply returns zero rows; an unknown type NAME exits 4.
 
 SEE ALSO
-  ib sijainti types, ib search
+  ib sijainti types, ib search, ib vehicle visits, ib vehicle timeline
 
 EXAMPLES
   ib sijainti list
   ib sijainti list --type jäteasema
-  ib sijainti list --search varikko
+  ib sijainti list --search kivikko --all
   ib sijainti list --valid-at today
 "
 `;
@@ -5209,6 +5210,7 @@ exports[`Help snapshots — contract stability > help for ib vehicle visits matc
 DESCRIPTION
   The active company's own vehicles that visited a worksite (tyomaa) or location (sijainti), grouped into visits with arrival/departure/duration (snapshot-based). Results are filtered to the caller's own fleet — other tenants' vehicles at a shared sijainti are not returned; a tyomaa must belong to the active company (else 404).
   Permissions: requires auth.page.vehicle.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
   <filterType> STRING    'tyomaa' or 'sijainti' (required)
@@ -5216,6 +5218,7 @@ ARGUMENTS
 
 FLAGS
   --days NUMBER    Look-back window in days (omit for all-time)
+  --date DATE    Only visits on this day (YYYY-MM-DD or today/yesterday/tomorrow; Europe/Helsinki). Filtered client-side; auto-bounds the look-back when --days is omitted
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -5230,9 +5233,17 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - filterType and id are POSITIONAL (\`visits sijainti 60\`), not flags — there is no --sijainti/--tyomaa option.
+  - Resolving a sijaintiId by name: supplier plants belong to OTHER companies, so use \`ib sijainti list --search <name> --all\` (plain \`sijainti list\` hides them). Alternatively \`ib vehicle timeline <vehicleId> --date <d>\` labels each stop with its sijaintiId/tyomaaId.
+
+SEE ALSO
+  ib sijainti list, ib vehicle timeline
+
 EXAMPLES
   ib vehicle visits tyomaa 17 --days 30
   ib vehicle visits sijainti 3
+  ib vehicle visits sijainti 60 --date 2026-04-15
 "
 `;
 

@@ -120,11 +120,23 @@ export interface SijaintiListFilter {
   limit?: number;
   validAt?: string;
   includeDeleted?: boolean;
+  /**
+   * Substring filter. Sent as `?search=` (newer backends LIKE-match
+   * name/street/typeName; older ones ignore it — runSijaintiListJoined
+   * re-applies the filter client-side either way).
+   */
+  search?: string;
+  /** Include EVERY company's sijainnit (scope=all), not just own + shared. */
+  all?: boolean;
 }
 
 /**
  * GET /api/cli/sijainti/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
+ *
+ * Default visibility is own company + shared (asiakasId 0); `all` maps to
+ * `?scope=all` which also surfaces OTHER companies' sijainnit (supplier
+ * betoniasemat etc. — the same rows GPS visits/timeline are tagged with).
  */
 export async function runSijaintiList(
   client: ApiClient,
@@ -135,6 +147,8 @@ export async function runSijaintiList(
   if (opts.limit !== undefined) params.set("limit", String(opts.limit));
   if (opts.validAt) params.set("validAtDate", opts.validAt);
   if (opts.includeDeleted) params.set("includeDeleted", "1");
+  if (opts.search) params.set("search", opts.search);
+  if (opts.all) params.set("scope", "all");
   const qs = params.toString();
   return client.get<ListEnvelope<Record<string, unknown>>>(
     `/api/cli/sijainti/list${qs ? `?${qs}` : ""}`
@@ -345,18 +359,19 @@ export function resolveSijaintiTypeId(
   );
 }
 
-export interface SijaintiListJoinedOptions extends SijaintiListFilter {
-  /** Client-side filter: case-insensitive substring over name/address/typeName. */
-  search?: string;
-}
+export type SijaintiListJoinedOptions = SijaintiListFilter;
 
 /**
  * `ib sijainti list` orchestrator. Fetches the sijaintiTypes lookup first (it
  * also resolves a type-NAME `--type` to its id), then the list, and joins a
- * human-readable `typeName` onto every row. There is no backend search for
- * sijainnit, so `--search` fetches up to the backend cap (500 rows), filters
- * locally by name/address/typeName substring, then slices to `limit` (default
- * 100) — deploy-safe, works against current production.
+ * human-readable `typeName` onto every row (server-provided typeName wins —
+ * newer backends emit it directly).
+ *
+ * `--search` works on EVERY backend: the query is forwarded server-side
+ * (newer backends pre-filter name/street/typeName via LIKE; older ones ignore
+ * the param) AND re-applied client-side over a scan of up to the backend cap
+ * (500 rows), then sliced to `limit` (default 100). `--all` (scope=all) is
+ * server-only — on a backend without it the own+shared scope comes back.
  */
 export async function runSijaintiListJoined(
   client: ApiClient,
@@ -372,11 +387,13 @@ export async function runSijaintiListJoined(
     limit: opts.search ? SIJAINTI_SEARCH_SCAN_LIMIT : opts.limit,
     validAt: opts.validAt,
     includeDeleted: opts.includeDeleted,
+    search: opts.search,
+    all: opts.all,
   });
   const selite = new Map(types.items.map((t) => [t.sijaintiTypeId, t.selite]));
   let items = env.items.map((r) => ({
     ...r,
-    typeName: selite.get(Number(r.type)) ?? null,
+    typeName: (r.typeName as string | undefined) ?? selite.get(Number(r.type)) ?? null,
   }));
   if (opts.search) {
     items = items
@@ -570,7 +587,7 @@ export function registerSijaintiCommands(
     .option("--type <t>", "Filter by sijaintiTypeId or type name (e.g. betoniasema)")
     .option(
       "--search <text>",
-      "Client-side filter: case-insensitive substring over name/address/typeName"
+      "Case-insensitive substring over name/address/typeName (newer backends also pre-filter server-side)"
     )
     .option("--limit <n>", "Max rows", (v: string) => Math.min(Number(v), 500))
     .option(
@@ -578,6 +595,10 @@ export function registerSijaintiCommands(
       "Only sijainnit valid on this date (YYYY-MM-DD or today/yesterday/tomorrow)"
     )
     .option("--include-deleted", "Include soft-deleted sijainnit")
+    .option(
+      "--all",
+      "Include all companies' sijainnit (supplier plants etc.), not just own + shared"
+    )
     .action(
       async (opts: {
         type?: string;
@@ -585,6 +606,7 @@ export function registerSijaintiCommands(
         limit?: number;
         validAt?: string;
         includeDeleted?: boolean;
+        all?: boolean;
       }) => {
         try {
           const client = await getClient();
@@ -594,6 +616,7 @@ export function registerSijaintiCommands(
             limit: opts.limit,
             validAt: opts.validAt ? resolveDate(opts.validAt) : undefined,
             includeDeleted: opts.includeDeleted,
+            all: opts.all,
           });
           writeJson(result);
         } catch (e) {

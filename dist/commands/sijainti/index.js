@@ -86,6 +86,10 @@ export function extractGeocodeLatLng(geo) {
 /**
  * GET /api/cli/sijainti/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
+ *
+ * Default visibility is own company + shared (asiakasId 0); `all` maps to
+ * `?scope=all` which also surfaces OTHER companies' sijainnit (supplier
+ * betoniasemat etc. — the same rows GPS visits/timeline are tagged with).
  */
 export async function runSijaintiList(client, opts) {
     const params = new URLSearchParams();
@@ -97,6 +101,10 @@ export async function runSijaintiList(client, opts) {
         params.set("validAtDate", opts.validAt);
     if (opts.includeDeleted)
         params.set("includeDeleted", "1");
+    if (opts.search)
+        params.set("search", opts.search);
+    if (opts.all)
+        params.set("scope", "all");
     const qs = params.toString();
     return client.get(`/api/cli/sijainti/list${qs ? `?${qs}` : ""}`);
 }
@@ -239,10 +247,14 @@ export function resolveSijaintiTypeId(types, input) {
 /**
  * `ib sijainti list` orchestrator. Fetches the sijaintiTypes lookup first (it
  * also resolves a type-NAME `--type` to its id), then the list, and joins a
- * human-readable `typeName` onto every row. There is no backend search for
- * sijainnit, so `--search` fetches up to the backend cap (500 rows), filters
- * locally by name/address/typeName substring, then slices to `limit` (default
- * 100) — deploy-safe, works against current production.
+ * human-readable `typeName` onto every row (server-provided typeName wins —
+ * newer backends emit it directly).
+ *
+ * `--search` works on EVERY backend: the query is forwarded server-side
+ * (newer backends pre-filter name/street/typeName via LIKE; older ones ignore
+ * the param) AND re-applied client-side over a scan of up to the backend cap
+ * (500 rows), then sliced to `limit` (default 100). `--all` (scope=all) is
+ * server-only — on a backend without it the own+shared scope comes back.
  */
 export async function runSijaintiListJoined(client, opts) {
     const types = await runSijaintiTypes(client);
@@ -254,11 +266,13 @@ export async function runSijaintiListJoined(client, opts) {
         limit: opts.search ? SIJAINTI_SEARCH_SCAN_LIMIT : opts.limit,
         validAt: opts.validAt,
         includeDeleted: opts.includeDeleted,
+        search: opts.search,
+        all: opts.all,
     });
     const selite = new Map(types.items.map((t) => [t.sijaintiTypeId, t.selite]));
     let items = env.items.map((r) => ({
         ...r,
-        typeName: selite.get(Number(r.type)) ?? null,
+        typeName: r.typeName ?? selite.get(Number(r.type)) ?? null,
     }));
     if (opts.search) {
         items = items
@@ -408,10 +422,11 @@ export function registerSijaintiCommands(parent, getClient) {
     s.command("list")
         .description("List sijainti (locations)")
         .option("--type <t>", "Filter by sijaintiTypeId or type name (e.g. betoniasema)")
-        .option("--search <text>", "Client-side filter: case-insensitive substring over name/address/typeName")
+        .option("--search <text>", "Case-insensitive substring over name/address/typeName (newer backends also pre-filter server-side)")
         .option("--limit <n>", "Max rows", (v) => Math.min(Number(v), 500))
         .option("--valid-at <date>", "Only sijainnit valid on this date (YYYY-MM-DD or today/yesterday/tomorrow)")
         .option("--include-deleted", "Include soft-deleted sijainnit")
+        .option("--all", "Include all companies' sijainnit (supplier plants etc.), not just own + shared")
         .action(async (opts) => {
         try {
             const client = await getClient();
@@ -421,6 +436,7 @@ export function registerSijaintiCommands(parent, getClient) {
                 limit: opts.limit,
                 validAt: opts.validAt ? resolveDate(opts.validAt) : undefined,
                 includeDeleted: opts.includeDeleted,
+                all: opts.all,
             });
             writeJson(result);
         }

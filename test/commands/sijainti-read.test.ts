@@ -79,6 +79,18 @@ describe("ib sijainti list/get", () => {
       "/api/cli/sijainti/list?validAtDate=2026-06-02&includeDeleted=1"
     );
   });
+
+  test("runSijaintiList: includes search and scope=all when set", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      count: 0,
+    });
+    await runSijaintiList(mockClient, { search: "kivikko", all: true });
+    expect(mockClient.get).toHaveBeenCalledWith(
+      "/api/cli/sijainti/list?search=kivikko&scope=all"
+    );
+  });
 });
 
 describe("ib sijainti set-jerry", () => {
@@ -359,9 +371,13 @@ describe("runSijaintiListJoined", () => {
     expect(get).toHaveBeenCalledWith("/api/cli/sijainti/list?type=2");
   });
 
-  test("--search fetches at the 500 cap and filters by name/address/typeName", async () => {
+  test("--search fetches at the 500 cap, forwards the query server-side and filters by name/address/typeName", async () => {
     const result = await runSijaintiListJoined(mockClient, { search: "jäte" });
-    expect(get).toHaveBeenCalledWith("/api/cli/sijainti/list?limit=500");
+    // search is forwarded for server-side pre-filtering (newer backends);
+    // the client-side filter below covers older backends that ignore it.
+    expect(get).toHaveBeenCalledWith(
+      "/api/cli/sijainti/list?limit=500&search=j%C3%A4te"
+    );
     // "jäte" hits Kaatopaikka twice (address Jätekuja + typeName Jäteasema) — once
     expect(result.items.map((r) => r.sijaintiId)).toEqual([2]);
     expect(result.count).toBe(1);
@@ -369,7 +385,12 @@ describe("runSijaintiListJoined", () => {
 
   test("--search slices filtered hits to --limit", async () => {
     const result = await runSijaintiListJoined(mockClient, { search: "a", limit: 2 });
-    expect(get).toHaveBeenCalledWith("/api/cli/sijainti/list?limit=500");
+    expect(get).toHaveBeenCalledWith("/api/cli/sijainti/list?limit=500&search=a");
     expect(result.items).toHaveLength(2);
+  });
+
+  test("--all forwards scope=all", async () => {
+    await runSijaintiListJoined(mockClient, { all: true });
+    expect(get).toHaveBeenCalledWith("/api/cli/sijainti/list?scope=all");
   });
 });

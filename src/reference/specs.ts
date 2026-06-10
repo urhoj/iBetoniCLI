@@ -1691,6 +1691,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     flags: [
       { name: "days", type: "number", description: "Look-back window in days (omit for all-time)" },
+      { name: "date", type: "date", description: "Only visits on this day (YYYY-MM-DD or today/yesterday/tomorrow; Europe/Helsinki). Filtered client-side; auto-bounds the look-back when --days is omitted" },
     ],
     outputShape:
       "ListEnvelope<{ vehicleId, plate, objectName, arrived, departed, durationMin }> & { gpsAvailable }",
@@ -1699,7 +1700,16 @@ export const COMMAND_SPECS: CommandSpec[] = [
       apiErr(404, "tyomaa not found / not owned", "verify tyomaaId belongs to the active company"),
       ...permErrors("auth.page.vehicle.read"),
     ],
-    examples: ["ib vehicle visits tyomaa 17 --days 30", "ib vehicle visits sijainti 3"],
+    notes: [
+      "filterType and id are POSITIONAL (`visits sijainti 60`), not flags — there is no --sijainti/--tyomaa option.",
+      "Resolving a sijaintiId by name: supplier plants belong to OTHER companies, so use `ib sijainti list --search <name> --all` (plain `sijainti list` hides them). Alternatively `ib vehicle timeline <vehicleId> --date <d>` labels each stop with its sijaintiId/tyomaaId.",
+    ],
+    seeAlso: ["ib sijainti list", "ib vehicle timeline"],
+    examples: [
+      "ib vehicle visits tyomaa 17 --days 30",
+      "ib vehicle visits sijainti 3",
+      "ib vehicle visits sijainti 60 --date 2026-04-15",
+    ],
   },
   {
     command: "ib vehicle history",
@@ -1863,31 +1873,33 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib sijainti list",
     description:
-      "List geocoded locations (sijainnit) — depots, plants, customer destinations. Rows carry a human-readable typeName (joined from the sijaintiTypes lookup). --type filters by sijaintiTypeId OR type name (e.g. betoniasema, jäteasema); --search filters client-side by name/address/typeName substring.",
+      "List geocoded locations (sijainnit) — depots, plants, customer destinations. Rows carry a human-readable typeName. --type filters by sijaintiTypeId OR type name (e.g. betoniasema, jäteasema); --search filters by name/address/typeName substring. Default scope is own company + shared rows; pass --all to also see OTHER companies' sijainnit (e.g. supplier betoniasemat — the rows GPS visits/timeline reference).",
     permissions: ["auth.page.sijainnit.read"],
     flags: [
       { name: "type", type: "string", description: "Filter by sijaintiTypeId or type name (case-insensitive; exact selite match wins, else unique substring — see `ib sijainti types`)" },
-      { name: "search", type: "string", description: "Client-side filter: case-insensitive substring over name/address/typeName (scans up to 500 rows)" },
+      { name: "search", type: "string", description: "Case-insensitive substring over name/address/typeName (client-side scan up to 500 rows; newer backends also pre-filter server-side)" },
       { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
       { name: "valid-at", type: "date", description: "Only sijainnit valid on this date (startDate/endDate window)" },
       { name: "include-deleted", type: "boolean", description: "Include soft-deleted sijainnit" },
+      { name: "all", type: "boolean", description: "Include ALL companies' sijainnit, not just own + shared (ownerAsiakasId 0)" },
     ],
     outputShape:
-      "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, jerryActiveUntil }>",
+      "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil }>",
     errors: [
       { exit: 4, meaning: "Unknown or ambiguous --type name", remedy: "the error lists the valid types; or run `ib sijainti types`" },
       ...permErrors("auth.page.sijainnit.read"),
     ],
     notes: [
-      "typeName is joined client-side from the sijaintiTypes lookup (one extra GET, automatic).",
-      "--search has no backend counterpart: the CLI fetches up to the 500-row cap, filters locally, then applies --limit.",
+      "typeName is joined client-side from the sijaintiTypes lookup (one extra GET, automatic); newer backends also emit it directly, plus ownerAsiakasId/ownerName.",
+      "Supplier locations (betoniasemat, depots) usually belong to ANOTHER company — without --all they are invisible here even though `ib vehicle visits sijainti <id>` and the GPS timeline reference them. To resolve such a location by name use --search <name> --all.",
+      "--all needs a backend deployed ≥ 2026-06-10; an older backend silently ignores it (returns the own+shared scope). --search works on every backend (client-side fallback).",
       "An unknown numeric --type id is passed through and simply returns zero rows; an unknown type NAME exits 4.",
     ],
-    seeAlso: ["ib sijainti types", "ib search"],
+    seeAlso: ["ib sijainti types", "ib search", "ib vehicle visits", "ib vehicle timeline"],
     examples: [
       "ib sijainti list",
       "ib sijainti list --type jäteasema",
-      "ib sijainti list --search varikko",
+      "ib sijainti list --search kivikko --all",
       "ib sijainti list --valid-at today",
     ],
   },
@@ -3519,9 +3531,8 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "A failing/denied entity degrades gracefully into errors[] — exit 0 if at least one entity succeeded; if ALL fail, exits with the first failure's mapped code.",
       "Ordering: prefix label matches first, then entity order customer→worksite→person→vehicle→keikka→sijainti.",
       "Each hit carries its native id field (asiakasId/tyomaaId/personId/vehicleId/keikkaId/sijaintiId) for a follow-up `ib <entity> get <id>`.",
-      "Sijainti is matched fully client-side (no backend search): name/address/typeName substring over up to 500 rows — type names like \"jäteasema\" match too.",
-      "No backend changes — works against current production.",
-      "--my-companies covers customer/worksite/person only; vehicle, keikka and sijainti stay scoped to the active company.",
+      "Sijainti is matched by name/address/typeName substring (type names like \"jäteasema\" match too) over scope=all — INCLUDING other companies' rows (supplier betoniasemat referenced by GPS visits/timeline). Newer backends pre-filter server-side; older ones return the own+shared 500-row scan and the filter runs client-side.",
+      "--my-companies covers customer/worksite/person only; vehicle and keikka stay scoped to the active company (sijainti is already scope=all).",
     ],
     examples: [
       "ib search kamppi",

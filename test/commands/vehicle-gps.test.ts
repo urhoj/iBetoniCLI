@@ -50,4 +50,34 @@ describe("ib vehicle visits", () => {
     await expect(runVehicleVisits(mockClient, "foo", 3, {})).rejects.toThrow();
     expect(mockClient.get).not.toHaveBeenCalled();
   });
+  test("runVehicleVisits: --date filters to the Helsinki-local day and auto-bounds look-back", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [
+        // 08:30 Helsinki (EEST = UTC+3) on 15.4 → kept
+        { plate: "A", arrived: "2026-04-15T05:30:00.000Z", departed: "2026-04-15T05:40:00.000Z" },
+        // 00:30 Helsinki on 15.4 (still 14.4 in UTC) → kept (TZ-correct filtering)
+        { plate: "B", arrived: "2026-04-14T21:30:00.000Z", departed: "2026-04-14T21:40:00.000Z" },
+        // 13.4 → dropped
+        { plate: "C", arrived: "2026-04-13T10:00:00.000Z", departed: "2026-04-13T10:10:00.000Z" },
+      ],
+      nextCursor: null, count: 3, gpsAvailable: true,
+    });
+    const res = await runVehicleVisits(mockClient, "sijainti", 60, { date: "2026-04-15" });
+    expect(mockClient.get).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/api\/cli\/vehicle\/visits\/sijainti\/60\?days=\d+$/)
+    );
+    expect(res.items.map((i) => i.plate)).toEqual(["A", "B"]);
+    expect(res.count).toBe(2);
+  });
+  test("runVehicleVisits: explicit --days wins over the derived look-back", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, gpsAvailable: true });
+    await runVehicleVisits(mockClient, "sijainti", 60, { days: 90, date: "2026-04-15" });
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/vehicle/visits/sijainti/60?days=90");
+  });
+  test("runVehicleVisits: rejects a malformed date", async () => {
+    await expect(
+      runVehicleVisits(mockClient, "sijainti", 60, { date: "15.4.2026" })
+    ).rejects.toThrow(/date/);
+    expect(mockClient.get).not.toHaveBeenCalled();
+  });
 });
