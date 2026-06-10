@@ -435,7 +435,7 @@ OUTPUT (JSON, stdout)
   { ok: true, attachmentId } | { dryRun: true, wouldUpdate: { fileComment: {from,to}, liitaLaskuun: {from,to}, ... } }
 
 ERRORS (stderr, exit non-zero)
-  exit 3 (HTTP 403)  Not owner company / missing manager role / liitaLaskuun without lasku-admin → switch company or use an admin account
+  exit 3 (HTTP 403)  Not owner company / missing manager role / liitaLaskuun without lasku-admin → use an account with lasku or asiakas admin role on the owner company
   exit 5 (HTTP 404)  Attachment not found   → verify attachmentId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose

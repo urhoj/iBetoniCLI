@@ -205,7 +205,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     outputShape: "{ ok: true, attachmentId } | { dryRun: true, wouldUpdate: { fileComment: {from,to}, liitaLaskuun: {from,to}, ... } }",
-    errors: [apiErr(403, "Not owner company / missing manager role / liitaLaskuun without lasku-admin", "switch company or use an admin account"), apiErr(404, "Attachment not found", "verify attachmentId"), ...COMMON_AUTH_ERRORS],
+    errors: [apiErr(403, "Not owner company / missing manager role / liitaLaskuun without lasku-admin", "use an account with lasku or asiakas admin role on the owner company"), apiErr(404, "Attachment not found", "verify attachmentId"), ...COMMON_AUTH_ERRORS],
     notes: ["Comment changes are audited via ChangeTracker.", DEPLOY_NOTE],
     seeAlso: ["ib attachment types", "ib attachment get"],
     examples: ["ib attachment update 4711 --comment \"hyväksytty\"", "ib attachment update 4711 --group laskutus --liita-laskuun 1"],
