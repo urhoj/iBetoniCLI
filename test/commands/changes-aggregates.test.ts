@@ -31,17 +31,18 @@ describe("changes aggregates", () => {
     expect(result.items[0].field).toBe("pumppuAika");
   });
 
-  test("range: GET /api/changes/range/<owner> with startDate/endDate/personId", async () => {
+  test("range: GET /api/changes/range/<owner> with startDate/endDate/entityType/personId", async () => {
     get().mockResolvedValueOnce([ROW(1), ROW(2)]);
     const result = await runChangesRange(mockClient, {
       from: "2026-06-01",
       to: "2026-06-10",
+      entityType: "keikka",
       person: 8,
       owner: 27,
       limit: 200,
     });
     expect(get()).toHaveBeenCalledWith(
-      "/api/changes/range/27?startDate=2026-06-01&endDate=2026-06-10&personId=8"
+      "/api/changes/range/27?startDate=2026-06-01&endDate=2026-06-10&entityType=keikka&personId=8"
     );
     expect(result.count).toBe(2);
     expect(result.truncated).toBeUndefined();
@@ -64,6 +65,25 @@ describe("changes aggregates", () => {
     expect(err).toBeInstanceOf(CliError);
     expect((err as CliError).exitCode).toBe(4);
     expect(get()).not.toHaveBeenCalled();
+  });
+
+  test("latest: unknown entityType is CliError exit 4, no fetch", async () => {
+    let err: unknown;
+    try {
+      await runChangesLatest(mockClient, 50, { entityType: "banana", owner: 27 });
+    } catch (e) { err = e; }
+    expect(err).toBeInstanceOf(CliError);
+    expect((err as CliError).exitCode).toBe(4);
+    expect(get()).not.toHaveBeenCalled();
+  });
+
+  test("by-entity-date: client-side --limit slices and sets truncated", async () => {
+    get().mockResolvedValueOnce([ROW(1), ROW(2), ROW(3)]);
+    const result = await runChangesByEntityDate(mockClient, {
+      entityType: "keikka", from: "2026-06-01", to: "2026-06-10", owner: 27, limit: 2,
+    });
+    expect(result.count).toBe(2);
+    expect(result.truncated).toBe(true);
   });
 
   test("by-entity-date: requires keikka|palkki", async () => {
@@ -109,5 +129,6 @@ describe("changes aggregates", () => {
       .mockResolvedValueOnce([]);
     await runChangesLatest(mockClient, 100, {});
     expect(get()).toHaveBeenNthCalledWith(1, "/api/company-selection/available");
+    expect(get()).toHaveBeenNthCalledWith(2, "/api/changes/latest/27?limit=100");
   });
 });
