@@ -2198,6 +2198,40 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib keikka search matches snapshot 1`] = `
+"USAGE
+  ib keikka search <query> [flags]
+
+DESCRIPTION
+  Search keikkas via the backend full-text search: phone number, keikkaId, worksite name/number, invoice reference. Returns deduped hits (one per keikka), newest first.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <query> STRING    Full-text search string (phone, keikkaId, worksite name/number, invoice ref) (required)
+
+FLAGS
+  --limit NUMBER    Max hits (client-side; backend caps at 100)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ keikkaId, title, pumppuAika, customerName, worksiteName, address, contactPerson, contactPhone }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Backed by the deployed GET /api/keikka/search (same path the AI order tool uses) — no deploy gate.
+  - Scope: the active company (ownerAsiakasId from the session token).
+
+EXAMPLES
+  ib keikka search 0401234567
+  ib keikka search "As Oy Esimerkki" --limit 3
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib keikka update matches snapshot 1`] = `
 "USAGE
   ib keikka update <keikkaId> [flags]
@@ -3139,6 +3173,44 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib schema views
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib search matches snapshot 1`] = `
+"USAGE
+  ib search <query> [flags]
+
+DESCRIPTION
+  Cross-entity unified search: customers, worksites, persons, vehicles and keikkas in ONE flat ranked list. Client-side parallel fan-out over the per-entity searches — use this to resolve "who/what is X" without guessing the entity type.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <query> STRING    Search string (required)
+
+FLAGS
+  --in STRING    Comma-separated subset of: customer,worksite,person,vehicle,keikka
+  --limit NUMBER    Max hits per entity (default: 5)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  { items: [{ entity, id, label, detail, <nativeIdField> }], nextCursor: null, count, errors: [{ entity, message }] }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - A failing/denied entity degrades gracefully into errors[] — exit 0 if at least one entity succeeded; if ALL fail, exits with the first failure's mapped code.
+  - Ordering: prefix label matches first, then entity order customer→worksite→person→vehicle→keikka.
+  - Each hit carries its native id field (asiakasId/tyomaaId/personId/vehicleId/keikkaId) for a follow-up \`ib <entity> get <id>\`.
+  - No backend changes — works against current production.
+
+EXAMPLES
+  ib search kamppi
+  ib search 0401234567 --in person,keikka
+  ib search "Rudus" --in customer --limit 10
 "
 `;
 
