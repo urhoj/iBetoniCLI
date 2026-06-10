@@ -24,6 +24,7 @@ import { registerOhjeCommands } from "./commands/ohje/index.js";
 import { registerJerryCommands } from "./commands/jerry/index.js";
 import { registerScheduleCommands } from "./commands/schedule/index.js";
 import { registerStatsCommands } from "./commands/stats/index.js";
+import { registerSearchCommands } from "./commands/search/index.js";
 import { registerSchemaCommands } from "./commands/schema/index.js";
 import { registerCacheCommands } from "./commands/cache/index.js";
 import { registerWeatherCommands } from "./commands/weather/index.js";
@@ -115,6 +116,7 @@ export function buildProgram() {
     registerCacheCommands(program, getClient);
     registerWeatherCommands(program, getClient);
     registerFeedbackCommands(program, getClient);
+    registerSearchCommands(program, getClient);
     registerVersionCommand(program, packageJson.version, getEndpoint);
     registerDoctorCommand(program, getClient, getEndpoint, packageJson.version, () => getGlobalOptions(program).readOnly);
     const reference = program

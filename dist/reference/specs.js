@@ -253,6 +253,25 @@ export const COMMAND_SPECS = [
             "ib keikka drivers assign 9001 --dry-run",
         ],
     },
+    {
+        command: "ib keikka search",
+        description: "Search keikkas via the backend full-text search: phone number, keikkaId, worksite name/number, invoice reference. Returns deduped hits (one per keikka), newest first.",
+        auth: "any",
+        args: [{ name: "query", type: "string", description: "Full-text search string (phone, keikkaId, worksite name/number, invoice ref)" }],
+        flags: [
+            { name: "limit", type: "number", description: "Max hits (client-side; backend caps at 100)" },
+        ],
+        outputShape: "ListEnvelope<{ keikkaId, title, pumppuAika, customerName, worksiteName, address, contactPerson, contactPhone }>",
+        errors: COMMON_AUTH_ERRORS,
+        notes: [
+            "Backed by the deployed GET /api/keikka/search (same path the AI order tool uses) — no deploy gate.",
+            "Scope: the active company (ownerAsiakasId from the session token).",
+        ],
+        examples: [
+            "ib keikka search 0401234567",
+            "ib keikka search \"As Oy Esimerkki\" --limit 3",
+        ],
+    },
     // ─── stats (1) ───────────────────────────────────────────────────────────
     {
         command: "ib stats",
@@ -2639,6 +2658,30 @@ export const COMMAND_SPECS = [
         outputShape: "no arg: { items:[{id,title}], nextCursor:null, count } | with topic: { id, title, body }",
         errors: [{ exit: 5, meaning: "Unknown topic", remedy: "run `ib help` to list valid topic ids" }],
         examples: ["ib help", "ib help write-safety"],
+    },
+    // ─── search (1) ──────────────────────────────────────────────────────────
+    {
+        command: "ib search",
+        description: "Cross-entity unified search: customers, worksites, persons, vehicles and keikkas in ONE flat ranked list. Client-side parallel fan-out over the per-entity searches — use this to resolve \"who/what is X\" without guessing the entity type.",
+        auth: "any",
+        args: [{ name: "query", type: "string", description: "Search string" }],
+        flags: [
+            { name: "in", type: "string", description: "Comma-separated subset of: customer,worksite,person,vehicle,keikka" },
+            { name: "limit", type: "number", default: "5", description: "Max hits per entity" },
+        ],
+        outputShape: "{ items: [{ entity, id, label, detail, <nativeIdField> }], nextCursor: null, count, errors: [{ entity, message }] }",
+        errors: COMMON_AUTH_ERRORS,
+        notes: [
+            "A failing/denied entity degrades gracefully into errors[] — exit 0 if at least one entity succeeded; if ALL fail, exits with the first failure's mapped code.",
+            "Ordering: prefix label matches first, then entity order customer→worksite→person→vehicle→keikka.",
+            "Each hit carries its native id field (asiakasId/tyomaaId/personId/vehicleId/keikkaId) for a follow-up `ib <entity> get <id>`.",
+            "No backend changes — works against current production.",
+        ],
+        examples: [
+            "ib search kamppi",
+            "ib search 0401234567 --in person,keikka",
+            "ib search \"Rudus\" --in customer --limit 10",
+        ],
     },
 ];
 //# sourceMappingURL=specs.js.map

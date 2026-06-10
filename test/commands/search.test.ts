@@ -7,10 +7,13 @@ import {
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
 
-const mockClient = {
+// mockClient is not used directly in tests (sources stubs are injected instead),
+// but it exists to satisfy the ApiClient type for buildSearchSources.
+const _mockClient = {
   get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(),
   getCurrentToken: vi.fn(() => "h.e.s"),
 } as unknown as ApiClient;
+void _mockClient; // suppress unused-var lint
 
 // One source stub per entity, injected so the test controls each branch.
 function sources(overrides: Partial<Record<string, () => Promise<unknown>>> = {}) {
