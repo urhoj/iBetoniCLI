@@ -42,3 +42,29 @@ describe("ib reference dump", () => {
     }
   });
 });
+
+describe("ib reference dump <domain>", () => {
+  test("filters commands to the domain but keeps the full primer", () => {
+    const full = buildReference();
+    const ref = buildReference("keikka");
+    const cmds = Object.keys(ref.commands);
+    expect(cmds.length).toBeGreaterThan(0);
+    expect(cmds.every((c) => c.startsWith("ib keikka"))).toBe(true);
+    expect(cmds.length).toBeLessThan(Object.keys(full.commands).length);
+    // primer retained in full
+    expect(ref.overview).toBe(full.overview);
+    expect(ref.glossary).toEqual(full.glossary);
+    expect(ref.topics).toEqual(full.topics);
+    expect(ref.feedbackGuidance).toEqual(full.feedbackGuidance);
+  });
+
+  test("unknown domain throws exit-4 CliError", () => {
+    try {
+      buildReference("nope");
+      expect.unreachable("should have thrown");
+    } catch (e) {
+      expect(e).toMatchObject({ exitCode: 4 });
+      expect((e as Error).message).toContain("unknown domain: nope");
+    }
+  });
+});
