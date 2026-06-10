@@ -14,6 +14,7 @@ describe("changes entityType catalog", () => {
       "dayDriver",
       "keikka",
       "keikkaBetoni",
+      "keikkaLasku",
       "kuski",
       "palkki",
       "person",
