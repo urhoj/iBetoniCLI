@@ -2,6 +2,8 @@ import { describe, test, expect } from "vitest";
 import {
   filterCommandSpecs,
   buildCommandsList,
+  commandDomains,
+  assertKnownDomain,
 } from "../../src/reference/commandsList.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
 import type { CommandSpec } from "../../src/output/help.js";
@@ -91,6 +93,61 @@ describe("buildCommandsList", () => {
     const env = buildCommandsList({ mutations: true });
     expect(env.count).toBeGreaterThan(0);
     expect(env.items.every((c) => c.writeFlags)).toBe(true);
+  });
+});
+
+describe("commandDomains", () => {
+  test("derives the unique, sorted set of tokens after `ib`", () => {
+    expect(commandDomains(SAMPLE)).toEqual(["x", "y"]);
+  });
+
+  test("real catalogue contains the core domains", () => {
+    const domains = commandDomains(COMMAND_SPECS);
+    for (const d of ["auth", "keikka", "jerry", "vehicle", "commands"]) {
+      expect(domains).toContain(d);
+    }
+    // sorted + unique
+    expect(domains).toEqual([...new Set(domains)].sort());
+  });
+});
+
+describe("assertKnownDomain", () => {
+  test("passes silently for a known domain", () => {
+    expect(() => assertKnownDomain(SAMPLE, "x")).not.toThrow();
+  });
+
+  test("unknown domain throws exit-4 CliError listing valid domains", () => {
+    try {
+      assertKnownDomain(SAMPLE, "nope");
+      expect.unreachable("should have thrown");
+    } catch (e) {
+      expect(e).toMatchObject({ exitCode: 4 });
+      expect((e as Error).message).toContain("unknown domain: nope");
+      expect((e as Error).message).toContain("x, y");
+    }
+  });
+});
+
+describe("filterCommandSpecs — domain filter", () => {
+  test("domain keeps only that group's commands", () => {
+    expect(
+      filterCommandSpecs(SAMPLE, { domain: "x" }).map((c) => c.command)
+    ).toEqual(["ib x read", "ib x write"]);
+  });
+
+  test("domain composes with --mutations", () => {
+    expect(
+      filterCommandSpecs(SAMPLE, { domain: "x", mutations: true }).map((c) => c.command)
+    ).toEqual(["ib x write"]);
+  });
+
+  test("unknown domain is a validation error (exit 4)", () => {
+    try {
+      filterCommandSpecs(SAMPLE, { domain: "zzz" });
+      expect.unreachable("should have thrown");
+    } catch (e) {
+      expect(e).toMatchObject({ exitCode: 4 });
+    }
   });
 });
 
