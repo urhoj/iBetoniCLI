@@ -24,6 +24,7 @@
  */
 
 import type { Command } from "commander";
+import type { GlossaryEntry } from "../reference/domain.js";
 
 export interface CommandError {
   /** HTTP status when API-originated (401/403/404/409/429/400/500). */
@@ -203,6 +204,66 @@ export function formatHelp(spec: CommandSpec): string {
     lines.push(`  ${ex}`);
   }
 
+  return lines.join("\n") + "\n";
+}
+
+/** First sentence of a description — group listings stay one line per child. */
+function firstSentence(text: string): string {
+  const i = text.indexOf(". ");
+  return i === -1 ? text : text.slice(0, i + 1);
+}
+
+/**
+ * Render computed help for a GROUP command (e.g. `ib keikka`, `ib jerry offer`).
+ *
+ * Groups have no CommandSpec of their own; everything here is derived — the
+ * subcommand table from the spec catalogue (children = unique next token after
+ * the group path), the blurb from the first GLOSSARY entry whose term contains
+ * the group's last token (falling back to the Commander description), and the
+ * footer from the group's domain. Mirrors `formatHelp`'s parse-friendly layout
+ * (uppercase sections, two-space indent). No new source of truth → cannot
+ * drift from `--help` / `ib reference dump` / `ib commands`.
+ */
+export function formatGroupHelp(
+  groupPath: string,
+  fallbackDescription: string,
+  specs: CommandSpec[],
+  glossary: GlossaryEntry[]
+): string {
+  const prefix = groupPath + " ";
+  const depth = groupPath.split(" ").length; // child = token at this index
+  const domain = groupPath.split(" ")[1];
+  const groupName = groupPath.split(" ").at(-1)!.toLowerCase();
+
+  const inGroup = specs.filter((s) => s.command.startsWith(prefix));
+  const children = [...new Set(inGroup.map((s) => s.command.split(" ")[depth]))];
+  const byCommand = new Map(specs.map((s) => [s.command, s]));
+
+  const blurb =
+    glossary.find((g) => g.term.toLowerCase().includes(groupName))?.definition ??
+    fallbackDescription;
+
+  const lines: string[] = [];
+  lines.push("USAGE");
+  lines.push(`  ${groupPath} <command> [flags]`);
+  lines.push("");
+  lines.push("DESCRIPTION");
+  lines.push(`  ${blurb}`);
+  lines.push("");
+  lines.push("SUBCOMMANDS");
+  const pad = Math.max(...children.map((c) => c.length));
+  for (const child of children) {
+    const leaf = byCommand.get(`${groupPath} ${child}`);
+    const desc = leaf
+      ? firstSentence(leaf.description)
+      : `(group) → ${groupPath} ${child} --help`;
+    lines.push(`  ${child.padEnd(pad)}  ${desc}`);
+  }
+  lines.push("");
+  lines.push("DISCOVER");
+  lines.push(`  ib reference dump ${domain}    Full specs for this group (JSON)`);
+  lines.push(`  ${groupPath} <command> --help    Complete spec for one command`);
+  lines.push("  ib help    Concept guides (offline)");
   return lines.join("\n") + "\n";
 }
 
