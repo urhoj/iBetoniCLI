@@ -281,4 +281,17 @@ describe("ib attachment link/write commands", () => {
       { headers: { "X-Action-Reason": "duplicate" } }
     );
   });
+
+  test("detach rejects an unknown entity word with exit-4 CliError (before network)", async () => {
+    await expect(runAttachmentDetach(c, 4711, "invalid-entity", {})).rejects.toThrowError(CliError);
+    expect(c.post).not.toHaveBeenCalled();
+  });
+
+  test("update forwards NaN liitaLaskuun unchanged (JSON.stringify will null it; backend 400s)", async () => {
+    (c.patch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });
+    await runAttachmentUpdate(c, 4711, { liitaLaskuun: NaN }, {});
+    const [path, body] = (c.patch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(path).toBe("/api/cli/attachment/4711");
+    expect(Number.isNaN((body as { liitaLaskuun: number }).liitaLaskuun)).toBe(true);
+  });
 });
