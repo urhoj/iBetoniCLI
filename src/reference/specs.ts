@@ -2732,7 +2732,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ version, generatedAt, overview, glossary, topics, feedbackGuidance, commands: { '<command>': CommandSpec } }",
     errors: [
-      { exit: 4, meaning: "Unknown domain", remedy: "run `ib commands` to see valid domains" },
+      { exit: 4, meaning: "Unknown domain", remedy: "run `ib commands` (no arg) to see valid domains" },
       { exit: 1, meaning: "I/O error", remedy: "retry; check stdout pipe" },
     ],
     examples: [
@@ -2744,7 +2744,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib commands",
     description:
-      "Offline command discovery from the spec catalogue. No args = compact DOMAIN INDEX (~2 KB: every domain with leaf count, glossary blurb, runnable command paths). A domain arg, a filter flag, or --all returns the flat per-command list { command, description, permissions, isWrite }. Lighter than `ib reference dump` (the full surface). No auth, no network.",
+      "Offline command discovery from the spec catalogue. No args = compact DOMAIN INDEX (~5 KB: every domain with leaf count, glossary blurb, runnable command paths). A domain arg, a filter flag, or --all returns the flat per-command list { command, description, permissions, isWrite }. Lighter than `ib reference dump` (the full surface). No auth, no network.",
     auth: "none",
     args: [
       {

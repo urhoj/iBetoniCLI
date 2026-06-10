@@ -205,7 +205,7 @@ export function renderDomainHelp(): string {
   lines.push("");
   lines.push("DISCOVER");
   lines.push(
-    "  Commands (cheap, offline): `ib commands` — domain index (~2 KB); `ib commands <domain>`"
+    "  Commands (cheap, offline): `ib commands` — domain index (~5 KB); `ib commands <domain>`"
   );
   lines.push(
     "    for one group's commands (e.g. `ib commands keikka`); `ib commands --all` for the full"

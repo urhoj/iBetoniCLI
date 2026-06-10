@@ -141,7 +141,7 @@ export interface DomainIndexEnvelope {
 }
 
 /**
- * Bare `ib commands` — a ~2 KB domain INDEX instead of the full flat list
+ * Bare `ib commands` — a ~5 KB domain INDEX instead of the full flat list
  * (~43 KB at 149 leaves and growing). Progressive-discovery entry point:
  * index → `ib commands <domain>` → `ib <command> --help`. The flat list moved
  * behind `--all` (BREAKING, 2026-06-10). Blurbs reuse the GLOSSARY (same

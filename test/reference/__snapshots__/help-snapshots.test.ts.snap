@@ -332,7 +332,7 @@ exports[`Help snapshots — contract stability > help for ib commands matches sn
   ib commands [<domain>] [flags]
 
 DESCRIPTION
-  Offline command discovery from the spec catalogue. No args = compact DOMAIN INDEX (~2 KB: every domain with leaf count, glossary blurb, runnable command paths). A domain arg, a filter flag, or --all returns the flat per-command list { command, description, permissions, isWrite }. Lighter than \`ib reference dump\` (the full surface). No auth, no network.
+  Offline command discovery from the spec catalogue. No args = compact DOMAIN INDEX (~5 KB: every domain with leaf count, glossary blurb, runnable command paths). A domain arg, a filter flag, or --all returns the flat per-command list { command, description, permissions, isWrite }. Lighter than \`ib reference dump\` (the full surface). No auth, no network.
   Auth: none (public).
 
 ARGUMENTS
@@ -3026,7 +3026,7 @@ OUTPUT (JSON, stdout)
   { version, generatedAt, overview, glossary, topics, feedbackGuidance, commands: { '<command>': CommandSpec } }
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Unknown domain         → run \`ib commands\` to see valid domains
+  exit 4  Unknown domain         → run \`ib commands\` (no arg) to see valid domains
   exit 1  I/O error              → retry; check stdout pipe
 
 EXAMPLES

@@ -189,7 +189,7 @@ export function buildProgram(): Command {
           // Bare `ib commands` = cheap domain index; any narrowing argument
           // (domain, filter flag, or explicit --all) = flat leaf list.
           const wantsFlatList =
-            opts.all || domain || opts.mutations || opts.reads || opts.permission;
+            opts.all || domain || opts.mutations || opts.reads || opts.permission !== undefined;
           writeJson(
             wantsFlatList
               ? buildCommandsList({
