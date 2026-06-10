@@ -141,8 +141,16 @@ export function buildProgram(): Command {
   reference
     .command("dump")
     .description("Emit the full command surface as JSON on stdout")
-    .action(() => {
-      runReferenceDump();
+    .argument(
+      "[domain]",
+      "Restrict the commands map to one domain — the token after `ib` (e.g. keikka)"
+    )
+    .action((domain?: string) => {
+      try {
+        runReferenceDump(domain);
+      } catch (e) {
+        exitWithError(e);
+      }
     });
 
   // `ib commands` — filtered, offline discovery over the same spec catalogue.
@@ -151,6 +159,10 @@ export function buildProgram(): Command {
   program
     .command("commands")
     .description("Filtered list of ib commands from the spec catalogue (offline)")
+    .argument(
+      "[domain]",
+      "Only commands in this domain — the token after `ib` (e.g. keikka)"
+    )
     .option("--mutations", "Only commands that write (carry write-safety flags)")
     .option("--reads", "Only read-only commands (no writes)")
     .option(
@@ -158,10 +170,14 @@ export function buildProgram(): Command {
       "Only commands whose required permissions contain this substring"
     )
     .action(
-      (opts: { mutations?: boolean; reads?: boolean; permission?: string }) => {
+      (
+        domain: string | undefined,
+        opts: { mutations?: boolean; reads?: boolean; permission?: string }
+      ) => {
         try {
           writeJson(
             buildCommandsList({
+              domain,
               mutations: opts.mutations,
               reads: opts.reads,
               permission: opts.permission,

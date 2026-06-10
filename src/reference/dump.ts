@@ -9,6 +9,7 @@
  * out of sync — there is exactly one source of truth (`./specs.ts`).
  */
 import { COMMAND_SPECS } from "./specs.js";
+import { assertKnownDomain } from "./commandsList.js";
 import { DOMAIN_OVERVIEW, GLOSSARY, FEEDBACK_GUIDANCE, TOPICS } from "./domain.js";
 import type { GlossaryEntry, Topic } from "./domain.js";
 import type { CommandSpec } from "../output/help.js";
@@ -31,9 +32,18 @@ export interface ReferenceDump {
 /**
  * Build the reference object. Pure — no I/O — so tests can assert on it
  * directly. Commands are keyed by their full path (e.g. `ib keikka list`),
- * matching what an AI assistant sees from `--help`.
+ * matching what an AI assistant sees from `--help`. When `domain` is given,
+ * the commands map is narrowed to that group (the token after `ib`) while the
+ * primer (overview/glossary/topics/feedbackGuidance) is kept in full — it is
+ * small, high-value context that keeps a filtered dump self-contained.
+ * Unknown domain → exit-4 CliError (via assertKnownDomain).
  */
-export function buildReference(): ReferenceDump {
+export function buildReference(domain?: string): ReferenceDump {
+  let specs = COMMAND_SPECS;
+  if (domain) {
+    assertKnownDomain(COMMAND_SPECS, domain);
+    specs = COMMAND_SPECS.filter((s) => s.command.split(" ")[1] === domain);
+  }
   return {
     version: packageJson.version,
     generatedAt: new Date().toISOString(),
@@ -41,17 +51,15 @@ export function buildReference(): ReferenceDump {
     glossary: GLOSSARY,
     feedbackGuidance: FEEDBACK_GUIDANCE,
     topics: TOPICS,
-    commands: Object.fromEntries(
-      COMMAND_SPECS.map((spec) => [spec.command, spec])
-    ),
+    commands: Object.fromEntries(specs.map((spec) => [spec.command, spec])),
   };
 }
 
 /**
  * Write the reference dump as pretty-printed JSON to stdout. Used by the
- * `ib reference dump` subcommand. Trailing newline so shells / `jq` see a
- * clean line-terminated document.
+ * `ib reference dump` subcommand (optionally narrowed to one `domain`).
+ * Trailing newline so shells / `jq` see a clean line-terminated document.
  */
-export function runReferenceDump(): void {
-  process.stdout.write(JSON.stringify(buildReference(), null, 2) + "\n");
+export function runReferenceDump(domain?: string): void {
+  process.stdout.write(JSON.stringify(buildReference(domain), null, 2) + "\n");
 }

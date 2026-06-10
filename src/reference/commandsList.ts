@@ -30,6 +30,30 @@ export interface CommandsListFilter {
   reads?: boolean;
   /** Keep only commands whose permission strings contain this substring. */
   permission?: string;
+  /** Keep only commands in this domain (the token after `ib`). Unknown domain → exit-4 CliError. */
+  domain?: string;
+}
+
+/** Unique, sorted set of command domains (the token after `ib`), derived from the specs. */
+export function commandDomains(specs: CommandSpec[]): string[] {
+  return [...new Set(specs.map((s) => s.command.split(" ")[1]).filter(Boolean))].sort();
+}
+
+/**
+ * Throw an exit-4 CliError when `domain` is not a known command domain.
+ * Single validation point shared by `ib commands` and `ib reference dump` so
+ * the message and exit code can never diverge.
+ */
+export function assertKnownDomain(specs: CommandSpec[], domain: string): void {
+  const valid = commandDomains(specs);
+  if (!valid.includes(domain)) {
+    throw new CliError(
+      `unknown domain: ${domain}. Valid: ${valid.join(", ")}`,
+      0,
+      null,
+      4
+    );
+  }
 }
 
 /** List-envelope shape (matches the universal `{ items, nextCursor, count }`). */
@@ -57,9 +81,11 @@ export function filterCommandSpecs(
       4
     );
   }
+  if (filter.domain) assertKnownDomain(specs, filter.domain);
   const needle = filter.permission?.toLowerCase();
   return specs
     .filter((s) => {
+      if (filter.domain && s.command.split(" ")[1] !== filter.domain) return false;
       const mutates = s.mutates ?? !!s.writeFlags;
       if (filter.mutations && !mutates) return false;
       if (filter.reads && mutates) return false;

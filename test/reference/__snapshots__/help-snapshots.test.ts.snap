@@ -324,11 +324,14 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib commands matches snapshot 1`] = `
 "USAGE
-  ib commands [flags]
+  ib commands [<domain>] [flags]
 
 DESCRIPTION
   Filtered, offline list of ib commands from the spec catalogue: which write, which are read-only, which require a given permission. Lighter than \`ib reference dump\` (the full surface) — returns just { command, description, permissions, writeFlags } per match. No auth, no network.
   Auth: none (public).
+
+ARGUMENTS
+  <domain> STRING    Only commands in this domain (the token after \`ib\`, e.g. keikka, jerry). Unknown domain exits 4 listing valid domains. (optional)
 
 FLAGS
   --mutations BOOLEAN    Only commands that write (carry write-safety flags)
@@ -343,9 +346,11 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4  Bad flag combo         → --mutations and --reads are mutually exclusive
+  exit 4  Unknown domain         → run \`ib commands\` (no arg) to see valid domains
 
 EXAMPLES
   ib commands
+  ib commands keikka
   ib commands --mutations
   ib commands --reads
   ib commands --permission auth.page.vehicle
@@ -2817,11 +2822,14 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib reference dump matches snapshot 1`] = `
 "USAGE
-  ib reference dump [flags]
+  ib reference dump [<domain>] [flags]
 
 DESCRIPTION
-  Emit the full command surface as JSON (version, generatedAt, commands map). Read by AI assistants for one-shot CLI ingestion.
+  Emit the full command surface as JSON (version, generatedAt, overview, glossary, topics, feedbackGuidance, commands map). Read by AI assistants for one-shot CLI ingestion. Pass a domain (the token after \`ib\`, e.g. keikka) to narrow the commands map to one group — the primer (overview/glossary/topics) is always retained, so a filtered dump stays self-contained.
   Auth: none (public).
+
+ARGUMENTS
+  <domain> STRING    Restrict the commands map to one domain (the token after \`ib\`, e.g. keikka). Unknown domain exits 4 listing valid domains. (optional)
 
 FLAGS
   (none)
@@ -2830,13 +2838,15 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
 
 OUTPUT (JSON, stdout)
-  { version: string, generatedAt: ISO-8601, commands: { '<command>': CommandSpec } }
+  { version, generatedAt, overview, glossary, topics, feedbackGuidance, commands: { '<command>': CommandSpec } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4  Unknown domain         → run \`ib commands\` to see valid domains
   exit 1  I/O error              → retry; check stdout pipe
 
 EXAMPLES
   ib reference dump
+  ib reference dump keikka
   ib reference dump | jq .version
 "
 `;

@@ -159,9 +159,13 @@ export function renderDomainHelp() {
     }
     lines.push(`  ${FEEDBACK_GUIDANCE.how}`);
     lines.push("");
+    lines.push("DISCOVER");
+    lines.push("  Commands (cheap, offline): `ib commands` — compact list of every command; `ib commands");
+    lines.push("    <domain>` for one group (e.g. `ib commands keikka`); filters --reads / --mutations /");
+    lines.push("    --permission <substr>.");
+    lines.push("  Full machine-readable specs: `ib reference dump` (entire surface) or `ib reference dump");
+    lines.push("    <domain>` for one group. Single command: `ib <command> --help`.");
     lines.push("  Concept guides: `ib help <topic>` — " + TOPICS.map((t) => t.id).join(", ") + ".");
-    lines.push("");
-    lines.push("  Run `ib reference dump` for the full machine-readable command catalogue.");
     return lines.join("\n");
 }
 //# sourceMappingURL=domain.js.map
