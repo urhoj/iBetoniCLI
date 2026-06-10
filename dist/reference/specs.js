@@ -69,6 +69,9 @@ export const COMMAND_SPECS = [
         command: "ib auth switch",
         description: "Switch the active company. Issues a new JWT bound to the target ownerAsiakasId and persists it.",
         auth: "any",
+        // No tenant-data write, but persists local auth state (rotated JWT) and is
+        // blocked under read-only — classify as a write so isWrite agrees with the gate.
+        mutates: true,
         flags: [
             {
                 name: "to",
@@ -126,6 +129,8 @@ export const COMMAND_SPECS = [
         command: "ib company switch",
         description: "Switch the active company. Alias of `ib auth switch`. Persists the rotated JWT.",
         auth: "any",
+        // Same classification as `ib auth switch`: local-state write, gated under read-only.
+        mutates: true,
         flags: [
             {
                 name: "to",
@@ -187,11 +192,12 @@ export const COMMAND_SPECS = [
             },
             { name: "cursor", type: "string", description: "Pagination cursor" },
         ],
-        outputShape: "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }>",
+        outputShape: "ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { range: { from, to } } (the interpreted date window, echoed so an empty result is verifiably scoped)",
         errors: permErrors("auth.page.grid.tilaus.read"),
         notes: [
             "`tila` is the numeric keikkaTilaId. Legend: -1 Uusi tilaus · 0 Luonnos (draft) · 1 Kesken · 2 Lähetetty (sent) · 3 Käsittelyssä · 4 Toimitusvalmis · 5 Toimitus meneillään · 6 Toimitus epäonnistui · 7 Epäonnistui · 8 Peruttu (cancelled) · 9/12/13 Toimitettu (delivered) · 10 Poistettu (deleted) · 100 Valmis (complete) · 11/200 Järjestelmätilaus (system, do not edit).",
             "The same legend is in the GLOSSARY (`tila`) on `ib --help`; source of truth: GET /api/tila/list.",
+            "A keikka spanning multiple worksites returns ONE ROW PER tyomaa (join fan-out): the same keikkaId can appear on several rows with different tyomaaId, and `count` counts ROWS, not distinct deliveries — dedupe by keikkaId when counting deliveries.",
         ],
         examples: [
             "ib keikka list --from 2026-05-28 --to 2026-05-30",
@@ -2558,7 +2564,7 @@ export const COMMAND_SPECS = [
                 description: "Only commands whose required permissions contain this substring",
             },
         ],
-        outputShape: "{ items: [{ command, description, permissions: string[], isWrite: boolean }], nextCursor: null, count }",
+        outputShape: "{ hint?, items: [{ command, description, permissions: string[], isWrite: boolean }], nextCursor: null, count } — `hint` (unfiltered list only) advertises the domain-filtered form",
         errors: [
             { exit: 4, meaning: "Bad flag combo", remedy: "--mutations and --reads are mutually exclusive" },
             { exit: 4, meaning: "Unknown domain", remedy: "run `ib commands` (no arg) to see valid domains" },
@@ -2802,13 +2808,13 @@ export const COMMAND_SPECS = [
     // ─── help (1) ────────────────────────────────────────────────────────────
     {
         command: "ib help",
-        description: "Concept guides for AI users (offline, no auth). No arg lists topic ids; `ib help <topic>` prints one guide.",
+        description: "Concept guides for AI users (offline, no auth). No arg lists topic ids; `ib help <topic>` prints one guide. Glossary terms (e.g. tila, keikka, ownerAsiakasId) also resolve here.",
         auth: "none",
-        args: [{ name: "topic", type: "string", required: false, description: "topic id (roles, jerry-lifecycle, write-safety, exit-codes, multi-tenancy)" }],
+        args: [{ name: "topic", type: "string", required: false, description: "topic id (roles, jerry-lifecycle, write-safety, exit-codes, multi-tenancy) or a GLOSSARY term (tila, keikka, asiakas, ...)" }],
         flags: [],
         outputShape: "no arg: { items:[{id,title}], nextCursor:null, count } | with topic: { id, title, body }",
-        errors: [{ exit: 5, meaning: "Unknown topic", remedy: "run `ib help` to list valid topic ids" }],
-        examples: ["ib help", "ib help write-safety"],
+        errors: [{ exit: 5, meaning: "Unknown topic", remedy: "run `ib help` to list valid topic ids; the error message also lists the glossary terms" }],
+        examples: ["ib help", "ib help write-safety", "ib help tila"],
     },
     // ─── search (1) ──────────────────────────────────────────────────────────
     {

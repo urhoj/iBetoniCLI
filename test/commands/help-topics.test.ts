@@ -12,10 +12,21 @@ describe("ib help topics", () => {
     expect(t.id).toBe("write-safety");
     expect(t.body.length).toBeGreaterThan(20);
   });
-  test("unknown topic throws (mapped to exit 5)", () => {
-    let caught: any;
+  test("unknown topic throws (mapped to exit 5) and lists glossary terms", () => {
+    let caught: unknown;
     try { runHelpTopic("nope"); } catch (e) { caught = e; }
     expect(caught).toMatchObject({ exitCode: 5 });
-    expect(String(caught.message)).toMatch(/unknown topic/i);
+    expect(String((caught as Error).message)).toMatch(/unknown topic/i);
+    expect(String((caught as Error).message)).toMatch(/glossary terms/i);
+  });
+  test("glossary term resolves (ib help tila)", () => {
+    const t = runHelpTopic("tila");
+    expect(t.title).toMatch(/glossary/i);
+    expect(t.body).toMatch(/keikkaTilaId/);
+  });
+  test("compound glossary term resolves by alias (ib help worksite)", () => {
+    const t = runHelpTopic("worksite");
+    expect(t.title).toMatch(/glossary/i);
+    expect(t.body.length).toBeGreaterThan(10);
   });
 });

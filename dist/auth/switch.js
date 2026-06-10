@@ -10,7 +10,9 @@ import { CliError, exitCodeFromStatus } from "../api/errors.js";
 export function assertPersistedSwitchAllowed(readOnly) {
     if (!readOnly)
         return;
-    throw new CliError("Refused: company switch persists a rotated JWT and read-only mode is active (--read-only / IB_READ_ONLY). Use the per-command global --company <id> ephemeral context instead.", 0, null, 3);
+    // Same READ_ONLY_BLOCKED code as the client gate: `code` in the stderr
+    // envelope marks a client-side refusal vs a real HTTP 403 (both exit 3).
+    throw new CliError("Refused: company switch persists a rotated JWT and read-only mode is active (--read-only / IB_READ_ONLY). Use the per-command global --company <id> ephemeral context instead.", 0, { code: "READ_ONLY_BLOCKED" }, 3);
 }
 /**
  * Switch the active company by POSTing the target `newAsiakasId` to

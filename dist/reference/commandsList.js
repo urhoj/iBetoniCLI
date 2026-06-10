@@ -55,6 +55,14 @@ export function filterCommandSpecs(specs, filter) {
  */
 export function buildCommandsList(filter) {
     const items = filterCommandSpecs(COMMAND_SPECS, filter);
+    if (!filter.domain) {
+        return {
+            hint: `narrow with \`ib commands <domain>\` (then \`ib <command> --help\`); domains: ${commandDomains(COMMAND_SPECS).join(", ")}`,
+            items,
+            nextCursor: null,
+            count: items.length,
+        };
+    }
     return { items, nextCursor: null, count: items.length };
 }
 //# sourceMappingURL=commandsList.js.map

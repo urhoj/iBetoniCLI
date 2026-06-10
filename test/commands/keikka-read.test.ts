@@ -33,6 +33,18 @@ describe("ib keikka list/get", () => {
       "/api/cli/keikka/list?from=2026-06-01&to=2026-06-30"
     );
     expect(result.count).toBe(1);
+    // The interpreted date window is echoed so an empty result is verifiably scoped.
+    expect(result.range).toEqual({ from: "2026-06-01", to: "2026-06-30" });
+  });
+
+  test("runKeikkaList: range echoes null when no dates were sent", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      count: 0,
+    });
+    const result = await runKeikkaList(mockClient, {});
+    expect(result.range).toEqual({ from: null, to: null });
   });
 
   test("runKeikkaList: includes customer/vehicle/status/limit/cursor when set", async () => {

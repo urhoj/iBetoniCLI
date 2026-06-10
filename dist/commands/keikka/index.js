@@ -28,7 +28,10 @@ export async function runKeikkaList(client, opts) {
     if (opts.cursor)
         params.set("cursor", opts.cursor);
     const qs = params.toString();
-    return client.get(`/api/cli/keikka/list${qs ? `?${qs}` : ""}`);
+    const envelope = await client.get(`/api/cli/keikka/list${qs ? `?${qs}` : ""}`);
+    // Echo the interpreted date window so a count:0 result is self-evidently
+    // scoped — without it an empty list is indistinguishable from a mis-aimed query.
+    return { ...envelope, range: { from: opts.from ?? null, to: opts.to ?? null } };
 }
 /**
  * GET /api/cli/keikka/get/:keikkaId. Returns the flat backend record as-is.

@@ -148,10 +148,13 @@ export function createApiClient({
     // `meta` requests (e.g. `ib feedback`) are not domain mutations — they are
     // whitelisted past the lock so feedback can be filed even under read-only.
     if (readOnly && method !== "GET" && !opts.meta && !opts.read) {
+      // body.code surfaces as `code` in the stderr envelope — a machine-parseable
+      // marker distinguishing this client-side refusal (statusCode 0) from a real
+      // server-side HTTP 403, which shares exit code 3.
       throw new CliError(
         `Refused: '${method} ${path}' is a write and read-only mode is active (--read-only / IB_READ_ONLY).`,
         0,
-        null,
+        { code: "READ_ONLY_BLOCKED" },
         3
       );
     }

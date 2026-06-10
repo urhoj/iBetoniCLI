@@ -94,6 +94,18 @@ describe("buildCommandsList", () => {
     expect(env.count).toBeGreaterThan(0);
     expect(env.items.every((c) => c.isWrite)).toBe(true);
   });
+
+  test("unfiltered list carries a hint advertising the domain-filtered form", () => {
+    const env = buildCommandsList({});
+    expect(env.hint).toContain("ib commands <domain>");
+    expect(env.hint).toContain("keikka");
+    // hint is the FIRST key so a streaming reader sees it before the items
+    expect(Object.keys(env)[0]).toBe("hint");
+  });
+
+  test("domain-filtered list has no hint", () => {
+    expect(buildCommandsList({ domain: "keikka" }).hint).toBeUndefined();
+  });
 });
 
 describe("commandDomains", () => {
@@ -152,6 +164,12 @@ describe("filterCommandSpecs — domain filter", () => {
 });
 
 describe("ib commands classification", () => {
+  test("auth/company switch are writes (persist a rotated JWT, gated under read-only)", () => {
+    const muts = filterCommandSpecs(COMMAND_SPECS, { mutations: true }).map((c) => c.command);
+    expect(muts).toContain("ib auth switch");
+    expect(muts).toContain("ib company switch");
+  });
+
   test("feedback create/resolve are mutations despite writeFlags:false", () => {
     const muts = filterCommandSpecs(COMMAND_SPECS, { mutations: true }).map((c) => c.command);
     expect(muts).toContain("ib feedback create");

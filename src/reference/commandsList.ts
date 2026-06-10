@@ -62,6 +62,12 @@ export function assertKnownDomain(specs: CommandSpec[], domain: string): void {
 
 /** List-envelope shape (matches the universal `{ items, nextCursor, count }`). */
 export interface CommandsListEnvelope {
+  /**
+   * Present only on the UNFILTERED list: advertises the domain-filtered form so
+   * an agent whose first call is bare `ib commands` (~43 KB) learns the cheaper
+   * path from the output itself. First key so it's read before the items.
+   */
+  hint?: string;
   items: CommandSummary[];
   nextCursor: null;
   count: number;
@@ -114,5 +120,13 @@ export function buildCommandsList(
   filter: CommandsListFilter
 ): CommandsListEnvelope {
   const items = filterCommandSpecs(COMMAND_SPECS, filter);
+  if (!filter.domain) {
+    return {
+      hint: `narrow with \`ib commands <domain>\` (then \`ib <command> --help\`); domains: ${commandDomains(COMMAND_SPECS).join(", ")}`,
+      items,
+      nextCursor: null,
+      count: items.length,
+    };
+  }
   return { items, nextCursor: null, count: items.length };
 }

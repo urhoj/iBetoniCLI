@@ -129,6 +129,7 @@ describe("ApiClient", () => {
       await expect(call()).rejects.toMatchObject({
         name: "CliError",
         exitCode: 3,
+        body: { code: "READ_ONLY_BLOCKED" },
       });
     }
     expect(mockFetch).not.toHaveBeenCalled();

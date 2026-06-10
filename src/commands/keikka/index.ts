@@ -32,7 +32,7 @@ export interface KeikkaListFilter {
 export async function runKeikkaList(
   client: ApiClient,
   opts: KeikkaListFilter
-): Promise<ListEnvelope<Record<string, unknown>>> {
+): Promise<ListEnvelope<Record<string, unknown>> & { range: { from: string | null; to: string | null } }> {
   const params = new URLSearchParams();
   if (opts.from) params.set("from", opts.from);
   if (opts.to) params.set("to", opts.to);
@@ -43,9 +43,12 @@ export async function runKeikkaList(
   if (opts.limit !== undefined) params.set("limit", String(opts.limit));
   if (opts.cursor) params.set("cursor", opts.cursor);
   const qs = params.toString();
-  return client.get<ListEnvelope<Record<string, unknown>>>(
+  const envelope = await client.get<ListEnvelope<Record<string, unknown>>>(
     `/api/cli/keikka/list${qs ? `?${qs}` : ""}`
   );
+  // Echo the interpreted date window so a count:0 result is self-evidently
+  // scoped — without it an empty list is indistinguishable from a mis-aimed query.
+  return { ...envelope, range: { from: opts.from ?? null, to: opts.to ?? null } };
 }
 
 /**

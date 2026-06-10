@@ -83,6 +83,7 @@ describe("assertPersistedSwitchAllowed (read-only write-lock)", () => {
     expect(err).toBeInstanceOf(CliError);
     expect((err as CliError).exitCode).toBe(3);
     expect((err as CliError).message).toMatch(/read-only/i);
+    expect((err as CliError).body).toEqual({ code: "READ_ONLY_BLOCKED" });
   });
 
   test("no-op when read-only mode is off", () => {
