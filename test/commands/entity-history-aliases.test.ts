@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
+import type { Command } from "commander";
 import { runChangesEntity } from "../../src/commands/changes/index.js";
 import { buildProgram } from "../../src/program.js";
 import type { ApiClient } from "../../src/api/client.js";
@@ -24,7 +25,7 @@ describe("entity history aliases", () => {
   test("keikka/vehicle/worksite groups expose a history leaf", () => {
     const program = buildProgram();
     const paths: string[] = [];
-    const walk = (cmd: any, path: string[]): void => {
+    const walk = (cmd: Command, path: string[]): void => {
       const full = [...path, cmd.name()].join(" ");
       paths.push(full);
       for (const sub of cmd.commands) walk(sub, [...path, cmd.name()]);

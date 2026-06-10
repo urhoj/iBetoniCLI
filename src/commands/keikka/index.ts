@@ -10,7 +10,7 @@ import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveDate } from "../../dates.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
-import { runChangesEntity } from "../changes/index.js";
+import { registerHistoryAlias } from "../changes/index.js";
 
 // Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
 export { resolveDate };
@@ -334,24 +334,12 @@ export function registerKeikkaCommands(
     }
   );
 
-  k.command("history <keikkaId>")
-    .description(
-      "Change-tracker audit trail for one keikka (folds in its keikkaBetoni rows). Alias of `ib changes entity keikka`."
-    )
-    .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))
-    .option("--limit <n>", "Max rows (default 100, cap 500)", (v: string) => Math.min(Number(v), 500), 100)
-    .option("--field <name>", "Filter by changeTracker fieldName (e.g. kuskit, laskuMemo)")
-    .action(async (idStr: string, opts: { owner?: number; limit: number; field?: string }) => {
-      try {
-        const client = await getClient();
-        writeJson(
-          await runChangesEntity(client, "keikka", Number(idStr), opts.limit, {
-            owner: opts.owner,
-            field: opts.field,
-          })
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+  registerHistoryAlias(
+    k,
+    getClient,
+    "keikka",
+    "keikkaId",
+    "Change-tracker audit trail for one keikka (folds in its keikkaBetoni rows). Alias of `ib changes entity keikka`.",
+    "Filter by changeTracker fieldName (e.g. kuskit, laskuMemo)"
+  );
 }

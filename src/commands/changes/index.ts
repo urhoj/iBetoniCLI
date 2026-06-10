@@ -243,6 +243,36 @@ export async function runChangesUser(
   return envelope((Array.isArray(rows) ? rows : []).map(projectRow));
 }
 
+/** Registers a thin `history <id>` alias on an entity group, delegating to runChangesEntity. */
+export function registerHistoryAlias(
+  group: Command,
+  getClient: () => Promise<ApiClient>,
+  entityType: string,
+  idArgName: string,
+  description: string,
+  fieldExample = "Filter by changeTracker fieldName"
+): void {
+  group
+    .command(`history <${idArgName}>`)
+    .description(description)
+    .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))
+    .option("--limit <n>", "Max rows (default 100, cap 500)", (v: string) => Math.min(Number(v), 500), 100)
+    .option("--field <name>", fieldExample)
+    .action(async (idStr: string, opts: { owner?: number; limit: number; field?: string }) => {
+      try {
+        const client = await getClient();
+        writeJson(
+          await runChangesEntity(client, entityType, Number(idStr), opts.limit, {
+            owner: opts.owner,
+            field: opts.field,
+          })
+        );
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+}
+
 export function registerChangesCommands(
   parent: Command,
   getClient: () => Promise<ApiClient>
