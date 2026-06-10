@@ -2,6 +2,7 @@ import { describe, test, expect } from "vitest";
 import {
   filterCommandSpecs,
   buildCommandsList,
+  buildDomainIndex,
   commandDomains,
   assertKnownDomain,
 } from "../../src/reference/commandsList.js";
@@ -95,15 +96,8 @@ describe("buildCommandsList", () => {
     expect(env.items.every((c) => c.isWrite)).toBe(true);
   });
 
-  test("unfiltered list carries a hint advertising the domain-filtered form", () => {
-    const env = buildCommandsList({});
-    expect(env.hint).toContain("ib commands <domain>");
-    expect(env.hint).toContain("keikka");
-    // hint is the FIRST key so a streaming reader sees it before the items
-    expect(Object.keys(env)[0]).toBe("hint");
-  });
-
-  test("domain-filtered list has no hint", () => {
+  test("flat list never carries a hint (the domain index owns discovery)", () => {
+    expect(buildCommandsList({}).hint).toBeUndefined();
     expect(buildCommandsList({ domain: "keikka" }).hint).toBeUndefined();
   });
 });
@@ -177,5 +171,35 @@ describe("ib commands classification", () => {
     const reads = filterCommandSpecs(COMMAND_SPECS, { reads: true }).map((c) => c.command);
     expect(reads).not.toContain("ib feedback create");
     expect(reads).not.toContain("ib feedback resolve");
+  });
+});
+
+describe("buildDomainIndex", () => {
+  test("one row per domain: count + runnable leaf paths (relative to `ib`)", () => {
+    const env = buildDomainIndex(SAMPLE);
+    expect(env.count).toBe(2);
+    expect(env.items[0]).toMatchObject({
+      domain: "x",
+      count: 2,
+      commands: ["x read", "x write"],
+    });
+    expect(env.items[1]).toMatchObject({ domain: "y", count: 1, commands: ["y read"] });
+  });
+
+  test("hint advertises the next steps and is the FIRST key", () => {
+    const env = buildDomainIndex(SAMPLE);
+    expect(env.hint).toContain("ib commands <domain>");
+    expect(env.hint).toContain("--all");
+    expect(Object.keys(env)[0]).toBe("hint");
+  });
+
+  test("real catalogue: every leaf counted once; keikka gets its glossary blurb", () => {
+    const env = buildDomainIndex();
+    expect(env.items.reduce((a, i) => a + i.count, 0)).toBe(COMMAND_SPECS.length);
+    const keikka = env.items.find((i) => i.domain === "keikka");
+    expect(keikka?.description).toMatch(/delivery/i);
+    // a domain with no glossary entry degrades to null, not a crash
+    const version = env.items.find((i) => i.domain === "version");
+    expect(version).toMatchObject({ count: 1, description: null, commands: ["version"] });
   });
 });

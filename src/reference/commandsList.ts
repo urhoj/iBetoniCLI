@@ -12,6 +12,7 @@
 import type { CommandSpec } from "../output/help.js";
 import { COMMAND_SPECS } from "./specs.js";
 import { CliError } from "../api/errors.js";
+import { GLOSSARY } from "./domain.js";
 
 /** Compact per-command summary surfaced by `ib commands`. */
 export interface CommandSummary {
@@ -62,11 +63,6 @@ export function assertKnownDomain(specs: CommandSpec[], domain: string): void {
 
 /** List-envelope shape (matches the universal `{ items, nextCursor, count }`). */
 export interface CommandsListEnvelope {
-  /**
-   * Present only on the UNFILTERED list: advertises the domain-filtered form so
-   * an agent whose first call is bare `ib commands` (~43 KB) learns the cheaper
-   * path from the output itself. First key so it's read before the items.
-   */
   hint?: string;
   items: CommandSummary[];
   nextCursor: null;
@@ -120,13 +116,54 @@ export function buildCommandsList(
   filter: CommandsListFilter
 ): CommandsListEnvelope {
   const items = filterCommandSpecs(COMMAND_SPECS, filter);
-  if (!filter.domain) {
-    return {
-      hint: `narrow with \`ib commands <domain>\` (then \`ib <command> --help\`); domains: ${commandDomains(COMMAND_SPECS).join(", ")}`,
-      items,
-      nextCursor: null,
-      count: items.length,
-    };
-  }
   return { items, nextCursor: null, count: items.length };
+}
+
+/** One row of the `ib commands` (no-args) domain index. */
+export interface DomainIndexEntry {
+  /** The token after `ib` (e.g. `keikka`). */
+  domain: string;
+  /** Number of leaf commands in the domain. */
+  count: number;
+  /** Glossary blurb when a GLOSSARY term matches the domain name, else null. */
+  description: string | null;
+  /** Leaf command paths relative to `ib` (directly runnable, e.g. "keikka list"). */
+  commands: string[];
+}
+
+/** Envelope for the domain index; `hint` is the FIRST key so it's read before the rows. */
+export interface DomainIndexEnvelope {
+  hint: string;
+  items: DomainIndexEntry[];
+  nextCursor: null;
+  count: number;
+}
+
+/**
+ * Bare `ib commands` — a ~2 KB domain INDEX instead of the full flat list
+ * (~43 KB at 149 leaves and growing). Progressive-discovery entry point:
+ * index → `ib commands <domain>` → `ib <command> --help`. The flat list moved
+ * behind `--all` (BREAKING, 2026-06-10). Blurbs reuse the GLOSSARY (same
+ * source as group help), so domains without a glossary term get null.
+ */
+export function buildDomainIndex(
+  specs: CommandSpec[] = COMMAND_SPECS
+): DomainIndexEnvelope {
+  const items = commandDomains(specs).map((domain) => {
+    const inDomain = specs.filter((s) => s.command.split(" ")[1] === domain);
+    return {
+      domain,
+      count: inDomain.length,
+      description:
+        GLOSSARY.find((g) => g.term.toLowerCase().includes(domain))?.definition ??
+        null,
+      commands: inDomain.map((s) => s.command.replace(/^ib /, "")),
+    };
+  });
+  return {
+    hint: "domain index — one domain's commands: `ib commands <domain>` · full flat list: `ib commands --all` · one command's spec: `ib <command> --help`",
+    items,
+    nextCursor: null,
+    count: items.length,
+  };
 }
