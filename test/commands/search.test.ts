@@ -3,6 +3,7 @@ import {
   runUnifiedSearch,
   parseEntityFilter,
   SEARCH_ENTITIES,
+  buildSearchSources,
 } from "../../src/commands/search/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -110,5 +111,35 @@ describe("runUnifiedSearch", () => {
     const env = await runUnifiedSearch("kamppi", { ...sources(), person: spy }, ["customer"]);
     expect(spy).not.toHaveBeenCalled();
     expect(env.items.every((h) => h.entity === "customer")).toBe(true);
+  });
+});
+
+describe("ib search --my-companies wiring", () => {
+  test("buildSearchSources forwards myCompanies to customer/worksite/person, NOT vehicle/keikka", async () => {
+    const calls: Record<string, boolean> = {};
+    const client = {
+      get: vi.fn(async (path: string) => {
+        if (path.includes("/api/asiakas/search")) calls.customer = path.includes("myCompanies=1");
+        if (path.includes("/api/cli/person/search")) calls.person = true;
+        if (path.includes("/api/cli/vehicle/list")) calls.vehicleHadMy = path.includes("myCompanies");
+        return path.includes("vehicle") ? { items: [], nextCursor: null, count: 0 } : [];
+      }),
+      post: vi.fn(async (_p: string, body: Record<string, unknown>) => {
+        calls.worksite = body?.myCompanies === true;
+        return [];
+      }),
+      getCurrentToken: vi.fn(() => "h.e.s"),
+    } as unknown as ApiClient;
+
+    const srcs = buildSearchSources(client, "x", 5, true /* myCompanies */);
+    await srcs.customer();
+    await srcs.worksite();
+    await srcs.person();
+    await srcs.vehicle();
+
+    expect(calls.customer).toBe(true);
+    expect(calls.worksite).toBe(true);
+    expect(calls.person).toBe(true);          // person uses the cross-company /api/cli/person/search
+    expect(calls.vehicleHadMy).toBe(false);   // vehicle ignores myCompanies
   });
 });
