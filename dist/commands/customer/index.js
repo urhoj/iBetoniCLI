@@ -353,11 +353,17 @@ export async function runCustomerWorksites(client, asiakasId) {
  * company (req.user.ownerAsiakasId) when no ownerAsiakasId query param is given,
  * so the CLI sends only searchString. Result shape is whatever the backend
  * returns (typically an array of asiakas records).
+ *
+ * When `myCompanies` is true, adds `myCompanies=1` to the query so the backend
+ * fans out across all companies the caller belongs to (rows tagged with
+ * `ownerAsiakasId`).
  */
-export async function runCustomerSearch(client, query, limit) {
+export async function runCustomerSearch(client, query, limit, myCompanies = false) {
     const params = new URLSearchParams({ searchString: query });
     if (limit !== undefined)
         params.set("limit", String(limit));
+    if (myCompanies)
+        params.set("myCompanies", "1");
     return client.get(`/api/asiakas/search?${params.toString()}`);
 }
 /**
@@ -769,10 +775,11 @@ export function registerCustomerCommands(parent, getClient) {
     c.command("search <query>")
         .description("Free-text search for customers")
         .option("--limit <n>", "Max results", (v) => Math.min(Number(v), 500))
+        .option("--my-companies", "Search across every company you belong to (rows tagged with ownerAsiakasId)")
         .action(async (query, opts) => {
         try {
             const client = await getClient();
-            const result = await runCustomerSearch(client, query, opts.limit);
+            const result = await runCustomerSearch(client, query, opts.limit, !!opts.myCompanies);
             writeJson(result);
         }
         catch (e) {

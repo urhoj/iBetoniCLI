@@ -44,6 +44,10 @@ export async function runWorksiteGet(client, tyomaaId, opts = {}) {
  * caller's company (req.user.ownerAsiakasId) when no ownerAsiakasId is in the
  * body, so the CLI sends only searchString (+ optional limit).
  *
+ * When `myCompanies` is true, adds `myCompanies: true` to the body so the
+ * backend fans out across all companies the caller belongs to (rows tagged with
+ * `ownerAsiakasId`).
+ *
  * Sent as a `read` request: search is a tenant-scoped non-mutating POST, so
  * `read:true` exempts it from the `--read-only` write-lock and the acting-as
  * write diagnostic (it neither creates nor updates tenant data). Distinct from
@@ -51,10 +55,12 @@ export async function runWorksiteGet(client, tyomaaId, opts = {}) {
  * Finnish-named recordset is projected into the universal `ListEnvelope` with
  * the same camelCase keys as `worksite get` for a consistent AI-facing shape.
  */
-export async function runWorksiteSearch(client, query, limit) {
+export async function runWorksiteSearch(client, query, limit, myCompanies = false) {
     const body = { searchString: query };
     if (limit !== undefined)
         body.limit = limit;
+    if (myCompanies)
+        body.myCompanies = true;
     const rows = await client.post("/api/tyomaa/search", body, { read: true });
     const items = (rows || []).map((r) => ({
         tyomaaId: r.tyomaaId,
@@ -306,10 +312,11 @@ export function registerWorksiteCommands(parent, getClient) {
     w.command("search <query>")
         .description("Free-text search for worksites")
         .option("--limit <n>", "Max results", (v) => Math.min(Number(v), 500))
+        .option("--my-companies", "Search across every company you belong to (rows tagged with ownerAsiakasId)")
         .action(async (query, opts) => {
         try {
             const client = await getClient();
-            const result = await runWorksiteSearch(client, query, opts.limit);
+            const result = await runWorksiteSearch(client, query, opts.limit, !!opts.myCompanies);
             writeJson(result);
         }
         catch (e) {

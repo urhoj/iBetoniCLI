@@ -509,6 +509,11 @@ export const COMMAND_SPECS: CommandSpec[] = [
         default: "50",
         description: "Max results",
       },
+      {
+        name: "my-companies",
+        type: "boolean",
+        description: "Search across every company you belong to (customer/worksite/person)",
+      },
     ],
     outputShape:
       "ListEnvelope<{ asiakasId, name, yTunnus, score }>",
@@ -793,6 +798,11 @@ export const COMMAND_SPECS: CommandSpec[] = [
         type: "number",
         default: "50",
         description: "Max results (backend caps at 100)",
+      },
+      {
+        name: "my-companies",
+        type: "boolean",
+        description: "Search across every company you belong to (customer/worksite/person)",
       },
     ],
     outputShape:
@@ -2913,6 +2923,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     flags: [
       { name: "in", type: "string", description: "Comma-separated subset of: customer,worksite,person,vehicle,keikka" },
       { name: "limit", type: "number", default: "5", description: "Max hits per entity" },
+      { name: "my-companies", type: "boolean", description: "Search across every company you belong to (customer/worksite/person)" },
     ],
     outputShape:
       "{ items: [{ entity, id, label, detail, <nativeIdField> }], nextCursor: null, count, errors: [{ entity, message }] }",
@@ -2922,6 +2933,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "Ordering: prefix label matches first, then entity order customer→worksite→person→vehicle→keikka.",
       "Each hit carries its native id field (asiakasId/tyomaaId/personId/vehicleId/keikkaId) for a follow-up `ib <entity> get <id>`.",
       "No backend changes — works against current production.",
+      "--my-companies covers customer/worksite/person only; vehicle and keikka stay scoped to the active company.",
     ],
     examples: [
       "ib search kamppi",

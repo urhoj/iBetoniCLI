@@ -129,16 +129,26 @@ export async function runUnifiedSearch(query, rawSources, entities = [...SEARCH_
 /**
  * Build the real per-entity sources for a client. Returns RAW results so
  * `projectFor` in `runUnifiedSearch` is the single projection point.
+ *
+ * When `myCompanies` is true, customer/worksite/person fan out across all
+ * companies the caller belongs to (backend-side fan-out or the cross-company
+ * person endpoint). Vehicle and keikka are always active-company only.
  */
-export function buildSearchSources(client, query, limit) {
+export function buildSearchSources(client, query, limit, myCompanies = false) {
     return {
-        customer: () => runCustomerSearch(client, query, limit),
-        worksite: () => runWorksiteSearch(client, query, limit),
-        person: () => runPersonSearch(client, query, limit),
-        vehicle: () => runVehicleSearch(client, query, limit),
+        customer: () => runCustomerSearch(client, query, limit, myCompanies),
+        worksite: () => runWorksiteSearch(client, query, limit, myCompanies),
+        person: () => {
+            if (myCompanies) {
+                const qs = new URLSearchParams({ q: query, limit: String(limit) });
+                return client.get(`/api/cli/person/search?${qs.toString()}`);
+            }
+            return runPersonSearch(client, query, limit);
+        },
+        vehicle: () => runVehicleSearch(client, query, limit), // active company only
         keikka: async () => {
             const { ownerAsiakasId } = decodeJwtPayload(client.getCurrentToken());
-            return runKeikkaSearch(client, query, ownerAsiakasId, limit);
+            return runKeikkaSearch(client, query, ownerAsiakasId, limit); // active company only
         },
     };
 }
@@ -153,11 +163,12 @@ export function registerSearchCommands(parent, getClient) {
         .description("Cross-entity search: customers, worksites, persons, vehicles, keikkas (one flat ranked list)")
         .option("--in <entities>", `Comma-separated subset of: ${SEARCH_ENTITIES.join(",")}`)
         .option("--limit <n>", "Max hits per entity", (v) => Number(v), DEFAULT_LIMIT)
+        .option("--my-companies", "Also search every company you belong to (customer/worksite/person only; vehicle & keikka stay active-company)")
         .action(async (query, opts) => {
         try {
             const entities = parseEntityFilter(opts.in);
             const client = await getClient();
-            const srcs = buildSearchSources(client, query, opts.limit);
+            const srcs = buildSearchSources(client, query, opts.limit, !!opts.myCompanies);
             const result = await runUnifiedSearch(query, srcs, entities);
             writeJson(result);
         }

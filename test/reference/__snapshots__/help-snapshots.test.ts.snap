@@ -905,6 +905,7 @@ ARGUMENTS
 
 FLAGS
   --limit NUMBER    Max results (default: 50)
+  --my-companies BOOLEAN    Search across every company you belong to (customer/worksite/person)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
@@ -3200,6 +3201,7 @@ ARGUMENTS
 FLAGS
   --in STRING    Comma-separated subset of: customer,worksite,person,vehicle,keikka
   --limit NUMBER    Max hits per entity (default: 5)
+  --my-companies BOOLEAN    Search across every company you belong to (customer/worksite/person)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
@@ -3216,6 +3218,7 @@ NOTES
   - Ordering: prefix label matches first, then entity order customer→worksite→person→vehicle→keikka.
   - Each hit carries its native id field (asiakasId/tyomaaId/personId/vehicleId/keikkaId) for a follow-up \`ib <entity> get <id>\`.
   - No backend changes — works against current production.
+  - --my-companies covers customer/worksite/person only; vehicle and keikka stay scoped to the active company.
 
 EXAMPLES
   ib search kamppi
@@ -4820,6 +4823,7 @@ ARGUMENTS
 
 FLAGS
   --limit NUMBER    Max results (backend caps at 100) (default: 50)
+  --my-companies BOOLEAN    Search across every company you belong to (customer/worksite/person)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID

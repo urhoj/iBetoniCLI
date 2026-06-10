@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { test, expect, vi, beforeEach } from "vitest";
 import { runCustomerSearch } from "../../src/commands/customer/index.js";
 import { runWorksiteSearch } from "../../src/commands/worksite/index.js";
 import type { ApiClient } from "../../src/api/client.js";

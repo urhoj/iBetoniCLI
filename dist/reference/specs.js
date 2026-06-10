@@ -452,6 +452,11 @@ export const COMMAND_SPECS = [
                 default: "50",
                 description: "Max results",
             },
+            {
+                name: "my-companies",
+                type: "boolean",
+                description: "Search across every company you belong to (customer/worksite/person)",
+            },
         ],
         outputShape: "ListEnvelope<{ asiakasId, name, yTunnus, score }>",
         errors: permErrors("auth.page.asiakas.read"),
@@ -712,6 +717,11 @@ export const COMMAND_SPECS = [
                 type: "number",
                 default: "50",
                 description: "Max results (backend caps at 100)",
+            },
+            {
+                name: "my-companies",
+                type: "boolean",
+                description: "Search across every company you belong to (customer/worksite/person)",
             },
         ],
         outputShape: "ListEnvelope<{ tyomaaId, name, tyomaaNum, address, address2, postalCode, city, formattedAddress, coords:{lat,lng}|null, drivingInstructions, comment }>",
@@ -2691,6 +2701,7 @@ export const COMMAND_SPECS = [
         flags: [
             { name: "in", type: "string", description: "Comma-separated subset of: customer,worksite,person,vehicle,keikka" },
             { name: "limit", type: "number", default: "5", description: "Max hits per entity" },
+            { name: "my-companies", type: "boolean", description: "Search across every company you belong to (customer/worksite/person)" },
         ],
         outputShape: "{ items: [{ entity, id, label, detail, <nativeIdField> }], nextCursor: null, count, errors: [{ entity, message }] }",
         errors: COMMON_AUTH_ERRORS,
@@ -2699,6 +2710,7 @@ export const COMMAND_SPECS = [
             "Ordering: prefix label matches first, then entity order customer→worksite→person→vehicle→keikka.",
             "Each hit carries its native id field (asiakasId/tyomaaId/personId/vehicleId/keikkaId) for a follow-up `ib <entity> get <id>`.",
             "No backend changes — works against current production.",
+            "--my-companies covers customer/worksite/person only; vehicle and keikka stay scoped to the active company.",
         ],
         examples: [
             "ib search kamppi",
