@@ -1067,24 +1067,31 @@ exports[`Help snapshots — contract stability > help for ib driver absences mat
   ib driver absences [flags]
 
 DESCRIPTION
-  Driver absences (vacation/sick leave — personPvm pois rows) in a date range. Optional --person filters to one driver.
+  Driver absences (vacation/sick leave — personPvm 'pois' rows) in a date range. Optional --person filters to one driver.
   Permissions: requires auth.page.grid.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
-  --from STRING    Start date YYYY-MM-DD (or today/yesterday/tomorrow) (required)
-  --to STRING    End date YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+  --from DATE    Start date YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+  --to DATE    End date YYYY-MM-DD (or today/yesterday/tomorrow) (required)
   --person NUMBER    Filter to one driver personId
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ personId, name, fromDate, toDate, absenceType }>
+  ListEnvelope<{ personId, name, date, status, statusName }>
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Read-only — setting absence status is not exposed by the CLI in v1. Deploy-gated.
+
+SEE ALSO
+  ib driver available
 
 EXAMPLES
   ib driver absences --from 2026-06-01 --to 2026-06-30
@@ -1143,11 +1150,12 @@ exports[`Help snapshots — contract stability > help for ib driver available ma
   ib driver available <date> [flags]
 
 DESCRIPTION
-  Assignable drivers who are free and not on vacation/absence that day. Useful to find candidates for \`ib driver assign\` (Task 9).
+  Assignable drivers (company pumpparit) who are free that day — not assigned to a vehicle and not on vacation/sick.
   Permissions: requires auth.page.grid.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
-  <date> STRING    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
 
 FLAGS
   (none)
@@ -1156,16 +1164,23 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ personId, name, defaultVehicleId, defaultVehiclePlate }>
+  ListEnvelope<{ personId, firstName, lastName, phone }>
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - Roster = asiakasPersonSettingTypeId 8 (pumppari) minus assigned-that-day minus absent-that-day.
+  - Deploy-gated.
+
+SEE ALSO
+  ib driver gaps, ib driver assign
+
 EXAMPLES
   ib driver available today
-  ib driver available 2026-06-10
+  ib driver available tomorrow
 "
 `;
 
@@ -1174,11 +1189,12 @@ exports[`Help snapshots — contract stability > help for ib driver board matche
   ib driver board <date> [flags]
 
 DESCRIPTION
-  All grid-eligible vehicles for a day with their assigned driver, gap status (Ei kuljettajaa), and keikka load context. Person/day-centric complement to \`ib vehicle drivers\`.
+  All grid-eligible vehicles for a day with their assigned driver, gap status (Ei kuljettajaa), and keikka load. Person/day-centric complement to \`ib vehicle drivers\`.
   Permissions: requires auth.page.grid.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
-  <date> STRING    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
 
 FLAGS
   (none)
@@ -1187,12 +1203,19 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ vehicleId, plate, name, driverPersonId, driverName, keikkaCount, hasGap }>
+  ListEnvelope<{ vehicleId, plate, name, type, typeName, driverPersonId, driverName, hasDriver, needsDriver, keikkaCount, m3 }>
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - needsDriver = the vehicle uses the no-driver bar AND has no day driver (i.e. it's a gap).
+  - Deploy-gated: 404 until puminet5api ships /api/cli/driver/*.
+
+SEE ALSO
+  ib driver gaps, ib driver available, ib driver assign
 
 EXAMPLES
   ib driver board today
@@ -1247,11 +1270,12 @@ exports[`Help snapshots — contract stability > help for ib driver gaps matches
   ib driver gaps <date> [flags]
 
 DESCRIPTION
-  Vehicles needing a driver that day — the 'Ei kuljettajaa' list. Subset of \`ib driver board\` rows where driverPersonId is null.
+  Vehicles needing a driver that day — the 'Ei kuljettajaa' list. Board rows filtered to needsDriver.
   Permissions: requires auth.page.grid.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
-  <date> STRING    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
 
 FLAGS
   (none)
@@ -1260,16 +1284,23 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ vehicleId, plate, name, keikkaCount }>
+  ListEnvelope<{ vehicleId, plate, name, type, typeName, driverPersonId, driverName, hasDriver, needsDriver, keikkaCount, m3 }>
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - Pair with \`ib driver available <date>\` to find drivers to fill these.
+  - Deploy-gated.
+
+SEE ALSO
+  ib driver available, ib driver assign, ib driver board
+
 EXAMPLES
   ib driver gaps today
-  ib driver gaps 2026-06-10
+  ib driver gaps tomorrow
 "
 `;
 
@@ -1278,12 +1309,13 @@ exports[`Help snapshots — contract stability > help for ib driver who matches 
   ib driver who <vehicleId> <date> [flags]
 
 DESCRIPTION
-  The day driver assigned to a single vehicle on a given date.
+  The day driver assigned to a single vehicle on a given date (or null when none).
   Permissions: requires auth.page.grid.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
-  <vehicleId> NUMBER    Target vehicle id (required)
-  <date> STRING    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+  <vehicleId> NUMBER    Target vehicleId (required)
+  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
 
 FLAGS
   (none)
@@ -1292,13 +1324,18 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
 
 OUTPUT (JSON, stdout)
-  { vehicleId, date, driverPersonId, driverName } — driverPersonId/driverName null when no driver assigned
+  { vehicleId, date, driver: { personId, firstName, lastName, phone } | null }
 
 ERRORS (stderr, exit non-zero)
-  exit 5 (HTTP 404)  Vehicle not found      → check vehicleId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Returns driver:null (not 404) when no driver is assigned. Deploy-gated.
+
+SEE ALSO
+  ib driver board, ib vehicle drivers
 
 EXAMPLES
   ib driver who 53 today
@@ -3662,6 +3699,12 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - personPvm-only: this sets just the day-driver bar and does NOT update the keikkat/palkit on the vehicle that day. For the atomic equivalent the grid uses, prefer \`ib driver assign\`.
+
+SEE ALSO
+  ib driver assign, ib driver gaps
+
 EXAMPLES
   ib vehicle driver-assign 7 --person 555 --date 2026-06-02 --reason 'cover shift'
   ib vehicle driver-assign 7 --person 555 --dry-run
@@ -3695,6 +3738,9 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib driver who, ib driver board
 
 EXAMPLES
   ib vehicle drivers 7 --from 2026-05-01 --to 2026-05-31
