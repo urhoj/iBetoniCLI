@@ -13,6 +13,7 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { resolveDate } from "../../dates.js";
 import {
   CHANGE_ENTITY_TYPES,
   findEntityType,
@@ -110,8 +111,8 @@ function assertKnownEntityType(entityType: string): void {
       4
     );
   }
-  const info = findEntityType(entityType);
-  if (info?.deprecated) {
+  const info = findEntityType(entityType)!;
+  if (info.deprecated) {
     // Diagnostic on stderr (stdout stays pure JSON data).
     process.stderr.write(
       `note: entityType '${entityType}' is deprecated — ${info.notes}\n`
@@ -309,12 +310,23 @@ export function registerChangesCommands(
 
   c.command("range")
     .description("Changes MADE within a time window (admin). Filter by entityType/person.")
-    .requiredOption("--from <iso>", "Window start (YYYY-MM-DD or ISO datetime)")
-    .requiredOption("--to <iso>", "Window end (YYYY-MM-DD or ISO datetime)")
+    .requiredOption(
+      "--from <iso>",
+      "Window start YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)"
+    )
+    .requiredOption(
+      "--to <iso>",
+      "Window end YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)"
+    )
     .option("--entity-type <type>", "Filter to one entityType")
     .option("--person <personId>", "Filter to one actor", (v: string) => Number(v))
     .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))
-    .option("--limit <n>", "Max rows kept client-side (default 200)", (v: string) => Number(v), 200)
+    .option(
+      "--limit <n>",
+      "Max rows kept client-side (default 200, cap 2000)",
+      (v: string) => Math.min(Number(v), 2000),
+      200
+    )
     .action(
       async (opts: {
         from: string;
@@ -328,8 +340,8 @@ export function registerChangesCommands(
           const client = await getClient();
           writeJson(
             await runChangesRange(client, {
-              from: opts.from,
-              to: opts.to,
+              from: resolveDate(opts.from) ?? opts.from,
+              to: resolveDate(opts.to) ?? opts.to,
               entityType: opts.entityType,
               person: opts.person,
               owner: opts.owner,
@@ -348,13 +360,19 @@ export function registerChangesCommands(
         "keikka.pumppuAika / palkki starttime, not change time."
     )
     .requiredOption("--entity-type <type>", "keikka or palkki")
-    .requiredOption("--from <iso>", "Entity-date window start")
-    .requiredOption("--to <iso>", "Entity-date window end")
+    .requiredOption(
+      "--from <iso>",
+      "Entity-date window start YYYY-MM-DD (or today/yesterday/tomorrow)"
+    )
+    .requiredOption(
+      "--to <iso>",
+      "Entity-date window end YYYY-MM-DD (or today/yesterday/tomorrow)"
+    )
     .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))
     .option(
       "--limit <n>",
-      "Max rows kept client-side (default 200)",
-      (v: string) => Number(v),
+      "Max rows kept client-side (default 200, cap 2000)",
+      (v: string) => Math.min(Number(v), 2000),
       200
     )
     .action(
@@ -370,8 +388,8 @@ export function registerChangesCommands(
           writeJson(
             await runChangesByEntityDate(client, {
               entityType: opts.entityType,
-              from: opts.from,
-              to: opts.to,
+              from: resolveDate(opts.from) ?? opts.from,
+              to: resolveDate(opts.to) ?? opts.to,
               owner: opts.owner,
               limit: opts.limit,
             })
