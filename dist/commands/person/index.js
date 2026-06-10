@@ -5,6 +5,7 @@ import { decodeJwtPayload } from "../../auth/jwt.js";
 import { roleNameForTypeId, resolveRoleTypeId } from "../../roles.js";
 import { runCompanyList } from "../company/index.js";
 import { CliError } from "../../api/errors.js";
+import { registerPersonDayCommands } from "./day.js";
 /**
  * Merge typed create flags over a parsed --body object (typed flags win) into the
  * /api/person/newPerson body. Email is intentionally optional: person.personEmail
@@ -241,6 +242,7 @@ export async function runPersonCompanies(client, personId) {
  */
 export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     const p = parent.command("person").description("Person commands");
+    registerPersonDayCommands(p, getClient);
     p.command("list")
         .description("List persons")
         .option("--role <role>", "Filter by role name")
