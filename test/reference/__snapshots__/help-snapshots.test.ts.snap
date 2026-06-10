@@ -2424,6 +2424,47 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib keikka latest matches snapshot 1`] = `
+"USAGE
+  ib keikka latest [flags]
+
+DESCRIPTION
+  The single most recent keikka matching the filters — no date range needed. Answers 'when was the latest delivered order?' in one command by searching backwards from today.
+  Permissions: requires auth.page.grid.tilaus.read.
+
+FLAGS
+  --status STRING    Filter by status (keikkaTilaId — e.g. 9 = Toimitettu; see the \`tila\` GLOSSARY legend)
+  --customer NUMBER    Filter by asiakasId
+  --vehicle NUMBER    Filter by vehicleId
+  --worksite NUMBER    Filter by worksite (tyomaaId)
+  --lookback NUMBER    How far back from today to search, in days (max 3650) (default: 365)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { item: { keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time } | null, searched: { from, to } }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Client-side windowed search over \`keikka list\`: walks 7/30/90/365-day windows backwards from today until a window has matches (a handful of round-trips at most). \`item: null\` + the \`searched\` range echo = genuinely nothing within --lookback.
+  - Windows truncated at the 500-row server cap are halved toward their newest end, so the true latest row cannot be hidden by truncation.
+  - Statuses 9/12/13 are all 'Toimitettu' — query the one you mean (no multi-status filter in v1).
+
+SEE ALSO
+  ib keikka list, ib keikka get
+
+EXAMPLES
+  ib keikka latest
+  ib keikka latest --status 9
+  ib keikka latest --customer 1349 --lookback 730
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib keikka list matches snapshot 1`] = `
 "USAGE
   ib keikka list [flags]

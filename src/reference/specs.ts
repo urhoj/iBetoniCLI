@@ -246,6 +246,43 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib keikka latest",
+    description:
+      "The single most recent keikka matching the filters — no date range needed. Answers 'when was the latest delivered order?' in one command by searching backwards from today.",
+    permissions: ["auth.page.grid.tilaus.read"],
+    flags: [
+      {
+        name: "status",
+        type: "string",
+        description:
+          "Filter by status (keikkaTilaId — e.g. 9 = Toimitettu; see the `tila` GLOSSARY legend)",
+      },
+      { name: "customer", type: "number", description: "Filter by asiakasId" },
+      { name: "vehicle", type: "number", description: "Filter by vehicleId" },
+      { name: "worksite", type: "number", description: "Filter by worksite (tyomaaId)" },
+      {
+        name: "lookback",
+        type: "number",
+        default: "365",
+        description: "How far back from today to search, in days (max 3650)",
+      },
+    ],
+    outputShape:
+      "{ item: { keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time } | null, searched: { from, to } }",
+    errors: permErrors("auth.page.grid.tilaus.read"),
+    notes: [
+      "Client-side windowed search over `keikka list`: walks 7/30/90/365-day windows backwards from today until a window has matches (a handful of round-trips at most). `item: null` + the `searched` range echo = genuinely nothing within --lookback.",
+      "Windows truncated at the 500-row server cap are halved toward their newest end, so the true latest row cannot be hidden by truncation.",
+      "Statuses 9/12/13 are all 'Toimitettu' — query the one you mean (no multi-status filter in v1).",
+    ],
+    seeAlso: ["ib keikka list", "ib keikka get"],
+    examples: [
+      "ib keikka latest",
+      "ib keikka latest --status 9",
+      "ib keikka latest --customer 1349 --lookback 730",
+    ],
+  },
+  {
     command: "ib keikka get",
     description:
       "Get a single keikka by id with related customer / worksite / vehicle / driver projections.",

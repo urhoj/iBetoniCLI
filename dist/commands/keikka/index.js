@@ -1,7 +1,7 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
-import { resolveDate } from "../../dates.js";
+import { resolveDate, todayHelsinki, addDaysISO } from "../../dates.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { registerHistoryAlias } from "../changes/index.js";
 // Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
@@ -33,6 +33,64 @@ export async function runKeikkaList(client, opts) {
     // Echo the interpreted date window so a count:0 result is self-evidently
     // scoped — without it an empty list is indistinguishable from a mis-aimed query.
     return { ...envelope, range: { from: opts.from ?? null, to: opts.to ?? null } };
+}
+/** Window sizes (days) walked backwards from today; the last size repeats until --lookback is covered. */
+const LATEST_WINDOW_DAYS = [7, 30, 90, 365];
+/** Whole days between two ISO dates (a ≤ b). */
+function daysBetween(a, b) {
+    return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
+}
+/** Newest row first: order by pvm, then time (ISO strings compare lexically). */
+function newestFirst(a, b) {
+    return (String(b.pvm ?? "").localeCompare(String(a.pvm ?? "")) ||
+        String(b.time ?? "").localeCompare(String(a.time ?? "")));
+}
+/**
+ * "Latest keikka matching the filters" WITHOUT a mandatory date range
+ * (feedback #26: one-step answers to "when was the last delivered order?").
+ *
+ * Entirely client-side over the existing `/api/cli/keikka/list` window query —
+ * no backend change, no deploy gate. Walks contiguous windows backwards from
+ * today (7 → 30 → 90 → 365-day spans, the last repeating) until a window has
+ * matches or `--lookback` (default 365 days) is exhausted; the newest row of
+ * the first non-empty window is the answer. Worst case = a handful of
+ * round-trips. When a window comes back truncated at the 500-row server cap
+ * (order not guaranteed), it is repeatedly halved toward its NEWEST end so
+ * the true latest row cannot be hidden by truncation.
+ */
+export async function runKeikkaLatest(client, opts) {
+    const today = todayHelsinki();
+    const lookback = Math.min(Math.max(opts.lookback ?? 365, 1), 3650);
+    const earliest = addDaysISO(today, -(lookback - 1));
+    const base = {
+        status: opts.status,
+        customer: opts.customer,
+        vehicle: opts.vehicle,
+        worksite: opts.worksite,
+        limit: 500,
+    };
+    let to = today;
+    let windowIdx = 0;
+    while (to >= earliest) {
+        const span = LATEST_WINDOW_DAYS[Math.min(windowIdx, LATEST_WINDOW_DAYS.length - 1)];
+        windowIdx++;
+        let from = addDaysISO(to, -(span - 1));
+        if (from < earliest)
+            from = earliest;
+        let env = await runKeikkaList(client, { ...base, from, to });
+        // Truncated at the server cap → halve toward the newest end until the
+        // window fits (or is a single day, which we accept as-is).
+        while (env.count >= 500 && from < to) {
+            from = addDaysISO(to, -Math.floor(daysBetween(from, to) / 2));
+            env = await runKeikkaList(client, { ...base, from, to });
+        }
+        if (env.count > 0) {
+            const newest = [...env.items].sort(newestFirst)[0];
+            return { item: newest, searched: { from, to: today } };
+        }
+        to = addDaysISO(from, -1);
+    }
+    return { item: null, searched: { from: earliest, to: today } };
 }
 /**
  * GET /api/cli/keikka/get/:keikkaId. Returns the flat backend record as-is.
@@ -138,6 +196,22 @@ export function registerKeikkaCommands(parent, getClient) {
             };
             const result = await runKeikkaList(client, resolved);
             writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    k.command("latest")
+        .description("Latest keikka matching the filters — searches backwards from today, no date range needed")
+        .option("--status <s>", "Filter by status (keikkaTilaId, e.g. 9 = Toimitettu)")
+        .option("--customer <id>", "Filter by asiakasId", (v) => Number(v))
+        .option("--vehicle <id>", "Filter by vehicleId", (v) => Number(v))
+        .option("--worksite <id>", "Filter by worksite (tyomaaId)", (v) => Number(v))
+        .option("--lookback <days>", "How far back from today to search (default 365, max 3650)", (v) => Number(v))
+        .action(async (opts) => {
+        try {
+            const client = await getClient();
+            writeJson(await runKeikkaLatest(client, opts));
         }
         catch (e) {
             exitWithError(e);
