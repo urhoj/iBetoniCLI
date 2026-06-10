@@ -72,7 +72,7 @@ export function mimeFromExtension(name: string): string {
 }
 
 /** Resolve --group/--type values that may be names ("tilaus") or ids ("1"). */
-async function resolveGroupAndType(
+export async function resolveGroupAndType(
   client: ApiClient,
   opts: { group?: string; type?: string }
 ): Promise<{ groupId?: number; typeId?: number }> {
@@ -131,6 +131,8 @@ export async function runAttachmentSearch(
   client: ApiClient,
   opts: { q?: string; missing?: boolean; limit?: number }
 ): Promise<ListEnvelope<Row>> {
+  // Manual encodeURIComponent (not URLSearchParams): the backend's qs parser
+  // does NOT decode "+" to a space, so free-text q must use %20-encoding.
   const parts: string[] = [];
   if (opts.q) parts.push(`q=${encodeURIComponent(opts.q)}`);
   if (opts.missing) parts.push("missing=1");

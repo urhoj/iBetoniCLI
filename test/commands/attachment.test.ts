@@ -6,6 +6,7 @@ import {
   runAttachmentSearch,
   resolveEntityTarget,
   mimeFromExtension,
+  resolveGroupAndType,
 } from "../../src/commands/attachment/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -78,5 +79,33 @@ describe("mimeFromExtension", () => {
     expect(mimeFromExtension("a.JPG")).toBe("image/jpeg");
     expect(mimeFromExtension("b.pdf")).toBe("application/pdf");
     expect(mimeFromExtension("c.unknownext")).toBe("application/octet-stream");
+  });
+});
+
+describe("resolveGroupAndType", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  test("passes numeric ids through without fetching", async () => {
+    const out = await resolveGroupAndType(c, { group: "1", type: "7" });
+    expect(out).toEqual({ groupId: 1, typeId: 7 });
+    expect(c.get).not.toHaveBeenCalled();
+  });
+
+  test("resolves names to ids with a single /types fetch", async () => {
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      groups: [{ attachmentGroupId: 1, attachmentGroupName: "Tilaus" }],
+      types: [{ attachmentTypeId: 7, attachmentTypeName: "Kuva" }],
+    });
+    const out = await resolveGroupAndType(c, { group: "tilaus", type: "kuva" });
+    expect(out).toEqual({ groupId: 1, typeId: 7 });
+    expect(c.get).toHaveBeenCalledTimes(1); // memoized — not two /types calls
+  });
+
+  test("unknown name throws exit-4 CliError", async () => {
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      groups: [{ attachmentGroupId: 1, attachmentGroupName: "Tilaus" }],
+      types: [],
+    });
+    await expect(resolveGroupAndType(c, { group: "nope" })).rejects.toThrowError(CliError);
   });
 });
