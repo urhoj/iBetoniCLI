@@ -1062,6 +1062,162 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib driver absences matches snapshot 1`] = `
+"USAGE
+  ib driver absences [flags]
+
+DESCRIPTION
+  Driver absences (vacation/sick leave — personPvm pois rows) in a date range. Optional --person filters to one driver.
+  Permissions: requires auth.page.grid.read.
+
+FLAGS
+  --from STRING    Start date YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+  --to STRING    End date YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+  --person NUMBER    Filter to one driver personId
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ personId, name, fromDate, toDate, absenceType }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib driver absences --from 2026-06-01 --to 2026-06-30
+  ib driver absences --from today --to today --person 123
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib driver available matches snapshot 1`] = `
+"USAGE
+  ib driver available <date> [flags]
+
+DESCRIPTION
+  Assignable drivers who are free and not on vacation/absence that day. Useful to find candidates for \`ib driver assign\` (Task 9).
+  Permissions: requires auth.page.grid.read.
+
+ARGUMENTS
+  <date> STRING    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ personId, name, defaultVehicleId, defaultVehiclePlate }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib driver available today
+  ib driver available 2026-06-10
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib driver board matches snapshot 1`] = `
+"USAGE
+  ib driver board <date> [flags]
+
+DESCRIPTION
+  All grid-eligible vehicles for a day with their assigned driver, gap status (Ei kuljettajaa), and keikka load context. Person/day-centric complement to \`ib vehicle drivers\`.
+  Permissions: requires auth.page.grid.read.
+
+ARGUMENTS
+  <date> STRING    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ vehicleId, plate, name, driverPersonId, driverName, keikkaCount, hasGap }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib driver board today
+  ib driver board 2026-06-10
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib driver gaps matches snapshot 1`] = `
+"USAGE
+  ib driver gaps <date> [flags]
+
+DESCRIPTION
+  Vehicles needing a driver that day — the 'Ei kuljettajaa' list. Subset of \`ib driver board\` rows where driverPersonId is null.
+  Permissions: requires auth.page.grid.read.
+
+ARGUMENTS
+  <date> STRING    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ vehicleId, plate, name, keikkaCount }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib driver gaps today
+  ib driver gaps 2026-06-10
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib driver who matches snapshot 1`] = `
+"USAGE
+  ib driver who <vehicleId> <date> [flags]
+
+DESCRIPTION
+  The day driver assigned to a single vehicle on a given date.
+  Permissions: requires auth.page.grid.read.
+
+ARGUMENTS
+  <vehicleId> NUMBER    Target vehicle id (required)
+  <date> STRING    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --asiakas ID
+
+OUTPUT (JSON, stdout)
+  { vehicleId, date, driverPersonId, driverName } — driverPersonId/driverName null when no driver assigned
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  Vehicle not found      → check vehicleId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib driver who 53 today
+  ib driver who 53 2026-06-10
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib feedback create matches snapshot 1`] = `
 "USAGE
   ib feedback create <description> [flags]

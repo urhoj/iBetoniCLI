@@ -1253,6 +1253,80 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib vehicle visits tyomaa 17 --days 30", "ib vehicle visits sijainti 3"],
   },
 
+  // ─── driver (5 reads; writes added in Task 9) ────────────────────────────
+  {
+    command: "ib driver board",
+    description:
+      "All grid-eligible vehicles for a day with their assigned driver, gap status (Ei kuljettajaa), and keikka load context. Person/day-centric complement to `ib vehicle drivers`.",
+    permissions: ["auth.page.grid.read"],
+    args: [
+      { name: "date", type: "string", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)" },
+    ],
+    flags: [],
+    outputShape: "ListEnvelope<{ vehicleId, plate, name, driverPersonId, driverName, keikkaCount, hasGap }>",
+    errors: permErrors("auth.page.grid.read"),
+    examples: ["ib driver board today", "ib driver board 2026-06-10"],
+  },
+  {
+    command: "ib driver gaps",
+    description:
+      "Vehicles needing a driver that day — the 'Ei kuljettajaa' list. Subset of `ib driver board` rows where driverPersonId is null.",
+    permissions: ["auth.page.grid.read"],
+    args: [
+      { name: "date", type: "string", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)" },
+    ],
+    flags: [],
+    outputShape: "ListEnvelope<{ vehicleId, plate, name, keikkaCount }>",
+    errors: permErrors("auth.page.grid.read"),
+    examples: ["ib driver gaps today", "ib driver gaps 2026-06-10"],
+  },
+  {
+    command: "ib driver available",
+    description:
+      "Assignable drivers who are free and not on vacation/absence that day. Useful to find candidates for `ib driver assign` (Task 9).",
+    permissions: ["auth.page.grid.read"],
+    args: [
+      { name: "date", type: "string", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)" },
+    ],
+    flags: [],
+    outputShape: "ListEnvelope<{ personId, name, defaultVehicleId, defaultVehiclePlate }>",
+    errors: permErrors("auth.page.grid.read"),
+    examples: ["ib driver available today", "ib driver available 2026-06-10"],
+  },
+  {
+    command: "ib driver who",
+    description: "The day driver assigned to a single vehicle on a given date.",
+    permissions: ["auth.page.grid.read"],
+    args: [
+      { name: "vehicleId", type: "number", description: "Target vehicle id" },
+      { name: "date", type: "string", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)" },
+    ],
+    flags: [],
+    outputShape: "{ vehicleId, date, driverPersonId, driverName } — driverPersonId/driverName null when no driver assigned",
+    errors: [
+      apiErr(404, "Vehicle not found", "check vehicleId"),
+      ...permErrors("auth.page.grid.read"),
+    ],
+    examples: ["ib driver who 53 today", "ib driver who 53 2026-06-10"],
+  },
+  {
+    command: "ib driver absences",
+    description:
+      "Driver absences (vacation/sick leave — personPvm pois rows) in a date range. Optional --person filters to one driver.",
+    permissions: ["auth.page.grid.read"],
+    flags: [
+      { name: "from", type: "string", description: "Start date YYYY-MM-DD (or today/yesterday/tomorrow)", required: true },
+      { name: "to", type: "string", description: "End date YYYY-MM-DD (or today/yesterday/tomorrow)", required: true },
+      { name: "person", type: "number", description: "Filter to one driver personId" },
+    ],
+    outputShape: "ListEnvelope<{ personId, name, fromDate, toDate, absenceType }>",
+    errors: permErrors("auth.page.grid.read"),
+    examples: [
+      "ib driver absences --from 2026-06-01 --to 2026-06-30",
+      "ib driver absences --from today --to today --person 123",
+    ],
+  },
+
   // ─── sijainti (11) ───────────────────────────────────────────────────────
   {
     command: "ib sijainti list",
