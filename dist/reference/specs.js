@@ -2248,6 +2248,9 @@ export const COMMAND_SPECS = [
             apiErr(404, "No active document of this type", "ib legal versions <typeName>"),
             ...COMMON_AUTH_ERRORS,
         ],
+        notes: [
+            "Resolves the active version via two sequential reads (current + types); if another developer activates a new version between them, the recorded version string can be one step stale. Acceptable for a testing aid — verify with ib legal status afterwards.",
+        ],
         seeAlso: ["ib legal status", "ib legal show"],
         examples: ['ib legal accept --type BETONIJERRY_TOS --reason "acceptance flow e2e test"'],
     },
