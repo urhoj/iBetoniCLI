@@ -120,6 +120,11 @@ export const GLOSSARY: GlossaryEntry[] = [
     definition:
       "Field-level audit trail (changeTracker table): every tracked write stores who/when/old→new and the --reason header, scoped per tenant (ownerAsiakasId). Read with `ib changes ...` or the per-entity `history` subcommands.",
   },
+  {
+    term: "validate",
+    definition:
+      "Company-setup validation profiles: jerry (BetoniJerry provider readiness) and betoni (betoni.online customer setup) — per-company pass/fail checklists with Finnish details.",
+  },
 ];
 
 /**

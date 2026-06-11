@@ -24,6 +24,7 @@ import { registerOhjeCommands } from "./commands/ohje/index.js";
 import { registerJerryCommands } from "./commands/jerry/index.js";
 import { registerScheduleCommands } from "./commands/schedule/index.js";
 import { registerStatsCommands } from "./commands/stats/index.js";
+import { registerValidateCommands } from "./commands/validate/index.js";
 import { registerChangesCommands } from "./commands/changes/index.js";
 import { registerSearchCommands } from "./commands/search/index.js";
 import { registerAttachmentCommands } from "./commands/attachment/index.js";
@@ -120,6 +121,7 @@ export function buildProgram() {
     registerJerryCommands(program, getClient);
     registerScheduleCommands(program, getClient);
     registerStatsCommands(program, getClient);
+    registerValidateCommands(program, getClient);
     registerChangesCommands(program, getClient);
     registerSchemaCommands(program, getClient);
     registerCacheCommands(program, getClient);
