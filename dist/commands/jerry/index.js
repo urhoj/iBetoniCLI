@@ -1,6 +1,7 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
+import { resolveAsiakasTarget } from "../customer/index.js";
 /**
  * Wrap a backend array into the universal `{ items, nextCursor, count }` list
  * envelope. The BetoniJerry endpoints return bare arrays (sendSuccess sends raw
@@ -402,36 +403,39 @@ export function registerJerryCommands(parent, getClient) {
         }
     });
     admin
-        .command("detail <asiakasId>")
+        .command("detail [asiakasId]")
         .description("Company drill-down: people by role, vehicles, sijainnit Jerry status")
-        .action(async (idStr) => {
+        .option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number)
+        .action(async (idStr, opts) => {
         try {
             const client = await getClient();
-            writeJson(await runJerryAdminDetail(client, Number(idStr)));
+            writeJson(await runJerryAdminDetail(client, resolveAsiakasTarget(idStr, opts.asiakas)));
         }
         catch (e) {
             exitWithError(e);
         }
     });
     addWriteFlagsToCommand(admin
-        .command("enable <asiakasId>")
-        .description("Enable the Jerry module for a company (audited). Requires --reason.")).action(async (idStr, opts) => {
+        .command("enable [asiakasId]")
+        .description("Enable the Jerry module for a company (audited). Requires --reason.")
+        .option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number)).action(async (idStr, opts) => {
         requireReason(opts);
         try {
             const client = await getClient();
-            writeJson(await runJerryAdminToggle(client, Number(idStr), true, opts));
+            writeJson(await runJerryAdminToggle(client, resolveAsiakasTarget(idStr, opts.asiakas), true, opts));
         }
         catch (e) {
             exitWithError(e);
         }
     });
     addWriteFlagsToCommand(admin
-        .command("disable <asiakasId>")
-        .description("Disable the Jerry module for a company (audited). Requires --reason.")).action(async (idStr, opts) => {
+        .command("disable [asiakasId]")
+        .description("Disable the Jerry module for a company (audited). Requires --reason.")
+        .option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number)).action(async (idStr, opts) => {
         requireReason(opts);
         try {
             const client = await getClient();
-            writeJson(await runJerryAdminToggle(client, Number(idStr), false, opts));
+            writeJson(await runJerryAdminToggle(client, resolveAsiakasTarget(idStr, opts.asiakas), false, opts));
         }
         catch (e) {
             exitWithError(e);

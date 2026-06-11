@@ -2262,8 +2262,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
     description:
       "List persons attached to a customer. `--role` filters by role name; the per-row `roleTypeId` only echoes that filter (null when unfiltered — the base membership row), so it is NOT the person's role set. For the FULL per-company roles pass `--include-roles` (adds permissionRoles[]) or use `ib person role list`.",
     permissions: ["auth.page.asiakas.read"],
-    args: [{ name: "asiakasId", type: "number", description: "asiakasId" }],
+    args: [{ name: "asiakasId", type: "number", required: false, description: "asiakasId (or pass --asiakas, like person add/remove)" }],
     flags: [
+      { name: "asiakas", type: "number", description: "Target asiakasId (alias for the positional; same flag as person add/remove)" },
       { name: "role", type: "string", description: "Filter by role name (e.g. keikkaHandler)" },
       { name: "include-roles", type: "boolean", description: "Add permissionRoles[] (full per-company role names) to each person — N extra GETs, opt-in" },
     ],
@@ -2273,7 +2274,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.asiakas.read"),
     ],
     seeAlso: ["ib person role list"],
-    examples: ["ib customer person list 26", "ib customer person list 26 --role keikkaHandler", "ib customer person list 27 --include-roles"],
+    examples: ["ib customer person list 26", "ib customer person list --asiakas 26 --role keikkaHandler", "ib customer person list 27 --include-roles"],
   },
   {
     command: "ib role explain",
@@ -2765,8 +2766,10 @@ export const COMMAND_SPECS: CommandSpec[] = [
     description:
       "Company Jerry drill-down: people by role (admins/tarjousAdmins/pumpparit), vehicles, and each sijainti's Jerry enrolment status (GET /api/admin/jerry-companies/:asiakasId/detail). System-admin only.",
     permissions: ["isSystemAdmin"],
-    args: [{ name: "asiakasId", type: "number", description: "company asiakasId" }],
-    flags: [],
+    args: [{ name: "asiakasId", type: "number", required: false, description: "company asiakasId (or pass --asiakas)" }],
+    flags: [
+      { name: "asiakas", type: "number", description: "Target asiakasId (alias for the positional)" },
+    ],
     outputShape:
       "{ admins:[{personId,name}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,isJerry}] }",
     errors: [
@@ -2781,8 +2784,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
     description:
       "Enable the BetoniJerry module for a company — the audited toggle that sets BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/enable). Change-tracked via the asiakasSql proc paths. System-admin only. Requires --reason.",
     permissions: ["isSystemAdmin"],
-    args: [{ name: "asiakasId", type: "number", description: "company asiakasId" }],
+    args: [{ name: "asiakasId", type: "number", required: false, description: "company asiakasId (or pass --asiakas)" }],
     flags: [
+      { name: "asiakas", type: "number", description: "Target asiakasId (alias for the positional)" },
       { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
     ],
     writeFlags: true,
@@ -2793,15 +2797,16 @@ export const COMMAND_SPECS: CommandSpec[] = [
       apiErr(404, "Company not found", "verify asiakasId"),
       ...COMMON_AUTH_ERRORS,
     ],
-    examples: ['ib jerry admin enable 1402 --reason "onboard provider"', "ib jerry admin enable 1402 --dry-run"],
+    examples: ['ib jerry admin enable 1402 --reason "onboard provider"', "ib jerry admin enable --asiakas 1402 --dry-run"],
   },
   {
     command: "ib jerry admin disable",
     description:
       "Disable the BetoniJerry module for a company — clears BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/disable). System-admin only. Requires --reason.",
     permissions: ["isSystemAdmin"],
-    args: [{ name: "asiakasId", type: "number", description: "company asiakasId" }],
+    args: [{ name: "asiakasId", type: "number", required: false, description: "company asiakasId (or pass --asiakas)" }],
     flags: [
+      { name: "asiakas", type: "number", description: "Target asiakasId (alias for the positional)" },
       { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
     ],
     writeFlags: true,

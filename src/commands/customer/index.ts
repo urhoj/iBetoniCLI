@@ -1413,14 +1413,15 @@ export function registerCustomerCommands(
   });
 
   customerPerson
-    .command("list <asiakasId>")
+    .command("list [asiakasId]")
     .description("List persons attached to a customer. Optional --role filter.")
+    .option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number)
     .option("--role <name>", "Filter by role name (e.g. keikkaHandler)")
     .option("--include-roles", "Add permissionRoles[] (full per-company role names) to each person — N extra GETs")
-    .action(async (asiakasIdStr: string, opts: { role?: string; includeRoles?: boolean }) => {
+    .action(async (asiakasIdStr: string | undefined, opts: { asiakas?: number; role?: string; includeRoles?: boolean }) => {
       try {
         const client = await getClient();
-        const result = await runCustomerPersonList(client, Number(asiakasIdStr), opts.role, opts.includeRoles);
+        const result = await runCustomerPersonList(client, resolveAsiakasTarget(asiakasIdStr, opts.asiakas), opts.role, opts.includeRoles);
         writeJson(result);
       } catch (e) {
         exitWithError(e);

@@ -1559,16 +1559,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib customer person list matches snapshot 1`] = `
 "USAGE
-  ib customer person list <asiakasId> [flags]
+  ib customer person list [<asiakasId>] [flags]
 
 DESCRIPTION
   List persons attached to a customer. \`--role\` filters by role name; the per-row \`roleTypeId\` only echoes that filter (null when unfiltered — the base membership row), so it is NOT the person's role set. For the FULL per-company roles pass \`--include-roles\` (adds permissionRoles[]) or use \`ib person role list\`.
   Permissions: requires auth.page.asiakas.read.
 
 ARGUMENTS
-  <asiakasId> NUMBER    asiakasId (required)
+  <asiakasId> NUMBER    asiakasId (or pass --asiakas, like person add/remove) (optional)
 
 FLAGS
+  --asiakas NUMBER    Target asiakasId (alias for the positional; same flag as person add/remove)
   --role STRING    Filter by role name (e.g. keikkaHandler)
   --include-roles BOOLEAN    Add permissionRoles[] (full per-company role names) to each person — N extra GETs, opt-in
 
@@ -1589,7 +1590,7 @@ SEE ALSO
 
 EXAMPLES
   ib customer person list 26
-  ib customer person list 26 --role keikkaHandler
+  ib customer person list --asiakas 26 --role keikkaHandler
   ib customer person list 27 --include-roles
 "
 `;
@@ -2283,17 +2284,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib jerry admin detail matches snapshot 1`] = `
 "USAGE
-  ib jerry admin detail <asiakasId> [flags]
+  ib jerry admin detail [<asiakasId>] [flags]
 
 DESCRIPTION
   Company Jerry drill-down: people by role (admins/tarjousAdmins/pumpparit), vehicles, and each sijainti's Jerry enrolment status (GET /api/admin/jerry-companies/:asiakasId/detail). System-admin only.
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
-  <asiakasId> NUMBER    company asiakasId (required)
+  <asiakasId> NUMBER    company asiakasId (or pass --asiakas) (optional)
 
 FLAGS
-  (none)
+  --asiakas NUMBER    Target asiakasId (alias for the positional)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -2314,16 +2315,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib jerry admin disable matches snapshot 1`] = `
 "USAGE
-  ib jerry admin disable <asiakasId> [flags]
+  ib jerry admin disable [<asiakasId>] [flags]
 
 DESCRIPTION
   Disable the BetoniJerry module for a company — clears BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/disable). System-admin only. Requires --reason.
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
-  <asiakasId> NUMBER    company asiakasId (required)
+  <asiakasId> NUMBER    company asiakasId (or pass --asiakas) (optional)
 
 FLAGS
+  --asiakas NUMBER    Target asiakasId (alias for the positional)
   --reason STRING    Audit-log reason (REQUIRED)
 
 WRITE-SAFETY FLAGS
@@ -2351,16 +2353,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib jerry admin enable matches snapshot 1`] = `
 "USAGE
-  ib jerry admin enable <asiakasId> [flags]
+  ib jerry admin enable [<asiakasId>] [flags]
 
 DESCRIPTION
   Enable the BetoniJerry module for a company — the audited toggle that sets BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/enable). Change-tracked via the asiakasSql proc paths. System-admin only. Requires --reason.
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
-  <asiakasId> NUMBER    company asiakasId (required)
+  <asiakasId> NUMBER    company asiakasId (or pass --asiakas) (optional)
 
 FLAGS
+  --asiakas NUMBER    Target asiakasId (alias for the positional)
   --reason STRING    Audit-log reason (REQUIRED)
 
 WRITE-SAFETY FLAGS
@@ -2383,7 +2386,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib jerry admin enable 1402 --reason "onboard provider"
-  ib jerry admin enable 1402 --dry-run
+  ib jerry admin enable --asiakas 1402 --dry-run
 "
 `;
 

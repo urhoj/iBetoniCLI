@@ -8,6 +8,7 @@ import {
 } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
+import { resolveAsiakasTarget } from "../customer/index.js";
 
 type Row = Record<string, unknown>;
 
@@ -584,12 +585,13 @@ export function registerJerryCommands(
     });
 
   admin
-    .command("detail <asiakasId>")
+    .command("detail [asiakasId]")
     .description("Company drill-down: people by role, vehicles, sijainnit Jerry status")
-    .action(async (idStr: string) => {
+    .option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number)
+    .action(async (idStr: string | undefined, opts: { asiakas?: number }) => {
       try {
         const client = await getClient();
-        writeJson(await runJerryAdminDetail(client, Number(idStr)));
+        writeJson(await runJerryAdminDetail(client, resolveAsiakasTarget(idStr, opts.asiakas)));
       } catch (e) {
         exitWithError(e);
       }
@@ -597,13 +599,14 @@ export function registerJerryCommands(
 
   addWriteFlagsToCommand(
     admin
-      .command("enable <asiakasId>")
+      .command("enable [asiakasId]")
       .description("Enable the Jerry module for a company (audited). Requires --reason.")
-  ).action(async (idStr: string, opts: WriteOpts) => {
+      .option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number)
+  ).action(async (idStr: string | undefined, opts: WriteOpts & { asiakas?: number }) => {
     requireReason(opts);
     try {
       const client = await getClient();
-      writeJson(await runJerryAdminToggle(client, Number(idStr), true, opts));
+      writeJson(await runJerryAdminToggle(client, resolveAsiakasTarget(idStr, opts.asiakas), true, opts));
     } catch (e) {
       exitWithError(e);
     }
@@ -611,13 +614,14 @@ export function registerJerryCommands(
 
   addWriteFlagsToCommand(
     admin
-      .command("disable <asiakasId>")
+      .command("disable [asiakasId]")
       .description("Disable the Jerry module for a company (audited). Requires --reason.")
-  ).action(async (idStr: string, opts: WriteOpts) => {
+      .option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number)
+  ).action(async (idStr: string | undefined, opts: WriteOpts & { asiakas?: number }) => {
     requireReason(opts);
     try {
       const client = await getClient();
-      writeJson(await runJerryAdminToggle(client, Number(idStr), false, opts));
+      writeJson(await runJerryAdminToggle(client, resolveAsiakasTarget(idStr, opts.asiakas), false, opts));
     } catch (e) {
       exitWithError(e);
     }
