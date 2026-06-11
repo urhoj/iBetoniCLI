@@ -3142,6 +3142,369 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib legal accept matches snapshot 1`] = `
+"USAGE
+  ib legal accept [flags]
+
+DESCRIPTION
+  Record YOUR OWN acceptance of the current active version of a type. DEVELOPER TESTING AID, gated client-side to developer/sysadmin tokens — real consent is a human action recorded via the betoni.online / betonijerry.fi UI flows. The backend endpoint is self-only: you can never accept on someone else's behalf. --reason required unless --dry-run.
+  Permissions: requires isSystemAdmin or isDeveloper (client-side gate).
+
+FLAGS
+  --type STRING    Document type name to accept (required)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  {success} | dry-run: {dryRun: true, wouldAccept: {...}, validation}
+
+ERRORS (stderr, exit non-zero)
+  exit 3  Not a developer/sysadmin token (client-side gate) → use a developer account
+  exit 4  Missing --reason / type has no personSettingTypeId mapping → pass --reason; check ib legal types
+  exit 5 (HTTP 404)  No active document of this type → ib legal versions <typeName>
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib legal status, ib legal show
+
+EXAMPLES
+  ib legal accept --type BETONIJERRY_TOS --reason "acceptance flow e2e test"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib legal acceptances matches snapshot 1`] = `
+"USAGE
+  ib legal acceptances <typeName> [flags]
+
+DESCRIPTION
+  Compliance report (developer/sysadmin only): WHO has accepted a document type — personId, name, email, accepted version + timestamp, newest first. Capped at 500 rows with a truncated flag. Types with NULL personSettingTypeId (e.g. GLOBAL today) are not trackable and return a validation error.
+  Permissions: requires isSystemAdmin or isDeveloper (server-enforced).
+
+ARGUMENTS
+  <typeName> STRING    Document type name (see ib legal types) (required)
+
+FLAGS
+  --doc-version STRING    Only acceptances of this version string (NOT --version — that is the global CLI version flag)
+  --limit NUMBER    Max rows (cap 500) (default: 500)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{personId, firstName, lastName, email, acceptedVersion, acceptedAt}> & {typeName, personSettingTypeId, truncated?}
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Type has no personSettingTypeId mapping → fix the legalDocumentTypes row first
+  exit 5 (HTTP 404)  Unknown document type  → ib legal types
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib legal status, ib legal types
+
+EXAMPLES
+  ib legal acceptances BETONIJERRY_TOS
+  ib legal acceptances TOS --doc-version 2.0
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib legal activate matches snapshot 1`] = `
+"USAGE
+  ib legal activate <documentId> [flags]
+
+DESCRIPTION
+  Publish a document version (developer/sysadmin only): atomically deactivates all sibling versions of the same type+tenant and activates this one (also stamps effectiveDate). Use to publish a draft or roll back to an earlier version.
+  Permissions: requires isSystemAdmin or isDeveloper (server-enforced).
+
+ARGUMENTS
+  <documentId> NUMBER    legalDocuments.documentId to activate (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  {success} | dry-run: {dryRun: true, wouldActivate: {documentId}, validation}
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Missing --reason or invalid documentId → pass --reason 'why' (not needed with --dry-run)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib legal save, ib legal versions
+
+EXAMPLES
+  ib legal activate 12 --reason "publish v2.1"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib legal delete matches snapshot 1`] = `
+"USAGE
+  ib legal delete <documentId> [flags]
+
+DESCRIPTION
+  Soft-delete (deactivate) a document version (developer/sysadmin only). The row and all acceptance history remain in the database.
+  Permissions: requires isSystemAdmin or isDeveloper (server-enforced).
+
+ARGUMENTS
+  <documentId> NUMBER    legalDocuments.documentId to soft-delete (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  {success} | dry-run: {dryRun: true, wouldDelete: {documentId}, validation}
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Missing --reason or invalid documentId → pass --reason 'why' (not needed with --dry-run)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib legal versions
+
+EXAMPLES
+  ib legal delete 12 --reason "superseded stub" --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib legal get matches snapshot 1`] = `
+"USAGE
+  ib legal get <documentId> [flags]
+
+DESCRIPTION
+  One document version by documentId, including full markdown content.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <documentId> NUMBER    legalDocuments.documentId (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  {documentId, documentTypeId, typeName, version, title, markdownContent, isActive, ...}
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  Document not found     → list ids via ib legal versions <typeName>
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib legal versions
+
+EXAMPLES
+  ib legal get 12
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib legal save matches snapshot 1`] = `
+"USAGE
+  ib legal save [flags]
+
+DESCRIPTION
+  Create a NEW document version (developer/sysadmin only). Versions are IMMUTABLE — any content/title change is a new version; there is no in-place edit. Draft by default (isActive=0); --activate publishes atomically (deactivates prior versions of the same type+tenant). Content from --file (local) or --content (inline; required over /api/cli/exec). --reason required unless --dry-run.
+  Permissions: requires isSystemAdmin or isDeveloper (server-enforced).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --type STRING    Document type name (see ib legal types) (required)
+  --doc-version STRING    Version string, e.g. 2.0 (NOT --version — that is the global CLI version flag) (required)
+  --title STRING    Document title (required)
+  --file STRING    Read markdown content from a local file
+  --content STRING    Inline markdown content (use over /api/cli/exec — no local FS there)
+  --owner NUMBER    ownerAsiakasId tenant scope (1349 = BetoniJerry); omit for global
+  --notes STRING    Internal notes
+  --effective-date DATE    Effective date YYYY-MM-DD (default: now)
+  --activate BOOLEAN    Publish immediately (deactivates prior versions). Default: inactive draft
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  {documentId, success} | dry-run: {dryRun: true, wouldCreate: {...}, validation}
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Missing --reason / no content / --file unreadable or combined with --content → pass --file OR --content, and --reason unless --dry-run
+  exit 4 (HTTP 400)  Required fields missing → provide --type --doc-version --title and content
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - X-Dry-Run is honoured server-side on this route once the gating deploy is live — do not --dry-run against a backend without it (the write would persist).
+
+SEE ALSO
+  ib legal activate, ib legal versions
+
+EXAMPLES
+  ib legal save --type TOS --doc-version 2.1 --title Kayttoehdot --file ./tos.md --reason "new clause 7"
+  ib legal save --type TOS --doc-version 2.1 --title Kayttoehdot --content "# TOS" --activate --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib legal show matches snapshot 1`] = `
+"USAGE
+  ib legal show <typeName> [flags]
+
+DESCRIPTION
+  Fetch the current ACTIVE document of a type, including markdown content. typeName uniquely implies the tenant (BETONIJERRY_TOS vs TOS) — no owner flag needed. --meta omits the (potentially >10 KB) content.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <typeName> STRING    Document type name (see ib legal types) (required)
+
+FLAGS
+  --meta BOOLEAN    Omit markdownContent (returns contentLength instead)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  {documentId, typeName, version, title, effectiveDate, markdownContent | contentLength, ...}
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  No active document of this type → check ib legal versions <typeName>
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib legal types, ib legal versions
+
+EXAMPLES
+  ib legal show BETONIJERRY_TOS
+  ib legal show TOS --meta
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib legal status matches snapshot 1`] = `
+"USAGE
+  ib legal status [flags]
+
+DESCRIPTION
+  Which legal documents you have accepted (version + timestamp) and which are still missing. Defaults to yourself and your token's company scope. --person requires developer/sysadmin (server-enforced). Content is stripped — read it via ib legal show. Note: betoni.online currently has no active documents, so an empty result is normal.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --person NUMBER    Check another personId (developer/sysadmin only)
+  --owner NUMBER    ownerAsiakasId scope (default: your company from the token)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  {personId, ownerAsiakasId, requiresAcceptance, accepted: [{typeName, acceptedVersion, acceptedDate, ...}], missing: [...]}
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  --person on someone else without developer/sysadmin → drop --person or use a developer token
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib legal show, ib legal acceptances
+
+EXAMPLES
+  ib legal status
+  ib legal status --person 6233
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib legal types matches snapshot 1`] = `
+"USAGE
+  ib legal types [flags]
+
+DESCRIPTION
+  List legal document types (EULA, TOS, PRIVACY, BETONIJERRY_TOS, ...) with their personSettingTypeId acceptance mapping. A NULL personSettingTypeId means acceptances for that type cannot be tracked.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{documentTypeId, typeName, displayName, description, sortOrder, personSettingTypeId}>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib legal show, ib legal status
+
+EXAMPLES
+  ib legal types
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib legal versions matches snapshot 1`] = `
+"USAGE
+  ib legal versions <typeName> [flags]
+
+DESCRIPTION
+  All versions of a document type — active, drafts, and superseded history. Content stripped; fetch one version with ib legal get.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <typeName> STRING    Document type name (see ib legal types) (required)
+
+FLAGS
+  --owner NUMBER    Filter by ownerAsiakasId tenant scope
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{documentId, version, title, isActive, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib legal get, ib legal activate
+
+EXAMPLES
+  ib legal versions TOS
+  ib legal versions BETONIJERRY_TOS
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib ohje get matches snapshot 1`] = `
 "USAGE
   ib ohje get <helpId> [flags]

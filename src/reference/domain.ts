@@ -125,6 +125,11 @@ export const GLOSSARY: GlossaryEntry[] = [
     definition:
       "Company-setup validation profiles: jerry (BetoniJerry provider readiness) and betoni (betoni.online customer setup) — per-company pass/fail checklists with Finnish details.",
   },
+  {
+    term: "legal",
+    definition:
+      "Versioned legal documents (TOS, EULA, privacy) in dbo.legalDocuments; per-person acceptances tracked via personSettings (`ib legal …`).",
+  },
 ];
 
 /**

@@ -323,7 +323,9 @@ export function registerLegalCommands(
     .command("save")
     .description("Create a NEW document version (immutable; draft unless --activate)")
     .requiredOption("--type <typeName>", "Document type name (see ib legal types)")
-    .requiredOption("--version <v>", "Version string, e.g. 2.0")
+    // NOT --version: the root global -V/--version is recognised anywhere in argv
+    // and would shadow it (see help-wiring "no root collision" test).
+    .requiredOption("--doc-version <v>", "Version string, e.g. 2.0")
     .requiredOption("--title <title>", "Document title")
     .option("--file <path>", "Read markdown content from a local file")
     .option("--content <markdown>", "Inline markdown content (use over /api/cli/exec — no local FS there)")
@@ -334,7 +336,7 @@ export function registerLegalCommands(
   addWriteFlagsToCommand(saveCmd).action(
     async (opts: {
       type: string;
-      version: string;
+      docVersion: string;
       title: string;
       file?: string;
       content?: string;
@@ -364,7 +366,7 @@ export function registerLegalCommands(
             client,
             {
               typeName: opts.type,
-              version: opts.version,
+              version: opts.docVersion,
               title: opts.title,
               markdownContent,
               ownerAsiakasId: opts.owner,
@@ -422,12 +424,18 @@ export function registerLegalCommands(
   legal
     .command("acceptances <typeName>")
     .description("Compliance report: WHO has accepted a document type (developer/sysadmin)")
-    .option("--version <v>", "Only acceptances of this version string")
+    // NOT --version: shadowed by the root global -V/--version (see save above).
+    .option("--doc-version <v>", "Only acceptances of this version string")
     .option("--limit <n>", "Max rows (default 500, cap 500)", (v: string) => Math.min(Number(v), 500))
-    .action(async (typeName: string, opts: { version?: string; limit?: number }) => {
+    .action(async (typeName: string, opts: { docVersion?: string; limit?: number }) => {
       try {
         const client = await getClient();
-        writeJson(await runLegalAcceptances(client, typeName, opts));
+        writeJson(
+          await runLegalAcceptances(client, typeName, {
+            version: opts.docVersion,
+            limit: opts.limit,
+          })
+        );
       } catch (e) {
         exitWithError(e);
       }
