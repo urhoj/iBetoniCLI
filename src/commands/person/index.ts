@@ -733,7 +733,7 @@ export function registerPersonCommands(
       }
     });
 
-  p.command("history <personId>")
+  p.command("log <personId>")
     .description(
       "Change-tracker audit trail for one person (who changed what, when, with --reason). " +
         "Includes role grants/revokes — pass `--field asiakasPersonSetting` for role changes only."

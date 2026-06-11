@@ -625,7 +625,7 @@ export function buildAsiakasUpdateBody(current, flags, prh) {
  *   - update    read-merge-write via typed flags; --body overrides (write flags)
  *   - create-or-update  upsert keyed by ytunnus (lookup → update or create; alias `upsert`)
  *   - delete    DELETE /api/asiakas/delete/<id>/<owner> (requires --reason)
- *   - history   change-tracker audit trail for one customer
+ *   - log       change-tracker audit trail for one customer
  *   - modules   report/toggle roolit + the 8 module flags (admin-gated; write flags)
  *   - operator  verify/provision all 9 operator flags at once (admin-gated; write flags)
  *   - settings  report/toggle ALL asiakasSettings + pumppu (admin-gated; write flags)
@@ -822,7 +822,7 @@ export function registerCustomerCommands(parent, getClient) {
             exitWithError(e);
         }
     });
-    c.command("history <asiakasId>")
+    c.command("log <asiakasId>")
         .description("Change-tracker audit trail for one customer (who changed what, with --reason).")
         .option("--limit <n>", "Max rows (default 100, cap 500)", (v) => Math.min(Number(v), 500), 100)
         .action(async (idStr, opts) => {
@@ -1037,7 +1037,7 @@ export function registerCustomerCommands(parent, getClient) {
 /**
  * Resolve the caller's current `ownerAsiakasId` via the existing
  * `/api/company-selection/available` route. Used by every customer command
- * that needs the active tenant id (create body, history path, delete URL).
+ * that needs the active tenant id (create body, log path, delete URL).
  */
 async function resolveCurrentOwnerAsiakasId(client) {
     const available = await client.get("/api/company-selection/available");

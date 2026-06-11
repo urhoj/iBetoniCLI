@@ -1,9 +1,9 @@
 /**
  * Offline catalog of changeTracker entityTypes — single source for:
- *  - `ib changes types` output,
+ *  - `ib log types` output,
  *  - client-side entityType validation (the backend returns [] for unknown
  *    types, which an AI would misread as "no history"),
- *  - the `ib help changes` concept guide.
+ *  - the `ib help log` concept guide.
  *
  * Inventory verified 2026-06-10 by grepping `new ChangeTracker(` across
  * puminet5api — see docs/superpowers/specs/2026-06-10-ib-changetracker-reading-design.md.
@@ -25,7 +25,7 @@ export const CHANGE_ENTITY_TYPES: readonly EntityTypeInfo[] = [
     entityType: "asiakas",
     entityIdMeaning: "asiakasId",
     gate: "member",
-    notes: "Customer companies. Same data as `ib customer history`.",
+    notes: "Customer companies. Same data as `ib customer log`.",
   },
   {
     entityType: "dayDriver",
@@ -38,13 +38,13 @@ export const CHANGE_ENTITY_TYPES: readonly EntityTypeInfo[] = [
     entityIdMeaning: "keikkaId",
     gate: "member",
     notes:
-      "Delivery orders. The history read FOLDS IN keikkaBetoni rows for the same keikka. Driver changes use fieldName 'kuskit'; invoice-memo edits use fieldName 'laskuMemo'.",
+      "Delivery orders. The log read FOLDS IN keikkaBetoni rows for the same keikka. Driver changes use fieldName 'kuskit'; invoice-memo edits use fieldName 'laskuMemo'.",
   },
   {
     entityType: "keikkaBetoni",
     entityIdMeaning: "keikkaBetoniId",
     gate: "member",
-    notes: "Concrete lines of a keikka. Also visible inside `changes entity keikka <keikkaId>`.",
+    notes: "Concrete lines of a keikka. Also visible inside `log entity keikka <keikkaId>`.",
   },
   {
     entityType: "keikkaLasku",
@@ -71,7 +71,7 @@ export const CHANGE_ENTITY_TYPES: readonly EntityTypeInfo[] = [
     entityIdMeaning: "personId",
     gate: "member",
     notes:
-      "Same data as `ib person history`. Role grants/revokes have fieldName 'asiakasPersonSetting'.",
+      "Same data as `ib person log`. Role grants/revokes have fieldName 'asiakasPersonSetting'.",
   },
   {
     entityType: "personAvailability",
@@ -102,13 +102,13 @@ export const CHANGE_ENTITY_TYPES: readonly EntityTypeInfo[] = [
     entityType: "tyomaa",
     entityIdMeaning: "tyomaaId",
     gate: "member",
-    notes: "Worksites. Same data as `ib worksite history`.",
+    notes: "Worksites. Same data as `ib worksite log`.",
   },
   {
     entityType: "vehicle",
     entityIdMeaning: "vehicleId",
     gate: "member",
-    notes: "Vehicles. Same data as `ib vehicle history`.",
+    notes: "Vehicles. Same data as `ib vehicle log`.",
   },
 ];
 
@@ -120,8 +120,8 @@ export function isKnownEntityType(t: string): boolean {
   return findEntityType(t) !== undefined;
 }
 
-/** `ib changes types` — offline, no network, no auth. */
-export function runChangesTypes(): ListEnvelope<EntityTypeInfo> {
+/** `ib log types` — offline, no network, no auth. */
+export function runLogTypes(): ListEnvelope<EntityTypeInfo> {
   return {
     items: [...CHANGE_ENTITY_TYPES],
     nextCursor: null,

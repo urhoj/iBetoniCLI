@@ -1,5 +1,5 @@
 /**
- * `ib changes` — changeTracker (audit trail) reading.
+ * `ib log` — changeTracker (audit trail) reading.
  *
  * All subcommands are read-only GETs against the ALREADY-DEPLOYED
  * /api/changes/* routes (puminet5api/routes/changeTrackingRoutes.js) — no
@@ -8,6 +8,7 @@
  * role; user <otherPersonId> needs admin.
  *
  * Spec: docs/superpowers/specs/2026-06-10-ib-changetracker-reading-design.md
+ * Rename (changes→log): docs/superpowers/specs/2026-06-11-ib-log-rename-design.md
  */
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
@@ -18,7 +19,7 @@ import {
   CHANGE_ENTITY_TYPES,
   findEntityType,
   isKnownEntityType,
-  runChangesTypes,
+  runLogTypes,
 } from "./entityTypes.js";
 
 /** Raw wire row from /api/changes/* (superset across the five routes). */
@@ -89,7 +90,7 @@ function projectRow(r: RawChangeRow): ChangeItem {
   return item;
 }
 
-/** Same owner-resolution contract as `ib person history`. */
+/** Same owner-resolution contract as `ib person log`. */
 async function resolveOwnerAsiakasId(client: ApiClient): Promise<number> {
   const available = await client.get<{ currentCompanyId?: number }>(
     "/api/company-selection/available"
@@ -107,7 +108,7 @@ function assertKnownEntityType(entityType: string): void {
     failWith(
       `unknown entityType '${entityType}'. Valid: ` +
         CHANGE_ENTITY_TYPES.map((e) => e.entityType).join(", ") +
-        ". See `ib changes types`.",
+        ". See `ib log types`.",
       4
     );
   }
@@ -137,7 +138,7 @@ function envelope(items: ChangeItem[], truncated = false): ListEnvelope<ChangeIt
 }
 
 /** GET /api/changes/:entityType/:entityId/:owner — generic entity history. */
-export async function runChangesEntity(
+export async function runLogEntity(
   client: ApiClient,
   entityType: string,
   entityId: number,
@@ -155,7 +156,7 @@ export async function runChangesEntity(
 }
 
 /** GET /api/changes/latest/:owner — admin-only, newest first, server cap 500. */
-export async function runChangesLatest(
+export async function runLogLatest(
   client: ApiClient,
   limit: number,
   opts: { entityType?: string; owner?: number } = {}
@@ -169,7 +170,7 @@ export async function runChangesLatest(
 }
 
 /** GET /api/changes/range/:owner — admin-only, by change timestamp. */
-export async function runChangesRange(
+export async function runLogRange(
   client: ApiClient,
   opts: {
     from: string;
@@ -199,7 +200,7 @@ export async function runChangesRange(
  * ENTITY's date (keikka.pumppuAika / grid_palkit.starttime), not the change
  * timestamp: "changes affecting that day's deliveries".
  */
-export async function runChangesByEntityDate(
+export async function runLogByEntityDate(
   client: ApiClient,
   opts: { entityType: string; from: string; to: string; limit: number; owner?: number }
 ): Promise<ListEnvelope<ChangeItem>> {
@@ -224,11 +225,11 @@ export async function runChangesByEntityDate(
 }
 
 /**
- * `ib changes user [personId]` — no arg: own recent changes
+ * `ib log user [personId]` — no arg: own recent changes
  * (GET /api/changes/user/recent/:owner); with personId: that person's changes
  * (GET /api/changes/user/:personId/:owner — self or admin).
  */
-export async function runChangesUser(
+export async function runLogUser(
   client: ApiClient,
   personId: number | null,
   limit: number,
@@ -243,8 +244,8 @@ export async function runChangesUser(
   return envelope((Array.isArray(rows) ? rows : []).map(projectRow));
 }
 
-/** Registers a thin `history <id>` alias on an entity group, delegating to runChangesEntity. */
-export function registerHistoryAlias(
+/** Registers a thin `log <id>` alias on an entity group, delegating to runLogEntity. */
+export function registerLogAlias(
   group: Command,
   getClient: () => Promise<ApiClient>,
   entityType: string,
@@ -253,7 +254,7 @@ export function registerHistoryAlias(
   fieldExample = "Filter by changeTracker fieldName"
 ): void {
   group
-    .command(`history <${idArgName}>`)
+    .command(`log <${idArgName}>`)
     .description(description)
     .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))
     .option("--limit <n>", "Max rows (default 100, cap 500)", (v: string) => Math.min(Number(v), 500), 100)
@@ -262,7 +263,7 @@ export function registerHistoryAlias(
       try {
         const client = await getClient();
         writeJson(
-          await runChangesEntity(client, entityType, Number(idStr), opts.limit, {
+          await runLogEntity(client, entityType, Number(idStr), opts.limit, {
             owner: opts.owner,
             field: opts.field,
           })
@@ -273,16 +274,16 @@ export function registerHistoryAlias(
     });
 }
 
-export function registerChangesCommands(
+export function registerLogCommands(
   parent: Command,
   getClient: () => Promise<ApiClient>
 ): void {
-  const c = parent.command("changes").description("ChangeTracker (audit trail) reads");
+  const c = parent.command("log").description("ChangeTracker (audit trail) reads");
 
   c.command("entity <entityType> <entityId>")
     .description(
       "Audit trail for ONE entity — who changed which field, when, old→new, with --reason. " +
-        "Valid entityTypes: `ib changes types`."
+        "Valid entityTypes: `ib log types`."
     )
     .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))
     .option(
@@ -301,7 +302,7 @@ export function registerChangesCommands(
         try {
           const client = await getClient();
           writeJson(
-            await runChangesEntity(client, entityType, Number(entityIdStr), opts.limit, {
+            await runLogEntity(client, entityType, Number(entityIdStr), opts.limit, {
               owner: opts.owner,
               field: opts.field,
             })
@@ -328,7 +329,7 @@ export function registerChangesCommands(
       try {
         const client = await getClient();
         writeJson(
-          await runChangesLatest(client, opts.limit, {
+          await runLogLatest(client, opts.limit, {
             entityType: opts.entityType,
             owner: opts.owner,
           })
@@ -369,7 +370,7 @@ export function registerChangesCommands(
         try {
           const client = await getClient();
           writeJson(
-            await runChangesRange(client, {
+            await runLogRange(client, {
               from: resolveDate(opts.from) ?? opts.from,
               to: resolveDate(opts.to) ?? opts.to,
               entityType: opts.entityType,
@@ -416,7 +417,7 @@ export function registerChangesCommands(
         try {
           const client = await getClient();
           writeJson(
-            await runChangesByEntityDate(client, {
+            await runLogByEntityDate(client, {
               entityType: opts.entityType,
               from: resolveDate(opts.from) ?? opts.from,
               to: resolveDate(opts.to) ?? opts.to,
@@ -446,7 +447,7 @@ export function registerChangesCommands(
         try {
           const client = await getClient();
           writeJson(
-            await runChangesUser(client, personIdStr ? Number(personIdStr) : null, opts.limit, {
+            await runLogUser(client, personIdStr ? Number(personIdStr) : null, opts.limit, {
               owner: opts.owner,
             })
           );
@@ -462,7 +463,7 @@ export function registerChangesCommands(
     )
     .action(() => {
       try {
-        writeJson(runChangesTypes());
+        writeJson(runLogTypes());
       } catch (e) {
         exitWithError(e);
       }

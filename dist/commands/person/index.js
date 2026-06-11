@@ -558,7 +558,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
             exitWithError(e);
         }
     });
-    p.command("history <personId>")
+    p.command("log <personId>")
         .description("Change-tracker audit trail for one person (who changed what, when, with --reason). " +
         "Includes role grants/revokes — pass `--field asiakasPersonSetting` for role changes only.")
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))

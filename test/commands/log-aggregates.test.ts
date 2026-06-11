@@ -1,10 +1,10 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import {
-  runChangesLatest,
-  runChangesRange,
-  runChangesByEntityDate,
-  runChangesUser,
-} from "../../src/commands/changes/index.js";
+  runLogLatest,
+  runLogRange,
+  runLogByEntityDate,
+  runLogUser,
+} from "../../src/commands/log/index.js";
 import { CliError } from "../../src/api/errors.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -20,12 +20,12 @@ const ROW = (id: number) => ({
   description: "Aika siirretty",
 });
 
-describe("changes aggregates", () => {
+describe("log aggregates", () => {
   beforeEach(() => get().mockReset());
 
   test("latest: GET /api/changes/latest/<owner> with limit + entityType", async () => {
     get().mockResolvedValueOnce([ROW(1)]);
-    const result = await runChangesLatest(mockClient, 50, { entityType: "keikka", owner: 27 });
+    const result = await runLogLatest(mockClient, 50, { entityType: "keikka", owner: 27 });
     expect(get()).toHaveBeenCalledWith("/api/changes/latest/27?limit=50&entityType=keikka");
     expect(result.count).toBe(1);
     expect(result.items[0].field).toBe("pumppuAika");
@@ -33,7 +33,7 @@ describe("changes aggregates", () => {
 
   test("range: GET /api/changes/range/<owner> with startDate/endDate/entityType/personId", async () => {
     get().mockResolvedValueOnce([ROW(1), ROW(2)]);
-    const result = await runChangesRange(mockClient, {
+    const result = await runLogRange(mockClient, {
       from: "2026-06-01",
       to: "2026-06-10",
       entityType: "keikka",
@@ -50,7 +50,7 @@ describe("changes aggregates", () => {
 
   test("range: client-side --limit slices and sets truncated", async () => {
     get().mockResolvedValueOnce([ROW(1), ROW(2), ROW(3)]);
-    const result = await runChangesRange(mockClient, {
+    const result = await runLogRange(mockClient, {
       from: "2026-06-01", to: "2026-06-10", owner: 27, limit: 2,
     });
     expect(result.count).toBe(2);
@@ -60,7 +60,7 @@ describe("changes aggregates", () => {
   test("range: bad --from is CliError exit 4, no fetch", async () => {
     let err: unknown;
     try {
-      await runChangesRange(mockClient, { from: "soon", to: "2026-06-10", owner: 27, limit: 200 });
+      await runLogRange(mockClient, { from: "soon", to: "2026-06-10", owner: 27, limit: 200 });
     } catch (e) { err = e; }
     expect(err).toBeInstanceOf(CliError);
     expect((err as CliError).exitCode).toBe(4);
@@ -70,7 +70,7 @@ describe("changes aggregates", () => {
   test("latest: unknown entityType is CliError exit 4, no fetch", async () => {
     let err: unknown;
     try {
-      await runChangesLatest(mockClient, 50, { entityType: "banana", owner: 27 });
+      await runLogLatest(mockClient, 50, { entityType: "banana", owner: 27 });
     } catch (e) { err = e; }
     expect(err).toBeInstanceOf(CliError);
     expect((err as CliError).exitCode).toBe(4);
@@ -79,7 +79,7 @@ describe("changes aggregates", () => {
 
   test("by-entity-date: client-side --limit slices and sets truncated", async () => {
     get().mockResolvedValueOnce([ROW(1), ROW(2), ROW(3)]);
-    const result = await runChangesByEntityDate(mockClient, {
+    const result = await runLogByEntityDate(mockClient, {
       entityType: "keikka", from: "2026-06-01", to: "2026-06-10", owner: 27, limit: 2,
     });
     expect(result.count).toBe(2);
@@ -89,7 +89,7 @@ describe("changes aggregates", () => {
   test("by-entity-date: requires keikka|palkki", async () => {
     let err: unknown;
     try {
-      await runChangesByEntityDate(mockClient, {
+      await runLogByEntityDate(mockClient, {
         entityType: "vehicle", from: "2026-06-01", to: "2026-06-10", owner: 27, limit: 200,
       });
     } catch (e) { err = e; }
@@ -101,7 +101,7 @@ describe("changes aggregates", () => {
     get().mockResolvedValueOnce([
       { ...ROW(1), entityType: "palkki", palkkiText: "Pumppu 1", palkkiVehicleRegNo: "ABC-123" },
     ]);
-    const result = await runChangesByEntityDate(mockClient, {
+    const result = await runLogByEntityDate(mockClient, {
       entityType: "palkki", from: "2026-06-10", to: "2026-06-10", owner: 27, limit: 200,
     });
     expect(get()).toHaveBeenCalledWith(
@@ -113,13 +113,13 @@ describe("changes aggregates", () => {
 
   test("user without personId hits /user/recent; with personId hits /user/<id>", async () => {
     get().mockResolvedValueOnce([{ ...ROW(1), entityDisplayName: "42 - Tilaus" }]);
-    const self = await runChangesUser(mockClient, null, 100, { owner: 27 });
+    const self = await runLogUser(mockClient, null, 100, { owner: 27 });
     expect(get()).toHaveBeenCalledWith("/api/changes/user/recent/27?limit=100");
     expect(self.items[0].entityDisplayName).toBe("42 - Tilaus");
 
     get().mockReset();
     get().mockResolvedValueOnce([]);
-    await runChangesUser(mockClient, 63, 50, { owner: 27 });
+    await runLogUser(mockClient, 63, 50, { owner: 27 });
     expect(get()).toHaveBeenCalledWith("/api/changes/user/63/27?limit=50");
   });
 
@@ -127,7 +127,7 @@ describe("changes aggregates", () => {
     get()
       .mockResolvedValueOnce({ currentCompanyId: 27 })
       .mockResolvedValueOnce([]);
-    await runChangesLatest(mockClient, 100, {});
+    await runLogLatest(mockClient, 100, {});
     expect(get()).toHaveBeenNthCalledWith(1, "/api/company-selection/available");
     expect(get()).toHaveBeenNthCalledWith(2, "/api/changes/latest/27?limit=100");
   });

@@ -11,7 +11,7 @@ import {
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { CliError } from "../../api/errors.js";
 import { diffFields } from "../../diff.js";
-import { registerHistoryAlias } from "../changes/index.js";
+import { registerLogAlias } from "../log/index.js";
 
 /**
  * Parse a CLI boolean flag value. Accepts true/1/yes/on (case-insensitive) as
@@ -828,11 +828,11 @@ export function registerVehicleCommands(
       }
     });
 
-  registerHistoryAlias(
+  registerLogAlias(
     v,
     getClient,
     "vehicle",
     "vehicleId",
-    "Change-tracker audit trail for one vehicle. Alias of `ib changes entity vehicle`."
+    "Change-tracker audit trail for one vehicle. Alias of `ib log entity vehicle`."
   );
 }

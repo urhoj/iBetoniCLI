@@ -3,10 +3,10 @@ import {
   CHANGE_ENTITY_TYPES,
   findEntityType,
   isKnownEntityType,
-  runChangesTypes,
-} from "../../src/commands/changes/entityTypes.js";
+  runLogTypes,
+} from "../../src/commands/log/entityTypes.js";
 
-describe("changes entityType catalog", () => {
+describe("log entityType catalog", () => {
   test("lists entityTypes in alphabetical order", () => {
     const names = CHANGE_ENTITY_TYPES.map((e) => e.entityType);
     expect(names).toEqual([
@@ -47,8 +47,8 @@ describe("changes entityType catalog", () => {
     expect(findEntityType("banana")).toBeUndefined();
   });
 
-  test("runChangesTypes returns a ListEnvelope of the catalog", () => {
-    const result = runChangesTypes();
+  test("runLogTypes returns a ListEnvelope of the catalog", () => {
+    const result = runLogTypes();
     expect(result.count).toBe(CHANGE_ENTITY_TYPES.length);
     expect(result.items[0]).toHaveProperty("entityType");
     expect(result.items[0]).toHaveProperty("entityIdMeaning");

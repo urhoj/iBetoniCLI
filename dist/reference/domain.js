@@ -93,8 +93,8 @@ export const GLOSSARY = [
         definition: "sijainti column gating a varikko's BetoniJerry enrolment: future/sentinel datetime = active, NULL = not enrolled, past = expired.",
     },
     {
-        term: "changes / muutoshistoria",
-        definition: "Field-level audit trail (changeTracker table): every tracked write stores who/when/old→new and the --reason header, scoped per tenant (ownerAsiakasId). Read with `ib changes ...` or the per-entity `history` subcommands.",
+        term: "log / muutoshistoria",
+        definition: "Field-level audit trail (changeTracker table): every tracked write stores who/when/old→new and the --reason header, scoped per tenant (ownerAsiakasId). Read with `ib log ...` or the per-entity `log` subcommands (`ib keikka log <id>`, `ib person log <id>`, ...).",
     },
     {
         term: "validate",
@@ -152,9 +152,9 @@ export const TOPICS = [
         body: "Every read/write is scoped to the active company's ownerAsiakasId, derived from your JWT. `ib company switch --to <id>` persists a new active company; the global `--company <id>` runs ONE command in another company's context via an ephemeral (non-persisted) switch (it is named --company because many subcommands have their own --asiakas flag). BetoniJerry is the umbrella tenant asiakasId 1349.",
     },
     {
-        id: "changes",
+        id: "log",
         title: "Audit trail (changeTracker) reading",
-        body: "Every tracked write produces field-level rows: who (personId/personName, impersonatedByPersonName when impersonated), when, fieldName old→new, description, and the --reason the writer supplied (X-Action-Reason). Reads: `ib changes entity <type> <id>` for one entity (keikka folds in its keikkaBetoni rows; person/customer/keikka/vehicle/worksite also have `history` shortcuts). Admin-wide views: `changes latest` (newest N), `changes range --from --to` (changes MADE in the window), `changes by-entity-date` (changes affecting deliveries DATED in the window — the grid drawer's view). `changes user [personId]` = changes BY a person. entityType catalog: `ib changes types` (offline). Gates: entity reads need company membership (personAvailability: admin); latest/range/by-entity-date and other-person user reads need an admin role (asiakasAdmin/laskuAdmin/sysadmin). Aggregate views return reason/impersonator only after the 2026-06 backend deploy; nulls before that. NOT in changeTracker: email-send fallback events when the sender had no personId/ownerAsiakasId (stepLog-only edge case).",
+        body: "Every tracked write produces field-level rows: who (personId/personName, impersonatedByPersonName when impersonated), when, fieldName old→new, description, and the --reason the writer supplied (X-Action-Reason). Reads: `ib log entity <type> <id>` for one entity (keikka folds in its keikkaBetoni rows; person/customer/keikka/vehicle/worksite also have `log` shortcuts). Admin-wide views: `log latest` (newest N), `log range --from --to` (changes MADE in the window), `log by-entity-date` (changes affecting deliveries DATED in the window — the grid drawer's view). `log user [personId]` = changes BY a person. entityType catalog: `ib log types` (offline). Gates: entity reads need company membership (personAvailability: admin); latest/range/by-entity-date and other-person user reads need an admin role (asiakasAdmin/laskuAdmin/sysadmin). Aggregate views return reason/impersonator only after the 2026-06 backend deploy; nulls before that. NOT in changeTracker: email-send fallback events when the sender had no personId/ownerAsiakasId (stepLog-only edge case).",
     },
     {
         id: "attachments",

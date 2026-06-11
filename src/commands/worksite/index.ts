@@ -9,7 +9,7 @@ import {
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
-import { registerHistoryAlias } from "../changes/index.js";
+import { registerLogAlias } from "../log/index.js";
 import { resolveTarget } from "../../targets.js";
 
 export interface WorksiteListFilter {
@@ -683,11 +683,11 @@ export function registerWorksiteCommands(
       }
     });
 
-  registerHistoryAlias(
+  registerLogAlias(
     w,
     getClient,
     "tyomaa",
     "tyomaaId",
-    "Change-tracker audit trail for one worksite (tyomaa). Alias of `ib changes entity tyomaa`."
+    "Change-tracker audit trail for one worksite (tyomaa). Alias of `ib log entity tyomaa`."
   );
 }

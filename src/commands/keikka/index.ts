@@ -10,7 +10,7 @@ import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveDate, todayHelsinki, addDaysISO } from "../../dates.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
-import { registerHistoryAlias } from "../changes/index.js";
+import { registerLogAlias } from "../log/index.js";
 
 // Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
 export { resolveDate };
@@ -442,12 +442,12 @@ export function registerKeikkaCommands(
     }
   );
 
-  registerHistoryAlias(
+  registerLogAlias(
     k,
     getClient,
     "keikka",
     "keikkaId",
-    "Change-tracker audit trail for one keikka (folds in its keikkaBetoni rows). Alias of `ib changes entity keikka`.",
+    "Change-tracker audit trail for one keikka (folds in its keikkaBetoni rows). Alias of `ib log entity keikka`.",
     "Filter by changeTracker fieldName (e.g. kuskit, laskuMemo)"
   );
 }

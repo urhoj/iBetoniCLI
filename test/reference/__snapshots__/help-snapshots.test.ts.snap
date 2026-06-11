@@ -875,214 +875,6 @@ EXAMPLES
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib changes by-entity-date matches snapshot 1`] = `
-"USAGE
-  ib changes by-entity-date [flags]
-
-DESCRIPTION
-  Changes affecting deliveries DATED in the window — filters by the entity's own date (keikka.pumppuAika / grid_palkit.starttime), NOT the change timestamp. This is what the grid Muutoshistoria drawer shows: 'everything that touched that day's deliveries, whenever the change was made'. GET /api/changes/by-entity-date/:ownerAsiakasId. Admin only. NOTE: reason/impersonatedByPersonName are null until the 2026-06 aggregate-procs backend deploy.
-  Permissions: requires isAnyAdmin (asiakasAdmin/laskuAdmin/system admin).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
-
-FLAGS
-  --entity-type STRING    keikka or palkki (required)
-  --from DATE    Entity-date window start (or today/yesterday/tomorrow) (required)
-  --to DATE    Entity-date window end (or today/yesterday/tomorrow) (required)
-  --owner NUMBER    ownerAsiakasId (default: active company)
-  --limit NUMBER    Max rows kept client-side (cap 2000) (default: 200)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personName, at, description, keikkaTilaContext, deviceType, palkkiText, palkkiVehicleRegNo, reason, impersonatedByPersonName }>
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not an admin in the owner company → use an admin token
-  exit 4  entityType not keikka|palkki, or bad dates (client-side) → use --entity-type keikka|palkki and ISO dates or today/yesterday/tomorrow
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-SEE ALSO
-  ib changes range
-
-EXAMPLES
-  ib changes by-entity-date --entity-type keikka --from today --to today
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib changes entity matches snapshot 1`] = `
-"USAGE
-  ib changes entity <entityType> <entityId> [flags]
-
-DESCRIPTION
-  Change-tracker audit trail for ONE entity of any type — who changed which field, when, old→new, and the --reason recorded by writes. GET /api/changes/:entityType/:entityId/:ownerAsiakasId; owner defaults to the active company. entityType is validated client-side against the offline catalog (\`ib changes types\`); 'keikka' folds in the keikka's keikkaBetoni rows; deprecated 'kuski' is accepted with a stderr note. --field filters client-side.
-  Auth: requires login (any authenticated user).
-
-ARGUMENTS
-  <entityType> STRING    One of \`ib changes types\` (e.g. keikka, vehicle, pumppuRequest) (required)
-  <entityId> NUMBER    The entity's id (see entityIdMeaning in \`ib changes types\`) (required)
-
-FLAGS
-  --owner NUMBER    ownerAsiakasId (default: active company)
-  --limit NUMBER    Max rows (capped at 500) (default: 100)
-  --field STRING    Filter by changeTracker fieldName (client-side)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a member of that company — or entityType personAvailability without an admin role → ib company switch to that owner, or use an admin token
-  exit 4  Unknown entityType (client-side validation) → ib changes types
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-NOTES
-  - personAvailability is admin-gated server-side; every other type needs company membership only.
-  - Shortcuts: ib keikka|vehicle|worksite history (same row shape) and ib person|customer history (slimmer rows without entityType/entityId).
-
-SEE ALSO
-  ib changes types, ib keikka history, ib changes latest
-
-EXAMPLES
-  ib changes entity keikka 12345
-  ib changes entity vehicle 53 --field kuskit
-  ib changes entity pumppuRequest 17
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib changes latest matches snapshot 1`] = `
-"USAGE
-  ib changes latest [flags]
-
-DESCRIPTION
-  Newest changes across the whole active company, optionally one entityType — admin view for 'what just happened'. GET /api/changes/latest/:ownerAsiakasId. NOTE: reason/impersonator columns appear only after the 2026-06 aggregate-procs backend deploy; until then they are null.
-  Permissions: requires isAnyAdmin (asiakasAdmin/laskuAdmin/system admin).
-
-FLAGS
-  --entity-type STRING    Filter to one entityType
-  --owner NUMBER    ownerAsiakasId (default: active company)
-  --limit NUMBER    Max rows (server cap 500) (default: 100)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not an admin in the owner company → use an admin token, or per-entity \`ib changes entity\`
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-SEE ALSO
-  ib changes range, ib changes by-entity-date
-
-EXAMPLES
-  ib changes latest
-  ib changes latest --entity-type keikka --limit 50
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib changes range matches snapshot 1`] = `
-"USAGE
-  ib changes range [flags]
-
-DESCRIPTION
-  All changes MADE within a time window (by change timestamp), optional entityType/person filters — admin forensic view. GET /api/changes/range/:ownerAsiakasId. The backend has no row cap; --limit slices client-side (truncated:true when cut). NOTE: reason/impersonatedByPersonName are null until the 2026-06 aggregate-procs backend deploy.
-  Permissions: requires isAnyAdmin (asiakasAdmin/laskuAdmin/system admin).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
-
-FLAGS
-  --from DATE    Window start, YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow) (required)
-  --to DATE    Window end, YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow) (required)
-  --entity-type STRING    Filter to one entityType
-  --person NUMBER    Filter to one actor personId
-  --owner NUMBER    ownerAsiakasId (default: active company)
-  --limit NUMBER    Max rows kept client-side (cap 2000) (default: 200)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }> (+truncated when --limit cut rows)
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not an admin in the owner company → use an admin token
-  exit 4  Invalid --from/--to (client-side) → use YYYY-MM-DD or ISO datetime; today/yesterday/tomorrow are also accepted
-  exit 4 (HTTP 400)  Backend rejected the dates → use ISO date strings
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-SEE ALSO
-  ib changes by-entity-date
-
-EXAMPLES
-  ib changes range --from 2026-06-01 --to 2026-06-10
-  ib changes range --from yesterday --to today --entity-type keikka --person 63
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib changes types matches snapshot 1`] = `
-"USAGE
-  ib changes types [flags]
-
-DESCRIPTION
-  Offline catalog of changeTracker entityTypes: what each entityId means, the server-side read gate, and notes (deprecated kuski, keikka⊃keikkaBetoni fold-in, pumppuRequest two-party rows). No network, no auth.
-  Auth: none (public).
-
-FLAGS
-  (none)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  ListEnvelope<{ entityType, entityIdMeaning, gate: 'member'|'admin', notes, deprecated? }>
-
-ERRORS (stderr, exit non-zero)
-  exit 0  Always succeeds (offline static list) → n/a
-
-EXAMPLES
-  ib changes types
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib changes user matches snapshot 1`] = `
-"USAGE
-  ib changes user [<personId>] [flags]
-
-DESCRIPTION
-  Changes MADE BY a person. Without personId: your own recent changes (GET /api/changes/user/recent/:owner — any member). With personId: that person's changes (GET /api/changes/user/:personId/:owner — self or admin). Rows carry entityDisplayName (e.g. '12345 - Tilaus') instead of personName (the actor IS the queried person).
-  Auth: requires login (any authenticated user).
-
-ARGUMENTS
-  <personId> NUMBER    Whose changes (omit = yourself; others need admin) (optional)
-
-FLAGS
-  --owner NUMBER    ownerAsiakasId (default: active company)
-  --limit NUMBER    Max rows (cap 500) (default: 100)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, at, description, deviceType, entityDisplayName, reason, impersonatedByPersonName }>
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Another person's history without an admin role → omit personId, or use an admin token
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-EXAMPLES
-  ib changes user
-  ib changes user 63 --limit 50
-"
-`;
-
 exports[`Help snapshots — contract stability > help for ib commands matches snapshot 1`] = `
 "USAGE
   ib commands [<domain>] [flags]
@@ -1362,37 +1154,6 @@ EXAMPLES
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib customer history matches snapshot 1`] = `
-"USAGE
-  ib customer history <asiakasId> [flags]
-
-DESCRIPTION
-  Change-tracker audit trail for one customer — who changed which field, when, and the --reason. Reads the same log the CLI's writes populate.
-  Permissions: requires auth.page.asiakas.read (company member or admin).
-
-ARGUMENTS
-  <asiakasId> NUMBER    asiakasId (required)
-
-FLAGS
-  --limit NUMBER    Max rows (cap 500) (default: 100)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.read
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-EXAMPLES
-  ib customer history 26
-  ib customer history 26 --limit 20
-"
-`;
-
 exports[`Help snapshots — contract stability > help for ib customer list matches snapshot 1`] = `
 "USAGE
   ib customer list [flags]
@@ -1431,6 +1192,37 @@ EXAMPLES
   ib customer list --full
   ib customer list --ids 26,42,1349 --full
   ib customer list --ids 26,42 --full --include contacts,sijainnit
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib customer log matches snapshot 1`] = `
+"USAGE
+  ib customer log <asiakasId> [flags]
+
+DESCRIPTION
+  Change-tracker audit trail for one customer — who changed which field, when, and the --reason. Reads the same log the CLI's writes populate.
+  Permissions: requires auth.page.asiakas.read (company member or admin).
+
+ARGUMENTS
+  <asiakasId> NUMBER    asiakasId (required)
+
+FLAGS
+  --limit NUMBER    Max rows (cap 500) (default: 100)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib customer log 26
+  ib customer log 26 --limit 20
 "
 `;
 
@@ -2948,42 +2740,6 @@ EXAMPLES
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib keikka history matches snapshot 1`] = `
-"USAGE
-  ib keikka history <keikkaId> [flags]
-
-DESCRIPTION
-  Change-tracker audit trail for one keikka — who changed which field, when, old→new, with --reason. Folds in the keikka's keikkaBetoni (concrete-line) rows. Alias of \`ib changes entity keikka\`. GET /api/changes/keikka/:keikkaId/:ownerAsiakasId.
-  Auth: requires login (any authenticated user).
-
-ARGUMENTS
-  <keikkaId> NUMBER    keikkaId (required)
-
-FLAGS
-  --owner NUMBER    ownerAsiakasId (default: active company)
-  --limit NUMBER    Max rows (capped at 500) (default: 100)
-  --field STRING    Filter by fieldName (e.g. kuskit, laskuMemo, keikkaTilaId)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-SEE ALSO
-  ib changes entity, ib changes by-entity-date
-
-EXAMPLES
-  ib keikka history 12345
-  ib keikka history 12345 --field kuskit
-"
-`;
-
 exports[`Help snapshots — contract stability > help for ib keikka latest matches snapshot 1`] = `
 "USAGE
   ib keikka latest [flags]
@@ -3067,6 +2823,42 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib keikka log matches snapshot 1`] = `
+"USAGE
+  ib keikka log <keikkaId> [flags]
+
+DESCRIPTION
+  Change-tracker audit trail for one keikka — who changed which field, when, old→new, with --reason. Folds in the keikka's keikkaBetoni (concrete-line) rows. Alias of \`ib log entity keikka\`. GET /api/changes/keikka/:keikkaId/:ownerAsiakasId.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <keikkaId> NUMBER    keikkaId (required)
+
+FLAGS
+  --owner NUMBER    ownerAsiakasId (default: active company)
+  --limit NUMBER    Max rows (capped at 500) (default: 100)
+  --field STRING    Filter by fieldName (e.g. kuskit, laskuMemo, keikkaTilaId)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib log entity, ib log by-entity-date
+
+EXAMPLES
+  ib keikka log 12345
+  ib keikka log 12345 --field kuskit
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib keikka search matches snapshot 1`] = `
 "USAGE
   ib keikka search <query> [flags]
@@ -3139,6 +2931,214 @@ NOTES
 EXAMPLES
   ib keikka update 9001 --status done
   ib keikka update 9001 --status confirmed --reason 'phone confirmation'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib log by-entity-date matches snapshot 1`] = `
+"USAGE
+  ib log by-entity-date [flags]
+
+DESCRIPTION
+  Changes affecting deliveries DATED in the window — filters by the entity's own date (keikka.pumppuAika / grid_palkit.starttime), NOT the change timestamp. This is what the grid Muutoshistoria drawer shows: 'everything that touched that day's deliveries, whenever the change was made'. GET /api/changes/by-entity-date/:ownerAsiakasId. Admin only. NOTE: reason/impersonatedByPersonName are null until the 2026-06 aggregate-procs backend deploy.
+  Permissions: requires isAnyAdmin (asiakasAdmin/laskuAdmin/system admin).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --entity-type STRING    keikka or palkki (required)
+  --from DATE    Entity-date window start (or today/yesterday/tomorrow) (required)
+  --to DATE    Entity-date window end (or today/yesterday/tomorrow) (required)
+  --owner NUMBER    ownerAsiakasId (default: active company)
+  --limit NUMBER    Max rows kept client-side (cap 2000) (default: 200)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personName, at, description, keikkaTilaContext, deviceType, palkkiText, palkkiVehicleRegNo, reason, impersonatedByPersonName }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not an admin in the owner company → use an admin token
+  exit 4  entityType not keikka|palkki, or bad dates (client-side) → use --entity-type keikka|palkki and ISO dates or today/yesterday/tomorrow
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib log range
+
+EXAMPLES
+  ib log by-entity-date --entity-type keikka --from today --to today
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib log entity matches snapshot 1`] = `
+"USAGE
+  ib log entity <entityType> <entityId> [flags]
+
+DESCRIPTION
+  Change-tracker audit trail for ONE entity of any type — who changed which field, when, old→new, and the --reason recorded by writes. GET /api/changes/:entityType/:entityId/:ownerAsiakasId; owner defaults to the active company. entityType is validated client-side against the offline catalog (\`ib log types\`); 'keikka' folds in the keikka's keikkaBetoni rows; deprecated 'kuski' is accepted with a stderr note. --field filters client-side.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <entityType> STRING    One of \`ib log types\` (e.g. keikka, vehicle, pumppuRequest) (required)
+  <entityId> NUMBER    The entity's id (see entityIdMeaning in \`ib log types\`) (required)
+
+FLAGS
+  --owner NUMBER    ownerAsiakasId (default: active company)
+  --limit NUMBER    Max rows (capped at 500) (default: 100)
+  --field STRING    Filter by changeTracker fieldName (client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a member of that company — or entityType personAvailability without an admin role → ib company switch to that owner, or use an admin token
+  exit 4  Unknown entityType (client-side validation) → ib log types
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - personAvailability is admin-gated server-side; every other type needs company membership only.
+  - Shortcuts: ib keikka|vehicle|worksite log (same row shape) and ib person|customer log (slimmer rows without entityType/entityId).
+
+SEE ALSO
+  ib log types, ib keikka log, ib log latest
+
+EXAMPLES
+  ib log entity keikka 12345
+  ib log entity vehicle 53 --field kuskit
+  ib log entity pumppuRequest 17
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib log latest matches snapshot 1`] = `
+"USAGE
+  ib log latest [flags]
+
+DESCRIPTION
+  Newest changes across the whole active company, optionally one entityType — admin view for 'what just happened'. GET /api/changes/latest/:ownerAsiakasId. NOTE: reason/impersonator columns appear only after the 2026-06 aggregate-procs backend deploy; until then they are null.
+  Permissions: requires isAnyAdmin (asiakasAdmin/laskuAdmin/system admin).
+
+FLAGS
+  --entity-type STRING    Filter to one entityType
+  --owner NUMBER    ownerAsiakasId (default: active company)
+  --limit NUMBER    Max rows (server cap 500) (default: 100)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not an admin in the owner company → use an admin token, or per-entity \`ib log entity\`
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib log range, ib log by-entity-date
+
+EXAMPLES
+  ib log latest
+  ib log latest --entity-type keikka --limit 50
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib log range matches snapshot 1`] = `
+"USAGE
+  ib log range [flags]
+
+DESCRIPTION
+  All changes MADE within a time window (by change timestamp), optional entityType/person filters — admin forensic view. GET /api/changes/range/:ownerAsiakasId. The backend has no row cap; --limit slices client-side (truncated:true when cut). NOTE: reason/impersonatedByPersonName are null until the 2026-06 aggregate-procs backend deploy.
+  Permissions: requires isAnyAdmin (asiakasAdmin/laskuAdmin/system admin).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --from DATE    Window start, YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow) (required)
+  --to DATE    Window end, YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow) (required)
+  --entity-type STRING    Filter to one entityType
+  --person NUMBER    Filter to one actor personId
+  --owner NUMBER    ownerAsiakasId (default: active company)
+  --limit NUMBER    Max rows kept client-side (cap 2000) (default: 200)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }> (+truncated when --limit cut rows)
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not an admin in the owner company → use an admin token
+  exit 4  Invalid --from/--to (client-side) → use YYYY-MM-DD or ISO datetime; today/yesterday/tomorrow are also accepted
+  exit 4 (HTTP 400)  Backend rejected the dates → use ISO date strings
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib log by-entity-date
+
+EXAMPLES
+  ib log range --from 2026-06-01 --to 2026-06-10
+  ib log range --from yesterday --to today --entity-type keikka --person 63
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib log types matches snapshot 1`] = `
+"USAGE
+  ib log types [flags]
+
+DESCRIPTION
+  Offline catalog of changeTracker entityTypes: what each entityId means, the server-side read gate, and notes (deprecated kuski, keikka⊃keikkaBetoni fold-in, pumppuRequest two-party rows). No network, no auth.
+  Auth: none (public).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ entityType, entityIdMeaning, gate: 'member'|'admin', notes, deprecated? }>
+
+ERRORS (stderr, exit non-zero)
+  exit 0  Always succeeds (offline static list) → n/a
+
+EXAMPLES
+  ib log types
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib log user matches snapshot 1`] = `
+"USAGE
+  ib log user [<personId>] [flags]
+
+DESCRIPTION
+  Changes MADE BY a person. Without personId: your own recent changes (GET /api/changes/user/recent/:owner — any member). With personId: that person's changes (GET /api/changes/user/:personId/:owner — self or admin). Rows carry entityDisplayName (e.g. '12345 - Tilaus') instead of personName (the actor IS the queried person).
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <personId> NUMBER    Whose changes (omit = yourself; others need admin) (optional)
+
+FLAGS
+  --owner NUMBER    ownerAsiakasId (default: active company)
+  --limit NUMBER    Max rows (cap 500) (default: 100)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, at, description, deviceType, entityDisplayName, reason, impersonatedByPersonName }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Another person's history without an admin role → omit personId, or use an admin token
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib log user
+  ib log user 63 --limit 50
 "
 `;
 
@@ -3545,40 +3545,6 @@ EXAMPLES
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib person history matches snapshot 1`] = `
-"USAGE
-  ib person history <personId> [flags]
-
-DESCRIPTION
-  Change-tracker audit trail for one person — who changed what, when, with the \`--reason\` recorded by every write. INCLUDES role grants/revokes (fieldName 'asiakasPersonSetting', e.g. 'Rooli lisätty: asiakasAdmin (Asiakas Admin)'); pass \`--field asiakasPersonSetting\` to see only role changes. GET /api/changes/person/:personId/:ownerAsiakasId; owner defaults to the active company. --field filters client-side.
-  Auth: requires login (any authenticated user).
-
-ARGUMENTS
-  <personId> NUMBER    personId whose history to fetch (required)
-
-FLAGS
-  --owner NUMBER    ownerAsiakasId (default: active company)
-  --limit NUMBER    Max rows (capped at 500) (default: 100)
-  --field STRING    Filter by changeTracker fieldName (e.g. asiakasPersonSetting for role changes)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-EXAMPLES
-  ib person history 63
-  ib person history 63 --field asiakasPersonSetting
-  ib person history 63 --owner 27 --limit 50
-"
-`;
-
 exports[`Help snapshots — contract stability > help for ib person list matches snapshot 1`] = `
 "USAGE
   ib person list [flags]
@@ -3607,6 +3573,40 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib person list --role driver
   ib person list --asiakas 1349 --limit 50
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person log matches snapshot 1`] = `
+"USAGE
+  ib person log <personId> [flags]
+
+DESCRIPTION
+  Change-tracker audit trail for one person — who changed what, when, with the \`--reason\` recorded by every write. INCLUDES role grants/revokes (fieldName 'asiakasPersonSetting', e.g. 'Rooli lisätty: asiakasAdmin (Asiakas Admin)'); pass \`--field asiakasPersonSetting\` to see only role changes. GET /api/changes/person/:personId/:ownerAsiakasId; owner defaults to the active company. --field filters client-side.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <personId> NUMBER    personId whose audit trail to fetch (required)
+
+FLAGS
+  --owner NUMBER    ownerAsiakasId (default: active company)
+  --limit NUMBER    Max rows (capped at 500) (default: 100)
+  --field STRING    Filter by changeTracker fieldName (e.g. asiakasPersonSetting for role changes)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib person log 63
+  ib person log 63 --field asiakasPersonSetting
+  ib person log 63 --owner 27 --limit 50
 "
 `;
 
@@ -4951,41 +4951,6 @@ EXAMPLES
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib vehicle history matches snapshot 1`] = `
-"USAGE
-  ib vehicle history <vehicleId> [flags]
-
-DESCRIPTION
-  Change-tracker audit trail for one vehicle — who changed which field, when, old→new, with --reason. Alias of \`ib changes entity vehicle\`. For DRIVER-assignment history use \`ib vehicle drivers\` (different data: personPvm assignments). GET /api/changes/vehicle/:vehicleId/:ownerAsiakasId.
-  Auth: requires login (any authenticated user).
-
-ARGUMENTS
-  <vehicleId> NUMBER    vehicleId (required)
-
-FLAGS
-  --owner NUMBER    ownerAsiakasId (default: active company)
-  --limit NUMBER    Max rows (capped at 500) (default: 100)
-  --field STRING    Filter by fieldName (e.g. vehicleRegNo)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }>
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-SEE ALSO
-  ib changes entity, ib vehicle drivers
-
-EXAMPLES
-  ib vehicle history 53
-"
-`;
-
 exports[`Help snapshots — contract stability > help for ib vehicle list matches snapshot 1`] = `
 "USAGE
   ib vehicle list [flags]
@@ -5051,6 +5016,41 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib vehicle locations
   ib vehicle locations --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle log matches snapshot 1`] = `
+"USAGE
+  ib vehicle log <vehicleId> [flags]
+
+DESCRIPTION
+  Change-tracker audit trail for one vehicle — who changed which field, when, old→new, with --reason. Alias of \`ib log entity vehicle\`. For DRIVER-assignment history use \`ib vehicle drivers\` (different data: personPvm assignments). GET /api/changes/vehicle/:vehicleId/:ownerAsiakasId.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <vehicleId> NUMBER    vehicleId (required)
+
+FLAGS
+  --owner NUMBER    ownerAsiakasId (default: active company)
+  --limit NUMBER    Max rows (capped at 500) (default: 100)
+  --field STRING    Filter by fieldName (e.g. vehicleRegNo)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib log entity, ib vehicle drivers
+
+EXAMPLES
+  ib vehicle log 53
 "
 `;
 
@@ -5746,41 +5746,6 @@ EXAMPLES
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib worksite history matches snapshot 1`] = `
-"USAGE
-  ib worksite history <tyomaaId> [flags]
-
-DESCRIPTION
-  Change-tracker audit trail for one worksite (tyomaa) — who changed which field, when, old→new, with --reason. Alias of \`ib changes entity tyomaa\`. GET /api/changes/tyomaa/:tyomaaId/:ownerAsiakasId.
-  Auth: requires login (any authenticated user).
-
-ARGUMENTS
-  <tyomaaId> NUMBER    tyomaaId (required)
-
-FLAGS
-  --owner NUMBER    ownerAsiakasId (default: active company)
-  --limit NUMBER    Max rows (capped at 500) (default: 100)
-  --field STRING    Filter by fieldName
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }>
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-SEE ALSO
-  ib changes entity
-
-EXAMPLES
-  ib worksite history 7
-"
-`;
-
 exports[`Help snapshots — contract stability > help for ib worksite list matches snapshot 1`] = `
 "USAGE
   ib worksite list [flags]
@@ -5808,6 +5773,41 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib worksite list
   ib worksite list --customer 1349
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib worksite log matches snapshot 1`] = `
+"USAGE
+  ib worksite log <tyomaaId> [flags]
+
+DESCRIPTION
+  Change-tracker audit trail for one worksite (tyomaa) — who changed which field, when, old→new, with --reason. Alias of \`ib log entity tyomaa\`. GET /api/changes/tyomaa/:tyomaaId/:ownerAsiakasId.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <tyomaaId> NUMBER    tyomaaId (required)
+
+FLAGS
+  --owner NUMBER    ownerAsiakasId (default: active company)
+  --limit NUMBER    Max rows (capped at 500) (default: 100)
+  --field STRING    Filter by fieldName
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a member of that company (and not admin) → ib company switch to that owner, or use an admin token
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib log entity
+
+EXAMPLES
+  ib worksite log 7
 "
 `;
 

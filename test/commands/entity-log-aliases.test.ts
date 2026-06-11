@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import type { Command } from "commander";
-import { runChangesEntity } from "../../src/commands/changes/index.js";
+import { runLogEntity } from "../../src/commands/log/index.js";
 import { buildProgram } from "../../src/program.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -9,20 +9,20 @@ const mockClient = {
 } as unknown as ApiClient;
 const get = () => mockClient.get as ReturnType<typeof vi.fn>;
 
-describe("entity history aliases", () => {
+describe("entity log subcommands", () => {
   beforeEach(() => get().mockReset());
 
   test.each([
     ["keikka", 12345, "/api/changes/keikka/12345/27?limit=100"],
     ["vehicle", 53, "/api/changes/vehicle/53/27?limit=100"],
     ["tyomaa", 7, "/api/changes/tyomaa/7/27?limit=100"],
-  ])("alias entityType %s hits %s", async (entityType, id, url) => {
+  ])("log entityType %s hits %s", async (entityType, id, url) => {
     get().mockResolvedValueOnce([]);
-    await runChangesEntity(mockClient, entityType as string, id as number, 100, { owner: 27 });
+    await runLogEntity(mockClient, entityType as string, id as number, 100, { owner: 27 });
     expect(get()).toHaveBeenCalledWith(url);
   });
 
-  test("keikka/vehicle/worksite groups expose a history leaf", () => {
+  test("keikka/vehicle/worksite groups expose a log leaf; old names are gone", () => {
     const program = buildProgram();
     const paths: string[] = [];
     const walk = (cmd: Command, path: string[]): void => {
@@ -31,8 +31,13 @@ describe("entity history aliases", () => {
       for (const sub of cmd.commands) walk(sub, [...path, cmd.name()]);
     };
     walk(program, []);
-    expect(paths).toContain("ib keikka history");
-    expect(paths).toContain("ib vehicle history");
-    expect(paths).toContain("ib worksite history");
+    expect(paths).toContain("ib keikka log");
+    expect(paths).toContain("ib vehicle log");
+    expect(paths).toContain("ib worksite log");
+    expect(paths).toContain("ib customer log");
+    expect(paths).toContain("ib person log");
+    expect(paths).toContain("ib log entity");
+    expect(paths).not.toContain("ib changes entity");
+    expect(paths).not.toContain("ib keikka history");
   });
 });

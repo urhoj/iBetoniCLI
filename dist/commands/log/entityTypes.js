@@ -3,7 +3,7 @@ export const CHANGE_ENTITY_TYPES = [
         entityType: "asiakas",
         entityIdMeaning: "asiakasId",
         gate: "member",
-        notes: "Customer companies. Same data as `ib customer history`.",
+        notes: "Customer companies. Same data as `ib customer log`.",
     },
     {
         entityType: "dayDriver",
@@ -15,13 +15,13 @@ export const CHANGE_ENTITY_TYPES = [
         entityType: "keikka",
         entityIdMeaning: "keikkaId",
         gate: "member",
-        notes: "Delivery orders. The history read FOLDS IN keikkaBetoni rows for the same keikka. Driver changes use fieldName 'kuskit'; invoice-memo edits use fieldName 'laskuMemo'.",
+        notes: "Delivery orders. The log read FOLDS IN keikkaBetoni rows for the same keikka. Driver changes use fieldName 'kuskit'; invoice-memo edits use fieldName 'laskuMemo'.",
     },
     {
         entityType: "keikkaBetoni",
         entityIdMeaning: "keikkaBetoniId",
         gate: "member",
-        notes: "Concrete lines of a keikka. Also visible inside `changes entity keikka <keikkaId>`.",
+        notes: "Concrete lines of a keikka. Also visible inside `log entity keikka <keikkaId>`.",
     },
     {
         entityType: "keikkaLasku",
@@ -46,7 +46,7 @@ export const CHANGE_ENTITY_TYPES = [
         entityType: "person",
         entityIdMeaning: "personId",
         gate: "member",
-        notes: "Same data as `ib person history`. Role grants/revokes have fieldName 'asiakasPersonSetting'.",
+        notes: "Same data as `ib person log`. Role grants/revokes have fieldName 'asiakasPersonSetting'.",
     },
     {
         entityType: "personAvailability",
@@ -76,13 +76,13 @@ export const CHANGE_ENTITY_TYPES = [
         entityType: "tyomaa",
         entityIdMeaning: "tyomaaId",
         gate: "member",
-        notes: "Worksites. Same data as `ib worksite history`.",
+        notes: "Worksites. Same data as `ib worksite log`.",
     },
     {
         entityType: "vehicle",
         entityIdMeaning: "vehicleId",
         gate: "member",
-        notes: "Vehicles. Same data as `ib vehicle history`.",
+        notes: "Vehicles. Same data as `ib vehicle log`.",
     },
 ];
 export function findEntityType(t) {
@@ -91,8 +91,8 @@ export function findEntityType(t) {
 export function isKnownEntityType(t) {
     return findEntityType(t) !== undefined;
 }
-/** `ib changes types` — offline, no network, no auth. */
-export function runChangesTypes() {
+/** `ib log types` — offline, no network, no auth. */
+export function runLogTypes() {
     return {
         items: [...CHANGE_ENTITY_TYPES],
         nextCursor: null,

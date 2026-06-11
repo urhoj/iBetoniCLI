@@ -2,7 +2,7 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFla
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
-import { registerHistoryAlias } from "../changes/index.js";
+import { registerLogAlias } from "../log/index.js";
 import { resolveTarget } from "../../targets.js";
 /**
  * GET /api/cli/worksite/list with the universal list envelope shape.
@@ -463,6 +463,6 @@ export function registerWorksiteCommands(parent, getClient) {
             exitWithError(e);
         }
     });
-    registerHistoryAlias(w, getClient, "tyomaa", "tyomaaId", "Change-tracker audit trail for one worksite (tyomaa). Alias of `ib changes entity tyomaa`.");
+    registerLogAlias(w, getClient, "tyomaa", "tyomaaId", "Change-tracker audit trail for one worksite (tyomaa). Alias of `ib log entity tyomaa`.");
 }
 //# sourceMappingURL=index.js.map
