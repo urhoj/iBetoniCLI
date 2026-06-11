@@ -4849,7 +4849,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil }> (+truncated:true when the result hit the limit)
+  ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil }> (+truncated:true when the result hit the limit; +hint pointing at --all when 0 rows came back without --all)
 
 ERRORS (stderr, exit non-zero)
   exit 4  Unknown or ambiguous --type name → the error lists the valid types; or run \`ib sijainti types\`
@@ -4860,7 +4860,7 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - The list is capped (default 100 / max 500) with NO cursor — \`truncated:true\` flags a result that filled the limit (raise --limit or narrow with --search/--type). Backend signal needs a backend deployed ≥ 2026-06-11; the client-side --search slice sets it on every backend.
   - typeName is joined client-side from the sijaintiTypes lookup (one extra GET, automatic); newer backends also emit it directly, plus ownerAsiakasId/ownerName.
-  - Supplier locations (betoniasemat, depots) usually belong to ANOTHER company — without --all they are invisible here even though \`ib vehicle visits sijainti <id>\` and the GPS timeline reference them. To resolve such a location by name use --search <name> --all.
+  - Supplier locations (betoniasemat, depots) usually belong to ANOTHER company — without --all they are invisible here even though \`ib vehicle visits sijainti <id>\` and the GPS timeline reference them. To resolve such a location by name use --search <name> --all. An empty result without --all carries a \`hint\` saying exactly this.
   - --all needs a backend deployed ≥ 2026-06-10; an older backend silently ignores it (returns the own+shared scope). --search works on every backend (client-side fallback).
   - An unknown numeric --type id is passed through and simply returns zero rows; an unknown type NAME exits 4.
   - --asiakas filters client-side on the server-emitted ownerAsiakasId field — needs a backend deployed ≥ 2026-06-11 (older backends omit the field, so it matches nothing).

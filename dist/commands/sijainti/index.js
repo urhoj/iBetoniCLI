@@ -257,6 +257,10 @@ export function resolveSijaintiTypeId(types, input) {
  * server-only — on a backend without it the own+shared scope comes back.
  * `owner` (--asiakas) is a client-side filter on `ownerAsiakasId` and uses the
  * same scan-then-slice path as `search`.
+ *
+ * An EMPTY result without `all` carries a `hint` pointing at `--all` (feedback
+ * #30): supplier sijainnit belong to other companies and are invisible in the
+ * default scope, so "0 rows" alone reads as "does not exist".
  */
 export async function runSijaintiListJoined(client, opts) {
     const types = await runSijaintiTypes(client);
@@ -301,6 +305,10 @@ export async function runSijaintiListJoined(client, opts) {
     };
     if (truncated)
         out.truncated = true;
+    if (items.length === 0 && !opts.all) {
+        out.hint =
+            "0 rows in the default own+shared scope — supplier locations (betoniasemat, depots) belong to OTHER companies; retry with --all to search every company's sijainnit";
+    }
     return out;
 }
 /**

@@ -4,6 +4,8 @@ export interface ListEnvelope<T> {
   count: number;
   /** True when the backend signalled the page was capped (more rows exist). */
   truncated?: boolean;
+  /** Next-step pointer for an AI reader (e.g. a wider scope that may match). */
+  hint?: string;
 }
 
 export function isListEnvelope(value: unknown): value is ListEnvelope<unknown> {

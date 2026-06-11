@@ -436,6 +436,31 @@ describe("runSijaintiListJoined", () => {
     expect(result.items).toHaveLength(2);
     expect(result.truncated).toBe(true);
   });
+
+  test("empty result without --all carries a hint pointing at --all (feedback #30)", async () => {
+    const result = await runSijaintiListJoined(mockClient, { search: "kivikko" });
+    expect(result.items).toEqual([]);
+    expect(result.hint).toContain("--all");
+  });
+
+  test("empty result WITH --all has no hint (nothing wider to suggest)", async () => {
+    get.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/geocode/sijaintiTypes")) return TYPE_ROWS;
+      if (path.startsWith("/api/cli/sijainti/list")) {
+        return { items: [], nextCursor: null, count: 0 };
+      }
+      throw new Error(`unexpected GET ${path}`);
+    });
+    const result = await runSijaintiListJoined(mockClient, { search: "kivikko", all: true });
+    expect(result.items).toEqual([]);
+    expect(result.hint).toBeUndefined();
+  });
+
+  test("non-empty result has no hint", async () => {
+    const result = await runSijaintiListJoined(mockClient, {});
+    expect(result.items.length).toBeGreaterThan(0);
+    expect(result.hint).toBeUndefined();
+  });
 });
 
 describe("runSijaintiPlants / --asiakas owner filter", () => {
