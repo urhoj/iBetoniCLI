@@ -9,6 +9,9 @@ export interface DecodedClaims {
   issuedFor?: "cli" | "mcp" | "web";
   /** JWT `exp` (seconds since epoch), when present. Used by `ib doctor`. */
   exp?: number;
+  /** From JWT `globalRoles` — used by `ib legal accept` dev-gate. */
+  isSystemAdmin: boolean;
+  isDeveloper: boolean;
 }
 
 /**
@@ -39,6 +42,8 @@ export function decodeJwtPayload(jwt: string): DecodedClaims {
     // Codec unavailable (e.g., during unit tests that mock JWTs). Use raw shape.
   }
 
+  const globalRoles = (expanded.globalRoles ?? {}) as Record<string, unknown>;
+
   return {
     personId: Number(expanded.personId ?? expanded.sub),
     ownerAsiakasId: Number(expanded.ownerAsiakasId ?? expanded.o),
@@ -46,5 +51,7 @@ export function decodeJwtPayload(jwt: string): DecodedClaims {
     email: expanded.email as string | undefined,
     issuedFor: expanded.issuedFor as "cli" | "mcp" | "web" | undefined,
     exp: typeof expanded.exp === "number" ? expanded.exp : undefined,
+    isSystemAdmin: globalRoles.isSystemAdmin === true,
+    isDeveloper: globalRoles.isDeveloper === true,
   };
 }
