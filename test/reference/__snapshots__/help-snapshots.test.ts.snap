@@ -1436,16 +1436,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib customer modules matches snapshot 1`] = `
 "USAGE
-  ib customer modules <asiakasId> [flags]
+  ib customer modules [<asiakasId>] [flags]
 
 DESCRIPTION
   Report or toggle a customer's roolit + module flags.
   Permissions: requires company admin on the target tenant (system admin = any tenant).
 
 ARGUMENTS
-  <asiakasId> NUMBER    asiakasId to report/modify (required)
+  <asiakasId> NUMBER    asiakasId to report/modify (or pass --asiakas) (optional)
 
 FLAGS
+  --asiakas NUMBER    Target asiakasId (alias for the positional)
   --set STRING    Comma-separated field keys to turn ON
   --unset STRING    Comma-separated field keys to turn OFF
 
@@ -1470,26 +1471,28 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - Field keys: pumppu (isPumppuToimittaja), jerry, henkilot, sijainnit, ajoneuvot, tiedostot, weather, lomaseuranta, shareorders.
   - Without --set/--unset it is a read-only report (GET /api/cli/customer/modules/:asiakasId); with them it routes pumppu → POST /api/asiakas/setRoolit and modules → POST /api/asiakas/settings/save.
+  - The target accepts either the positional <asiakasId> or --asiakas <id> (same flag as the rest of customer/*); pass one.
 
 EXAMPLES
   ib customer modules 1349
-  ib customer modules 1349 --set jerry,weather,pumppu --reason 'enable operator features'
+  ib customer modules --asiakas 1349 --set jerry,weather,pumppu --reason 'enable operator features'
   ib customer modules 1349 --unset shareorders --dry-run
 "
 `;
 
 exports[`Help snapshots — contract stability > help for ib customer operator matches snapshot 1`] = `
 "USAGE
-  ib customer operator <asiakasId> [flags]
+  ib customer operator [<asiakasId>] [flags]
 
 DESCRIPTION
   Verify or provision the full operator preset — all 9 operator flags at once (pumppu + the 8 modules). Default (no flag): verify, exit 0 iff every flag is on else exit 1 (CI-gateable). --set turns all 9 on; --reset turns all 9 off. System-admin can run cross-tenant.
   Permissions: requires company admin on the target tenant (system admin = any tenant).
 
 ARGUMENTS
-  <asiakasId> NUMBER    asiakasId to verify/provision (required)
+  <asiakasId> NUMBER    asiakasId to verify/provision (or pass --asiakas) (optional)
 
 FLAGS
+  --asiakas NUMBER    Target asiakasId (alias for the positional)
   --set BOOLEAN    Turn ALL 9 operator flags ON
   --reset BOOLEAN    Turn ALL 9 operator flags OFF
 
@@ -1694,16 +1697,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib customer settings matches snapshot 1`] = `
 "USAGE
-  ib customer settings <asiakasId> [flags]
+  ib customer settings [<asiakasId>] [flags]
 
 DESCRIPTION
   Report or toggle ALL asiakasSettings (every canonical ASIAKAS_SETTING_TYPE_IDS name) plus pumppu. Without --set/--unset it is a read-only report. Names are case-insensitive; the 8 module aliases (jerry, weather, …) and pumppu are also accepted. Superset of \`customer modules\`.
   Permissions: requires company admin on the target tenant (system admin = any tenant).
 
 ARGUMENTS
-  <asiakasId> NUMBER    asiakasId (required)
+  <asiakasId> NUMBER    asiakasId (or pass --asiakas) (optional)
 
 FLAGS
+  --asiakas NUMBER    Target asiakasId (alias for the positional)
   --set STRING    Comma-separated setting names to turn ON
   --unset STRING    Comma-separated setting names to turn OFF
 
@@ -1727,7 +1731,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib customer settings 1349
-  ib customer settings 1349 --set HAS_FENNOA,ALV --unset HAS_OCR --reason 'billing setup'
+  ib customer settings --asiakas 1349 --set HAS_FENNOA,ALV --unset HAS_OCR --reason 'billing setup'
 "
 `;
 

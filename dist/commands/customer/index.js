@@ -334,6 +334,23 @@ export async function runCustomerOperatorVerify(client, asiakasId) {
     return { asiakasId, allSet: missing.length === 0, flags, missing };
 }
 /**
+ * Resolve the target asiakasId for the modules/operator/settings trio, which
+ * accept it positionally OR via --asiakas (the dominant flag across the
+ * customer/* and jerry/* groups — feedback #28). Exactly one is required;
+ * giving both is allowed only when they agree.
+ */
+export function resolveAsiakasTarget(positional, flag) {
+    const pos = positional === undefined ? undefined : Number(positional);
+    if (pos !== undefined && flag !== undefined && pos !== flag) {
+        failWith(`positional asiakasId (${positional}) and --asiakas (${flag}) differ — pass only one`, 4);
+    }
+    const id = pos ?? flag;
+    if (id === undefined || !Number.isInteger(id) || id <= 0) {
+        failWith("missing or invalid target: pass <asiakasId> positionally or via --asiakas <id>", 4);
+    }
+    return id;
+}
+/**
  * GET /api/tyomaa/asiakasTyomaaList/:asiakasId — worksites belonging to a
  * customer. Backend returns a raw array; wrapped into the universal envelope.
  */
@@ -683,15 +700,16 @@ export function registerCustomerCommands(parent, getClient) {
         }
     });
     const modulesCmd = c
-        .command("modules <asiakasId>")
+        .command("modules [asiakasId]")
         .description("Report or toggle a customer's module flags + roolit. Without --set/--unset: read-only report. Field keys: " +
         ALL_FIELD_KEYS.join(", "))
+        .option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number)
         .option("--set <keys>", "Comma-separated field keys to turn ON (e.g. jerry,weather,pumppu)")
         .option("--unset <keys>", "Comma-separated field keys to turn OFF");
     addWriteFlagsToCommand(modulesCmd).action(async (idStr, opts) => {
         try {
             const client = await getClient();
-            const asiakasId = Number(idStr);
+            const asiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
             if (!opts.set && !opts.unset) {
                 writeJson(await runCustomerModulesReport(client, asiakasId));
                 return;
@@ -715,14 +733,15 @@ export function registerCustomerCommands(parent, getClient) {
         }
     });
     const operatorCmd = c
-        .command("operator <asiakasId>")
+        .command("operator [asiakasId]")
         .description("Verify or provision the full operator preset (all 9 operator flags at once). System-admin, cross-tenant. Default (no flag): verify — exit 0 iff all 9 are on, else exit 1.")
+        .option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number)
         .option("--set", "Turn ALL 9 operator flags ON")
         .option("--reset", "Turn ALL 9 operator flags OFF");
     addWriteFlagsToCommand(operatorCmd).action(async (idStr, opts) => {
         try {
             const client = await getClient();
-            const asiakasId = Number(idStr);
+            const asiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
             if (opts.set && opts.reset) {
                 failWith("--set and --reset are mutually exclusive", 4);
             }
@@ -747,14 +766,15 @@ export function registerCustomerCommands(parent, getClient) {
         }
     });
     const settingsCmd = c
-        .command("settings <asiakasId>")
+        .command("settings [asiakasId]")
         .description("Report or toggle ALL asiakasSettings (every canonical ASIAKAS_SETTING_TYPE_IDS name) + pumppu. No --set/--unset = read-only report. Names accept canonical settings (case-insensitive), the 8 module aliases, or pumppu.")
+        .option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number)
         .option("--set <keys>", "Comma-separated setting names to turn ON")
         .option("--unset <keys>", "Comma-separated setting names to turn OFF");
     addWriteFlagsToCommand(settingsCmd).action(async (idStr, opts) => {
         try {
             const client = await getClient();
-            const asiakasId = Number(idStr);
+            const asiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
             if (!opts.set && !opts.unset) {
                 writeJson(await runCustomerSettingsReport(client, asiakasId));
                 return;

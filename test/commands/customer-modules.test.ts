@@ -4,6 +4,7 @@ import {
   runCustomerModulesApply,
   operatorPresetChanges,
   runCustomerOperatorVerify,
+  resolveAsiakasTarget,
   ALL_FIELD_KEYS,
 } from "../../src/commands/customer/index.js";
 import type { ApiClient } from "../../src/api/client.js";
@@ -70,6 +71,40 @@ describe("parseModuleChanges", () => {
   test("ALL_FIELD_KEYS includes pumppu plus the 8 modules", () => {
     expect(ALL_FIELD_KEYS).toContain("pumppu");
     expect(ALL_FIELD_KEYS.length).toBe(9);
+  });
+});
+
+describe("resolveAsiakasTarget", () => {
+  const exitCodeOf = (fn: () => void): number | undefined => {
+    try {
+      fn();
+      return undefined;
+    } catch (e) {
+      return (e as { exitCode?: number }).exitCode;
+    }
+  };
+
+  test("accepts the positional alone", () => {
+    expect(resolveAsiakasTarget("26", undefined)).toBe(26);
+  });
+
+  test("accepts --asiakas alone", () => {
+    expect(resolveAsiakasTarget(undefined, 26)).toBe(26);
+  });
+
+  test("accepts both when they agree", () => {
+    expect(resolveAsiakasTarget("26", 26)).toBe(26);
+  });
+
+  test("rejects both when they differ with exit 4", () => {
+    expect(() => resolveAsiakasTarget("26", 27)).toThrow(/differ/);
+    expect(exitCodeOf(() => resolveAsiakasTarget("26", 27))).toBe(4);
+  });
+
+  test("rejects a missing or invalid target with exit 4", () => {
+    expect(exitCodeOf(() => resolveAsiakasTarget(undefined, undefined))).toBe(4);
+    expect(exitCodeOf(() => resolveAsiakasTarget("abc", undefined))).toBe(4);
+    expect(exitCodeOf(() => resolveAsiakasTarget("0", undefined))).toBe(4);
   });
 });
 

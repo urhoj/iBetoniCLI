@@ -754,8 +754,13 @@ export const COMMAND_SPECS = [
         command: "ib customer modules",
         description: "Report or toggle a customer's roolit + module flags.",
         permissions: ["company admin on the target tenant (system admin = any tenant)"],
-        args: [{ name: "asiakasId", type: "number", description: "asiakasId to report/modify" }],
+        args: [{ name: "asiakasId", type: "number", required: false, description: "asiakasId to report/modify (or pass --asiakas)" }],
         flags: [
+            {
+                name: "asiakas",
+                type: "number",
+                description: "Target asiakasId (alias for the positional)",
+            },
             {
                 name: "set",
                 type: "string",
@@ -778,10 +783,11 @@ export const COMMAND_SPECS = [
         notes: [
             "Field keys: pumppu (isPumppuToimittaja), jerry, henkilot, sijainnit, ajoneuvot, tiedostot, weather, lomaseuranta, shareorders.",
             "Without --set/--unset it is a read-only report (GET /api/cli/customer/modules/:asiakasId); with them it routes pumppu → POST /api/asiakas/setRoolit and modules → POST /api/asiakas/settings/save.",
+            "The target accepts either the positional <asiakasId> or --asiakas <id> (same flag as the rest of customer/*); pass one.",
         ],
         examples: [
             "ib customer modules 1349",
-            "ib customer modules 1349 --set jerry,weather,pumppu --reason 'enable operator features'",
+            "ib customer modules --asiakas 1349 --set jerry,weather,pumppu --reason 'enable operator features'",
             "ib customer modules 1349 --unset shareorders --dry-run",
         ],
     },
@@ -789,8 +795,9 @@ export const COMMAND_SPECS = [
         command: "ib customer operator",
         description: "Verify or provision the full operator preset — all 9 operator flags at once (pumppu + the 8 modules). Default (no flag): verify, exit 0 iff every flag is on else exit 1 (CI-gateable). --set turns all 9 on; --reset turns all 9 off. System-admin can run cross-tenant.",
         permissions: ["company admin on the target tenant (system admin = any tenant)"],
-        args: [{ name: "asiakasId", type: "number", description: "asiakasId to verify/provision" }],
+        args: [{ name: "asiakasId", type: "number", required: false, description: "asiakasId to verify/provision (or pass --asiakas)" }],
         flags: [
+            { name: "asiakas", type: "number", description: "Target asiakasId (alias for the positional)" },
             { name: "set", type: "boolean", description: "Turn ALL 9 operator flags ON" },
             { name: "reset", type: "boolean", description: "Turn ALL 9 operator flags OFF" },
         ],
@@ -841,8 +848,9 @@ export const COMMAND_SPECS = [
         command: "ib customer settings",
         description: "Report or toggle ALL asiakasSettings (every canonical ASIAKAS_SETTING_TYPE_IDS name) plus pumppu. Without --set/--unset it is a read-only report. Names are case-insensitive; the 8 module aliases (jerry, weather, …) and pumppu are also accepted. Superset of `customer modules`.",
         permissions: ["company admin on the target tenant (system admin = any tenant)"],
-        args: [{ name: "asiakasId", type: "number", description: "asiakasId" }],
+        args: [{ name: "asiakasId", type: "number", required: false, description: "asiakasId (or pass --asiakas)" }],
         flags: [
+            { name: "asiakas", type: "number", description: "Target asiakasId (alias for the positional)" },
             { name: "set", type: "string", description: "Comma-separated setting names to turn ON" },
             { name: "unset", type: "string", description: "Comma-separated setting names to turn OFF" },
         ],
@@ -856,7 +864,7 @@ export const COMMAND_SPECS = [
         ],
         examples: [
             "ib customer settings 1349",
-            "ib customer settings 1349 --set HAS_FENNOA,ALV --unset HAS_OCR --reason 'billing setup'",
+            "ib customer settings --asiakas 1349 --set HAS_FENNOA,ALV --unset HAS_OCR --reason 'billing setup'",
         ],
     },
     // ─── worksite (6) ────────────────────────────────────────────────────────
