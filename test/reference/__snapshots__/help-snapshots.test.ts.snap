@@ -691,7 +691,7 @@ DESCRIPTION
 
 FLAGS
   --confirm BOOLEAN    Execute the operation (default is dry-run preview)
-  --force-prod BOOLEAN    Allow execution against a deployed (shared-cache) endpoint
+  --force-prod BOOLEAN    Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec.
   --reason STRING    Audit reason (X-Action-Reason)
 
 GLOBAL FLAGS
@@ -754,7 +754,7 @@ FLAGS
   --asiakas-id NUMBER    Tenant scope (developers may target others; non-devs use their own)
   --cascade BOOLEAN    Also invalidate related families (keikka only)
   --confirm BOOLEAN    Execute the operation (default is dry-run preview)
-  --force-prod BOOLEAN    Allow execution against a deployed (shared-cache) endpoint
+  --force-prod BOOLEAN    Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec.
   --reason STRING    Audit reason (X-Action-Reason)
 
 GLOBAL FLAGS
@@ -826,7 +826,7 @@ ARGUMENTS
 
 FLAGS
   --confirm BOOLEAN    Execute the operation (default is dry-run preview)
-  --force-prod BOOLEAN    Allow execution against a deployed (shared-cache) endpoint
+  --force-prod BOOLEAN    Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec.
   --reason STRING    Audit reason (X-Action-Reason)
 
 GLOBAL FLAGS

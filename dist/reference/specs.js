@@ -3098,7 +3098,7 @@ export const COMMAND_SPECS = [
         };
         const writeFlags = [
             { name: "confirm", type: "boolean", description: "Execute the operation (default is dry-run preview)" },
-            { name: "force-prod", type: "boolean", description: "Allow execution against a deployed (shared-cache) endpoint" },
+            { name: "force-prod", type: "boolean", description: "Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec." },
             { name: "reason", type: "string", description: "Audit reason (X-Action-Reason)" },
         ];
         return [
