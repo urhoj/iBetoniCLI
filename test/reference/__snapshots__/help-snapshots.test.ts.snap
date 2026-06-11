@@ -4261,7 +4261,8 @@ DESCRIPTION
   Permissions: requires auth.page.sijainnit.read.
 
 FLAGS
-  --tyomaa NUMBER    Target tyomaaId (REQUIRED)
+  --worksite NUMBER    Target tyomaaId (REQUIRED unless --tyomaa; same flag as the rest of the CLI)
+  --tyomaa NUMBER    Target tyomaaId (Finnish alias of --worksite)
   --type NUMBER    sijaintiTypeId to search within (REQUIRED)
   --asiakas NUMBER    Owner asiakasId (defaults to active company)
 
@@ -4278,6 +4279,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
+  ib sijainti closest --worksite 555 --type 1
   ib sijainti closest --tyomaa 555 --type 1
 "
 `;
@@ -5828,17 +5830,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib worksite person list matches snapshot 1`] = `
 "USAGE
-  ib worksite person list <tyomaaId> [flags]
+  ib worksite person list [<tyomaaId>] [flags]
 
 DESCRIPTION
   List persons attached to a worksite.
   Permissions: requires auth.page.tyomaa.read.
 
 ARGUMENTS
-  <tyomaaId> NUMBER    tyomaaId (required)
+  <tyomaaId> NUMBER    tyomaaId (or pass --worksite, like person add/remove) (optional)
 
 FLAGS
-  (none)
+  --worksite NUMBER    Target tyomaaId (alias for the positional; same flag as person add/remove)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -5853,6 +5855,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib worksite person list 99
+  ib worksite person list --worksite 99
 "
 `;
 

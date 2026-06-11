@@ -3,6 +3,7 @@ import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { registerHistoryAlias } from "../changes/index.js";
+import { resolveTarget } from "../../targets.js";
 /**
  * GET /api/cli/worksite/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
@@ -449,12 +450,13 @@ export function registerWorksiteCommands(parent, getClient) {
         }
     });
     worksitePerson
-        .command("list <tyomaaId>")
+        .command("list [tyomaaId]")
         .description("List persons attached to a worksite.")
-        .action(async (tyomaaIdStr) => {
+        .option("--worksite <id>", "Target tyomaaId (alias for the positional; same flag as person add/remove)", Number)
+        .action(async (tyomaaIdStr, opts) => {
         try {
             const client = await getClient();
-            const result = await runWorksitePersonList(client, Number(tyomaaIdStr));
+            const result = await runWorksitePersonList(client, resolveTarget(tyomaaIdStr, opts.worksite, "tyomaaId", "worksite"));
             writeJson(result);
         }
         catch (e) {

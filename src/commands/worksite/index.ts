@@ -10,6 +10,7 @@ import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { registerHistoryAlias } from "../changes/index.js";
+import { resolveTarget } from "../../targets.js";
 
 export interface WorksiteListFilter {
   limit?: number;
@@ -666,12 +667,16 @@ export function registerWorksiteCommands(
   });
 
   worksitePerson
-    .command("list <tyomaaId>")
+    .command("list [tyomaaId]")
     .description("List persons attached to a worksite.")
-    .action(async (tyomaaIdStr: string) => {
+    .option("--worksite <id>", "Target tyomaaId (alias for the positional; same flag as person add/remove)", Number)
+    .action(async (tyomaaIdStr: string | undefined, opts: { worksite?: number }) => {
       try {
         const client = await getClient();
-        const result = await runWorksitePersonList(client, Number(tyomaaIdStr));
+        const result = await runWorksitePersonList(
+          client,
+          resolveTarget(tyomaaIdStr, opts.worksite, "tyomaaId", "worksite")
+        );
         writeJson(result);
       } catch (e) {
         exitWithError(e);

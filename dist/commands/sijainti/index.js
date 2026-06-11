@@ -658,14 +658,22 @@ export function registerSijaintiCommands(parent, getClient) {
     });
     s.command("closest")
         .description("Find the closest sijainti of a given type to a worksite (straight-line distance)")
-        .requiredOption("--tyomaa <id>", "Target tyomaaId", Number)
+        .option("--worksite <id>", "Target tyomaaId (same flag as the rest of the CLI)", Number)
+        .option("--tyomaa <id>", "Target tyomaaId (Finnish alias of --worksite)", Number)
         .requiredOption("--type <id>", "sijaintiTypeId to search within", Number)
         .option("--asiakas <id>", "Owner asiakasId (defaults to active company)", Number)
         .action(async (opts) => {
         try {
             const client = await getClient();
+            if (opts.worksite !== undefined && opts.tyomaa !== undefined && opts.worksite !== opts.tyomaa) {
+                failWith("--worksite and --tyomaa differ — pass only one", 4);
+            }
+            const tyomaaId = opts.worksite ?? opts.tyomaa;
+            if (tyomaaId === undefined) {
+                failWith("missing target: pass --worksite <id> (--tyomaa is accepted as an alias)", 4);
+            }
             const result = await runSijaintiClosest(client, {
-                tyomaaId: opts.tyomaa,
+                tyomaaId,
                 sijaintiTypeId: opts.type,
                 asiakasId: opts.asiakas,
             });

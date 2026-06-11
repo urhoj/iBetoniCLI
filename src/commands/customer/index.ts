@@ -15,6 +15,7 @@ import {
 } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveRoleTypeId } from "../../roles.js";
+import { resolveTarget } from "../../targets.js";
 import { runPersonRoleList } from "../person/index.js";
 
 export interface CustomerListFilter {
@@ -506,30 +507,15 @@ export async function runCustomerOperatorVerify(
 }
 
 /**
- * Resolve the target asiakasId for the modules/operator/settings trio, which
- * accept it positionally OR via --asiakas (the dominant flag across the
- * customer/* and jerry/* groups — feedback #28). Exactly one is required;
- * giving both is allowed only when they agree.
+ * Resolve the target asiakasId for commands that accept it positionally OR
+ * via --asiakas (the dominant flag across the customer/* and jerry/* groups
+ * — feedback #28). Thin wrapper over the generic {@link resolveTarget}.
  */
 export function resolveAsiakasTarget(
   positional: string | undefined,
   flag: number | undefined
 ): number {
-  const pos = positional === undefined ? undefined : Number(positional);
-  if (pos !== undefined && flag !== undefined && pos !== flag) {
-    failWith(
-      `positional asiakasId (${positional}) and --asiakas (${flag}) differ — pass only one`,
-      4
-    );
-  }
-  const id = pos ?? flag;
-  if (id === undefined || !Number.isInteger(id) || id <= 0) {
-    failWith(
-      "missing or invalid target: pass <asiakasId> positionally or via --asiakas <id>",
-      4
-    );
-  }
-  return id;
+  return resolveTarget(positional, flag, "asiakasId", "asiakas");
 }
 
 interface CustomerWorksiteRow {

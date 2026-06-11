@@ -1923,7 +1923,8 @@ export const COMMAND_SPECS = [
         description: "Find the closest sijainti of a given sijaintiTypeId to a worksite (tyomaa), by straight-line distance. asiakasId defaults to the active company.",
         permissions: ["auth.page.sijainnit.read"],
         flags: [
-            { name: "tyomaa", type: "number", description: "Target tyomaaId (REQUIRED)" },
+            { name: "worksite", type: "number", description: "Target tyomaaId (REQUIRED unless --tyomaa; same flag as the rest of the CLI)" },
+            { name: "tyomaa", type: "number", description: "Target tyomaaId (Finnish alias of --worksite)" },
             { name: "type", type: "number", description: "sijaintiTypeId to search within (REQUIRED)" },
             { name: "asiakas", type: "number", description: "Owner asiakasId (defaults to active company)" },
         ],
@@ -1932,7 +1933,7 @@ export const COMMAND_SPECS = [
             apiErr(400, "Invalid tyomaaId or missing coordinates", "verify the worksite has lat/lng"),
             ...permErrors("auth.page.sijainnit.read"),
         ],
-        examples: ["ib sijainti closest --tyomaa 555 --type 1"],
+        examples: ["ib sijainti closest --worksite 555 --type 1", "ib sijainti closest --tyomaa 555 --type 1"],
     },
     {
         command: "ib sijainti distance",
@@ -2219,11 +2220,13 @@ export const COMMAND_SPECS = [
         command: "ib worksite person list",
         description: "List persons attached to a worksite.",
         permissions: ["auth.page.tyomaa.read"],
-        args: [{ name: "tyomaaId", type: "number", description: "tyomaaId" }],
-        flags: [],
+        args: [{ name: "tyomaaId", type: "number", required: false, description: "tyomaaId (or pass --worksite, like person add/remove)" }],
+        flags: [
+            { name: "worksite", type: "number", description: "Target tyomaaId (alias for the positional; same flag as person add/remove)" },
+        ],
         outputShape: "ListEnvelope<{ personId, name, email, contactType }>",
         errors: permErrors("auth.page.tyomaa.read"),
-        examples: ["ib worksite person list 99"],
+        examples: ["ib worksite person list 99", "ib worksite person list --worksite 99"],
     },
     {
         command: "ib person create",
