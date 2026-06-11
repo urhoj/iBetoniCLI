@@ -50,6 +50,16 @@ describe("ib legal reads", () => {
     expect(out).toEqual({ documentId: 1, version: "1.0", contentLength: 7 });
   });
 
+  test("show without --meta returns full doc", async () => {
+    const c = mockClient();
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      documentId: 1, version: "1.0", markdownContent: "# hello",
+    });
+    const out = await runLegalShow(c, "TOS", false);
+    expect(c.get).toHaveBeenCalledWith("/api/legal-documents/current/TOS");
+    expect(out).toHaveProperty("markdownContent", "# hello");
+  });
+
   test("status strips content from missing docs and passes owner", async () => {
     const c = mockClient();
     (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -63,6 +73,17 @@ describe("ib legal reads", () => {
     expect(out.requiresAcceptance).toBe(true);
     expect(out.missing[0]).not.toHaveProperty("markdownContent");
     expect(out.accepted).toHaveLength(1);
+  });
+
+  test("status with null owner omits the query string", async () => {
+    const c = mockClient();
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      missingAcceptances: [],
+      acceptedAcceptances: [],
+      requiresAcceptance: false,
+    });
+    await runLegalStatus(c, 5, null);
+    expect(c.get).toHaveBeenCalledWith("/api/legal-documents/check-acceptances/5");
   });
 
   test("versions strips content, returns envelope", async () => {
@@ -94,6 +115,8 @@ describe("ib legal reads", () => {
     expect(out).toEqual(expect.objectContaining({
       count: 1, truncated: true, nextCursor: null, typeName: "TOS",
     }));
+    expect(out.items).toHaveLength(1);
+    expect(out.items[0]).toEqual({ personId: 5, acceptedVersion: "1.0" });
   });
 });
 

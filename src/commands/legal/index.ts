@@ -324,7 +324,8 @@ export function registerLegalCommands(
     .description("Create a NEW document version (immutable; draft unless --activate)")
     .requiredOption("--type <typeName>", "Document type name (see ib legal types)")
     // NOT --version: the root global -V/--version is recognised anywhere in argv
-    // and would shadow it (see help-wiring "no root collision" test).
+    // and would shadow it (enforced by the root-option reuse test in
+    // test/reference/help-wiring.test.ts).
     .requiredOption("--doc-version <v>", "Version string, e.g. 2.0")
     .requiredOption("--title <title>", "Document title")
     .option("--file <path>", "Read markdown content from a local file")
@@ -424,7 +425,8 @@ export function registerLegalCommands(
   legal
     .command("acceptances <typeName>")
     .description("Compliance report: WHO has accepted a document type (developer/sysadmin)")
-    // NOT --version: shadowed by the root global -V/--version (see save above).
+    // NOT --version: shadowed by the root global -V/--version (enforced by the
+    // root-option reuse test in test/reference/help-wiring.test.ts).
     .option("--doc-version <v>", "Only acceptances of this version string")
     .option("--limit <n>", "Max rows (default 500, cap 500)", (v: string) => Math.min(Number(v), 500))
     .action(async (typeName: string, opts: { docVersion?: string; limit?: number }) => {
