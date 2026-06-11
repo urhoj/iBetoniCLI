@@ -126,4 +126,28 @@ describe("ib cache run* functions", () => {
     ).rejects.toThrow(/Refused/);
     expect(mockClient.post).not.toHaveBeenCalled();
   });
+
+  test("runCacheClear with --confirm --force-prod sends the X-Force-Prod header", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ deleted: 10 });
+    await runCacheClear(mockClient, { confirm: true, forceProd: true });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/cli/cache/clear",
+      { confirmed: true },
+      { headers: { "X-Force-Prod": "1" } }
+    );
+  });
+
+  test("runCacheInvalidate with --confirm --force-prod sends the X-Force-Prod header", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ deleted: 1 });
+    await runCacheInvalidate(
+      mockClient,
+      { entityType: "vehicle", id: 5 },
+      { confirm: true, forceProd: true }
+    );
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/cli/cache/invalidate",
+      { entityType: "vehicle", cascade: false, id: 5 },
+      { headers: { "X-Force-Prod": "1" } }
+    );
+  });
 });
