@@ -4283,6 +4283,9 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - No sijainti of the type → both fields null (the backend's 999999999 no-result sentinel distance is normalized to null).
+
 EXAMPLES
   ib sijainti closest --worksite 555 --type 1
   ib sijainti closest --tyomaa 555 --type 1

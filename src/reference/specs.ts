@@ -2087,6 +2087,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
       apiErr(400, "Invalid tyomaaId or missing coordinates", "verify the worksite has lat/lng"),
       ...permErrors("auth.page.sijainnit.read"),
     ],
+    notes: [
+      "No sijainti of the type → both fields null (the backend's 999999999 no-result sentinel distance is normalized to null).",
+    ],
     examples: ["ib sijainti closest --worksite 555 --type 1", "ib sijainti closest --tyomaa 555 --type 1"],
   },
   {

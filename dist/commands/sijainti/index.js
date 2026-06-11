@@ -308,6 +308,8 @@ async function resolveOwnerAsiakasId(client) {
     }
     return available.currentCompanyId;
 }
+/** Backend "nothing found" sentinel distance from getClosestAsiakasSijaintiForTyomaa. */
+const NO_CLOSEST_SENTINEL = 999999999;
 /**
  * GET /api/geocode/sijainti/getClosestAsiakasSijaintiForTyomaa — nearest
  * sijainti of the given type to a worksite (straight-line / Haversine).
@@ -315,14 +317,21 @@ async function resolveOwnerAsiakasId(client) {
  * The legacy route path carries a `:sijaintiId` segment the handler IGNORES —
  * we pass `0`. asiakasId defaults to the caller's active company. The raw
  * response is a createSuccessResponse envelope (matkaM/min/timestamp noise);
- * we project to just `{ closestSijainti, closestDistance }`.
+ * we project to just `{ closestSijainti, closestDistance }`. The backend
+ * reports "no sijainti of this type" as closestSijainti null + distance
+ * 999999999 — the sentinel is normalized to null so it is never mistaken
+ * for a real distance.
  */
 export async function runSijaintiClosest(client, opts) {
     const asiakasId = opts.asiakasId ?? (await resolveOwnerAsiakasId(client));
     const raw = await client.get(`/api/geocode/sijainti/getClosestAsiakasSijaintiForTyomaa/${opts.tyomaaId}/0/${opts.sijaintiTypeId}/${asiakasId}`);
+    const closestSijainti = raw.closestSijainti ?? null;
+    const distance = raw.closestDistance;
     return {
-        closestSijainti: raw.closestSijainti ?? null,
-        closestDistance: raw.closestDistance ?? null,
+        closestSijainti,
+        closestDistance: closestSijainti === null || distance === undefined || distance >= NO_CLOSEST_SENTINEL
+            ? null
+            : distance,
     };
 }
 /** Parse a "lat,lng" token into coordinates, or null if it is not that shape. */

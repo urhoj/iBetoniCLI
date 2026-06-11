@@ -218,6 +218,16 @@ describe("ib sijainti closest", () => {
     });
   });
 
+  test("normalizes the backend 999999999 no-result sentinel to null", async () => {
+    get.mockResolvedValueOnce({ closestSijainti: null, closestDistance: 999999999 });
+    const result = await runSijaintiClosest(mockClient, {
+      tyomaaId: 555,
+      sijaintiTypeId: 1,
+      asiakasId: 26,
+    });
+    expect(result).toEqual({ closestSijainti: null, closestDistance: null });
+  });
+
   test("resolves asiakasId from active company when --asiakas omitted", async () => {
     get
       .mockResolvedValueOnce({ currentCompanyId: 1349 }) // /api/company-selection/available

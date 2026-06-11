@@ -6,7 +6,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 
 /** Expand `now` to the current ISO timestamp; pass any other value through. */
@@ -271,13 +271,11 @@ export function registerWeatherCommands(
       idempotencyKey?: string;
       reason?: string;
     }) => {
-      if (!opts.on && !opts.off) {
-        exitWithError(new CliError("Pass exactly one of --on / --off", 400, null, 4));
-        return;
-      }
-      if (opts.on && opts.off) {
-        exitWithError(new CliError("Pass only one of --on / --off", 400, null, 4));
-        return;
+      // Covers both "neither" and "both" — failWith keeps the envelope honest
+      // (statusCode 0: no HTTP request happened) and matches the spec's exit-4
+      // row so the remedy surfaces as the envelope hint.
+      if (!!opts.on === !!opts.off) {
+        failWith("Pass exactly one of --on / --off", 4);
       }
       try {
         const client = await getClient();
