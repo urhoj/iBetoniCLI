@@ -85,16 +85,15 @@ export async function runLegalAcceptances(client, typeName, opts) {
         params.set("limit", String(opts.limit));
     const qs = params.toString();
     const data = await client.get(`/api/legal-documents/acceptances/${encodeURIComponent(typeName)}${qs ? `?${qs}` : ""}`);
-    const out = {
+    return {
         items: data.acceptances ?? [],
         nextCursor: null,
         count: data.count ?? (data.acceptances ?? []).length,
+        // Always-present boolean (list-envelope convention for capped lists).
+        truncated: !!data.truncated,
         typeName: data.typeName,
         personSettingTypeId: data.personSettingTypeId,
     };
-    if (data.truncated)
-        out.truncated = true;
-    return out;
 }
 /** Client-side dev-gate for `accept` — the endpoint itself stays user-open (FE flows). */
 export function assertDeveloperClaims(claims) {

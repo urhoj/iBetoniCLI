@@ -1921,7 +1921,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib driver clear --vehicle 53 --date today --reason 'sick leave'"],
   },
 
-  // ─── sijainti (11) ───────────────────────────────────────────────────────
+  // ─── sijainti (12) ───────────────────────────────────────────────────────
   {
     command: "ib sijainti list",
     description:
@@ -1934,6 +1934,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { name: "valid-at", type: "date", description: "Only sijainnit valid on this date (startDate/endDate window)" },
       { name: "include-deleted", type: "boolean", description: "Include soft-deleted sijainnit" },
       { name: "all", type: "boolean", description: "Include ALL companies' sijainnit, not just own + shared (ownerAsiakasId 0)" },
+      { name: "asiakas", type: "number", description: "Only rows owned by this asiakasId (client-side filter on ownerAsiakasId; combine with --all for another company's rows)" },
     ],
     outputShape:
       "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil }> (+truncated:true when the result hit the limit)",
@@ -1947,13 +1948,44 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "Supplier locations (betoniasemat, depots) usually belong to ANOTHER company — without --all they are invisible here even though `ib vehicle visits sijainti <id>` and the GPS timeline reference them. To resolve such a location by name use --search <name> --all.",
       "--all needs a backend deployed ≥ 2026-06-10; an older backend silently ignores it (returns the own+shared scope). --search works on every backend (client-side fallback).",
       "An unknown numeric --type id is passed through and simply returns zero rows; an unknown type NAME exits 4.",
+      "--asiakas filters client-side on the server-emitted ownerAsiakasId field — needs a backend deployed ≥ 2026-06-11 (older backends omit the field, so it matches nothing).",
     ],
-    seeAlso: ["ib sijainti types", "ib search", "ib vehicle visits", "ib vehicle timeline"],
+    seeAlso: ["ib sijainti plants", "ib sijainti types", "ib search", "ib vehicle visits", "ib vehicle timeline"],
     examples: [
       "ib sijainti list",
       "ib sijainti list --type jäteasema",
       "ib sijainti list --search kivikko --all",
+      "ib sijainti list --all --asiakas 30",
       "ib sijainti list --valid-at today",
+    ],
+  },
+  {
+    command: "ib sijainti plants",
+    description:
+      "List concrete plants (betoniasemat) across ALL companies — sugar for `sijainti list --type betoniasema --all`. Plants belong to supplier companies (Rudus, Lujabetoni, Betset, …), so the default own+shared list scope hides nearly all of them; this command surfaces the whole catalogue. --asiakas narrows to a single company's plants. Alias: `ib sijainti tehtaat`.",
+    permissions: ["auth.page.sijainnit.read"],
+    flags: [
+      { name: "asiakas", type: "number", description: "Only this company's plants (numeric asiakasId; client-side filter on ownerAsiakasId)" },
+      { name: "search", type: "string", description: "Case-insensitive substring over name/address (same semantics as `list --search`)" },
+      { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+    ],
+    outputShape:
+      "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil }> (+truncated:true when the result hit the limit)",
+    errors: [
+      { exit: 4, meaning: "--asiakas is not a positive integer", remedy: "pass a numeric asiakasId (see ownerAsiakasId in the output, or resolve the company via `ib search <name>`)" },
+      ...permErrors("auth.page.sijainnit.read"),
+    ],
+    notes: [
+      "Needs a backend deployed ≥ 2026-06-11 (scope=all + the ownerAsiakasId field); on an older backend the result silently falls back to the own+shared scope and --asiakas matches nothing.",
+      "The plant type is resolved by NAME (betoniasema) through the sijaintiTypes lookup, not a hardcoded id.",
+      "`truncated:true` flags a capped result — same semantics as `sijainti list`.",
+    ],
+    seeAlso: ["ib sijainti list", "ib sijainti types", "ib search"],
+    examples: [
+      "ib sijainti plants",
+      "ib sijainti plants --asiakas 30",
+      "ib sijainti plants --search kivikko",
+      "ib sijainti tehtaat",
     ],
   },
   {
@@ -2399,6 +2431,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
       { exit: 4, meaning: "Missing --reason / type has no personSettingTypeId mapping", remedy: "pass --reason; check ib legal types" },
       apiErr(404, "No active document of this type", "ib legal versions <typeName>"),
       ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Resolves the active version via two sequential reads (current + types); if another developer activates a new version between them, the recorded version string can be one step stale. Acceptable for a testing aid — verify with ib legal status afterwards.",
     ],
     seeAlso: ["ib legal status", "ib legal show"],
     examples: ['ib legal accept --type BETONIJERRY_TOS --reason "acceptance flow e2e test"'],

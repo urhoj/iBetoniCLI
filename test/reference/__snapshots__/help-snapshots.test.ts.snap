@@ -2963,6 +2963,9 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - Resolves the active version via two sequential reads (current + types); if another developer activates a new version between them, the recorded version string can be one step stale. Acceptable for a testing aid — verify with ib legal status afterwards.
+
 SEE ALSO
   ib legal status, ib legal show
 
@@ -4840,6 +4843,7 @@ FLAGS
   --valid-at DATE    Only sijainnit valid on this date (startDate/endDate window)
   --include-deleted BOOLEAN    Include soft-deleted sijainnit
   --all BOOLEAN    Include ALL companies' sijainnit, not just own + shared (ownerAsiakasId 0)
+  --asiakas NUMBER    Only rows owned by this asiakasId (client-side filter on ownerAsiakasId; combine with --all for another company's rows)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -4859,15 +4863,58 @@ NOTES
   - Supplier locations (betoniasemat, depots) usually belong to ANOTHER company — without --all they are invisible here even though \`ib vehicle visits sijainti <id>\` and the GPS timeline reference them. To resolve such a location by name use --search <name> --all.
   - --all needs a backend deployed ≥ 2026-06-10; an older backend silently ignores it (returns the own+shared scope). --search works on every backend (client-side fallback).
   - An unknown numeric --type id is passed through and simply returns zero rows; an unknown type NAME exits 4.
+  - --asiakas filters client-side on the server-emitted ownerAsiakasId field — needs a backend deployed ≥ 2026-06-11 (older backends omit the field, so it matches nothing).
 
 SEE ALSO
-  ib sijainti types, ib search, ib vehicle visits, ib vehicle timeline
+  ib sijainti plants, ib sijainti types, ib search, ib vehicle visits, ib vehicle timeline
 
 EXAMPLES
   ib sijainti list
   ib sijainti list --type jäteasema
   ib sijainti list --search kivikko --all
+  ib sijainti list --all --asiakas 30
   ib sijainti list --valid-at today
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib sijainti plants matches snapshot 1`] = `
+"USAGE
+  ib sijainti plants [flags]
+
+DESCRIPTION
+  List concrete plants (betoniasemat) across ALL companies — sugar for \`sijainti list --type betoniasema --all\`. Plants belong to supplier companies (Rudus, Lujabetoni, Betset, …), so the default own+shared list scope hides nearly all of them; this command surfaces the whole catalogue. --asiakas narrows to a single company's plants. Alias: \`ib sijainti tehtaat\`.
+  Permissions: requires auth.page.sijainnit.read.
+
+FLAGS
+  --asiakas NUMBER    Only this company's plants (numeric asiakasId; client-side filter on ownerAsiakasId)
+  --search STRING    Case-insensitive substring over name/address (same semantics as \`list --search\`)
+  --limit NUMBER    Max rows (capped at 500) (default: 100)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil }> (+truncated:true when the result hit the limit)
+
+ERRORS (stderr, exit non-zero)
+  exit 4  --asiakas is not a positive integer → pass a numeric asiakasId (see ownerAsiakasId in the output, or resolve the company via \`ib search <name>\`)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Needs a backend deployed ≥ 2026-06-11 (scope=all + the ownerAsiakasId field); on an older backend the result silently falls back to the own+shared scope and --asiakas matches nothing.
+  - The plant type is resolved by NAME (betoniasema) through the sijaintiTypes lookup, not a hardcoded id.
+  - \`truncated:true\` flags a capped result — same semantics as \`sijainti list\`.
+
+SEE ALSO
+  ib sijainti list, ib sijainti types, ib search
+
+EXAMPLES
+  ib sijainti plants
+  ib sijainti plants --asiakas 30
+  ib sijainti plants --search kivikko
+  ib sijainti tehtaat
 "
 `;
 

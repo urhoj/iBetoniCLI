@@ -118,6 +118,16 @@ describe("ib legal reads", () => {
     expect(out.items).toHaveLength(1);
     expect(out.items[0]).toEqual({ personId: 5, acceptedVersion: "1.0" });
   });
+
+  test("acceptances emits truncated:false as a present boolean (not undefined)", async () => {
+    const c = mockClient();
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      typeName: "TOS", personSettingTypeId: 40, count: 1, truncated: false,
+      acceptances: [{ personId: 5, acceptedVersion: "1.0" }],
+    });
+    const out = await runLegalAcceptances(c, "TOS", {});
+    expect(out.truncated).toBe(false);
+  });
 });
 
 describe("ib legal writes", () => {

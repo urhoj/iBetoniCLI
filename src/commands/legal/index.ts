@@ -192,15 +192,15 @@ export async function runLegalAcceptances(
     truncated: boolean;
     acceptances: Row[];
   }>(`/api/legal-documents/acceptances/${encodeURIComponent(typeName)}${qs ? `?${qs}` : ""}`);
-  const out: ListEnvelope<Row> & { typeName: string; personSettingTypeId: number } = {
+  return {
     items: data.acceptances ?? [],
     nextCursor: null,
     count: data.count ?? (data.acceptances ?? []).length,
+    // Always-present boolean (list-envelope convention for capped lists).
+    truncated: !!data.truncated,
     typeName: data.typeName,
     personSettingTypeId: data.personSettingTypeId,
   };
-  if (data.truncated) out.truncated = true;
-  return out;
 }
 
 /** Client-side dev-gate for `accept` — the endpoint itself stays user-open (FE flows). */

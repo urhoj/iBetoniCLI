@@ -128,6 +128,12 @@ export interface SijaintiListFilter {
   search?: string;
   /** Include EVERY company's sijainnit (scope=all), not just own + shared. */
   all?: boolean;
+  /**
+   * Only rows owned by this asiakasId. Client-side filter on the server-emitted
+   * `ownerAsiakasId` field (needs a backend deployed ≥ 2026-06-11; older
+   * backends omit the field, so the filter matches nothing).
+   */
+  owner?: number;
 }
 
 /**
@@ -372,6 +378,8 @@ export type SijaintiListJoinedOptions = SijaintiListFilter;
  * the param) AND re-applied client-side over a scan of up to the backend cap
  * (500 rows), then sliced to `limit` (default 100). `--all` (scope=all) is
  * server-only — on a backend without it the own+shared scope comes back.
+ * `owner` (--asiakas) is a client-side filter on `ownerAsiakasId` and uses the
+ * same scan-then-slice path as `search`.
  */
 export async function runSijaintiListJoined(
   client: ApiClient,
@@ -382,26 +390,33 @@ export async function runSijaintiListJoined(
     opts.type !== undefined && opts.type !== ""
       ? resolveSijaintiTypeId(types.items, opts.type)
       : undefined;
+  const clientFiltered = !!opts.search || opts.owner !== undefined;
   const env = await runSijaintiList(client, {
     type: typeId !== undefined ? String(typeId) : undefined,
-    limit: opts.search ? SIJAINTI_SEARCH_SCAN_LIMIT : opts.limit,
+    limit: clientFiltered ? SIJAINTI_SEARCH_SCAN_LIMIT : opts.limit,
     validAt: opts.validAt,
     includeDeleted: opts.includeDeleted,
     search: opts.search,
     all: opts.all,
   });
   const selite = new Map(types.items.map((t) => [t.sijaintiTypeId, t.selite]));
-  let items = env.items.map((r) => ({
+  let items: Record<string, unknown>[] = env.items.map((r) => ({
     ...r,
     typeName: (r.typeName as string | undefined) ?? selite.get(Number(r.type)) ?? null,
   }));
   // Propagate the backend's honest truncation signal (deploy-gated; undefined
   // on older backends) — without it a default-limit scope=all list silently
-  // capped at 100 reads as complete. A client-side --search slice that cuts
-  // matched rows is truncation too.
+  // capped at 100 reads as complete. A client-side --search/--asiakas slice
+  // that cuts matched rows is truncation too.
   let truncated = env.truncated === true;
-  if (opts.search) {
-    const matched = items.filter((r) => sijaintiRowMatches(r, opts.search!));
+  if (clientFiltered) {
+    let matched = items;
+    if (opts.owner !== undefined) {
+      matched = matched.filter((r) => Number(r.ownerAsiakasId) === opts.owner);
+    }
+    if (opts.search) {
+      matched = matched.filter((r) => sijaintiRowMatches(r, opts.search!));
+    }
     const cap = opts.limit ?? DEFAULT_LIST_LIMIT;
     truncated = truncated || matched.length > cap;
     items = matched.slice(0, cap);
@@ -413,6 +428,27 @@ export async function runSijaintiListJoined(
   };
   if (truncated) out.truncated = true;
   return out;
+}
+
+/**
+ * `ib sijainti plants` (alias `tehtaat`) — concrete plants (type Betoniasema)
+ * across ALL companies. Sugar for `sijainti list --type betoniasema --all`:
+ * plants overwhelmingly belong to supplier companies (Rudus, Lujabetoni, …),
+ * so the own+shared default scope would hide nearly all of them. The type is
+ * resolved by NAME through the sijaintiTypes lookup (not a hardcoded id).
+ * `asiakas` narrows to one company's plants (client-side on ownerAsiakasId).
+ */
+export async function runSijaintiPlants(
+  client: ApiClient,
+  opts: { asiakas?: number; search?: string; limit?: number }
+): Promise<ListEnvelope<Record<string, unknown>>> {
+  return runSijaintiListJoined(client, {
+    type: "betoniasema",
+    all: true,
+    owner: opts.asiakas,
+    search: opts.search,
+    limit: opts.limit,
+  });
 }
 
 /**
@@ -580,9 +616,22 @@ export async function runSijaintiDistance(
 }
 
 /**
+ * Fail fast (exit 4) on a non-numeric / non-positive `--asiakas` value —
+ * Commander's Number coercion would otherwise turn it into NaN, which the
+ * client-side owner filter silently matches against nothing.
+ */
+function assertValidAsiakasFlag(asiakas: number | undefined): void {
+  if (asiakas !== undefined && (!Number.isInteger(asiakas) || asiakas <= 0)) {
+    failWith("--asiakas must be a positive integer asiakasId", 4);
+  }
+}
+
+/**
  * Register `ib sijainti` subcommands on the parent commander instance:
  *   - list      typeName-joined rows; filterable by --type (id or name)/--search/
- *               --limit/--valid-at/--include-deleted
+ *               --limit/--valid-at/--include-deleted/--asiakas (owner)
+ *   - plants    (alias: tehtaat) concrete plants (betoniasemat) across ALL
+ *               companies; --asiakas narrows to one company's plants
  *   - get       single sijainti by id (existing /api/geocode/sijainti route)
  *   - types     sijainti type lookup (sijaintiTypeId → selite)
  *   - geocode   address → coords via Google Maps
@@ -622,6 +671,11 @@ export function registerSijaintiCommands(
       "--all",
       "Include all companies' sijainnit (supplier plants etc.), not just own + shared"
     )
+    .option(
+      "--asiakas <id>",
+      "Only rows owned by this asiakasId (combine with --all for another company's rows)",
+      Number
+    )
     .action(
       async (opts: {
         type?: string;
@@ -630,7 +684,9 @@ export function registerSijaintiCommands(
         validAt?: string;
         includeDeleted?: boolean;
         all?: boolean;
+        asiakas?: number;
       }) => {
+        assertValidAsiakasFlag(opts.asiakas);
         try {
           const client = await getClient();
           const result = await runSijaintiListJoined(client, {
@@ -640,6 +696,7 @@ export function registerSijaintiCommands(
             validAt: opts.validAt ? resolveDate(opts.validAt) : undefined,
             includeDeleted: opts.includeDeleted,
             all: opts.all,
+            owner: opts.asiakas,
           });
           writeJson(result);
         } catch (e) {
@@ -647,6 +704,32 @@ export function registerSijaintiCommands(
         }
       }
     );
+
+  s.command("plants")
+    .alias("tehtaat")
+    .description(
+      "List concrete plants (betoniasemat) across ALL companies — sugar for `list --type betoniasema --all`"
+    )
+    .option("--asiakas <id>", "Only this company's plants (numeric asiakasId)", Number)
+    .option(
+      "--search <text>",
+      "Case-insensitive substring over name/address (same semantics as `list --search`)"
+    )
+    .option("--limit <n>", "Max rows", (v: string) => Math.min(Number(v), 500))
+    .action(async (opts: { asiakas?: number; search?: string; limit?: number }) => {
+      assertValidAsiakasFlag(opts.asiakas);
+      try {
+        const client = await getClient();
+        const result = await runSijaintiPlants(client, {
+          asiakas: opts.asiakas,
+          search: opts.search,
+          limit: opts.limit,
+        });
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
 
   s.command("get <sijaintiId>")
     .description("Get a single sijainti by sijaintiId")

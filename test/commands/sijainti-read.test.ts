@@ -2,6 +2,7 @@ import { describe, test, expect, vi, beforeEach } from "vitest";
 import {
   runSijaintiList,
   runSijaintiListJoined,
+  runSijaintiPlants,
   runSijaintiGet,
   runSijaintiSetJerry,
   runSijaintiTypes,
@@ -434,5 +435,76 @@ describe("runSijaintiListJoined", () => {
     const result = await runSijaintiListJoined(mockClient, { search: "a", limit: 2 });
     expect(result.items).toHaveLength(2);
     expect(result.truncated).toBe(true);
+  });
+});
+
+describe("runSijaintiPlants / --asiakas owner filter", () => {
+  const get = mockClient.get as ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    get.mockReset();
+    get.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/geocode/sijaintiTypes")) return TYPE_ROWS;
+      if (path.startsWith("/api/cli/sijainti/list")) {
+        return {
+          items: [
+            { sijaintiId: 60, name: "Kivikko", address: "Kivikonlaita 17", coords: null, type: 1, ownerAsiakasId: 30, ownerName: "Rudus Oy", jerryActiveUntil: null },
+            { sijaintiId: 61, name: "Konala", address: "Betonitie 5", coords: null, type: 1, ownerAsiakasId: 30, ownerName: "Rudus Oy", jerryActiveUntil: null },
+            { sijaintiId: 22, name: "Fazer", address: "Fazerintie 3", coords: null, type: 1, ownerAsiakasId: 65, ownerName: "Ruskon betoni Oy", jerryActiveUntil: null },
+          ],
+          nextCursor: null,
+          count: 3,
+        };
+      }
+      throw new Error(`unexpected GET ${path}`);
+    });
+  });
+
+  test("plants: resolves the betoniasema type by NAME and queries type + scope=all", async () => {
+    const result = await runSijaintiPlants(mockClient, {});
+    expect(get).toHaveBeenCalledWith("/api/cli/sijainti/list?type=1&scope=all");
+    expect(result.count).toBe(3);
+    expect(result.items.map((r) => r.typeName)).toEqual([
+      "Betoniasema",
+      "Betoniasema",
+      "Betoniasema",
+    ]);
+  });
+
+  test("plants --asiakas: scans at the 500 cap and keeps only that owner's rows", async () => {
+    const result = await runSijaintiPlants(mockClient, { asiakas: 30 });
+    expect(get).toHaveBeenCalledWith(
+      "/api/cli/sijainti/list?type=1&limit=500&scope=all"
+    );
+    expect(result.items.map((r) => r.sijaintiId)).toEqual([60, 61]);
+    expect(result.count).toBe(2);
+    expect(result.truncated).toBeUndefined();
+  });
+
+  test("plants --asiakas composes with --search (both client-side filters apply)", async () => {
+    const result = await runSijaintiPlants(mockClient, { asiakas: 30, search: "kivikko" });
+    expect(result.items.map((r) => r.sijaintiId)).toEqual([60]);
+  });
+
+  test("owner filter sets truncated when the slice cuts matched rows", async () => {
+    const result = await runSijaintiListJoined(mockClient, { owner: 30, limit: 1, all: true });
+    expect(result.items).toHaveLength(1);
+    expect(result.truncated).toBe(true);
+  });
+
+  test("owner filter matches nothing on rows lacking ownerAsiakasId (older backend)", async () => {
+    get.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/geocode/sijaintiTypes")) return TYPE_ROWS;
+      if (path.startsWith("/api/cli/sijainti/list")) {
+        return {
+          items: [{ sijaintiId: 1, name: "A", address: null, coords: null, type: 1, jerryActiveUntil: null }],
+          nextCursor: null,
+          count: 1,
+        };
+      }
+      throw new Error(`unexpected GET ${path}`);
+    });
+    const result = await runSijaintiListJoined(mockClient, { owner: 30 });
+    expect(result.items).toEqual([]);
+    expect(result.count).toBe(0);
   });
 });
