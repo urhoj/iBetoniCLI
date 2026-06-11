@@ -4482,7 +4482,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil }>
+  ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil }> (+truncated:true when the result hit the limit)
 
 ERRORS (stderr, exit non-zero)
   exit 4  Unknown or ambiguous --type name → the error lists the valid types; or run \`ib sijainti types\`
@@ -4491,6 +4491,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
+  - The list is capped (default 100 / max 500) with NO cursor — \`truncated:true\` flags a result that filled the limit (raise --limit or narrow with --search/--type). Backend signal needs a backend deployed ≥ 2026-06-11; the client-side --search slice sets it on every backend.
   - typeName is joined client-side from the sijaintiTypes lookup (one extra GET, automatic); newer backends also emit it directly, plus ownerAsiakasId/ownerName.
   - Supplier locations (betoniasemat, depots) usually belong to ANOTHER company — without --all they are invisible here even though \`ib vehicle visits sijainti <id>\` and the GPS timeline reference them. To resolve such a location by name use --search <name> --all.
   - --all needs a backend deployed ≥ 2026-06-10; an older backend silently ignores it (returns the own+shared scope). --search works on every backend (client-side fallback).

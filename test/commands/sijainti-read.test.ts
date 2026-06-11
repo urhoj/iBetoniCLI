@@ -403,4 +403,36 @@ describe("runSijaintiListJoined", () => {
     await runSijaintiListJoined(mockClient, { all: true });
     expect(get).toHaveBeenCalledWith("/api/cli/sijainti/list?scope=all");
   });
+
+  test("propagates the backend truncated flag", async () => {
+    // Regression guard: the joined orchestrator rebuilds the envelope and used
+    // to DROP the backend's truncated signal — a default-limit scope=all list
+    // silently capped at 100 then read as complete (38/138 rows hidden in the
+    // 2026-06-11 Jerry investigation).
+    get.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/geocode/sijaintiTypes")) return TYPE_ROWS;
+      if (path.startsWith("/api/cli/sijainti/list")) {
+        return {
+          items: [{ sijaintiId: 1, name: "A", address: null, coords: null, type: 1, jerryActiveUntil: null }],
+          nextCursor: null,
+          count: 1,
+          truncated: true,
+        };
+      }
+      throw new Error(`unexpected GET ${path}`);
+    });
+    const result = await runSijaintiListJoined(mockClient, {});
+    expect(result.truncated).toBe(true);
+  });
+
+  test("omits truncated when the backend does not send it (older backend)", async () => {
+    const result = await runSijaintiListJoined(mockClient, {});
+    expect(result.truncated).toBeUndefined();
+  });
+
+  test("--search sets truncated when the client-side slice cuts matched rows", async () => {
+    const result = await runSijaintiListJoined(mockClient, { search: "a", limit: 2 });
+    expect(result.items).toHaveLength(2);
+    expect(result.truncated).toBe(true);
+  });
 });

@@ -395,12 +395,24 @@ export async function runSijaintiListJoined(
     ...r,
     typeName: (r.typeName as string | undefined) ?? selite.get(Number(r.type)) ?? null,
   }));
+  // Propagate the backend's honest truncation signal (deploy-gated; undefined
+  // on older backends) — without it a default-limit scope=all list silently
+  // capped at 100 reads as complete. A client-side --search slice that cuts
+  // matched rows is truncation too.
+  let truncated = env.truncated === true;
   if (opts.search) {
-    items = items
-      .filter((r) => sijaintiRowMatches(r, opts.search!))
-      .slice(0, opts.limit ?? DEFAULT_LIST_LIMIT);
+    const matched = items.filter((r) => sijaintiRowMatches(r, opts.search!));
+    const cap = opts.limit ?? DEFAULT_LIST_LIMIT;
+    truncated = truncated || matched.length > cap;
+    items = matched.slice(0, cap);
   }
-  return { items, nextCursor: null, count: items.length };
+  const out: ListEnvelope<Record<string, unknown>> = {
+    items,
+    nextCursor: null,
+    count: items.length,
+  };
+  if (truncated) out.truncated = true;
+  return out;
 }
 
 /**
