@@ -35,6 +35,14 @@ const ATTACHMENT_ENTITY_FLAGS = [
 const ATTACHMENT_ROW = "{ attachmentId, origFileName, fileName, fileType, fileSize, fileComment, attachTime, liitaLaskuun, attachmentGroupId, attachmentGroupName, attachmentTypeId, attachmentTypeName, keikkaId?, vehicleId?, personId?, asiakasId?, tyomaaId?, sijaintiId?, tuoteId?, bugReportId?, pumppuRequestId?, pumppuOfferId?, entryByPersonId, ownerAsiakasId, imageWidth, imageHeight }";
 const ENTITY_FLAG_NOTE = "Exactly ONE entity flag selects the target (--keikka | --vehicle | --person | --customer | --worksite | --sijainti | --tuote | --bug-report | --request | --offer).";
 const DEPLOY_NOTE = "Deploy-gated (404 until the backend ships /api/cli/attachment/*).";
+/** Appended to capped-list outputShapes — single-sources the wording + backend date. */
+const TRUNCATED_NOTE = " (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)";
+// ─── legal shared fragments ──────────────────────────────────────────────────
+const LEGAL_DEV_ERRORS = [
+    apiErr(401, "Token expired", "ib auth refresh"),
+    apiErr(403, "Developer/sysadmin only (server-enforced)", "use a developer account token"),
+    apiErr(500, "Backend error", "retry with --verbose"),
+];
 export const COMMAND_SPECS = [
     // ─── attachment (12) ─────────────────────────────────────────────────────
     {
@@ -916,7 +924,7 @@ export const COMMAND_SPECS = [
             },
             { name: "cursor", type: "string", description: "Pagination cursor" },
         ],
-        outputShape: "ListEnvelope<{ tyomaaId, name, address, asiakasId, city }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)",
+        outputShape: "ListEnvelope<{ tyomaaId, name, address, asiakasId, city }>" + TRUNCATED_NOTE,
         errors: permErrors("auth.page.tyomaa.read"),
         examples: ["ib worksite list", "ib worksite list --customer 1349"],
     },
@@ -1099,7 +1107,7 @@ export const COMMAND_SPECS = [
                 description: "Max rows (capped at 500)",
             },
         ],
-        outputShape: "ListEnvelope<{ personId, name, email, roles:number[] }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)",
+        outputShape: "ListEnvelope<{ personId, name, email, roles:number[] }>" + TRUNCATED_NOTE,
         errors: [
             apiErr(400, "Unknown role", "use a role from @ibetoni/constants ROLE_TYPEID_BY_NAME"),
             ...permErrors("auth.page.person.read"),
@@ -1368,7 +1376,7 @@ export const COMMAND_SPECS = [
                 description: "Pagination cursor (from a previous page's nextCursor)",
             },
         ],
-        outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)",
+        outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>" + TRUNCATED_NOTE,
         errors: permErrors("auth.page.vehicle.read"),
         examples: [
             "ib vehicle list",
@@ -1448,7 +1456,7 @@ export const COMMAND_SPECS = [
         flags: [
             { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
         ],
-        outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)",
+        outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>" + TRUNCATED_NOTE,
         errors: permErrors("auth.page.vehicle.read"),
         examples: ["ib vehicle search ABC", "ib vehicle search kuorma --limit 20", "ib vehicle search 82"],
     },
@@ -2041,6 +2049,177 @@ export const COMMAND_SPECS = [
             'ib ohje update LaskupohjaTilaus --dry-run --title "New title"',
             "ib ohje update LaskupohjaTilaus --body '{\"title\":\"X\",\"htmltext\":\"<p>Y</p>\"}' --reason edit",
         ],
+    },
+    // ─── legal (10) — versioned legal documents + acceptance tracking ─────────
+    {
+        command: "ib legal types",
+        description: "List legal document types (EULA, TOS, PRIVACY, BETONIJERRY_TOS, ...) with their personSettingTypeId acceptance mapping. A NULL personSettingTypeId means acceptances for that type cannot be tracked.",
+        auth: "any",
+        flags: [],
+        outputShape: "ListEnvelope<{documentTypeId, typeName, displayName, description, sortOrder, personSettingTypeId}>",
+        errors: COMMON_AUTH_ERRORS,
+        seeAlso: ["ib legal show", "ib legal status"],
+        examples: ["ib legal types"],
+    },
+    {
+        command: "ib legal show",
+        description: "Fetch the current ACTIVE document of a type, including markdown content. typeName uniquely implies the tenant (BETONIJERRY_TOS vs TOS) — no owner flag needed. --meta omits the (potentially >10 KB) content.",
+        auth: "any",
+        args: [{ name: "typeName", type: "string", description: "Document type name (see ib legal types)" }],
+        flags: [
+            { name: "meta", type: "boolean", description: "Omit markdownContent (returns contentLength instead)" },
+        ],
+        outputShape: "{documentId, typeName, version, title, effectiveDate, markdownContent | contentLength, ...}",
+        errors: [
+            apiErr(404, "No active document of this type", "check ib legal versions <typeName>"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        seeAlso: ["ib legal types", "ib legal versions"],
+        examples: ["ib legal show BETONIJERRY_TOS", "ib legal show TOS --meta"],
+    },
+    {
+        command: "ib legal status",
+        description: "Which legal documents you have accepted (version + timestamp) and which are still missing. Defaults to yourself and your token's company scope. --person requires developer/sysadmin (server-enforced). Content is stripped — read it via ib legal show. Note: betoni.online currently has no active documents, so an empty result is normal.",
+        auth: "any",
+        flags: [
+            { name: "person", type: "number", description: "Check another personId (developer/sysadmin only)" },
+            { name: "owner", type: "number", description: "ownerAsiakasId scope (default: your company from the token)" },
+        ],
+        outputShape: "{personId, ownerAsiakasId, requiresAcceptance, accepted: [{typeName, acceptedVersion, acceptedDate, ...}], missing: [...]}",
+        errors: [
+            apiErr(403, "--person on someone else without developer/sysadmin", "drop --person or use a developer token"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        seeAlso: ["ib legal show", "ib legal acceptances"],
+        examples: ["ib legal status", "ib legal status --person 6233"],
+    },
+    {
+        command: "ib legal versions",
+        description: "All versions of a document type — active, drafts, and superseded history. Content stripped; fetch one version with ib legal get.",
+        auth: "any",
+        args: [{ name: "typeName", type: "string", description: "Document type name (see ib legal types)" }],
+        flags: [
+            { name: "owner", type: "number", description: "Filter by ownerAsiakasId tenant scope" },
+        ],
+        outputShape: "ListEnvelope<{documentId, version, title, isActive, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>",
+        errors: COMMON_AUTH_ERRORS,
+        seeAlso: ["ib legal get", "ib legal activate"],
+        examples: ["ib legal versions TOS", "ib legal versions BETONIJERRY_TOS"],
+    },
+    {
+        command: "ib legal get",
+        description: "One document version by documentId, including full markdown content.",
+        auth: "any",
+        args: [{ name: "documentId", type: "number", description: "legalDocuments.documentId" }],
+        flags: [],
+        outputShape: "{documentId, documentTypeId, typeName, version, title, markdownContent, isActive, ...}",
+        errors: [
+            apiErr(404, "Document not found", "list ids via ib legal versions <typeName>"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        seeAlso: ["ib legal versions"],
+        examples: ["ib legal get 12"],
+    },
+    {
+        command: "ib legal save",
+        description: "Create a NEW document version (developer/sysadmin only). Versions are IMMUTABLE — any content/title change is a new version; there is no in-place edit. Draft by default (isActive=0); --activate publishes atomically (deactivates prior versions of the same type+tenant). Content from --file (local) or --content (inline; required over /api/cli/exec). --reason required unless --dry-run.",
+        permissions: ["isSystemAdmin or isDeveloper (server-enforced)"],
+        flags: [
+            { name: "type", type: "string", required: true, description: "Document type name (see ib legal types)" },
+            { name: "doc-version", type: "string", required: true, description: "Version string, e.g. 2.0 (NOT --version — that is the global CLI version flag)" },
+            { name: "title", type: "string", required: true, description: "Document title" },
+            { name: "file", type: "string", description: "Read markdown content from a local file" },
+            { name: "content", type: "string", description: "Inline markdown content (use over /api/cli/exec — no local FS there)" },
+            { name: "owner", type: "number", description: "ownerAsiakasId tenant scope (1349 = BetoniJerry); omit for global" },
+            { name: "notes", type: "string", description: "Internal notes" },
+            { name: "effective-date", type: "date", description: "Effective date YYYY-MM-DD (default: now)" },
+            { name: "activate", type: "boolean", description: "Publish immediately (deactivates prior versions). Default: inactive draft" },
+        ],
+        writeFlags: true,
+        mutates: true,
+        outputShape: "{documentId, success} | dry-run: {dryRun: true, wouldCreate: {...}, validation}",
+        errors: [
+            { exit: 4, meaning: "Missing --reason / no content / --file unreadable or combined with --content", remedy: "pass --file OR --content, and --reason unless --dry-run" },
+            apiErr(400, "Required fields missing", "provide --type --doc-version --title and content"),
+            ...LEGAL_DEV_ERRORS,
+        ],
+        notes: [
+            "X-Dry-Run is honoured server-side on this route once the gating deploy is live — do not --dry-run against a backend without it (the write would persist).",
+        ],
+        seeAlso: ["ib legal activate", "ib legal versions"],
+        examples: [
+            'ib legal save --type TOS --doc-version 2.1 --title Kayttoehdot --file ./tos.md --reason "new clause 7"',
+            'ib legal save --type TOS --doc-version 2.1 --title Kayttoehdot --content "# TOS" --activate --dry-run',
+        ],
+    },
+    {
+        command: "ib legal activate",
+        description: "Publish a document version (developer/sysadmin only): atomically deactivates all sibling versions of the same type+tenant and activates this one (also stamps effectiveDate). Use to publish a draft or roll back to an earlier version.",
+        permissions: ["isSystemAdmin or isDeveloper (server-enforced)"],
+        args: [{ name: "documentId", type: "number", description: "legalDocuments.documentId to activate" }],
+        flags: [],
+        writeFlags: true,
+        mutates: true,
+        outputShape: "{success} | dry-run: {dryRun: true, wouldActivate: {documentId}, validation}",
+        errors: [
+            { exit: 4, meaning: "Missing --reason or invalid documentId", remedy: "pass --reason 'why' (not needed with --dry-run)" },
+            ...LEGAL_DEV_ERRORS,
+        ],
+        seeAlso: ["ib legal save", "ib legal versions"],
+        examples: ['ib legal activate 12 --reason "publish v2.1"'],
+    },
+    {
+        command: "ib legal delete",
+        description: "Soft-delete (deactivate) a document version (developer/sysadmin only). The row and all acceptance history remain in the database.",
+        permissions: ["isSystemAdmin or isDeveloper (server-enforced)"],
+        args: [{ name: "documentId", type: "number", description: "legalDocuments.documentId to soft-delete" }],
+        flags: [],
+        writeFlags: true,
+        mutates: true,
+        outputShape: "{success} | dry-run: {dryRun: true, wouldDelete: {documentId}, validation}",
+        errors: [
+            { exit: 4, meaning: "Missing --reason or invalid documentId", remedy: "pass --reason 'why' (not needed with --dry-run)" },
+            ...LEGAL_DEV_ERRORS,
+        ],
+        seeAlso: ["ib legal versions"],
+        examples: ['ib legal delete 12 --reason "superseded stub" --dry-run'],
+    },
+    {
+        command: "ib legal acceptances",
+        description: "Compliance report (developer/sysadmin only): WHO has accepted a document type — personId, name, email, accepted version + timestamp, newest first. Capped at 500 rows with a truncated flag. Types with NULL personSettingTypeId (e.g. GLOBAL today) are not trackable and return a validation error.",
+        permissions: ["isSystemAdmin or isDeveloper (server-enforced)"],
+        args: [{ name: "typeName", type: "string", description: "Document type name (see ib legal types)" }],
+        flags: [
+            { name: "doc-version", type: "string", description: "Only acceptances of this version string (NOT --version — that is the global CLI version flag)" },
+            { name: "limit", type: "number", default: "500", description: "Max rows (cap 500)" },
+        ],
+        outputShape: "ListEnvelope<{personId, firstName, lastName, email, acceptedVersion, acceptedAt}> & {typeName, personSettingTypeId, truncated?}",
+        errors: [
+            apiErr(400, "Type has no personSettingTypeId mapping", "fix the legalDocumentTypes row first"),
+            apiErr(404, "Unknown document type", "ib legal types"),
+            ...LEGAL_DEV_ERRORS,
+        ],
+        seeAlso: ["ib legal status", "ib legal types"],
+        examples: ["ib legal acceptances BETONIJERRY_TOS", "ib legal acceptances TOS --doc-version 2.0"],
+    },
+    {
+        command: "ib legal accept",
+        description: "Record YOUR OWN acceptance of the current active version of a type. DEVELOPER TESTING AID, gated client-side to developer/sysadmin tokens — real consent is a human action recorded via the betoni.online / betonijerry.fi UI flows. The backend endpoint is self-only: you can never accept on someone else's behalf. --reason required unless --dry-run.",
+        permissions: ["isSystemAdmin or isDeveloper (client-side gate)"],
+        flags: [
+            { name: "type", type: "string", required: true, description: "Document type name to accept" },
+        ],
+        writeFlags: true,
+        mutates: true,
+        outputShape: "{success} | dry-run: {dryRun: true, wouldAccept: {...}, validation}",
+        errors: [
+            { exit: 3, meaning: "Not a developer/sysadmin token (client-side gate)", remedy: "use a developer account" },
+            { exit: 4, meaning: "Missing --reason / type has no personSettingTypeId mapping", remedy: "pass --reason; check ib legal types" },
+            apiErr(404, "No active document of this type", "ib legal versions <typeName>"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        seeAlso: ["ib legal status", "ib legal show"],
+        examples: ['ib legal accept --type BETONIJERRY_TOS --reason "acceptance flow e2e test"'],
     },
     // ─── schedule (3) ────────────────────────────────────────────────────────
     {
@@ -3096,7 +3275,7 @@ export const COMMAND_SPECS = [
         };
         const writeFlags = [
             { name: "confirm", type: "boolean", description: "Execute the operation (default is dry-run preview)" },
-            { name: "force-prod", type: "boolean", description: "Allow execution against a deployed (shared-cache) endpoint" },
+            { name: "force-prod", type: "boolean", description: "Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec." },
             { name: "reason", type: "string", description: "Audit reason (X-Action-Reason)" },
         ];
         return [

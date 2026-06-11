@@ -21,4 +21,12 @@ describe("decodeJwtPayload globalRoles", () => {
     expect(claims.isDeveloper).toBe(false);
     expect(claims.isSystemAdmin).toBe(false);
   });
+
+  test("extracts isSystemAdmin independently of isDeveloper", () => {
+    const claims = decodeJwtPayload(
+      fakeJwt({ personId: 5, ownerAsiakasId: 10, globalRoles: { isSystemAdmin: true } })
+    );
+    expect(claims.isSystemAdmin).toBe(true);
+    expect(claims.isDeveloper).toBe(false);
+  });
 });

@@ -5,6 +5,9 @@ import { CACHE_ENTITIES } from "./entities.js";
 // - preview (no --confirm): dry-run → X-Dry-Run header + { read: true } so it is
 //   allowed under --read-only and skips the endpoint guard.
 // - execute (--confirm): real write → enforce the shared-cache endpoint guard.
+// - --force-prod additionally travels as X-Force-Prod: 1 — a deployed backend
+//   refuses destructive ops without it (server-side guard; closes the
+//   /api/cli/exec + MCP loopback bypass of the client-side endpoint check).
 function writeRequestOptions(client, opts) {
     const dryRun = !opts.confirm;
     if (!dryRun)
@@ -12,6 +15,8 @@ function writeRequestOptions(client, opts) {
     const headers = {};
     if (dryRun)
         headers["X-Dry-Run"] = "1";
+    if (!dryRun && opts.forceProd)
+        headers["X-Force-Prod"] = "1";
     if (opts.reason)
         headers["X-Action-Reason"] = opts.reason;
     return { dryRun, fetchOpts: dryRun ? { headers, read: true } : { headers } };

@@ -100,6 +100,10 @@ export const GLOSSARY = [
         term: "validate",
         definition: "Company-setup validation profiles: jerry (BetoniJerry provider readiness) and betoni (betoni.online customer setup) — per-company pass/fail checklists with Finnish details.",
     },
+    {
+        term: "legal",
+        definition: "Versioned legal documents (TOS, EULA, privacy) in dbo.legalDocuments; per-person acceptances tracked via personSettings (`ib legal …`).",
+    },
 ];
 /**
  * Guidance for an AI consuming this CLI on WHEN to file feedback. Surfaced in
