@@ -575,7 +575,8 @@ export function registerSijaintiCommands(parent, getClient) {
         "keys on the delivery radius maxDeliveryDistance (KM) — NOT geofenceRadius " +
         "(metres, a GPS depot detector) — so --on also sets that radius: --radius " +
         "<km>, or a 50 km default when the varikko has none (otherwise it would be " +
-        "enrolled but cover nothing). Also requires the company's isPumppuToimittaja flag.")
+        "enrolled but cover nothing). Also requires the company's isPumppuToimittaja " +
+        "flag AND HAS_JERRY setting (ib jerry admin enable).")
         .option("--on", "Enrol: jerryActiveUntil = sentinel + ensure a delivery radius")
         .option("--off", "Unenrol: jerryActiveUntil = null")
         .option("--radius <km>", "Delivery radius in km (maxDeliveryDistance) to set when enrolling", Number);

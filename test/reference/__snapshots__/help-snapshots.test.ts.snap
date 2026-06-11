@@ -2476,6 +2476,9 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 429)  Rate limit (10/min/IP) → wait and retry
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - A varikko counts toward providerCount only when ALL THREE hold: the company has isPumppuToimittaja = 1, the company has the HAS_JERRY setting on (ib jerry admin enable), and the sijainti is enrolled (jerryActiveUntil in the future, ib sijainti set-jerry --on) with maxDeliveryDistance covering the point.
+
 EXAMPLES
   ib jerry check-address --address 'Mannerheimintie 1, Helsinki'
   ib jerry check-address --address 'Hämeenkatu 1, Tampere' --lat 61.498 --lng 23.761 --place-id ChIJxxxx
@@ -4539,7 +4542,7 @@ NOTES
   - --on writes the permanent sentinel; --off clears it to null.
   - IMPORTANT: BetoniJerry coverage keys on the delivery radius maxDeliveryDistance (KM) — NOT geofenceRadius (metres, a GPS depot detector) — so --on ALSO sets that radius: --radius <km>, or a 50 km default when the varikko has none (otherwise it would be enrolled but cover nothing).
   - Replicates the EditSijainti toggle: reads the row, overrides the fields, and writes back (lat/lng etc. preserved).
-  - Matching also requires the company's isPumppuToimittaja flag.
+  - Matching also requires the company-level gates: isPumppuToimittaja AND the HAS_JERRY setting (asiakasSettingTypeId 35) — toggle both with \`ib jerry admin enable\`. Varikko enrolment alone does not make the company matchable.
 
 EXAMPLES
   ib sijainti set-jerry 42 --on --radius 60 --reason 'pilot varikko, 60 km radius'

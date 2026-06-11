@@ -2005,7 +2005,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "--on writes the permanent sentinel; --off clears it to null.",
       "IMPORTANT: BetoniJerry coverage keys on the delivery radius maxDeliveryDistance (KM) — NOT geofenceRadius (metres, a GPS depot detector) — so --on ALSO sets that radius: --radius <km>, or a 50 km default when the varikko has none (otherwise it would be enrolled but cover nothing).",
       "Replicates the EditSijainti toggle: reads the row, overrides the fields, and writes back (lat/lng etc. preserved).",
-      "Matching also requires the company's isPumppuToimittaja flag.",
+      "Matching also requires the company-level gates: isPumppuToimittaja AND the HAS_JERRY setting (asiakasSettingTypeId 35) — toggle both with `ib jerry admin enable`. Varikko enrolment alone does not make the company matchable.",
     ],
     examples: [
       "ib sijainti set-jerry 42 --on --radius 60 --reason 'pilot varikko, 60 km radius'",
@@ -2692,6 +2692,9 @@ export const COMMAND_SPECS: CommandSpec[] = [
       apiErr(400, "osoite missing", "pass --address"),
       apiErr(429, "Rate limit (10/min/IP)", "wait and retry"),
       apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    notes: [
+      "A varikko counts toward providerCount only when ALL THREE hold: the company has isPumppuToimittaja = 1, the company has the HAS_JERRY setting on (ib jerry admin enable), and the sijainti is enrolled (jerryActiveUntil in the future, ib sijainti set-jerry --on) with maxDeliveryDistance covering the point.",
     ],
     examples: [
       "ib jerry check-address --address 'Mannerheimintie 1, Helsinki'",
