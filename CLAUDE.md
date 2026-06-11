@@ -59,7 +59,7 @@ Some commands accept their target id either as a positional OR a flag alias (`<a
 
 ### List envelope
 
-Anything list-shaped returns `ListEnvelope<T> = { items, nextCursor, count }` (`src/api/envelopes.ts`). The pretty renderer auto-detects it. Project backend responses into this shape inside the `run*` function rather than passing raw backend shapes through.
+Anything list-shaped returns `ListEnvelope<T> = { items, nextCursor, count, truncated? }` (`src/api/envelopes.ts`). The pretty renderer auto-detects it. Project backend responses into this shape inside the `run*` function rather than passing raw backend shapes through. `truncated: true` signals the result was capped at the row limit — required on any list with a cap and no real cursor (the backend CLI list routes emit it as an always-present boolean; client-side slicing in a `run*` fn must set it too, see `runSijaintiListJoined` / `changes`' `envelope()`).
 
 ### Write-safety flags (`src/api/writeFlags.ts`)
 

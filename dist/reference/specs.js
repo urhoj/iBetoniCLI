@@ -35,6 +35,8 @@ const ATTACHMENT_ENTITY_FLAGS = [
 const ATTACHMENT_ROW = "{ attachmentId, origFileName, fileName, fileType, fileSize, fileComment, attachTime, liitaLaskuun, attachmentGroupId, attachmentGroupName, attachmentTypeId, attachmentTypeName, keikkaId?, vehicleId?, personId?, asiakasId?, tyomaaId?, sijaintiId?, tuoteId?, bugReportId?, pumppuRequestId?, pumppuOfferId?, entryByPersonId, ownerAsiakasId, imageWidth, imageHeight }";
 const ENTITY_FLAG_NOTE = "Exactly ONE entity flag selects the target (--keikka | --vehicle | --person | --customer | --worksite | --sijainti | --tuote | --bug-report | --request | --offer).";
 const DEPLOY_NOTE = "Deploy-gated (404 until the backend ships /api/cli/attachment/*).";
+/** Appended to capped-list outputShapes — single-sources the wording + backend date. */
+const TRUNCATED_NOTE = " (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)";
 export const COMMAND_SPECS = [
     // ─── attachment (12) ─────────────────────────────────────────────────────
     {
@@ -916,7 +918,7 @@ export const COMMAND_SPECS = [
             },
             { name: "cursor", type: "string", description: "Pagination cursor" },
         ],
-        outputShape: "ListEnvelope<{ tyomaaId, name, address, asiakasId, city }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)",
+        outputShape: "ListEnvelope<{ tyomaaId, name, address, asiakasId, city }>" + TRUNCATED_NOTE,
         errors: permErrors("auth.page.tyomaa.read"),
         examples: ["ib worksite list", "ib worksite list --customer 1349"],
     },
@@ -1099,7 +1101,7 @@ export const COMMAND_SPECS = [
                 description: "Max rows (capped at 500)",
             },
         ],
-        outputShape: "ListEnvelope<{ personId, name, email, roles:number[] }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)",
+        outputShape: "ListEnvelope<{ personId, name, email, roles:number[] }>" + TRUNCATED_NOTE,
         errors: [
             apiErr(400, "Unknown role", "use a role from @ibetoni/constants ROLE_TYPEID_BY_NAME"),
             ...permErrors("auth.page.person.read"),
@@ -1368,7 +1370,7 @@ export const COMMAND_SPECS = [
                 description: "Pagination cursor (from a previous page's nextCursor)",
             },
         ],
-        outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)",
+        outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>" + TRUNCATED_NOTE,
         errors: permErrors("auth.page.vehicle.read"),
         examples: [
             "ib vehicle list",
@@ -1448,7 +1450,7 @@ export const COMMAND_SPECS = [
         flags: [
             { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
         ],
-        outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)",
+        outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>" + TRUNCATED_NOTE,
         errors: permErrors("auth.page.vehicle.read"),
         examples: ["ib vehicle search ABC", "ib vehicle search kuorma --limit 20", "ib vehicle search 82"],
     },

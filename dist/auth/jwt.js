@@ -26,6 +26,7 @@ export function decodeJwtPayload(jwt) {
     catch {
         // Codec unavailable (e.g., during unit tests that mock JWTs). Use raw shape.
     }
+    const globalRoles = (expanded.globalRoles ?? {});
     return {
         personId: Number(expanded.personId ?? expanded.sub),
         ownerAsiakasId: Number(expanded.ownerAsiakasId ?? expanded.o),
@@ -33,6 +34,8 @@ export function decodeJwtPayload(jwt) {
         email: expanded.email,
         issuedFor: expanded.issuedFor,
         exp: typeof expanded.exp === "number" ? expanded.exp : undefined,
+        isSystemAdmin: globalRoles.isSystemAdmin === true,
+        isDeveloper: globalRoles.isDeveloper === true,
     };
 }
 //# sourceMappingURL=jwt.js.map
