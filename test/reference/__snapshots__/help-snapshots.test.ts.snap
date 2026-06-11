@@ -1516,7 +1516,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib customer operator 1349
-  ib customer operator 1349 --set --reason 'onboard operator'
+  ib customer operator --asiakas 1349 --set --reason 'onboard operator'
   ib customer operator 1349 --reset --reason 'offboard operator'
 "
 `;
@@ -2310,6 +2310,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib jerry admin detail 1402
+  ib jerry admin detail --asiakas 1402
 "
 `;
 
@@ -2348,6 +2349,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib jerry admin disable 1402 --reason "offboard provider"
+  ib jerry admin disable --asiakas 1402 --dry-run
 "
 `;
 

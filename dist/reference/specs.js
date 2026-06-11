@@ -811,7 +811,7 @@ export const COMMAND_SPECS = [
         ],
         examples: [
             "ib customer operator 1349",
-            "ib customer operator 1349 --set --reason 'onboard operator'",
+            "ib customer operator --asiakas 1349 --set --reason 'onboard operator'",
             "ib customer operator 1349 --reset --reason 'offboard operator'",
         ],
     },
@@ -2582,7 +2582,7 @@ export const COMMAND_SPECS = [
             apiErr(403, "Not a system admin", "use a system-admin token"),
             ...COMMON_AUTH_ERRORS,
         ],
-        examples: ["ib jerry admin detail 1402"],
+        examples: ["ib jerry admin detail 1402", "ib jerry admin detail --asiakas 1402"],
     },
     {
         command: "ib jerry admin enable",
@@ -2620,7 +2620,7 @@ export const COMMAND_SPECS = [
             apiErr(404, "Company not found", "verify asiakasId"),
             ...COMMON_AUTH_ERRORS,
         ],
-        examples: ['ib jerry admin disable 1402 --reason "offboard provider"'],
+        examples: ['ib jerry admin disable 1402 --reason "offboard provider"', "ib jerry admin disable --asiakas 1402 --dry-run"],
     },
     // ─── schema (7) — developer-only SQL introspection ─────────────────────────
     ...(() => {

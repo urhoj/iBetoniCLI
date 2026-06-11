@@ -105,6 +105,14 @@ describe("resolveAsiakasTarget", () => {
     expect(exitCodeOf(() => resolveAsiakasTarget(undefined, undefined))).toBe(4);
     expect(exitCodeOf(() => resolveAsiakasTarget("abc", undefined))).toBe(4);
     expect(exitCodeOf(() => resolveAsiakasTarget("0", undefined))).toBe(4);
+    expect(exitCodeOf(() => resolveAsiakasTarget("26.5", undefined))).toBe(4);
+  });
+
+  test("rejects an invalid flag even when the positional is valid — invalid message, not a NaN 'differ'", () => {
+    // --asiakas abc → Commander Number coercion produces NaN
+    expect(() => resolveAsiakasTarget("26", Number("abc"))).toThrow(/missing or invalid/);
+    expect(exitCodeOf(() => resolveAsiakasTarget("26", Number("abc")))).toBe(4);
+    expect(() => resolveAsiakasTarget("abc", 26)).toThrow(/missing or invalid/);
   });
 });
 

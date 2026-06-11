@@ -47,6 +47,10 @@ The `getClient: () => Promise<ApiClient>` factory is passed into every domain re
 
 Keep the network/transform logic in an exported pure `run*` function (e.g. `runCompanyList(client)`) that returns plain data, and keep the Commander `.action()` thin: call `getClient()`, call the `run*` fn, `writeJson(result)`, and `catch { writeError(e); process.exit(...) }`. Tests exercise the `run*` functions against a mock `ApiClient` — they do not spawn the CLI. Follow this split for every new command.
 
+### Dual-target ids (`src/targets.ts`)
+
+Some commands accept their target id either as a positional OR a flag alias (`<asiakasId>` / `--asiakas`, `<tyomaaId>` / `--worksite`) — the dual-target pattern (feedback #28). Implement it by declaring the positional optional (`[asiakasId]`), adding `.option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number)`, and resolving in the action via `resolveTarget(idStr, opts.asiakas, "asiakasId", "asiakas")` — or the `resolveAsiakasTarget` wrapper from `commands/customer` for the asiakas case. Exactly one is required; both are allowed only when they agree; any provided value that is not a positive integer exits 4. Used by customer modules/operator/settings/person-list, jerry admin detail/enable/disable, and worksite person list. (`sijainti closest` is the one flag-vs-flag pair — `--worksite`/`--tyomaa` — validated inline.) Primary-key commands (`get <id>`, `update <id>`, `delete <id>`, …) stay positional-only by design — do not add target flags to them. The global `--company` flag is the acting-as context and is distinct from local `--asiakas` target flags.
+
 ### API client (`src/api/client.ts`)
 
 `createApiClient` returns `{ get, post, put, delete, getCurrentToken }`. It sets `Authorization: Bearer`, `User-Agent` (`ib-cli/<version>`), and `X-Request-ID`. Non-2xx responses throw a `CliError` carrying `statusCode`, parsed `body`, and the mapped `exitCode`.
