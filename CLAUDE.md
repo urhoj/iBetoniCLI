@@ -125,6 +125,12 @@ The backend speaks Finnish; the CLI mostly preserves it: `keikka` (delivery orde
 - Mock the `ApiClient` with `vi.fn()` for `get/post/put/delete/getCurrentToken`; assert on the exact path/body and the projected return shape (see `test/commands/company.test.ts`).
 - After changing help/spec rendering, refresh snapshots: `npx vitest run -u`.
 
+### Local backend e2e
+
+Running `ib` against a local backend works (verified 2026-06-11): start it (`npm run dev:backend` from the workspace root; port = `SERVER_PORT` in `puminet5api/.env`, currently 8080), set `IB_TOKEN` to a JWT minted with the backend's `createToken` (`puminet5api/authz/verifyToken`; canonical claims: `ownerAsiakasId`, `tenantAsiakasId`, `globalRoles`, `asiakasesWithTypes`), and pass `--endpoint http://127.0.0.1:<port>`. `auth login --endpoint <local>` also works — the root global `--endpoint` is read by login (the historical shadowing bug that silently authorized against prod is fixed).
+
+If verification fails with `invalid signature`: `puminet5api/app.js` loads `.env.development` first and `.env` as fallback fill — historically a STALE `JWT_KEY` copy in `.env.development` shadowed the real key and made the dev server reject every token (the 2026-06 blocker). Diagnose with `node puminet5api/utils/test/jwt-key-fingerprint.js` (prints non-secret fingerprints of both env files + the effective runtime key) and check `.env` ↔ Key Vault drift with `npm run env:rebuild:report` (in `puminet5api/`, needs `az login`). Also note `puminet5api/test/utils/generate-test-token.js` is stale (`/api/auth/authenticate` no longer exists) — mint via `createToken` instead.
+
 ## CI
 
 `.github/workflows/ci.yml` runs lint + type-check + tests; `publish.yml` publishes the package. Run `npm run lint && npm run type-check && npm test` locally before pushing.
