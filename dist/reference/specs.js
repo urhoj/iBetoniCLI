@@ -886,7 +886,7 @@ export const COMMAND_SPECS = [
             },
             { name: "cursor", type: "string", description: "Pagination cursor" },
         ],
-        outputShape: "ListEnvelope<{ tyomaaId, name, address, asiakasId, city }>",
+        outputShape: "ListEnvelope<{ tyomaaId, name, address, asiakasId, city }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)",
         errors: permErrors("auth.page.tyomaa.read"),
         examples: ["ib worksite list", "ib worksite list --customer 1349"],
     },
@@ -1069,7 +1069,7 @@ export const COMMAND_SPECS = [
                 description: "Max rows (capped at 500)",
             },
         ],
-        outputShape: "ListEnvelope<{ personId, name, email, roles:number[] }>",
+        outputShape: "ListEnvelope<{ personId, name, email, roles:number[] }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)",
         errors: [
             apiErr(400, "Unknown role", "use a role from @ibetoni/constants ROLE_TYPEID_BY_NAME"),
             ...permErrors("auth.page.person.read"),
@@ -1116,7 +1116,7 @@ export const COMMAND_SPECS = [
             },
         ],
         outputShape: "ListEnvelope<{ personId, name, email, phone, asiakasId }>. " +
-            "With --my-companies each row also carries asiakasName.",
+            "With --my-companies each row also carries asiakasName, and the envelope gains truncated:true when the result hit the limit (backend ≥ 2026-06-11).",
         errors: permErrors("auth.page.person.read"),
         examples: [
             "ib person search 'Matti'",
@@ -1338,7 +1338,7 @@ export const COMMAND_SPECS = [
                 description: "Pagination cursor (from a previous page's nextCursor)",
             },
         ],
-        outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>",
+        outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)",
         errors: permErrors("auth.page.vehicle.read"),
         examples: [
             "ib vehicle list",
@@ -1418,7 +1418,7 @@ export const COMMAND_SPECS = [
         flags: [
             { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
         ],
-        outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>",
+        outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)",
         errors: permErrors("auth.page.vehicle.read"),
         examples: ["ib vehicle search ABC", "ib vehicle search kuorma --limit 20", "ib vehicle search 82"],
     },
