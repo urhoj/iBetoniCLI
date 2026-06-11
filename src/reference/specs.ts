@@ -1976,11 +1976,12 @@ export const COMMAND_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.sijainnit.read"),
     ],
     notes: [
+      "Synonyms: plant = factory = tehdas = (betoni)asema — Finnish users say tehdas or asema for the same thing, so 'Mitkä autot kävi Kivikon asemalla?' means the Kivikko betoniasema (resolve it here, then `ib vehicle visits sijainti <id>`).",
       "Needs a backend deployed ≥ 2026-06-11 (scope=all + the ownerAsiakasId field); on an older backend the result silently falls back to the own+shared scope and --asiakas matches nothing.",
       "The plant type is resolved by NAME (betoniasema) through the sijaintiTypes lookup, not a hardcoded id.",
       "`truncated:true` flags a capped result — same semantics as `sijainti list`.",
     ],
-    seeAlso: ["ib sijainti list", "ib sijainti types", "ib search"],
+    seeAlso: ["ib sijainti list", "ib sijainti types", "ib search", "ib vehicle visits"],
     examples: [
       "ib sijainti plants",
       "ib sijainti plants --asiakas 30",

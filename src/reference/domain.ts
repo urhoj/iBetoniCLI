@@ -57,6 +57,11 @@ export const GLOSSARY: GlossaryEntry[] = [
       "A geocoded location — depot, plant, or customer destination (`ib sijainti …`).",
   },
   {
+    term: "betoniasema / tehdas / plant",
+    definition:
+      "A concrete batching plant — sijainti type Betoniasema. These are all the SAME thing: plant = factory = tehdas = (betoni)asema; users say tehdas or asema interchangeably, so 'Kivikon asemalla' / 'Kivikon tehtaalla' = at the Kivikko betoniasema. Plants belong to SUPPLIER companies (Rudus, Lujabetoni, …), not your tenant — list them with `ib sijainti plants` (alias: tehtaat) or resolve one by name with `ib sijainti plants --search <name>`.",
+  },
+  {
     term: "vehicle",
     definition: "A pump or mixer truck (`ib vehicle …`).",
   },
