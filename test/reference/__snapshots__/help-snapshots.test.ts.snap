@@ -3242,6 +3242,99 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib legal type create matches snapshot 1`] = `
+"USAGE
+  ib legal type create [flags]
+
+DESCRIPTION
+  Create a new legal document TYPE (developer/sysadmin only). Types are the catalogue rows behind ib legal types; document versions attach to a type via ib legal save. --setting-type-id wires acceptance tracking — the id must exist in personSettingTypes and not be mapped to another type. --reason required unless --dry-run.
+  Permissions: requires isSystemAdmin or isDeveloper (server-enforced).
+
+FLAGS
+  --name STRING    Type name, UPPER_SNAKE, max 50 (e.g. TOS_EN); immutable after creation (required)
+  --display-name STRING    Human-readable name (max 100) (required)
+  --description STRING    Short description (max 200)
+  --sort-order NUMBER    List position (default 0)
+  --setting-type-id NUMBER    personSettingTypeId for acceptance tracking (must exist and be unmapped)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  the created legalDocumentTypes row | dry-run: {dryRun: true, wouldCreateType: {...}, validation}
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Missing --reason / invalid or duplicate typeName / settingTypeId unknown or already mapped → check ib legal types; pass --reason unless --dry-run
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - typeName is immutable after creation — choose carefully.
+  - Deploy-gated: 404 until the backend ships POST /api/legal-documents/types.
+
+SEE ALSO
+  ib legal type update, ib legal types, ib legal save
+
+EXAMPLES
+  ib legal type create --name TOS_EN --display-name "Terms of Service" --reason "publish EN docs"
+  ib legal type create --name SLA_FI --display-name Palvelutasosopimus --setting-type-id 45 --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib legal type update matches snapshot 1`] = `
+"USAGE
+  ib legal type update <typeName> [flags]
+
+DESCRIPTION
+  Update a legal document TYPE's editable fields: displayName, description, sortOrder, personSettingTypeId (developer/sysadmin only). typeName itself is immutable; fields you do not pass are untouched. At least one field flag required. --reason required unless --dry-run.
+  Permissions: requires isSystemAdmin or isDeveloper (server-enforced).
+
+ARGUMENTS
+  <typeName> STRING    Document type name (see ib legal types) (required)
+
+FLAGS
+  --display-name STRING    Human-readable name (max 100)
+  --description STRING    Short description (max 200)
+  --sort-order NUMBER    List position
+  --setting-type-id NUMBER    personSettingTypeId for acceptance tracking (must exist in personSettingTypes and not be mapped to another type)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  the updated legalDocumentTypes row | dry-run: {dryRun: true, wouldUpdateType: {typeName, fields}, validation}
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Missing --reason / no field flags / settingTypeId unknown or already mapped to another type → pass at least one field flag and --reason unless --dry-run
+  exit 5 (HTTP 404)  Unknown document type  → ib legal types
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Clearing a value to NULL is not supported.
+  - Deploy-gated: 404 until the backend ships PUT /api/legal-documents/types/:typeName.
+
+SEE ALSO
+  ib legal type create, ib legal types, ib legal acceptances
+
+EXAMPLES
+  ib legal type update GLOBAL --setting-type-id 44 --reason "fix NULL mapping (feedback #31)"
+  ib legal type update TOS_EN --display-name "Terms of Service v2" --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib legal types matches snapshot 1`] = `
 "USAGE
   ib legal types [flags]

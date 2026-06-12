@@ -12,6 +12,9 @@ import {
   runLegalAccept,
   resolveTypeNameTarget,
   assertDeveloperClaims,
+  runLegalTypeCreate,
+  runLegalTypeUpdate,
+  pickTypeFields,
 } from "../../src/commands/legal/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import type { DecodedClaims } from "../../src/auth/jwt.js";
@@ -227,5 +230,49 @@ describe("assertDeveloperClaims", () => {
   });
   test("sysadmin passes", () => {
     expect(() => assertDeveloperClaims({ ...CLAIMS, isSystemAdmin: true })).not.toThrow();
+  });
+});
+
+describe("ib legal type writes (feedback #31)", () => {
+  test("type create POSTs typeName + provided fields with write headers", async () => {
+    const c = mockClient();
+    const row = { documentTypeId: 8, typeName: "TOS_EN" };
+    (c.post as ReturnType<typeof vi.fn>).mockResolvedValue(row);
+    const out = await runLegalTypeCreate(
+      c,
+      "TOS_EN",
+      { displayName: "Terms of Service", personSettingTypeId: 45 },
+      { reason: "publish EN docs" }
+    );
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/legal-documents/types",
+      { typeName: "TOS_EN", displayName: "Terms of Service", personSettingTypeId: 45 },
+      { headers: { "X-Action-Reason": "publish EN docs" } }
+    );
+    expect(out).toEqual(row);
+  });
+
+  test("type update PUTs only provided fields with dry-run header", async () => {
+    const c = mockClient();
+    (c.put as ReturnType<typeof vi.fn>).mockResolvedValue({ documentTypeId: 5, personSettingTypeId: 44 });
+    await runLegalTypeUpdate(c, "GLOBAL", { personSettingTypeId: 44 }, { dryRun: true });
+    expect(c.put).toHaveBeenCalledWith(
+      "/api/legal-documents/types/GLOBAL",
+      { personSettingTypeId: 44 },
+      { headers: { "X-Dry-Run": "1" } }
+    );
+  });
+
+  test("type update with no fields -> exit 4, no PUT", async () => {
+    const c = mockClient();
+    await expect(runLegalTypeUpdate(c, "GLOBAL", {}, {})).rejects.toMatchObject({ exitCode: 4 });
+    expect(c.put).not.toHaveBeenCalled();
+  });
+
+  test("pickTypeFields maps settingTypeId -> personSettingTypeId, drops undefined", () => {
+    expect(pickTypeFields({ settingTypeId: 44, displayName: undefined })).toEqual({
+      personSettingTypeId: 44,
+    });
+    expect(pickTypeFields({})).toEqual({});
   });
 });

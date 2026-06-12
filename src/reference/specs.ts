@@ -2445,6 +2445,65 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "ib legal accept TOS --dry-run",
     ],
   },
+  {
+    command: "ib legal type create",
+    description:
+      "Create a new legal document TYPE (developer/sysadmin only). Types are the catalogue rows behind ib legal types; document versions attach to a type via ib legal save. --setting-type-id wires acceptance tracking — the id must exist in personSettingTypes and not be mapped to another type. --reason required unless --dry-run.",
+    permissions: ["isSystemAdmin or isDeveloper (server-enforced)"],
+    flags: [
+      { name: "name", type: "string", required: true, description: "Type name, UPPER_SNAKE, max 50 (e.g. TOS_EN); immutable after creation" },
+      { name: "display-name", type: "string", required: true, description: "Human-readable name (max 100)" },
+      { name: "description", type: "string", description: "Short description (max 200)" },
+      { name: "sort-order", type: "number", description: "List position (default 0)" },
+      { name: "setting-type-id", type: "number", description: "personSettingTypeId for acceptance tracking (must exist and be unmapped)" },
+    ],
+    writeFlags: true,
+    mutates: true,
+    outputShape: "the created legalDocumentTypes row | dry-run: {dryRun: true, wouldCreateType: {...}, validation}",
+    errors: [
+      { exit: 4, meaning: "Missing --reason / invalid or duplicate typeName / settingTypeId unknown or already mapped", remedy: "check ib legal types; pass --reason unless --dry-run" },
+      ...LEGAL_DEV_ERRORS,
+    ],
+    notes: [
+      "typeName is immutable after creation — choose carefully.",
+      "Deploy-gated: 404 until the backend ships POST /api/legal-documents/types.",
+    ],
+    seeAlso: ["ib legal type update", "ib legal types", "ib legal save"],
+    examples: [
+      'ib legal type create --name TOS_EN --display-name "Terms of Service" --reason "publish EN docs"',
+      "ib legal type create --name SLA_FI --display-name Palvelutasosopimus --setting-type-id 45 --dry-run",
+    ],
+  },
+  {
+    command: "ib legal type update",
+    description:
+      "Update a legal document TYPE's editable fields: displayName, description, sortOrder, personSettingTypeId (developer/sysadmin only). typeName itself is immutable; fields you do not pass are untouched. At least one field flag required. --reason required unless --dry-run.",
+    permissions: ["isSystemAdmin or isDeveloper (server-enforced)"],
+    args: [{ name: "typeName", type: "string", description: "Document type name (see ib legal types)" }],
+    flags: [
+      { name: "display-name", type: "string", description: "Human-readable name (max 100)" },
+      { name: "description", type: "string", description: "Short description (max 200)" },
+      { name: "sort-order", type: "number", description: "List position" },
+      { name: "setting-type-id", type: "number", description: "personSettingTypeId for acceptance tracking (must exist in personSettingTypes and not be mapped to another type)" },
+    ],
+    writeFlags: true,
+    mutates: true,
+    outputShape: "the updated legalDocumentTypes row | dry-run: {dryRun: true, wouldUpdateType: {typeName, fields}, validation}",
+    errors: [
+      { exit: 4, meaning: "Missing --reason / no field flags / settingTypeId unknown or already mapped to another type", remedy: "pass at least one field flag and --reason unless --dry-run" },
+      apiErr(404, "Unknown document type", "ib legal types"),
+      ...LEGAL_DEV_ERRORS,
+    ],
+    notes: [
+      "Clearing a value to NULL is not supported.",
+      "Deploy-gated: 404 until the backend ships PUT /api/legal-documents/types/:typeName.",
+    ],
+    seeAlso: ["ib legal type create", "ib legal types", "ib legal acceptances"],
+    examples: [
+      'ib legal type update GLOBAL --setting-type-id 44 --reason "fix NULL mapping (feedback #31)"',
+      'ib legal type update TOS_EN --display-name "Terms of Service v2" --dry-run',
+    ],
+  },
 
   // ─── schedule (3) ────────────────────────────────────────────────────────
   {
