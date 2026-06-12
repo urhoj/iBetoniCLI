@@ -87,11 +87,14 @@ describe("ib feedback create", () => {
     expect(post.mock.calls[0][1]).toMatchObject({ scope: "cli" });
   });
 
-  test("--scope jerry is sent through", async () => {
-    post.mockResolvedValueOnce({ feedbackId: 10 });
-    await runFeedbackCreate(mockClient, { description: "x", scope: "jerry" });
-    expect(post.mock.calls[0][1]).toMatchObject({ scope: "jerry" });
-  });
+  test.each(["cli", "app", "jerry", "bsg2", "workspace", "other"])(
+    "--scope %s is accepted and forwarded",
+    async (scope) => {
+      post.mockResolvedValueOnce({ feedbackId: 1 });
+      await runFeedbackCreate(mockClient, { description: "x", scope });
+      expect(post.mock.calls[0][1]).toMatchObject({ scope });
+    }
+  );
 
   test("unknown --scope exits 4 (strict, unlike --kind)", async () => {
     await expect(
