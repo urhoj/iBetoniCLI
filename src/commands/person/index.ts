@@ -13,6 +13,7 @@ import {
   errorMessage,
 } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
+import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { roleNameForTypeId, resolveRoleTypeId } from "../../roles.js";
 import { runCompanyList } from "../company/index.js";
 import { CliError } from "../../api/errors.js";
@@ -515,7 +516,10 @@ export function registerPersonCommands(
         // when neither --asiakas nor --body supplied one — but NOT for --global,
         // whose null owner is intentional.
         if (!opts.global && (body.ownerAsiakasId === undefined || body.ownerAsiakasId === null)) {
-          body.ownerAsiakasId = await resolveOwnerAsiakasId(client);
+          body.ownerAsiakasId = await resolveActiveOwnerAsiakasId(
+            client,
+            "run `ib auth switch` or pass --asiakas / ownerAsiakasId in --body"
+          );
         }
         let res: unknown;
         try {
@@ -755,23 +759,6 @@ export function registerPersonCommands(
     });
 }
 
-/**
- * Resolve the caller's active ownerAsiakasId via the existing
- * /api/company-selection/available route (same pattern as customer/sijainti
- * create). Throws a clear error if no active company resolves.
- */
-async function resolveOwnerAsiakasId(client: ApiClient): Promise<number> {
-  const available = await client.get<{ currentCompanyId?: number }>(
-    "/api/company-selection/available"
-  );
-  if (typeof available.currentCompanyId !== "number" || available.currentCompanyId <= 0) {
-    throw new Error(
-      "could not resolve active company — run `ib auth switch` or pass --asiakas / ownerAsiakasId in --body"
-    );
-  }
-  return available.currentCompanyId;
-}
-
 interface RawPersonChangeRow {
   changeId: number;
   fieldName?: string | null;
@@ -812,7 +799,7 @@ export async function runPersonHistory(
   limit: number,
   opts: { owner?: number; field?: string } = {}
 ): Promise<ListEnvelope<PersonHistoryItem>> {
-  const owner = opts.owner ?? (await resolveOwnerAsiakasId(client));
+  const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
   const rows = await client.get<RawPersonChangeRow[]>(
     `/api/changes/person/${personId}/${owner}?limit=${limit}`
   );

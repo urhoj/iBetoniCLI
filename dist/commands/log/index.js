@@ -1,5 +1,6 @@
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
+import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { CHANGE_ENTITY_TYPES, findEntityType, isKnownEntityType, runLogTypes, } from "./entityTypes.js";
 function projectRow(r) {
     const item = {
@@ -26,14 +27,6 @@ function projectRow(r) {
     if (r.palkkiVehicleRegNo != null)
         item.palkkiVehicleRegNo = r.palkkiVehicleRegNo;
     return item;
-}
-/** Same owner-resolution contract as `ib person log`. */
-async function resolveOwnerAsiakasId(client) {
-    const available = await client.get("/api/company-selection/available");
-    if (typeof available.currentCompanyId !== "number" || available.currentCompanyId <= 0) {
-        throw new Error("could not resolve active company — run `ib auth switch`, or pass --owner");
-    }
-    return available.currentCompanyId;
 }
 function assertKnownEntityType(entityType) {
     if (!isKnownEntityType(entityType)) {
@@ -63,7 +56,7 @@ function envelope(items, truncated = false) {
 /** GET /api/changes/:entityType/:entityId/:owner — generic entity history. */
 export async function runLogEntity(client, entityType, entityId, limit, opts = {}) {
     assertKnownEntityType(entityType);
-    const owner = opts.owner ?? (await resolveOwnerAsiakasId(client));
+    const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
     const rows = await client.get(`/api/changes/${entityType}/${entityId}/${owner}?limit=${limit}`);
     let list = Array.isArray(rows) ? rows : [];
     if (opts.field)
@@ -74,7 +67,7 @@ export async function runLogEntity(client, entityType, entityId, limit, opts = {
 export async function runLogLatest(client, limit, opts = {}) {
     if (opts.entityType)
         assertKnownEntityType(opts.entityType);
-    const owner = opts.owner ?? (await resolveOwnerAsiakasId(client));
+    const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
     const qs = new URLSearchParams({ limit: String(limit) });
     if (opts.entityType)
         qs.set("entityType", opts.entityType);
@@ -87,7 +80,7 @@ export async function runLogRange(client, opts) {
     assertIsoDate(opts.to, "--to");
     if (opts.entityType)
         assertKnownEntityType(opts.entityType);
-    const owner = opts.owner ?? (await resolveOwnerAsiakasId(client));
+    const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
     const qs = new URLSearchParams({ startDate: opts.from, endDate: opts.to });
     if (opts.entityType)
         qs.set("entityType", opts.entityType);
@@ -110,7 +103,7 @@ export async function runLogByEntityDate(client, opts) {
     }
     assertIsoDate(opts.from, "--from");
     assertIsoDate(opts.to, "--to");
-    const owner = opts.owner ?? (await resolveOwnerAsiakasId(client));
+    const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
     const qs = new URLSearchParams({
         startDate: opts.from,
         endDate: opts.to,
@@ -127,7 +120,7 @@ export async function runLogByEntityDate(client, opts) {
  * (GET /api/changes/user/:personId/:owner — self or admin).
  */
 export async function runLogUser(client, personId, limit, opts = {}) {
-    const owner = opts.owner ?? (await resolveOwnerAsiakasId(client));
+    const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
     const path = personId == null
         ? `/api/changes/user/recent/${owner}?limit=${limit}`
         : `/api/changes/user/${personId}/${owner}?limit=${limit}`;

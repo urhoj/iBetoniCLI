@@ -2,6 +2,7 @@ import { unwrapRows } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith, errorMessage, } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
+import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { roleNameForTypeId, resolveRoleTypeId } from "../../roles.js";
 import { runCompanyList } from "../company/index.js";
 import { CliError } from "../../api/errors.js";
@@ -353,7 +354,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
             // when neither --asiakas nor --body supplied one — but NOT for --global,
             // whose null owner is intentional.
             if (!opts.global && (body.ownerAsiakasId === undefined || body.ownerAsiakasId === null)) {
-                body.ownerAsiakasId = await resolveOwnerAsiakasId(client);
+                body.ownerAsiakasId = await resolveActiveOwnerAsiakasId(client, "run `ib auth switch` or pass --asiakas / ownerAsiakasId in --body");
             }
             let res;
             try {
@@ -579,18 +580,6 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     });
 }
 /**
- * Resolve the caller's active ownerAsiakasId via the existing
- * /api/company-selection/available route (same pattern as customer/sijainti
- * create). Throws a clear error if no active company resolves.
- */
-async function resolveOwnerAsiakasId(client) {
-    const available = await client.get("/api/company-selection/available");
-    if (typeof available.currentCompanyId !== "number" || available.currentCompanyId <= 0) {
-        throw new Error("could not resolve active company — run `ib auth switch` or pass --asiakas / ownerAsiakasId in --body");
-    }
-    return available.currentCompanyId;
-}
-/**
  * GET /api/changes/person/:personId/:ownerAsiakasId — the change-tracker audit
  * trail for one person (the same log every `--reason` write feeds). Includes
  * role grants/revokes (fieldName "asiakasPersonSetting"); pass `field` to filter
@@ -599,7 +588,7 @@ async function resolveOwnerAsiakasId(client) {
  * member or admin (BE-enforced). Mirrors runCustomerHistory.
  */
 export async function runPersonHistory(client, personId, limit, opts = {}) {
-    const owner = opts.owner ?? (await resolveOwnerAsiakasId(client));
+    const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
     const rows = await client.get(`/api/changes/person/${personId}/${owner}?limit=${limit}`);
     let list = Array.isArray(rows) ? rows : [];
     if (opts.field)

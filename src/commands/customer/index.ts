@@ -14,6 +14,7 @@ import {
   errorMessage,
 } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
+import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveRoleTypeId } from "../../roles.js";
 import { resolveTarget } from "../../targets.js";
 import { runPersonRoleList } from "../person/index.js";
@@ -1416,15 +1417,13 @@ export function registerCustomerCommands(
 }
 
 /**
- * Resolve the caller's current `ownerAsiakasId` via the existing
- * `/api/company-selection/available` route. Used by every customer command
- * that needs the active tenant id (create body, log path, delete URL).
+ * Resolve the caller's current `ownerAsiakasId`. Used by every customer
+ * command that needs the active tenant id (create body, log path, delete URL).
+ * Delegates to the shared guarded resolver — previously unguarded here, which
+ * could interpolate `undefined` into request URLs.
  */
 async function resolveCurrentOwnerAsiakasId(client: ApiClient): Promise<number> {
-  const available = await client.get<{ currentCompanyId: number }>(
-    "/api/company-selection/available"
-  );
-  return available.currentCompanyId;
+  return resolveActiveOwnerAsiakasId(client, "run `ib auth switch`");
 }
 
 // `@ibetoni/constants` is a CommonJS package — pulled in via createRequire so

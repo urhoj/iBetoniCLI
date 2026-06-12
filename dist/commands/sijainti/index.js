@@ -1,6 +1,7 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith, errorMessage, } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
+import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { CliError } from "../../api/errors.js";
 /**
@@ -339,21 +340,12 @@ export async function runSijaintiGeocode(client, address) {
     return client.post("/api/geocode/getLatLng", { osoite: address });
 }
 /**
- * Resolve the caller's active ownerAsiakasId via the existing
- * /api/company-selection/available route. Used by closest/distance, whose
- * legacy geocode routes still take asiakasId as a URL positional.
+ * Resolve the caller's active ownerAsiakasId. Used by closest/distance, whose
+ * legacy geocode routes still take asiakasId as a URL positional — the shared
+ * resolver's guard prevents `undefined` interpolating into those URLs.
  */
 async function resolveOwnerAsiakasId(client) {
-    const available = await client.get("/api/company-selection/available");
-    // Guard the falsy case: the backend derives currentCompanyId from the token's
-    // ownerAsiakasId and returns undefined when it is absent. Without this, the
-    // value would interpolate into the closest/distance URL as the string
-    // "undefined" (→ NaN server-side) and silently return zero results instead of
-    // a clear error.
-    if (typeof available.currentCompanyId !== "number" || available.currentCompanyId <= 0) {
-        throw new Error("could not resolve active company — run `ib auth switch` or pass --asiakas");
-    }
-    return available.currentCompanyId;
+    return resolveActiveOwnerAsiakasId(client, "run `ib auth switch` or pass --asiakas");
 }
 /** Backend "nothing found" sentinel distance from getClosestAsiakasSijaintiForTyomaa. */
 const NO_CLOSEST_SENTINEL = 999999999;

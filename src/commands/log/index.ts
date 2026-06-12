@@ -15,6 +15,7 @@ import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
+import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import {
   CHANGE_ENTITY_TYPES,
   findEntityType,
@@ -90,18 +91,6 @@ function projectRow(r: RawChangeRow): ChangeItem {
   return item;
 }
 
-/** Same owner-resolution contract as `ib person log`. */
-async function resolveOwnerAsiakasId(client: ApiClient): Promise<number> {
-  const available = await client.get<{ currentCompanyId?: number }>(
-    "/api/company-selection/available"
-  );
-  if (typeof available.currentCompanyId !== "number" || available.currentCompanyId <= 0) {
-    throw new Error(
-      "could not resolve active company — run `ib auth switch`, or pass --owner"
-    );
-  }
-  return available.currentCompanyId;
-}
 
 function assertKnownEntityType(entityType: string): void {
   if (!isKnownEntityType(entityType)) {
@@ -146,7 +135,7 @@ export async function runLogEntity(
   opts: { owner?: number; field?: string } = {}
 ): Promise<ListEnvelope<ChangeItem>> {
   assertKnownEntityType(entityType);
-  const owner = opts.owner ?? (await resolveOwnerAsiakasId(client));
+  const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
   const rows = await client.get<RawChangeRow[]>(
     `/api/changes/${entityType}/${entityId}/${owner}?limit=${limit}`
   );
@@ -162,7 +151,7 @@ export async function runLogLatest(
   opts: { entityType?: string; owner?: number } = {}
 ): Promise<ListEnvelope<ChangeItem>> {
   if (opts.entityType) assertKnownEntityType(opts.entityType);
-  const owner = opts.owner ?? (await resolveOwnerAsiakasId(client));
+  const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
   const qs = new URLSearchParams({ limit: String(limit) });
   if (opts.entityType) qs.set("entityType", opts.entityType);
   const rows = await client.get<RawChangeRow[]>(`/api/changes/latest/${owner}?${qs}`);
@@ -184,7 +173,7 @@ export async function runLogRange(
   assertIsoDate(opts.from, "--from");
   assertIsoDate(opts.to, "--to");
   if (opts.entityType) assertKnownEntityType(opts.entityType);
-  const owner = opts.owner ?? (await resolveOwnerAsiakasId(client));
+  const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
   const qs = new URLSearchParams({ startDate: opts.from, endDate: opts.to });
   if (opts.entityType) qs.set("entityType", opts.entityType);
   if (opts.person != null) qs.set("personId", String(opts.person));
@@ -212,7 +201,7 @@ export async function runLogByEntityDate(
   }
   assertIsoDate(opts.from, "--from");
   assertIsoDate(opts.to, "--to");
-  const owner = opts.owner ?? (await resolveOwnerAsiakasId(client));
+  const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
   const qs = new URLSearchParams({
     startDate: opts.from,
     endDate: opts.to,
@@ -235,7 +224,7 @@ export async function runLogUser(
   limit: number,
   opts: { owner?: number } = {}
 ): Promise<ListEnvelope<ChangeItem>> {
-  const owner = opts.owner ?? (await resolveOwnerAsiakasId(client));
+  const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
   const path =
     personId == null
       ? `/api/changes/user/recent/${owner}?limit=${limit}`
