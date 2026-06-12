@@ -203,6 +203,62 @@ export async function runLegalAcceptances(
   };
 }
 
+export interface LegalTypeFields {
+  displayName?: string;
+  description?: string;
+  sortOrder?: number;
+  personSettingTypeId?: number;
+}
+
+/** Map CLI flags → API body fields; only flags the user actually passed. */
+export function pickTypeFields(opts: {
+  displayName?: string;
+  description?: string;
+  sortOrder?: number;
+  settingTypeId?: number;
+}): LegalTypeFields {
+  const fields: LegalTypeFields = {};
+  if (opts.displayName !== undefined) fields.displayName = opts.displayName;
+  if (opts.description !== undefined) fields.description = opts.description;
+  if (opts.sortOrder !== undefined) fields.sortOrder = opts.sortOrder;
+  if (opts.settingTypeId !== undefined) fields.personSettingTypeId = opts.settingTypeId;
+  return fields;
+}
+
+export async function runLegalTypeCreate(
+  client: ApiClient,
+  typeName: string,
+  fields: LegalTypeFields,
+  flags: WriteFlags
+): Promise<Row> {
+  return client.post<Row>(
+    "/api/legal-documents/types",
+    { typeName, ...fields },
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+export async function runLegalTypeUpdate(
+  client: ApiClient,
+  typeName: string,
+  fields: LegalTypeFields,
+  flags: WriteFlags
+): Promise<Row> {
+  if (Object.keys(fields).length === 0) {
+    throw new CliError(
+      "nothing to update: pass at least one of --display-name / --description / --sort-order / --setting-type-id",
+      0,
+      null,
+      4
+    );
+  }
+  return client.put<Row>(
+    `/api/legal-documents/types/${encodeURIComponent(typeName)}`,
+    fields,
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
 /**
  * `accept` takes its typeName positionally like its siblings (show / versions /
  * acceptances), with --type kept as an alias (feedback #32). Exactly one is
@@ -478,6 +534,69 @@ export function registerLegalCommands(
         const claims = decodeJwtPayload(client.getCurrentToken());
         assertDeveloperClaims(claims);
         writeJson(await runLegalAccept(client, typeName, claims.personId, opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
+
+  const typeGroup = legal
+    .command("type")
+    .description("Legal document TYPE management — create types, fix acceptance mappings (developer/sysadmin)");
+
+  const typeCreateCmd = typeGroup
+    .command("create")
+    .description("Create a new legal document type")
+    .requiredOption("--name <typeName>", "Type name, UPPER_SNAKE, max 50 (e.g. TOS_EN); immutable after creation")
+    .requiredOption("--display-name <s>", "Human-readable name (max 100)")
+    .option("--description <s>", "Short description (max 200)")
+    .option("--sort-order <n>", "List position (default 0)", Number)
+    .option("--setting-type-id <n>", "personSettingTypeId for acceptance tracking (must exist and be unmapped)", Number);
+  addWriteFlagsToCommand(typeCreateCmd).action(
+    async (opts: {
+      name: string;
+      displayName: string;
+      description?: string;
+      sortOrder?: number;
+      settingTypeId?: number;
+      dryRun?: boolean;
+      reason?: string;
+      idempotencyKey?: string;
+    }) => {
+      try {
+        if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
+        const client = await getClient();
+        writeJson(await runLegalTypeCreate(client, opts.name, pickTypeFields(opts), opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
+
+  const typeUpdateCmd = typeGroup
+    .command("update <typeName>")
+    .description("Update a type's editable fields (typeName itself is immutable)")
+    .option("--display-name <s>", "Human-readable name (max 100)")
+    .option("--description <s>", "Short description (max 200)")
+    .option("--sort-order <n>", "List position", Number)
+    .option("--setting-type-id <n>", "personSettingTypeId for acceptance tracking (must exist and be unmapped)", Number);
+  addWriteFlagsToCommand(typeUpdateCmd).action(
+    async (
+      typeName: string,
+      opts: {
+        displayName?: string;
+        description?: string;
+        sortOrder?: number;
+        settingTypeId?: number;
+        dryRun?: boolean;
+        reason?: string;
+        idempotencyKey?: string;
+      }
+    ) => {
+      try {
+        if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
+        const client = await getClient();
+        writeJson(await runLegalTypeUpdate(client, typeName, pickTypeFields(opts), opts));
       } catch (e) {
         exitWithError(e);
       }
