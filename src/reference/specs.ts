@@ -2250,7 +2250,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
   },
 
-  // ─── legal (10) — versioned legal documents + acceptance tracking ─────────
+  // ─── legal (12) — versioned legal documents + acceptance tracking ─────────
   {
     command: "ib legal types",
     description:

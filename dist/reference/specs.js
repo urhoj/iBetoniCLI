@@ -2081,7 +2081,7 @@ export const COMMAND_SPECS = [
             "ib ohje update LaskupohjaTilaus --body '{\"title\":\"X\",\"htmltext\":\"<p>Y</p>\"}' --reason edit",
         ],
     },
-    // ─── legal (10) — versioned legal documents + acceptance tracking ─────────
+    // ─── legal (12) — versioned legal documents + acceptance tracking ─────────
     {
         command: "ib legal types",
         description: "List legal document types (EULA, TOS, PRIVACY, BETONIJERRY_TOS, ...) with their personSettingTypeId acceptance mapping. A NULL personSettingTypeId means acceptances for that type cannot be tracked.",

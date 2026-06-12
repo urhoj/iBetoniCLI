@@ -252,6 +252,17 @@ describe("ib legal type writes (feedback #31)", () => {
     expect(out).toEqual(row);
   });
 
+  test("type create with only required fields sends a minimal body", async () => {
+    const c = mockClient();
+    (c.post as ReturnType<typeof vi.fn>).mockResolvedValue({ documentTypeId: 9 });
+    await runLegalTypeCreate(c, "AUP_FI", { displayName: "Hyvaksyttavan kayton periaatteet" }, { dryRun: true });
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/legal-documents/types",
+      { typeName: "AUP_FI", displayName: "Hyvaksyttavan kayton periaatteet" },
+      { headers: { "X-Dry-Run": "1" } }
+    );
+  });
+
   test("type update PUTs only provided fields with dry-run header", async () => {
     const c = mockClient();
     (c.put as ReturnType<typeof vi.fn>).mockResolvedValue({ documentTypeId: 5, personSettingTypeId: 44 });
