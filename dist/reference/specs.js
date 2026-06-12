@@ -3290,6 +3290,9 @@ export const COMMAND_SPECS = [
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
+        notes: [
+            'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib feedback create --kind bug -- "--pretty output too wide". Everything after `--` is taken as positional text.',
+        ],
         examples: [
             'ib feedback create "schema table output should include row counts"',
             'ib feedback create "keikka list --pvm rejected my date" --kind bug --command "keikka list --pvm 1.6." --error "invalid date format"',
