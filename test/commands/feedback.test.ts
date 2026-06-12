@@ -36,7 +36,7 @@ describe("ib feedback create", () => {
     });
     expect(post).toHaveBeenCalledWith(
       "/api/feedback",
-      { kind: "improvement", description: "schema output should include row counts" },
+      { kind: "improvement", scope: "cli", description: "schema output should include row counts" },
       { meta: true }
     );
     expect(out).toEqual({ feedbackId: 7 });
@@ -54,6 +54,7 @@ describe("ib feedback create", () => {
       "/api/feedback",
       {
         kind: "bug",
+        scope: "cli",
         description: "date rejected",
         command: "keikka list --pvm 1.6.",
         error: "invalid date format",
@@ -80,6 +81,25 @@ describe("ib feedback create", () => {
     expect(post.mock.calls[0][1]).toMatchObject({ kind: "legal" });
   });
 
+  test("defaults scope to cli", async () => {
+    post.mockResolvedValueOnce({ feedbackId: 9 });
+    await runFeedbackCreate(mockClient, { description: "x" });
+    expect(post.mock.calls[0][1]).toMatchObject({ scope: "cli" });
+  });
+
+  test("--scope jerry is sent through", async () => {
+    post.mockResolvedValueOnce({ feedbackId: 10 });
+    await runFeedbackCreate(mockClient, { description: "x", scope: "jerry" });
+    expect(post.mock.calls[0][1]).toMatchObject({ scope: "jerry" });
+  });
+
+  test("unknown --scope exits 4 (strict, unlike --kind)", async () => {
+    await expect(
+      runFeedbackCreate(mockClient, { description: "x", scope: "nonsense" })
+    ).rejects.toMatchObject({ exitCode: 4 });
+    expect(post).not.toHaveBeenCalled();
+  });
+
   test("--dry-run prints the payload and never POSTs", async () => {
     const out = await runFeedbackCreate(mockClient, {
       description: "preview me",
@@ -91,7 +111,7 @@ describe("ib feedback create", () => {
       wouldSend: {
         method: "POST",
         path: "/api/feedback",
-        body: { kind: "improvement", description: "preview me" },
+        body: { kind: "improvement", scope: "cli", description: "preview me" },
       },
     });
   });
@@ -123,6 +143,12 @@ describe("ib feedback list", () => {
     const out = await runFeedbackList(mockClient, {});
     expect(get).toHaveBeenCalledWith("/api/feedback");
     expect(out).toEqual({ items: [], nextCursor: null, count: 0 });
+  });
+
+  test("forwards --scope filter", async () => {
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { scope: "workspace" });
+    expect(get).toHaveBeenCalledWith("/api/feedback?scope=workspace");
   });
 });
 

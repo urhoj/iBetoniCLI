@@ -1,14 +1,19 @@
 import { CliError } from "../../api/errors.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 const KINDS = ["improvement", "bug", "idea", "legal"];
+const SCOPES = ["cli", "app", "jerry", "bsg2", "workspace", "other"];
 const STATUSES = ["open", "reviewed", "applied", "dismissed"];
 function buildCreateBody(input) {
     const description = input.description?.trim();
     if (!description) {
         throw new CliError("description is required", 400, null, 4);
     }
+    if (input.scope !== undefined && !SCOPES.includes(input.scope)) {
+        throw new CliError(`--scope must be one of: ${SCOPES.join(", ")}`, 400, null, 4);
+    }
     const body = {
         kind: KINDS.includes(input.kind) ? input.kind : "improvement",
+        scope: input.scope ?? "cli",
         description,
     };
     if (input.command)
@@ -38,6 +43,8 @@ export async function runFeedbackList(client, opts) {
         qs.set("status", opts.status);
     if (opts.kind)
         qs.set("kind", opts.kind);
+    if (opts.scope)
+        qs.set("scope", opts.scope);
     if (opts.limit !== undefined)
         qs.set("limit", String(opts.limit));
     if (opts.offset !== undefined)
@@ -87,6 +94,7 @@ export function registerFeedbackCommands(parent, getClient) {
     f.command("create <description>")
         .description("File a proposal/trouble report. Silent server-side; works under --read-only.")
         .option("--kind <kind>", "improvement | bug | idea | legal", "improvement")
+        .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | other — product surface this feedback targets", "cli")
         .option("--command <argv>", "The ib command/argv that triggered the friction")
         .option("--error <msg>", "Error message you hit, if any")
         .option("--dry-run", "Print the payload without sending (client-side)")
@@ -103,6 +111,7 @@ export function registerFeedbackCommands(parent, getClient) {
         .description("List feedback for triage (developer-only)")
         .option("--status <status>", "open | reviewed | applied | dismissed")
         .option("--kind <kind>", "improvement | bug | idea | legal")
+        .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | other")
         .option("--limit <n>", "Max rows (default 50, cap 200)", Number)
         .option("--offset <n>", "Pagination offset", Number)
         .action(async (opts) => {

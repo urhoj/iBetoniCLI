@@ -20,12 +20,15 @@ import { writeJson, exitWithError } from "../../output/json.js";
 
 const KINDS = ["improvement", "bug", "idea", "legal"] as const;
 type Kind = (typeof KINDS)[number];
+const SCOPES = ["cli", "app", "jerry", "bsg2", "workspace", "other"] as const;
+type Scope = (typeof SCOPES)[number];
 const STATUSES = ["open", "reviewed", "applied", "dismissed"] as const;
 type Status = (typeof STATUSES)[number];
 
 export interface FeedbackCreateInput {
   description: string;
   kind?: string;
+  scope?: string;
   command?: string;
   error?: string;
   dryRun?: boolean;
@@ -33,6 +36,7 @@ export interface FeedbackCreateInput {
 
 interface FeedbackCreateBody {
   kind: Kind;
+  scope: Scope;
   description: string;
   command?: string;
   error?: string;
@@ -43,8 +47,12 @@ function buildCreateBody(input: FeedbackCreateInput): FeedbackCreateBody {
   if (!description) {
     throw new CliError("description is required", 400, null, 4);
   }
+  if (input.scope !== undefined && !SCOPES.includes(input.scope as Scope)) {
+    throw new CliError(`--scope must be one of: ${SCOPES.join(", ")}`, 400, null, 4);
+  }
   const body: FeedbackCreateBody = {
     kind: KINDS.includes(input.kind as Kind) ? (input.kind as Kind) : "improvement",
+    scope: (input.scope as Scope) ?? "cli",
     description,
   };
   if (input.command) body.command = input.command;
@@ -73,11 +81,12 @@ export async function runFeedbackCreate(
  */
 export async function runFeedbackList(
   client: ApiClient,
-  opts: { status?: string; kind?: string; limit?: number; offset?: number }
+  opts: { status?: string; kind?: string; scope?: string; limit?: number; offset?: number }
 ): Promise<ListEnvelope<Record<string, unknown>>> {
   const qs = new URLSearchParams();
   if (opts.status) qs.set("status", opts.status);
   if (opts.kind) qs.set("kind", opts.kind);
+  if (opts.scope) qs.set("scope", opts.scope);
   if (opts.limit !== undefined) qs.set("limit", String(opts.limit));
   if (opts.offset !== undefined) qs.set("offset", String(opts.offset));
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
@@ -145,13 +154,18 @@ export function registerFeedbackCommands(
       "File a proposal/trouble report. Silent server-side; works under --read-only."
     )
     .option("--kind <kind>", "improvement | bug | idea | legal", "improvement")
+    .option(
+      "--scope <scope>",
+      "cli | app | jerry | bsg2 | workspace | other — product surface this feedback targets",
+      "cli"
+    )
     .option("--command <argv>", "The ib command/argv that triggered the friction")
     .option("--error <msg>", "Error message you hit, if any")
     .option("--dry-run", "Print the payload without sending (client-side)")
     .action(
       async (
         description: string,
-        opts: { kind?: string; command?: string; error?: string; dryRun?: boolean }
+        opts: { kind?: string; scope?: string; command?: string; error?: string; dryRun?: boolean }
       ) => {
         try {
           const client = await getClient();
@@ -166,10 +180,11 @@ export function registerFeedbackCommands(
     .description("List feedback for triage (developer-only)")
     .option("--status <status>", "open | reviewed | applied | dismissed")
     .option("--kind <kind>", "improvement | bug | idea | legal")
+    .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | other")
     .option("--limit <n>", "Max rows (default 50, cap 200)", Number)
     .option("--offset <n>", "Pagination offset", Number)
     .action(
-      async (opts: { status?: string; kind?: string; limit?: number; offset?: number }) => {
+      async (opts: { status?: string; kind?: string; scope?: string; limit?: number; offset?: number }) => {
         try {
           writeJson(await runFeedbackList(await getClient(), opts));
         } catch (e) {

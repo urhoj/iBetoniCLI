@@ -3280,13 +3280,14 @@ export const COMMAND_SPECS = [
         args: [{ name: "description", type: "string", description: "freetext description of the friction, gap, or bug" }],
         flags: [
             { name: "kind", type: "string", default: "improvement", description: "improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal)" },
+            { name: "scope", type: "string", default: "cli", description: "cli | app | jerry | bsg2 | workspace | other — which product surface this targets (routing key for triage; orthogonal to --kind)" },
             { name: "command", type: "string", description: "The ib command/argv that triggered the friction" },
             { name: "error", type: "string", description: "Error message you hit, if any" },
             { name: "dry-run", type: "boolean", description: "Print the payload without sending (client-side)" },
         ],
         outputShape: "{ feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement)" },
+            { exit: 4, meaning: "Validation", remedy: "description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|other (STRICT — unknown exits 4)" },
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
@@ -3298,6 +3299,7 @@ export const COMMAND_SPECS = [
             'ib feedback create "keikka list --pvm rejected my date" --kind bug --command "keikka list --pvm 1.6." --error "invalid date format"',
             'ib feedback create "ib customer search --email" --kind idea --dry-run',
             'ib feedback create "TOS 2.0 lacks a clause covering the AI assistant features; draft update suggested" --kind legal',
+            'ib feedback create "Jerry inbox should show boom length on request cards" --scope jerry --kind idea',
         ],
     },
     {
@@ -3307,6 +3309,7 @@ export const COMMAND_SPECS = [
         flags: [
             { name: "status", type: "string", description: "open | reviewed | applied | dismissed" },
             { name: "kind", type: "string", description: "improvement | bug | idea | legal" },
+            { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | other" },
             { name: "limit", type: "number", default: "50", description: "Max rows (cap 200)" },
             { name: "offset", type: "number", default: "0", description: "Pagination offset" },
         ],
@@ -3316,7 +3319,7 @@ export const COMMAND_SPECS = [
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
-        examples: ["ib feedback list --status open", "ib feedback list --kind bug --limit 20"],
+        examples: ["ib feedback list --status open --scope cli", "ib feedback list --kind bug --limit 20"],
     },
     {
         command: "ib feedback get",
@@ -3324,7 +3327,7 @@ export const COMMAND_SPECS = [
         permissions: ["isSystemAdmin or isDeveloper"],
         args: [{ name: "id", type: "number", description: "feedbackId" }],
         flags: [],
-        outputShape: "The full feedback row { feedbackId, kind, status, description, command, errorText, cliVersion, context, resolution, createdAt, ... }",
+        outputShape: "The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, ... }",
         errors: [
             apiErr(403, "Permission denied", "requires a developer token"),
             apiErr(404, "Not found", "check the id via `ib feedback list`"),

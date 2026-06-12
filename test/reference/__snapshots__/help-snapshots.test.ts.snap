@@ -1927,6 +1927,7 @@ ARGUMENTS
 
 FLAGS
   --kind STRING    improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal) (default: improvement)
+  --scope STRING    cli | app | jerry | bsg2 | workspace | other — which product surface this targets (routing key for triage; orthogonal to --kind) (default: cli)
   --command STRING    The ib command/argv that triggered the friction
   --error STRING    Error message you hit, if any
   --dry-run BOOLEAN    Print the payload without sending (client-side)
@@ -1938,7 +1939,7 @@ OUTPUT (JSON, stdout)
   { feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement)
+  exit 4  Validation             → description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|other (STRICT — unknown exits 4)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -1950,6 +1951,7 @@ EXAMPLES
   ib feedback create "keikka list --pvm rejected my date" --kind bug --command "keikka list --pvm 1.6." --error "invalid date format"
   ib feedback create "ib customer search --email" --kind idea --dry-run
   ib feedback create "TOS 2.0 lacks a clause covering the AI assistant features; draft update suggested" --kind legal
+  ib feedback create "Jerry inbox should show boom length on request cards" --scope jerry --kind idea
 "
 `;
 
@@ -1971,7 +1973,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  The full feedback row { feedbackId, kind, status, description, command, errorText, cliVersion, context, resolution, createdAt, ... }
+  The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, ... }
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → requires a developer token
@@ -1994,6 +1996,7 @@ DESCRIPTION
 FLAGS
   --status STRING    open | reviewed | applied | dismissed
   --kind STRING    improvement | bug | idea | legal
+  --scope STRING    cli | app | jerry | bsg2 | workspace | other
   --limit NUMBER    Max rows (cap 200) (default: 50)
   --offset NUMBER    Pagination offset (default: 0)
 
@@ -2009,7 +2012,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
-  ib feedback list --status open
+  ib feedback list --status open --scope cli
   ib feedback list --kind bug --limit 20
 "
 `;
