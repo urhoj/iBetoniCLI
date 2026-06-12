@@ -1,6 +1,6 @@
 import { CliError } from "../../api/errors.js";
 import { writeJson, exitWithError } from "../../output/json.js";
-const KINDS = ["improvement", "bug"];
+const KINDS = ["improvement", "bug", "idea", "legal"];
 const STATUSES = ["open", "reviewed", "applied", "dismissed"];
 function buildCreateBody(input) {
     const description = input.description?.trim();
@@ -86,7 +86,7 @@ export function registerFeedbackCommands(parent, getClient) {
         .description("File & triage CLI improvement proposals / trouble reports");
     f.command("create <description>")
         .description("File a proposal/trouble report. Silent server-side; works under --read-only.")
-        .option("--kind <kind>", "improvement | bug", "improvement")
+        .option("--kind <kind>", "improvement | bug | idea | legal", "improvement")
         .option("--command <argv>", "The ib command/argv that triggered the friction")
         .option("--error <msg>", "Error message you hit, if any")
         .option("--dry-run", "Print the payload without sending (client-side)")
@@ -102,7 +102,7 @@ export function registerFeedbackCommands(parent, getClient) {
     f.command("list")
         .description("List feedback for triage (developer-only)")
         .option("--status <status>", "open | reviewed | applied | dismissed")
-        .option("--kind <kind>", "improvement | bug")
+        .option("--kind <kind>", "improvement | bug | idea | legal")
         .option("--limit <n>", "Max rows (default 50, cap 200)", Number)
         .option("--offset <n>", "Pagination offset", Number)
         .action(async (opts) => {

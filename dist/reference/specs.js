@@ -3279,21 +3279,22 @@ export const COMMAND_SPECS = [
         mutates: true,
         args: [{ name: "description", type: "string", description: "freetext description of the friction, gap, or bug" }],
         flags: [
-            { name: "kind", type: "string", default: "improvement", description: "improvement | bug" },
+            { name: "kind", type: "string", default: "improvement", description: "improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal)" },
             { name: "command", type: "string", description: "The ib command/argv that triggered the friction" },
             { name: "error", type: "string", description: "Error message you hit, if any" },
             { name: "dry-run", type: "boolean", description: "Print the payload without sending (client-side)" },
         ],
         outputShape: "{ feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "description is required; --kind must be improvement|bug" },
+            { exit: 4, meaning: "Validation", remedy: "description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement)" },
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
         examples: [
             'ib feedback create "schema table output should include row counts"',
             'ib feedback create "keikka list --pvm rejected my date" --kind bug --command "keikka list --pvm 1.6." --error "invalid date format"',
-            'ib feedback create "idea: ib customer search --email" --dry-run',
+            'ib feedback create "ib customer search --email" --kind idea --dry-run',
+            'ib feedback create "TOS 2.0 lacks a clause covering the AI assistant features; draft update suggested" --kind legal',
         ],
     },
     {
@@ -3302,7 +3303,7 @@ export const COMMAND_SPECS = [
         permissions: ["isSystemAdmin or isDeveloper"],
         flags: [
             { name: "status", type: "string", description: "open | reviewed | applied | dismissed" },
-            { name: "kind", type: "string", description: "improvement | bug" },
+            { name: "kind", type: "string", description: "improvement | bug | idea | legal" },
             { name: "limit", type: "number", default: "50", description: "Max rows (cap 200)" },
             { name: "offset", type: "number", default: "0", description: "Pagination offset" },
         ],

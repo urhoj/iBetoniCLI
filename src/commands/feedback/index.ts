@@ -18,7 +18,7 @@ import { CliError } from "../../api/errors.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 
-const KINDS = ["improvement", "bug"] as const;
+const KINDS = ["improvement", "bug", "idea", "legal"] as const;
 type Kind = (typeof KINDS)[number];
 const STATUSES = ["open", "reviewed", "applied", "dismissed"] as const;
 type Status = (typeof STATUSES)[number];
@@ -144,7 +144,7 @@ export function registerFeedbackCommands(
     .description(
       "File a proposal/trouble report. Silent server-side; works under --read-only."
     )
-    .option("--kind <kind>", "improvement | bug", "improvement")
+    .option("--kind <kind>", "improvement | bug | idea | legal", "improvement")
     .option("--command <argv>", "The ib command/argv that triggered the friction")
     .option("--error <msg>", "Error message you hit, if any")
     .option("--dry-run", "Print the payload without sending (client-side)")
@@ -165,7 +165,7 @@ export function registerFeedbackCommands(
   f.command("list")
     .description("List feedback for triage (developer-only)")
     .option("--status <status>", "open | reviewed | applied | dismissed")
-    .option("--kind <kind>", "improvement | bug")
+    .option("--kind <kind>", "improvement | bug | idea | legal")
     .option("--limit <n>", "Max rows (default 50, cap 200)", Number)
     .option("--offset <n>", "Pagination offset", Number)
     .action(

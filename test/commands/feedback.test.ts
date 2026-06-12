@@ -68,6 +68,18 @@ describe("ib feedback create", () => {
     expect(post.mock.calls[0][1]).toMatchObject({ kind: "improvement" });
   });
 
+  test("--kind idea is accepted, not coerced", async () => {
+    post.mockResolvedValueOnce({ feedbackId: 10 });
+    await runFeedbackCreate(mockClient, { description: "ib customer search --email", kind: "idea" });
+    expect(post.mock.calls[0][1]).toMatchObject({ kind: "idea" });
+  });
+
+  test("--kind legal is accepted, not coerced", async () => {
+    post.mockResolvedValueOnce({ feedbackId: 11 });
+    await runFeedbackCreate(mockClient, { description: "TOS lacks AI clause", kind: "legal" });
+    expect(post.mock.calls[0][1]).toMatchObject({ kind: "legal" });
+  });
+
   test("--dry-run prints the payload and never POSTs", async () => {
     const out = await runFeedbackCreate(mockClient, {
       description: "preview me",
