@@ -53,8 +53,14 @@ jobs:
     steps:
       - name: Dispatch vendored-cli-bump to urhoj/puminet5api
         run: |
-          curl -sf -X POST \
+          STATUS=$(curl -s -o resp.txt -w "%{http_code}" -X POST \
             -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
             -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/urhoj/puminet5api/dispatches \
-            -d "{\"event_type\":\"vendored-cli-bump\",\"client_payload\":{\"sha\":\"${{ github.sha }}\"}}"
+            -d "{\"event_type\":\"vendored-cli-bump\",\"client_payload\":{\"sha\":\"${{ github.sha }}\"}}")
+          if [ "$STATUS" != "204" ]; then
+            echo "Dispatch failed: HTTP $STATUS"
+            cat resp.txt
+            exit 1
+          fi
+          echo "Dispatched vendored-cli-bump for ${{ github.sha }} (HTTP 204)"
