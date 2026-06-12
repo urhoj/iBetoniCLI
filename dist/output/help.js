@@ -108,8 +108,8 @@ export function formatHelp(spec) {
     }
     return lines.join("\n") + "\n";
 }
-/** First sentence of a description — group listings stay one line per child. */
-function firstSentence(text) {
+/** First sentence of a description — group/root listings stay one line per child. */
+export function firstSentence(text) {
     const i = text.indexOf(". ");
     return i === -1 ? text : text.slice(0, i + 1);
 }
@@ -168,7 +168,10 @@ export function formatGroupHelp(groupPath, fallbackDescription, specs, glossary)
  * - A non-root command with subcommands (a group — no spec of its own) gets
  *   the computed {@link formatGroupHelp} rendering.
  * - The root keeps Commander's default help + the domain primer appended via
- *   `addHelpText` in `program.ts`.
+ *   `addHelpText` in `program.ts` — but its command list truncates each
+ *   subcommand description to its first sentence (`subcommandDescription`
+ *   override in `buildProgram`), same as group listings; full descriptions
+ *   stay one `--help` away.
  *
  * Matching is by exact path so the same `COMMAND_SPECS` catalogue drives
  * per-command `--help`, group help, and `ib reference dump` — there is no

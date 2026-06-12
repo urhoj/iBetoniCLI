@@ -39,7 +39,8 @@ export const GLOSSARY: GlossaryEntry[] = [
   },
   {
     term: "asiakas / customer",
-    definition: "A customer company you deliver to (`ib customer …`).",
+    definition:
+      "A customer company you deliver to (`ib customer …`). NOTE: 'asiakas' is also the word for a tenant company itself — `ib customer` = companies you deliver to, `ib company` = the tenant you act as (see 'company (tenant)').",
   },
   {
     term: "liite / attachment",
@@ -59,7 +60,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   {
     term: "betoniasema / tehdas / plant / asema",
     definition:
-      "A concrete batching plant — sijainti type Betoniasema. These are all the SAME thing: plant = factory = tehdas = (betoni)asema; users say tehdas or asema interchangeably, so 'Kivikon asemalla' / 'Kivikon tehtaalla' = at the Kivikko betoniasema. Plants belong to SUPPLIER companies (Rudus, Lujabetoni, …), not your tenant — list them with `ib sijainti plants` (alias: tehtaat) or resolve one by name with `ib sijainti plants --search <name>`.",
+      "A concrete batching plant — sijainti type Betoniasema. plant = factory = tehdas = (betoni)asema, used interchangeably ('Kivikon asemalla' / 'Kivikon tehtaalla' = the Kivikko betoniasema). Plants belong to SUPPLIER companies (Rudus, Lujabetoni, …), not your tenant — list with `ib sijainti plants` (alias: tehtaat), resolve by name with `--search <name>`.",
   },
   {
     term: "ajoneuvo / vehicle / pumppu / auto",
@@ -72,7 +73,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   {
     term: "company (tenant) / yritys / asiakas",
     definition:
-      "The active company your token acts on — the multi-tenancy boundary (`ib company …`).",
+      "The active company your token acts on — the multi-tenancy boundary (`ib company …`). Same Finnish word as customer — see 'asiakas / customer'.",
   },
   {
     term: "schedule / aikataulu",
@@ -240,7 +241,19 @@ export function renderDomainHelp(): string {
   }
   lines.push(`  ${FEEDBACK_GUIDANCE.how}`);
   lines.push("");
+  lines.push("OUTPUT");
+  lines.push(
+    "  All commands: JSON on stdout; errors as a JSON envelope on stderr. Exit codes: 0 ok ·"
+  );
+  lines.push(
+    "    1 generic · 2 auth · 3 permission · 4 validation · 5 not-found · 6 server · 7 network"
+  );
+  lines.push("    — details: `ib help exit-codes`.");
+  lines.push("");
   lines.push("DISCOVER");
+  lines.push(
+    "  First run: `ib auth login` (opens browser) or set IB_TOKEN=<jwt>; verify with `ib doctor`."
+  );
   lines.push(
     "  Commands (cheap, offline): `ib commands` — domain index (~5 KB); `ib commands <domain>`"
   );

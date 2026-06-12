@@ -23,7 +23,8 @@ describe("ib reference dump", () => {
       expect(typeof entry.definition, "glossary definition").toBe("string");
       expect(entry.definition.length).toBeGreaterThan(0);
     }
-    expect(ref.glossary.map((g) => g.term)).toContain("keikka");
+    // term-contains, not exact: the entry is "tilaus / keikka"
+    expect(ref.glossary.some((g) => g.term.includes("keikka"))).toBe(true);
   });
 
   test("every command has flags array, outputShape, errors, examples", () => {

@@ -39,7 +39,7 @@ import { registerDoctorCommand } from "./commands/doctor/index.js";
 import { runReferenceDump } from "./reference/dump.js";
 import { buildCommandsList, buildDomainIndex } from "./reference/commandsList.js";
 import { renderDomainHelp } from "./reference/domain.js";
-import { attachRichHelp } from "./output/help.js";
+import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
 import { writeJson, exitWithError, failWith } from "./output/json.js";
 import { CliError } from "./api/errors.js";
@@ -57,6 +57,12 @@ export function buildProgram() {
     // AI inspecting top-level help gets the same context `ib reference dump`
     // embeds. Sourced from reference/domain.ts — one source of truth, no drift.
     program.addHelpText("after", renderDomainHelp());
+    // Root command list is a table of contents: first sentence only (same
+    // truncation formatGroupHelp applies to group listings); the full
+    // description stays in each command's `--help`.
+    program.configureHelp({
+        subcommandDescription: (cmd) => firstSentence(cmd.description()),
+    });
     addGlobalOptions(program);
     // Build an authenticated client from a resolved set of global options. Exits 2
     // with "Not logged in" when no auth resolves — so command actions never deal
