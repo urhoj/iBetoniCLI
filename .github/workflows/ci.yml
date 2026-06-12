@@ -40,3 +40,21 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+
+  # On a green master push, tell puminet5api to move its vendored-CLI
+  # submodule pointer (bump-vendored-cli.yml there). Gated on build-and-test
+  # so a red master never propagates to the server-side CLI surface
+  # (MCP ib_exec / /api/cli/exec). Requires GH_PAT with write access to
+  # urhoj/puminet5api.
+  notify-vendored-bump:
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch vendored-cli-bump to urhoj/puminet5api
+        run: |
+          curl -sf -X POST \
+            -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/urhoj/puminet5api/dispatches \
+            -d "{\"event_type\":\"vendored-cli-bump\",\"client_payload\":{\"sha\":\"${{ github.sha }}\"}}"
