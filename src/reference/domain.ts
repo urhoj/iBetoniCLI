@@ -33,7 +33,7 @@ export interface GlossaryEntry {
 /** Core entities and recurring field names an AI will meet in the data. */
 export const GLOSSARY: GlossaryEntry[] = [
   {
-    term: "keikka",
+    term: "tilaus / keikka",
     definition:
       "A concrete delivery/pumping order: one job delivered to a worksite in a date/time window. The central entity (`ib keikka …`).",
   },
@@ -42,7 +42,7 @@ export const GLOSSARY: GlossaryEntry[] = [
     definition: "A customer company you deliver to (`ib customer …`).",
   },
   {
-    term: "attachment",
+    term: "liite / attachment",
     definition:
       "A file (photo/PDF/document) in Azure Blob, linked to entities via the generic attachments table — keikka, vehicle, person, customer, worksite, sijainti, tuote, bug report, Jerry request/offer. Managed with `ib attachment …`; bytes move directly between you and Azure via 1h SAS URLs.",
   },
@@ -57,30 +57,30 @@ export const GLOSSARY: GlossaryEntry[] = [
       "A geocoded location — depot, plant, or customer destination (`ib sijainti …`).",
   },
   {
-    term: "betoniasema / tehdas / plant",
+    term: "betoniasema / tehdas / plant / asema",
     definition:
       "A concrete batching plant — sijainti type Betoniasema. These are all the SAME thing: plant = factory = tehdas = (betoni)asema; users say tehdas or asema interchangeably, so 'Kivikon asemalla' / 'Kivikon tehtaalla' = at the Kivikko betoniasema. Plants belong to SUPPLIER companies (Rudus, Lujabetoni, …), not your tenant — list them with `ib sijainti plants` (alias: tehtaat) or resolve one by name with `ib sijainti plants --search <name>`.",
   },
   {
-    term: "vehicle",
+    term: "ajoneuvo / vehicle / pumppu / auto",
     definition: "A pump or mixer truck (`ib vehicle …`).",
   },
   {
-    term: "person",
+    term: "henkilö / käyttäjä / person / pumppari / kuljettaja",
     definition: "A system user: driver, admin, etc. (`ib person …`).",
   },
   {
-    term: "company (tenant)",
+    term: "company (tenant) / yritys / asiakas",
     definition:
       "The active company your token acts on — the multi-tenancy boundary (`ib company …`).",
   },
   {
-    term: "schedule",
+    term: "schedule / aikataulu",
     definition:
       "Date-scoped views of keikkas: today / a given day / a week (`ib schedule …`).",
   },
   {
-    term: "tila",
+    term: "tila / status",
     definition:
       "Finnish for \"status\" — keikka rows carry the numeric keikkaTilaId: " +
       "-1 Uusi tilaus (new) · 0 Luonnos (draft) · 1 Kesken (in progress) · " +
@@ -111,7 +111,7 @@ export const GLOSSARY: GlossaryEntry[] = [
       "A provider's bid (price, availability, terms) on a pumppuRequest (`ib jerry request offers`).",
   },
   {
-    term: "varikko",
+    term: "varikko / depot",
     definition:
       "A pumping provider's depot — a sijainti with a delivery radius. Enrolled in BetoniJerry per-varikko via jerryActiveUntil (`ib sijainti set-jerry`).",
   },
@@ -121,7 +121,7 @@ export const GLOSSARY: GlossaryEntry[] = [
       "sijainti column gating a varikko's BetoniJerry enrolment: future/sentinel datetime = active, NULL = not enrolled, past = expired.",
   },
   {
-    term: "log / muutoshistoria",
+    term: "log / muutoshistoria / changeTracker",
     definition:
       "Field-level audit trail (changeTracker table): every tracked write stores who/when/old→new and the --reason header, scoped per tenant (ownerAsiakasId). Read with `ib log ...` or the per-entity `log` subcommands (`ib keikka log <id>`, `ib person log <id>`, ...).",
   },
