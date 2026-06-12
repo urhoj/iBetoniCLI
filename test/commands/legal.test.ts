@@ -10,6 +10,7 @@ import {
   runLegalDelete,
   runLegalAcceptances,
   runLegalAccept,
+  resolveTypeNameTarget,
   assertDeveloperClaims,
 } from "../../src/commands/legal/index.js";
 import type { ApiClient } from "../../src/api/client.js";
@@ -191,6 +192,28 @@ describe("ib legal writes", () => {
       .mockResolvedValueOnce(TYPES);
     await expect(runLegalAccept(c, "GLOBAL", 5, {})).rejects.toMatchObject({ exitCode: 4 });
     expect(c.post).not.toHaveBeenCalled();
+  });
+});
+
+describe("resolveTypeNameTarget (accept dual-target, feedback #32)", () => {
+  test("positional alone resolves", () => {
+    expect(resolveTypeNameTarget("TOS", undefined)).toBe("TOS");
+  });
+  test("--type alone resolves", () => {
+    expect(resolveTypeNameTarget(undefined, "TOS")).toBe("TOS");
+  });
+  test("both agreeing resolves", () => {
+    expect(resolveTypeNameTarget("TOS", "TOS")).toBe("TOS");
+  });
+  test("neither -> exit 4", () => {
+    expect(() => resolveTypeNameTarget(undefined, undefined)).toThrowError(
+      expect.objectContaining({ exitCode: 4 })
+    );
+  });
+  test("both differing -> exit 4", () => {
+    expect(() => resolveTypeNameTarget("TOS", "EULA")).toThrowError(
+      expect.objectContaining({ exitCode: 4 })
+    );
   });
 });
 

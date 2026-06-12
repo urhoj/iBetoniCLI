@@ -2110,7 +2110,7 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib legal status",
-        description: "Which legal documents you have accepted (version + timestamp) and which are still missing. Defaults to yourself and your token's company scope. --person requires developer/sysadmin (server-enforced). Content is stripped — read it via ib legal show. Note: betoni.online currently has no active documents, so an empty result is normal.",
+        description: "Which legal documents you have accepted (version + timestamp) and which are still missing. Defaults to yourself and your token's company scope. --person requires developer/sysadmin (server-enforced). Content is stripped — read it via ib legal show. Entries under `missing` are active documents not yet accepted; an empty result means the scope has no active documents.",
         auth: "any",
         flags: [
             { name: "person", type: "number", description: "Check another personId (developer/sysadmin only)" },
@@ -2237,15 +2237,18 @@ export const COMMAND_SPECS = [
         command: "ib legal accept",
         description: "Record YOUR OWN acceptance of the current active version of a type. DEVELOPER TESTING AID, gated client-side to developer/sysadmin tokens — real consent is a human action recorded via the betoni.online / betonijerry.fi UI flows. The backend endpoint is self-only: you can never accept on someone else's behalf. --reason required unless --dry-run.",
         permissions: ["isSystemAdmin or isDeveloper (client-side gate)"],
+        args: [
+            { name: "typeName", type: "string", required: false, description: "Document type name (see ib legal types; or pass --type)" },
+        ],
         flags: [
-            { name: "type", type: "string", required: true, description: "Document type name to accept" },
+            { name: "type", type: "string", description: "Document type name (alias for the positional)" },
         ],
         writeFlags: true,
         mutates: true,
         outputShape: "{success} | dry-run: {dryRun: true, wouldAccept: {...}, validation}",
         errors: [
             { exit: 3, meaning: "Not a developer/sysadmin token (client-side gate)", remedy: "use a developer account" },
-            { exit: 4, meaning: "Missing --reason / type has no personSettingTypeId mapping", remedy: "pass --reason; check ib legal types" },
+            { exit: 4, meaning: "Missing typeName / missing --reason / type has no personSettingTypeId mapping", remedy: "pass <typeName> and --reason; check ib legal types" },
             apiErr(404, "No active document of this type", "ib legal versions <typeName>"),
             ...COMMON_AUTH_ERRORS,
         ],
@@ -2253,7 +2256,10 @@ export const COMMAND_SPECS = [
             "Resolves the active version via two sequential reads (current + types); if another developer activates a new version between them, the recorded version string can be one step stale. Acceptable for a testing aid — verify with ib legal status afterwards.",
         ],
         seeAlso: ["ib legal status", "ib legal show"],
-        examples: ['ib legal accept --type BETONIJERRY_TOS --reason "acceptance flow e2e test"'],
+        examples: [
+            'ib legal accept BETONIJERRY_TOS --reason "acceptance flow e2e test"',
+            "ib legal accept TOS --dry-run",
+        ],
     },
     // ─── schedule (3) ────────────────────────────────────────────────────────
     {

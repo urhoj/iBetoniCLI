@@ -2936,14 +2936,17 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib legal accept matches snapshot 1`] = `
 "USAGE
-  ib legal accept [flags]
+  ib legal accept [<typeName>] [flags]
 
 DESCRIPTION
   Record YOUR OWN acceptance of the current active version of a type. DEVELOPER TESTING AID, gated client-side to developer/sysadmin tokens — real consent is a human action recorded via the betoni.online / betonijerry.fi UI flows. The backend endpoint is self-only: you can never accept on someone else's behalf. --reason required unless --dry-run.
   Permissions: requires isSystemAdmin or isDeveloper (client-side gate).
 
+ARGUMENTS
+  <typeName> STRING    Document type name (see ib legal types; or pass --type) (optional)
+
 FLAGS
-  --type STRING    Document type name to accept (required)
+  --type STRING    Document type name (alias for the positional)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -2958,7 +2961,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3  Not a developer/sysadmin token (client-side gate) → use a developer account
-  exit 4  Missing --reason / type has no personSettingTypeId mapping → pass --reason; check ib legal types
+  exit 4  Missing typeName / missing --reason / type has no personSettingTypeId mapping → pass <typeName> and --reason; check ib legal types
   exit 5 (HTTP 404)  No active document of this type → ib legal versions <typeName>
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -2970,7 +2973,8 @@ SEE ALSO
   ib legal status, ib legal show
 
 EXAMPLES
-  ib legal accept --type BETONIJERRY_TOS --reason "acceptance flow e2e test"
+  ib legal accept BETONIJERRY_TOS --reason "acceptance flow e2e test"
+  ib legal accept TOS --dry-run
 "
 `;
 
@@ -3211,7 +3215,7 @@ exports[`Help snapshots — contract stability > help for ib legal status matche
   ib legal status [flags]
 
 DESCRIPTION
-  Which legal documents you have accepted (version + timestamp) and which are still missing. Defaults to yourself and your token's company scope. --person requires developer/sysadmin (server-enforced). Content is stripped — read it via ib legal show. Note: betoni.online currently has no active documents, so an empty result is normal.
+  Which legal documents you have accepted (version + timestamp) and which are still missing. Defaults to yourself and your token's company scope. --person requires developer/sysadmin (server-enforced). Content is stripped — read it via ib legal show. Entries under \`missing\` are active documents not yet accepted; an empty result means the scope has no active documents.
   Auth: requires login (any authenticated user).
 
 FLAGS

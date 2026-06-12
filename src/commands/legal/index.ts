@@ -203,6 +203,25 @@ export async function runLegalAcceptances(
   };
 }
 
+/**
+ * `accept` takes its typeName positionally like its siblings (show / versions /
+ * acceptances), with --type kept as an alias (feedback #32). Exactly one is
+ * required; both are allowed only when they agree.
+ */
+export function resolveTypeNameTarget(
+  positional: string | undefined,
+  flag: string | undefined
+): string {
+  const name = positional ?? flag;
+  if (!name) {
+    failWith("missing document type: pass <typeName> positionally or via --type <typeName>", 4);
+  }
+  if (positional !== undefined && flag !== undefined && positional !== flag) {
+    failWith(`positional typeName (${positional}) and --type (${flag}) differ — pass only one`, 4);
+  }
+  return name;
+}
+
 /** Client-side dev-gate for `accept` — the endpoint itself stays user-open (FE flows). */
 export function assertDeveloperClaims(claims: DecodedClaims): void {
   if (!claims.isDeveloper && !claims.isSystemAdmin) {
@@ -444,17 +463,21 @@ export function registerLegalCommands(
     });
 
   const acceptCmd = legal
-    .command("accept")
+    .command("accept [typeName]")
     .description("Record YOUR OWN acceptance of the current active version (developer testing aid)")
-    .requiredOption("--type <typeName>", "Document type name to accept");
+    .option("--type <typeName>", "Document type name (alias for the positional)");
   addWriteFlagsToCommand(acceptCmd).action(
-    async (opts: { type: string; dryRun?: boolean; reason?: string; idempotencyKey?: string }) => {
-      if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
+    async (
+      typeNameArg: string | undefined,
+      opts: { type?: string; dryRun?: boolean; reason?: string; idempotencyKey?: string }
+    ) => {
       try {
+        const typeName = resolveTypeNameTarget(typeNameArg, opts.type);
+        if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
         const client = await getClient();
         const claims = decodeJwtPayload(client.getCurrentToken());
         assertDeveloperClaims(claims);
-        writeJson(await runLegalAccept(client, opts.type, claims.personId, opts));
+        writeJson(await runLegalAccept(client, typeName, claims.personId, opts));
       } catch (e) {
         exitWithError(e);
       }
