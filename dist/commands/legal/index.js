@@ -21,6 +21,54 @@ export async function runLegalShow(client, typeName, metaOnly) {
     }
     return doc;
 }
+/**
+ * Roll-up of the current ACTIVE document of EVERY type — fills the gap that
+ * `types` lists types and `show` covers one type, but nothing answers "what is
+ * live right now across all types". Client-side fan-out over the two existing
+ * read endpoints (no dedicated backend route). One row per type so types with
+ * no active version are visible (`hasActive:false`) rather than silently
+ * dropped. Content is stripped (reported as `contentLength`) — read a body via
+ * `ib legal show <typeName>`.
+ */
+export async function runLegalActive(client) {
+    const types = await runLegalTypes(client);
+    const items = await Promise.all(types.items.map(async (t) => {
+        const base = {
+            typeName: t.typeName,
+            displayName: t.displayName ?? null,
+            personSettingTypeId: t.personSettingTypeId,
+        };
+        try {
+            const doc = await client.get(`/api/legal-documents/current/${encodeURIComponent(t.typeName)}`);
+            const len = typeof doc.markdownContent === "string" ? doc.markdownContent.length : 0;
+            return {
+                ...base,
+                hasActive: true,
+                documentId: doc.documentId ?? null,
+                version: doc.version ?? null,
+                title: doc.title ?? null,
+                effectiveDate: doc.effectiveDate ?? null,
+                contentLength: len,
+            };
+        }
+        catch (e) {
+            // 404 = this type has no active document; any other status is a real error.
+            if (e instanceof CliError && e.statusCode === 404) {
+                return {
+                    ...base,
+                    hasActive: false,
+                    documentId: null,
+                    version: null,
+                    title: null,
+                    effectiveDate: null,
+                    contentLength: null,
+                };
+            }
+            throw e;
+        }
+    }));
+    return { items, nextCursor: null, count: items.length };
+}
 export async function runLegalStatus(client, personId, ownerAsiakasId) {
     const q = ownerAsiakasId != null ? `?ownerAsiakasId=${ownerAsiakasId}` : "";
     const data = await client.get(`/api/legal-documents/check-acceptances/${personId}${q}`);
@@ -178,6 +226,18 @@ export function registerLegalCommands(parent, getClient) {
         try {
             const client = await getClient();
             writeJson(await runLegalShow(client, typeName, !!opts.meta));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    legal
+        .command("active")
+        .description("Current ACTIVE document of EVERY type (one row per type; hasActive:false where none)")
+        .action(async () => {
+        try {
+            const client = await getClient();
+            writeJson(await runLegalActive(client));
         }
         catch (e) {
             exitWithError(e);

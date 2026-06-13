@@ -2,6 +2,7 @@ import { describe, test, expect, vi } from "vitest";
 import {
   runLegalTypes,
   runLegalShow,
+  runLegalActive,
   runLegalStatus,
   runLegalVersions,
   runLegalGet,
@@ -16,6 +17,7 @@ import {
   runLegalTypeUpdate,
   pickTypeFields,
 } from "../../src/commands/legal/index.js";
+import { CliError } from "../../src/api/errors.js";
 import type { ApiClient } from "../../src/api/client.js";
 import type { DecodedClaims } from "../../src/auth/jwt.js";
 
@@ -62,6 +64,41 @@ describe("ib legal reads", () => {
     const out = await runLegalShow(c, "TOS", false);
     expect(c.get).toHaveBeenCalledWith("/api/legal-documents/current/TOS");
     expect(out).toHaveProperty("markdownContent", "# hello");
+  });
+
+  test("active rolls up every type, marking hasActive and stripping content", async () => {
+    const c = mockClient();
+    (c.get as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(TYPES) // /types
+      .mockResolvedValueOnce({
+        documentId: 3, version: "2.0", title: "Käyttöehdot",
+        effectiveDate: "2026-01-01", markdownContent: "# hello",
+      }) // current/TOS
+      .mockRejectedValueOnce(new CliError("not found", 404, null, 5)); // current/GLOBAL
+    const out = await runLegalActive(c);
+    expect(c.get).toHaveBeenNthCalledWith(1, "/api/legal-documents/types");
+    expect(c.get).toHaveBeenNthCalledWith(2, "/api/legal-documents/current/TOS");
+    expect(c.get).toHaveBeenNthCalledWith(3, "/api/legal-documents/current/GLOBAL");
+    expect(out.count).toBe(2);
+    expect(out.items[0]).toEqual({
+      typeName: "TOS", displayName: "Käyttöehdot", personSettingTypeId: 40,
+      hasActive: true, documentId: 3, version: "2.0", title: "Käyttöehdot",
+      effectiveDate: "2026-01-01", contentLength: 7,
+    });
+    expect(out.items[0]).not.toHaveProperty("markdownContent");
+    expect(out.items[1]).toEqual({
+      typeName: "GLOBAL", displayName: "Global", personSettingTypeId: null,
+      hasActive: false, documentId: null, version: null, title: null,
+      effectiveDate: null, contentLength: null,
+    });
+  });
+
+  test("active rethrows a non-404 error from a per-type fetch", async () => {
+    const c = mockClient();
+    (c.get as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce([TYPES[0]]) // single type -> no second fetch to race
+      .mockRejectedValueOnce(new CliError("boom", 500, null, 6));
+    await expect(runLegalActive(c)).rejects.toMatchObject({ exitCode: 6 });
   });
 
   test("status strips content from missing docs and passes owner", async () => {

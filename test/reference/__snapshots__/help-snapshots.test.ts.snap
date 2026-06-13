@@ -3061,6 +3061,35 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib legal active matches snapshot 1`] = `
+"USAGE
+  ib legal active [flags]
+
+DESCRIPTION
+  Roll-up of the current ACTIVE document of EVERY type in one call — the single-view answer to 'what legal text is live right now'. One row per type: types with no active version appear with hasActive:false (not dropped). Content is stripped (contentLength only) — read a body via ib legal show <typeName>. Client-side fan-out over ib legal types + ib legal show.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{typeName, displayName, personSettingTypeId, hasActive, documentId, version, title, effectiveDate, contentLength}>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib legal types, ib legal show
+
+EXAMPLES
+  ib legal active
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib legal delete matches snapshot 1`] = `
 "USAGE
   ib legal delete <documentId> [flags]

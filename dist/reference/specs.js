@@ -2081,7 +2081,7 @@ export const COMMAND_SPECS = [
             "ib ohje update LaskupohjaTilaus --body '{\"title\":\"X\",\"htmltext\":\"<p>Y</p>\"}' --reason edit",
         ],
     },
-    // ─── legal (12) — versioned legal documents + acceptance tracking ─────────
+    // ─── legal (13) — versioned legal documents + acceptance tracking ─────────
     {
         command: "ib legal types",
         description: "List legal document types (EULA, TOS, PRIVACY, BETONIJERRY_TOS, ...) with their personSettingTypeId acceptance mapping. A NULL personSettingTypeId means acceptances for that type cannot be tracked.",
@@ -2107,6 +2107,16 @@ export const COMMAND_SPECS = [
         ],
         seeAlso: ["ib legal types", "ib legal versions"],
         examples: ["ib legal show BETONIJERRY_TOS", "ib legal show TOS --meta"],
+    },
+    {
+        command: "ib legal active",
+        description: "Roll-up of the current ACTIVE document of EVERY type in one call — the single-view answer to 'what legal text is live right now'. One row per type: types with no active version appear with hasActive:false (not dropped). Content is stripped (contentLength only) — read a body via ib legal show <typeName>. Client-side fan-out over ib legal types + ib legal show.",
+        auth: "any",
+        flags: [],
+        outputShape: "ListEnvelope<{typeName, displayName, personSettingTypeId, hasActive, documentId, version, title, effectiveDate, contentLength}>",
+        errors: COMMON_AUTH_ERRORS,
+        seeAlso: ["ib legal types", "ib legal show"],
+        examples: ["ib legal active"],
     },
     {
         command: "ib legal status",
