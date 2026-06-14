@@ -1,8 +1,5 @@
-import { buildProgram, enableParserThrow, handleParseRejection } from "./program.js";
+import { buildProgram, enableParserThrow, handleParseRejection, applySpecErrors } from "./program.js";
 import { runEmbedded, type EmbeddedCtx } from "./embedded.js";
-import { setActiveCommandErrors } from "./output/json.js";
-import { COMMAND_SPECS } from "./reference/specs.js";
-import type { Command } from "commander";
 
 export interface RunArgvOpts {
   token: string;
@@ -31,15 +28,7 @@ export async function runArgv(
   const parserText = enableParserThrow(program);
 
   // Mirror bin/ib.ts: resolve each command's CommandSpec errors for hint output.
-  program.hook("preAction", (_thisCommand, actionCommand: Command) => {
-    const parts: string[] = [];
-    for (let c: Command | null = actionCommand; c; c = c.parent) {
-      parts.unshift(c.name());
-    }
-    const path = parts.join(" ");
-    const spec = COMMAND_SPECS.find((s) => s.command === path);
-    setActiveCommandErrors(spec?.errors ?? null);
-  });
+  program.hook("preAction", (_t, actionCommand) => applySpecErrors(actionCommand));
 
   const ctx: EmbeddedCtx = {
     token: opts.token,

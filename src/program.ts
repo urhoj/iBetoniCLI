@@ -44,7 +44,7 @@ import { buildCommandsList, buildDomainIndex } from "./reference/commandsList.js
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
-import { writeJson, exitWithError, failWith, emitStderr } from "./output/json.js";
+import { writeJson, exitWithError, failWith, emitStderr, setActiveCommandErrors } from "./output/json.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { createApiClient } from "./api/client.js";
 import { CliError } from "./api/errors.js";
@@ -233,6 +233,23 @@ export function buildProgram(): Command {
   attachRichHelp(program, COMMAND_SPECS);
 
   return program;
+}
+
+/**
+ * Resolve the running command's `CommandSpec.errors` and stash them so error
+ * envelopes can echo the command's OWN documented remedy as `hint` (feedback
+ * #25). Walks the command up its `.parent` chain to reconstruct the full
+ * space-joined command path, matches it against {@link COMMAND_SPECS}, and
+ * sets the active errors (`null` when no spec matches → generic hints only).
+ *
+ * Shared by `bin/ib.ts` and `runArgv` so both resolve hints identically — the
+ * path-join logic must NOT drift between the two entry points.
+ */
+export function applySpecErrors(actionCommand: Command): void {
+  const parts: string[] = [];
+  for (let c: Command | null = actionCommand; c; c = c.parent) parts.unshift(c.name());
+  const spec = COMMAND_SPECS.find((s) => s.command === parts.join(" "));
+  setActiveCommandErrors(spec?.errors ?? null);
 }
 
 /**
