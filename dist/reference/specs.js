@@ -3637,5 +3637,131 @@ export const COMMAND_SPECS = [
             "ib search jäteasema --in sijainti",
         ],
     },
+    // ─── message chat (5) ────────────────────────────────────────────────────
+    {
+        command: "ib message chat threads",
+        description: "List your conversational message threads (inbox), newest first, with unread counts and a last-message preview. Projects GET /api/messages/threads/mine into the list envelope; --unread / --tarjous filter client-side.",
+        auth: "any",
+        flags: [
+            { name: "unread", type: "boolean", description: "Only threads with unreadCount > 0" },
+            { name: "tarjous", type: "number", description: "Only threads for this pumppuRequestId" },
+        ],
+        outputShape: "ListEnvelope<{ threadId, contextType, contextId, ownerAsiakasId, createdAt, lastMessageAt, lastReadAt, unreadCount, lastMessageBody }>",
+        errors: [...COMMON_AUTH_ERRORS],
+        notes: [
+            "Only threads you participate in are returned (server-scoped by your personId).",
+            "A keikka thread (contextType 'keikka') appears here automatically once keikka messaging ships — no CLI change needed.",
+        ],
+        seeAlso: ["ib message chat list", "ib message chat thread"],
+        examples: [
+            "ib message chat threads",
+            "ib message chat threads --unread",
+            "ib message chat threads --tarjous 23",
+        ],
+    },
+    {
+        command: "ib message chat thread",
+        description: "Get one thread's metadata + participants (display names, roles, asiakas). Target by threadId positional or resolve from --tarjous.",
+        auth: "any",
+        args: [
+            { name: "threadId", type: "number", required: false, description: "Thread id (omit when using --tarjous)" },
+        ],
+        flags: [
+            { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+        ],
+        outputShape: "{ thread: { threadId, contextType, contextId, ownerAsiakasId, createdAt, lastMessageAt, archivedAt }, participants: [{ participantId, personId, asiakasId, role, joinedAt, lastReadAt, leftAt, personFirstName, personLastName, asiakasNimi }] }",
+        errors: [
+            apiErr(403, "Not a participant of this thread", "you can only read threads you are part of"),
+            apiErr(404, "Thread not found", "verify the threadId / --tarjous"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        notes: [
+            "--tarjous resolves client-side over /threads/mine; if it matches multiple threads (one per competing provider) you get exit 4 listing the threadIds — pass one explicitly.",
+        ],
+        seeAlso: ["ib message chat threads", "ib message chat list"],
+        examples: ["ib message chat thread 42", "ib message chat thread --tarjous 23"],
+    },
+    {
+        command: "ib message chat list",
+        description: "List messages in a thread, oldest first. Does NOT mark the thread read (use `ib message chat mark-read`). Target by threadId or --tarjous; --since backfills, --limit caps.",
+        auth: "any",
+        args: [
+            { name: "threadId", type: "number", required: false, description: "Thread id (omit when using --tarjous)" },
+        ],
+        flags: [
+            { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+            { name: "since", type: "string", description: "Only messages created after this ISO timestamp" },
+            { name: "limit", type: "number", default: "100", description: "Max messages (server max 500)" },
+        ],
+        outputShape: "ListEnvelope<{ messageId, threadId, senderPersonId, senderAsiakasId, kind, body, source, sourceNote, createdAt, editedAt, personFirstName, personLastName, senderAsiakasNimi }>",
+        errors: [
+            apiErr(403, "Not a participant of this thread", "you can only read threads you are part of"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        notes: [
+            "Reading does NOT stamp lastReadAt — safe for an AI to browse without clearing your unread badge.",
+            "source/sourceNote are null until the provenance backend change is deployed.",
+        ],
+        seeAlso: ["ib message chat send", "ib message chat mark-read"],
+        examples: [
+            "ib message chat list 42",
+            "ib message chat list --tarjous 23 --limit 20",
+            "ib message chat list 42 --since 2026-06-14T10:00:00Z",
+        ],
+    },
+    {
+        command: "ib message chat send",
+        description: "Send a message to a thread (POST /api/messages/threads/:id/messages). Outward-facing: the recipient sees it and gets a push. --dry-run previews the body + recipients CLIENT-SIDE without sending. --reason is stored as the message's sourceNote (optional).",
+        auth: "any",
+        args: [
+            { name: "threadId", type: "number", required: false, description: "Thread id (omit when using --tarjous)" },
+        ],
+        flags: [
+            { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+            { name: "body", type: "string", required: true, description: "Message text (max 4000 chars)" },
+            { name: "source", type: "string", description: "Provenance: web|cli|ai (default: IB_SOURCE env or cli)" },
+        ],
+        writeFlags: true,
+        outputShape: "{ messageId, threadId, senderPersonId, senderAsiakasId, kind, body, source, sourceNote, createdAt } · { dryRun:true, threadId, wouldSend:{ body, source, sourceNote, recipients:[{ personId, name, role }] } } on --dry-run",
+        errors: [
+            apiErr(400, "Empty / too-long body", "body is required, max 4000 chars"),
+            apiErr(403, "Not a participant of this thread", "you can only post to threads you are part of"),
+            apiErr(409, "Thread archived", "archived threads are read-only"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        notes: [
+            "--dry-run only issues a GET (thread participants) — it works under --read-only and never persists.",
+            "--reason → sourceNote (optional; chat is conversational). source/sourceNote are persisted only after the provenance backend change deploys; until then the API silently ignores them.",
+            "An AI-driven send sets source=ai automatically via the IB_SOURCE env var.",
+        ],
+        seeAlso: ["ib message chat list", "ib message chat thread"],
+        examples: [
+            'ib message chat send 42 --body "Onko tyomaalle ajoyhteys raskaalle kalustolle?"',
+            'ib message chat send --tarjous 23 --body "Kiitos tarjouksesta" --dry-run',
+            'ib message chat send 42 --body "Vahvistettu" --reason "confirmed by phone"',
+        ],
+    },
+    {
+        command: "ib message chat mark-read",
+        description: "Mark a thread read — stamp your lastReadAt to now (POST /api/messages/threads/:id/read), clearing the unread badge. A write, so blocked under --read-only.",
+        auth: "any",
+        args: [
+            { name: "threadId", type: "number", required: false, description: "Thread id (omit when using --tarjous)" },
+        ],
+        flags: [
+            { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+        ],
+        mutates: true,
+        outputShape: "{ lastReadAt }",
+        errors: [
+            apiErr(403, "Not a participant of this thread", "you can only mark threads you are part of"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        notes: [
+            "Deliberately separate from `list` so reading never auto-marks (an AI can browse without clearing your unread state).",
+        ],
+        seeAlso: ["ib message chat list", "ib message chat threads"],
+        examples: ["ib message chat mark-read 42", "ib message chat mark-read --tarjous 23"],
+    },
 ];
 //# sourceMappingURL=specs.js.map
