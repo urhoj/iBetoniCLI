@@ -1,5 +1,43 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`Help snapshots — contract stability > help for ib ai conversation matches snapshot 1`] = `
+"USAGE
+  ib ai conversation <conversationId> [flags]
+
+DESCRIPTION
+  Fetch the FULL transcript of an /ai assistant conversation by id. Developer-only (isSystemAdmin / isDeveloper) and CROSS-TENANT — reads any tenant's conversation, because the id comes from an \`ib feedback\` row's context.conversationId (stamped automatically when the AI files feedback from the /ai page). Transcripts may contain customer PII.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <conversationId> NUMBER    gptConversations id (from a feedback row's context.conversationId) (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { conversationId, personId, ownerAsiakasId, messageCount, messages: [{ gptMessageId, role?, content?, raw?, ... }] }
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → conversationId must be a positive integer
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
+  exit 5 (HTTP 404)  Not found              → no conversation with that id
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Deploy-gated: 404 until puminet5api ships the /api/cli/ai/conversation/:id route.
+
+SEE ALSO
+  ib feedback get, ib feedback list
+
+EXAMPLES
+  ib ai conversation 4321
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib attachment attach matches snapshot 1`] = `
 "USAGE
   ib attachment attach <attachmentId> [flags]
@@ -2409,6 +2447,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - A description starting with "-" is parsed as an option (exit 4) — put a bare \`--\` terminator before it: ib feedback create --kind bug -- "--pretty output too wide". Everything after \`--\` is taken as positional text.
+  - When invoked by the betoni.online /ai assistant, the originating conversation id is auto-attached as context.conversationId (via the IB_CONVERSATION_ID env var the /ai loop injects) — a developer can then read the full conversation with \`ib ai conversation <id>\`. Manual CLI use does not set it.
 
 EXAMPLES
   ib feedback create "schema table output should include row counts"

@@ -151,6 +151,11 @@ export const GLOSSARY: GlossaryEntry[] = [
     definition:
       "A user-filed bug report in the bugReport system: severity/priority/status, a comment thread, GitHub-issue + admin-email workflow, and a developer triage tier (`ib bug …`). Distinct from `ib feedback` (the quiet CLI/AI friction sink).",
   },
+  {
+    term: "ai / conversation",
+    definition:
+      "An /ai assistant conversation (gptConversations/gptMessages). Read the full transcript by id with `ib ai conversation <id>` (developer-only). Feedback filed from /ai carries the originating id in context.conversationId.",
+  },
 ];
 
 /**
