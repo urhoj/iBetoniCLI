@@ -36,6 +36,7 @@ import { registerCacheCommands } from "./commands/cache/index.js";
 import { registerWeatherCommands } from "./commands/weather/index.js";
 import { registerChangelogCommands } from "./commands/changelog/index.js";
 import { registerFeedbackCommands } from "./commands/feedback/index.js";
+import { registerAiCommands } from "./commands/ai/index.js";
 import { registerBugCommands } from "./commands/bug/index.js";
 import { registerHelpCommands } from "./commands/help/index.js";
 import { registerVersionCommand } from "./commands/version/index.js";
@@ -154,6 +155,7 @@ export function buildProgram(): Command {
   registerWeatherCommands(program, getClient);
   registerChangelogCommands(program, getClient);
   registerFeedbackCommands(program, getClient);
+  registerAiCommands(program, getClient);
   registerBugCommands(program, getClient);
   registerSearchCommands(program, getClient);
   registerAttachmentCommands(program, getClient);
