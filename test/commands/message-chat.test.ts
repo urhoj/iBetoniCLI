@@ -3,6 +3,8 @@ import {
   runChatThreads,
   runChatThread,
   runChatList,
+  runChatSend,
+  runChatMarkRead,
 } from "../../src/commands/message/chat/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -70,5 +72,62 @@ describe("runChatList", () => {
     expect(mockClient.get).toHaveBeenCalledWith(
       "/api/messages/threads/42/messages?since=2026-06-14T10%3A00%3A00Z&limit=20"
     );
+  });
+});
+
+describe("runChatSend", () => {
+  const asPost = () => mockClient.post as ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    asGet().mockReset();
+    asPost().mockReset();
+  });
+
+  test("--dry-run previews recipients via a GET and never POSTs", async () => {
+    asGet().mockResolvedValueOnce({
+      thread: { threadId: 42 },
+      participants: [
+        { personId: 6233, personFirstName: "Kalle", personLastName: "Urho", role: "customer" },
+        { personId: 10, personFirstName: "Pia", personLastName: "Pumppu", role: "pumppu" },
+      ],
+    });
+    const res = (await runChatSend(mockClient, 42, {
+      body: "hei",
+      source: "cli",
+      dryRun: true,
+    })) as { dryRun: boolean; wouldSend: { recipients: unknown[]; source: string } };
+    expect(mockClient.get).toHaveBeenCalledWith("/api/messages/threads/42");
+    expect(mockClient.post).not.toHaveBeenCalled();
+    expect(res.dryRun).toBe(true);
+    expect(res.wouldSend.source).toBe("cli");
+    expect(res.wouldSend.recipients).toHaveLength(2);
+  });
+
+  test("a real send POSTs body + source (+ sourceNote when reason given)", async () => {
+    asPost().mockResolvedValueOnce({ messageId: 7, threadId: 42 });
+    await runChatSend(mockClient, 42, { body: "hei", source: "ai", reason: "auto-reply" });
+    expect(mockClient.post).toHaveBeenCalledWith("/api/messages/threads/42/messages", {
+      body: "hei",
+      source: "ai",
+      sourceNote: "auto-reply",
+    });
+  });
+
+  test("omits sourceNote when no reason", async () => {
+    asPost().mockResolvedValueOnce({ messageId: 8 });
+    await runChatSend(mockClient, 42, { body: "moi", source: "cli" });
+    expect(mockClient.post).toHaveBeenCalledWith("/api/messages/threads/42/messages", {
+      body: "moi",
+      source: "cli",
+    });
+  });
+});
+
+describe("runChatMarkRead", () => {
+  const asPost = () => mockClient.post as ReturnType<typeof vi.fn>;
+  beforeEach(() => asPost().mockReset());
+  test("POSTs to the read endpoint with an empty body", async () => {
+    asPost().mockResolvedValueOnce({ lastReadAt: "2026-06-14T12:00:00Z" });
+    await runChatMarkRead(mockClient, 42);
+    expect(mockClient.post).toHaveBeenCalledWith("/api/messages/threads/42/read", {});
   });
 });

@@ -57,3 +57,59 @@ export async function runChatList(
     )
   );
 }
+
+/** Options for {@link runChatSend}. `source` is already resolved by the action. */
+export interface ChatSendOpts {
+  body: string;
+  source: string;
+  reason?: string;
+  dryRun?: boolean;
+}
+
+/**
+ * POST /api/messages/threads/:id/messages — send a message.
+ *
+ * `--dry-run` is CLIENT-SIDE: the route has no X-Dry-Run guard
+ * ([[feedback_ib_dryrun_deploy_gated]]), so a "dry-run" that POSTed would
+ * actually send. Instead we GET the thread participants and return a preview of
+ * the body + who would receive it, issuing NO write (works under --read-only).
+ * A real send POSTs { body, source, sourceNote? }; the non-GET is naturally
+ * blocked by the read-only write-lock when active.
+ */
+export async function runChatSend(
+  client: ApiClient,
+  threadId: number,
+  opts: ChatSendOpts
+): Promise<unknown> {
+  if (opts.dryRun) {
+    const meta = await client.get<{ participants?: Row[] }>(
+      `/api/messages/threads/${threadId}`
+    );
+    const recipients = (meta.participants ?? []).map((p) => ({
+      personId: p.personId,
+      name: `${p.personFirstName ?? ""} ${p.personLastName ?? ""}`.trim(),
+      role: p.role,
+    }));
+    return {
+      dryRun: true,
+      threadId,
+      wouldSend: {
+        body: opts.body,
+        source: opts.source,
+        sourceNote: opts.reason ?? null,
+        recipients,
+      },
+    };
+  }
+  const payload: Row = { body: opts.body, source: opts.source };
+  if (opts.reason) payload.sourceNote = opts.reason;
+  return client.post<unknown>(`/api/messages/threads/${threadId}/messages`, payload);
+}
+
+/** POST /api/messages/threads/:id/read — stamp the caller's lastReadAt to now. */
+export async function runChatMarkRead(
+  client: ApiClient,
+  threadId: number
+): Promise<unknown> {
+  return client.post<unknown>(`/api/messages/threads/${threadId}/read`, {});
+}
