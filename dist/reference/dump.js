@@ -11,6 +11,7 @@
 import { COMMAND_SPECS } from "./specs.js";
 import { assertKnownDomain } from "./commandsList.js";
 import { DOMAIN_OVERVIEW, GLOSSARY, FEEDBACK_GUIDANCE, TOPICS } from "./domain.js";
+import { emitStdout } from "../output/json.js";
 import packageJson from "../../package.json" with { type: "json" };
 /**
  * Build the reference object. Pure — no I/O — so tests can assert on it
@@ -45,6 +46,6 @@ export function buildReference(domain) {
  * pushed the customer domain over the 10k-token audit threshold.
  */
 export function runReferenceDump(domain) {
-    process.stdout.write(JSON.stringify(buildReference(domain)) + "\n");
+    emitStdout(JSON.stringify(buildReference(domain)) + "\n");
 }
 //# sourceMappingURL=dump.js.map
