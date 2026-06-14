@@ -1194,7 +1194,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib person list",
     description:
-      "List persons (drivers, admins, etc.) visible to the active company. Optional --role uses ROLE_NAME_BY_TYPEID from @ibetoni/constants.",
+      "List the active company's MEMBERS — persons attached to it via asiakasPerson, the same set as `ib customer person list`. `--asiakas N` lists company N's members (you must belong to N); `--owned` lists persons the company OWNS (created, e.g. customer contacts) instead. Optional --role uses ROLE_NAME_BY_TYPEID from @ibetoni/constants.",
     permissions: ["auth.page.person.read"],
     flags: [
       {
@@ -1205,7 +1205,14 @@ export const COMMAND_SPECS: CommandSpec[] = [
       {
         name: "asiakas",
         type: "number",
-        description: "Filter by asiakasId membership",
+        description:
+          "List members of this company instead of your active one (you must belong to it)",
+      },
+      {
+        name: "owned",
+        type: "boolean",
+        description:
+          "List persons the company OWNS (person.ownerAsiakasId — e.g. customer contacts) instead of its members",
       },
       {
         name: "limit",
@@ -1218,11 +1225,21 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "ListEnvelope<{ personId, name, email, roles:number[] }>" + TRUNCATED_NOTE,
     errors: [
       apiErr(400, "Unknown role", "use a role from @ibetoni/constants ROLE_TYPEID_BY_NAME"),
+      apiErr(
+        403,
+        "Not a member of the --asiakas company",
+        "you can only list members of companies you belong to (sysadmin/developer bypass)"
+      ),
       ...permErrors("auth.page.person.read"),
     ],
+    notes: [
+      "Default lists MEMBERS (attached), not owned persons — a company that owns no persons but has members no longer lists empty. Use --owned for the ownership view.",
+    ],
+    seeAlso: ["ib customer person list", "ib person search"],
     examples: [
       "ib person list --role driver",
-      "ib person list --asiakas 1349 --limit 50",
+      "ib person list --asiakas 27",
+      "ib person list --owned",
     ],
   },
   {
