@@ -213,8 +213,8 @@ export function registerBugCommands(parent, getClient) {
         .option("--owner <asiakasId>", "Filter by owning tenant (admins only; ignored otherwise)", Number)
         .option("--limit <n>", "Max rows", Number)
         .option("--offset <n>", "Pagination offset", Number)
-        .option("--order-by <f>", "createdAt | updatedAt | severity | status | bugType | bugReportId")
-        .option("--order <dir>", "asc | desc")
+        .option("--order-by <f>", "createdAt | updatedAt | severity | status | bugType | bugReportId", "createdAt")
+        .option("--order <dir>", "asc | desc", "desc")
         .action(async (opts) => {
         try {
             writeJson(await runBugList(await getClient(), opts));
