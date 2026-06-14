@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   runFeedbackCreate,
   runFeedbackList,
@@ -123,6 +123,48 @@ describe("ib feedback create", () => {
     await expect(runFeedbackCreate(mockClient, { description: "   " })).rejects.toThrowError(
       CliError
     );
+    expect(post).not.toHaveBeenCalled();
+  });
+});
+
+// ─── /ai conversation provenance ─────────────────────────────────────────────
+
+describe("ib feedback create — /ai conversation provenance", () => {
+  const prev = process.env.IB_CONVERSATION_ID;
+  afterEach(() => {
+    if (prev === undefined) delete process.env.IB_CONVERSATION_ID;
+    else process.env.IB_CONVERSATION_ID = prev;
+  });
+
+  test("folds IB_CONVERSATION_ID into context.conversationId", async () => {
+    process.env.IB_CONVERSATION_ID = "4321";
+    post.mockResolvedValueOnce({ feedbackId: 1 });
+    await runFeedbackCreate(mockClient, { description: "grid crash", kind: "bug" });
+    expect(post.mock.calls[0][1]).toMatchObject({
+      kind: "bug",
+      description: "grid crash",
+      context: { conversationId: 4321 },
+    });
+  });
+
+  test("omits context when IB_CONVERSATION_ID is unset", async () => {
+    delete process.env.IB_CONVERSATION_ID;
+    post.mockResolvedValueOnce({ feedbackId: 2 });
+    await runFeedbackCreate(mockClient, { description: "x" });
+    expect(post.mock.calls[0][1]).not.toHaveProperty("context");
+  });
+
+  test("omits context when IB_CONVERSATION_ID is non-numeric or non-positive", async () => {
+    process.env.IB_CONVERSATION_ID = "abc";
+    post.mockResolvedValueOnce({ feedbackId: 3 });
+    await runFeedbackCreate(mockClient, { description: "x" });
+    expect(post.mock.calls[0][1]).not.toHaveProperty("context");
+  });
+
+  test("--dry-run includes context in wouldSend.body", async () => {
+    process.env.IB_CONVERSATION_ID = "9";
+    const out = await runFeedbackCreate(mockClient, { description: "x", dryRun: true });
+    expect(out).toMatchObject({ wouldSend: { body: { context: { conversationId: 9 } } } });
     expect(post).not.toHaveBeenCalled();
   });
 });
