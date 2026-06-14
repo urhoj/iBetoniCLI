@@ -362,7 +362,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib auth refresh"],
   },
 
-  // ─── company (3) ─────────────────────────────────────────────────────────
+  // ─── company (4) ─────────────────────────────────────────────────────────
   {
     command: "ib company list",
     description:
@@ -414,6 +414,37 @@ export const COMMAND_SPECS: CommandSpec[] = [
       "For a one-command company context that does NOT persist, use the global `--company <id>` flag instead.",
     ],
     examples: ["ib company switch --to 1349"],
+  },
+  {
+    command: "ib company validate",
+    description:
+      "Run a company-setup validation profile — a pass/fail checklist with Finnish details naming what is missing. Profiles: jerry (BetoniJerry provider readiness), betoni (betoni.online customer base setup). Omit the profile (or use 'list') to list available profiles. GET /api/validation/:profile/:asiakasId.",
+    permissions: ["system admin OR admin-tier role in the target company"],
+    args: [
+      {
+        name: "profile",
+        type: "string",
+        required: false,
+        description: "Profile id (jerry | betoni). Omit or 'list' to list profiles.",
+      },
+    ],
+    flags: [
+      { name: "asiakas", type: "number", description: "Target asiakasId (default: active company)" },
+    ],
+    outputShape:
+      "No profile: ListEnvelope<{ id, titleFi, description }>. With profile: { profile, asiakasId, asiakasNimi, ok, summary:{required,recommended,optional?}, checks:[{ id, severity:'required'|'recommended'|'optional', status:'pass'|'fail', titleFi, detail? }] }",
+    errors: [
+      apiErr(401, "Token expired", "ib auth refresh"),
+      apiErr(403, "Not an admin of the target company", "use an admin token or validate your own company"),
+      apiErr(404, "Unknown profile or company", "run `ib company validate` to list profiles"),
+    ],
+    notes: [
+      "ok = every 'required' check passes; recommended/optional failures do not flip it.",
+      "Exit code is 0 even when ok:false — the JSON carries the outcome.",
+      "Deploy-gated: returns 404 until /api/validation is deployed.",
+    ],
+    seeAlso: ["ib jerry admin detail", "ib customer modules"],
+    examples: ["ib company validate", "ib company validate jerry --asiakas 8", "ib company validate betoni"],
   },
 
   // ─── keikka (6) ──────────────────────────────────────────────────────────
@@ -662,38 +693,6 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
   },
 
-  // ─── validate (1) ──────────────────────────────────────────────────────────
-  {
-    command: "ib validate",
-    description:
-      "Run a company-setup validation profile — a pass/fail checklist with Finnish details naming what is missing. Profiles: jerry (BetoniJerry provider readiness), betoni (betoni.online customer base setup). Omit the profile (or use 'list') to list available profiles. GET /api/validation/:profile/:asiakasId.",
-    permissions: ["system admin OR admin-tier role in the target company"],
-    args: [
-      {
-        name: "profile",
-        type: "string",
-        required: false,
-        description: "Profile id (jerry | betoni). Omit or 'list' to list profiles.",
-      },
-    ],
-    flags: [
-      { name: "asiakas", type: "number", description: "Target asiakasId (default: active company)" },
-    ],
-    outputShape:
-      "No profile: ListEnvelope<{ id, titleFi, description }>. With profile: { profile, asiakasId, asiakasNimi, ok, summary:{required,recommended,optional?}, checks:[{ id, severity:'required'|'recommended'|'optional', status:'pass'|'fail', titleFi, detail? }] }",
-    errors: [
-      apiErr(401, "Token expired", "ib auth refresh"),
-      apiErr(403, "Not an admin of the target company", "use an admin token or validate your own company"),
-      apiErr(404, "Unknown profile or company", "run `ib validate` to list profiles"),
-    ],
-    notes: [
-      "ok = every 'required' check passes; recommended/optional failures do not flip it.",
-      "Exit code is 0 even when ok:false — the JSON carries the outcome.",
-      "Deploy-gated: returns 404 until /api/validation is deployed.",
-    ],
-    seeAlso: ["ib jerry admin detail", "ib customer modules"],
-    examples: ["ib validate", "ib validate jerry --asiakas 8", "ib validate betoni"],
-  },
 
   // ─── customer (7) ────────────────────────────────────────────────────────
   {

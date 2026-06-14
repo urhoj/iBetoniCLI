@@ -28,7 +28,7 @@ describe("pretty output", () => {
     expect(out).toMatch(/pvm.*2026-06-01/);
   });
 
-  // feedback #34: --pretty exploded nested payloads (ib validate jerry: 1.5KB
+  // feedback #34: --pretty exploded nested payloads (ib company validate jerry: 1.5KB
   // JSON → ~30KB table with 1200-char lines). Tables must never exceed the
   // terminal width, and arrays of objects render as per-row key:value lines.
   // eslint-disable-next-line no-control-regex

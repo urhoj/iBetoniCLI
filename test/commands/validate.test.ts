@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
-import { runValidate, runValidateProfiles } from "../../src/commands/validate/index.js";
+import { runValidate, runValidateProfiles } from "../../src/commands/company/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
 function mockClient(getImpl: (path: string) => unknown): ApiClient {

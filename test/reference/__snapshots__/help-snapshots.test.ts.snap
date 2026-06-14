@@ -1500,6 +1500,46 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib company validate matches snapshot 1`] = `
+"USAGE
+  ib company validate [<profile>] [flags]
+
+DESCRIPTION
+  Run a company-setup validation profile — a pass/fail checklist with Finnish details naming what is missing. Profiles: jerry (BetoniJerry provider readiness), betoni (betoni.online customer base setup). Omit the profile (or use 'list') to list available profiles. GET /api/validation/:profile/:asiakasId.
+  Permissions: requires system admin OR admin-tier role in the target company.
+
+ARGUMENTS
+  <profile> STRING    Profile id (jerry | betoni). Omit or 'list' to list profiles. (optional)
+
+FLAGS
+  --asiakas NUMBER    Target asiakasId (default: active company)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  No profile: ListEnvelope<{ id, titleFi, description }>. With profile: { profile, asiakasId, asiakasNimi, ok, summary:{required,recommended,optional?}, checks:[{ id, severity:'required'|'recommended'|'optional', status:'pass'|'fail', titleFi, detail? }] }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not an admin of the target company → use an admin token or validate your own company
+  exit 5 (HTTP 404)  Unknown profile or company → run \`ib company validate\` to list profiles
+
+NOTES
+  - ok = every 'required' check passes; recommended/optional failures do not flip it.
+  - Exit code is 0 even when ok:false — the JSON carries the outcome.
+  - Deploy-gated: returns 404 until /api/validation is deployed.
+
+SEE ALSO
+  ib jerry admin detail, ib customer modules
+
+EXAMPLES
+  ib company validate
+  ib company validate jerry --asiakas 8
+  ib company validate betoni
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib customer create matches snapshot 1`] = `
 "USAGE
   ib customer create [flags]
@@ -6703,46 +6743,6 @@ EXAMPLES
   ib stats --month 2026-06
   ib stats --from 2026-06-01 --to 2026-06-07 --by driver
   ib stats --today --pretty
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib validate matches snapshot 1`] = `
-"USAGE
-  ib validate [<profile>] [flags]
-
-DESCRIPTION
-  Run a company-setup validation profile — a pass/fail checklist with Finnish details naming what is missing. Profiles: jerry (BetoniJerry provider readiness), betoni (betoni.online customer base setup). Omit the profile (or use 'list') to list available profiles. GET /api/validation/:profile/:asiakasId.
-  Permissions: requires system admin OR admin-tier role in the target company.
-
-ARGUMENTS
-  <profile> STRING    Profile id (jerry | betoni). Omit or 'list' to list profiles. (optional)
-
-FLAGS
-  --asiakas NUMBER    Target asiakasId (default: active company)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  No profile: ListEnvelope<{ id, titleFi, description }>. With profile: { profile, asiakasId, asiakasNimi, ok, summary:{required,recommended,optional?}, checks:[{ id, severity:'required'|'recommended'|'optional', status:'pass'|'fail', titleFi, detail? }] }
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not an admin of the target company → use an admin token or validate your own company
-  exit 5 (HTTP 404)  Unknown profile or company → run \`ib validate\` to list profiles
-
-NOTES
-  - ok = every 'required' check passes; recommended/optional failures do not flip it.
-  - Exit code is 0 even when ok:false — the JSON carries the outcome.
-  - Deploy-gated: returns 404 until /api/validation is deployed.
-
-SEE ALSO
-  ib jerry admin detail, ib customer modules
-
-EXAMPLES
-  ib validate
-  ib validate jerry --asiakas 8
-  ib validate betoni
 "
 `;
 

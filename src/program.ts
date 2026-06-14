@@ -26,7 +26,6 @@ import { registerJerryCommands } from "./commands/jerry/index.js";
 import { registerMessageCommands } from "./commands/message/index.js";
 import { registerScheduleCommands } from "./commands/schedule/index.js";
 import { registerStatsCommands } from "./commands/stats/index.js";
-import { registerValidateCommands } from "./commands/validate/index.js";
 import { registerLogCommands } from "./commands/log/index.js";
 import { registerSearchCommands } from "./commands/search/index.js";
 import { registerAttachmentCommands } from "./commands/attachment/index.js";
@@ -143,7 +142,6 @@ export function buildProgram(): Command {
   registerMessageCommands(program, getClient);
   registerScheduleCommands(program, getClient);
   registerStatsCommands(program, getClient);
-  registerValidateCommands(program, getClient);
   registerLogCommands(program, getClient);
   registerSchemaCommands(program, getClient);
   registerCacheCommands(program, getClient);

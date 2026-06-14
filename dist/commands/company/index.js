@@ -1,6 +1,20 @@
 import { createStore, defaultCredentialsPath } from "../../auth/store.js";
 import { performSwitch, assertPersistedSwitchAllowed, } from "../../auth/switch.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { decodeJwtPayload } from "../../auth/jwt.js";
+import { CliError } from "../../api/errors.js";
+/** GET /api/validation/profiles → ListEnvelope. */
+export async function runValidateProfiles(client) {
+    const items = await client.get("/api/validation/profiles");
+    return { items, nextCursor: null, count: items.length };
+}
+/** GET /api/validation/:profile/:asiakasId — server-evaluated checklist. */
+export async function runValidate(client, profile, asiakasId) {
+    if (!Number.isInteger(asiakasId) || asiakasId < 1) {
+        throw new CliError("--asiakas must be a positive integer", 0, null, 4);
+    }
+    return client.get(`/api/validation/${encodeURIComponent(profile)}/${asiakasId}`);
+}
 function companyName(c) {
     return c.asiakasNimi ?? c.name ?? "";
 }
@@ -97,6 +111,29 @@ export function registerCompanyCommands(parent, getClient, isReadOnly) {
                     name: next.ownerAsiakasName,
                 },
             });
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    // `validate` runs a per-company setup checklist (jerry / betoni profiles), so
+    // it lives with the other company commands. Bare `validate` (or the reserved
+    // word `list`) lists profiles; a profile id runs the server-side checklist.
+    // The profile string is passed through, so new server-side profiles need zero
+    // CLI changes. Deploy-gated: 404 until /api/validation is deployed.
+    company
+        .command("validate [profile]")
+        .description("Run a company-setup validation profile (jerry, betoni); omit profile or use 'list' to list profiles")
+        .option("--asiakas <id>", "Target asiakasId (default: active company)", Number)
+        .action(async (profile, opts) => {
+        try {
+            const client = await getClient();
+            if (!profile || profile === "list") {
+                writeJson(await runValidateProfiles(client));
+                return;
+            }
+            const asiakasId = opts.asiakas ?? decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId;
+            writeJson(await runValidate(client, profile, asiakasId));
         }
         catch (e) {
             exitWithError(e);
