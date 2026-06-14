@@ -94,3 +94,47 @@ export async function runBugCreate(
   );
   return { bugReportId: res.bugReportId, referenceNumber: res.referenceNumber };
 }
+
+export interface BugListOpts {
+  status?: string;
+  severity?: string;
+  type?: string;
+  owner?: number;
+  limit?: number;
+  offset?: number;
+  orderBy?: string;
+  order?: string;
+}
+
+/**
+ * GET /api/bugs/list — permission-filtered server-side (a non-admin sees their
+ * own + company reports; admins see all and may filter by --owner). Projects
+ * the { success, data } envelope into the universal ListEnvelope.
+ */
+export async function runBugList(
+  client: ApiClient,
+  opts: BugListOpts
+): Promise<ListEnvelope<Record<string, unknown>>> {
+  assertEnum(opts.status, STATUSES, "status");
+  assertEnum(opts.severity, SEVERITIES, "severity");
+  assertEnum(opts.type, BUG_TYPES, "type");
+  assertEnum(opts.orderBy, ORDER_BY, "order-by");
+  assertEnum(opts.order, ORDER_DIR, "order");
+
+  const qs = new URLSearchParams();
+  if (opts.status) qs.set("status", opts.status);
+  if (opts.severity) qs.set("severity", opts.severity);
+  if (opts.type) qs.set("bugType", opts.type);
+  if (opts.owner !== undefined) qs.set("ownerAsiakasId", String(opts.owner));
+  if (opts.limit !== undefined) qs.set("limit", String(opts.limit));
+  if (opts.offset !== undefined) qs.set("offset", String(opts.offset));
+  if (opts.orderBy) qs.set("orderBy", opts.orderBy);
+  if (opts.order) qs.set("orderDirection", opts.order);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+
+  const res = await client.get<unknown>(`/api/bugs/list${suffix}`);
+  const data = unwrapData(res);
+  const items = Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
+  const truncated = opts.limit !== undefined && items.length >= opts.limit;
+  return { items, nextCursor: null, count: items.length, truncated };
+}

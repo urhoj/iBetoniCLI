@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import {
   runBugCreate,
+  runBugList,
 } from "../../src/commands/bug/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -105,5 +106,52 @@ describe("ib bug create", () => {
     await expect(
       runBugCreate(mockClient, { type: "other", severity: "minor", description: "x", priority: "p0" })
     ).rejects.toThrowError(CliError);
+  });
+});
+
+describe("ib bug list", () => {
+  test("maps filters to the querystring and projects { success, data } into the envelope", async () => {
+    get.mockResolvedValueOnce({ success: true, data: [{ bugReportId: 1 }, { bugReportId: 2 }] });
+    const out = await runBugList(mockClient, {
+      status: "new",
+      severity: "major",
+      type: "functionality-error",
+      owner: 1349,
+      limit: 20,
+      offset: 0,
+      orderBy: "severity",
+      order: "asc",
+    });
+    expect(get).toHaveBeenCalledWith(
+      "/api/bugs/list?status=new&severity=major&bugType=functionality-error&ownerAsiakasId=1349&limit=20&offset=0&orderBy=severity&orderDirection=asc"
+    );
+    expect(out).toEqual({
+      items: [{ bugReportId: 1 }, { bugReportId: 2 }],
+      nextCursor: null,
+      count: 2,
+      truncated: false,
+    });
+  });
+
+  test("no filters → bare path; null data tolerated", async () => {
+    get.mockResolvedValueOnce(null);
+    const out = await runBugList(mockClient, {});
+    expect(get).toHaveBeenCalledWith("/api/bugs/list");
+    expect(out).toEqual({ items: [], nextCursor: null, count: 0, truncated: false });
+  });
+
+  test("sets truncated when rows hit the limit", async () => {
+    get.mockResolvedValueOnce({ data: [{ bugReportId: 1 }, { bugReportId: 2 }] });
+    const out = await runBugList(mockClient, { limit: 2 });
+    expect(out).toMatchObject({ count: 2, truncated: true });
+  });
+
+  test("bad --status → exit 4, no GET", async () => {
+    await expect(runBugList(mockClient, { status: "bogus" })).rejects.toMatchObject({ exitCode: 4 });
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  test("bad --order-by → exit 4", async () => {
+    await expect(runBugList(mockClient, { orderBy: "hacker" })).rejects.toThrowError(CliError);
   });
 });
