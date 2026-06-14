@@ -105,20 +105,31 @@ describe("runChatSend", () => {
   test("a real send POSTs body + source (+ sourceNote when reason given)", async () => {
     asPost().mockResolvedValueOnce({ messageId: 7, threadId: 42 });
     await runChatSend(mockClient, 42, { body: "hei", source: "ai", reason: "auto-reply" });
-    expect(mockClient.post).toHaveBeenCalledWith("/api/messages/threads/42/messages", {
-      body: "hei",
-      source: "ai",
-      sourceNote: "auto-reply",
-    });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/messages/threads/42/messages",
+      { body: "hei", source: "ai", sourceNote: "auto-reply" },
+      { headers: { "X-Action-Reason": "auto-reply" } }
+    );
   });
 
   test("omits sourceNote when no reason", async () => {
     asPost().mockResolvedValueOnce({ messageId: 8 });
     await runChatSend(mockClient, 42, { body: "moi", source: "cli" });
-    expect(mockClient.post).toHaveBeenCalledWith("/api/messages/threads/42/messages", {
-      body: "moi",
-      source: "cli",
-    });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/messages/threads/42/messages",
+      { body: "moi", source: "cli" },
+      { headers: {} }
+    );
+  });
+
+  test("forwards --idempotency-key as the Idempotency-Key header", async () => {
+    asPost().mockResolvedValueOnce({ messageId: 9 });
+    await runChatSend(mockClient, 42, { body: "x", source: "cli", idempotencyKey: "abc-123" });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/messages/threads/42/messages",
+      { body: "x", source: "cli" },
+      { headers: { "Idempotency-Key": "abc-123" } }
+    );
   });
 });
 

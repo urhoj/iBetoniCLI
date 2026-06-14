@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../../api/client.js";
 import type { ListEnvelope } from "../../../api/envelopes.js";
-import { addWriteFlagsToCommand } from "../../../api/writeFlags.js";
+import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../../output/json.js";
 import { resolveThreadId, type ThreadTarget } from "./resolveThread.js";
 
@@ -63,6 +63,7 @@ export interface ChatSendOpts {
   body: string;
   source: string;
   reason?: string;
+  idempotencyKey?: string;
   dryRun?: boolean;
 }
 
@@ -103,7 +104,9 @@ export async function runChatSend(
   }
   const payload: Row = { body: opts.body, source: opts.source };
   if (opts.reason) payload.sourceNote = opts.reason;
-  return client.post<unknown>(`/api/messages/threads/${threadId}/messages`, payload);
+  return client.post<unknown>(`/api/messages/threads/${threadId}/messages`, payload, {
+    headers: writeFlagsToHeaders({ idempotencyKey: opts.idempotencyKey, reason: opts.reason }),
+  });
 }
 
 /** POST /api/messages/threads/:id/read — stamp the caller's lastReadAt to now. */
@@ -222,6 +225,7 @@ export function registerMessageChatCommands(
             body,
             source,
             reason: opts.reason,
+            idempotencyKey: opts.idempotencyKey,
             dryRun: opts.dryRun,
           })
         );
