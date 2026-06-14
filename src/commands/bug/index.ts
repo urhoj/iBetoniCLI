@@ -247,3 +247,27 @@ export async function runBugAdminStats(
   const res = await client.get<unknown>(`/api/bugs/admin/statistics${qs}`);
   return unwrapData(res);
 }
+
+export interface BugAdminDeleteInput {
+  reason?: string;
+  dryRun?: boolean;
+}
+
+/** DELETE /api/bugs/admin/:id — developer-only, irreversible. --reason required. */
+export async function runBugAdminDelete(
+  client: ApiClient,
+  id: number,
+  input: BugAdminDeleteInput
+): Promise<Record<string, unknown>> {
+  const reason = input.reason?.trim();
+  if (!reason) throw new CliError("--reason is required for delete", 400, null, 4);
+  const path = `/api/bugs/admin/${id}`;
+  if (input.dryRun) {
+    return {
+      dryRun: true,
+      wouldSend: { method: "DELETE", path, headers: { "X-Action-Reason": reason } },
+    };
+  }
+  await client.delete<unknown>(path, { headers: writeFlagsToHeaders({ reason }) });
+  return { success: true, bugReportId: id };
+}

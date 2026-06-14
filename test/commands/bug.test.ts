@@ -7,6 +7,7 @@ import {
   runBugAdminUpdate,
   runBugAdminAssign,
   runBugAdminStats,
+  runBugAdminDelete,
 } from "../../src/commands/bug/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -292,5 +293,35 @@ describe("ib bug admin stats", () => {
     get.mockResolvedValueOnce({ data: {} });
     await runBugAdminStats(mockClient, { owner: 1349 });
     expect(get).toHaveBeenCalledWith("/api/bugs/admin/statistics?ownerAsiakasId=1349");
+  });
+});
+
+describe("ib bug admin delete", () => {
+  test("DELETEs with the reason header and returns { success, bugReportId }", async () => {
+    del.mockResolvedValueOnce({ success: true });
+    const out = await runBugAdminDelete(mockClient, 51, { reason: "duplicate of 40" });
+    expect(del).toHaveBeenCalledWith("/api/bugs/admin/51", {
+      headers: { "X-Action-Reason": "duplicate of 40" },
+    });
+    expect(out).toEqual({ success: true, bugReportId: 51 });
+  });
+
+  test("--dry-run previews and never DELETEs", async () => {
+    const out = await runBugAdminDelete(mockClient, 51, { reason: "dup", dryRun: true });
+    expect(del).not.toHaveBeenCalled();
+    expect(out).toEqual({
+      dryRun: true,
+      wouldSend: {
+        method: "DELETE",
+        path: "/api/bugs/admin/51",
+        headers: { "X-Action-Reason": "dup" },
+      },
+    });
+  });
+
+  test("missing --reason → exit 4, no DELETE", async () => {
+    await expect(runBugAdminDelete(mockClient, 51, {})).rejects.toMatchObject({ exitCode: 4 });
+    await expect(runBugAdminDelete(mockClient, 51, { reason: "  " })).rejects.toThrowError(CliError);
+    expect(del).not.toHaveBeenCalled();
   });
 });
