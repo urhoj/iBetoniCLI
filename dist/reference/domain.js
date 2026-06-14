@@ -112,6 +112,10 @@ export const GLOSSARY = [
         term: "legal",
         definition: "Versioned legal documents (TOS, EULA, privacy) in dbo.legalDocuments; per-person acceptances tracked via personSettings (`ib legal …`).",
     },
+    {
+        term: "vikaraportti / bug report",
+        definition: "A user-filed bug report in the bugReport system: severity/priority/status, a comment thread, GitHub-issue + admin-email workflow, and a developer triage tier (`ib bug …`). Distinct from `ib feedback` (the quiet CLI/AI friction sink).",
+    },
 ];
 /**
  * Guidance for an AI consuming this CLI on WHEN to file feedback. Surfaced in
