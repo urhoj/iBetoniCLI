@@ -6,6 +6,7 @@ import {
   runBugComment,
   runBugAdminUpdate,
   runBugAdminAssign,
+  runBugAdminStats,
 } from "../../src/commands/bug/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -276,5 +277,20 @@ describe("ib bug admin assign", () => {
     await expect(runBugAdminAssign(mockClient, 51, {})).rejects.toMatchObject({ exitCode: 4 });
     await expect(runBugAdminAssign(mockClient, 51, { to: 0 })).rejects.toThrowError(CliError);
     expect(post).not.toHaveBeenCalled();
+  });
+});
+
+describe("ib bug admin stats", () => {
+  test("GETs statistics and unwraps .data", async () => {
+    get.mockResolvedValueOnce({ success: true, data: { total: 12, open: 3 } });
+    const out = await runBugAdminStats(mockClient, {});
+    expect(get).toHaveBeenCalledWith("/api/bugs/admin/statistics");
+    expect(out).toEqual({ total: 12, open: 3 });
+  });
+
+  test("forwards --owner as ownerAsiakasId", async () => {
+    get.mockResolvedValueOnce({ data: {} });
+    await runBugAdminStats(mockClient, { owner: 1349 });
+    expect(get).toHaveBeenCalledWith("/api/bugs/admin/statistics?ownerAsiakasId=1349");
   });
 });

@@ -237,3 +237,13 @@ export async function runBugAdminAssign(
   });
   return unwrapData(res);
 }
+
+/** GET /api/bugs/admin/statistics — developer-only aggregate counts. */
+export async function runBugAdminStats(
+  client: ApiClient,
+  opts: { owner?: number }
+): Promise<unknown> {
+  const qs = opts.owner !== undefined ? `?ownerAsiakasId=${opts.owner}` : "";
+  const res = await client.get<unknown>(`/api/bugs/admin/statistics${qs}`);
+  return unwrapData(res);
+}
