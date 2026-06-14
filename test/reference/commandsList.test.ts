@@ -204,5 +204,10 @@ describe("buildDomainIndex", () => {
     // pin jerry → BetoniJerry blurb (a GLOSSARY reorder could shadow it via jerryActiveUntil)
     const jerry = env.items.find((i) => i.domain === "jerry");
     expect(jerry?.description).toMatch(/BetoniJerry|request-for-quote/i);
+    // regression: "ai" must NOT inherit sijainti's blurb via the "ai" ⊂ "sijainti"
+    // substring collision — whole-word match wins (see glossaryBlurbForDomain).
+    const ai = env.items.find((i) => i.domain === "ai");
+    expect(ai?.description).toMatch(/conversation/i);
+    expect(ai?.description).not.toMatch(/geocoded location/i);
   });
 });

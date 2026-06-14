@@ -14,7 +14,7 @@ import {
 } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
-import { roleNameForTypeId, resolveRoleTypeId } from "../../roles.js";
+import { roleNameForTypeId, resolveRoleTypeId, explainRole } from "../../roles.js";
 import { runCompanyList } from "../company/index.js";
 import { CliError } from "../../api/errors.js";
 import { registerPersonDayCommands } from "./day.js";
@@ -708,6 +708,25 @@ export function registerPersonCommands(
       exitWithError(e);
     }
   });
+
+  // `explain` resolves typeId/tiers/deprecation OFFLINE from @ibetoni/constants,
+  // then enriches with the LIVE DB description/comment via an authenticated GET
+  // (GET /api/asiakasPersonSettings/getAllTypes) — the network/transform logic
+  // lives in `explainRole` (src/roles.ts), keeping this action thin. It disambiguates
+  // the role names accepted by `person role grant/revoke` (and `customer person list --role`).
+  personRole
+    .command("explain <name>")
+    .description(
+      "Explain a role name: typeId, display name, DB description/comment, access tiers, deprecation"
+    )
+    .action(async (name: string) => {
+      try {
+        const client = await getClient();
+        writeJson(await explainRole(client, name));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
 
   // ─── self-introspection ───────────────────────────────────────────────────
   p.command("me")

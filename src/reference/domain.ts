@@ -196,7 +196,7 @@ export const TOPICS: Topic[] = [
     id: "roles",
     title: "Role model (two layers)",
     body:
-      "`customer person list` row `roleTypeId` only echoes the --role FILTER (null = base membership), NOT the person's role set. For the full per-company roles use `ib person role list <personId> --asiakas <id>`. One `person role grant` adds exactly ONE setting (no bundle). Resolve role NAME<->typeId and see access tiers with `ib role explain <name>`.",
+      "`customer person list` row `roleTypeId` only echoes the --role FILTER (null = base membership), NOT the person's role set. For the full per-company roles use `ib person role list <personId> --asiakas <id>`. One `person role grant` adds exactly ONE setting (no bundle). Resolve role NAME<->typeId and see access tiers with `ib person role explain <name>`.",
   },
   {
     id: "jerry-lifecycle",

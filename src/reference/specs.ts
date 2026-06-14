@@ -1330,6 +1330,21 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib person role revoke 5351 --role keikkaHandler --asiakas 26 --reason rotation"],
   },
   {
+    command: "ib person role explain",
+    description:
+      "Explain a role NAME: its asiakasPersonSettingTypeId, human display name, the access tiers it grants (anyAdmin/anyWorker/anyViewer/laskuRead/requestOffer/adminCompanySelection), and whether it is deprecated — all from @ibetoni/constants. Enriched with the LIVE DB `description` (internal flag name, e.g. isAsiakasAdmin) and `comment` (rich Finnish text) read from GET /api/asiakasPersonSettings/getAllTypes, so the prose never drifts from dbo.asiakasPersonSettingTypes. Requires auth (any logged-in user); description/comment are null for roles the endpoint omits (soft-deleted pumppuHandler/Viewer). Use it to disambiguate the role names accepted by `person role grant/revoke` and `customer person list --role`.",
+    auth: "any",
+    args: [{ name: "name", type: "string", description: "role name (e.g. asiakasAdmin, keikkaHandler, lomaseurannassa)" }],
+    flags: [],
+    outputShape: "{ role, typeId, displayName: string|null, description: string|null, comment: string|null, tiers: string[], deprecated: boolean }",
+    errors: [
+      apiErr(400, "Unknown role name", "see ROLE_TYPEID_BY_NAME in @ibetoni/constants"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    seeAlso: ["ib person role grant", "ib person role revoke", "ib customer person list"],
+    examples: ["ib person role explain asiakasAdmin", "ib person role explain lomaseurannassa"],
+  },
+  {
     command: "ib person me",
     description:
       "Your own profile, your roles aggregated across all your companies, and the companies you can act on. Derives identity from the JWT (works with IB_TOKEN). For the roles scoped to a single company, use `person role list --asiakas`.",
@@ -2630,21 +2645,6 @@ export const COMMAND_SPECS: CommandSpec[] = [
     ],
     seeAlso: ["ib person role list"],
     examples: ["ib customer person list 26", "ib customer person list --asiakas 26 --role keikkaHandler", "ib customer person list 27 --include-roles"],
-  },
-  {
-    command: "ib role explain",
-    description:
-      "Explain a role NAME: its asiakasPersonSettingTypeId, human display name, the access tiers it grants (anyAdmin/anyWorker/anyViewer/laskuRead/requestOffer/adminCompanySelection), and whether it is deprecated — all from @ibetoni/constants. Enriched with the LIVE DB `description` (internal flag name, e.g. isAsiakasAdmin) and `comment` (rich Finnish text) read from GET /api/asiakasPersonSettings/getAllTypes, so the prose never drifts from dbo.asiakasPersonSettingTypes. Requires auth (any logged-in user); description/comment are null for roles the endpoint omits (soft-deleted pumppuHandler/Viewer). Use it to disambiguate the role names accepted by `person role grant/revoke` and `customer person list --role`.",
-    auth: "any",
-    args: [{ name: "name", type: "string", description: "role name (e.g. asiakasAdmin, keikkaHandler, lomaseurannassa)" }],
-    flags: [],
-    outputShape: "{ role, typeId, displayName: string|null, description: string|null, comment: string|null, tiers: string[], deprecated: boolean }",
-    errors: [
-      apiErr(400, "Unknown role name", "see ROLE_TYPEID_BY_NAME in @ibetoni/constants"),
-      ...COMMON_AUTH_ERRORS,
-    ],
-    seeAlso: ["ib person role grant", "ib person role revoke", "ib customer person list"],
-    examples: ["ib role explain asiakasAdmin", "ib role explain lomaseurannassa"],
   },
   {
     command: "ib worksite delete",

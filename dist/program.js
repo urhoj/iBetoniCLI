@@ -16,7 +16,6 @@ import { registerKeikkaCommands } from "./commands/keikka/index.js";
 import { registerCustomerCommands } from "./commands/customer/index.js";
 import { registerWorksiteCommands } from "./commands/worksite/index.js";
 import { registerPersonCommands } from "./commands/person/index.js";
-import { registerRoleCommands } from "./commands/role/index.js";
 import { registerVehicleCommands } from "./commands/vehicle/index.js";
 import { registerDriverCommands } from "./commands/driver/index.js";
 import { registerSijaintiCommands } from "./commands/sijainti/index.js";
@@ -55,7 +54,7 @@ export function buildProgram() {
     const program = new Command();
     program
         .name("ib")
-        .description("iBetoni CLI — AI-driven command-line interface for betoni.online")
+        .description("iBetoni CLI — AI-driven command-line interface for betoni.online and betoniJerry")
         .version(packageJson.version);
     // Domain primer (what betoni.online is + glossary) on the root `--help`, so an
     // AI inspecting top-level help gets the same context `ib reference dump`
@@ -117,9 +116,6 @@ export function buildProgram() {
     // `help` — offline concept guides, no auth. Registered before authenticated
     // commands so the spec catalogue and wiring tests can find it.
     registerHelpCommands(program);
-    // `role explain` resolves tiers offline (@ibetoni/constants) but reads the DB
-    // description/comment via an authenticated GET, so it needs the client.
-    registerRoleCommands(program, getClient);
     registerCompanyCommands(program, getClient, isReadOnly);
     registerKeikkaCommands(program, getClient);
     registerCustomerCommands(program, getClient);

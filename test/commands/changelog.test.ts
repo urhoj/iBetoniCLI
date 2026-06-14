@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { test, expect, vi, beforeEach } from "vitest";
 import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate }
   from "../../src/commands/changelog/index.js";
 import type { ApiClient } from "../../src/api/client.js";

@@ -147,6 +147,24 @@ export interface DomainIndexEnvelope {
  * behind `--all` (BREAKING, 2026-06-10). Blurbs reuse the GLOSSARY (same
  * source as group help), so domains without a glossary term get null.
  */
+/**
+ * Pick the GLOSSARY blurb for a domain. Prefer a WHOLE-WORD match so a domain
+ * never inherits a blurb where its name is merely a substring of another term
+ * (the "ai" ⊂ "sij**ai**nti" collision — `ai` must get the `ai / conversation`
+ * entry, not sijainti's). Fall back to a loose substring match for compound
+ * terms with no word boundary before the domain (e.g. `jerry` ⊂ "BetoniJerry").
+ * Returns null when no glossary term mentions the domain. Domain names are
+ * command tokens (lowercase letters), so they are regex-safe.
+ */
+function glossaryBlurbForDomain(domain: string): string | null {
+  const wholeWord = new RegExp(`\\b${domain}\\b`, "i");
+  return (
+    GLOSSARY.find((g) => wholeWord.test(g.term))?.definition ??
+    GLOSSARY.find((g) => g.term.toLowerCase().includes(domain))?.definition ??
+    null
+  );
+}
+
 export function buildDomainIndex(
   specs: CommandSpec[] = COMMAND_SPECS
 ): DomainIndexEnvelope {
@@ -155,9 +173,7 @@ export function buildDomainIndex(
     return {
       domain,
       count: inDomain.length,
-      description:
-        GLOSSARY.find((g) => g.term.toLowerCase().includes(domain))?.definition ??
-        null,
+      description: glossaryBlurbForDomain(domain),
       commands: inDomain.map((s) => s.command.replace(/^ib /, "")),
     };
   });
