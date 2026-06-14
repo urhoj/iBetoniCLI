@@ -4510,7 +4510,7 @@ OUTPUT (JSON, stdout)
   { threadId, message } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → provide --keikka or --tarjous; --body must be non-empty
+  exit 4  Validation             → Provide exactly one of --keikka / --tarjous (positive integer) and a non-empty --body
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 

@@ -113,6 +113,13 @@ describe("ib message support contact", () => {
     ).rejects.toMatchObject({ exitCode: 4 });
     expect(post).not.toHaveBeenCalled();
   });
+
+  test("non-numeric context exits 4, no POST", async () => {
+    await expect(
+      runSupportContact(mockClient, { contextType: "pumppuRequest", contextId: NaN, body: "x" })
+    ).rejects.toMatchObject({ exitCode: 4 });
+    expect(post).not.toHaveBeenCalled();
+  });
 });
 
 // ─── resolve ─────────────────────────────────────────────────────────────────

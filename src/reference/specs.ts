@@ -4096,7 +4096,7 @@ export const COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ threadId, message } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
     errors: [
-      { exit: 4, meaning: "Validation", remedy: "provide --keikka or --tarjous; --body must be non-empty" },
+      { exit: 4, meaning: "Validation", remedy: "Provide exactly one of --keikka / --tarjous (positive integer) and a non-empty --body" },
       apiErr(401, "Token expired", "ib auth refresh"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],

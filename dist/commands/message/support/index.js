@@ -97,17 +97,22 @@ export function registerMessageSupportCommands(parent, getClient) {
         .option("--tarjous <id>", "pumppuRequestId this escalation is about", Number)
         .option("--keikka <id>", "keikkaId this escalation is about", Number)
         .requiredOption("--body <text>", "The message to support")
+        // client-side --dry-run (the /support routes have no server X-Dry-Run guard); no
+        // audit headers — contact persists no reason and ensureSupportThread is idempotent.
         .option("--dry-run", "Print the payload without sending (client-side)")
         .action(async (opts) => {
         try {
-            if (opts.keikka === undefined && opts.tarjous === undefined) {
-                throw new CliError("Provide --keikka or --tarjous", 400, null, 4);
+            // Number-coerced flags turn "abc" into NaN (which is !== undefined), so a
+            // bare presence check would skip this guard and fire a misleading downstream
+            // error. Gate on finiteness instead. (run* keeps its own guard as defence.)
+            const contextId = Number.isFinite(opts.keikka) ? opts.keikka : opts.tarjous;
+            if (!Number.isFinite(contextId)) {
+                throw new CliError("Provide --keikka or --tarjous (positive integer)", 400, null, 4);
             }
-            const contextType = opts.keikka !== undefined ? "keikka" : "pumppuRequest";
-            const contextId = opts.keikka ?? opts.tarjous;
+            const contextType = Number.isFinite(opts.keikka) ? "keikka" : "pumppuRequest";
             writeJson(await runSupportContact(await getClient(), {
                 contextType,
-                contextId,
+                contextId: contextId,
                 body: opts.body,
                 dryRun: opts.dryRun,
             }));
@@ -120,6 +125,8 @@ export function registerMessageSupportCommands(parent, getClient) {
         .command("resolve <threadId>")
         .description("Mark a support thread resolved, or --reopen it (developer-only; a write). --dry-run previews the body client-side.")
         .option("--reopen", "Set status back to open instead of resolved")
+        // client-side --dry-run (the status PATCH has no server X-Dry-Run guard); no
+        // audit headers — the status change persists no reason.
         .option("--dry-run", "Print the update body without sending (client-side)")
         .action(async (threadIdStr, opts) => {
         try {
