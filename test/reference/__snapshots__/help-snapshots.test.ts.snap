@@ -3641,6 +3641,207 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib message chat list matches snapshot 1`] = `
+"USAGE
+  ib message chat list [<threadId>] [flags]
+
+DESCRIPTION
+  List messages in a thread, oldest first. Does NOT mark the thread read (use \`ib message chat mark-read\`). Target by threadId or --tarjous; --since backfills, --limit caps.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <threadId> NUMBER    Thread id (omit when using --tarjous) (optional)
+
+FLAGS
+  --tarjous NUMBER    Resolve the thread from this pumppuRequestId
+  --since STRING    Only messages created after this ISO timestamp
+  --limit NUMBER    Max messages (server max 500) (default: 100)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ messageId, threadId, senderPersonId, senderAsiakasId, kind, body, source, sourceNote, createdAt, editedAt, personFirstName, personLastName, senderAsiakasNimi }>
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a participant of this thread → you can only read threads you are part of
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Reading does NOT stamp lastReadAt — safe for an AI to browse without clearing your unread badge.
+  - source/sourceNote are null until the provenance backend change is deployed.
+
+SEE ALSO
+  ib message chat send, ib message chat mark-read
+
+EXAMPLES
+  ib message chat list 42
+  ib message chat list --tarjous 23 --limit 20
+  ib message chat list 42 --since 2026-06-14T10:00:00Z
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message chat mark-read matches snapshot 1`] = `
+"USAGE
+  ib message chat mark-read [<threadId>] [flags]
+
+DESCRIPTION
+  Mark a thread read — stamp your lastReadAt to now (POST /api/messages/threads/:id/read), clearing the unread badge. A write, so blocked under --read-only.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <threadId> NUMBER    Thread id (omit when using --tarjous) (optional)
+
+FLAGS
+  --tarjous NUMBER    Resolve the thread from this pumppuRequestId
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { lastReadAt }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a participant of this thread → you can only mark threads you are part of
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Deliberately separate from \`list\` so reading never auto-marks (an AI can browse without clearing your unread state).
+
+SEE ALSO
+  ib message chat list, ib message chat threads
+
+EXAMPLES
+  ib message chat mark-read 42
+  ib message chat mark-read --tarjous 23
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message chat send matches snapshot 1`] = `
+"USAGE
+  ib message chat send [<threadId>] [flags]
+
+DESCRIPTION
+  Send a message to a thread (POST /api/messages/threads/:id/messages). Outward-facing: the recipient sees it and gets a push. --dry-run previews the body + recipients CLIENT-SIDE without sending. --reason is stored as the message's sourceNote (optional).
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <threadId> NUMBER    Thread id (omit when using --tarjous) (optional)
+
+FLAGS
+  --tarjous NUMBER    Resolve the thread from this pumppuRequestId
+  --body STRING    Message text (max 4000 chars) (required)
+  --source STRING    Provenance: web|cli|ai (default: IB_SOURCE env or cli)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { messageId, threadId, senderPersonId, senderAsiakasId, kind, body, source, sourceNote, createdAt } · { dryRun:true, threadId, wouldSend:{ body, source, sourceNote, recipients:[{ personId, name, role }] } } on --dry-run
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Empty / too-long body  → body is required, max 4000 chars
+  exit 3 (HTTP 403)  Not a participant of this thread → you can only post to threads you are part of
+  exit 4 (HTTP 409)  Thread archived        → archived threads are read-only
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - --dry-run only issues a GET (thread participants) — it works under --read-only and never persists.
+  - --reason → sourceNote (optional; chat is conversational). source/sourceNote are persisted only after the provenance backend change deploys; until then the API silently ignores them.
+  - An AI-driven send sets source=ai automatically via the IB_SOURCE env var.
+
+SEE ALSO
+  ib message chat list, ib message chat thread
+
+EXAMPLES
+  ib message chat send 42 --body "Onko tyomaalle ajoyhteys raskaalle kalustolle?"
+  ib message chat send --tarjous 23 --body "Kiitos tarjouksesta" --dry-run
+  ib message chat send 42 --body "Vahvistettu" --reason "confirmed by phone"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message chat thread matches snapshot 1`] = `
+"USAGE
+  ib message chat thread [<threadId>] [flags]
+
+DESCRIPTION
+  Get one thread's metadata + participants (display names, roles, asiakas). Target by threadId positional or resolve from --tarjous.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <threadId> NUMBER    Thread id (omit when using --tarjous) (optional)
+
+FLAGS
+  --tarjous NUMBER    Resolve the thread from this pumppuRequestId
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { thread: { threadId, contextType, contextId, ownerAsiakasId, createdAt, lastMessageAt, archivedAt }, participants: [{ participantId, personId, asiakasId, role, joinedAt, lastReadAt, leftAt, personFirstName, personLastName, asiakasNimi }] }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a participant of this thread → you can only read threads you are part of
+  exit 5 (HTTP 404)  Thread not found       → verify the threadId / --tarjous
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - --tarjous resolves client-side over /threads/mine; if it matches multiple threads (one per competing provider) you get exit 4 listing the threadIds — pass one explicitly.
+
+SEE ALSO
+  ib message chat threads, ib message chat list
+
+EXAMPLES
+  ib message chat thread 42
+  ib message chat thread --tarjous 23
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message chat threads matches snapshot 1`] = `
+"USAGE
+  ib message chat threads [flags]
+
+DESCRIPTION
+  List your conversational message threads (inbox), newest first, with unread counts and a last-message preview. Projects GET /api/messages/threads/mine into the list envelope; --unread / --tarjous filter client-side.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --unread BOOLEAN    Only threads with unreadCount > 0
+  --tarjous NUMBER    Only threads for this pumppuRequestId
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ threadId, contextType, contextId, ownerAsiakasId, createdAt, lastMessageAt, lastReadAt, unreadCount, lastMessageBody }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Only threads you participate in are returned (server-scoped by your personId).
+  - A keikka thread (contextType 'keikka') appears here automatically once keikka messaging ships — no CLI change needed.
+
+SEE ALSO
+  ib message chat list, ib message chat thread
+
+EXAMPLES
+  ib message chat threads
+  ib message chat threads --unread
+  ib message chat threads --tarjous 23
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib ohje get matches snapshot 1`] = `
 "USAGE
   ib ohje get <helpId> [flags]

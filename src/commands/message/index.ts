@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { registerMessageChatCommands } from "./chat/index.js";
+import { registerMessageDailyCommands } from "./daily/index.js";
 
 /**
  * Register the `ib message` umbrella — communication systems grouped for
@@ -23,4 +24,5 @@ export function registerMessageCommands(
       "Messaging: conversational chat threads (daily notes + announcements are reserved sub-groups)"
     );
   registerMessageChatCommands(m, getClient);
+  registerMessageDailyCommands(m, getClient);
 }
