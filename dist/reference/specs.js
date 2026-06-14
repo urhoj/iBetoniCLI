@@ -3309,6 +3309,7 @@ export const COMMAND_SPECS = [
         ],
         notes: [
             'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib feedback create --kind bug -- "--pretty output too wide". Everything after `--` is taken as positional text.',
+            "When invoked by the betoni.online /ai assistant, the originating conversation id is auto-attached as context.conversationId (via the IB_CONVERSATION_ID env var the /ai loop injects) — a developer can then read the full conversation with `ib ai conversation <id>`. Manual CLI use does not set it.",
         ],
         examples: [
             'ib feedback create "schema table output should include row counts"',
@@ -3373,6 +3374,26 @@ export const COMMAND_SPECS = [
             'ib feedback resolve 42 --status applied --note "added row counts in CLI v1.3"',
             'ib feedback resolve 42 --status dismissed --note "by design"',
         ],
+    },
+    // ─── ai (1) — read AI assistant conversations ────────────────────────────
+    {
+        command: "ib ai conversation",
+        description: "Fetch the FULL transcript of an /ai assistant conversation by id. Developer-only (isSystemAdmin / isDeveloper) and CROSS-TENANT — reads any tenant's conversation, because the id comes from an `ib feedback` row's context.conversationId (stamped automatically when the AI files feedback from the /ai page). Transcripts may contain customer PII.",
+        permissions: ["isSystemAdmin or isDeveloper"],
+        args: [{ name: "conversationId", type: "number", description: "gptConversations id (from a feedback row's context.conversationId)" }],
+        flags: [],
+        outputShape: "{ conversationId, personId, ownerAsiakasId, messageCount, messages: [{ gptMessageId, role?, content?, raw?, ... }] }",
+        errors: [
+            { exit: 4, meaning: "Validation", remedy: "conversationId must be a positive integer" },
+            apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
+            apiErr(404, "Not found", "no conversation with that id"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        notes: [
+            "Deploy-gated: 404 until puminet5api ships the /api/cli/ai/conversation/:id route.",
+        ],
+        seeAlso: ["ib feedback get", "ib feedback list"],
+        examples: ["ib ai conversation 4321"],
     },
     // ─── bug (8) — bugReport system (/api/bugs/*) ────────────────────────────
     // Sibling of feedback. Writes are REAL (read-only-blocked, NOT meta-exempt);

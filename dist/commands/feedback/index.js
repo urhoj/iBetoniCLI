@@ -20,6 +20,10 @@ function buildCreateBody(input) {
         body.command = input.command;
     if (input.error)
         body.error = input.error;
+    const convId = Number(process.env.IB_CONVERSATION_ID);
+    if (Number.isInteger(convId) && convId > 0) {
+        body.context = { conversationId: convId };
+    }
     return body;
 }
 /**
