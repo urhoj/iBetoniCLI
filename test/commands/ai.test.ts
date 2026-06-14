@@ -1,7 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { runAiConversation } from "../../src/commands/ai/index.js";
 import type { ApiClient } from "../../src/api/client.js";
-import { CliError } from "../../src/api/errors.js";
 
 const mockClient = {
   get: vi.fn(),
@@ -25,9 +24,10 @@ describe("ib ai conversation", () => {
     expect(out).toMatchObject({ conversationId: 55, messageCount: 2 });
   });
 
-  test("rejects a non-positive / non-integer id (exit 4), no GET", async () => {
-    await expect(runAiConversation(mockClient, 0)).rejects.toMatchObject({ exitCode: 4 });
-    await expect(runAiConversation(mockClient, NaN)).rejects.toThrowError(CliError);
+  test("rejects non-positive / non-integer ids (exit 4), no GET", async () => {
+    for (const bad of [0, -1, NaN, 4.5]) {
+      await expect(runAiConversation(mockClient, bad)).rejects.toMatchObject({ exitCode: 4 });
+    }
     expect(get).not.toHaveBeenCalled();
   });
 });

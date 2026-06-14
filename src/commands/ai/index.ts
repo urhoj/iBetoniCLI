@@ -12,11 +12,14 @@ import { CliError } from "../../api/errors.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 
 /** GET /api/cli/ai/conversation/:id — developer-only, cross-tenant full transcript. */
-export async function runAiConversation(client: ApiClient, id: number): Promise<unknown> {
+export async function runAiConversation(
+  client: ApiClient,
+  id: number
+): Promise<Record<string, unknown>> {
   if (!Number.isInteger(id) || id <= 0) {
     throw new CliError("conversationId must be a positive integer", 400, null, 4);
   }
-  return client.get<unknown>(`/api/cli/ai/conversation/${id}`);
+  return client.get<Record<string, unknown>>(`/api/cli/ai/conversation/${id}`);
 }
 
 /** Register `ib ai conversation <id>`. */

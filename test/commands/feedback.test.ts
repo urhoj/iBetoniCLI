@@ -154,12 +154,15 @@ describe("ib feedback create — /ai conversation provenance", () => {
     expect(post.mock.calls[0][1]).not.toHaveProperty("context");
   });
 
-  test("omits context when IB_CONVERSATION_ID is non-numeric or non-positive", async () => {
-    process.env.IB_CONVERSATION_ID = "abc";
-    post.mockResolvedValueOnce({ feedbackId: 3 });
-    await runFeedbackCreate(mockClient, { description: "x" });
-    expect(post.mock.calls[0][1]).not.toHaveProperty("context");
-  });
+  test.each(["abc", "0", "-1", "4.5", ""])(
+    "omits context when IB_CONVERSATION_ID is %s",
+    async (val) => {
+      process.env.IB_CONVERSATION_ID = val;
+      post.mockResolvedValueOnce({ feedbackId: 3 });
+      await runFeedbackCreate(mockClient, { description: "x" });
+      expect(post.mock.calls[0][1]).not.toHaveProperty("context");
+    }
+  );
 
   test("--dry-run includes context in wouldSend.body", async () => {
     process.env.IB_CONVERSATION_ID = "9";
