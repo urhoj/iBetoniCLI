@@ -5,6 +5,7 @@ import {
   runBugGet,
   runBugComment,
   runBugAdminUpdate,
+  runBugAdminAssign,
 } from "../../src/commands/bug/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -243,5 +244,37 @@ describe("ib bug admin update", () => {
 
   test("bad --priority → exit 4", async () => {
     await expect(runBugAdminUpdate(mockClient, 51, { priority: "p1" })).rejects.toThrowError(CliError);
+  });
+});
+
+describe("ib bug admin assign", () => {
+  test("POSTs assignToPersonId and unwraps .data", async () => {
+    post.mockResolvedValueOnce({ success: true, data: { bugReportId: 51, status: "in-progress" } });
+    const out = await runBugAdminAssign(mockClient, 51, { to: 6233, reason: "to me" });
+    expect(post).toHaveBeenCalledWith(
+      "/api/bugs/admin/51/assign",
+      { assignToPersonId: 6233 },
+      { headers: { "X-Action-Reason": "to me" } }
+    );
+    expect(out).toEqual({ bugReportId: 51, status: "in-progress" });
+  });
+
+  test("--dry-run previews and never POSTs", async () => {
+    const out = await runBugAdminAssign(mockClient, 51, { to: 6233, dryRun: true });
+    expect(post).not.toHaveBeenCalled();
+    expect(out).toEqual({
+      dryRun: true,
+      wouldSend: {
+        method: "POST",
+        path: "/api/bugs/admin/51/assign",
+        body: { assignToPersonId: 6233 },
+      },
+    });
+  });
+
+  test("missing / non-positive --to → exit 4, no POST", async () => {
+    await expect(runBugAdminAssign(mockClient, 51, {})).rejects.toMatchObject({ exitCode: 4 });
+    await expect(runBugAdminAssign(mockClient, 51, { to: 0 })).rejects.toThrowError(CliError);
+    expect(post).not.toHaveBeenCalled();
   });
 });

@@ -211,3 +211,29 @@ export async function runBugAdminUpdate(
   });
   return unwrapData(res);
 }
+
+export interface BugAdminAssignInput {
+  to?: number;
+  reason?: string;
+  dryRun?: boolean;
+}
+
+/** POST /api/bugs/admin/:id/assign — developer-only; also flips status→in-progress. */
+export async function runBugAdminAssign(
+  client: ApiClient,
+  id: number,
+  input: BugAdminAssignInput
+): Promise<unknown> {
+  if (input.to === undefined || !Number.isInteger(input.to) || input.to <= 0) {
+    throw new CliError("--to <personId> is required (a positive integer)", 400, null, 4);
+  }
+  const body = { assignToPersonId: input.to };
+  const path = `/api/bugs/admin/${id}/assign`;
+  if (input.dryRun) {
+    return { dryRun: true, wouldSend: { method: "POST", path, body } };
+  }
+  const res = await client.post<unknown>(path, body, {
+    headers: writeFlagsToHeaders({ reason: input.reason }),
+  });
+  return unwrapData(res);
+}
