@@ -3633,6 +3633,183 @@ export const COMMAND_SPECS: CommandSpec[] = [
       'ib feedback resolve 42 --status dismissed --note "by design"',
     ],
   },
+  // ─── bug (8) — bugReport system (/api/bugs/*) ────────────────────────────
+  // Sibling of feedback. Writes are REAL (read-only-blocked, NOT meta-exempt);
+  // --dry-run is CLIENT-side on every write (no server X-Dry-Run guard on
+  // /api/bugs/*). writeFlags:false + mutates:true so `ib commands --mutations`
+  // classifies create/comment/admin* as writes despite the custom flag block.
+  {
+    command: "ib bug create",
+    description:
+      "File a bug report into the betoni.online bugReport system. This is a LOUD write (distinct from the quiet `ib feedback`): it opens a GitHub issue AND emails admins. A real mutation — blocked under --read-only/IB_READ_ONLY (exit 3). CLI-filed reports are auto-tagged via browserInfo=ib-cli/<version>. --dry-run resolves client-side (prints the payload, never sends).",
+    auth: "any",
+    mutates: true,
+    flags: [
+      { name: "type", type: "string", required: true, description: "ui-display-issue | functionality-error | performance-problem | data-incorrect | other" },
+      { name: "severity", type: "string", required: true, description: "critical | major | minor | cosmetic" },
+      { name: "description", type: "string", required: true, description: "What is wrong" },
+      { name: "steps", type: "string", description: "Steps to reproduce" },
+      { name: "priority", type: "string", description: "low | medium | high | urgent (omitted → derived from severity)" },
+      { name: "reason", type: "string", description: "Audit reason (X-Action-Reason header)" },
+      { name: "dry-run", type: "boolean", description: "Preview the payload without sending (client-side)" },
+    ],
+    outputShape:
+      "{ bugReportId, referenceNumber } (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
+    errors: [
+      { exit: 4, meaning: "Validation", remedy: "--type/--severity/--description required; --type, --severity, --priority must be valid enum values" },
+      apiErr(401, "Token expired", "ib auth refresh"),
+      apiErr(403, "Blocked under --read-only", "this is a real write; drop --read-only / unset IB_READ_ONLY"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    seeAlso: ["ib bug list", "ib feedback create", "ib attachment upload --bug-report <id>"],
+    examples: [
+      'ib bug create --type functionality-error --severity major --description "Grid crashes on save" --steps "open grid, click save"',
+      'ib bug create --type other --severity minor --description "preview" --dry-run',
+    ],
+  },
+  {
+    command: "ib bug list",
+    description:
+      "List bug reports. Permission-filtered server-side: a regular user sees their own + their company's reports; an admin/developer sees all and may narrow by --owner (ownerAsiakasId; ignored for non-admins). Newest first by default.",
+    auth: "any",
+    flags: [
+      { name: "status", type: "string", description: "new | in-progress | resolved | closed" },
+      { name: "severity", type: "string", description: "critical | major | minor | cosmetic" },
+      { name: "type", type: "string", description: "ui-display-issue | functionality-error | performance-problem | data-incorrect | other" },
+      { name: "owner", type: "number", description: "Filter by owning tenant asiakasId (admins only)" },
+      { name: "limit", type: "number", description: "Max rows (sets truncated when hit)" },
+      { name: "offset", type: "number", description: "Pagination offset" },
+      { name: "order-by", type: "string", default: "createdAt", description: "createdAt | updatedAt | severity | status | bugType | bugReportId" },
+      { name: "order", type: "string", default: "desc", description: "asc | desc" },
+    ],
+    outputShape:
+      "{ items: BugReportRow[], nextCursor: null, count, truncated }" + TRUNCATED_NOTE,
+    errors: [
+      { exit: 4, meaning: "Validation", remedy: "--status/--severity/--type/--order-by/--order must be valid enum values" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    seeAlso: ["ib bug get", "ib bug admin stats"],
+    examples: ["ib bug list --status new --severity major", "ib bug list --owner 1349 --limit 20"],
+  },
+  {
+    command: "ib bug get",
+    description:
+      "Fetch one bug report with its comments and attachments inline. Access: report owner OR same ownerAsiakasId OR admin/developer.",
+    auth: "any",
+    args: [{ name: "bugReportId", type: "number", description: "bugReportId" }],
+    flags: [],
+    outputShape: "The full report { bugReportId, bugType, severity, status, priority, description, reporterName, comments: [...], attachments: [...], ... }",
+    errors: [
+      apiErr(403, "Permission denied", "you must own the report, share its company, or be a developer"),
+      apiErr(404, "Not found", "check the id via `ib bug list`"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    seeAlso: ["ib bug list", "ib attachment list --bug-report <id>"],
+    examples: ["ib bug get 51"],
+  },
+  {
+    command: "ib bug comment",
+    description:
+      "Add a comment to a bug report (owner / same-company / admin). Notifies the other party by email. A real write — blocked under --read-only. --dry-run previews client-side.",
+    auth: "any",
+    mutates: true,
+    args: [{ name: "bugReportId", type: "number", description: "bugReportId" }],
+    flags: [
+      { name: "body", type: "string", required: true, description: "Comment text" },
+      { name: "reason", type: "string", description: "Audit reason (X-Action-Reason)" },
+      { name: "dry-run", type: "boolean", description: "Preview without sending (client-side)" },
+    ],
+    outputShape: "{ commentId } (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
+    errors: [
+      { exit: 4, meaning: "Validation", remedy: "--body must not be empty" },
+      apiErr(403, "Permission denied / read-only", "you must own the report, share its company, or be a developer; not under --read-only"),
+      apiErr(404, "Not found", "check the id via `ib bug list`"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ['ib bug comment 51 --body "still reproduces on staging"'],
+  },
+  {
+    command: "ib bug admin update",
+    description:
+      "Triage a bug report: set status / priority / admin notes / resolution / assignee. Developer-only (isSystemAdmin / isDeveloper). A real write — blocked under --read-only. --dry-run previews client-side.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    mutates: true,
+    args: [{ name: "bugReportId", type: "number", description: "bugReportId" }],
+    flags: [
+      { name: "status", type: "string", description: "new | in-progress | resolved | closed" },
+      { name: "priority", type: "string", description: "low | medium | high | urgent" },
+      { name: "notes", type: "string", description: "Admin notes (stored as adminNotes)" },
+      { name: "resolution", type: "string", description: "Resolution text" },
+      { name: "assign", type: "number", description: "Assign to a developer (personId → assignedTo)" },
+      { name: "reason", type: "string", description: "Audit reason (X-Action-Reason)" },
+      { name: "dry-run", type: "boolean", description: "Preview without sending (client-side)" },
+    ],
+    outputShape: "The updated report. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
+    errors: [
+      { exit: 4, meaning: "Validation", remedy: "provide at least one of --status/--priority/--notes/--resolution/--assign; status/priority must be valid enums" },
+      apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
+      apiErr(404, "Not found", "check the id via `ib bug list`"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    seeAlso: ["ib bug admin assign", "ib bug admin delete"],
+    examples: [
+      'ib bug admin update 51 --status resolved --resolution "fixed in v2.1"',
+      "ib bug admin update 51 --priority urgent --assign 6233",
+    ],
+  },
+  {
+    command: "ib bug admin assign",
+    description:
+      "Assign a bug report to a developer; the backend also flips its status to in-progress. Developer-only. A real write — blocked under --read-only. --dry-run previews client-side.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    mutates: true,
+    args: [{ name: "bugReportId", type: "number", description: "bugReportId" }],
+    flags: [
+      { name: "to", type: "number", required: true, description: "Assignee personId" },
+      { name: "reason", type: "string", description: "Audit reason (X-Action-Reason)" },
+      { name: "dry-run", type: "boolean", description: "Preview without sending (client-side)" },
+    ],
+    outputShape: "The updated report (status now in-progress). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
+    errors: [
+      { exit: 4, meaning: "Validation", remedy: "--to <personId> must be a positive integer" },
+      apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
+      apiErr(404, "Not found", "check the id via `ib bug list`"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ["ib bug admin assign 51 --to 6233"],
+  },
+  {
+    command: "ib bug admin stats",
+    description: "Aggregate bug report statistics (counts by status/severity/etc.). Developer-only. Optionally scoped to one tenant with --owner.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    flags: [{ name: "owner", type: "number", description: "Scope to one tenant (ownerAsiakasId)" }],
+    outputShape: "{ ...aggregate counts }",
+    errors: [
+      apiErr(403, "Permission denied", "requires a developer token"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ["ib bug admin stats", "ib bug admin stats --owner 1349"],
+  },
+  {
+    command: "ib bug admin delete",
+    description:
+      "Permanently delete a bug report. Developer-only and IRREVERSIBLE. A real write — blocked under --read-only. --reason is REQUIRED. --dry-run previews client-side.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    mutates: true,
+    args: [{ name: "bugReportId", type: "number", description: "bugReportId" }],
+    flags: [
+      { name: "reason", type: "string", required: true, description: "Why (required; X-Action-Reason)" },
+      { name: "dry-run", type: "boolean", description: "Preview without sending (client-side)" },
+    ],
+    outputShape: "{ success: true, bugReportId } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, headers } }.",
+    errors: [
+      { exit: 4, meaning: "Validation", remedy: "--reason is required for delete" },
+      apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
+      apiErr(404, "Not found", "check the id via `ib bug list`"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ['ib bug admin delete 51 --reason "duplicate of BR-40"'],
+  },
   // ─── cache (6) — Redis inspection and invalidation ───────────────────────
   ...((): CommandSpec[] => {
     const DEV_PERMS = ["isSystemAdmin or isDeveloper"];
