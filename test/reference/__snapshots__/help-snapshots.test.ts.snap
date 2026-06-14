@@ -681,6 +681,287 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib bug admin assign matches snapshot 1`] = `
+"USAGE
+  ib bug admin assign <bugReportId> [flags]
+
+DESCRIPTION
+  Assign a bug report to a developer; the backend also flips its status to in-progress. Developer-only. A real write — blocked under --read-only. --dry-run previews client-side.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <bugReportId> NUMBER    bugReportId (required)
+
+FLAGS
+  --to NUMBER    Assignee personId (required)
+  --reason STRING    Audit reason (X-Action-Reason)
+  --dry-run BOOLEAN    Preview without sending (client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  The updated report (status now in-progress). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → --to <personId> must be a positive integer
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib bug list\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib bug admin assign 51 --to 6233
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib bug admin delete matches snapshot 1`] = `
+"USAGE
+  ib bug admin delete <bugReportId> [flags]
+
+DESCRIPTION
+  Permanently delete a bug report. Developer-only and IRREVERSIBLE. A real write — blocked under --read-only. --reason is REQUIRED. --dry-run previews client-side.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <bugReportId> NUMBER    bugReportId (required)
+
+FLAGS
+  --reason STRING    Why (required; X-Action-Reason) (required)
+  --dry-run BOOLEAN    Preview without sending (client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success: true, bugReportId } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, headers } }.
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → --reason is required for delete
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib bug list\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib bug admin delete 51 --reason "duplicate of BR-40"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib bug admin stats matches snapshot 1`] = `
+"USAGE
+  ib bug admin stats [flags]
+
+DESCRIPTION
+  Aggregate bug report statistics (counts by status/severity/etc.). Developer-only. Optionally scoped to one tenant with --owner.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --owner NUMBER    Scope to one tenant (ownerAsiakasId)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { ...aggregate counts }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib bug admin stats
+  ib bug admin stats --owner 1349
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib bug admin update matches snapshot 1`] = `
+"USAGE
+  ib bug admin update <bugReportId> [flags]
+
+DESCRIPTION
+  Triage a bug report: set status / priority / admin notes / resolution / assignee. Developer-only (isSystemAdmin / isDeveloper). A real write — blocked under --read-only. --dry-run previews client-side.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <bugReportId> NUMBER    bugReportId (required)
+
+FLAGS
+  --status STRING    new | in-progress | resolved | closed
+  --priority STRING    low | medium | high | urgent
+  --notes STRING    Admin notes (stored as adminNotes)
+  --resolution STRING    Resolution text
+  --assign NUMBER    Assign to a developer (personId → assignedTo)
+  --reason STRING    Audit reason (X-Action-Reason)
+  --dry-run BOOLEAN    Preview without sending (client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  The updated report. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → provide at least one of --status/--priority/--notes/--resolution/--assign; status/priority must be valid enums
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib bug list\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib bug admin assign, ib bug admin delete
+
+EXAMPLES
+  ib bug admin update 51 --status resolved --resolution "fixed in v2.1"
+  ib bug admin update 51 --priority urgent --assign 6233
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib bug comment matches snapshot 1`] = `
+"USAGE
+  ib bug comment <bugReportId> [flags]
+
+DESCRIPTION
+  Add a comment to a bug report (owner / same-company / admin). Notifies the other party by email. A real write — blocked under --read-only. --dry-run previews client-side.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <bugReportId> NUMBER    bugReportId (required)
+
+FLAGS
+  --body STRING    Comment text (required)
+  --reason STRING    Audit reason (X-Action-Reason)
+  --dry-run BOOLEAN    Preview without sending (client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { commentId } (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → --body must not be empty
+  exit 3 (HTTP 403)  Permission denied / read-only → you must own the report, share its company, or be a developer; not under --read-only
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib bug list\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib bug comment 51 --body "still reproduces on staging"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib bug create matches snapshot 1`] = `
+"USAGE
+  ib bug create [flags]
+
+DESCRIPTION
+  File a bug report into the betoni.online bugReport system. This is a LOUD write (distinct from the quiet \`ib feedback\`): it opens a GitHub issue AND emails admins. A real mutation — blocked under --read-only/IB_READ_ONLY (exit 3). CLI-filed reports are auto-tagged via browserInfo=ib-cli/<version>. --dry-run resolves client-side (prints the payload, never sends).
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --type STRING    ui-display-issue | functionality-error | performance-problem | data-incorrect | other (required)
+  --severity STRING    critical | major | minor | cosmetic (required)
+  --description STRING    What is wrong (required)
+  --steps STRING    Steps to reproduce
+  --priority STRING    low | medium | high | urgent (omitted → derived from severity)
+  --reason STRING    Audit reason (X-Action-Reason header)
+  --dry-run BOOLEAN    Preview the payload without sending (client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { bugReportId, referenceNumber } (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → --type/--severity/--description required; --type, --severity, --priority must be valid enum values
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Blocked under --read-only → this is a real write; drop --read-only / unset IB_READ_ONLY
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib bug list, ib feedback create, ib attachment upload --bug-report <id>
+
+EXAMPLES
+  ib bug create --type functionality-error --severity major --description "Grid crashes on save" --steps "open grid, click save"
+  ib bug create --type other --severity minor --description "preview" --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib bug get matches snapshot 1`] = `
+"USAGE
+  ib bug get <bugReportId> [flags]
+
+DESCRIPTION
+  Fetch one bug report with its comments and attachments inline. Access: report owner OR same ownerAsiakasId OR admin/developer.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <bugReportId> NUMBER    bugReportId (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  The full report { bugReportId, bugType, severity, status, priority, description, reporterName, comments: [...], attachments: [...], ... }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Permission denied      → you must own the report, share its company, or be a developer
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib bug list\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib bug list, ib attachment list --bug-report <id>
+
+EXAMPLES
+  ib bug get 51
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib bug list matches snapshot 1`] = `
+"USAGE
+  ib bug list [flags]
+
+DESCRIPTION
+  List bug reports. Permission-filtered server-side: a regular user sees their own + their company's reports; an admin/developer sees all and may narrow by --owner (ownerAsiakasId; ignored for non-admins). Newest first by default.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --status STRING    new | in-progress | resolved | closed
+  --severity STRING    critical | major | minor | cosmetic
+  --type STRING    ui-display-issue | functionality-error | performance-problem | data-incorrect | other
+  --owner NUMBER    Filter by owning tenant asiakasId (admins only)
+  --limit NUMBER    Max rows (sets truncated when hit)
+  --offset NUMBER    Pagination offset
+  --order-by STRING    createdAt | updatedAt | severity | status | bugType | bugReportId (default: createdAt)
+  --order STRING    asc | desc (default: desc)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { items: BugReportRow[], nextCursor: null, count, truncated } (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → --status/--severity/--type/--order-by/--order must be valid enum values
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib bug get, ib bug admin stats
+
+EXAMPLES
+  ib bug list --status new --severity major
+  ib bug list --owner 1349 --limit 20
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib cache clear matches snapshot 1`] = `
 "USAGE
   ib cache clear [flags]
