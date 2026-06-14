@@ -3641,6 +3641,238 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib message board all matches snapshot 1`] = `
+"USAGE
+  ib message board all [flags]
+
+DESCRIPTION
+  List EVERY notice for the company including expired and not-yet-started ones (the admin-panel view). Requires an asiakas admin/editor or ilmoitustaulu editor.
+  Permissions: requires auth.page.ilmoitustaulu.edit, auth.page.ilmoitustaulu.editOwn.
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ messageId, ownerAsiakasId, title, body, priority, startDate, expiresAt, createdAt, updatedAt, createdBy }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not an admin/editor (writes + \`all\`/\`get\` require it) → an asiakas admin/editor or ilmoitustaulu editor must run it
+  exit 4 (HTTP 400)  Validation error (missing title/text/start-date, bad priority/date) → check the flags
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib message board list
+
+EXAMPLES
+  ib message board all
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message board create matches snapshot 1`] = `
+"USAGE
+  ib message board create [flags]
+
+DESCRIPTION
+  Create a notice (POST). --title, --text and --start-date are required; --priority defaults to info; --expires-at is optional (omit = never expires). Requires admin/editor. --reason required.
+  Permissions: requires auth.page.ilmoitustaulu.edit, auth.page.ilmoitustaulu.editOwn.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --title STRING    Notice title (required)
+  --text STRING    Notice body text (stored as body) (required)
+  --priority STRING    info | warning | urgent (default info)
+  --start-date DATE    Day the notice becomes visible: today | YYYY-MM-DD (required)
+  --expires-at DATE    Last day visible: YYYY-MM-DD (omit = never expires)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { messageId, ownerAsiakasId, title, body, priority, startDate, expiresAt, createdAt, updatedAt, createdBy } · { dryRun: true, proposed: {...} } on --dry-run
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not an admin/editor (writes + \`all\`/\`get\` require it) → an asiakas admin/editor or ilmoitustaulu editor must run it
+  exit 4 (HTTP 400)  Validation error (missing title/text/start-date, bad priority/date) → check the flags
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - --dry-run previews the payload CLIENT-SIDE without writing (the route has no X-Dry-Run guard).
+
+SEE ALSO
+  ib message board update, ib message board delete
+
+EXAMPLES
+  ib message board create --title "Asema kiinni" --text "Perjantaina suljettu" --start-date today --priority warning --reason "tiedote"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message board delete matches snapshot 1`] = `
+"USAGE
+  ib message board delete <messageId> [flags]
+
+DESCRIPTION
+  Delete a notice (DELETE, 204). Admins delete any row; editors only their own. --reason required.
+  Permissions: requires auth.page.ilmoitustaulu.edit, auth.page.ilmoitustaulu.editOwn.
+
+ARGUMENTS
+  <messageId> NUMBER    Notice to delete (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  204 no content · { dryRun: true, messageId, wouldDelete: {...} } on --dry-run
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  No notice with that id for the company → ib message board all
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not an admin/editor (writes + \`all\`/\`get\` require it) → an asiakas admin/editor or ilmoitustaulu editor must run it
+  exit 4 (HTTP 400)  Validation error (missing title/text/start-date, bad priority/date) → check the flags
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - --dry-run previews what would be deleted CLIENT-SIDE without writing.
+
+EXAMPLES
+  ib message board delete 7 --reason "vanhentunut"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message board get matches snapshot 1`] = `
+"USAGE
+  ib message board get <messageId> [flags]
+
+DESCRIPTION
+  Get one notice by id. There is no single-message GET route, so it is resolved CLIENT-SIDE over \`all\` — and therefore needs the same admin/editor access. Unknown id → exit 5.
+  Permissions: requires auth.page.ilmoitustaulu.edit, auth.page.ilmoitustaulu.editOwn.
+
+ARGUMENTS
+  <messageId> NUMBER    Notice to fetch (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { messageId, ownerAsiakasId, title, body, priority, startDate, expiresAt, createdAt, updatedAt, createdBy }
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  No notice with that id for the company → ib message board all
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not an admin/editor (writes + \`all\`/\`get\` require it) → an asiakas admin/editor or ilmoitustaulu editor must run it
+  exit 4 (HTTP 400)  Validation error (missing title/text/start-date, bad priority/date) → check the flags
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib message board get 7
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message board list matches snapshot 1`] = `
+"USAGE
+  ib message board list [flags]
+
+DESCRIPTION
+  List notices ACTIVE on a day (startDate ≤ day ≤ expiresAt, or no expiry), newest first. Open to any company member. --date takes today/yesterday/tomorrow or YYYYMMDD (defaults to today). The web UI's per-device dismiss state is NOT applied — the CLI returns the full active set.
+  Auth: requires login (any authenticated user).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --date DATE    Day to query: today | yesterday | tomorrow | YYYYMMDD (default today)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ messageId, ownerAsiakasId, title, body, priority, startDate, expiresAt, createdAt, updatedAt, createdBy }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not an admin/editor (writes + \`all\`/\`get\` require it) → an asiakas admin/editor or ilmoitustaulu editor must run it
+  exit 4 (HTTP 400)  Validation error (missing title/text/start-date, bad priority/date) → check the flags
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Requires the ilmoitustaulu module enabled for the company.
+  - The active-list endpoint uses compact YYYYMMDD (not ISO) — the CLI converts for you.
+
+SEE ALSO
+  ib message board all, ib message board get
+
+EXAMPLES
+  ib message board list
+  ib message board list --date 20260614
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message board update matches snapshot 1`] = `
+"USAGE
+  ib message board update <messageId> [flags]
+
+DESCRIPTION
+  Update a notice (PUT). GET-merges the current row (over \`all\`) so omitted fields are preserved — the backend overwrites the whole row. Admins edit any row; editors only their own. --reason required.
+  Permissions: requires auth.page.ilmoitustaulu.edit, auth.page.ilmoitustaulu.editOwn.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+ARGUMENTS
+  <messageId> NUMBER    Notice to update (required)
+
+FLAGS
+  --title STRING    Notice title
+  --text STRING    Notice body text (stored as body)
+  --priority STRING    info | warning | urgent
+  --start-date DATE    Day the notice becomes visible: today | YYYY-MM-DD
+  --expires-at DATE    Last day visible: YYYY-MM-DD (pass "" to clear the expiry)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { messageId, ownerAsiakasId, title, body, priority, startDate, expiresAt, createdAt, updatedAt, createdBy } · { dryRun: true, messageId, current, proposed } on --dry-run
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  No notice with that id for the company → ib message board all
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not an admin/editor (writes + \`all\`/\`get\` require it) → an asiakas admin/editor or ilmoitustaulu editor must run it
+  exit 4 (HTTP 400)  Validation error (missing title/text/start-date, bad priority/date) → check the flags
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - --dry-run previews the merged row CLIENT-SIDE without writing (no server X-Dry-Run guard).
+
+SEE ALSO
+  ib message board get
+
+EXAMPLES
+  ib message board update 7 --priority urgent --reason "nostettu kiireelliseksi"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib message chat list matches snapshot 1`] = `
 "USAGE
   ib message chat list [<threadId>] [flags]
@@ -4174,7 +4406,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - Exactly one of --message / --clear is required.
-  - --dry-run is server-side (deploy-gated).
+  - --dry-run is CLIENT-side (returns the would-be payload, sends nothing) — the dailyMessage routes have no server X-Dry-Run guard.
 
 SEE ALSO
   ib message daily get
