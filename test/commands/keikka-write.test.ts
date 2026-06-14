@@ -43,14 +43,14 @@ describe("ib keikka create/update/drivers", () => {
     expect((result as { keikkaId: number }).keikkaId).toBe(12345);
   });
 
-  test("runKeikkaUpdate with --status posts setStatus + no flag headers; missing --status throws v1.0 error", async () => {
+  test("runKeikkaUpdate posts numeric keikkaTilaId to /tila/set (NOT /setStatus); guards bad input", async () => {
     (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       success: true,
     });
-    await runKeikkaUpdate(mockClient, 9001, { status: "2" }, {});
+    await runKeikkaUpdate(mockClient, 9001, { status: "9" }, {});
     expect(mockClient.post).toHaveBeenCalledWith(
-      "/api/keikka/setStatus",
-      { keikkaId: 9001, tila: "2" },
+      "/api/keikka/tila/set",
+      { keikkaId: 9001, keikkaTilaId: 9 },
       { headers: {} }
     );
 
@@ -58,6 +58,13 @@ describe("ib keikka create/update/drivers", () => {
     await expect(
       runKeikkaUpdate(mockClient, 9001, { vehicleId: 7 }, {})
     ).rejects.toThrow(/v1\.0 only supports --status/);
+
+    // Non-numeric status → exit-4 validation error (failWith), no POST.
+    (mockClient.post as ReturnType<typeof vi.fn>).mockClear();
+    await expect(
+      runKeikkaUpdate(mockClient, 9001, { status: "done" }, {})
+    ).rejects.toThrow(/numeric keikkaTilaId/);
+    expect(mockClient.post).not.toHaveBeenCalled();
   });
 
   test("runKeikkaDriversAssign posts empty body to /defaultDriver/assign/:id", async () => {

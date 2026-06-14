@@ -143,15 +143,24 @@ export async function runKeikkaCreate(client, body, flags) {
     });
 }
 /**
- * Update a keikka. v1.0 supports only `--status`; other fields are deferred
- * until the dedicated CLI mutation routes ship (v1.1). Calls the existing
- * `/api/keikka/setStatus` endpoint with the universal write-flag headers.
+ * Update a keikka. v1.0 supports only `--status` (the lifecycle keikkaTilaId);
+ * other fields are deferred until the dedicated CLI mutation routes ship (v1.1).
+ * Posts the numeric keikkaTilaId to `/api/keikka/tila/set` with the universal
+ * write-flag headers.
  */
 export async function runKeikkaUpdate(client, keikkaId, fields, flags) {
     if (!("status" in fields)) {
         throw new Error("v1.0 only supports --status; other fields are pending v1.1");
     }
-    return client.post("/api/keikka/setStatus", { keikkaId, tila: fields.status }, { headers: writeFlagsToHeaders(flags) });
+    // --status is a keikkaTilaId and MUST go to /api/keikka/tila/set as
+    // `keikkaTilaId`. The older /setStatus endpoint ignores a `tila` field (it
+    // saves per-section completion flags), so posting there silently no-ops the
+    // lifecycle-state change.
+    const keikkaTilaId = Number(fields.status);
+    if (!Number.isInteger(keikkaTilaId)) {
+        failWith(`--status must be a numeric keikkaTilaId (e.g. 9 = Toimitettu); got "${String(fields.status)}"`, 4);
+    }
+    return client.post("/api/keikka/tila/set", { keikkaId, keikkaTilaId }, { headers: writeFlagsToHeaders(flags) });
 }
 /**
  * POST /api/keikka/defaultDriver/assign/:keikkaId with an empty body. The
@@ -265,7 +274,7 @@ export function registerKeikkaCommands(parent, getClient) {
     const updateCmd = k
         .command("update <keikkaId>")
         .description("Update a keikka (v1.0: --status only)")
-        .option("--status <s>", "New status (forwarded as `tila`)");
+        .option("--status <s>", "New keikkaTilaId (numeric, e.g. 9 = Toimitettu)");
     addWriteFlagsToCommand(updateCmd).action(async (idStr, opts) => {
         if (opts.status === undefined) {
             failWith("Nothing to update: pass --status (v1.0 supports --status only)", 4);

@@ -547,29 +547,29 @@ export const COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib keikka update",
     description:
-      "Update a keikka. v1.0 supports only `--status` (forwarded as `tila` to POST /api/keikka/setStatus). Other field-setters land in v1.1.",
+      "Update a keikka. v1.0 supports only `--status` (the numeric keikkaTilaId, posted to POST /api/keikka/tila/set). Other field-setters land in v1.1.",
     permissions: ["auth.page.grid.tilaus.edit"],
     args: [{ name: "keikkaId", type: "number", description: "keikkaId to update" }],
     flags: [
       {
         name: "status",
         type: "string",
-        description: "New tila/status value",
+        description: "New keikkaTilaId (numeric, e.g. 9 = Toimitettu)",
       },
     ],
     writeFlags: true,
     outputShape: "{ ok: true } or backend response",
     errors: [
-      apiErr(400, "Validation failed", "check --status"),
+      { exit: 4, meaning: "--status not a numeric keikkaTilaId", remedy: "pass a number, e.g. --status 9" },
       apiErr(404, "Keikka not found", "verify keikkaId"),
       ...permErrors("auth.page.grid.tilaus.edit"),
     ],
     notes: [
-      "Status values are keikkaTilaIds — see the legend on `ib keikka list --help` or the `tila` GLOSSARY entry on `ib --help`.",
+      "--status takes the numeric keikkaTilaId, NOT a name — e.g. `--status 9` (Toimitettu), `--status 8` (Peruttu), `--status 2` (Lähetetty). See the legend on `ib keikka list --help` or the `tila` GLOSSARY entry on `ib --help`.",
     ],
     examples: [
-      "ib keikka update 9001 --status done",
-      "ib keikka update 9001 --status confirmed --reason 'phone confirmation'",
+      "ib keikka update 9001 --status 9",
+      "ib keikka update 9001 --status 8 --reason 'phone cancellation'",
     ],
   },
   {
