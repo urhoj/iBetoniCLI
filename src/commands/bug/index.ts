@@ -169,3 +169,45 @@ export async function runBugComment(
   });
   return { commentId: res.commentId };
 }
+
+export interface BugAdminUpdateInput {
+  status?: string;
+  priority?: string;
+  notes?: string;
+  resolution?: string;
+  assign?: number;
+  reason?: string;
+  dryRun?: boolean;
+}
+
+/** PUT /api/bugs/admin/:id — developer-only triage of status/priority/notes/resolution/assignee. */
+export async function runBugAdminUpdate(
+  client: ApiClient,
+  id: number,
+  input: BugAdminUpdateInput
+): Promise<unknown> {
+  assertEnum(input.status, STATUSES, "status");
+  assertEnum(input.priority, PRIORITIES, "priority");
+  const body: Record<string, unknown> = {};
+  if (input.status !== undefined) body.status = input.status;
+  if (input.priority !== undefined) body.priority = input.priority;
+  if (input.notes !== undefined) body.adminNotes = input.notes;
+  if (input.resolution !== undefined) body.resolution = input.resolution;
+  if (input.assign !== undefined) body.assignedTo = input.assign;
+  if (Object.keys(body).length === 0) {
+    throw new CliError(
+      "provide at least one of --status / --priority / --notes / --resolution / --assign",
+      400,
+      null,
+      4
+    );
+  }
+  const path = `/api/bugs/admin/${id}`;
+  if (input.dryRun) {
+    return { dryRun: true, wouldSend: { method: "PUT", path, body } };
+  }
+  const res = await client.put<unknown>(path, body, {
+    headers: writeFlagsToHeaders({ reason: input.reason }),
+  });
+  return unwrapData(res);
+}

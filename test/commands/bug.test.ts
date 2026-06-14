@@ -4,6 +4,7 @@ import {
   runBugList,
   runBugGet,
   runBugComment,
+  runBugAdminUpdate,
 } from "../../src/commands/bug/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -194,5 +195,53 @@ describe("ib bug comment", () => {
   test("empty --body → exit 4, no POST", async () => {
     await expect(runBugComment(mockClient, 51, { body: "  " })).rejects.toMatchObject({ exitCode: 4 });
     expect(post).not.toHaveBeenCalled();
+  });
+});
+
+describe("ib bug admin update", () => {
+  test("PUTs only the provided fields (notes→adminNotes, assign→assignedTo) and unwraps .data", async () => {
+    put.mockResolvedValueOnce({ success: true, data: { bugReportId: 51, status: "resolved" } });
+    const out = await runBugAdminUpdate(mockClient, 51, {
+      status: "resolved",
+      priority: "high",
+      notes: "fixed in v2",
+      resolution: "patched grid save",
+      assign: 6233,
+      reason: "triage",
+    });
+    expect(put).toHaveBeenCalledWith(
+      "/api/bugs/admin/51",
+      {
+        status: "resolved",
+        priority: "high",
+        adminNotes: "fixed in v2",
+        resolution: "patched grid save",
+        assignedTo: 6233,
+      },
+      { headers: { "X-Action-Reason": "triage" } }
+    );
+    expect(out).toEqual({ bugReportId: 51, status: "resolved" });
+  });
+
+  test("--dry-run previews and never PUTs", async () => {
+    const out = await runBugAdminUpdate(mockClient, 51, { status: "closed", dryRun: true });
+    expect(put).not.toHaveBeenCalled();
+    expect(out).toEqual({
+      dryRun: true,
+      wouldSend: { method: "PUT", path: "/api/bugs/admin/51", body: { status: "closed" } },
+    });
+  });
+
+  test("no fields provided → exit 4, no PUT", async () => {
+    await expect(runBugAdminUpdate(mockClient, 51, {})).rejects.toMatchObject({ exitCode: 4 });
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  test("bad --status → exit 4", async () => {
+    await expect(runBugAdminUpdate(mockClient, 51, { status: "done" })).rejects.toThrowError(CliError);
+  });
+
+  test("bad --priority → exit 4", async () => {
+    await expect(runBugAdminUpdate(mockClient, 51, { priority: "p1" })).rejects.toThrowError(CliError);
   });
 });
