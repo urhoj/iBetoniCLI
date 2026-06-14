@@ -44,7 +44,9 @@ import { buildCommandsList, buildDomainIndex } from "./reference/commandsList.js
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
-import { writeJson, exitWithError, failWith } from "./output/json.js";
+import { writeJson, exitWithError, failWith, emitStderr } from "./output/json.js";
+import { getEmbeddedCtx } from "./embedded.js";
+import { createApiClient } from "./api/client.js";
 import { CliError } from "./api/errors.js";
 
 /**
@@ -87,8 +89,13 @@ export function buildProgram(): Command {
     return ctx.client;
   }
 
-  const getClient = (): Promise<ApiClient> =>
-    clientFrom(getGlobalOptions(program));
+  const getClient = (): Promise<ApiClient> => {
+    const embCtx = getEmbeddedCtx();
+    if (embCtx) {
+      return Promise.resolve(createApiClient({ endpoint: embCtx.endpoint, token: embCtx.token, version: packageJson.version, readOnly: embCtx.readOnly }));
+    }
+    return clientFrom(getGlobalOptions(program));
+  };
 
   // A client bound to a SPECIFIC company via an ephemeral switch (never
   // persisted). Reuses the same tested switch path and inherits
@@ -276,6 +283,12 @@ function isCommanderError(err: unknown): err is CommanderErrorLike {
   );
 }
 
+function setExit(code: number): void {
+  const ctx = getEmbeddedCtx();
+  if (ctx) ctx.exitCode = code;
+  else process.exitCode = code;
+}
+
 /**
  * Terminal handler for `program.parseAsync(...).catch(...)`. Never calls
  * `process.exit()` (Windows-unsafe post-fetch) — sets `process.exitCode` and
@@ -305,14 +318,14 @@ export function handleParseRejection(
   if (isCommanderError(err)) {
     const text = parserText();
     if (err.exitCode === 0 || err.code === "commander.help") {
-      if (text) process.stderr.write(text);
-      process.exitCode = err.exitCode ?? 0;
+      if (text) emitStderr(text);
+      setExit(err.exitCode ?? 0);
       return;
     }
     const detail = (text || err.message || "usage error")
       .replace(/^error:\s*/gm, "")
       .trim();
-    process.stderr.write(
+    emitStderr(
       JSON.stringify({
         success: false,
         error: detail,
@@ -321,10 +334,10 @@ export function handleParseRejection(
         hint: "usage error — run `ib <command> --help` for the exact arguments and flags, or `ib commands` to discover commands",
       }) + "\n"
     );
-    process.exitCode = 4;
+    setExit(4);
     return;
   }
   const message = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`${message}\n`);
-  process.exitCode = 1;
+  emitStderr(`${message}\n`);
+  setExit(1);
 }
