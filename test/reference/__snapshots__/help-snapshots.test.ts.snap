@@ -1156,6 +1156,189 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib changelog add matches snapshot 1`] = `
+"USAGE
+  ib changelog add [flags]
+
+DESCRIPTION
+  Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row.
+  Auth: requires login (any authenticated user).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --type STRING    feature|improvement|bugfix (required)
+  --area STRING    frontend|backend|cli|database|cicd (required)
+  --title STRING    Entry title (required)
+  --description STRING    Kuvaus (required)
+  --benefits STRING    Hyödyt
+  --impact STRING    Vaikutus
+  --status STRING    Tila (Julkaistu/Korjattu/...)
+  --severity STRING    Bug severity (Kriittinen/Korkea/Normaali/Matala)
+  --files STRING    CSV of file paths
+  --repo STRING    Repo/submodule
+  --sha STRING    Commit SHAs (CSV)
+  --vtag STRING    Version tag
+  --feedback NUMBER    cliFeedback id this entry resolves
+  --date DATE    Entry date (YYYY-MM-DD|today)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { changelogId } | { dryRun, wouldAdd }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Developer access required → use a developer token
+  exit 4 (HTTP 400)  Validation (bad enum/date) → check --type/--area/--date
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+
+NOTES
+  - --dry-run is CLIENT-side (no server X-Dry-Run guard).
+  - Developer-gated.
+
+SEE ALSO
+  ib changelog report, ib feedback resolve
+
+EXAMPLES
+  ib changelog add --type bugfix --area cli --title "x" --description "y" --feedback 12 --sha 59d9cc5
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib changelog get matches snapshot 1`] = `
+"USAGE
+  ib changelog get <changelogId> [flags]
+
+DESCRIPTION
+  Get one change entry.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <changelogId> NUMBER    Entry id (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  entry
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  Not found              → ib changelog list
+
+EXAMPLES
+  ib changelog get 7
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib changelog list matches snapshot 1`] = `
+"USAGE
+  ib changelog list [flags]
+
+DESCRIPTION
+  List change entries with filters.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --month STRING    YYYY-MM
+  --type STRING    feature|improvement|bugfix
+  --area STRING    frontend|backend|cli|database|cicd
+  --repo STRING    Repo/submodule
+  --feedback NUMBER    linked feedback id
+  --limit NUMBER    Max rows
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<entry>
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Developer only         → dev token
+
+EXAMPLES
+  ib changelog list --month 2026-06 --type feature
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib changelog report matches snapshot 1`] = `
+"USAGE
+  ib changelog report [flags]
+
+DESCRIPTION
+  Generate the monthly report (markdown or json) from entries.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --month STRING    YYYY-MM (required)
+  --format STRING    md|json (default: md)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { month, markdown } | { month, rows }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Developer only         → dev token
+
+EXAMPLES
+  ib changelog report --month 2026-06
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib changelog update matches snapshot 1`] = `
+"USAGE
+  ib changelog update <changelogId> [flags]
+
+DESCRIPTION
+  Edit a change entry.
+  Auth: requires login (any authenticated user).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+ARGUMENTS
+  <changelogId> NUMBER    Entry id (required)
+
+FLAGS
+  --type STRING    feature|improvement|bugfix
+  --area STRING    frontend|backend|cli|database|cicd
+  --title STRING    New title
+  --description STRING    New description
+  --benefits STRING    Hyödyt
+  --impact STRING    Vaikutus
+  --status STRING    Status update (e.g. mark deployed)
+  --severity STRING    Bug severity
+  --files STRING    CSV of file paths
+  --repo STRING    Repo/submodule
+  --sha STRING    Commit SHAs (CSV)
+  --vtag STRING    Version tag
+  --date DATE    Entry date (YYYY-MM-DD|today)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  entry
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Developer only         → dev token
+
+EXAMPLES
+  ib changelog update 7 --status "Deployed prod"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib commands matches snapshot 1`] = `
 "USAGE
   ib commands [<domain>] [flags]

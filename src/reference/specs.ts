@@ -23,6 +23,7 @@ import { exitCodeFromStatus } from "../api/errors.js";
 // COMMAND_SPECS.
 import { MESSAGE_DAILY_SPECS } from "../commands/message/daily/index.js";
 import { MESSAGE_BOARD_SPECS } from "../commands/message/board/index.js";
+import { CHANGELOG_SPECS } from "../commands/changelog/index.js";
 
 /** API error row: derive the exit code from the HTTP status. */
 const apiErr = (http: number, meaning: string, remedy: string): CommandError => ({
@@ -4317,4 +4318,6 @@ export const COMMAND_SPECS: CommandSpec[] = [
   ...MESSAGE_DAILY_SPECS,
   // ─── message board (6) — co-located specs (see import at top) ───────────────
   ...MESSAGE_BOARD_SPECS,
+  // ─── changelog ───────────────────────────────────────────────────────────────
+  ...CHANGELOG_SPECS,
 ];
