@@ -301,4 +301,147 @@ export function registerMessageBoardCommands(parent, getClient) {
         }
     });
 }
+// ─── CommandSpecs (co-located: one source of truth for this sub-group). ───────
+// Spread into COMMAND_SPECS in reference/specs.ts; `registerMessageBoardCommands`
+// wires the matching leaves into the `ib message` umbrella in commands/message. ──
+const BOARD_AUTH_ERRORS = [
+    { http: 401, exit: 2, meaning: "Token expired", remedy: "ib auth refresh" },
+    {
+        http: 403,
+        exit: 3,
+        meaning: "Not an admin/editor (writes + `all`/`get` require it)",
+        remedy: "an asiakas admin/editor or ilmoitustaulu editor must run it",
+    },
+    {
+        http: 400,
+        exit: 4,
+        meaning: "Validation error (missing title/text/start-date, bad priority/date)",
+        remedy: "check the flags",
+    },
+    { http: 500, exit: 6, meaning: "Backend error", remedy: "retry with --verbose" },
+];
+const BOARD_NOT_FOUND = {
+    http: 404,
+    exit: 5,
+    meaning: "No notice with that id for the company",
+    remedy: "ib message board all",
+};
+const BOARD_ROW = "{ messageId, ownerAsiakasId, title, body, priority, startDate, expiresAt, createdAt, updatedAt, createdBy }";
+const BOARD_EDIT_PERMS = ["auth.page.ilmoitustaulu.edit", "auth.page.ilmoitustaulu.editOwn"];
+export const MESSAGE_BOARD_SPECS = [
+    {
+        command: "ib message board list",
+        description: "List notices ACTIVE on a day (startDate ≤ day ≤ expiresAt, or no expiry), newest first. Open to any company member. --date takes today/yesterday/tomorrow or YYYYMMDD (defaults to today). The web UI's per-device dismiss state is NOT applied — the CLI returns the full active set.",
+        auth: "any",
+        flags: [
+            {
+                name: "date",
+                type: "date",
+                description: "Day to query: today | yesterday | tomorrow | YYYYMMDD (default today)",
+            },
+        ],
+        outputShape: `ListEnvelope<${BOARD_ROW}>`,
+        errors: BOARD_AUTH_ERRORS,
+        notes: [
+            "Requires the ilmoitustaulu module enabled for the company.",
+            "The active-list endpoint uses compact YYYYMMDD (not ISO) — the CLI converts for you.",
+        ],
+        seeAlso: ["ib message board all", "ib message board get"],
+        examples: ["ib message board list", "ib message board list --date 20260614"],
+    },
+    {
+        command: "ib message board all",
+        description: "List EVERY notice for the company including expired and not-yet-started ones (the admin-panel view). Requires an asiakas admin/editor or ilmoitustaulu editor.",
+        permissions: BOARD_EDIT_PERMS,
+        flags: [],
+        outputShape: `ListEnvelope<${BOARD_ROW}>`,
+        errors: BOARD_AUTH_ERRORS,
+        seeAlso: ["ib message board list"],
+        examples: ["ib message board all"],
+    },
+    {
+        command: "ib message board get",
+        description: "Get one notice by id. There is no single-message GET route, so it is resolved CLIENT-SIDE over `all` — and therefore needs the same admin/editor access. Unknown id → exit 5.",
+        permissions: BOARD_EDIT_PERMS,
+        args: [{ name: "messageId", type: "number", description: "Notice to fetch" }],
+        flags: [],
+        outputShape: BOARD_ROW,
+        errors: [BOARD_NOT_FOUND, ...BOARD_AUTH_ERRORS],
+        examples: ["ib message board get 7"],
+    },
+    {
+        command: "ib message board create",
+        description: "Create a notice (POST). --title, --text and --start-date are required; --priority defaults to info; --expires-at is optional (omit = never expires). Requires admin/editor. --reason required.",
+        permissions: BOARD_EDIT_PERMS,
+        flags: [
+            { name: "title", type: "string", required: true, description: "Notice title" },
+            { name: "text", type: "string", required: true, description: "Notice body text (stored as body)" },
+            { name: "priority", type: "string", description: "info | warning | urgent (default info)" },
+            {
+                name: "start-date",
+                type: "date",
+                description: "Day the notice becomes visible: today | YYYY-MM-DD (required)",
+            },
+            {
+                name: "expires-at",
+                type: "date",
+                description: "Last day visible: YYYY-MM-DD (omit = never expires)",
+            },
+        ],
+        writeFlags: true,
+        mutates: true,
+        outputShape: `${BOARD_ROW} · { dryRun: true, proposed: {...} } on --dry-run`,
+        errors: BOARD_AUTH_ERRORS,
+        notes: [
+            "--dry-run previews the payload CLIENT-SIDE without writing (the route has no X-Dry-Run guard).",
+        ],
+        seeAlso: ["ib message board update", "ib message board delete"],
+        examples: [
+            'ib message board create --title "Asema kiinni" --text "Perjantaina suljettu" --start-date today --priority warning --reason "tiedote"',
+        ],
+    },
+    {
+        command: "ib message board update",
+        description: "Update a notice (PUT). GET-merges the current row (over `all`) so omitted fields are preserved — the backend overwrites the whole row. Admins edit any row; editors only their own. --reason required.",
+        permissions: BOARD_EDIT_PERMS,
+        args: [{ name: "messageId", type: "number", description: "Notice to update" }],
+        flags: [
+            { name: "title", type: "string", description: "Notice title" },
+            { name: "text", type: "string", description: "Notice body text (stored as body)" },
+            { name: "priority", type: "string", description: "info | warning | urgent" },
+            {
+                name: "start-date",
+                type: "date",
+                description: "Day the notice becomes visible: today | YYYY-MM-DD",
+            },
+            {
+                name: "expires-at",
+                type: "date",
+                description: 'Last day visible: YYYY-MM-DD (pass "" to clear the expiry)',
+            },
+        ],
+        writeFlags: true,
+        mutates: true,
+        outputShape: `${BOARD_ROW} · { dryRun: true, messageId, current, proposed } on --dry-run`,
+        errors: [BOARD_NOT_FOUND, ...BOARD_AUTH_ERRORS],
+        notes: [
+            "--dry-run previews the merged row CLIENT-SIDE without writing (no server X-Dry-Run guard).",
+        ],
+        seeAlso: ["ib message board get"],
+        examples: ['ib message board update 7 --priority urgent --reason "nostettu kiireelliseksi"'],
+    },
+    {
+        command: "ib message board delete",
+        description: "Delete a notice (DELETE, 204). Admins delete any row; editors only their own. --reason required.",
+        permissions: BOARD_EDIT_PERMS,
+        args: [{ name: "messageId", type: "number", description: "Notice to delete" }],
+        flags: [],
+        writeFlags: true,
+        mutates: true,
+        outputShape: "204 no content · { dryRun: true, messageId, wouldDelete: {...} } on --dry-run",
+        errors: [BOARD_NOT_FOUND, ...BOARD_AUTH_ERRORS],
+        notes: ["--dry-run previews what would be deleted CLIENT-SIDE without writing."],
+        examples: ['ib message board delete 7 --reason "vanhentunut"'],
+    },
+];
 //# sourceMappingURL=index.js.map

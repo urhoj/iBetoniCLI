@@ -1,7 +1,9 @@
 import { exitCodeFromStatus } from "../api/errors.js";
-// `ib message daily` specs are co-located with the command (one source of truth
-// for that sub-group) and spread in at the end of COMMAND_SPECS.
+// `ib message daily` / `ib message board` specs are co-located with their
+// commands (one source of truth per sub-group) and spread in at the end of
+// COMMAND_SPECS.
 import { MESSAGE_DAILY_SPECS } from "../commands/message/daily/index.js";
+import { MESSAGE_BOARD_SPECS } from "../commands/message/board/index.js";
 /** API error row: derive the exit code from the HTTP status. */
 const apiErr = (http, meaning, remedy) => ({
     http,
@@ -3936,5 +3938,7 @@ export const COMMAND_SPECS = [
     },
     // ─── message daily (11) — co-located specs (see import at top) ──────────────
     ...MESSAGE_DAILY_SPECS,
+    // ─── message board (6) — co-located specs (see import at top) ───────────────
+    ...MESSAGE_BOARD_SPECS,
 ];
 //# sourceMappingURL=specs.js.map

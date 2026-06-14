@@ -99,23 +99,32 @@ export async function runDailyGet(
  * `dailyMessage:updated` socket to every associated company. `message: null`
  * clears the day. Passing `--clear` and `--message` together is rejected upstream
  * (the action only sends one).
+ *
+ * `--dry-run` is CLIENT-SIDE: the dailyMessage routes have NO X-Dry-Run guard, so
+ * a "dry-run" that POSTed would actually persist ([[feedback_ib_dryrun_deploy_gated]]).
+ * We return the would-be payload and write NOTHING.
  */
 export async function runDailySetMessage(
   client: ApiClient,
   body: { boxId: number; message: string | null; yyyymmdd: string },
   flags: WriteFlags
 ): Promise<unknown> {
+  if (flags.dryRun) return { dryRun: true, wouldSet: body };
   return client.post<unknown>("/api/dailyMessage/box/message/save", body, {
     headers: writeFlagsToHeaders(flags),
   });
 }
 
-/** POST /box/save — rename a box / edit its lisätieto (box metadata, not content). */
+/**
+ * POST /box/save — rename a box / edit its lisätieto (box metadata, not content).
+ * `--dry-run` is client-side (see {@link runDailySetMessage}).
+ */
 export async function runDailySaveBox(
   client: ApiClient,
   body: { boxId: number; boxTitle: string; boxLisatieto?: string | null },
   flags: WriteFlags
 ): Promise<unknown> {
+  if (flags.dryRun) return { dryRun: true, wouldSave: body };
   return client.post<unknown>("/api/dailyMessage/box/save", body, {
     headers: writeFlagsToHeaders(flags),
   });
@@ -126,6 +135,8 @@ export async function runDailySaveBox(
  *   default → POST /box/add/:yyyymmdd { ownerAsiakasId, boxTitle }
  *   --init  → POST /box/initialize { boxTitle } (the caller's OWN company's first
  *             box; server derives the company + checks permission)
+ *
+ * `--dry-run` is client-side (see {@link runDailySetMessage}).
  */
 export async function runDailyAddBox(
   client: ApiClient,
@@ -136,42 +147,57 @@ export async function runDailyAddBox(
   if (opts.init) {
     const body: Row = {};
     if (opts.boxTitle) body.boxTitle = opts.boxTitle;
+    if (flags.dryRun) return { dryRun: true, wouldAdd: { path: "/api/dailyMessage/box/initialize", body } };
     return client.post<unknown>("/api/dailyMessage/box/initialize", body, { headers });
   }
   const yyyymmdd = opts.yyyymmdd ?? "00000000";
   const body: Row = { ownerAsiakasId: opts.ownerAsiakasId };
   if (opts.boxTitle) body.boxTitle = opts.boxTitle;
-  return client.post<unknown>(`/api/dailyMessage/box/add/${yyyymmdd}`, body, { headers });
+  const path = `/api/dailyMessage/box/add/${yyyymmdd}`;
+  if (flags.dryRun) return { dryRun: true, wouldAdd: { path, body } };
+  return client.post<unknown>(path, body, { headers });
 }
 
-/** DELETE /box/delete/:boxId — remove a box (and its messages) for all companies. */
+/**
+ * DELETE /box/delete/:boxId — remove a box (and its messages) for all companies.
+ * `--dry-run` is client-side (see {@link runDailySetMessage}).
+ */
 export async function runDailyDeleteBox(
   client: ApiClient,
   boxId: number,
   flags: WriteFlags
 ): Promise<unknown> {
+  if (flags.dryRun) return { dryRun: true, wouldDelete: { boxId } };
   return client.delete<unknown>(`/api/dailyMessage/box/delete/${boxId}`, {
     headers: writeFlagsToHeaders(flags),
   });
 }
 
-/** POST /box/asiakas/add — share a box to another tenant (read-only by default). */
+/**
+ * POST /box/asiakas/add — share a box to another tenant (read-only by default).
+ * `--dry-run` is client-side (see {@link runDailySetMessage}).
+ */
 export async function runDailyShare(
   client: ApiClient,
   body: { boxId: number; asiakasId: number },
   flags: WriteFlags
 ): Promise<unknown> {
+  if (flags.dryRun) return { dryRun: true, wouldShare: body };
   return client.post<unknown>("/api/dailyMessage/box/asiakas/add", body, {
     headers: writeFlagsToHeaders(flags),
   });
 }
 
-/** DELETE /box/asiakas/delete/:id — stop sharing a box with a tenant. */
+/**
+ * DELETE /box/asiakas/delete/:id — stop sharing a box with a tenant.
+ * `--dry-run` is client-side (see {@link runDailySetMessage}).
+ */
 export async function runDailyUnshare(
   client: ApiClient,
   dailyMessageBoxAsiakasId: number,
   flags: WriteFlags
 ): Promise<unknown> {
+  if (flags.dryRun) return { dryRun: true, wouldUnshare: { dailyMessageBoxAsiakasId } };
   return client.delete<unknown>(
     `/api/dailyMessage/box/asiakas/delete/${dailyMessageBoxAsiakasId}`,
     { headers: writeFlagsToHeaders(flags) }
@@ -181,7 +207,8 @@ export async function runDailyUnshare(
 /**
  * POST /box/asiakas/permission/add — add a per-role ACL row for a shared box.
  * The endpoint does NOT set readOnly here (the row defaults read-only); adjust
- * read/edit afterwards with `perm-set`.
+ * read/edit afterwards with `perm-set`. `--dry-run` is client-side (see
+ * {@link runDailySetMessage}).
  */
 export async function runDailyGrant(
   client: ApiClient,
@@ -193,24 +220,32 @@ export async function runDailyGrant(
   },
   flags: WriteFlags
 ): Promise<unknown> {
+  if (flags.dryRun) return { dryRun: true, wouldGrant: body };
   return client.post<unknown>("/api/dailyMessage/box/asiakas/permission/add", body, {
     headers: writeFlagsToHeaders(flags),
   });
 }
 
-/** DELETE /box/asiakas/permission/delete/:id — remove a per-role ACL row. */
+/**
+ * DELETE /box/asiakas/permission/delete/:id — remove a per-role ACL row.
+ * `--dry-run` is client-side (see {@link runDailySetMessage}).
+ */
 export async function runDailyRevoke(
   client: ApiClient,
   dailyMessageBoxAsiakasPermissionsId: number,
   flags: WriteFlags
 ): Promise<unknown> {
+  if (flags.dryRun) return { dryRun: true, wouldRevoke: { dailyMessageBoxAsiakasPermissionsId } };
   return client.delete<unknown>(
     `/api/dailyMessage/box/asiakas/permission/delete/${dailyMessageBoxAsiakasPermissionsId}`,
     { headers: writeFlagsToHeaders(flags) }
   );
 }
 
-/** POST /box/asiakas/permission/save — set a permission row's role + read/edit access. */
+/**
+ * POST /box/asiakas/permission/save — set a permission row's role + read/edit access.
+ * `--dry-run` is client-side (see {@link runDailySetMessage}).
+ */
 export async function runDailyPermSet(
   client: ApiClient,
   body: {
@@ -220,6 +255,7 @@ export async function runDailyPermSet(
   },
   flags: WriteFlags
 ): Promise<unknown> {
+  if (flags.dryRun) return { dryRun: true, wouldPermSet: body };
   return client.post<unknown>("/api/dailyMessage/box/asiakas/permission/save", body, {
     headers: writeFlagsToHeaders(flags),
   });
@@ -242,8 +278,9 @@ export async function runDailyPermSet(
  *   grant  <boxId> …          add a per-role ACL row · revoke <id> · perm-set <id>
  *
  * All writes carry the universal --dry-run/--idempotency-key/--reason flags and
- * are blocked under --read-only. Daily-message dry-run is SERVER-side (deploy-
- * gated like every other non-GET handler).
+ * are blocked under --read-only. Daily-message --dry-run is resolved CLIENT-side
+ * (returns the would-be payload, sends nothing) because the dailyMessage routes
+ * have no server X-Dry-Run guard — a POSTed "dry-run" would persist.
  */
 export function registerMessageDailyCommands(
   parent: Command,
@@ -547,7 +584,7 @@ export const MESSAGE_DAILY_SPECS: CommandSpec[] = [
     mutates: true,
     outputShape: "{ success, ... }",
     errors: DAILY_AUTH_ERRORS,
-    notes: ["Exactly one of --message / --clear is required.", "--dry-run is server-side (deploy-gated)."],
+    notes: ["Exactly one of --message / --clear is required.", "--dry-run is CLIENT-side (returns the would-be payload, sends nothing) — the dailyMessage routes have no server X-Dry-Run guard."],
     seeAlso: ["ib message daily get"],
     examples: ['ib message daily set 36 --date today --message "Asema kiinni klo 15" --reason "tiedote"'],
   },

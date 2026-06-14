@@ -176,3 +176,43 @@ describe("daily writes", () => {
     );
   });
 });
+
+describe("daily --dry-run is client-side (no write leaves the process)", () => {
+  test("set previews and never POSTs (routes have no X-Dry-Run guard)", async () => {
+    const res = await runDailySetMessage(
+      mockClient,
+      { boxId: 36, message: "x", yyyymmdd: "20260614" },
+      { dryRun: true }
+    );
+    expect(res).toEqual({ dryRun: true, wouldSet: { boxId: 36, message: "x", yyyymmdd: "20260614" } });
+    expect(asPost()).not.toHaveBeenCalled();
+  });
+
+  test("add --init previews and never POSTs", async () => {
+    const res = await runDailyAddBox(mockClient, { init: true, boxTitle: "T" }, { dryRun: true });
+    expect(res).toEqual({
+      dryRun: true,
+      wouldAdd: { path: "/api/dailyMessage/box/initialize", body: { boxTitle: "T" } },
+    });
+    expect(asPost()).not.toHaveBeenCalled();
+  });
+
+  test("delete previews and never DELETEs", async () => {
+    const res = await runDailyDeleteBox(mockClient, 36, { dryRun: true, reason: "r" });
+    expect(res).toEqual({ dryRun: true, wouldDelete: { boxId: 36 } });
+    expect(asDelete()).not.toHaveBeenCalled();
+  });
+
+  test("perm-set previews and never POSTs", async () => {
+    const res = await runDailyPermSet(
+      mockClient,
+      { dailyMessageBoxAsiakasPermissionsId: 111, asiakasPersonSettingTypeId: 8, readOnly: false },
+      { dryRun: true }
+    );
+    expect(res).toEqual({
+      dryRun: true,
+      wouldPermSet: { dailyMessageBoxAsiakasPermissionsId: 111, asiakasPersonSettingTypeId: 8, readOnly: false },
+    });
+    expect(asPost()).not.toHaveBeenCalled();
+  });
+});

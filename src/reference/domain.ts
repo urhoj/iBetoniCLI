@@ -117,6 +117,11 @@ export const GLOSSARY: GlossaryEntry[] = [
       "Conversational chat threads between a customer and a provider/operator, tied to a context (Jerry tarjous now, keikka later) (`ib message chat …`). Distinct from daily grid notes and the announcement board.",
   },
   {
+    term: "ilmoitustaulu / announcement board",
+    definition:
+      "Company-wide dated notices (title + body + priority info/warning/urgent) every member sees until they expire — a one-to-many broadcast, tenant-scoped (`ib message board …`, alias `ib message ilmoitustaulu`). Distinct from chat threads and daily grid notes.",
+  },
+  {
     term: "varikko / depot",
     definition:
       "A pumping provider's depot — a sijainti with a delivery radius. Enrolled in BetoniJerry per-varikko via jerryActiveUntil (`ib sijainti set-jerry`).",
