@@ -271,3 +271,147 @@ export async function runBugAdminDelete(
   await client.delete<unknown>(path, { headers: writeFlagsToHeaders({ reason }) });
   return { success: true, bugReportId: id };
 }
+
+/**
+ * Register `ib bug` (create/list/get/comment) + the developer-only
+ * `ib bug admin` subgroup (update/assign/stats/delete). Each leaf's --help is
+ * replaced by its CommandSpec via attachRichHelp; the two group commands render
+ * computed group help.
+ */
+export function registerBugCommands(
+  parent: Command,
+  getClient: () => Promise<ApiClient>
+): void {
+  const bug = parent
+    .command("bug")
+    .description("File, read, and triage bug reports (bugReport system)");
+
+  bug
+    .command("create")
+    .description("File a bug report (opens a GitHub issue + emails admins)")
+    .requiredOption(
+      "--type <type>",
+      "ui-display-issue | functionality-error | performance-problem | data-incorrect | other"
+    )
+    .requiredOption("--severity <sev>", "critical | major | minor | cosmetic")
+    .requiredOption("--description <text>", "What is wrong")
+    .option("--steps <text>", "Steps to reproduce")
+    .option("--priority <p>", "low | medium | high | urgent (default: derived from severity)")
+    .option("--reason <text>", "Audit reason (X-Action-Reason)")
+    .option("--dry-run", "Preview the payload without sending (client-side)")
+    .action(async (opts: BugCreateInput) => {
+      try {
+        writeJson(await runBugCreate(await getClient(), opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  bug
+    .command("list")
+    .description("List bug reports (permission-filtered; admins see all)")
+    .option("--status <s>", "new | in-progress | resolved | closed")
+    .option("--severity <s>", "critical | major | minor | cosmetic")
+    .option(
+      "--type <t>",
+      "ui-display-issue | functionality-error | performance-problem | data-incorrect | other"
+    )
+    .option("--owner <asiakasId>", "Filter by owning tenant (admins only; ignored otherwise)", Number)
+    .option("--limit <n>", "Max rows", Number)
+    .option("--offset <n>", "Pagination offset", Number)
+    .option("--order-by <f>", "createdAt | updatedAt | severity | status | bugType | bugReportId")
+    .option("--order <dir>", "asc | desc")
+    .action(async (opts: BugListOpts) => {
+      try {
+        writeJson(await runBugList(await getClient(), opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  bug
+    .command("get <bugReportId>")
+    .description("Fetch one bug report with its comments + attachments")
+    .action(async (idStr: string) => {
+      try {
+        writeJson(await runBugGet(await getClient(), Number(idStr)));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  bug
+    .command("comment <bugReportId>")
+    .description("Add a comment to a bug report")
+    .requiredOption("--body <text>", "Comment text")
+    .option("--reason <text>", "Audit reason (X-Action-Reason)")
+    .option("--dry-run", "Preview without sending (client-side)")
+    .action(async (idStr: string, opts: BugCommentInput) => {
+      try {
+        writeJson(await runBugComment(await getClient(), Number(idStr), opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  const admin = bug
+    .command("admin")
+    .description("Developer-only triage: update, assign, stats, delete");
+
+  admin
+    .command("update <bugReportId>")
+    .description("Update status/priority/notes/resolution/assignee (developer-only)")
+    .option("--status <s>", "new | in-progress | resolved | closed")
+    .option("--priority <p>", "low | medium | high | urgent")
+    .option("--notes <text>", "Admin notes")
+    .option("--resolution <text>", "Resolution text")
+    .option("--assign <personId>", "Assign to a developer", Number)
+    .option("--reason <text>", "Audit reason (X-Action-Reason)")
+    .option("--dry-run", "Preview without sending (client-side)")
+    .action(async (idStr: string, opts: BugAdminUpdateInput) => {
+      try {
+        writeJson(await runBugAdminUpdate(await getClient(), Number(idStr), opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  admin
+    .command("assign <bugReportId>")
+    .description("Assign a report to a developer (sets status→in-progress; developer-only)")
+    .requiredOption("--to <personId>", "Assignee personId", Number)
+    .option("--reason <text>", "Audit reason (X-Action-Reason)")
+    .option("--dry-run", "Preview without sending (client-side)")
+    .action(async (idStr: string, opts: BugAdminAssignInput) => {
+      try {
+        writeJson(await runBugAdminAssign(await getClient(), Number(idStr), opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  admin
+    .command("stats")
+    .description("Bug report statistics (developer-only)")
+    .option("--owner <asiakasId>", "Scope to one tenant", Number)
+    .action(async (opts: { owner?: number }) => {
+      try {
+        writeJson(await runBugAdminStats(await getClient(), opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  admin
+    .command("delete <bugReportId>")
+    .description("Delete a bug report (irreversible; developer-only). Requires --reason.")
+    .requiredOption("--reason <text>", "Why (required; X-Action-Reason)")
+    .option("--dry-run", "Preview without sending (client-side)")
+    .action(async (idStr: string, opts: BugAdminDeleteInput) => {
+      try {
+        writeJson(await runBugAdminDelete(await getClient(), Number(idStr), opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+}
