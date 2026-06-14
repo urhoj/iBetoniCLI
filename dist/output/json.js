@@ -104,6 +104,15 @@ export function exitWithError(err) {
     else
         process.exitCode = code;
 }
+/** Set the process/embedded exit code (ctx-aware). Use instead of a bare
+ * `process.exitCode = N` so commands report their exit code in in-process mode. */
+export function setExitCode(code) {
+    const ctx = getEmbeddedCtx();
+    if (ctx)
+        ctx.exitCode = code;
+    else
+        process.exitCode = code;
+}
 export { emitStdout, emitStderr };
 /**
  * Terminate a command from a validation/guard check WITHOUT `process.exit()`

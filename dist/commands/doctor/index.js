@@ -1,4 +1,4 @@
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson, exitWithError, setExitCode } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { runVersion } from "../version/index.js";
 import { runCompanyList } from "../company/index.js";
@@ -78,7 +78,7 @@ export function registerDoctorCommand(parent, getClient, getEndpoint, cliVersion
             writeJson(report);
             // Set the code and RETURN (don't process.exit) so stdout drains first.
             if (!report.ok)
-                process.exitCode = 1;
+                setExitCode(1);
         }
         catch (e) {
             exitWithError(e);

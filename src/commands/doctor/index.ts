@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson, exitWithError, setExitCode } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { runVersion, type VersionReport } from "../version/index.js";
 import { runCompanyList } from "../company/index.js";
@@ -127,7 +127,7 @@ export function registerDoctorCommand(
         });
         writeJson(report);
         // Set the code and RETURN (don't process.exit) so stdout drains first.
-        if (!report.ok) process.exitCode = 1;
+        if (!report.ok) setExitCode(1);
       } catch (e) {
         exitWithError(e);
       }

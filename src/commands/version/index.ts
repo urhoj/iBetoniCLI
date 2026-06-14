@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { writeJson } from "../../output/json.js";
+import { writeJson, setExitCode } from "../../output/json.js";
 
 /**
  * `ib version` — report the local CLI version AND the deployed iB version at the
@@ -111,6 +111,6 @@ export function registerVersionCommand(
       // Unreachable → exit 7 (network). Set the code and RETURN (don't
       // process.exit) so the JSON on stdout drains first — a hard exit truncates
       // piped output on Windows, and piped stdout is this CLI's primary mode.
-      if (!report.reachable) process.exitCode = 7;
+      if (!report.reachable) setExitCode(7);
     });
 }

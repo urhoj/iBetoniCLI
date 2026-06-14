@@ -110,6 +110,14 @@ export function exitWithError(err: unknown): void {
   else process.exitCode = code;
 }
 
+/** Set the process/embedded exit code (ctx-aware). Use instead of a bare
+ * `process.exitCode = N` so commands report their exit code in in-process mode. */
+export function setExitCode(code: number): void {
+  const ctx = getEmbeddedCtx();
+  if (ctx) ctx.exitCode = code;
+  else process.exitCode = code;
+}
+
 export { emitStdout, emitStderr };
 
 /**

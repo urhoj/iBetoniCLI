@@ -1,6 +1,6 @@
 import { describe, test, expect, vi } from "vitest";
 import { runEmbedded, type EmbeddedCtx } from "../../src/embedded.js";
-import { writeJson, writeError, exitWithError, setOutputMode } from "../../src/output/json.js";
+import { writeJson, writeError, exitWithError, setOutputMode, setExitCode } from "../../src/output/json.js";
 import { CliError } from "../../src/api/errors.js";
 import { runReferenceDump } from "../../src/reference/dump.js";
 
@@ -34,6 +34,16 @@ describe("json.ts embedded routing", () => {
     expect(c.stdout.join("")).toMatch(/^\{.*\}\n$/);
     expect(() => JSON.parse(c.stdout.join("").trim())).not.toThrow();
     spy.mockRestore();
+  });
+  test("setExitCode sets ctx.exitCode in embedded mode, process.exitCode otherwise", async () => {
+    const c = ctx();
+    await runEmbedded(c, async () => setExitCode(7));
+    expect(c.exitCode).toBe(7);
+    // outside embedded: writes process.exitCode (save/restore to avoid polluting the runner)
+    const prev = process.exitCode;
+    setExitCode(0);
+    expect(process.exitCode).toBe(0);
+    process.exitCode = prev;
   });
   test("outside embedded mode still writes to process.stdout (unchanged)", () => {
     const spy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
