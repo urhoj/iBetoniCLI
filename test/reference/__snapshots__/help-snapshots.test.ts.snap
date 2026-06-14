@@ -4489,6 +4489,117 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib message support contact matches snapshot 1`] = `
+"USAGE
+  ib message support contact [flags]
+
+DESCRIPTION
+  Open (or append to) a support thread escalating a tarjous (pumppuRequest) or keikka to the platform. Any authenticated user. A REAL write — honours the read-only write-lock. --dry-run resolves CLIENT-SIDE (prints the payload, never POSTs). Reply later with \`ib message chat send <threadId> --body ...\`.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --tarjous NUMBER    pumppuRequestId this escalation is about
+  --keikka NUMBER    keikkaId this escalation is about
+  --body STRING    The message to support (required)
+  --dry-run BOOLEAN    Print the payload without sending (client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { threadId, message } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → Provide exactly one of --keikka / --tarjous (positive integer) and a non-empty --body
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Exactly one of --keikka / --tarjous selects the context; --keikka wins if both are passed.
+  - reply with: ib message chat send <threadId> --body ...
+
+SEE ALSO
+  ib message chat send, ib message support inbox
+
+EXAMPLES
+  ib message support contact --tarjous 23 --body "Provider not responding — please intervene"
+  ib message support contact --keikka 5012 --body "Wrong worksite assigned" --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message support inbox matches snapshot 1`] = `
+"USAGE
+  ib message support inbox [flags]
+
+DESCRIPTION
+  Support triage queue: support threads escalated by operators, newest first. Developer-only (isSystemAdmin / isDeveloper); global across tenants. Filter by lifecycle status. Projects GET /api/messages/support/inbox into the list envelope.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --status STRING    open | resolved | all (default: open)
+  --limit NUMBER    Max rows
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { items: SupportThreadRow[], nextCursor: null, count, truncated }
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → --status must be open|resolved|all
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Read a thread's messages with \`ib message chat list <threadId>\` and reply with \`ib message chat send <threadId> --body ...\` (a support thread is a normal messageThread admins can read).
+
+SEE ALSO
+  ib message chat list, ib message support resolve
+
+EXAMPLES
+  ib message support inbox
+  ib message support inbox --status all --limit 50
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message support resolve matches snapshot 1`] = `
+"USAGE
+  ib message support resolve <threadId> [flags]
+
+DESCRIPTION
+  Mark a support thread resolved, or --reopen it back to open. Developer-only (isSystemAdmin / isDeveloper). A REAL write (PATCH) — blocked under --read-only (exit 3). --dry-run previews the body client-side without sending.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <threadId> NUMBER    support messageThread id (required)
+
+FLAGS
+  --reopen BOOLEAN    Set status back to open instead of resolved
+  --dry-run BOOLEAN    Print the update body without sending (client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { threadId, status } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → threadId must be a positive number
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
+  exit 5 (HTTP 404)  Not found              → check the threadId via \`ib message support inbox\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib message support inbox, ib message chat list
+
+EXAMPLES
+  ib message support resolve 42
+  ib message support resolve 42 --reopen
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib ohje get matches snapshot 1`] = `
 "USAGE
   ib ohje get <helpId> [flags]

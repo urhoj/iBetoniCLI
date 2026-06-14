@@ -4055,6 +4055,87 @@ export const COMMAND_SPECS: CommandSpec[] = [
     seeAlso: ["ib message chat list", "ib message chat threads"],
     examples: ["ib message chat mark-read 42", "ib message chat mark-read --tarjous 23"],
   },
+  // ─── message support (3) ──────────────────────────────────────────────────
+  {
+    command: "ib message support inbox",
+    description:
+      "Support triage queue: support threads escalated by operators, newest first. Developer-only (isSystemAdmin / isDeveloper); global across tenants. Filter by lifecycle status. Projects GET /api/messages/support/inbox into the list envelope.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    flags: [
+      { name: "status", type: "string", default: "open", description: "open | resolved | all" },
+      { name: "limit", type: "number", description: "Max rows" },
+    ],
+    outputShape: "{ items: SupportThreadRow[], nextCursor: null, count, truncated }",
+    errors: [
+      { exit: 4, meaning: "Validation", remedy: "--status must be open|resolved|all" },
+      apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
+      apiErr(401, "Token expired", "ib auth refresh"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    notes: [
+      "Read a thread's messages with `ib message chat list <threadId>` and reply with `ib message chat send <threadId> --body ...` (a support thread is a normal messageThread admins can read).",
+    ],
+    seeAlso: ["ib message chat list", "ib message support resolve"],
+    examples: [
+      "ib message support inbox",
+      "ib message support inbox --status all --limit 50",
+    ],
+  },
+  {
+    command: "ib message support contact",
+    description:
+      "Open (or append to) a support thread escalating a tarjous (pumppuRequest) or keikka to the platform. Any authenticated user. A REAL write — honours the read-only write-lock. --dry-run resolves CLIENT-SIDE (prints the payload, never POSTs). Reply later with `ib message chat send <threadId> --body ...`.",
+    auth: "any",
+    mutates: true,
+    flags: [
+      { name: "tarjous", type: "number", description: "pumppuRequestId this escalation is about" },
+      { name: "keikka", type: "number", description: "keikkaId this escalation is about" },
+      { name: "body", type: "string", required: true, description: "The message to support" },
+      { name: "dry-run", type: "boolean", description: "Print the payload without sending (client-side)" },
+    ],
+    outputShape:
+      "{ threadId, message } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
+    errors: [
+      { exit: 4, meaning: "Validation", remedy: "Provide exactly one of --keikka / --tarjous (positive integer) and a non-empty --body" },
+      apiErr(401, "Token expired", "ib auth refresh"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    notes: [
+      "Exactly one of --keikka / --tarjous selects the context; --keikka wins if both are passed.",
+      "reply with: ib message chat send <threadId> --body ...",
+    ],
+    seeAlso: ["ib message chat send", "ib message support inbox"],
+    examples: [
+      'ib message support contact --tarjous 23 --body "Provider not responding — please intervene"',
+      'ib message support contact --keikka 5012 --body "Wrong worksite assigned" --dry-run',
+    ],
+  },
+  {
+    command: "ib message support resolve",
+    description:
+      "Mark a support thread resolved, or --reopen it back to open. Developer-only (isSystemAdmin / isDeveloper). A REAL write (PATCH) — blocked under --read-only (exit 3). --dry-run previews the body client-side without sending.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    mutates: true,
+    args: [{ name: "threadId", type: "number", description: "support messageThread id" }],
+    flags: [
+      { name: "reopen", type: "boolean", description: "Set status back to open instead of resolved" },
+      { name: "dry-run", type: "boolean", description: "Print the update body without sending (client-side)" },
+    ],
+    outputShape:
+      "{ threadId, status } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
+    errors: [
+      { exit: 4, meaning: "Validation", remedy: "threadId must be a positive number" },
+      apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
+      apiErr(404, "Not found", "check the threadId via `ib message support inbox`"),
+      apiErr(401, "Token expired", "ib auth refresh"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    seeAlso: ["ib message support inbox", "ib message chat list"],
+    examples: [
+      "ib message support resolve 42",
+      "ib message support resolve 42 --reopen",
+    ],
+  },
   // ─── message daily (11) — co-located specs (see import at top) ──────────────
   ...MESSAGE_DAILY_SPECS,
   // ─── message board (6) — co-located specs (see import at top) ───────────────
