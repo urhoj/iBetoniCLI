@@ -112,6 +112,11 @@ export const GLOSSARY: GlossaryEntry[] = [
       "A provider's bid (price, availability, terms) on a pumppuRequest (`ib jerry request offers`).",
   },
   {
+    term: "viesti / message",
+    definition:
+      "Conversational chat threads between a customer and a provider/operator, tied to a context (Jerry tarjous now, keikka later) (`ib message chat …`). Distinct from daily grid notes and the announcement board.",
+  },
+  {
     term: "varikko / depot",
     definition:
       "A pumping provider's depot — a sijainti with a delivery radius. Enrolled in BetoniJerry per-varikko via jerryActiveUntil (`ib sijainti set-jerry`).",
