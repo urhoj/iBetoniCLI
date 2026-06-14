@@ -23,6 +23,8 @@ export interface PersonListFilter {
   role?: string;
   asiakas?: number;
   limit?: number;
+  /** List persons the company OWNS (person.ownerAsiakasId) instead of its members. */
+  owned?: boolean;
 }
 
 /** Typed convenience fields for `person create`, mapped to backend column names. */
@@ -82,6 +84,7 @@ export async function runPersonList(
   if (opts.role) params.set("role", opts.role);
   if (opts.asiakas !== undefined) params.set("asiakas", String(opts.asiakas));
   if (opts.limit !== undefined) params.set("limit", String(opts.limit));
+  if (opts.owned) params.set("owned", "1");
   const qs = params.toString();
   return client.get<ListEnvelope<Record<string, unknown>>>(
     `/api/cli/person/list${qs ? `?${qs}` : ""}`
@@ -393,7 +396,15 @@ export function registerPersonCommands(
   p.command("list")
     .description("List persons")
     .option("--role <role>", "Filter by role name")
-    .option("--asiakas <id>", "Filter by asiakasId", (v: string) => Number(v))
+    .option(
+      "--asiakas <id>",
+      "List members of this company instead of your active one (you must belong to it)",
+      (v: string) => Number(v)
+    )
+    .option(
+      "--owned",
+      "List persons this company OWNS (created — e.g. customer contacts) instead of its members"
+    )
     .option("--limit <n>", "Max rows", (v: string) => Math.min(Number(v), 500))
     .action(async (opts: PersonListFilter) => {
       try {

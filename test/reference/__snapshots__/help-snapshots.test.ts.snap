@@ -5289,12 +5289,13 @@ exports[`Help snapshots — contract stability > help for ib person list matches
   ib person list [flags]
 
 DESCRIPTION
-  List persons (drivers, admins, etc.) visible to the active company. Optional --role uses ROLE_NAME_BY_TYPEID from @ibetoni/constants.
+  List the active company's MEMBERS — persons attached to it via asiakasPerson, the same set as \`ib customer person list\`. \`--asiakas N\` lists company N's members (you must belong to N); \`--owned\` lists persons the company OWNS (created, e.g. customer contacts) instead. Optional --role uses ROLE_NAME_BY_TYPEID from @ibetoni/constants.
   Permissions: requires auth.page.person.read.
 
 FLAGS
   --role STRING    Filter by role name (e.g. driver, admin, laskuAdmin)
-  --asiakas NUMBER    Filter by asiakasId membership
+  --asiakas NUMBER    List members of this company instead of your active one (you must belong to it)
+  --owned BOOLEAN    List persons the company OWNS (person.ownerAsiakasId — e.g. customer contacts) instead of its members
   --limit NUMBER    Max rows (capped at 500) (default: 100)
 
 GLOBAL FLAGS
@@ -5305,13 +5306,21 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Unknown role           → use a role from @ibetoni/constants ROLE_TYPEID_BY_NAME
+  exit 3 (HTTP 403)  Not a member of the --asiakas company → you can only list members of companies you belong to (sysadmin/developer bypass)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.person.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - Default lists MEMBERS (attached), not owned persons — a company that owns no persons but has members no longer lists empty. Use --owned for the ownership view.
+
+SEE ALSO
+  ib customer person list, ib person search
+
 EXAMPLES
   ib person list --role driver
-  ib person list --asiakas 1349 --limit 50
+  ib person list --asiakas 27
+  ib person list --owned
 "
 `;
 
