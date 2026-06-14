@@ -3408,14 +3408,14 @@ exports[`Help snapshots — contract stability > help for ib keikka update match
   ib keikka update <keikkaId> [flags]
 
 DESCRIPTION
-  Update a keikka. v1.0 supports only \`--status\` (forwarded as \`tila\` to POST /api/keikka/setStatus). Other field-setters land in v1.1.
+  Update a keikka. v1.0 supports only \`--status\` (the numeric keikkaTilaId, posted to POST /api/keikka/tila/set). Other field-setters land in v1.1.
   Permissions: requires auth.page.grid.tilaus.edit.
 
 ARGUMENTS
   <keikkaId> NUMBER    keikkaId to update (required)
 
 FLAGS
-  --status STRING    New tila/status value
+  --status STRING    New keikkaTilaId (numeric, e.g. 9 = Toimitettu)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -3429,18 +3429,18 @@ OUTPUT (JSON, stdout)
   { ok: true } or backend response
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Validation failed      → check --status
+  exit 4  --status not a numeric keikkaTilaId → pass a number, e.g. --status 9
   exit 5 (HTTP 404)  Keikka not found       → verify keikkaId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - Status values are keikkaTilaIds — see the legend on \`ib keikka list --help\` or the \`tila\` GLOSSARY entry on \`ib --help\`.
+  - --status takes the numeric keikkaTilaId, NOT a name — e.g. \`--status 9\` (Toimitettu), \`--status 8\` (Peruttu), \`--status 2\` (Lähetetty). See the legend on \`ib keikka list --help\` or the \`tila\` GLOSSARY entry on \`ib --help\`.
 
 EXAMPLES
-  ib keikka update 9001 --status done
-  ib keikka update 9001 --status confirmed --reason 'phone confirmation'
+  ib keikka update 9001 --status 9
+  ib keikka update 9001 --status 8 --reason 'phone cancellation'
 "
 `;
 
