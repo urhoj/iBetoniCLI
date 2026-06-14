@@ -113,3 +113,134 @@ export async function runChatMarkRead(
 ): Promise<unknown> {
   return client.post<unknown>(`/api/messages/threads/${threadId}/read`, {});
 }
+
+/** Resolve the {@link ThreadTarget} from a positional + --tarjous option. */
+function targetFrom(threadIdStr: string | undefined, opts: { tarjous?: number }): ThreadTarget {
+  return {
+    thread: threadIdStr !== undefined ? Number(threadIdStr) : undefined,
+    tarjous: opts.tarjous,
+  };
+}
+
+/**
+ * Register `ib message chat` — conversational threads over /api/messages/*:
+ *   threads              inbox (your threads, unread + last-message preview)
+ *   thread [id]          one thread's meta + participants
+ *   list [id]            messages in a thread (does NOT mark read)
+ *   send [id] --body     send a message (client-side --dry-run; --reason→sourceNote)
+ *   mark-read [id]       stamp lastReadAt
+ *
+ * Every thread-targeting leaf accepts a raw threadId OR --tarjous <pumppuRequestId>.
+ * send/mark-read are writes (blocked under --read-only by the client write-lock).
+ */
+export function registerMessageChatCommands(
+  parent: Command,
+  getClient: () => Promise<ApiClient>
+): void {
+  const c = parent
+    .command("chat")
+    .description("Conversational message threads (Jerry tarjous now, keikka later)");
+
+  c.command("threads")
+    .description("List your message threads (inbox), newest first")
+    .option("--unread", "Only threads with unread messages")
+    .option("--tarjous <id>", "Only threads for this pumppuRequestId", Number)
+    .action(async (opts: { unread?: boolean; tarjous?: number }) => {
+      try {
+        const client = await getClient();
+        writeJson(await runChatThreads(client, opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  c.command("thread [threadId]")
+    .description("Get one thread's metadata + participants")
+    .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
+    .action(async (threadIdStr: string | undefined, opts: { tarjous?: number }) => {
+      try {
+        const client = await getClient();
+        const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
+        writeJson(await runChatThread(client, id));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  c.command("list [threadId]")
+    .description("List messages in a thread (does NOT mark read)")
+    .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
+    .option("--since <iso>", "Only messages created after this ISO timestamp")
+    .option("--limit <n>", "Max messages (default 100, server max 500)", Number)
+    .action(
+      async (
+        threadIdStr: string | undefined,
+        opts: { tarjous?: number; since?: string; limit?: number }
+      ) => {
+        try {
+          const client = await getClient();
+          const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
+          writeJson(await runChatList(client, id, opts));
+        } catch (e) {
+          exitWithError(e);
+        }
+      }
+    );
+
+  const sendCmd = c
+    .command("send [threadId]")
+    .description(
+      "Send a message to a thread. --dry-run previews body + recipients CLIENT-SIDE (no send). --reason → sourceNote (optional)."
+    )
+    .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
+    .requiredOption("--body <text>", "Message text (max 4000 chars)")
+    .option("--source <src>", "Provenance: web|cli|ai (default: IB_SOURCE env or cli)");
+  addWriteFlagsToCommand(sendCmd).action(
+    async (
+      threadIdStr: string | undefined,
+      opts: {
+        tarjous?: number;
+        body: string;
+        source?: string;
+        dryRun?: boolean;
+        idempotencyKey?: string;
+        reason?: string;
+      }
+    ) => {
+      const body = String(opts.body ?? "").trim();
+      if (!body) failWith("Message body cannot be empty", 4);
+      if (body.length > 4000) failWith("Message body too long (max 4000 chars)", 4);
+      const source = opts.source ?? process.env.IB_SOURCE ?? "cli";
+      if (!["web", "cli", "ai"].includes(source)) {
+        failWith(`Invalid --source "${source}" — use web|cli|ai`, 4);
+      }
+      try {
+        const client = await getClient();
+        const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
+        writeJson(
+          await runChatSend(client, id, {
+            body,
+            source,
+            reason: opts.reason,
+            dryRun: opts.dryRun,
+          })
+        );
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
+
+  c.command("mark-read [threadId]")
+    .description("Mark a thread read (stamp lastReadAt)")
+    .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
+    .action(async (threadIdStr: string | undefined, opts: { tarjous?: number }) => {
+      try {
+        const client = await getClient();
+        const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
+        writeJson(await runChatMarkRead(client, id));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+}
