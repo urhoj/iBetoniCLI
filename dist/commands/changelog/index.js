@@ -15,9 +15,14 @@ export async function runChangelogAdd(client, body, flags) {
 }
 export async function runChangelogList(client, opts) {
     const p = new URLSearchParams();
-    for (const k of ["month", "type", "area", "repo", "feedbackId", "limit"]) {
-        if (opts[k] !== undefined)
-            p.set(k, String(opts[k]));
+    // CLI option key → API query key. The --feedback flag maps to the backend's
+    // `feedbackId` filter (controller passes req.query straight to listEntries).
+    const keyMap = {
+        month: "month", type: "type", area: "area", repo: "repo", feedback: "feedbackId", limit: "limit",
+    };
+    for (const [optKey, apiKey] of Object.entries(keyMap)) {
+        if (opts[optKey] !== undefined)
+            p.set(apiKey, String(opts[optKey]));
     }
     const qs = p.toString();
     const rows = await client.get(`/api/changelog${qs ? `?${qs}` : ""}`);

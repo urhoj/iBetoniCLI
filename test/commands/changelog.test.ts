@@ -1,11 +1,12 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { runChangelogAdd, runChangelogList, runChangelogReport }
+import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate }
   from "../../src/commands/changelog/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
 const client = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn() } as unknown as ApiClient;
 const asPost = () => client.post as ReturnType<typeof vi.fn>;
 const asGet = () => client.get as ReturnType<typeof vi.fn>;
+const asPut = () => client.put as ReturnType<typeof vi.fn>;
 beforeEach(() => vi.clearAllMocks());
 
 test("add posts the entry with feedback link", async () => {
@@ -34,4 +35,22 @@ test("list builds the query string", async () => {
   asGet().mockResolvedValue([{ changelogId: 1 }]);
   await runChangelogList(client, { month: "2026-06", type: "feature" });
   expect(asGet()).toHaveBeenCalledWith("/api/changelog?month=2026-06&type=feature");
+});
+
+test("list maps --feedback to the feedbackId query param", async () => {
+  asGet().mockResolvedValue([]);
+  await runChangelogList(client, { feedback: 12 });
+  expect(asGet()).toHaveBeenCalledWith("/api/changelog?feedbackId=12");
+});
+
+test("get fetches the entry url", async () => {
+  asGet().mockResolvedValue({ changelogId: 7 });
+  await runChangelogGet(client, 7);
+  expect(asGet()).toHaveBeenCalledWith("/api/changelog/7");
+});
+
+test("update --dry-run never puts", async () => {
+  const r = await runChangelogUpdate(client, 7, { status: "Deployed" }, { dryRun: true });
+  expect(r).toMatchObject({ dryRun: true, wouldUpdate: { id: 7, patch: { status: "Deployed" } } });
+  expect(asPut()).not.toHaveBeenCalled();
 });

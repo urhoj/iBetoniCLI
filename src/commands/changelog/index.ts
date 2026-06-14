@@ -60,18 +60,18 @@ export async function runChangelogAdd(
   });
 }
 
-export async function runChangelogList(
-  client: ApiClient,
-  opts: Record<string, string | number | undefined>
-): Promise<ListEnvelope<Row>> {
+export async function runChangelogList(client: ApiClient, opts: Record<string, string | number | undefined>): Promise<ListEnvelope<Row>> {
   const p = new URLSearchParams();
-  for (const k of ["month", "type", "area", "repo", "feedbackId", "limit"]) {
-    if (opts[k] !== undefined) p.set(k, String(opts[k]));
+  // CLI option key → API query key. The --feedback flag maps to the backend's
+  // `feedbackId` filter (controller passes req.query straight to listEntries).
+  const keyMap: Record<string, string> = {
+    month: "month", type: "type", area: "area", repo: "repo", feedback: "feedbackId", limit: "limit",
+  };
+  for (const [optKey, apiKey] of Object.entries(keyMap)) {
+    if (opts[optKey] !== undefined) p.set(apiKey, String(opts[optKey]));
   }
   const qs = p.toString();
-  const rows = await client.get<Row[]>(
-    `/api/changelog${qs ? `?${qs}` : ""}`
-  );
+  const rows = await client.get<Row[]>(`/api/changelog${qs ? `?${qs}` : ""}`);
   const items = Array.isArray(rows) ? rows : [];
   return { items, nextCursor: null, count: items.length };
 }
