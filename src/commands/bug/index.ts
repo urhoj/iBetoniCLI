@@ -144,3 +144,28 @@ export async function runBugGet(client: ApiClient, id: number): Promise<unknown>
   const res = await client.get<unknown>(`/api/bugs/${id}`);
   return unwrapData(res);
 }
+
+export interface BugCommentInput {
+  body?: string;
+  reason?: string;
+  dryRun?: boolean;
+}
+
+/** POST /api/bugs/:id/comment — add a comment (owner / same-company / admin). */
+export async function runBugComment(
+  client: ApiClient,
+  id: number,
+  input: BugCommentInput
+): Promise<Record<string, unknown>> {
+  const comment = input.body?.trim();
+  if (!comment) throw new CliError("--body is required", 400, null, 4);
+  const payload = { comment };
+  const path = `/api/bugs/${id}/comment`;
+  if (input.dryRun) {
+    return { dryRun: true, wouldSend: { method: "POST", path, body: payload } };
+  }
+  const res = await client.post<{ commentId?: number }>(path, payload, {
+    headers: writeFlagsToHeaders({ reason: input.reason }),
+  });
+  return { commentId: res.commentId };
+}

@@ -3,6 +3,7 @@ import {
   runBugCreate,
   runBugList,
   runBugGet,
+  runBugComment,
 } from "../../src/commands/bug/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -166,5 +167,32 @@ describe("ib bug get", () => {
     const out = await runBugGet(mockClient, 51);
     expect(get).toHaveBeenCalledWith("/api/bugs/51");
     expect(out).toEqual({ bugReportId: 51, comments: [], attachments: [] });
+  });
+});
+
+describe("ib bug comment", () => {
+  test("POSTs the trimmed comment and returns commentId", async () => {
+    post.mockResolvedValueOnce({ success: true, commentId: 9 });
+    const out = await runBugComment(mockClient, 51, { body: "  please retest  ", reason: "triage" });
+    expect(post).toHaveBeenCalledWith(
+      "/api/bugs/51/comment",
+      { comment: "please retest" },
+      { headers: { "X-Action-Reason": "triage" } }
+    );
+    expect(out).toEqual({ commentId: 9 });
+  });
+
+  test("--dry-run previews and never POSTs", async () => {
+    const out = await runBugComment(mockClient, 51, { body: "later", dryRun: true });
+    expect(post).not.toHaveBeenCalled();
+    expect(out).toEqual({
+      dryRun: true,
+      wouldSend: { method: "POST", path: "/api/bugs/51/comment", body: { comment: "later" } },
+    });
+  });
+
+  test("empty --body → exit 4, no POST", async () => {
+    await expect(runBugComment(mockClient, 51, { body: "  " })).rejects.toMatchObject({ exitCode: 4 });
+    expect(post).not.toHaveBeenCalled();
   });
 });
