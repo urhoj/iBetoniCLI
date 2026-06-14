@@ -138,3 +138,9 @@ export async function runBugList(
   const truncated = opts.limit !== undefined && items.length >= opts.limit;
   return { items, nextCursor: null, count: items.length, truncated };
 }
+
+/** GET /api/bugs/:id — one report with its comments + attachments inline. */
+export async function runBugGet(client: ApiClient, id: number): Promise<unknown> {
+  const res = await client.get<unknown>(`/api/bugs/${id}`);
+  return unwrapData(res);
+}

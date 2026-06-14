@@ -2,6 +2,7 @@ import { describe, test, expect, vi, beforeEach } from "vitest";
 import {
   runBugCreate,
   runBugList,
+  runBugGet,
 } from "../../src/commands/bug/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -153,5 +154,17 @@ describe("ib bug list", () => {
 
   test("bad --order-by → exit 4", async () => {
     await expect(runBugList(mockClient, { orderBy: "hacker" })).rejects.toThrowError(CliError);
+  });
+});
+
+describe("ib bug get", () => {
+  test("GETs /api/bugs/:id and unwraps .data (report + comments + attachments)", async () => {
+    get.mockResolvedValueOnce({
+      success: true,
+      data: { bugReportId: 51, comments: [], attachments: [] },
+    });
+    const out = await runBugGet(mockClient, 51);
+    expect(get).toHaveBeenCalledWith("/api/bugs/51");
+    expect(out).toEqual({ bugReportId: 51, comments: [], attachments: [] });
   });
 });
