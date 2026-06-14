@@ -3842,6 +3842,421 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib message daily add matches snapshot 1`] = `
+"USAGE
+  ib message daily add [<asiakasId>] [flags]
+
+DESCRIPTION
+  Create a daily box for a company. With --init, calls /box/initialize for the caller's OWN company's first box (server derives the company + checks permission).
+  Auth: requires login (any authenticated user).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+ARGUMENTS
+  <asiakasId> NUMBER    Owner company (omit with --init) (optional)
+
+FLAGS
+  --asiakas NUMBER    Owner asiakasId (alias for the positional)
+  --date DATE    Date the box is for (default 00000000 = undated default box)
+  --title STRING    Box title
+  --init BOOLEAN    Caller's own company's first box via /box/initialize (no asiakasId)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success, boxId?, created? }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (HTTP 400)  Validation error (bad date/ids/missing fields) → check the flags
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib message daily delete
+
+EXAMPLES
+  ib message daily add 8 --title "Tiedotteet"
+  ib message daily add --init
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message daily delete matches snapshot 1`] = `
+"USAGE
+  ib message daily delete <boxId> [flags]
+
+DESCRIPTION
+  Delete a daily box (and its messages) for all associated companies.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <boxId> NUMBER    Box to delete (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success, ... }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (HTTP 400)  Validation error (bad date/ids/missing fields) → check the flags
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib message daily delete 36 --reason cleanup
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message daily get matches snapshot 1`] = `
+"USAGE
+  ib message daily get <boxId> [flags]
+
+DESCRIPTION
+  One daily box's row + its message for the date + its permission rows, resolved client-side over the list (there is no per-box GET).
+  Auth: requires login (any authenticated user).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+ARGUMENTS
+  <boxId> NUMBER    Box to fetch (required)
+
+FLAGS
+  --asiakas NUMBER    Company the box is listed for (asiakasId) (required)
+  --date DATE    Date for the message (YYYYMMDD | YYYY-MM-DD | today)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { box: { boxId, boxTitle, boxLisatieto?, ownerAsiakasId, dailyMessageBoxAsiakasId }, message: {...}|null, permissions: {...}[] }
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  Box not visible for the company → ib message daily list <asiakasId>
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (HTTP 400)  Validation error (bad date/ids/missing fields) → check the flags
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib message daily get 36 --asiakas 8 --date today
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message daily grant matches snapshot 1`] = `
+"USAGE
+  ib message daily grant <boxId> [flags]
+
+DESCRIPTION
+  Add a per-role ACL row on a shared box. The row defaults read-only — adjust read/edit afterwards with \`perm-set\`.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <boxId> NUMBER    Box the rule applies to (required)
+
+FLAGS
+  --to NUMBER    Tenant (asiakasId) the role belongs to (required)
+  --role NUMBER    asiakasPersonSettingTypeId (e.g. 8=Pumppari, 2=Admin) (required)
+  --box-asiakas NUMBER    dailyMessageBoxAsiakasId of the share row (required)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success, dailyMessageBoxAsiakasPermissionsId? }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (HTTP 400)  Validation error (bad date/ids/missing fields) → check the flags
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib message daily perm-set, ib message daily revoke
+
+EXAMPLES
+  ib message daily grant 36 --to 8 --role 8 --box-asiakas 34
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message daily list matches snapshot 1`] = `
+"USAGE
+  ib message daily list [<asiakasId>] [flags]
+
+DESCRIPTION
+  List a company's daily-message boxes; with --date, also that date's message text and the per-role permission rows. Returns the composite { boxes, messages, boxPermissions } (not a flat list).
+  Auth: requires login (any authenticated user).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+ARGUMENTS
+  <asiakasId> NUMBER    Company to list boxes for (or --asiakas) (optional)
+
+FLAGS
+  --asiakas NUMBER    Target asiakasId (alias for the positional)
+  --date DATE    Date for messages: YYYYMMDD | YYYY-MM-DD | today/yesterday/tomorrow
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { boxes: { boxId, boxTitle, boxLisatieto?, ownerAsiakasId, dailyMessageBoxAsiakasId }[], messages: {...}[], boxPermissions: {...}[] }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (HTTP 400)  Validation error (bad date/ids/missing fields) → check the flags
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Boxes a company does not own are read-only for it (cross-tenant ownership rule).
+
+SEE ALSO
+  ib message daily get, ib message daily set
+
+EXAMPLES
+  ib message daily list 8 --date today
+  ib message daily list --asiakas 8
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message daily perm-set matches snapshot 1`] = `
+"USAGE
+  ib message daily perm-set <dailyMessageBoxAsiakasPermissionsId> [flags]
+
+DESCRIPTION
+  Set a permission row's role + access (read = read-only, edit = read/write).
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <dailyMessageBoxAsiakasPermissionsId> NUMBER    Permission row id (required)
+
+FLAGS
+  --role NUMBER    asiakasPersonSettingTypeId (required)
+  --access STRING    read = read-only, edit = read/write (required)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success, ... }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (HTTP 400)  Validation error (bad date/ids/missing fields) → check the flags
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib message daily perm-set 111 --role 8 --access edit
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message daily revoke matches snapshot 1`] = `
+"USAGE
+  ib message daily revoke <dailyMessageBoxAsiakasPermissionsId> [flags]
+
+DESCRIPTION
+  Remove a per-role ACL row (by dailyMessageBoxAsiakasPermissionsId).
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <dailyMessageBoxAsiakasPermissionsId> NUMBER    Permission row id (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success, ... }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (HTTP 400)  Validation error (bad date/ids/missing fields) → check the flags
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib message daily revoke 111
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message daily save matches snapshot 1`] = `
+"USAGE
+  ib message daily save <boxId> [flags]
+
+DESCRIPTION
+  Rename a box / edit its lisätieto (box metadata — distinct from \`set\`, which writes message content).
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <boxId> NUMBER    Box to rename (required)
+
+FLAGS
+  --title STRING    New box title (required)
+  --lisatieto STRING    Optional sub-text under the title
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success, ... }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (HTTP 400)  Validation error (bad date/ids/missing fields) → check the flags
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib message daily save 36 --title "Pumpparitiedotteet"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message daily set matches snapshot 1`] = `
+"USAGE
+  ib message daily set <boxId> [flags]
+
+DESCRIPTION
+  Write or clear a box's message for a date — the core daily-message write. The backend also broadcasts a dailyMessage:updated socket to every associated company.
+  Auth: requires login (any authenticated user).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+ARGUMENTS
+  <boxId> NUMBER    Box whose message to set (required)
+
+FLAGS
+  --date DATE    Date the message applies to (required)
+  --message STRING    Message text to store
+  --clear BOOLEAN    Clear the message for the date (mutually exclusive with --message)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success, ... }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (HTTP 400)  Validation error (bad date/ids/missing fields) → check the flags
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Exactly one of --message / --clear is required.
+  - --dry-run is server-side (deploy-gated).
+
+SEE ALSO
+  ib message daily get
+
+EXAMPLES
+  ib message daily set 36 --date today --message "Asema kiinni klo 15" --reason "tiedote"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message daily share matches snapshot 1`] = `
+"USAGE
+  ib message daily share <boxId> [flags]
+
+DESCRIPTION
+  Share a box to another tenant. The share starts read-only; add a per-role rule with \`grant\` then set access with \`perm-set\`.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <boxId> NUMBER    Box to share (required)
+
+FLAGS
+  --to NUMBER    Tenant (asiakasId) to share with (required)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success, dailyMessageBoxAsiakasId? }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (HTTP 400)  Validation error (bad date/ids/missing fields) → check the flags
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib message daily grant, ib message daily unshare
+
+EXAMPLES
+  ib message daily share 36 --to 26
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message daily unshare matches snapshot 1`] = `
+"USAGE
+  ib message daily unshare <dailyMessageBoxAsiakasId> [flags]
+
+DESCRIPTION
+  Stop sharing a box with a tenant (by dailyMessageBoxAsiakasId).
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <dailyMessageBoxAsiakasId> NUMBER    Share row id (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success, ... }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (HTTP 400)  Validation error (bad date/ids/missing fields) → check the flags
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib message daily unshare 34
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib ohje get matches snapshot 1`] = `
 "USAGE
   ib ohje get <helpId> [flags]

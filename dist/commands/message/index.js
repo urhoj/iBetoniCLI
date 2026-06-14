@@ -1,4 +1,5 @@
 import { registerMessageChatCommands } from "./chat/index.js";
+import { registerMessageDailyCommands } from "./daily/index.js";
 /**
  * Register the `ib message` umbrella — communication systems grouped for
  * discovery (see spec §3). Conversational `chat` is built here.
@@ -15,5 +16,6 @@ export function registerMessageCommands(parent, getClient) {
         .command("message")
         .description("Messaging: conversational chat threads (daily notes + announcements are reserved sub-groups)");
     registerMessageChatCommands(m, getClient);
+    registerMessageDailyCommands(m, getClient);
 }
 //# sourceMappingURL=index.js.map

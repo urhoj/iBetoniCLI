@@ -320,10 +320,9 @@ export function registerMessageDailyCommands(parent, getClient) {
         }
     });
 }
-// ─── CommandSpecs (co-located; the `message` umbrella spreads these into ──────
-// COMMAND_SPECS when it wires the group, alongside the chat specs). Kept OUT of
-// reference/specs.ts until `daily` is registered so help-wiring.test stays green
-// (no spec may point at an unregistered command). ───────────────────────────────
+// ─── CommandSpecs (co-located: one source of truth for this sub-group). ───────
+// Spread into COMMAND_SPECS in reference/specs.ts; `registerMessageDailyCommands`
+// wires the matching leaves into the `ib message` umbrella in commands/message. ──
 const DAILY_AUTH_ERRORS = [
     { http: 401, exit: 2, meaning: "Token expired", remedy: "ib auth refresh" },
     { http: 400, exit: 4, meaning: "Validation error (bad date/ids/missing fields)", remedy: "check the flags" },

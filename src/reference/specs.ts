@@ -18,6 +18,9 @@
  */
 import type { CommandError, CommandFlag, CommandSpec } from "../output/help.js";
 import { exitCodeFromStatus } from "../api/errors.js";
+// `ib message daily` specs are co-located with the command (one source of truth
+// for that sub-group) and spread in at the end of COMMAND_SPECS.
+import { MESSAGE_DAILY_SPECS } from "../commands/message/daily/index.js";
 
 /** API error row: derive the exit code from the HTTP status. */
 const apiErr = (http: number, meaning: string, remedy: string): CommandError => ({
@@ -4050,4 +4053,6 @@ export const COMMAND_SPECS: CommandSpec[] = [
     seeAlso: ["ib message chat list", "ib message chat threads"],
     examples: ["ib message chat mark-read 42", "ib message chat mark-read --tarjous 23"],
   },
+  // ─── message daily (11) — co-located specs (see import at top) ──────────────
+  ...MESSAGE_DAILY_SPECS,
 ];
