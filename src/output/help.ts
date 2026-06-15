@@ -25,6 +25,7 @@
 
 import type { Command } from "commander";
 import { GLOSSARY, type GlossaryEntry } from "../reference/domain.js";
+import { type CallerTier, getCallerTier, isHiddenAtTier } from "../tier.js";
 
 export interface CommandError {
   /** HTTP status when API-originated (401/403/404/409/429/400/500). */
@@ -239,14 +240,17 @@ export function formatGroupHelp(
   groupPath: string,
   fallbackDescription: string,
   specs: CommandSpec[],
-  glossary: GlossaryEntry[]
+  glossary: GlossaryEntry[],
+  tier: CallerTier = "developer"
 ): string {
   const prefix = groupPath + " ";
   const depth = groupPath.split(" ").length; // child = token at this index
   const domain = groupPath.split(" ")[1];
   const groupName = groupPath.split(" ").at(-1)!.toLowerCase();
 
-  const inGroup = specs.filter((s) => s.command.startsWith(prefix));
+  const inGroup = specs.filter(
+    (s) => s.command.startsWith(prefix) && !isHiddenAtTier(s, tier)
+  );
   const children = [...new Set(inGroup.map((s) => s.command.split(" ")[depth]))];
   const byCommand = new Map(specs.map((s) => [s.command, s]));
 
@@ -306,12 +310,19 @@ export function attachRichHelp(root: Command, specs: CommandSpec[]): void {
     if (spec) {
       // Single source: the Commander listing description IS the spec description.
       cmd.description(spec.description);
-      cmd.configureHelp({ formatHelp: () => formatHelp(spec) });
+      cmd.configureHelp({
+        formatHelp: () =>
+          isHiddenAtTier(spec, getCallerTier())
+            ? `${full} is not available at your access level.\n` +
+              "  Run `ib commands` to see the commands you can use.\n"
+            : formatHelp(spec),
+      });
     } else if (path.length > 0 && cmd.commands.length > 0) {
       // Non-root group: computed group help (root keeps the domain primer).
       const fallback = cmd.description();
       cmd.configureHelp({
-        formatHelp: () => formatGroupHelp(full, fallback, specs, GLOSSARY),
+        formatHelp: () =>
+          formatGroupHelp(full, fallback, specs, GLOSSARY, getCallerTier()),
       });
     }
     for (const sub of cmd.commands) walk(sub, [...path, cmd.name()]);

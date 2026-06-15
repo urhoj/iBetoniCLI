@@ -1,5 +1,11 @@
 import { describe, test, expect } from "vitest";
-import { formatHelp, type CommandSpec } from "../../src/output/help.js";
+import {
+  formatHelp,
+  formatGroupHelp,
+  type CommandSpec,
+} from "../../src/output/help.js";
+import { COMMAND_SPECS } from "../../src/reference/specs.js";
+import { GLOSSARY } from "../../src/reference/domain.js";
 
 const sampleSpec: CommandSpec = {
   command: "ib keikka list",
@@ -70,5 +76,37 @@ describe("formatHelp", () => {
 
     const withoutWrite = formatHelp(sampleSpec);
     expect(withoutWrite).not.toContain("WRITE-SAFETY FLAGS");
+  });
+});
+
+describe("formatGroupHelp tier filtering", () => {
+  test("jerry group omits the admin subgroup at standard", () => {
+    const std = formatGroupHelp(
+      "ib jerry",
+      "Jerry",
+      COMMAND_SPECS,
+      GLOSSARY,
+      "standard"
+    );
+    expect(std).not.toContain("admin");
+    const dev = formatGroupHelp(
+      "ib jerry",
+      "Jerry",
+      COMMAND_SPECS,
+      GLOSSARY,
+      "developer"
+    );
+    expect(dev).toContain("admin");
+  });
+  test("feedback group keeps create, drops list at standard", () => {
+    const std = formatGroupHelp(
+      "ib feedback",
+      "Feedback",
+      COMMAND_SPECS,
+      GLOSSARY,
+      "standard"
+    );
+    expect(std).toContain("create");
+    expect(std).not.toMatch(/^\s+list\b/m);
   });
 });
