@@ -1217,6 +1217,7 @@ FLAGS
   --sha STRING    Commit SHAs (CSV)
   --vtag STRING    Version tag
   --feedback NUMBER    cliFeedback id this entry resolves
+  --sentry STRING    Sentry issue short id or URL this entry fixes (stored, not sent to Sentry)
   --date DATE    Entry date (YYYY-MM-DD|today)
 
 WRITE-SAFETY FLAGS
@@ -1244,6 +1245,7 @@ SEE ALSO
 
 EXAMPLES
   ib changelog add --type bugfix --area cli --title "x" --description "y" --feedback 12 --sha 59d9cc5
+  ib changelog add --type bugfix --area backend --title "fix npe" --description "y" --sentry PUMINET5API-1A2
 "
 `;
 
@@ -1289,6 +1291,7 @@ FLAGS
   --area STRING    frontend|backend|cli|database|cicd
   --repo STRING    Repo/submodule
   --feedback NUMBER    linked feedback id
+  --sentry STRING    linked Sentry issue short id
   --limit NUMBER    Max rows
 
 GLOBAL FLAGS
