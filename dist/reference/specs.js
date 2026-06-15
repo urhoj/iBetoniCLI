@@ -2207,6 +2207,7 @@ export const COMMAND_SPECS = [
         command: "ib legal save",
         description: "Create a NEW document version (developer/sysadmin only). Versions are IMMUTABLE — any content/title change is a new version; there is no in-place edit. Draft by default (isActive=0); --activate publishes atomically (deactivates prior versions of the same type+tenant). Content from --file (local) or --content (inline; required over /api/cli/exec). --reason required unless --dry-run.",
         permissions: ["isSystemAdmin or isDeveloper (server-enforced)"],
+        tier: "developer",
         flags: [
             { name: "type", type: "string", required: true, description: "Document type name (see ib legal types)" },
             { name: "doc-version", type: "string", required: true, description: "Version string, e.g. 2.0 (NOT --version — that is the global CLI version flag)" },
@@ -2239,6 +2240,7 @@ export const COMMAND_SPECS = [
         command: "ib legal activate",
         description: "Publish a document version (developer/sysadmin only): atomically deactivates all sibling versions of the same type+tenant and activates this one (also stamps effectiveDate). Use to publish a draft or roll back to an earlier version.",
         permissions: ["isSystemAdmin or isDeveloper (server-enforced)"],
+        tier: "developer",
         args: [{ name: "documentId", type: "number", description: "legalDocuments.documentId to activate" }],
         flags: [],
         writeFlags: true,
@@ -2255,6 +2257,7 @@ export const COMMAND_SPECS = [
         command: "ib legal delete",
         description: "Soft-delete (deactivate) a document version (developer/sysadmin only). The row and all acceptance history remain in the database.",
         permissions: ["isSystemAdmin or isDeveloper (server-enforced)"],
+        tier: "developer",
         args: [{ name: "documentId", type: "number", description: "legalDocuments.documentId to soft-delete" }],
         flags: [],
         writeFlags: true,
@@ -2271,6 +2274,7 @@ export const COMMAND_SPECS = [
         command: "ib legal acceptances",
         description: "Compliance report (developer/sysadmin only): WHO has accepted a document type — personId, name, email, accepted version + timestamp, newest first. Capped at 500 rows with a truncated flag. Types with NULL personSettingTypeId (e.g. GLOBAL today) are not trackable and return a validation error.",
         permissions: ["isSystemAdmin or isDeveloper (server-enforced)"],
+        tier: "developer",
         args: [{ name: "typeName", type: "string", description: "Document type name (see ib legal types)" }],
         flags: [
             { name: "doc-version", type: "string", description: "Only acceptances of this version string (NOT --version — that is the global CLI version flag)" },
@@ -2289,6 +2293,7 @@ export const COMMAND_SPECS = [
         command: "ib legal accept",
         description: "Record YOUR OWN acceptance of the current active version of a type. DEVELOPER TESTING AID, gated client-side to developer/sysadmin tokens — real consent is a human action recorded via the betoni.online / betonijerry.fi UI flows. The backend endpoint is self-only: you can never accept on someone else's behalf. --reason required unless --dry-run.",
         permissions: ["isSystemAdmin or isDeveloper (client-side gate)"],
+        tier: "developer",
         args: [
             { name: "typeName", type: "string", required: false, description: "Document type name (see ib legal types; or pass --type)" },
         ],
@@ -2317,6 +2322,7 @@ export const COMMAND_SPECS = [
         command: "ib legal type create",
         description: "Create a new legal document TYPE (developer/sysadmin only). Types are the catalogue rows behind ib legal types; document versions attach to a type via ib legal save. --setting-type-id wires acceptance tracking — the id must exist in personSettingTypes and not be mapped to another type. --reason required unless --dry-run.",
         permissions: ["isSystemAdmin or isDeveloper (server-enforced)"],
+        tier: "developer",
         flags: [
             { name: "name", type: "string", required: true, description: "Type name, UPPER_SNAKE, max 50 (e.g. TOS_EN); immutable after creation" },
             { name: "display-name", type: "string", required: true, description: "Human-readable name (max 100)" },
@@ -2345,6 +2351,7 @@ export const COMMAND_SPECS = [
         command: "ib legal type update",
         description: "Update a legal document TYPE's editable fields: displayName, description, sortOrder, personSettingTypeId (developer/sysadmin only). typeName itself is immutable; fields you do not pass are untouched. At least one field flag required. --reason required unless --dry-run.",
         permissions: ["isSystemAdmin or isDeveloper (server-enforced)"],
+        tier: "developer",
         args: [{ name: "typeName", type: "string", description: "Document type name (see ib legal types)" }],
         flags: [
             { name: "display-name", type: "string", description: "Human-readable name (max 100)" },
@@ -2898,6 +2905,7 @@ export const COMMAND_SPECS = [
         command: "ib jerry admin list",
         description: "List Jerry-active companies (isPumppuToimittaja + HAS_JERRY setting) with per-company counts (admins, tarjousAdmins, pumpparit, vehicles, Jerry/non-Jerry varikot). GET /api/admin/jerry-companies. System-admin only.",
         permissions: ["isSystemAdmin"],
+        tier: "developer",
         flags: [],
         outputShape: "ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, sijaintiNonJerryCount }>",
         errors: [
@@ -2910,6 +2918,7 @@ export const COMMAND_SPECS = [
         command: "ib jerry admin search",
         description: "Search companies NOT yet fully Jerry-enabled, for the Add picker (GET /api/admin/jerry-companies/search?q=). Name LIKE match, min 2 chars, top 20. System-admin only.",
         permissions: ["isSystemAdmin"],
+        tier: "developer",
         args: [{ name: "query", type: "string", description: "name search (min 2 chars)" }],
         flags: [],
         outputShape: "ListEnvelope<{ asiakasId, name }>",
@@ -2923,6 +2932,7 @@ export const COMMAND_SPECS = [
         command: "ib jerry admin detail",
         description: "Company Jerry drill-down: people by role (admins/tarjousAdmins/pumpparit), vehicles, and each sijainti's Jerry enrolment status (GET /api/admin/jerry-companies/:asiakasId/detail). System-admin only.",
         permissions: ["isSystemAdmin"],
+        tier: "developer",
         args: [{ name: "asiakasId", type: "number", required: false, description: "company asiakasId (or pass --asiakas)" }],
         flags: [
             { name: "asiakas", type: "number", description: "Target asiakasId (alias for the positional)" },
@@ -2939,6 +2949,7 @@ export const COMMAND_SPECS = [
         command: "ib jerry admin enable",
         description: "Enable the BetoniJerry module for a company — the audited toggle that sets BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/enable). Change-tracked via the asiakasSql proc paths. System-admin only. Requires --reason.",
         permissions: ["isSystemAdmin"],
+        tier: "developer",
         args: [{ name: "asiakasId", type: "number", required: false, description: "company asiakasId (or pass --asiakas)" }],
         flags: [
             { name: "asiakas", type: "number", description: "Target asiakasId (alias for the positional)" },
@@ -2958,6 +2969,7 @@ export const COMMAND_SPECS = [
         command: "ib jerry admin disable",
         description: "Disable the BetoniJerry module for a company — clears BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/disable). System-admin only. Requires --reason.",
         permissions: ["isSystemAdmin"],
+        tier: "developer",
         args: [{ name: "asiakasId", type: "number", required: false, description: "company asiakasId (or pass --asiakas)" }],
         flags: [
             { name: "asiakas", type: "number", description: "Target asiakasId (alias for the positional)" },
@@ -2991,6 +3003,7 @@ export const COMMAND_SPECS = [
                 command: "ib schema tables",
                 description: "List dbo base tables with column counts. Developer-only.",
                 permissions: DEV_PERMS,
+                tier: "developer",
                 flags: listFlags,
                 outputShape: "{ items: [{ name, type:'table', columnCount }], nextCursor: null, count }",
                 errors: devErrors,
@@ -3000,6 +3013,7 @@ export const COMMAND_SPECS = [
                 command: "ib schema table",
                 description: "Columns (type, nullability, default, key), primary key, foreign keys, and indexes for one dbo table. Developer-only.",
                 permissions: DEV_PERMS,
+                tier: "developer",
                 args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix)" }],
                 flags: [],
                 outputShape: "{ name, columns:[{name,dataType,maxLength,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], indexes:[{name,columns,unique}] }",
@@ -3010,6 +3024,7 @@ export const COMMAND_SPECS = [
                 command: "ib schema views",
                 description: "List dbo views with column counts. Developer-only.",
                 permissions: DEV_PERMS,
+                tier: "developer",
                 flags: listFlags,
                 outputShape: "{ items: [{ name, type:'view', columnCount }], nextCursor: null, count }",
                 errors: devErrors,
@@ -3019,6 +3034,7 @@ export const COMMAND_SPECS = [
                 command: "ib schema view",
                 description: "Columns and full definition (T-SQL) for one dbo view. Developer-only.",
                 permissions: DEV_PERMS,
+                tier: "developer",
                 args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix)" }],
                 flags: [],
                 outputShape: "{ name, columns:[{name,dataType,maxLength,nullable,default,key}], definition:'<T-SQL>' }",
@@ -3029,6 +3045,7 @@ export const COMMAND_SPECS = [
                 command: "ib schema procs",
                 description: "List dbo stored procedures and functions (P/FN/TF/IF). Developer-only.",
                 permissions: DEV_PERMS,
+                tier: "developer",
                 flags: listFlags,
                 outputShape: "{ items: [{ name, type:'P'|'FN'|'TF'|'IF' }], nextCursor: null, count }",
                 errors: devErrors,
@@ -3038,6 +3055,7 @@ export const COMMAND_SPECS = [
                 command: "ib schema proc",
                 description: "Signature (parameters) and full definition (T-SQL) for one dbo proc/function. Developer-only.",
                 permissions: DEV_PERMS,
+                tier: "developer",
                 args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix)" }],
                 flags: [],
                 outputShape: "{ name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }",
@@ -3046,8 +3064,9 @@ export const COMMAND_SPECS = [
             },
             {
                 command: "ib schema dump",
-                description: "Structural map of the whole dbo schema — all tables with column names and types, FK edges, view names, and proc signatures. No proc/view bodies (use `schema proc`/`schema view` for those). Developer-only.",
+                description: "Whole-schema structural map of the dbo schema (developer-gated, read-only) — all tables with column names and types, FK edges, view names, and proc signatures. No proc/view bodies (use `schema proc`/`schema view` for those).",
                 permissions: DEV_PERMS,
+                tier: "developer",
                 flags: [],
                 outputShape: "{ tables:[{name,columns}], foreignKeys:[{table,column,refTable,refColumn}], views:[{name}], procs:[{name,type,parameters}] }",
                 errors: devErrors,
@@ -3343,8 +3362,9 @@ export const COMMAND_SPECS = [
     },
     {
         command: "ib feedback list",
-        description: "List filed feedback for triage. Developer-only (isSystemAdmin / isDeveloper); global across tenants. Newest first, paginated (default 50, cap 200).",
+        description: "List filed feedback for triage. Developer-only (isSystemAdmin / isDeveloper). Newest first, paginated (default 50, cap 200).",
         permissions: ["isSystemAdmin or isDeveloper"],
+        tier: "developer",
         flags: [
             { name: "status", type: "string", description: "open | reviewed | applied | dismissed" },
             { name: "kind", type: "string", description: "improvement | bug | idea | legal" },
@@ -3364,6 +3384,7 @@ export const COMMAND_SPECS = [
         command: "ib feedback get",
         description: "Fetch one feedback row by id (developer-only).",
         permissions: ["isSystemAdmin or isDeveloper"],
+        tier: "developer",
         args: [{ name: "id", type: "number", description: "feedbackId" }],
         flags: [],
         outputShape: "The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, ... }",
@@ -3378,6 +3399,7 @@ export const COMMAND_SPECS = [
         command: "ib feedback resolve",
         description: "Triage a feedback row: set its status and/or attach a resolution note (developer-only). This IS a real write — blocked under --read-only (exit 3). --dry-run previews the update body client-side without sending.",
         permissions: ["isSystemAdmin or isDeveloper"],
+        tier: "developer",
         mutates: true,
         args: [{ name: "id", type: "number", description: "feedbackId" }],
         flags: [
@@ -3400,8 +3422,9 @@ export const COMMAND_SPECS = [
     // ─── ai (1) — read AI assistant conversations ────────────────────────────
     {
         command: "ib ai conversation",
-        description: "Fetch the FULL transcript of an /ai assistant conversation by id. Developer-only (isSystemAdmin / isDeveloper) and CROSS-TENANT — reads any tenant's conversation, because the id comes from an `ib feedback` row's context.conversationId (stamped automatically when the AI files feedback from the /ai page). Transcripts may contain customer PII.",
+        description: "Fetch the full transcript of an /ai assistant conversation by id (gptConversations/gptMessages). Developer/sysadmin tooling. The id originates from an `ib feedback` row's context.conversationId, stamped automatically when the AI files feedback from the /ai page.",
         permissions: ["isSystemAdmin or isDeveloper"],
+        tier: "developer",
         args: [{ name: "conversationId", type: "number", description: "gptConversations id (from a feedback row's context.conversationId)" }],
         flags: [],
         outputShape: "{ conversationId, personId, ownerAsiakasId, messageCount, messages: [{ gptMessageId, role?, content?, raw?, ... }] }",
@@ -3510,6 +3533,7 @@ export const COMMAND_SPECS = [
         command: "ib bug admin update",
         description: "Triage a bug report: set status / priority / admin notes / resolution / assignee. Developer-only (isSystemAdmin / isDeveloper). A real write — blocked under --read-only. --dry-run previews client-side.",
         permissions: ["isSystemAdmin or isDeveloper"],
+        tier: "developer",
         mutates: true,
         args: [{ name: "bugReportId", type: "number", description: "bugReportId" }],
         flags: [
@@ -3538,6 +3562,7 @@ export const COMMAND_SPECS = [
         command: "ib bug admin assign",
         description: "Assign a bug report to a developer; the backend also flips its status to in-progress. Developer-only. A real write — blocked under --read-only. --dry-run previews client-side.",
         permissions: ["isSystemAdmin or isDeveloper"],
+        tier: "developer",
         mutates: true,
         args: [{ name: "bugReportId", type: "number", description: "bugReportId" }],
         flags: [
@@ -3558,6 +3583,7 @@ export const COMMAND_SPECS = [
         command: "ib bug admin stats",
         description: "Aggregate bug report statistics (counts by status/severity/etc.). Developer-only. Optionally scoped to one tenant with --owner.",
         permissions: ["isSystemAdmin or isDeveloper"],
+        tier: "developer",
         flags: [{ name: "owner", type: "number", description: "Scope to one tenant (ownerAsiakasId)" }],
         outputShape: "{ ...aggregate counts }",
         errors: [
@@ -3570,6 +3596,7 @@ export const COMMAND_SPECS = [
         command: "ib bug admin delete",
         description: "Permanently delete a bug report. Developer-only and IRREVERSIBLE. A real write — blocked under --read-only. --reason is REQUIRED. --dry-run previews client-side.",
         permissions: ["isSystemAdmin or isDeveloper"],
+        tier: "developer",
         mutates: true,
         args: [{ name: "bugReportId", type: "number", description: "bugReportId" }],
         flags: [
@@ -3614,6 +3641,7 @@ export const COMMAND_SPECS = [
                 command: "ib cache stats",
                 description: "Redis connection status, total key count, and hit rate. Developer-only.",
                 permissions: DEV_PERMS,
+                tier: "developer",
                 flags: [],
                 outputShape: "{ connected, totalKeys, hitRate?, usedMemory? }",
                 errors: devErrors,
@@ -3623,6 +3651,7 @@ export const COMMAND_SPECS = [
                 command: "ib cache keys",
                 description: "Key counts grouped by prefix pattern (SCAN). Developer-only.",
                 permissions: DEV_PERMS,
+                tier: "developer",
                 flags: [{ name: "pattern", type: "string", default: "*", description: "SCAN match glob (default: *)" }],
                 outputShape: "{ totalKeys, groups: [{ prefix, count }] }",
                 errors: devErrors,
@@ -3663,6 +3692,7 @@ export const COMMAND_SPECS = [
                 command: "ib cache clear",
                 description: "Flush the entire Redis cache (curated sweep; preserves sessions/locks/metrics). Previews (X-Dry-Run) unless --confirm. Cross-tenant: clears every company's cached data. Guard: refuses deployed endpoints unless --force-prod. Developer-only.",
                 permissions: DEV_PERMS,
+                tier: "developer",
                 mutates: true,
                 flags: writeFlags,
                 outputShape: "preview: { dryRun:true, wouldDelete } | execute: { deleted }",
@@ -3673,6 +3703,7 @@ export const COMMAND_SPECS = [
                 command: "ib cache pattern",
                 description: "Invalidate keys matching a raw Redis glob. Previews unless --confirm. Guard: refuses deployed endpoints unless --force-prod. Developer-only. Prefer `ib cache invalidate` (domain entity); use `ib cache keys` to find the right glob.",
                 permissions: DEV_PERMS,
+                tier: "developer",
                 mutates: true,
                 args: [{ name: "glob", type: "string", description: "Raw Redis key glob (e.g. 'keikka:*')" }],
                 flags: writeFlags,
@@ -3983,8 +4014,9 @@ export const COMMAND_SPECS = [
     // ─── message support (3) ──────────────────────────────────────────────────
     {
         command: "ib message support inbox",
-        description: "Support triage queue: support threads escalated by operators, newest first. Developer-only (isSystemAdmin / isDeveloper); global across tenants. Filter by lifecycle status. Projects GET /api/messages/support/inbox into the list envelope.",
+        description: "Support triage queue: support threads escalated by operators, newest first. Developer-only (isSystemAdmin / isDeveloper). Filter by lifecycle status. Projects GET /api/messages/support/inbox into the list envelope.",
         permissions: ["isSystemAdmin or isDeveloper"],
+        tier: "developer",
         flags: [
             { name: "status", type: "string", default: "open", description: "open | resolved | all" },
             { name: "limit", type: "number", description: "Max rows" },
@@ -4036,6 +4068,7 @@ export const COMMAND_SPECS = [
         command: "ib message support resolve",
         description: "Mark a support thread resolved, or --reopen it back to open. Developer-only (isSystemAdmin / isDeveloper). A REAL write (PATCH) — blocked under --read-only (exit 3). --dry-run previews the body client-side without sending.",
         permissions: ["isSystemAdmin or isDeveloper"],
+        tier: "developer",
         mutates: true,
         args: [{ name: "threadId", type: "number", description: "support messageThread id" }],
         flags: [

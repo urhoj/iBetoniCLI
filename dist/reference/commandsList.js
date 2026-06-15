@@ -1,6 +1,7 @@
 import { COMMAND_SPECS } from "./specs.js";
 import { CliError } from "../api/errors.js";
 import { GLOSSARY } from "./domain.js";
+import { visibleSpecs } from "../tier.js";
 /** Unique, sorted set of command domains (the token after `ib`), derived from the specs. */
 export function commandDomains(specs) {
     return [...new Set(specs.map((s) => s.command.split(" ")[1]).filter(Boolean))].sort();
@@ -22,14 +23,16 @@ export function assertKnownDomain(specs, domain) {
  * passing both is a validation error (exit 4). `permission` matches a
  * case-insensitive substring against each spec's `permissions` entries.
  */
-export function filterCommandSpecs(specs, filter) {
+export function filterCommandSpecs(specs, filter, tier = "developer") {
     if (filter.mutations && filter.reads) {
         throw new CliError("--mutations and --reads are mutually exclusive", 0, null, 4);
     }
+    // Validate against the FULL specs so an unknown domain still exit-4s, while a
+    // hidden-but-valid domain (e.g. `schema` at standard) yields an empty list.
     if (filter.domain)
         assertKnownDomain(specs, filter.domain);
     const needle = filter.permission?.toLowerCase();
-    return specs
+    return visibleSpecs(specs, tier)
         .filter((s) => {
         if (filter.domain && s.command.split(" ")[1] !== filter.domain)
             return false;
@@ -54,8 +57,8 @@ export function filterCommandSpecs(specs, filter) {
  * Build the `ib commands` envelope from the live {@link COMMAND_SPECS}. Pure —
  * callers (`program.ts`) handle stdout via `writeJson`.
  */
-export function buildCommandsList(filter) {
-    const items = filterCommandSpecs(COMMAND_SPECS, filter);
+export function buildCommandsList(filter, tier = "developer") {
+    const items = filterCommandSpecs(COMMAND_SPECS, filter, tier);
     return { items, nextCursor: null, count: items.length };
 }
 /**
@@ -80,16 +83,19 @@ function glossaryBlurbForDomain(domain) {
         GLOSSARY.find((g) => g.term.toLowerCase().includes(domain))?.definition ??
         null);
 }
-export function buildDomainIndex(specs = COMMAND_SPECS) {
-    const items = commandDomains(specs).map((domain) => {
-        const inDomain = specs.filter((s) => s.command.split(" ")[1] === domain);
+export function buildDomainIndex(specs = COMMAND_SPECS, tier = "developer") {
+    const visible = visibleSpecs(specs, tier);
+    const items = commandDomains(visible)
+        .map((domain) => {
+        const inDomain = visible.filter((s) => s.command.split(" ")[1] === domain);
         return {
             domain,
             count: inDomain.length,
             description: glossaryBlurbForDomain(domain),
             commands: inDomain.map((s) => s.command.replace(/^ib /, "")),
         };
-    });
+    })
+        .filter((d) => d.count > 0);
     return {
         hint: "domain index — one domain's commands: `ib commands <domain>` · full flat list: `ib commands --all` · one command's spec: `ib <command> --help`",
         items,

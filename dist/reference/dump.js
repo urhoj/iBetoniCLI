@@ -10,7 +10,8 @@
  */
 import { COMMAND_SPECS } from "./specs.js";
 import { assertKnownDomain } from "./commandsList.js";
-import { DOMAIN_OVERVIEW, GLOSSARY, FEEDBACK_GUIDANCE, TOPICS } from "./domain.js";
+import { DOMAIN_OVERVIEW, FEEDBACK_GUIDANCE, TOPICS, glossaryForTier, } from "./domain.js";
+import { visibleSpecs } from "../tier.js";
 import { emitStdout } from "../output/json.js";
 import packageJson from "../../package.json" with { type: "json" };
 /**
@@ -22,17 +23,17 @@ import packageJson from "../../package.json" with { type: "json" };
  * small, high-value context that keeps a filtered dump self-contained.
  * Unknown domain → exit-4 CliError (via assertKnownDomain).
  */
-export function buildReference(domain) {
-    let specs = COMMAND_SPECS;
+export function buildReference(domain, tier = "developer") {
+    let specs = visibleSpecs(COMMAND_SPECS, tier);
     if (domain) {
         assertKnownDomain(COMMAND_SPECS, domain);
-        specs = COMMAND_SPECS.filter((s) => s.command.split(" ")[1] === domain);
+        specs = specs.filter((s) => s.command.split(" ")[1] === domain);
     }
     return {
         version: packageJson.version,
         generatedAt: new Date().toISOString(),
         overview: DOMAIN_OVERVIEW,
-        glossary: GLOSSARY,
+        glossary: glossaryForTier(tier),
         feedbackGuidance: FEEDBACK_GUIDANCE,
         topics: TOPICS,
         commands: Object.fromEntries(specs.map((spec) => [spec.command, spec])),
@@ -45,7 +46,7 @@ export function buildReference(domain) {
  * dropped 2026-06-10: it was ~30% of the dump's bytes (pure indentation) and
  * pushed the customer domain over the 10k-token audit threshold.
  */
-export function runReferenceDump(domain) {
-    emitStdout(JSON.stringify(buildReference(domain)) + "\n");
+export function runReferenceDump(domain, tier = "developer") {
+    emitStdout(JSON.stringify(buildReference(domain, tier)) + "\n");
 }
 //# sourceMappingURL=dump.js.map

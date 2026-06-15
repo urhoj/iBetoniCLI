@@ -48,6 +48,7 @@ import { writeJson, exitWithError, failWith, emitStdout, emitStderr, setActiveCo
 import { getEmbeddedCtx } from "./embedded.js";
 import { createApiClient } from "./api/client.js";
 import { CliError } from "./api/errors.js";
+import { getCallerTier } from "./tier.js";
 /**
  * Construct the `ib` program with all subcommands registered and rich
  * (`CommandSpec`-driven) `--help` attached. Does not parse argv.
@@ -61,7 +62,7 @@ export function buildProgram() {
     // Domain primer (what betoni.online is + glossary) on the root `--help`, so an
     // AI inspecting top-level help gets the same context `ib reference dump`
     // embeds. Sourced from reference/domain.ts — one source of truth, no drift.
-    program.addHelpText("after", renderDomainHelp());
+    program.addHelpText("after", () => renderDomainHelp(getCallerTier()));
     // Root command list is a table of contents: first sentence only (same
     // truncation formatGroupHelp applies to group listings); the full
     // description stays in each command's `--help`.
@@ -160,7 +161,7 @@ export function buildProgram() {
         .argument("[domain]", "Restrict the commands map to one domain — the token after `ib` (e.g. keikka)")
         .action((domain) => {
         try {
-            runReferenceDump(domain);
+            runReferenceDump(domain, getCallerTier());
         }
         catch (e) {
             exitWithError(e);
@@ -188,8 +189,8 @@ export function buildProgram() {
                     mutations: opts.mutations,
                     reads: opts.reads,
                     permission: opts.permission,
-                })
-                : buildDomainIndex());
+                }, getCallerTier())
+                : buildDomainIndex(undefined, getCallerTier()));
         }
         catch (e) {
             exitWithError(e);

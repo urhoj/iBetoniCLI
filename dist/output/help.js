@@ -23,6 +23,7 @@
  * spec without having to run `ib reference dump`.
  */
 import { GLOSSARY } from "../reference/domain.js";
+import { getCallerTier, isHiddenAtTier } from "../tier.js";
 /**
  * Render a {@link CommandSpec} as the AI-optimized `--help` text. Output is a
  * trailing-newline-terminated string suitable for `process.stdout.write`.
@@ -113,6 +114,11 @@ export function firstSentence(text) {
     const i = text.indexOf(". ");
     return i === -1 ? text : text.slice(0, i + 1);
 }
+/** Shared fallback shown when a command/group is hidden at the caller's tier. */
+export function hiddenAtTierMessage(path) {
+    return (`${path} is not available at your access level.\n` +
+        "  Run `ib commands` to see the commands you can use.\n");
+}
 /**
  * Render computed help for a GROUP command (e.g. `ib keikka`, `ib jerry offer`).
  *
@@ -124,13 +130,15 @@ export function firstSentence(text) {
  * (uppercase sections, two-space indent). No new source of truth → cannot
  * drift from `--help` / `ib reference dump` / `ib commands`.
  */
-export function formatGroupHelp(groupPath, fallbackDescription, specs, glossary) {
+export function formatGroupHelp(groupPath, fallbackDescription, specs, glossary, tier = "developer") {
     const prefix = groupPath + " ";
     const depth = groupPath.split(" ").length; // child = token at this index
     const domain = groupPath.split(" ")[1];
     const groupName = groupPath.split(" ").at(-1).toLowerCase();
-    const inGroup = specs.filter((s) => s.command.startsWith(prefix));
+    const inGroup = specs.filter((s) => s.command.startsWith(prefix) && !isHiddenAtTier(s, tier));
     const children = [...new Set(inGroup.map((s) => s.command.split(" ")[depth]))];
+    if (children.length === 0)
+        return hiddenAtTierMessage(groupPath);
     const byCommand = new Map(specs.map((s) => [s.command, s]));
     const blurb = glossary.find((g) => g.term.toLowerCase().includes(groupName))?.definition ??
         fallbackDescription;
@@ -185,13 +193,17 @@ export function attachRichHelp(root, specs) {
         if (spec) {
             // Single source: the Commander listing description IS the spec description.
             cmd.description(spec.description);
-            cmd.configureHelp({ formatHelp: () => formatHelp(spec) });
+            cmd.configureHelp({
+                formatHelp: () => isHiddenAtTier(spec, getCallerTier())
+                    ? hiddenAtTierMessage(full)
+                    : formatHelp(spec),
+            });
         }
         else if (path.length > 0 && cmd.commands.length > 0) {
             // Non-root group: computed group help (root keeps the domain primer).
             const fallback = cmd.description();
             cmd.configureHelp({
-                formatHelp: () => formatGroupHelp(full, fallback, specs, GLOSSARY),
+                formatHelp: () => formatGroupHelp(full, fallback, specs, GLOSSARY, getCallerTier()),
             });
         }
         for (const sub of cmd.commands)
