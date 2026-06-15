@@ -194,7 +194,8 @@ describe("buildDomainIndex", () => {
   });
 
   test("real catalogue: every leaf counted once; keikka gets its glossary blurb", () => {
-    const env = buildDomainIndex();
+    // Explicitly pass "developer" so the invariant doesn't depend on ambient tier state.
+    const env = buildDomainIndex(COMMAND_SPECS, "developer");
     expect(env.items.reduce((a, i) => a + i.count, 0)).toBe(COMMAND_SPECS.length);
     const keikka = env.items.find((i) => i.domain === "keikka");
     expect(keikka?.description).toMatch(/delivery/i);
@@ -217,6 +218,7 @@ describe("tier filtering — flat list", () => {
     const dev = buildCommandsList({ domain: "ai" }, "developer");
     expect(dev.items.map((i) => i.command)).toContain("ib ai conversation");
     const std = buildCommandsList({ domain: "ai" }, "standard");
+    // All ib ai commands are tier:developer — the whole domain collapses to empty at standard.
     expect(std.items).toHaveLength(0);
   });
   test("feedback create stays visible at standard; triage drops", () => {
