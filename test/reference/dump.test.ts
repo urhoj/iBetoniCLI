@@ -98,4 +98,10 @@ describe("reference dump tier filtering", () => {
   test("default tier is developer (back-compat)", () => {
     expect(Object.keys(buildReference().commands)).toContain("ib ai conversation");
   });
+  test("domain-filtered dump at standard retains the tier-filtered (not full) glossary", () => {
+    const std = buildReference(undefined, "standard");
+    const stdDomain = buildReference("keikka", "standard");
+    expect(stdDomain.glossary).toEqual(std.glossary);
+    expect(stdDomain.glossary.some((g) => g.term.startsWith("ai /"))).toBe(false);
+  });
 });
