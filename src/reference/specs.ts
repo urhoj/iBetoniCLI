@@ -416,35 +416,35 @@ export const COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib company switch --to 1349"],
   },
   {
-    // `ib validate` itself is a GROUP (it owns `list`) so it has no spec of its
-    // own — it renders computed group help (blurb from the GLOSSARY `validate`
-    // term). The running forms live on the bare invocation: `ib validate
-    // --asiakas <id> --profile <p>` (company) and `ib validate --asiakas <id>
-    // --person <id>` (person, profile defaults to onboarding). Entity is
-    // inferred from --person. The `list` leaf below documents the surface.
-    command: "ib validate list",
+    command: "ib validate",
     description:
-      "List the validation profiles, each tagged with its entity — company profiles (jerry = BetoniJerry provider readiness, betoni = betoni.online customer setup) and the person profile onboarding (is one employee ready to work). Run a profile via `ib validate --asiakas <id> --profile <p>` (company) or `ib validate --asiakas <id> --person <id>` (person; profile defaults to onboarding). GET /api/validation/profiles.",
+      "Validate a company OR a single employee against a profile — a pass/fail/skip checklist with Finnish details naming what is missing. Entity is inferred from --person: absent → company (profiles: jerry, betoni; --profile required); present → person (profile: onboarding, default). `ib validate list` lists profiles. Company: GET /api/validation/:profile/:asiakasId. Person: GET /api/validation/person/:profile/:asiakasId/:personId.",
     permissions: [
-      "any authenticated user (running a profile additionally needs admin/HR — see notes)",
+      "company: system admin OR admin-tier role in the target (or owner) company",
+      "person: the above OR HR admin (typeId 24) of the target company",
     ],
-    flags: [],
+    args: [
+      { name: "action", type: "string", required: false, description: "Use 'list' to list available profiles; omit to run validation." },
+    ],
+    flags: [
+      { name: "asiakas", type: "number", description: "Target asiakasId (default: active company)" },
+      { name: "person", type: "number", description: "Validate this person as an employee (switches to person validation)" },
+      { name: "profile", type: "string", description: "Profile id (company: jerry|betoni, required; person: onboarding, default)" },
+    ],
     outputShape:
-      "ListEnvelope<{ id, titleFi, description, entity:'company'|'person' }>. Running a company profile returns { entity:'company', profile, asiakasId, asiakasNimi, ok, summary, checks[] }; a person profile returns { entity:'person', profile, asiakasId, asiakasNimi, personId, personNimi, ok, summary, checks:[{ id, severity, status:'pass'|'fail'|'skip', titleFi, detail? }] }.",
+      "list: ListEnvelope<{ id, titleFi, description, entity:'company'|'person' }>. company: { entity:'company', profile, asiakasId, asiakasNimi, ok, summary, checks[] }. person: { entity:'person', profile, asiakasId, asiakasNimi, personId, personNimi, ok, summary, checks:[{ id, severity, status:'pass'|'fail'|'skip', titleFi, detail? }] }.",
     errors: [
       apiErr(401, "Token expired", "ib auth refresh"),
-      apiErr(403, "Not an admin/HR of the target company (when running a profile)", "use an admin/HR token"),
+      apiErr(403, "Not an admin/HR of the target company", "use an admin/HR token"),
       apiErr(404, "Unknown profile for that entity, or company/person not found", "run `ib validate list` to see profiles"),
       { exit: 4, meaning: "Missing --profile for company validation, or a non-positive --asiakas/--person", remedy: "pass --profile (jerry|betoni) for a company, or a positive --asiakas/--person; run `ib validate list`" },
     ],
     notes: [
-      "Run a profile via the bare `ib validate` command: --asiakas <id> (default: active company), --person <id> (switches to person validation), --profile <p> (company: jerry|betoni required; person: onboarding default).",
-      "Company validation: system admin OR admin-tier role in the target (or owner) company. Person validation: the above OR HR admin (typeId 24) of the target company.",
       "ok = every applicable 'required' check passes; skipped checks (conditional, not applicable) and recommended/optional never flip it.",
       "status 'skip' = the check did not apply (e.g. Ajoneuvot-moduuli only checked for pumppari); excluded from summary counts.",
       "Exit code is 0 even when ok:false — the JSON carries the outcome.",
       "Deploy-gated: returns 404 until /api/validation is deployed.",
-      "'ib company validate' was renamed to `ib validate` (exit 4 on the old path).",
+      "'ib company validate' was renamed to this command (exit 4 on the old path).",
     ],
     seeAlso: ["ib person get", "ib customer modules", "ib jerry admin detail"],
     examples: [

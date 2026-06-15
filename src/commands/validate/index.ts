@@ -51,33 +51,40 @@ export async function runValidatePerson(
 }
 
 /**
- * Register the top-level `ib validate` command. Entity is inferred from
- * `--person`: present → person validation (profile defaults to "onboarding");
- * absent → company validation (profile required). `ib validate list` lists
- * profiles (each row carries `entity`). Profile/entity mismatch is enforced
- * server-side (404). Deploy-gated: 404 until /api/validation/person is deployed.
+ * Register the top-level `ib validate` command as a SINGLE LEAF (no subcommands,
+ * so it renders a full leaf `--help` with a FLAGS section). The optional
+ * positional `action` is `list` to list profiles; otherwise it runs flag-driven
+ * validation. Entity is inferred from `--person`: present → person validation
+ * (profile defaults to "onboarding"); absent → company validation (profile
+ * required). Profile/entity mismatch is enforced server-side (404). Deploy-gated:
+ * 404 until /api/validation/person is deployed.
  */
 export function registerValidateCommands(
   parent: Command,
   getClient: () => Promise<ApiClient>
 ): void {
-  const validate = parent
-    .command("validate")
+  parent
+    .command("validate [action]")
     .description(
-      "Validate a company or a single employee against a profile (company: jerry|betoni; person: onboarding)"
+      "Validate a company or a single employee against a profile (company: jerry|betoni; person: onboarding). Use 'list' to list profiles."
     )
     .option("--asiakas <id>", "Target asiakasId (default: active company)", Number)
     .option("--person <id>", "Validate this person as an employee of the company", Number)
     .option("--profile <p>", "Profile id (company: jerry|betoni; person: onboarding [default])")
     .action(
-      async (opts: { asiakas?: number; person?: number; profile?: string }) => {
+      async (action: string | undefined, opts: { asiakas?: number; person?: number; profile?: string }) => {
         try {
           const client = await getClient();
+          if (action === "list") {
+            writeJson(await runValidateProfiles(client));
+            return;
+          }
           const asiakasId =
             opts.asiakas ?? decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId;
           if (opts.person != null) {
-            const profile = opts.profile ?? "onboarding";
-            writeJson(await runValidatePerson(client, profile, asiakasId, opts.person));
+            writeJson(
+              await runValidatePerson(client, opts.profile ?? "onboarding", asiakasId, opts.person)
+            );
             return;
           }
           if (!opts.profile) {
@@ -94,15 +101,4 @@ export function registerValidateCommands(
         }
       }
     );
-
-  validate
-    .command("list")
-    .description("List available validation profiles (each row carries its entity)")
-    .action(async () => {
-      try {
-        writeJson(await runValidateProfiles(await getClient()));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
 }
