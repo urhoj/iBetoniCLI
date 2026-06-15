@@ -7,14 +7,29 @@ export function commandDomains(specs) {
     return [...new Set(specs.map((s) => s.command.split(" ")[1]).filter(Boolean))].sort();
 }
 /**
+ * Domains every leaf of which is hidden at `tier` (so the whole domain should
+ * disappear from discovery — e.g. ai/schema/changelog at "standard"). Used to
+ * tier-filter the ROOT `ib --help` command listing and the unknown-domain error
+ * suggestion list, mirroring how `buildDomainIndex` drops zero-visible-leaf
+ * domains. Empty for "developer".
+ */
+export function fullyHiddenDomains(tier) {
+    const visible = new Set(commandDomains(visibleSpecs(COMMAND_SPECS, tier)));
+    return new Set(commandDomains(COMMAND_SPECS).filter((d) => !visible.has(d)));
+}
+/**
  * Throw an exit-4 CliError when `domain` is not a known command domain.
  * Single validation point shared by `ib commands` and `ib reference dump` so
- * the message and exit code can never diverge.
+ * the message and exit code can never diverge. Validation uses the FULL domain
+ * set (so a hidden-but-valid domain like `schema` at standard does NOT error —
+ * it yields an empty list); `tier` narrows ONLY the "Valid:" suggestion list so
+ * the error never leaks a developer-only domain to a standard caller.
  */
-export function assertKnownDomain(specs, domain) {
-    const valid = commandDomains(specs);
+export function assertKnownDomain(specs, domain, tier = "developer") {
+    const valid = commandDomains(specs); // FULL set — validation
     if (!valid.includes(domain)) {
-        throw new CliError(`unknown domain: ${domain}. Valid: ${valid.join(", ")}`, 0, null, 4);
+        const suggest = commandDomains(visibleSpecs(specs, tier)); // visible-only — suggestion
+        throw new CliError(`unknown domain: ${domain}. Valid: ${suggest.join(", ")}`, 0, null, 4);
     }
 }
 /**
@@ -30,7 +45,7 @@ export function filterCommandSpecs(specs, filter, tier = "developer") {
     // Validate against the FULL specs so an unknown domain still exit-4s, while a
     // hidden-but-valid domain (e.g. `schema` at standard) yields an empty list.
     if (filter.domain)
-        assertKnownDomain(specs, filter.domain);
+        assertKnownDomain(specs, filter.domain, tier);
     const needle = filter.permission?.toLowerCase();
     return visibleSpecs(specs, tier)
         .filter((s) => {

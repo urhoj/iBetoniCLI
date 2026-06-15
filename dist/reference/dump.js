@@ -26,7 +26,7 @@ import packageJson from "../../package.json" with { type: "json" };
 export function buildReference(domain, tier = "developer") {
     let specs = visibleSpecs(COMMAND_SPECS, tier);
     if (domain) {
-        assertKnownDomain(COMMAND_SPECS, domain);
+        assertKnownDomain(COMMAND_SPECS, domain, tier);
         specs = specs.filter((s) => s.command.split(" ")[1] === domain);
     }
     return {
