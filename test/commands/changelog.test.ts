@@ -81,3 +81,9 @@ test("list maps --sentry to the sentryIssue query param", async () => {
   await runChangelogList(client, { sentry: "PUMINET5API-1A2" });
   expect(asGet()).toHaveBeenCalledWith("/api/changelog?sentryIssue=PUMINET5API-1A2");
 });
+
+test("list normalizes a pasted --sentry url to the short id", async () => {
+  asGet().mockResolvedValue([]);
+  await runChangelogList(client, { sentry: "https://sentry.io/issues/?query=PUMINET5API-1A2" });
+  expect(asGet()).toHaveBeenCalledWith("/api/changelog?sentryIssue=PUMINET5API-1A2");
+});

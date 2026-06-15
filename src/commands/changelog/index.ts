@@ -73,6 +73,7 @@ export async function runChangelogAdd(
 }
 
 export async function runChangelogList(client: ApiClient, opts: Record<string, string | number | undefined>): Promise<ListEnvelope<Row>> {
+  if (typeof opts.sentry === "string") opts.sentry = normalizeSentryRef(opts.sentry);
   const p = new URLSearchParams();
   // CLI option key → API query key. The --feedback flag maps to the backend's
   // `feedbackId` filter (controller passes req.query straight to listEntries).
