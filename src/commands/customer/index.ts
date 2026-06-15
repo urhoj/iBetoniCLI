@@ -12,6 +12,7 @@ import {
   exitWithError,
   failWith,
   errorMessage,
+  setExitCode,
 } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
@@ -1088,7 +1089,7 @@ export function registerCustomerCommands(
         // Verify (default): report state and gate the exit code on it.
         const result = await runCustomerOperatorVerify(client, asiakasId);
         writeJson(result);
-        if (!result.allSet) process.exitCode = 1;
+        if (!result.allSet) setExitCode(1);
       } catch (e) {
         exitWithError(e);
       }

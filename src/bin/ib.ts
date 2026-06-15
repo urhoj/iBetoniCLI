@@ -1,13 +1,12 @@
 #!/usr/bin/env node
-import type { Command } from "commander";
 import {
   buildProgram,
   enableParserThrow,
   handleParseRejection,
+  applySpecErrors,
 } from "../program.js";
 import { getGlobalOptions } from "../globals.js";
-import { setOutputMode, setActiveCommandErrors } from "../output/json.js";
-import { COMMAND_SPECS } from "../reference/specs.js";
+import { setOutputMode } from "../output/json.js";
 
 const program = buildProgram();
 
@@ -18,15 +17,8 @@ const parserText = enableParserThrow(program);
 program.hook("preAction", (_thisCommand, actionCommand) => {
   if (getGlobalOptions(program).pretty) setOutputMode("pretty");
   // Resolve the running command's CommandSpec so error envelopes can echo ITS
-  // documented per-error remedy as `hint` (feedback #25). Spec-less commands
-  // (none today — wiring tests enforce coverage) fall back to generic hints.
-  const parts: string[] = [];
-  for (let c: Command | null = actionCommand; c; c = c.parent) {
-    parts.unshift(c.name());
-  }
-  const path = parts.join(" ");
-  const spec = COMMAND_SPECS.find((s) => s.command === path);
-  setActiveCommandErrors(spec?.errors ?? null);
+  // documented per-error remedy as `hint` (feedback #25). Shared with runArgv.
+  applySpecErrors(actionCommand);
 });
 
 program

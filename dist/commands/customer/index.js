@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith, errorMessage, } from "../../output/json.js";
+import { writeJson, exitWithError, failWith, errorMessage, setExitCode, } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveRoleTypeId } from "../../roles.js";
@@ -752,7 +752,7 @@ export function registerCustomerCommands(parent, getClient) {
             const result = await runCustomerOperatorVerify(client, asiakasId);
             writeJson(result);
             if (!result.allSet)
-                process.exitCode = 1;
+                setExitCode(1);
         }
         catch (e) {
             exitWithError(e);

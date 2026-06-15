@@ -1,6 +1,7 @@
 import { CliError, exitCodeForError, hintForError } from "../api/errors.js";
 import { isListEnvelope } from "../api/envelopes.js";
 import { renderList, renderRecord } from "./pretty.js";
+import { getEmbeddedCtx } from "../embedded.js";
 let outputMode = "json";
 /**
  * ERRORS rows of the command currently executing, set by the bin preAction
@@ -10,26 +11,50 @@ let outputMode = "json";
  * commands) → generic hints only.
  */
 let activeCommandErrors = null;
+function emitStdout(line) {
+    const ctx = getEmbeddedCtx();
+    if (ctx)
+        ctx.stdout.push(line);
+    else
+        process.stdout.write(line);
+}
+function emitStderr(line) {
+    const ctx = getEmbeddedCtx();
+    if (ctx)
+        ctx.stderr.push(line);
+    else
+        process.stderr.write(line);
+}
 export function setActiveCommandErrors(rows) {
-    activeCommandErrors = rows;
+    const ctx = getEmbeddedCtx();
+    if (ctx)
+        ctx.activeCommandErrors = rows;
+    else
+        activeCommandErrors = rows;
 }
 export function setOutputMode(m) {
-    outputMode = m;
+    const ctx = getEmbeddedCtx();
+    if (ctx)
+        ctx.outputMode = m;
+    else
+        outputMode = m;
 }
 export function writeJson(value) {
-    if (outputMode === "pretty") {
+    const mode = getEmbeddedCtx()?.outputMode ?? outputMode;
+    if (mode === "pretty") {
         if (isListEnvelope(value)) {
-            process.stdout.write(renderList(value) + "\n");
+            emitStdout(renderList(value) + "\n");
             return;
         }
         if (value !== null && typeof value === "object") {
-            process.stdout.write(renderRecord(value) + "\n");
+            emitStdout(renderRecord(value) + "\n");
             return;
         }
     }
-    process.stdout.write(JSON.stringify(value) + "\n");
+    emitStdout(JSON.stringify(value) + "\n");
 }
 export function writeError(err) {
+    const activeErrors = getEmbeddedCtx()?.activeCommandErrors ?? activeCommandErrors;
     if (err instanceof CliError) {
         const body = err.body && typeof err.body === "object"
             ? err.body
@@ -37,8 +62,8 @@ export function writeError(err) {
         // `hint` points an agent at the next step without it having to have read
         // the command's --help NOTES beforehand (e.g. 404 = deploy-gated endpoint?).
         // Prefers the running command's own spec remedy when one matches.
-        const hint = hintForError(err, activeCommandErrors);
-        process.stderr.write(JSON.stringify({
+        const hint = hintForError(err, activeErrors);
+        emitStderr(JSON.stringify({
             success: false,
             error: err.message,
             code: body.code ?? null,
@@ -48,7 +73,7 @@ export function writeError(err) {
         return;
     }
     const message = err instanceof Error ? err.message : String(err);
-    process.stderr.write(JSON.stringify({
+    emitStderr(JSON.stringify({
         success: false,
         error: message,
         code: null,
@@ -72,8 +97,23 @@ export function writeError(err) {
  */
 export function exitWithError(err) {
     writeError(err);
-    process.exitCode = exitCodeForError(err);
+    const code = exitCodeForError(err);
+    const ctx = getEmbeddedCtx();
+    if (ctx)
+        ctx.exitCode = code;
+    else
+        process.exitCode = code;
 }
+/** Set the process/embedded exit code (ctx-aware). Use instead of a bare
+ * `process.exitCode = N` so commands report their exit code in in-process mode. */
+export function setExitCode(code) {
+    const ctx = getEmbeddedCtx();
+    if (ctx)
+        ctx.exitCode = code;
+    else
+        process.exitCode = code;
+}
+export { emitStdout, emitStderr };
 /**
  * Terminate a command from a validation/guard check WITHOUT `process.exit()`
  * (which aborts Node on Windows when called after a completed fetch — libuv

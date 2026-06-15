@@ -45,7 +45,9 @@ import { buildCommandsList, buildDomainIndex } from "./reference/commandsList.js
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
-import { writeJson, exitWithError, failWith } from "./output/json.js";
+import { writeJson, exitWithError, failWith, emitStdout, emitStderr, setActiveCommandErrors } from "./output/json.js";
+import { getEmbeddedCtx } from "./embedded.js";
+import { createApiClient } from "./api/client.js";
 import { CliError } from "./api/errors.js";
 
 /**
@@ -88,8 +90,13 @@ export function buildProgram(): Command {
     return ctx.client;
   }
 
-  const getClient = (): Promise<ApiClient> =>
-    clientFrom(getGlobalOptions(program));
+  const getClient = (): Promise<ApiClient> => {
+    const embCtx = getEmbeddedCtx();
+    if (embCtx) {
+      return Promise.resolve(createApiClient({ endpoint: embCtx.endpoint, token: embCtx.token, version: packageJson.version, readOnly: embCtx.readOnly }));
+    }
+    return clientFrom(getGlobalOptions(program));
+  };
 
   // A client bound to a SPECIFIC company via an ephemeral switch (never
   // persisted). Reuses the same tested switch path and inherits
@@ -231,6 +238,23 @@ export function buildProgram(): Command {
 }
 
 /**
+ * Resolve the running command's `CommandSpec.errors` and stash them so error
+ * envelopes can echo the command's OWN documented remedy as `hint` (feedback
+ * #25). Walks the command up its `.parent` chain to reconstruct the full
+ * space-joined command path, matches it against {@link COMMAND_SPECS}, and
+ * sets the active errors (`null` when no spec matches → generic hints only).
+ *
+ * Shared by `bin/ib.ts` and `runArgv` so both resolve hints identically — the
+ * path-join logic must NOT drift between the two entry points.
+ */
+export function applySpecErrors(actionCommand: Command): void {
+  const parts: string[] = [];
+  for (let c: Command | null = actionCommand; c; c = c.parent) parts.unshift(c.name());
+  const spec = COMMAND_SPECS.find((s) => s.command === parts.join(" "));
+  setActiveCommandErrors(spec?.errors ?? null);
+}
+
+/**
  * Make every command in the tree THROW a CommanderError instead of calling
  * `process.exit()` for usage errors / help / version, and capture the parser's
  * stderr text (the "error: unknown command …" line, did-you-mean suggestions,
@@ -251,6 +275,13 @@ export function enableParserThrow(program: Command): () => string {
   const output = {
     writeErr: (s: string) => {
       captured += s;
+    },
+    // Commander writes --help / --version display through writeOut. Route it
+    // through the ctx-aware emitStdout so in-process (embedded) `ib … --help`
+    // is captured into ctx.stdout instead of leaking to the real stdout. In
+    // normal CLI mode emitStdout falls back to process.stdout — unchanged.
+    writeOut: (s: string) => {
+      emitStdout(s);
     },
   };
   const walk = (cmd: Command): void => {
@@ -276,6 +307,12 @@ function isCommanderError(err: unknown): err is CommanderErrorLike {
     typeof (err as CommanderErrorLike).code === "string" &&
     (err as CommanderErrorLike).code!.startsWith("commander.")
   );
+}
+
+function setExit(code: number): void {
+  const ctx = getEmbeddedCtx();
+  if (ctx) ctx.exitCode = code;
+  else process.exitCode = code;
 }
 
 /**
@@ -307,14 +344,14 @@ export function handleParseRejection(
   if (isCommanderError(err)) {
     const text = parserText();
     if (err.exitCode === 0 || err.code === "commander.help") {
-      if (text) process.stderr.write(text);
-      process.exitCode = err.exitCode ?? 0;
+      if (text) emitStderr(text);
+      setExit(err.exitCode ?? 0);
       return;
     }
     const detail = (text || err.message || "usage error")
       .replace(/^error:\s*/gm, "")
       .trim();
-    process.stderr.write(
+    emitStderr(
       JSON.stringify({
         success: false,
         error: detail,
@@ -323,10 +360,10 @@ export function handleParseRejection(
         hint: "usage error — run `ib <command> --help` for the exact arguments and flags, or `ib commands` to discover commands",
       }) + "\n"
     );
-    process.exitCode = 4;
+    setExit(4);
     return;
   }
   const message = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`${message}\n`);
-  process.exitCode = 1;
+  emitStderr(`${message}\n`);
+  setExit(1);
 }

@@ -13,6 +13,7 @@ import { assertKnownDomain } from "./commandsList.js";
 import { DOMAIN_OVERVIEW, GLOSSARY, FEEDBACK_GUIDANCE, TOPICS } from "./domain.js";
 import type { GlossaryEntry, Topic } from "./domain.js";
 import type { CommandSpec } from "../output/help.js";
+import { emitStdout } from "../output/json.js";
 import packageJson from "../../package.json" with { type: "json" };
 
 export interface ReferenceDump {
@@ -63,5 +64,5 @@ export function buildReference(domain?: string): ReferenceDump {
  * pushed the customer domain over the 10k-token audit threshold.
  */
 export function runReferenceDump(domain?: string): void {
-  process.stdout.write(JSON.stringify(buildReference(domain)) + "\n");
+  emitStdout(JSON.stringify(buildReference(domain)) + "\n");
 }

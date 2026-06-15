@@ -44,7 +44,9 @@ import { buildCommandsList, buildDomainIndex } from "./reference/commandsList.js
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
-import { writeJson, exitWithError, failWith } from "./output/json.js";
+import { writeJson, exitWithError, failWith, emitStdout, emitStderr, setActiveCommandErrors } from "./output/json.js";
+import { getEmbeddedCtx } from "./embedded.js";
+import { createApiClient } from "./api/client.js";
 import { CliError } from "./api/errors.js";
 /**
  * Construct the `ib` program with all subcommands registered and rich
@@ -84,7 +86,13 @@ export function buildProgram() {
         }
         return ctx.client;
     }
-    const getClient = () => clientFrom(getGlobalOptions(program));
+    const getClient = () => {
+        const embCtx = getEmbeddedCtx();
+        if (embCtx) {
+            return Promise.resolve(createApiClient({ endpoint: embCtx.endpoint, token: embCtx.token, version: packageJson.version, readOnly: embCtx.readOnly }));
+        }
+        return clientFrom(getGlobalOptions(program));
+    };
     // A client bound to a SPECIFIC company via an ephemeral switch (never
     // persisted). Reuses the same tested switch path and inherits
     // read-only/endpoint/version. Powers `person search --my-companies` fan-out.
@@ -192,6 +200,23 @@ export function buildProgram() {
     return program;
 }
 /**
+ * Resolve the running command's `CommandSpec.errors` and stash them so error
+ * envelopes can echo the command's OWN documented remedy as `hint` (feedback
+ * #25). Walks the command up its `.parent` chain to reconstruct the full
+ * space-joined command path, matches it against {@link COMMAND_SPECS}, and
+ * sets the active errors (`null` when no spec matches → generic hints only).
+ *
+ * Shared by `bin/ib.ts` and `runArgv` so both resolve hints identically — the
+ * path-join logic must NOT drift between the two entry points.
+ */
+export function applySpecErrors(actionCommand) {
+    const parts = [];
+    for (let c = actionCommand; c; c = c.parent)
+        parts.unshift(c.name());
+    const spec = COMMAND_SPECS.find((s) => s.command === parts.join(" "));
+    setActiveCommandErrors(spec?.errors ?? null);
+}
+/**
  * Make every command in the tree THROW a CommanderError instead of calling
  * `process.exit()` for usage errors / help / version, and capture the parser's
  * stderr text (the "error: unknown command …" line, did-you-mean suggestions,
@@ -213,6 +238,13 @@ export function enableParserThrow(program) {
         writeErr: (s) => {
             captured += s;
         },
+        // Commander writes --help / --version display through writeOut. Route it
+        // through the ctx-aware emitStdout so in-process (embedded) `ib … --help`
+        // is captured into ctx.stdout instead of leaking to the real stdout. In
+        // normal CLI mode emitStdout falls back to process.stdout — unchanged.
+        writeOut: (s) => {
+            emitStdout(s);
+        },
     };
     const walk = (cmd) => {
         cmd.exitOverride();
@@ -227,6 +259,13 @@ function isCommanderError(err) {
         err !== null &&
         typeof err.code === "string" &&
         err.code.startsWith("commander."));
+}
+function setExit(code) {
+    const ctx = getEmbeddedCtx();
+    if (ctx)
+        ctx.exitCode = code;
+    else
+        process.exitCode = code;
 }
 /**
  * Terminal handler for `program.parseAsync(...).catch(...)`. Never calls
@@ -255,25 +294,25 @@ export function handleParseRejection(err, parserText) {
         const text = parserText();
         if (err.exitCode === 0 || err.code === "commander.help") {
             if (text)
-                process.stderr.write(text);
-            process.exitCode = err.exitCode ?? 0;
+                emitStderr(text);
+            setExit(err.exitCode ?? 0);
             return;
         }
         const detail = (text || err.message || "usage error")
             .replace(/^error:\s*/gm, "")
             .trim();
-        process.stderr.write(JSON.stringify({
+        emitStderr(JSON.stringify({
             success: false,
             error: detail,
             code: "USAGE",
             statusCode: 0,
             hint: "usage error — run `ib <command> --help` for the exact arguments and flags, or `ib commands` to discover commands",
         }) + "\n");
-        process.exitCode = 4;
+        setExit(4);
         return;
     }
     const message = err instanceof Error ? err.message : String(err);
-    process.stderr.write(`${message}\n`);
-    process.exitCode = 1;
+    emitStderr(`${message}\n`);
+    setExit(1);
 }
 //# sourceMappingURL=program.js.map

@@ -4,6 +4,16 @@ import { resolveDate } from "../../dates.js";
 const TYPES = ["feature", "improvement", "bugfix"];
 const AREAS = ["frontend", "backend", "cli", "database", "cicd"];
 /**
+ * Normalize a Sentry issue reference: accept a bare short id (e.g. PUMINET5API-1A2)
+ * or extract one from a pasted URL/string; otherwise trim and cap at 64 chars to fit
+ * the devChangelog.sentryIssue column. Store-only — never sent to Sentry.
+ */
+export function normalizeSentryRef(raw) {
+    const trimmed = raw.trim();
+    const m = trimmed.match(/[A-Z0-9]{2,}-[A-Z0-9]+/);
+    return (m ? m[0] : trimmed).slice(0, 64);
+}
+/**
  * POST /api/changelog. --dry-run is CLIENT-side (no server X-Dry-Run guard).
  */
 export async function runChangelogAdd(client, body, flags) {
@@ -14,11 +24,14 @@ export async function runChangelogAdd(client, body, flags) {
     });
 }
 export async function runChangelogList(client, opts) {
+    if (typeof opts.sentry === "string")
+        opts.sentry = normalizeSentryRef(opts.sentry);
     const p = new URLSearchParams();
     // CLI option key → API query key. The --feedback flag maps to the backend's
     // `feedbackId` filter (controller passes req.query straight to listEntries).
     const keyMap = {
-        month: "month", type: "type", area: "area", repo: "repo", feedback: "feedbackId", limit: "limit",
+        month: "month", type: "type", area: "area", repo: "repo", feedback: "feedbackId",
+        sentry: "sentryIssue", limit: "limit",
     };
     for (const [optKey, apiKey] of Object.entries(keyMap)) {
         if (opts[optKey] !== undefined)
@@ -68,6 +81,7 @@ export function registerChangelogCommands(parent, getClient) {
         .option("--sha <csv>", "Commit SHAs (CSV)")
         .option("--vtag <s>", "Version tag")
         .option("--feedback <id>", "cliFeedback id this resolves", Number)
+        .option("--sentry <ref>", "Sentry issue short id or URL this fixes")
         .option("--date <d>", "Entry date (YYYY-MM-DD|today), default today")).action(async (o) => {
         validateEnums(o.type, o.area);
         const entryDate = resolveDate(o.date || "today");
@@ -99,6 +113,8 @@ export function registerChangelogCommands(parent, getClient) {
             body.versionTag = o.vtag;
         if (o.feedback !== undefined)
             body.feedbackId = Number(o.feedback);
+        if (o.sentry)
+            body.sentryIssue = normalizeSentryRef(o.sentry);
         try {
             writeJson(await runChangelogAdd(await getClient(), body, o));
         }
@@ -107,12 +123,13 @@ export function registerChangelogCommands(parent, getClient) {
         }
     });
     c.command("list")
-        .description("List change entries (filters: --month --type --area --repo --feedback --limit)")
+        .description("List change entries (filters: --month --type --area --repo --feedback --sentry --limit)")
         .option("--month <YYYY-MM>", "Filter to a month")
         .option("--type <t>", "feature|improvement|bugfix")
         .option("--area <a>", "frontend|backend|cli|database|cicd")
         .option("--repo <r>", "Repo/submodule")
         .option("--feedback <id>", "Entries linked to a feedback id", Number)
+        .option("--sentry <ref>", "Entries linked to a Sentry issue short id")
         .option("--limit <n>", "Max rows", Number)
         .action(async (o) => {
         try {
@@ -246,6 +263,11 @@ export const CHANGELOG_SPECS = [
                 description: "cliFeedback id this entry resolves",
             },
             {
+                name: "sentry",
+                type: "string",
+                description: "Sentry issue short id or URL this entry fixes (stored, not sent to Sentry)",
+            },
+            {
                 name: "date",
                 type: "date",
                 description: "Entry date (YYYY-MM-DD|today)",
@@ -281,6 +303,7 @@ export const CHANGELOG_SPECS = [
         seeAlso: ["ib changelog report", "ib feedback resolve"],
         examples: [
             'ib changelog add --type bugfix --area cli --title "x" --description "y" --feedback 12 --sha 59d9cc5',
+            'ib changelog add --type bugfix --area backend --title "fix npe" --description "y" --sentry PUMINET5API-1A2',
         ],
     },
     {
@@ -304,6 +327,11 @@ export const CHANGELOG_SPECS = [
                 name: "feedback",
                 type: "number",
                 description: "linked feedback id",
+            },
+            {
+                name: "sentry",
+                type: "string",
+                description: "linked Sentry issue short id",
             },
             { name: "limit", type: "number", description: "Max rows" },
         ],

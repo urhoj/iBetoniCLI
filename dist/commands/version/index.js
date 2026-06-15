@@ -1,4 +1,4 @@
-import { writeJson } from "../../output/json.js";
+import { writeJson, setExitCode } from "../../output/json.js";
 /** Coerce an unknown JSON value to a string field, preserving null/absent as null. */
 function asStr(v) {
     if (typeof v === "string")
@@ -65,7 +65,7 @@ export function registerVersionCommand(parent, cliVersion, getEndpoint) {
         // process.exit) so the JSON on stdout drains first — a hard exit truncates
         // piped output on Windows, and piped stdout is this CLI's primary mode.
         if (!report.reachable)
-            process.exitCode = 7;
+            setExitCode(7);
     });
 }
 //# sourceMappingURL=index.js.map
