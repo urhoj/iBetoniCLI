@@ -13,6 +13,7 @@ import type { CommandSpec } from "../output/help.js";
 import { COMMAND_SPECS } from "./specs.js";
 import { CliError } from "../api/errors.js";
 import { GLOSSARY } from "./domain.js";
+import { type CallerTier, visibleSpecs } from "../tier.js";
 
 /** Compact per-command summary surfaced by `ib commands`. */
 export interface CommandSummary {
@@ -78,7 +79,8 @@ export interface CommandsListEnvelope {
  */
 export function filterCommandSpecs(
   specs: CommandSpec[],
-  filter: CommandsListFilter
+  filter: CommandsListFilter,
+  tier: CallerTier = "developer"
 ): CommandSummary[] {
   if (filter.mutations && filter.reads) {
     throw new CliError(
@@ -88,9 +90,11 @@ export function filterCommandSpecs(
       4
     );
   }
+  // Validate against the FULL specs so an unknown domain still exit-4s, while a
+  // hidden-but-valid domain (e.g. `schema` at standard) yields an empty list.
   if (filter.domain) assertKnownDomain(specs, filter.domain);
   const needle = filter.permission?.toLowerCase();
-  return specs
+  return visibleSpecs(specs, tier)
     .filter((s) => {
       if (filter.domain && s.command.split(" ")[1] !== filter.domain) return false;
       const mutates = s.mutates ?? !!s.writeFlags;
@@ -114,9 +118,10 @@ export function filterCommandSpecs(
  * callers (`program.ts`) handle stdout via `writeJson`.
  */
 export function buildCommandsList(
-  filter: CommandsListFilter
+  filter: CommandsListFilter,
+  tier: CallerTier = "developer"
 ): CommandsListEnvelope {
-  const items = filterCommandSpecs(COMMAND_SPECS, filter);
+  const items = filterCommandSpecs(COMMAND_SPECS, filter, tier);
   return { items, nextCursor: null, count: items.length };
 }
 
@@ -166,17 +171,23 @@ function glossaryBlurbForDomain(domain: string): string | null {
 }
 
 export function buildDomainIndex(
-  specs: CommandSpec[] = COMMAND_SPECS
+  specs: CommandSpec[] = COMMAND_SPECS,
+  tier: CallerTier = "developer"
 ): DomainIndexEnvelope {
-  const items = commandDomains(specs).map((domain) => {
-    const inDomain = specs.filter((s) => s.command.split(" ")[1] === domain);
-    return {
-      domain,
-      count: inDomain.length,
-      description: glossaryBlurbForDomain(domain),
-      commands: inDomain.map((s) => s.command.replace(/^ib /, "")),
-    };
-  });
+  const visible = visibleSpecs(specs, tier);
+  const items = commandDomains(visible)
+    .map((domain) => {
+      const inDomain = visible.filter(
+        (s) => s.command.split(" ")[1] === domain
+      );
+      return {
+        domain,
+        count: inDomain.length,
+        description: glossaryBlurbForDomain(domain),
+        commands: inDomain.map((s) => s.command.replace(/^ib /, "")),
+      };
+    })
+    .filter((d) => d.count > 0);
   return {
     hint: "domain index — one domain's commands: `ib commands <domain>` · full flat list: `ib commands --all` · one command's spec: `ib <command> --help`",
     items,

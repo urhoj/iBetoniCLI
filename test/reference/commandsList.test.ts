@@ -211,3 +211,49 @@ describe("buildDomainIndex", () => {
     expect(ai?.description).not.toMatch(/geocoded location/i);
   });
 });
+
+describe("tier filtering — flat list", () => {
+  test("standard hides developer leaves; developer keeps them", () => {
+    const dev = buildCommandsList({ domain: "ai" }, "developer");
+    expect(dev.items.map((i) => i.command)).toContain("ib ai conversation");
+    const std = buildCommandsList({ domain: "ai" }, "standard");
+    expect(std.items).toHaveLength(0);
+  });
+  test("feedback create stays visible at standard; triage drops", () => {
+    const std = buildCommandsList({ domain: "feedback" }, "standard");
+    const cmds = std.items.map((i) => i.command);
+    expect(cmds).toContain("ib feedback create");
+    expect(cmds).not.toContain("ib feedback list");
+  });
+  test("default tier is developer (back-compat)", () => {
+    const def = buildCommandsList({ domain: "schema" });
+    expect(def.count).toBeGreaterThan(0);
+  });
+});
+
+describe("tier filtering — domain index", () => {
+  test("standard drops fully-developer domains (ai, schema, changelog)", () => {
+    const domains = buildDomainIndex(undefined, "standard").items.map(
+      (i) => i.domain
+    );
+    expect(domains).not.toContain("ai");
+    expect(domains).not.toContain("schema");
+    expect(domains).not.toContain("changelog");
+    expect(domains).toContain("feedback"); // create still visible
+  });
+  test("developer index keeps ai + schema", () => {
+    const domains = buildDomainIndex(undefined, "developer").items.map(
+      (i) => i.domain
+    );
+    expect(domains).toContain("ai");
+    expect(domains).toContain("schema");
+  });
+  test("standard feedback row lists only create", () => {
+    const fb = buildDomainIndex(undefined, "standard").items.find(
+      (i) => i.domain === "feedback"
+    )!;
+    expect(fb.commands).toContain("feedback create");
+    expect(fb.commands).not.toContain("feedback list");
+    expect(fb.count).toBe(fb.commands.length);
+  });
+});
