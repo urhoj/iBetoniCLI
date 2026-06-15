@@ -17,7 +17,7 @@ import { decodeJwtPayload } from "./auth/jwt.js";
 
 export type CallerTier = "developer" | "standard";
 
-/** Deterministic: map a JWT (or none) to a visibility tier. Fail-closed on missing/bad token. */
+/** Stateless: map a JWT (or none) to a visibility tier. Fail-closed on missing/bad/malformed token. */
 export function resolveCallerTier(token: string | null | undefined): CallerTier {
   if (!token) return "standard";
   try {

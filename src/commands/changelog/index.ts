@@ -11,6 +11,9 @@
  *   get      GET    /api/changelog/:id
  *   update   PUT    /api/changelog/:id  (developer-only)
  *   report   GET    /api/changelog/report?month=&format=  (developer-only)
+ *
+ * All specs carry `tier: "developer"` — the whole changelog domain is hidden
+ * from non-developer / tokenless callers in discovery (see src/tier.ts).
  */
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
