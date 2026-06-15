@@ -9,6 +9,8 @@
  * {@link renderDomainHelp}. One source of truth → the primer can never drift
  * from the CLI it describes.
  */
+import { type CallerTier, visibleSpecs } from "../tier.js";
+import { COMMAND_SPECS } from "./specs.js";
 
 /** One-paragraph description of the platform, tenancy model, and BetoniJerry. */
 export const DOMAIN_OVERVIEW =
@@ -154,7 +156,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   {
     term: "ai / conversation",
     definition:
-      "An /ai assistant conversation (gptConversations/gptMessages). Read the full transcript by id with `ib ai conversation <id>` (developer-only). Feedback filed from /ai carries the originating id in context.conversationId.",
+      "An /ai assistant conversation (gptConversations/gptMessages). Developers can read a transcript by id with `ib ai conversation <id>`. Feedback filed from /ai carries the originating id in context.conversationId.",
   },
 ];
 
@@ -237,19 +239,42 @@ export const TOPICS: Topic[] = [
 ];
 
 /**
+ * GLOSSARY entries whose term references a domain that is fully hidden at
+ * `tier` are dropped from the primer, so a `standard` caller's `--help` /
+ * `reference dump` doesn't reintroduce — via the glossary — a command its
+ * command list omits. A domain is "hidden" when it has zero visible leaves at
+ * `tier`. Domain extraction is inlined (not imported from commandsList) to
+ * avoid a domain.ts <-> commandsList.ts import cycle.
+ */
+export function glossaryForTier(tier: CallerTier): GlossaryEntry[] {
+  if (tier === "developer") return GLOSSARY;
+  const domainOf = (cmd: string): string => cmd.split(" ")[1];
+  const visibleDomains = new Set(
+    visibleSpecs(COMMAND_SPECS, tier).map((s) => domainOf(s.command))
+  );
+  const hiddenDomains = [
+    ...new Set(COMMAND_SPECS.map((s) => domainOf(s.command))),
+  ].filter((d) => d && !visibleDomains.has(d));
+  return GLOSSARY.filter(
+    (g) => !hiddenDomains.some((d) => new RegExp(`\\b${d}\\b`, "i").test(g.term))
+  );
+}
+
+/**
  * Render the primer as a fixed-section text block for `ib --help`. Mirrors the
  * parse-friendly style of `formatHelp` (uppercase section headers, two-space
  * indent) so an AI sees a consistent layout across root and per-command help.
  */
-export function renderDomainHelp(): string {
+export function renderDomainHelp(tier: CallerTier = "developer"): string {
+  const glossary = glossaryForTier(tier);
   const lines: string[] = [];
   lines.push("");
   lines.push("ABOUT");
   lines.push(`  ${DOMAIN_OVERVIEW}`);
   lines.push("");
   lines.push("GLOSSARY");
-  const pad = Math.max(...GLOSSARY.map((g) => g.term.length));
-  for (const g of GLOSSARY) {
+  const pad = Math.max(...glossary.map((g) => g.term.length));
+  for (const g of glossary) {
     lines.push(`  ${g.term.padEnd(pad)}  ${g.definition}`);
   }
   lines.push("");

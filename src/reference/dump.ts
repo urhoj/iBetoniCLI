@@ -10,9 +10,15 @@
  */
 import { COMMAND_SPECS } from "./specs.js";
 import { assertKnownDomain } from "./commandsList.js";
-import { DOMAIN_OVERVIEW, GLOSSARY, FEEDBACK_GUIDANCE, TOPICS } from "./domain.js";
+import {
+  DOMAIN_OVERVIEW,
+  FEEDBACK_GUIDANCE,
+  TOPICS,
+  glossaryForTier,
+} from "./domain.js";
 import type { GlossaryEntry, Topic } from "./domain.js";
 import type { CommandSpec } from "../output/help.js";
+import { type CallerTier, visibleSpecs } from "../tier.js";
 import { emitStdout } from "../output/json.js";
 import packageJson from "../../package.json" with { type: "json" };
 
@@ -39,17 +45,20 @@ export interface ReferenceDump {
  * small, high-value context that keeps a filtered dump self-contained.
  * Unknown domain → exit-4 CliError (via assertKnownDomain).
  */
-export function buildReference(domain?: string): ReferenceDump {
-  let specs = COMMAND_SPECS;
+export function buildReference(
+  domain?: string,
+  tier: CallerTier = "developer"
+): ReferenceDump {
+  let specs = visibleSpecs(COMMAND_SPECS, tier);
   if (domain) {
     assertKnownDomain(COMMAND_SPECS, domain);
-    specs = COMMAND_SPECS.filter((s) => s.command.split(" ")[1] === domain);
+    specs = specs.filter((s) => s.command.split(" ")[1] === domain);
   }
   return {
     version: packageJson.version,
     generatedAt: new Date().toISOString(),
     overview: DOMAIN_OVERVIEW,
-    glossary: GLOSSARY,
+    glossary: glossaryForTier(tier),
     feedbackGuidance: FEEDBACK_GUIDANCE,
     topics: TOPICS,
     commands: Object.fromEntries(specs.map((spec) => [spec.command, spec])),
@@ -63,6 +72,6 @@ export function buildReference(domain?: string): ReferenceDump {
  * dropped 2026-06-10: it was ~30% of the dump's bytes (pure indentation) and
  * pushed the customer domain over the 10k-token audit threshold.
  */
-export function runReferenceDump(domain?: string): void {
-  emitStdout(JSON.stringify(buildReference(domain)) + "\n");
+export function runReferenceDump(domain?: string, tier: CallerTier = "developer"): void {
+  emitStdout(JSON.stringify(buildReference(domain, tier)) + "\n");
 }

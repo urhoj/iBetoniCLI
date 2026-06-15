@@ -82,3 +82,20 @@ describe("ib reference dump <domain>", () => {
     }
   });
 });
+
+describe("reference dump tier filtering", () => {
+  test("standard omits developer commands + their glossary entry", () => {
+    const std = buildReference(undefined, "standard");
+    expect(Object.keys(std.commands)).not.toContain("ib ai conversation");
+    expect(Object.keys(std.commands)).toContain("ib feedback create");
+    expect(std.glossary.some((g) => g.term.startsWith("ai /"))).toBe(false);
+  });
+  test("developer dump retains everything", () => {
+    const dev = buildReference(undefined, "developer");
+    expect(Object.keys(dev.commands)).toContain("ib ai conversation");
+    expect(dev.glossary.some((g) => g.term.startsWith("ai /"))).toBe(true);
+  });
+  test("default tier is developer (back-compat)", () => {
+    expect(Object.keys(buildReference().commands)).toContain("ib ai conversation");
+  });
+});
