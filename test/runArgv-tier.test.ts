@@ -1,6 +1,10 @@
-import { describe, test, expect } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
 import { runArgv } from "../src/runArgv.js";
-import { getCallerTier } from "../src/tier.js";
+import { getCallerTier, setCallerTier } from "../src/tier.js";
+
+// Pin the ambient tier to the module default before each test so the no-leak
+// assertion can't be made flaky by state left over from another test file.
+beforeEach(() => setCallerTier("developer"));
 
 function jwt(payload: Record<string, unknown>): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
