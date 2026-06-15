@@ -58,11 +58,15 @@ describe("isHiddenAtTier / visibleSpecs", () => {
   });
 });
 
-describe("ambient tier holder", () => {
-  beforeEach(() => setCallerTier("developer"));
-  test("defaults to developer (full surface for library/test use)", () => {
+describe("ambient tier default (module init)", () => {
+  // No beforeEach — verifies the raw module-initialization value before any set.
+  test("initial value is developer", () => {
     expect(getCallerTier()).toBe("developer");
   });
+});
+
+describe("ambient tier holder", () => {
+  beforeEach(() => setCallerTier("developer"));
   test("set/get round-trips", () => {
     setCallerTier("standard");
     expect(getCallerTier()).toBe("standard");
