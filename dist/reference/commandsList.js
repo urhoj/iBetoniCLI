@@ -1,10 +1,12 @@
 import { COMMAND_SPECS } from "./specs.js";
 import { CliError } from "../api/errors.js";
 import { GLOSSARY } from "./domain.js";
-import { visibleSpecs } from "../tier.js";
+import { visibleSpecs, domainOf, hiddenDomainsAtTier } from "../tier.js";
+/** Single source for the write classification used by `ib commands`. */
+const isWriteSpec = (s) => s.mutates ?? !!s.writeFlags;
 /** Unique, sorted set of command domains (the token after `ib`), derived from the specs. */
 export function commandDomains(specs) {
-    return [...new Set(specs.map((s) => s.command.split(" ")[1]).filter(Boolean))].sort();
+    return [...new Set(specs.map((s) => domainOf(s.command)).filter(Boolean))].sort();
 }
 /**
  * Domains every leaf of which is hidden at `tier` (so the whole domain should
@@ -14,8 +16,7 @@ export function commandDomains(specs) {
  * domains. Empty for "developer".
  */
 export function fullyHiddenDomains(tier) {
-    const visible = new Set(commandDomains(visibleSpecs(COMMAND_SPECS, tier)));
-    return new Set(commandDomains(COMMAND_SPECS).filter((d) => !visible.has(d)));
+    return hiddenDomainsAtTier(COMMAND_SPECS, tier);
 }
 /**
  * Throw an exit-4 CliError when `domain` is not a known command domain.
@@ -49,9 +50,9 @@ export function filterCommandSpecs(specs, filter, tier = "developer") {
     const needle = filter.permission?.toLowerCase();
     return visibleSpecs(specs, tier)
         .filter((s) => {
-        if (filter.domain && s.command.split(" ")[1] !== filter.domain)
+        if (filter.domain && domainOf(s.command) !== filter.domain)
             return false;
-        const mutates = s.mutates ?? !!s.writeFlags;
+        const mutates = isWriteSpec(s);
         if (filter.mutations && !mutates)
             return false;
         if (filter.reads && mutates)
@@ -65,7 +66,7 @@ export function filterCommandSpecs(specs, filter, tier = "developer") {
         command: s.command,
         description: s.description,
         permissions: s.permissions ?? [],
-        isWrite: s.mutates ?? !!s.writeFlags,
+        isWrite: isWriteSpec(s),
     }));
 }
 /**
@@ -102,7 +103,7 @@ export function buildDomainIndex(specs = COMMAND_SPECS, tier = "developer") {
     const visible = visibleSpecs(specs, tier);
     const items = commandDomains(visible)
         .map((domain) => {
-        const inDomain = visible.filter((s) => s.command.split(" ")[1] === domain);
+        const inDomain = visible.filter((s) => domainOf(s.command) === domain);
         return {
             domain,
             count: inDomain.length,

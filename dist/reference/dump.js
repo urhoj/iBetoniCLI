@@ -22,6 +22,8 @@ import packageJson from "../../package.json" with { type: "json" };
  * cross-reference hidden command paths). Developer tier: spec returned unchanged
  * (byte-for-byte parity). `hiddenCommands` are full paths (e.g. `ib ai
  * conversation`), matched as substrings of the backtick-quoted mentions.
+ * Only the prose arrays (`seeAlso`/`notes`/`examples`) are scrubbed; `description`
+ * and `flags` don't embed backtick command paths in practice.
  */
 function scrubSpecForTier(spec, tier, hiddenCommands) {
     if (tier === "developer")

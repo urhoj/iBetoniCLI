@@ -14,7 +14,7 @@
  * the real per-caller tier is always set before argv is parsed.
  */
 import { decodeJwtPayload } from "./auth/jwt.js";
-/** Deterministic: map a JWT (or none) to a visibility tier. Fail-closed on missing/bad token. */
+/** Stateless: map a JWT (or none) to a visibility tier. Fail-closed on missing/bad/malformed token. */
 export function resolveCallerTier(token) {
     if (!token)
         return "standard";
@@ -33,6 +33,21 @@ export function isHiddenAtTier(spec, tier) {
 /** Keep only the specs visible at `tier`. */
 export function visibleSpecs(specs, tier) {
     return specs.filter((s) => !isHiddenAtTier(s, tier));
+}
+/** The domain token of a command path (`ib keikka list` → `keikka`). */
+export function domainOf(command) {
+    return command.split(" ")[1];
+}
+/**
+ * Domains every visible leaf of which is hidden at `tier` — i.e. the whole
+ * domain has zero visible leaves and should disappear from discovery
+ * (e.g. ai/schema/changelog at "standard"). Empty at "developer". Single source
+ * for the root-help command filter (`fullyHiddenDomains`) and the primer
+ * glossary filter (`glossaryForTier`), which must stay in lock-step.
+ */
+export function hiddenDomainsAtTier(specs, tier) {
+    const visible = new Set(visibleSpecs(specs, tier).map((s) => domainOf(s.command)));
+    return new Set(specs.map((s) => domainOf(s.command)).filter((d) => d && !visible.has(d)));
 }
 // Ambient holder — see module docstring. Default "developer" = full surface.
 let ambientTier = "developer";

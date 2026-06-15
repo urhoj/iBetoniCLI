@@ -114,7 +114,11 @@ export function firstSentence(text) {
     const i = text.indexOf(". ");
     return i === -1 ? text : text.slice(0, i + 1);
 }
-/** Shared fallback shown when a command/group is hidden at the caller's tier. */
+/**
+ * Shared fallback text shown when a command or group is not visible at the
+ * caller's tier. Used by {@link formatGroupHelp} (all children hidden) and by
+ * {@link attachRichHelp} (a hidden leaf's own `--help`).
+ */
 export function hiddenAtTierMessage(path) {
     return (`${path} is not available at your access level.\n` +
         "  Run `ib commands` to see the commands you can use.\n");
