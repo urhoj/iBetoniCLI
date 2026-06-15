@@ -38,6 +38,11 @@ describe("tier tagging", () => {
     "ib legal accept",
     "ib legal type create",
     "ib legal type update",
+    "ib changelog add",
+    "ib changelog list",
+    "ib changelog get",
+    "ib changelog update",
+    "ib changelog report",
   ];
   // Per-tenant company-admin OR open — MUST stay visible (untagged).
   const MUST_NOT_BE_DEVELOPER = [

@@ -301,6 +301,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     description:
       "Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row.",
     auth: "any",
+    tier: "developer",
     args: [],
     flags: [
       {
@@ -392,6 +393,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     command: "ib changelog list",
     description: "List change entries with filters.",
     auth: "any",
+    tier: "developer",
     flags: [
       { name: "month", type: "string", description: "YYYY-MM" },
       {
@@ -432,6 +434,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     command: "ib changelog get",
     description: "Get one change entry.",
     auth: "any",
+    tier: "developer",
     args: [
       {
         name: "changelogId",
@@ -442,6 +445,12 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     flags: [],
     outputShape: "entry",
     errors: [
+      {
+        http: 403,
+        exit: 3,
+        meaning: "Developer only",
+        remedy: "dev token",
+      },
       {
         http: 404,
         exit: 5,
@@ -455,6 +464,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     command: "ib changelog update",
     description: "Edit a change entry.",
     auth: "any",
+    tier: "developer",
     args: [
       {
         name: "changelogId",
@@ -511,6 +521,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     description:
       "Generate the monthly report (markdown or json) from entries.",
     auth: "any",
+    tier: "developer",
     flags: [
       {
         name: "month",
