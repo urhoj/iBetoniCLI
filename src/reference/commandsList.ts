@@ -13,7 +13,10 @@ import type { CommandSpec } from "../output/help.js";
 import { COMMAND_SPECS } from "./specs.js";
 import { CliError } from "../api/errors.js";
 import { GLOSSARY } from "./domain.js";
-import { type CallerTier, visibleSpecs } from "../tier.js";
+import { type CallerTier, visibleSpecs, domainOf, hiddenDomainsAtTier } from "../tier.js";
+
+/** Single source for the write classification used by `ib commands`. */
+const isWriteSpec = (s: CommandSpec): boolean => s.mutates ?? !!s.writeFlags;
 
 /** Compact per-command summary surfaced by `ib commands`. */
 export interface CommandSummary {
@@ -42,7 +45,7 @@ export interface CommandsListFilter {
 
 /** Unique, sorted set of command domains (the token after `ib`), derived from the specs. */
 export function commandDomains(specs: CommandSpec[]): string[] {
-  return [...new Set(specs.map((s) => s.command.split(" ")[1]).filter(Boolean))].sort();
+  return [...new Set(specs.map((s) => domainOf(s.command)).filter(Boolean))].sort();
 }
 
 /**
@@ -53,8 +56,7 @@ export function commandDomains(specs: CommandSpec[]): string[] {
  * domains. Empty for "developer".
  */
 export function fullyHiddenDomains(tier: CallerTier): Set<string> {
-  const visible = new Set(commandDomains(visibleSpecs(COMMAND_SPECS, tier)));
-  return new Set(commandDomains(COMMAND_SPECS).filter((d) => !visible.has(d)));
+  return hiddenDomainsAtTier(COMMAND_SPECS, tier);
 }
 
 /**
@@ -116,8 +118,8 @@ export function filterCommandSpecs(
   const needle = filter.permission?.toLowerCase();
   return visibleSpecs(specs, tier)
     .filter((s) => {
-      if (filter.domain && s.command.split(" ")[1] !== filter.domain) return false;
-      const mutates = s.mutates ?? !!s.writeFlags;
+      if (filter.domain && domainOf(s.command) !== filter.domain) return false;
+      const mutates = isWriteSpec(s);
       if (filter.mutations && !mutates) return false;
       if (filter.reads && mutates) return false;
       if (needle && !s.permissions?.some((p) => p.toLowerCase().includes(needle))) {
@@ -129,7 +131,7 @@ export function filterCommandSpecs(
       command: s.command,
       description: s.description,
       permissions: s.permissions ?? [],
-      isWrite: s.mutates ?? !!s.writeFlags,
+      isWrite: isWriteSpec(s),
     }));
 }
 
@@ -198,7 +200,7 @@ export function buildDomainIndex(
   const items = commandDomains(visible)
     .map((domain) => {
       const inDomain = visible.filter(
-        (s) => s.command.split(" ")[1] === domain
+        (s) => domainOf(s.command) === domain
       );
       return {
         domain,

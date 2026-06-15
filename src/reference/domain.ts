@@ -9,7 +9,7 @@
  * {@link renderDomainHelp}. One source of truth → the primer can never drift
  * from the CLI it describes.
  */
-import { type CallerTier, visibleSpecs } from "../tier.js";
+import { type CallerTier, hiddenDomainsAtTier } from "../tier.js";
 import { COMMAND_SPECS } from "./specs.js";
 
 /** One-paragraph description of the platform, tenancy model, and BetoniJerry. */
@@ -243,20 +243,15 @@ export const TOPICS: Topic[] = [
  * `tier` are dropped from the primer, so a `standard` caller's `--help` /
  * `reference dump` doesn't reintroduce — via the glossary — a command its
  * command list omits. A domain is "hidden" when it has zero visible leaves at
- * `tier`. Domain extraction is inlined (not imported from commandsList) to
- * avoid a domain.ts <-> commandsList.ts import cycle.
+ * `tier`. The domain-extraction + visible/hidden computation is the shared
+ * `hiddenDomainsAtTier` helper in `tier.ts` (imported by both this file and
+ * commandsList.ts — `tier.ts` depends on neither, so there is no import cycle).
  */
 export function glossaryForTier(tier: CallerTier): GlossaryEntry[] {
   if (tier === "developer") return GLOSSARY;
-  const domainOf = (cmd: string): string => cmd.split(" ")[1];
-  const visibleDomains = new Set(
-    visibleSpecs(COMMAND_SPECS, tier).map((s) => domainOf(s.command))
-  );
-  const hiddenDomains = [
-    ...new Set(COMMAND_SPECS.map((s) => domainOf(s.command))),
-  ].filter((d) => d && !visibleDomains.has(d));
+  const hidden = hiddenDomainsAtTier(COMMAND_SPECS, tier);
   return GLOSSARY.filter(
-    (g) => !hiddenDomains.some((d) => new RegExp(`\\b${d}\\b`, "i").test(g.term))
+    (g) => ![...hidden].some((d) => new RegExp(`\\b${d}\\b`, "i").test(g.term))
   );
 }
 

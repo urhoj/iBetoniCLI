@@ -44,6 +44,26 @@ export function visibleSpecs<T extends { tier?: "developer" }>(
   return specs.filter((s) => !isHiddenAtTier(s, tier));
 }
 
+/** The domain token of a command path (`ib keikka list` → `keikka`). */
+export function domainOf(command: string): string {
+  return command.split(" ")[1];
+}
+
+/**
+ * Domains every visible leaf of which is hidden at `tier` — i.e. the whole
+ * domain has zero visible leaves and should disappear from discovery
+ * (e.g. ai/schema/changelog at "standard"). Empty at "developer". Single source
+ * for the root-help command filter (`fullyHiddenDomains`) and the primer
+ * glossary filter (`glossaryForTier`), which must stay in lock-step.
+ */
+export function hiddenDomainsAtTier<T extends { command: string; tier?: "developer" }>(
+  specs: T[],
+  tier: CallerTier
+): Set<string> {
+  const visible = new Set(visibleSpecs(specs, tier).map((s) => domainOf(s.command)));
+  return new Set(specs.map((s) => domainOf(s.command)).filter((d) => d && !visible.has(d)));
+}
+
 // Ambient holder — see module docstring. Default "developer" = full surface.
 let ambientTier: CallerTier = "developer";
 export function setCallerTier(tier: CallerTier): void {
