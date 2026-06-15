@@ -11,9 +11,31 @@
 import { COMMAND_SPECS } from "./specs.js";
 import { assertKnownDomain } from "./commandsList.js";
 import { DOMAIN_OVERVIEW, FEEDBACK_GUIDANCE, TOPICS, glossaryForTier, } from "./domain.js";
-import { visibleSpecs } from "../tier.js";
+import { visibleSpecs, isHiddenAtTier } from "../tier.js";
 import { emitStdout } from "../output/json.js";
 import packageJson from "../../package.json" with { type: "json" };
+/**
+ * For a non-developer tier, strip cross-references (seeAlso / notes / examples)
+ * that name a command hidden at that tier — otherwise the dump's prose teaches a
+ * standard caller that the hidden subtrees exist (the dump filters WHICH specs
+ * appear, but emits each visible spec's prose verbatim, and ~10 of those strings
+ * cross-reference hidden command paths). Developer tier: spec returned unchanged
+ * (byte-for-byte parity). `hiddenCommands` are full paths (e.g. `ib ai
+ * conversation`), matched as substrings of the backtick-quoted mentions.
+ */
+function scrubSpecForTier(spec, tier, hiddenCommands) {
+    if (tier === "developer")
+        return spec;
+    const mentionsHidden = (s) => hiddenCommands.some((h) => s.includes(h));
+    const out = { ...spec };
+    if (spec.seeAlso)
+        out.seeAlso = spec.seeAlso.filter((r) => !mentionsHidden(r));
+    if (spec.notes)
+        out.notes = spec.notes.filter((n) => !mentionsHidden(n));
+    if (spec.examples)
+        out.examples = spec.examples.filter((e) => !mentionsHidden(e));
+    return out;
+}
 /**
  * Build the reference object. Pure — no I/O — so tests can assert on it
  * directly. Commands are keyed by their full path (e.g. `ib keikka list`),
@@ -21,7 +43,9 @@ import packageJson from "../../package.json" with { type: "json" };
  * the commands map is narrowed to that group (the token after `ib`) while the
  * primer (overview/glossary/topics/feedbackGuidance) is kept in full — it is
  * small, high-value context that keeps a filtered dump self-contained.
- * Unknown domain → exit-4 CliError (via assertKnownDomain).
+ * Unknown domain → exit-4 CliError (via assertKnownDomain). At a non-developer
+ * tier each surviving spec's prose is run through `scrubSpecForTier` so no
+ * cross-reference leaks a hidden command path.
  */
 export function buildReference(domain, tier = "developer") {
     let specs = visibleSpecs(COMMAND_SPECS, tier);
@@ -29,6 +53,7 @@ export function buildReference(domain, tier = "developer") {
         assertKnownDomain(COMMAND_SPECS, domain, tier);
         specs = specs.filter((s) => s.command.split(" ")[1] === domain);
     }
+    const hiddenCommands = COMMAND_SPECS.filter((s) => isHiddenAtTier(s, tier)).map((s) => s.command);
     return {
         version: packageJson.version,
         generatedAt: new Date().toISOString(),
@@ -36,7 +61,7 @@ export function buildReference(domain, tier = "developer") {
         glossary: glossaryForTier(tier),
         feedbackGuidance: FEEDBACK_GUIDANCE,
         topics: TOPICS,
-        commands: Object.fromEntries(specs.map((spec) => [spec.command, spec])),
+        commands: Object.fromEntries(specs.map((spec) => [spec.command, scrubSpecForTier(spec, tier, hiddenCommands)])),
     };
 }
 /**
