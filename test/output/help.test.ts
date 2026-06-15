@@ -88,7 +88,7 @@ describe("formatGroupHelp tier filtering", () => {
       GLOSSARY,
       "standard"
     );
-    expect(std).not.toContain("admin");
+    expect(std).not.toMatch(/^\s+admin\b/m);
     const dev = formatGroupHelp(
       "ib jerry",
       "Jerry",
@@ -97,6 +97,25 @@ describe("formatGroupHelp tier filtering", () => {
       "developer"
     );
     expect(dev).toContain("admin");
+  });
+  test("fully-hidden group renders the not-available fallback at standard", () => {
+    const std = formatGroupHelp(
+      "ib schema",
+      "Schema",
+      COMMAND_SPECS,
+      GLOSSARY,
+      "standard"
+    );
+    expect(std).toContain("not available at your access level");
+    expect(std).not.toContain("SUBCOMMANDS");
+    const dev = formatGroupHelp(
+      "ib schema",
+      "Schema",
+      COMMAND_SPECS,
+      GLOSSARY,
+      "developer"
+    );
+    expect(dev).toContain("SUBCOMMANDS");
   });
   test("feedback group keeps create, drops list at standard", () => {
     const std = formatGroupHelp(

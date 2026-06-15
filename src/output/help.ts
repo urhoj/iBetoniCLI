@@ -225,6 +225,14 @@ export function firstSentence(text: string): string {
   return i === -1 ? text : text.slice(0, i + 1);
 }
 
+/** Shared fallback shown when a command/group is hidden at the caller's tier. */
+export function hiddenAtTierMessage(path: string): string {
+  return (
+    `${path} is not available at your access level.\n` +
+    "  Run `ib commands` to see the commands you can use.\n"
+  );
+}
+
 /**
  * Render computed help for a GROUP command (e.g. `ib keikka`, `ib jerry offer`).
  *
@@ -252,6 +260,7 @@ export function formatGroupHelp(
     (s) => s.command.startsWith(prefix) && !isHiddenAtTier(s, tier)
   );
   const children = [...new Set(inGroup.map((s) => s.command.split(" ")[depth]))];
+  if (children.length === 0) return hiddenAtTierMessage(groupPath);
   const byCommand = new Map(specs.map((s) => [s.command, s]));
 
   const blurb =
@@ -313,8 +322,7 @@ export function attachRichHelp(root: Command, specs: CommandSpec[]): void {
       cmd.configureHelp({
         formatHelp: () =>
           isHiddenAtTier(spec, getCallerTier())
-            ? `${full} is not available at your access level.\n` +
-              "  Run `ib commands` to see the commands you can use.\n"
+            ? hiddenAtTierMessage(full)
             : formatHelp(spec),
       });
     } else if (path.length > 0 && cmd.commands.length > 0) {
