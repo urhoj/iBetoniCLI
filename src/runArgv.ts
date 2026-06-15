@@ -1,5 +1,6 @@
 import { buildProgram, enableParserThrow, handleParseRejection, applySpecErrors } from "./program.js";
 import { runEmbedded, type EmbeddedCtx } from "./embedded.js";
+import { setCallerTier, resolveCallerTier, getCallerTier } from "./tier.js";
 
 export interface RunArgvOpts {
   token: string;
@@ -30,6 +31,12 @@ export async function runArgv(
   // Mirror bin/ib.ts: resolve each command's CommandSpec errors for hint output.
   program.hook("preAction", (_t, actionCommand) => applySpecErrors(actionCommand));
 
+  // Set the caller's visibility tier from the session token (fail-closed).
+  // The ambient holder is a module-global, so SAVE the prior value and RESTORE
+  // it in `finally` below — otherwise this call leaks its tier into the next.
+  const priorTier = getCallerTier();
+  setCallerTier(resolveCallerTier(opts.token));
+
   const ctx: EmbeddedCtx = {
     token: opts.token,
     endpoint: opts.endpoint,
@@ -41,13 +48,17 @@ export async function runArgv(
     exitCode: null,
   };
 
-  await runEmbedded(ctx, async () => {
-    try {
-      await program.parseAsync(["node", "ib", ...argv]);
-    } catch (err) {
-      handleParseRejection(err, parserText);
-    }
-  });
+  try {
+    await runEmbedded(ctx, async () => {
+      try {
+        await program.parseAsync(["node", "ib", ...argv]);
+      } catch (err) {
+        handleParseRejection(err, parserText);
+      }
+    });
+  } finally {
+    setCallerTier(priorTier);
+  }
 
   return {
     exitCode: ctx.exitCode ?? 0,

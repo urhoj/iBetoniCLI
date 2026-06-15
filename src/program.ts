@@ -49,6 +49,7 @@ import { writeJson, exitWithError, failWith, emitStdout, emitStderr, setActiveCo
 import { getEmbeddedCtx } from "./embedded.js";
 import { createApiClient } from "./api/client.js";
 import { CliError } from "./api/errors.js";
+import { getCallerTier } from "./tier.js";
 
 /**
  * Construct the `ib` program with all subcommands registered and rich
@@ -63,7 +64,7 @@ export function buildProgram(): Command {
   // Domain primer (what betoni.online is + glossary) on the root `--help`, so an
   // AI inspecting top-level help gets the same context `ib reference dump`
   // embeds. Sourced from reference/domain.ts — one source of truth, no drift.
-  program.addHelpText("after", renderDomainHelp());
+  program.addHelpText("after", () => renderDomainHelp(getCallerTier()));
   // Root command list is a table of contents: first sentence only (same
   // truncation formatGroupHelp applies to group listings); the full
   // description stays in each command's `--help`.
@@ -182,7 +183,7 @@ export function buildProgram(): Command {
     )
     .action((domain?: string) => {
       try {
-        runReferenceDump(domain);
+        runReferenceDump(domain, getCallerTier());
       } catch (e) {
         exitWithError(e);
       }
@@ -217,13 +218,16 @@ export function buildProgram(): Command {
             opts.all || domain || opts.mutations || opts.reads || opts.permission !== undefined;
           writeJson(
             wantsFlatList
-              ? buildCommandsList({
-                  domain,
-                  mutations: opts.mutations,
-                  reads: opts.reads,
-                  permission: opts.permission,
-                })
-              : buildDomainIndex()
+              ? buildCommandsList(
+                  {
+                    domain,
+                    mutations: opts.mutations,
+                    reads: opts.reads,
+                    permission: opts.permission,
+                  },
+                  getCallerTier()
+                )
+              : buildDomainIndex(undefined, getCallerTier())
           );
         } catch (e) {
           exitWithError(e);
