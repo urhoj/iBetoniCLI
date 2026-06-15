@@ -1,5 +1,5 @@
 import { test, expect, vi, beforeEach } from "vitest";
-import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate }
+import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, normalizeSentryRef }
   from "../../src/commands/changelog/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -53,4 +53,31 @@ test("update --dry-run never puts", async () => {
   const r = await runChangelogUpdate(client, 7, { status: "Deployed" }, { dryRun: true });
   expect(r).toMatchObject({ dryRun: true, wouldUpdate: { id: 7, patch: { status: "Deployed" } } });
   expect(asPut()).not.toHaveBeenCalled();
+});
+
+test("normalizeSentryRef returns a bare short id unchanged", () => {
+  expect(normalizeSentryRef("PUMINET5API-1A2")).toBe("PUMINET5API-1A2");
+});
+
+test("normalizeSentryRef extracts the short id from a url", () => {
+  expect(normalizeSentryRef("https://sentry.io/issues/?query=PUMINET5API-1A2")).toBe("PUMINET5API-1A2");
+});
+
+test("normalizeSentryRef trims and caps non-matching input at 64 chars", () => {
+  expect(normalizeSentryRef("  weird ref  ")).toBe("weird ref");
+  expect(normalizeSentryRef("x".repeat(80)).length).toBe(64);
+});
+
+test("add posts the entry with sentry link", async () => {
+  asPost().mockResolvedValue({ changelogId: 8 });
+  await runChangelogAdd(client,
+    { type: "bugfix", area: "backend", title: "t", description: "d", entryDate: "2026-06-15", sentryIssue: "PUMINET5API-1A2" }, {});
+  expect(asPost()).toHaveBeenCalledWith("/api/changelog",
+    expect.objectContaining({ sentryIssue: "PUMINET5API-1A2" }), { headers: {} });
+});
+
+test("list maps --sentry to the sentryIssue query param", async () => {
+  asGet().mockResolvedValue([]);
+  await runChangelogList(client, { sentry: "PUMINET5API-1A2" });
+  expect(asGet()).toHaveBeenCalledWith("/api/changelog?sentryIssue=PUMINET5API-1A2");
 });
