@@ -24,6 +24,8 @@ export async function runChangelogAdd(client, body, flags) {
     });
 }
 export async function runChangelogList(client, opts) {
+    if (typeof opts.sentry === "string")
+        opts.sentry = normalizeSentryRef(opts.sentry);
     const p = new URLSearchParams();
     // CLI option key → API query key. The --feedback flag maps to the backend's
     // `feedbackId` filter (controller passes req.query straight to listEntries).
