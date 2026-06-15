@@ -5,6 +5,7 @@ import {
   buildDomainIndex,
   commandDomains,
   assertKnownDomain,
+  fullyHiddenDomains,
 } from "../../src/reference/commandsList.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
 import type { CommandSpec } from "../../src/output/help.js";
@@ -230,6 +231,42 @@ describe("tier filtering — flat list", () => {
   test("default tier is developer (back-compat)", () => {
     const def = buildCommandsList({ domain: "schema" });
     expect(def.count).toBeGreaterThan(0);
+  });
+});
+
+describe("fullyHiddenDomains", () => {
+  test("standard fully hides ai/schema/changelog only", () => {
+    const hidden = fullyHiddenDomains("standard");
+    expect(hidden.has("ai")).toBe(true);
+    expect(hidden.has("schema")).toBe(true);
+    expect(hidden.has("changelog")).toBe(true);
+    // partial / visible domains must NOT be fully hidden
+    expect(hidden.has("feedback")).toBe(false);
+    expect(hidden.has("jerry")).toBe(false);
+    expect(hidden.has("cache")).toBe(false);
+    expect(hidden.has("keikka")).toBe(false);
+  });
+  test("developer hides nothing", () => {
+    expect(fullyHiddenDomains("developer").size).toBe(0);
+  });
+});
+
+describe("assertKnownDomain tier-filtered error list", () => {
+  test("unknown domain error lists only visible domains at standard", () => {
+    let msg = "";
+    try { assertKnownDomain(COMMAND_SPECS, "bogusxyz", "standard"); } catch (e) { msg = (e as Error).message; }
+    expect(msg).toContain("unknown domain: bogusxyz");
+    expect(msg).not.toContain("schema");
+    expect(msg).not.toContain("changelog");
+    expect(msg).toContain("keikka"); // a visible domain is still suggested
+  });
+  test("a hidden-but-valid domain still validates as KNOWN at standard (no throw)", () => {
+    expect(() => assertKnownDomain(COMMAND_SPECS, "schema", "standard")).not.toThrow();
+  });
+  test("developer error lists all domains incl. schema", () => {
+    let msg = "";
+    try { assertKnownDomain(COMMAND_SPECS, "bogusxyz", "developer"); } catch (e) { msg = (e as Error).message; }
+    expect(msg).toContain("schema");
   });
 });
 

@@ -51,7 +51,7 @@ export function buildReference(
 ): ReferenceDump {
   let specs = visibleSpecs(COMMAND_SPECS, tier);
   if (domain) {
-    assertKnownDomain(COMMAND_SPECS, domain);
+    assertKnownDomain(COMMAND_SPECS, domain, tier);
     specs = specs.filter((s) => s.command.split(" ")[1] === domain);
   }
   return {

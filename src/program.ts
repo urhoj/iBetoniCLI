@@ -5,7 +5,7 @@
  * `--help` wiring — is importable by tests without triggering argv parsing.
  * `bin/ib.ts` is now just a thin shell: build, then `parseAsync`.
  */
-import { Command } from "commander";
+import { Command, Help } from "commander";
 import packageJson from "../package.json" with { type: "json" };
 import { addGlobalOptions, getGlobalOptions, type GlobalOptions } from "./globals.js";
 import { defaultCredentialsPath } from "./auth/store.js";
@@ -41,7 +41,7 @@ import { registerHelpCommands } from "./commands/help/index.js";
 import { registerVersionCommand } from "./commands/version/index.js";
 import { registerDoctorCommand } from "./commands/doctor/index.js";
 import { runReferenceDump } from "./reference/dump.js";
-import { buildCommandsList, buildDomainIndex } from "./reference/commandsList.js";
+import { buildCommandsList, buildDomainIndex, fullyHiddenDomains } from "./reference/commandsList.js";
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
@@ -68,8 +68,22 @@ export function buildProgram(): Command {
   // Root command list is a table of contents: first sentence only (same
   // truncation formatGroupHelp applies to group listings); the full
   // description stays in each command's `--help`.
+  // The root command has no CommandSpec, so `attachRichHelp` does not override
+  // its help — Commander's DEFAULT listing renders ALL registered subcommands,
+  // including developer-only groups (ai/schema/changelog) that are hidden at
+  // standard tier. Override `visibleCommands` so fully-hidden SPEC domains drop
+  // from the "Commands:" section at render time. Meta commands (commands,
+  // reference, help, doctor, version, auth) and partial domains are never in
+  // `fullyHiddenDomains`, so they stay; at developer tier the set is empty →
+  // identical to today (no snapshot drift).
   program.configureHelp({
     subcommandDescription: (cmd) => firstSentence(cmd.description()),
+    visibleCommands(cmd) {
+      const hidden = fullyHiddenDomains(getCallerTier());
+      return Help.prototype.visibleCommands
+        .call(this, cmd)
+        .filter((sub) => !hidden.has(sub.name()));
+    },
   });
   addGlobalOptions(program);
 
