@@ -1,7 +1,16 @@
-import { describe, test, expect } from "vitest";
+import { describe, test, expect, vi } from "vitest";
 import { runArgv } from "../src/runArgv.js";
 
 describe("runArgv", () => {
+  test("group --help is captured to ctx.stdout, not leaked to process.stdout", async () => {
+    const spy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+    const r = await runArgv(["keikka", "--help"], { token: "t", endpoint: "http://127.0.0.1:9" });
+    spy.mockRestore();
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("USAGE");
+    expect(r.stdout.length).toBeGreaterThan(100);
+  });
+
   test("offline command (commands) returns JSON on stdout, exit 0, no throw", async () => {
     const r = await runArgv(["commands"], { token: "t", endpoint: "http://127.0.0.1:9" });
     expect(r.exitCode).toBe(0);

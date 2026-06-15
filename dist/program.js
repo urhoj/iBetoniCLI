@@ -43,7 +43,7 @@ import { buildCommandsList, buildDomainIndex } from "./reference/commandsList.js
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
-import { writeJson, exitWithError, failWith, emitStderr, setActiveCommandErrors } from "./output/json.js";
+import { writeJson, exitWithError, failWith, emitStdout, emitStderr, setActiveCommandErrors } from "./output/json.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { createApiClient } from "./api/client.js";
 import { CliError } from "./api/errors.js";
@@ -235,6 +235,13 @@ export function enableParserThrow(program) {
     const output = {
         writeErr: (s) => {
             captured += s;
+        },
+        // Commander writes --help / --version display through writeOut. Route it
+        // through the ctx-aware emitStdout so in-process (embedded) `ib … --help`
+        // is captured into ctx.stdout instead of leaking to the real stdout. In
+        // normal CLI mode emitStdout falls back to process.stdout — unchanged.
+        writeOut: (s) => {
+            emitStdout(s);
         },
     };
     const walk = (cmd) => {
