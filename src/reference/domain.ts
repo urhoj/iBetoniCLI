@@ -139,7 +139,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   {
     term: "validate",
     definition:
-      "Company-setup validation profiles: jerry (BetoniJerry provider readiness) and betoni (betoni.online customer setup) — per-company pass/fail checklists with Finnish details.",
+      "Validation profiles run as `ib validate`: company profiles (jerry = BetoniJerry provider readiness, betoni = betoni.online customer setup) and the person profile onboarding (is one employee ready to work — työsuhteessa, role, contact, role-required modules). Pass/fail/skip checklists with Finnish details.",
   },
   {
     term: "legal",

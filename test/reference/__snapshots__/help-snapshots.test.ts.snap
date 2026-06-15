@@ -1502,41 +1502,33 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib company validate matches snapshot 1`] = `
 "USAGE
-  ib company validate [<profile>] [flags]
+  ib company validate [flags]
 
 DESCRIPTION
-  Run a company-setup validation profile — a pass/fail checklist with Finnish details naming what is missing. Profiles: jerry (BetoniJerry provider readiness), betoni (betoni.online customer base setup). Omit the profile (or use 'list') to list available profiles. GET /api/validation/:profile/:asiakasId.
-  Permissions: requires system admin OR admin-tier role in the target company.
-
-ARGUMENTS
-  <profile> STRING    Profile id (jerry | betoni). Omit or 'list' to list profiles. (optional)
+  Renamed to the top-level \`ib validate\` (clean break). This path now exits 4 with a hint. Use \`ib validate --asiakas <id> --profile <p>\` (company) or \`ib validate --asiakas <id> --person <id>\` (employee).
+  Permissions: requires none (always errors).
 
 FLAGS
-  --asiakas NUMBER    Target asiakasId (default: active company)
+  (none)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  No profile: ListEnvelope<{ id, titleFi, description }>. With profile: { profile, asiakasId, asiakasNimi, ok, summary:{required,recommended,optional?}, checks:[{ id, severity:'required'|'recommended'|'optional', status:'pass'|'fail', titleFi, detail? }] }
+  (none — always an error envelope)
 
 ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not an admin of the target company → use an admin token or validate your own company
-  exit 5 (HTTP 404)  Unknown profile or company → run \`ib company validate\` to list profiles
+  exit 4  'ib company validate' was renamed to 'ib validate' → use \`ib validate --asiakas <id> --profile <p>\` (company) or \`ib validate --asiakas <id> --person <id>\` (employee)
 
 NOTES
-  - ok = every 'required' check passes; recommended/optional failures do not flip it.
-  - Exit code is 0 even when ok:false — the JSON carries the outcome.
-  - Deploy-gated: returns 404 until /api/validation is deployed.
+  - Clean-break rename (mirrors the ib changes→ib log rename). The command is hidden and only emits the rename hint.
 
 SEE ALSO
-  ib jerry admin detail, ib customer modules
+  ib validate list
 
 EXAMPLES
-  ib company validate
-  ib company validate jerry --asiakas 8
-  ib company validate betoni
+  ib validate list
+  ib validate --asiakas 8 --profile betoni
 "
 `;
 
@@ -6743,6 +6735,49 @@ EXAMPLES
   ib stats --month 2026-06
   ib stats --from 2026-06-01 --to 2026-06-07 --by driver
   ib stats --today --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib validate list matches snapshot 1`] = `
+"USAGE
+  ib validate list [flags]
+
+DESCRIPTION
+  List the validation profiles, each tagged with its entity — company profiles (jerry = BetoniJerry provider readiness, betoni = betoni.online customer setup) and the person profile onboarding (is one employee ready to work). Run a profile via \`ib validate --asiakas <id> --profile <p>\` (company) or \`ib validate --asiakas <id> --person <id>\` (person; profile defaults to onboarding). GET /api/validation/profiles.
+  Permissions: requires any authenticated user (running a profile additionally needs admin/HR — see notes).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ id, titleFi, description, entity:'company'|'person' }>. Running a company profile returns { entity:'company', profile, asiakasId, asiakasNimi, ok, summary, checks[] }; a person profile returns { entity:'person', profile, asiakasId, asiakasNimi, personId, personNimi, ok, summary, checks:[{ id, severity, status:'pass'|'fail'|'skip', titleFi, detail? }] }.
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not an admin/HR of the target company (when running a profile) → use an admin/HR token
+  exit 5 (HTTP 404)  Unknown profile for that entity, or company/person not found → run \`ib validate list\` to see profiles
+  exit 4  Missing --profile for company validation, or a non-positive --asiakas/--person → pass --profile (jerry|betoni) for a company, or a positive --asiakas/--person; run \`ib validate list\`
+
+NOTES
+  - Run a profile via the bare \`ib validate\` command: --asiakas <id> (default: active company), --person <id> (switches to person validation), --profile <p> (company: jerry|betoni required; person: onboarding default).
+  - Company validation: system admin OR admin-tier role in the target (or owner) company. Person validation: the above OR HR admin (typeId 24) of the target company.
+  - ok = every applicable 'required' check passes; skipped checks (conditional, not applicable) and recommended/optional never flip it.
+  - status 'skip' = the check did not apply (e.g. Ajoneuvot-moduuli only checked for pumppari); excluded from summary counts.
+  - Exit code is 0 even when ok:false — the JSON carries the outcome.
+  - Deploy-gated: returns 404 until /api/validation is deployed.
+  - 'ib company validate' was renamed to \`ib validate\` (exit 4 on the old path).
+
+SEE ALSO
+  ib person get, ib customer modules, ib jerry admin detail
+
+EXAMPLES
+  ib validate list
+  ib validate --asiakas 8 --profile betoni
+  ib validate --asiakas 8 --person 10
+  ib validate --person 10 --profile onboarding
 "
 `;
 
