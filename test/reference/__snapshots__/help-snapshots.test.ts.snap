@@ -5,7 +5,7 @@ exports[`Help snapshots — contract stability > help for ib ai conversation mat
   ib ai conversation <conversationId> [flags]
 
 DESCRIPTION
-  Fetch the FULL transcript of an /ai assistant conversation by id. Developer-only (isSystemAdmin / isDeveloper) and CROSS-TENANT — reads any tenant's conversation, because the id comes from an \`ib feedback\` row's context.conversationId (stamped automatically when the AI files feedback from the /ai page). Transcripts may contain customer PII.
+  Fetch the full transcript of an /ai assistant conversation by id (gptConversations/gptMessages). Developer/sysadmin tooling. The id originates from an \`ib feedback\` row's context.conversationId, stamped automatically when the AI files feedback from the /ai page.
   Permissions: requires isSystemAdmin or isDeveloper.
 
 ARGUMENTS
@@ -1270,6 +1270,7 @@ OUTPUT (JSON, stdout)
   entry
 
 ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Developer only         → dev token
   exit 5 (HTTP 404)  Not found              → ib changelog list
 
 EXAMPLES
@@ -2528,7 +2529,7 @@ exports[`Help snapshots — contract stability > help for ib feedback list match
   ib feedback list [flags]
 
 DESCRIPTION
-  List filed feedback for triage. Developer-only (isSystemAdmin / isDeveloper); global across tenants. Newest first, paginated (default 50, cap 200).
+  List filed feedback for triage. Developer-only (isSystemAdmin / isDeveloper). Newest first, paginated (default 50, cap 200).
   Permissions: requires isSystemAdmin or isDeveloper.
 
 FLAGS
@@ -5070,7 +5071,7 @@ exports[`Help snapshots — contract stability > help for ib message support inb
   ib message support inbox [flags]
 
 DESCRIPTION
-  Support triage queue: support threads escalated by operators, newest first. Developer-only (isSystemAdmin / isDeveloper); global across tenants. Filter by lifecycle status. Projects GET /api/messages/support/inbox into the list envelope.
+  Support triage queue: support threads escalated by operators, newest first. Developer-only (isSystemAdmin / isDeveloper). Filter by lifecycle status. Projects GET /api/messages/support/inbox into the list envelope.
   Permissions: requires isSystemAdmin or isDeveloper.
 
 FLAGS
@@ -6008,7 +6009,7 @@ exports[`Help snapshots — contract stability > help for ib schema dump matches
   ib schema dump [flags]
 
 DESCRIPTION
-  Structural map of the whole dbo schema — all tables with column names and types, FK edges, view names, and proc signatures. No proc/view bodies (use \`schema proc\`/\`schema view\` for those). Developer-only.
+  Whole-schema structural map of the dbo schema (developer-gated, read-only) — all tables with column names and types, FK edges, view names, and proc signatures. No proc/view bodies (use \`schema proc\`/\`schema view\` for those).
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
 
 FLAGS

@@ -1,6 +1,6 @@
 import { describe, test, expect, vi } from "vitest";
 import { runEmbedded, type EmbeddedCtx } from "../../src/embedded.js";
-import { writeJson, writeError, exitWithError, setOutputMode, setExitCode } from "../../src/output/json.js";
+import { writeJson, exitWithError, setExitCode } from "../../src/output/json.js";
 import { CliError } from "../../src/api/errors.js";
 import { runReferenceDump } from "../../src/reference/dump.js";
 
