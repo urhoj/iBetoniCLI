@@ -1,5 +1,6 @@
 import { describe, test, expect, vi } from "vitest";
 import { buildReference, runReferenceDump } from "../../src/reference/dump.js";
+import { COMMAND_SPECS } from "../../src/reference/specs.js";
 
 describe("ib reference dump", () => {
   test("returns a version string + non-empty commands map", () => {
@@ -103,5 +104,17 @@ describe("reference dump tier filtering", () => {
     const stdDomain = buildReference("keikka", "standard");
     expect(stdDomain.glossary).toEqual(std.glossary);
     expect(stdDomain.glossary.some((g) => g.term.startsWith("ai /"))).toBe(false);
+  });
+});
+
+describe("reference dump leaks no hidden command path (notes/seeAlso/examples)", () => {
+  test("standard dump JSON contains NO hidden command path anywhere", () => {
+    const std = JSON.stringify(buildReference(undefined, "standard"));
+    const hidden = COMMAND_SPECS.filter((s) => s.tier === "developer").map((s) => s.command);
+    for (const h of hidden) expect(std).not.toContain(h);
+  });
+  test("developer dump still contains the cross-references (parity, not over-scrubbed)", () => {
+    const dev = JSON.stringify(buildReference(undefined, "developer"));
+    expect(dev).toContain("ib ai conversation"); // present for developers
   });
 });
