@@ -3935,7 +3935,6 @@ export const COMMAND_SPECS: CommandSpec[] = [
         command: "ib cache invalidate",
         description: "Invalidate cache for one entity family by domain identifier (no Redis key knowledge needed). Previews (X-Dry-Run) unless --confirm. --cascade fans out to related families (keikka only). Any admin; non-developers are scoped to their own company. Guard: refuses deployed endpoints unless --force-prod (all slots share Redis DB 3).",
         permissions: ADMIN_PERMS,
-        tier: "developer",
         mutates: true,
         args: [{ name: "entityType", type: "string", description: "Entity family, e.g. keikka/asiakas/vehicle (see `ib cache entities`)" }],
         flags: [

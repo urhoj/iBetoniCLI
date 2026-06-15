@@ -18,7 +18,6 @@ describe("tier tagging", () => {
     "ib feedback resolve",
     "ib cache stats",
     "ib cache keys",
-    "ib cache invalidate",
     "ib cache clear",
     "ib cache pattern",
     "ib bug admin update",
@@ -43,6 +42,7 @@ describe("tier tagging", () => {
   // Per-tenant company-admin OR open — MUST stay visible (untagged).
   const MUST_NOT_BE_DEVELOPER = [
     "ib feedback create",
+    "ib cache invalidate",
     "ib customer modules",
     "ib customer operator",
     "ib customer settings",
