@@ -3736,6 +3736,7 @@ ARGUMENTS
 
 FLAGS
   --type STRING    Diff newest DRAFT vs current ACTIVE of this type (instead of <a> <b>)
+  --owner NUMBER    ownerAsiakasId scope for --type resolution (1349 = BetoniJerry); only valid with --type
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -3744,7 +3745,7 @@ OUTPUT (JSON, stdout)
   {a: {documentId, typeName, version, status, contentLength}, b: {...}, sameContent, addedLines, removedLines, unified}
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Neither two documentIds nor --type supplied (or both) → pass <a> <b> OR --type <name>
+  exit 4  Neither two documentIds nor --type supplied (or both), or --owner without --type → pass <a> <b> OR --type <name>
   exit 5 (HTTP 404)  documentId / type's draft or active not found → check ib legal versions <typeName>
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -3755,6 +3756,7 @@ SEE ALSO
 EXAMPLES
   ib legal diff 4 38
   ib legal diff --type TOS
+  ib legal diff --type BETONIJERRY_TOS --owner 1349
 "
 `;
 
@@ -3805,7 +3807,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  {documentId, documentTypeId, typeName, version, title, markdownContent, isActive, ...}
+  {documentId, documentTypeId, typeName, version, title, status, markdownContent, isActive, ...}
 
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Document not found     → list ids via ib legal versions <typeName>
@@ -3838,7 +3840,7 @@ FLAGS
   --owner NUMBER    ownerAsiakasId tenant scope (1349 = BetoniJerry); omit for global
   --notes STRING    Internal notes
   --effective-date DATE    Effective date YYYY-MM-DD (default: now)
-  --activate BOOLEAN    Publish immediately (deactivates prior versions). Default: inactive draft
+  --activate BOOLEAN    Publish immediately (archives the prior active version). Default: inactive draft
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.

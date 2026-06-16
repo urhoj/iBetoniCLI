@@ -26,6 +26,21 @@ describe("lineDiff", () => {
     expect(d).toMatchObject({ addedLines: 1, removedLines: 0, sameContent: false });
   });
 
+  test("ignores a sole trailing newline (no spurious empty ± line)", () => {
+    // "x\n" vs "x" must read as identical, not as a removed/added empty line.
+    expect(lineDiff("a\nb\n", "a\nb")).toEqual({
+      addedLines: 0,
+      removedLines: 0,
+      sameContent: true,
+      unified: "",
+    });
+    expect(lineDiff("a\nb", "a\nb\n")).toMatchObject({ sameContent: true });
+    // A real trailing-line difference (blank line in the middle) is still shown.
+    const d = lineDiff("a\nb", "a\n\nb");
+    expect(d.sameContent).toBe(false);
+    expect(d.addedLines).toBe(1);
+  });
+
   test("collapses long unchanged runs into a marker", () => {
     const base = Array.from({ length: 40 }, (_, i) => `line${i}`).join("\n");
     const d = lineDiff(base, `${base}\nNEW`);

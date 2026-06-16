@@ -17,7 +17,7 @@ export interface LineDiff {
   addedLines: number;
   /** Lines present in `a` but not `b`. */
   removedLines: number;
-  /** True when the two inputs are byte-identical (no diff to read). */
+  /** True when the two inputs are identical, ignoring a sole trailing newline. */
   sameContent: boolean;
   /** Unified-style diff text (`+`/`-`/` ` prefixes, collapsed context). Empty when identical. */
   unified: string;
@@ -65,9 +65,14 @@ const CONTEXT = 3;
  * @param b New text.
  */
 export function lineDiff(a: string, b: string): LineDiff {
-  if (a === b) return { addedLines: 0, removedLines: 0, sameContent: true, unified: "" };
+  // Ignore a sole trailing newline: "x\n" vs "x" is not a meaningful legal-text
+  // change, and split("\n") would otherwise emit a spurious empty ± line and
+  // skew the counts. Internal line endings are left untouched.
+  const aTrim = a.replace(/\r?\n$/, "");
+  const bTrim = b.replace(/\r?\n$/, "");
+  if (aTrim === bTrim) return { addedLines: 0, removedLines: 0, sameContent: true, unified: "" };
 
-  const ops = lcsOps(a.split("\n"), b.split("\n"));
+  const ops = lcsOps(aTrim.split("\n"), bTrim.split("\n"));
   const addedLines = ops.filter((o) => o.kind === "+").length;
   const removedLines = ops.filter((o) => o.kind === "-").length;
 

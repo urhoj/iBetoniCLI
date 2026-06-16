@@ -55,11 +55,12 @@ const stripContent = (d: Row): Row => {
   return rest;
 };
 
+/** markdownContent length (0 when absent) — shared by the *-meta projections. */
+const contentLengthOf = (d: Row): number =>
+  typeof d.markdownContent === "string" ? d.markdownContent.length : 0;
+
 /** Strip content but report its length — the per-side meta used by `ib legal diff`. */
-const diffMeta = (d: Row): Row => {
-  const len = typeof d.markdownContent === "string" ? d.markdownContent.length : 0;
-  return { ...stripContent(d), contentLength: len };
-};
+const diffMeta = (d: Row): Row => ({ ...stripContent(d), contentLength: contentLengthOf(d) });
 
 export async function runLegalTypes(client: ApiClient): Promise<ListEnvelope<LegalDocType>> {
   const rows = await client.get<LegalDocType[]>("/api/legal-documents/types");
@@ -75,11 +76,7 @@ export async function runLegalShow(
   const doc = await client.get<Row>(
     `/api/legal-documents/current/${encodeURIComponent(typeName)}`
   );
-  if (metaOnly && doc && typeof doc === "object") {
-    const len =
-      typeof doc.markdownContent === "string" ? doc.markdownContent.length : 0;
-    return { ...stripContent(doc), contentLength: len };
-  }
+  if (metaOnly && doc && typeof doc === "object") return diffMeta(doc);
   return doc;
 }
 
@@ -105,8 +102,6 @@ export async function runLegalActive(client: ApiClient): Promise<ListEnvelope<Ro
         const doc = await client.get<Row>(
           `/api/legal-documents/current/${encodeURIComponent(t.typeName)}`
         );
-        const len =
-          typeof doc.markdownContent === "string" ? doc.markdownContent.length : 0;
         return {
           ...base,
           hasActive: true,
@@ -114,7 +109,7 @@ export async function runLegalActive(client: ApiClient): Promise<ListEnvelope<Ro
           version: doc.version ?? null,
           title: doc.title ?? null,
           effectiveDate: doc.effectiveDate ?? null,
-          contentLength: len,
+          contentLength: contentLengthOf(doc),
         };
       } catch (e) {
         // 404 = this type has no active document; any other status is a real error.
@@ -202,8 +197,10 @@ export async function runLegalGet(client: ApiClient, documentId: number): Promis
 /**
  * Line diff between two document versions. Two modes:
  *  - explicit `{ a, b }` documentIds — diff a (old) vs b (new);
- *  - `{ type }` — resolve the type's current ACTIVE (old) vs its newest DRAFT
- *    (new), i.e. "what would change if I publish the pending draft".
+ *  - `{ type, owner? }` — resolve the type's current ACTIVE (old) vs its newest
+ *    DRAFT (new), i.e. "what would change if I publish the pending draft".
+ *    `owner` scopes the version lookup to one tenant so a global active and a
+ *    tenant-specific draft of the same type are not diffed across scopes.
  *
  * Computes the diff locally and returns only the changed hunks + counts, so the
  * two full bodies never enter the caller's context. The action validates that
@@ -211,12 +208,12 @@ export async function runLegalGet(client: ApiClient, documentId: number): Promis
  */
 export async function runLegalDiff(
   client: ApiClient,
-  input: { a: number; b: number } | { type: string }
+  input: { a: number; b: number } | { type: string; owner?: number }
 ): Promise<Row> {
   let docA: Row;
   let docB: Row;
   if ("type" in input) {
-    const versions = await runLegalVersions(client, input.type);
+    const versions = await runLegalVersions(client, input.type, input.owner);
     const active = versions.items.find((r) => r.status === "active");
     const draft = versions.items.find((r) => r.status === "draft"); // newest first (createdTime DESC)
     if (!active) {
@@ -537,15 +534,17 @@ export function registerLegalCommands(
     .command("diff [a] [b]")
     .description("Line diff: two documentIds (<a> old, <b> new), or --type (newest draft vs active)")
     .option("--type <typeName>", "Diff the newest DRAFT vs the current ACTIVE version of this type")
-    .action(async (aStr: string | undefined, bStr: string | undefined, opts: { type?: string }) => {
+    .option("--owner <id>", "ownerAsiakasId scope for --type resolution (e.g. 1349 = BetoniJerry)", Number)
+    .action(async (aStr: string | undefined, bStr: string | undefined, opts: { type?: string; owner?: number }) => {
       try {
-        let input: { a: number; b: number } | { type: string };
+        let input: { a: number; b: number } | { type: string; owner?: number };
         if (opts.type) {
           if (aStr !== undefined || bStr !== undefined) {
             failWith("pass either <a> <b> documentIds OR --type <name>, not both", 4);
           }
-          input = { type: opts.type };
+          input = { type: opts.type, owner: opts.owner };
         } else {
+          if (opts.owner !== undefined) failWith("--owner only applies with --type", 4);
           const a = Number(aStr);
           const b = Number(bStr);
           if (!Number.isInteger(a) || a <= 0 || !Number.isInteger(b) || b <= 0) {
@@ -643,7 +642,7 @@ export function registerLegalCommands(
 
   const activateCmd = legal
     .command("activate <documentId>")
-    .description("Publish a version: atomically deactivates siblings, activates this one");
+    .description("Publish a version: atomically archives the current active, activates this one");
   addWriteFlagsToCommand(activateCmd).action(
     async (documentIdStr: string, opts: { dryRun?: boolean; reason?: string; idempotencyKey?: string }) => {
       const documentId = Number(documentIdStr);

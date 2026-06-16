@@ -53,9 +53,14 @@ const CONTEXT = 3;
  * @param b New text.
  */
 export function lineDiff(a, b) {
-    if (a === b)
+    // Ignore a sole trailing newline: "x\n" vs "x" is not a meaningful legal-text
+    // change, and split("\n") would otherwise emit a spurious empty ± line and
+    // skew the counts. Internal line endings are left untouched.
+    const aTrim = a.replace(/\r?\n$/, "");
+    const bTrim = b.replace(/\r?\n$/, "");
+    if (aTrim === bTrim)
         return { addedLines: 0, removedLines: 0, sameContent: true, unified: "" };
-    const ops = lcsOps(a.split("\n"), b.split("\n"));
+    const ops = lcsOps(aTrim.split("\n"), bTrim.split("\n"));
     const addedLines = ops.filter((o) => o.kind === "+").length;
     const removedLines = ops.filter((o) => o.kind === "-").length;
     // Collapse runs of unchanged lines longer than 2*CONTEXT down to a head +

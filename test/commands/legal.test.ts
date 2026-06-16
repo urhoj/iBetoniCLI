@@ -204,6 +204,22 @@ describe("ib legal reads", () => {
     expect(out.b).toMatchObject({ documentId: 50 });
   });
 
+  test("diff --type with owner scopes the version lookup to that tenant", async () => {
+    const c = mockClient();
+    (c.get as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce([
+        { documentId: 70, status: "draft" },
+        { documentId: 36, status: "active" },
+      ]) // /BETONIJERRY_TOS/versions?ownerAsiakasId=1349
+      .mockResolvedValueOnce({ documentId: 36, markdownContent: "old" })
+      .mockResolvedValueOnce({ documentId: 70, markdownContent: "new" });
+    await runLegalDiff(c, { type: "BETONIJERRY_TOS", owner: 1349 });
+    expect(c.get).toHaveBeenNthCalledWith(
+      1,
+      "/api/legal-documents/BETONIJERRY_TOS/versions?ownerAsiakasId=1349"
+    );
+  });
+
   test("diff --type with no draft -> exit 5", async () => {
     const c = mockClient();
     (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([{ documentId: 38, status: "active" }]);

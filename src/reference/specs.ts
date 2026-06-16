@@ -2390,7 +2390,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "documentId", type: "number", description: "legalDocuments.documentId" }],
     flags: [],
     outputShape:
-      "{documentId, documentTypeId, typeName, version, title, markdownContent, isActive, ...}",
+      "{documentId, documentTypeId, typeName, version, title, status, markdownContent, isActive, ...}",
     errors: [
       apiErr(404, "Document not found", "list ids via ib legal versions <typeName>"),
       ...COMMON_AUTH_ERRORS,
@@ -2409,16 +2409,17 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     flags: [
       { name: "type", type: "string", description: "Diff newest DRAFT vs current ACTIVE of this type (instead of <a> <b>)" },
+      { name: "owner", type: "number", description: "ownerAsiakasId scope for --type resolution (1349 = BetoniJerry); only valid with --type" },
     ],
     outputShape:
       "{a: {documentId, typeName, version, status, contentLength}, b: {...}, sameContent, addedLines, removedLines, unified}",
     errors: [
-      { exit: 4, meaning: "Neither two documentIds nor --type supplied (or both)", remedy: "pass <a> <b> OR --type <name>" },
+      { exit: 4, meaning: "Neither two documentIds nor --type supplied (or both), or --owner without --type", remedy: "pass <a> <b> OR --type <name>" },
       apiErr(404, "documentId / type's draft or active not found", "check ib legal versions <typeName>"),
       ...COMMON_AUTH_ERRORS,
     ],
     seeAlso: ["ib legal versions", "ib legal drafts", "ib legal get"],
-    examples: ["ib legal diff 4 38", "ib legal diff --type TOS"],
+    examples: ["ib legal diff 4 38", "ib legal diff --type TOS", "ib legal diff --type BETONIJERRY_TOS --owner 1349"],
   },
   {
     command: "ib legal save",
@@ -2435,7 +2436,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "owner", type: "number", description: "ownerAsiakasId tenant scope (1349 = BetoniJerry); omit for global" },
       { name: "notes", type: "string", description: "Internal notes" },
       { name: "effective-date", type: "date", description: "Effective date YYYY-MM-DD (default: now)" },
-      { name: "activate", type: "boolean", description: "Publish immediately (deactivates prior versions). Default: inactive draft" },
+      { name: "activate", type: "boolean", description: "Publish immediately (archives the prior active version). Default: inactive draft" },
     ],
     writeFlags: true,
     mutates: true,
