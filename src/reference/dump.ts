@@ -93,7 +93,14 @@ export function buildReference(
     feedbackGuidance: FEEDBACK_GUIDANCE,
     topics: TOPICS,
     commands: Object.fromEntries(
-      specs.map((spec) => [spec.command, scrubSpecForTier(spec, tier, hiddenCommands)])
+      specs.map((spec) => {
+        // `detail` is on-demand only (ib reference detail / --help AI NOTES) — never
+        // in the dump, so one-shot ingestion stays lean. Strip without mutating the
+        // shared COMMAND_SPECS object.
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { detail: _detail, ...rest } = scrubSpecForTier(spec, tier, hiddenCommands);
+        return [spec.command, rest];
+      })
     ),
   };
 }
