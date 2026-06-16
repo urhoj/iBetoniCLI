@@ -62,6 +62,16 @@ export interface CommandSpec {
   command: string;
   /** One-paragraph description of what the command does. */
   description: string;
+  /**
+   * Short (~≤80 char) catalog blurb consumed ONLY by the AI-chat command
+   * catalog (puminet5api `ibCatalog.js`, which picks `summary` over the
+   * `description` first line) to cut the re-billed system-prompt prefix on
+   * no-cache LLM providers. `--help` and `ib reference dump` keep the full
+   * `description`. Populated out-of-band from `src/reference/summaries.ts`
+   * (merged onto COMMAND_SPECS), not hand-set per literal. Absent → consumers
+   * fall back to `description`.
+   */
+  summary?: string;
   /** Backend permission strings (e.g. `auth.page.grid.tilaus.read`). */
   permissions?: string[];
   /**

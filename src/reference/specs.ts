@@ -24,6 +24,7 @@ import { exitCodeFromStatus } from "../api/errors.js";
 import { MESSAGE_DAILY_SPECS } from "../commands/message/daily/index.js";
 import { MESSAGE_BOARD_SPECS } from "../commands/message/board/index.js";
 import { CHANGELOG_SPECS } from "../commands/changelog/index.js";
+import { COMMAND_SUMMARIES } from "./summaries.js";
 
 /** API error row: derive the exit code from the HTTP status. */
 const apiErr = (http: number, meaning: string, remedy: string): CommandError => ({
@@ -78,7 +79,7 @@ const LEGAL_DEV_ERRORS: CommandError[] = [
   apiErr(500, "Backend error", "retry with --verbose"),
 ];
 
-export const COMMAND_SPECS: CommandSpec[] = [
+const BASE_COMMAND_SPECS: CommandSpec[] = [
   // ─── attachment (12) ─────────────────────────────────────────────────────
   {
     command: "ib attachment list",
@@ -4400,3 +4401,16 @@ export const COMMAND_SPECS: CommandSpec[] = [
   // ─── changelog ───────────────────────────────────────────────────────────────
   ...CHANGELOG_SPECS,
 ];
+
+/**
+ * The canonical catalogue, with curated AI-catalog `summary` blurbs merged on
+ * from `./summaries.ts` (keyed by full command path). Only the AI-chat catalog
+ * reads `summary`; `--help` and `ib reference dump` still render the full
+ * `description`. Keeping summaries out-of-band leaves the spec literals above
+ * untouched. `test/reference/summaries.test.ts` enforces that every summary key
+ * matches a real command (no orphans).
+ */
+export const COMMAND_SPECS: CommandSpec[] = BASE_COMMAND_SPECS.map((spec) => {
+  const summary = COMMAND_SUMMARIES[spec.command];
+  return summary ? { ...spec, summary } : spec;
+});
