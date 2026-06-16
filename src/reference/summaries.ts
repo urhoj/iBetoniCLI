@@ -19,10 +19,10 @@
  *  - keep the discriminating essence: verb + object + the gate/scope that
  *    decides between siblings (e.g. CUSTOMER vs PROVIDER side, developer-only,
  *    LOCAL-only, weather module). Flags/detail live in `--help`.
- *  - aim ≤ ~120 chars; spend the budget on the non-obvious "hook" (gotcha,
- *    "tool for X" routing cue, scope quirk), NOT a name restatement. Deeper
- *    business context goes in the detail tier (details.ts), not here. The test
- *    caps at MAX_SUMMARY_LEN (160).
+ *  - keep it tight but USE the budget: hard cap MAX_SUMMARY_LEN = 160 (the test
+ *    enforces ≤160 AND shorter-than-description). Spend it on the non-obvious
+ *    "hook" (gotcha, "tool for X" routing cue, scope quirk), NOT a name
+ *    restatement. Deeper business context goes in the detail tier (details.ts).
  *  - a few behavioural directives the proposal called out by name are kept
  *    verbatim-in-spirit even if slightly longer (feedback create's PROACTIVE
  *    filing; person create's --global / --get-or-create).
