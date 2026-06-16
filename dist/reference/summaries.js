@@ -123,7 +123,7 @@ export const COMMAND_SUMMARIES = {
     "ib keikka drivers assign": "Assign the default driver to a keikka (backend picks the driver).",
     "ib keikka get": "Get one keikka by id with customer/worksite/vehicle/driver projections.",
     "ib keikka latest": "The single most recent keikka matching the filters (no date range).",
-    "ib keikka list": "List keikkas (delivery orders) for the active company in a date range.",
+    "ib keikka list": "Date-windowed keikka list; --from/--to both default to today; dedupe by keikkaId (multi-worksite fan-out repeats rows).",
     "ib keikka log": "Change-tracker audit trail for one keikka (folds in keikkaBetoni rows).",
     "ib keikka search": "Search keikkas by phone / id / worksite / invoice ref. Newest first.",
     "ib keikka update": "Update a keikka; v1.0 supports only --status (numeric keikkaTilaId).",
@@ -210,7 +210,7 @@ export const COMMAND_SUMMARIES = {
     "ib sijainti types": "List sijainti type categories (the 'Sijainnin laji' lookup).",
     "ib sijainti update": "Update a sijainti (--id or in --body; typed flags win).",
     // ── stats ─────────────────────────────────────────────────────────────────
-    "ib stats": "Aggregated delivery stats for a date range (m³, counts, breakdowns).",
+    "ib stats": "Delivery aggregates (m³, orders); --by customer|vehicle|driver|worksite|status|day; visibility-scoped; byDriver m³ double-counts on multi-driver keikkas.",
     // ── validate ────────────────────────────────────────────────────────────────
     "ib validate": "Validate a company OR an employee against a profile (pass/fail/skip).",
     // ── vehicle ───────────────────────────────────────────────────────────────
@@ -241,7 +241,7 @@ export const COMMAND_SUMMARIES = {
     "ib worksite list": "List worksites visible to the active company.",
     "ib worksite log": "Change-tracker audit trail for one worksite (field history).",
     "ib worksite metrics": "Volume / keikka-count metrics for a worksite.",
-    "ib worksite search": "Free-text worksite search (name/address/contact/etc.). Scoped to the active company.",
+    "ib worksite search": "Matches all 4 address lines + contact name/phone/email, so a partial street finds the worksite. Safe under --read-only (POST sent as a read, not a write).",
     "ib worksite update": "Update a worksite (POST /api/tyomaa/set).",
 };
 //# sourceMappingURL=summaries.js.map
