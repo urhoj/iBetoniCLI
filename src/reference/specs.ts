@@ -25,6 +25,7 @@ import { MESSAGE_DAILY_SPECS } from "../commands/message/daily/index.js";
 import { MESSAGE_BOARD_SPECS } from "../commands/message/board/index.js";
 import { CHANGELOG_SPECS } from "../commands/changelog/index.js";
 import { COMMAND_SUMMARIES } from "./summaries.js";
+import { COMMAND_DETAILS } from "./details.js";
 
 /** API error row: derive the exit code from the HTTP status. */
 const apiErr = (http: number, meaning: string, remedy: string): CommandError => ({
@@ -4412,5 +4413,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
  */
 export const COMMAND_SPECS: CommandSpec[] = BASE_COMMAND_SPECS.map((spec) => {
   const summary = COMMAND_SUMMARIES[spec.command];
-  return summary ? { ...spec, summary } : spec;
+  const detail = COMMAND_DETAILS[spec.command];
+  if (!summary && !detail) return spec;
+  return {
+    ...spec,
+    ...(summary ? { summary } : {}),
+    ...(detail ? { detail } : {}),
+  };
 });

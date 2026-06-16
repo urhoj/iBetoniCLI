@@ -72,6 +72,16 @@ export interface CommandSpec {
    * fall back to `description`.
    */
   summary?: string;
+  /**
+   * Longer-form, on-demand business/AI context (a few short paragraphs, markdown;
+   * curation soft target ~1500 chars, hard test bound MAX_DETAIL_LEN). Surfaced
+   * ONLY by `ib reference detail <cmd>` and the
+   * `AI NOTES` section of `ib <cmd> --help`. Deliberately STRIPPED from
+   * `ib reference dump` and absent from the always-loaded catalog, so it never
+   * re-bloats one-shot ingestion. Populated out-of-band from
+   * `src/reference/details.ts`. The AI pulls it to verify claims / get domain context.
+   */
+  detail?: string;
   /** Backend permission strings (e.g. `auth.page.grid.tilaus.read`). */
   permissions?: string[];
   /**
