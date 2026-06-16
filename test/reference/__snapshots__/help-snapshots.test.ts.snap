@@ -2820,6 +2820,15 @@ NOTES
 EXAMPLES
   ib jerry check-address --address 'Mannerheimintie 1, Helsinki'
   ib jerry check-address --address 'Hämeenkatu 1, Tampere' --lat 61.498 --lng 23.761 --place-id ChIJxxxx
+
+AI NOTES (business context)
+  BetoniJerry = RFQ marketplace for concrete pumping: a customer posts a tarjouspyyntö (pumppuRequest), provider companies bid (pumppuOffer), the winner is confirmed into a keikka. 'No offers' is the classic failure — no provider varikko (depot) geofence-covers the address.
+
+  \`check-address\` is the diagnostic: it runs the same geofence feasibility probe the public request flow uses (POST /api/pumppuRequests/checkAddress — the route is unauthenticated, but ib sends your session). --address is required; if you also pass --lat/--lng/--place-id the server trusts them instead of re-geocoding. Rate-limited 10/min per IP.
+
+  The \`providers\` array (which varikot cover the point) is returned only to developer/admin tokens. Use it to explain a 'no offers' result: either no depot's delivery radius reaches the address, or no covering provider is Jerry-enrolled (sijainti.jerryActiveUntil).
+
+  If this is wrong/misleading/incomplete, file: ib feedback create --scope cli --command "reference detail jerry check-address" -- "<what is off>"
 "
 `;
 
@@ -3324,6 +3333,15 @@ EXAMPLES
   ib keikka latest
   ib keikka latest --status 9
   ib keikka latest --customer 1349 --lookback 730
+
+AI NOTES (business context)
+  Keikka = yksi betonin toimitus-/pumppauskeikka — the central delivery/pump job. 'Latest' answers the dispatcher's recurring 'when did we last deliver/pump for X?' without guessing a date range: it searches backwards from today over the same filters as \`ib keikka list\`.
+
+  Reading 'delivered' correctly depends on keikkaTilaId: 9/12/13 = Toimitettu (delivered), 100 = Valmis (closed); -1/0 = Uusi/Luonnos (not real yet). To get the last DELIVERED order, filter by a delivered status — otherwise you get the most recent row of ANY status.
+
+  Scope: tenant-scoped via ownerAsiakasId from your token; \`ib company switch\` changes what 'latest' sees. Same projection/backend as \`ib keikka list\`.
+
+  If this is wrong/misleading/incomplete, file: ib feedback create --scope cli --command "reference detail keikka latest" -- "<what is off>"
 "
 `;
 
