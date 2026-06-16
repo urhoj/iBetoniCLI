@@ -169,6 +169,36 @@ export async function runJerryOfferConfirm(
   );
 }
 
+// ─── request write (customer tarjouspyyntö) ─────────────────────────────────
+
+export interface JerryRequestCreateBody {
+  osoite: string;
+  pumppausaika: string;
+  maaraM3: number;
+  puomi?: number;
+  kesto?: number;
+  linjanPituus?: number;
+  kuvaus?: string;
+  asiakasId?: number;
+}
+
+/**
+ * Create a customer pump request / tarjouspyyntö (POST /api/pumppuRequests).
+ * CUSTOMER side — distinct from `runJerryOfferCreate` (the provider bid). The
+ * backend geocodes `osoite` and inserts the request as status:'open', visible
+ * to every matching provider. Body keys are the Finnish field names the route
+ * reads verbatim. `--dry-run` is deploy-gated (see the command notes).
+ */
+export async function runJerryRequestCreate(
+  client: ApiClient,
+  body: JerryRequestCreateBody,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>("/api/pumppuRequests", body, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
 /**
  * Lifecycle counts. Default is the customer view (GET /api/pumppuRequests/mine/counts:
  * draft/open/pending_verification/accepted/cancelled/expired/no_supply).
@@ -312,6 +342,23 @@ function parseBool(v: string): boolean {
 }
 
 /**
+ * Resolve the worksite address from the positional OR the --address flag.
+ * Exactly one is required; both are allowed only if they agree. (resolveTarget
+ * is integer-only, so the dual-input is handled inline for this string field.)
+ */
+function resolveAddress(positional: string | undefined, flag: string | undefined): string {
+  const p = positional?.trim();
+  const f = flag?.trim();
+  if (p && f) {
+    if (p !== f) failWith("Address given twice and they differ (positional vs --address)", 4);
+    return p;
+  }
+  const v = p || f;
+  if (!v) failWith("Missing required address (positional <address> or --address)", 4);
+  return v;
+}
+
+/**
  * Register the `ib jerry` command group — the BetoniJerry marketplace surface:
  *   request list/get/offers   read tarjouspyynnöt + their offers
  *   counts                    lifecycle counts (customer or provider view)
@@ -376,6 +423,55 @@ export function registerJerryCommands(
         exitWithError(e);
       }
     });
+
+  addWriteFlagsToCommand(
+    request
+      .command("create [address]")
+      .description(
+        "Create a customer pump request (tarjouspyyntö). Address positional or --address. Requires --reason. ⚠ --dry-run is deploy-gated."
+      )
+      .option("--address <s>", "Worksite address (osoite); alias for the positional")
+      .requiredOption("--pump-at <iso>", "Pump datetime (pumppausaika; ISO, e.g. 2026-06-17T09:00:00+03:00)")
+      .requiredOption("--m3 <n>", "Concrete volume m³ (maaraM3; > 0)", Number)
+      .option("--boom <m>", "Required boom reach m (puomi; default 0)", Number)
+      .option("--duration <h>", "Pump duration hours (kesto)", Number)
+      .option("--line-length <m>", "Hose line length m (linjanPituus)", Number)
+      .option("--notes <s>", "Free-text description shown to providers (kuvaus)")
+      .option("--asiakas <id>", "Customer asiakasId (omit → your private BetoniJerry account)", Number)
+  ).action(
+    async (
+      addressPositional: string | undefined,
+      opts: WriteOpts & {
+        address?: string;
+        pumpAt: string;
+        m3: number;
+        boom?: number;
+        duration?: number;
+        lineLength?: number;
+        notes?: string;
+        asiakas?: number;
+      }
+    ) => {
+      requireReason(opts);
+      const osoite = resolveAddress(addressPositional, opts.address);
+      const maaraM3 = Number(opts.m3);
+      if (!Number.isFinite(maaraM3) || maaraM3 <= 0) {
+        failWith("--m3 must be a number > 0", 4);
+      }
+      const body: JerryRequestCreateBody = { osoite, pumppausaika: opts.pumpAt, maaraM3 };
+      if (opts.boom !== undefined) body.puomi = opts.boom;
+      if (opts.duration !== undefined) body.kesto = opts.duration;
+      if (opts.lineLength !== undefined) body.linjanPituus = opts.lineLength;
+      if (opts.notes) body.kuvaus = opts.notes;
+      if (opts.asiakas !== undefined) body.asiakasId = opts.asiakas;
+      try {
+        const client = await getClient();
+        writeJson(await runJerryRequestCreate(client, body, opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
 
   // offer ──────────────────────────────────────────────────────────────────────
   const offer = j.command("offer").description("Act on offers (create/send/accept/confirm)");

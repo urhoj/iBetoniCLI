@@ -2907,7 +2907,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: ['ib person delete 5351 --reason "departed"'],
   },
 
-  // ─── jerry (16) — BetoniJerry marketplace ──────────────────────────────────
+  // ─── jerry (17) — BetoniJerry marketplace ──────────────────────────────────
   {
     command: "ib jerry request list",
     description:
@@ -2963,6 +2963,43 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ["ib jerry request offers 4012", "ib jerry request offers 4012 --pretty"],
+  },
+  {
+    command: "ib jerry request create",
+    description:
+      "Create a customer pump request / tarjouspyyntö (POST /api/pumppuRequests). Any authenticated user — this is the CUSTOMER side (distinct from `ib jerry offer create`, the provider bid). The worksite address is given positionally OR via --address (exactly one; both allowed only if they agree). The server geocodes the address and inserts the request as status:'open', immediately visible to every geographically-matching provider. Omit --asiakas to bill it to your auto-created private BetoniJerry customer account; pass --asiakas to use a company you have access to. Requires --reason. ⚠ --dry-run is honoured only once the backend change deploys — against older backends X-Dry-Run is ignored and the request IS created.",
+    auth: "any",
+    args: [{ name: "address", type: "string", description: "Worksite address (osoite); positional, or use --address" }],
+    flags: [
+      { name: "address", type: "string", description: "Worksite address (osoite); alias for the positional" },
+      { name: "pump-at", type: "string", description: "Pump datetime (pumppausaika; ISO, REQUIRED), e.g. 2026-06-17T09:00:00+03:00" },
+      { name: "m3", type: "number", description: "Concrete volume m³ (maaraM3; REQUIRED, > 0)" },
+      { name: "boom", type: "number", default: "0", description: "Required boom reach m (puomi)" },
+      { name: "duration", type: "number", description: "Pump duration hours (kesto)" },
+      { name: "line-length", type: "number", description: "Hose line length m (linjanPituus)" },
+      { name: "notes", type: "string", description: "Free-text description shown to providers (kuvaus)" },
+      { name: "asiakas", type: "number", description: "Customer asiakasId (omit → your private BetoniJerry account)" },
+      { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+    ],
+    writeFlags: true,
+    outputShape:
+      "{ pumppuRequestId, status:'open', asiakasId, personId, tyomaaId, geocoded } · { dryRun:true, wouldCreate:{ asiakasId, osoite, pumppuAika, totalM3, requiredPuomi, pumppuKesto, requiredLinja, notes }, validation:{ ok:true } } on --dry-run",
+    errors: [
+      apiErr(400, "osoite/pumppausaika/maaraM3 missing or invalid", "pass the address (positional or --address), --pump-at (ISO), --m3 (> 0)"),
+      apiErr(403, "No access to --asiakas", "omit --asiakas, or target a company you belong to"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Customer side: creates the tarjouspyyntö itself, NOT a provider offer (that is `ib jerry offer create`).",
+      "Created as status:'open' → immediately fans out to matching provider inboxes. Run `ib jerry check-address` first to preview which providers (if any) cover the address.",
+      "--dry-run is deploy-gated: until the backend honouring X-Dry-Run deploys, --dry-run still creates the request.",
+    ],
+    seeAlso: ["ib jerry check-address", "ib jerry request list", "ib jerry offer create"],
+    examples: [
+      'ib jerry request create "Mannerheimintie 1, Helsinki" --pump-at 2026-06-17T09:00:00+03:00 --m3 30 --reason "tilaus"',
+      'ib jerry request create --address "Mannerheimintie 1, Helsinki" --pump-at 2026-06-17T09:00:00+03:00 --m3 30 --boom 24 --notes "ahdas piha" --reason "tilaus"',
+      'ib jerry request create "Mannerheimintie 1, Helsinki" --pump-at 2026-06-17T09:00:00+03:00 --m3 30 --dry-run --reason "preview"',
+    ],
   },
   {
     command: "ib jerry offer create",

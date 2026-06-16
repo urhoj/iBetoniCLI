@@ -3089,6 +3089,60 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib jerry request create matches snapshot 1`] = `
+"USAGE
+  ib jerry request create <address> [flags]
+
+DESCRIPTION
+  Create a customer pump request / tarjouspyyntö (POST /api/pumppuRequests). Any authenticated user — this is the CUSTOMER side (distinct from \`ib jerry offer create\`, the provider bid). The worksite address is given positionally OR via --address (exactly one; both allowed only if they agree). The server geocodes the address and inserts the request as status:'open', immediately visible to every geographically-matching provider. Omit --asiakas to bill it to your auto-created private BetoniJerry customer account; pass --asiakas to use a company you have access to. Requires --reason. ⚠ --dry-run is honoured only once the backend change deploys — against older backends X-Dry-Run is ignored and the request IS created.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <address> STRING    Worksite address (osoite); positional, or use --address (required)
+
+FLAGS
+  --address STRING    Worksite address (osoite); alias for the positional
+  --pump-at STRING    Pump datetime (pumppausaika; ISO, REQUIRED), e.g. 2026-06-17T09:00:00+03:00
+  --m3 NUMBER    Concrete volume m³ (maaraM3; REQUIRED, > 0)
+  --boom NUMBER    Required boom reach m (puomi) (default: 0)
+  --duration NUMBER    Pump duration hours (kesto)
+  --line-length NUMBER    Hose line length m (linjanPituus)
+  --notes STRING    Free-text description shown to providers (kuvaus)
+  --asiakas NUMBER    Customer asiakasId (omit → your private BetoniJerry account)
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { pumppuRequestId, status:'open', asiakasId, personId, tyomaaId, geocoded } · { dryRun:true, wouldCreate:{ asiakasId, osoite, pumppuAika, totalM3, requiredPuomi, pumppuKesto, requiredLinja, notes }, validation:{ ok:true } } on --dry-run
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  osoite/pumppausaika/maaraM3 missing or invalid → pass the address (positional or --address), --pump-at (ISO), --m3 (> 0)
+  exit 3 (HTTP 403)  No access to --asiakas → omit --asiakas, or target a company you belong to
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Customer side: creates the tarjouspyyntö itself, NOT a provider offer (that is \`ib jerry offer create\`).
+  - Created as status:'open' → immediately fans out to matching provider inboxes. Run \`ib jerry check-address\` first to preview which providers (if any) cover the address.
+  - --dry-run is deploy-gated: until the backend honouring X-Dry-Run deploys, --dry-run still creates the request.
+
+SEE ALSO
+  ib jerry check-address, ib jerry request list, ib jerry offer create
+
+EXAMPLES
+  ib jerry request create "Mannerheimintie 1, Helsinki" --pump-at 2026-06-17T09:00:00+03:00 --m3 30 --reason "tilaus"
+  ib jerry request create --address "Mannerheimintie 1, Helsinki" --pump-at 2026-06-17T09:00:00+03:00 --m3 30 --boom 24 --notes "ahdas piha" --reason "tilaus"
+  ib jerry request create "Mannerheimintie 1, Helsinki" --pump-at 2026-06-17T09:00:00+03:00 --m3 30 --dry-run --reason "preview"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib jerry request get matches snapshot 1`] = `
 "USAGE
   ib jerry request get <requestId> [flags]

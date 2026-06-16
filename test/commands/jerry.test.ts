@@ -3,6 +3,7 @@ import {
   runJerryRequestList,
   runJerryRequestGet,
   runJerryRequestOffers,
+  runJerryRequestCreate,
   runJerryCounts,
   runJerryCheckAddress,
   runJerryProviderSettingsGet,
@@ -97,6 +98,34 @@ describe("ib jerry request", () => {
       nextCursor: null,
       count: 1,
     });
+  });
+
+  test("create posts the mapped body and forwards the reason header", async () => {
+    post.mockResolvedValueOnce({ pumppuRequestId: 7, status: "open" });
+    await runJerryRequestCreate(
+      mockClient,
+      { osoite: "Mannerheimintie 1, Helsinki", pumppausaika: "2026-06-17T09:00:00+03:00", maaraM3: 30, puomi: 24 },
+      { reason: "tilaus" }
+    );
+    expect(post).toHaveBeenCalledWith(
+      "/api/pumppuRequests",
+      { osoite: "Mannerheimintie 1, Helsinki", pumppausaika: "2026-06-17T09:00:00+03:00", maaraM3: 30, puomi: 24 },
+      { headers: { "X-Action-Reason": "tilaus" } }
+    );
+  });
+
+  test("create forwards --dry-run as X-Dry-Run", async () => {
+    post.mockResolvedValueOnce({ dryRun: true });
+    await runJerryRequestCreate(
+      mockClient,
+      { osoite: "A 1", pumppausaika: "2026-06-17T09:00:00+03:00", maaraM3: 30 },
+      { dryRun: true, reason: "preview" }
+    );
+    expect(post).toHaveBeenCalledWith(
+      "/api/pumppuRequests",
+      { osoite: "A 1", pumppausaika: "2026-06-17T09:00:00+03:00", maaraM3: 30 },
+      { headers: { "X-Dry-Run": "1", "X-Action-Reason": "preview" } }
+    );
   });
 });
 
