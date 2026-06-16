@@ -72,6 +72,8 @@ export const COMMAND_SUMMARIES = {
     // ── commands / discovery ──────────────────────────────────────────────────
     "ib commands": "Offline command discovery: domain index, a domain's list, or --all flat list. No auth.",
     "ib reference dump": "Emit the full command surface as JSON for AI ingestion; a domain arg narrows it.",
+    "ib reference detail get": "Fetch one command's business-context detail from the DB-backed catalog.",
+    "ib reference detail set": "Write summary/detail for one command in the DB-backed catalog (developer only).",
     // ── company ─────────────────────────────────────────────────────────────
     "ib company list": "List companies the user can act on; the active one is current:true.",
     "ib company validate": "Renamed to top-level `ib validate` — this path exits 4 with a hint.",

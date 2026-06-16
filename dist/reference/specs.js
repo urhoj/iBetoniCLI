@@ -3272,11 +3272,9 @@ const BASE_COMMAND_SPECS = [
         ],
     },
     {
-        command: "ib reference detail",
-        description: "On-demand business/AI context for one command (markdown); exit 5 if none.\n" +
-            "The deeper companion to the catalog summary — pull it to verify a claim or " +
-            "understand the domain. NOT in `ib reference dump`; also shown as the command's --help AI NOTES.",
-        auth: "none",
+        command: "ib reference detail get",
+        description: "On-demand business/AI context for one command (DB-backed via /api/cli/command-catalog); exit 5 if none",
+        auth: "any",
         args: [
             {
                 name: "command...",
@@ -3286,7 +3284,7 @@ const BASE_COMMAND_SPECS = [
             },
         ],
         flags: [],
-        outputShape: "{ command, detail, hint } (markdown). exit 5 when unknown or no detail yet.",
+        outputShape: "{ command, summary, detail, hint }. exit 5 when unknown or no detail yet.",
         errors: [
             {
                 exit: 5,
@@ -3295,8 +3293,70 @@ const BASE_COMMAND_SPECS = [
             },
         ],
         examples: [
-            "ib reference detail keikka latest",
-            "ib reference detail jerry check-address",
+            "ib reference detail get keikka latest",
+            "ib reference detail get jerry check-address",
+        ],
+    },
+    {
+        command: "ib reference detail list",
+        description: "List command-catalog entries, optionally ordered by stalest (DB-backed)",
+        tier: "developer",
+        auth: "any",
+        args: [],
+        flags: [
+            {
+                name: "stalest",
+                type: "number",
+                description: "Return up to N entries sorted by least-recently reviewed",
+            },
+        ],
+        outputShape: "{ items: [{ command, summary, lastReviewed, runs }], count }",
+        errors: [
+            { exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" },
+        ],
+        examples: [
+            "ib reference detail list",
+            "ib reference detail list --stalest 20",
+        ],
+    },
+    {
+        command: "ib reference detail set",
+        description: "Write summary and/or detail for one command in the command-catalog (developer only)",
+        tier: "developer",
+        auth: "any",
+        mutates: true,
+        writeFlags: true,
+        args: [
+            {
+                name: "command...",
+                type: "string",
+                required: true,
+                description: "Command path after `ib` (e.g. keikka latest)",
+            },
+        ],
+        flags: [
+            {
+                name: "summary",
+                type: "string",
+                description: "Short one-line summary stored in the catalog",
+            },
+            {
+                name: "detail",
+                type: "string",
+                description: "Full markdown business-context detail",
+            },
+        ],
+        outputShape: "{ command, runs, … } (backend response)",
+        errors: [
+            {
+                exit: 5,
+                meaning: "Unknown command",
+                remedy: "`ib commands` for valid paths",
+            },
+        ],
+        examples: [
+            "ib reference detail set keikka list --summary 'Lists delivery orders' --reason 'initial fill'",
+            "ib reference detail set keikka list --detail '## Keikka list\\nReturns ...' --reason 'update'",
         ],
     },
     {

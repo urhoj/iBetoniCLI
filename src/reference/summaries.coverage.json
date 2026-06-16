@@ -639,7 +639,15 @@
     "lastReviewed": null,
     "runs": 0
   },
-  "ib reference detail": {
+  "ib reference detail get": {
+    "lastReviewed": null,
+    "runs": 0
+  },
+  "ib reference detail list": {
+    "lastReviewed": null,
+    "runs": 0
+  },
+  "ib reference detail set": {
     "lastReviewed": null,
     "runs": 0
   },

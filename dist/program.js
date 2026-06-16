@@ -40,7 +40,8 @@ import { registerHelpCommands } from "./commands/help/index.js";
 import { registerVersionCommand } from "./commands/version/index.js";
 import { registerDoctorCommand } from "./commands/doctor/index.js";
 import { runReferenceDump } from "./reference/dump.js";
-import { runReferenceDetail } from "./reference/detail.js";
+import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList } from "./reference/detail.js";
+import { addWriteFlagsToCommand } from "./api/writeFlags.js";
 import { buildCommandsList, buildDomainIndex, fullyHiddenDomains } from "./reference/commandsList.js";
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
@@ -182,13 +183,54 @@ export function buildProgram() {
             exitWithError(e);
         }
     });
-    reference
+    // `detail` is a PURE GROUP (no action of its own) with three explicit leaves.
+    // A variadic action on the group AND `list`/`set` subcommands would make
+    // commander mis-route `ib reference detail keikka list` to the `list` leaf —
+    // so the read is an explicit `get <command...>` leaf instead.
+    const detail = reference
         .command("detail")
-        .description("On-demand business/AI context for one command (markdown); exit 5 if none")
+        .description("On-demand command catalog: get/set business-context detail + summary, or list entries (DB-backed)");
+    detail
+        .command("get")
+        .description("On-demand business/AI context for one command (DB-backed via /api/cli/command-catalog); exit 5 if none")
         .argument("<command...>", "Command path after `ib` (e.g. keikka latest)")
-        .action((commandParts) => {
+        .action(async (commandParts) => {
         try {
-            writeJson(runReferenceDetail(commandParts, getCallerTier()));
+            const client = await getClient();
+            writeJson(await runReferenceDetail(client, commandParts, getCallerTier()));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    detail
+        .command("list")
+        .description("List command-catalog entries, optionally ordered by stalest (DB-backed)")
+        .option("--stalest <n>", "Return up to N entries sorted by least-recently reviewed", (v) => Number(v))
+        .action(async (opts) => {
+        try {
+            const client = await getClient();
+            writeJson(await runReferenceDetailList(client, opts.stalest));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    const detailSet = detail
+        .command("set")
+        .description("Write summary and/or detail for one command in the command-catalog (developer only)")
+        .argument("<command...>", "Command path after `ib` (e.g. keikka latest)")
+        .option("--summary <text>", "Short one-line summary stored in the catalog")
+        .option("--detail <text>", "Full markdown business-context detail");
+    addWriteFlagsToCommand(detailSet).action(async (commandParts, opts) => {
+        try {
+            const client = await getClient();
+            const result = await runReferenceDetailSet(client, commandParts, { summary: opts.summary, detail: opts.detail }, {
+                dryRun: opts.dryRun,
+                idempotencyKey: opts.idempotencyKey,
+                reason: opts.reason,
+            }, getCallerTier());
+            writeJson(result);
         }
         catch (e) {
             exitWithError(e);
