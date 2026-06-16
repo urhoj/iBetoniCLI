@@ -3599,7 +3599,7 @@ exports[`Help snapshots — contract stability > help for ib legal activate matc
   ib legal activate <documentId> [flags]
 
 DESCRIPTION
-  Publish a document version (developer/sysadmin only): atomically deactivates all sibling versions of the same type+tenant and activates this one (also stamps effectiveDate). Use to publish a draft or roll back to an earlier version.
+  Publish a document version (developer/sysadmin only): atomically archives the current active version of the same type+tenant (status='archived') and activates this one (status='active', isActive=1; also stamps effectiveDate). Use to publish a draft or roll back to an earlier version.
   Permissions: requires isSystemAdmin or isDeveloper (server-enforced).
 
 ARGUMENTS
@@ -3667,7 +3667,7 @@ exports[`Help snapshots — contract stability > help for ib legal delete matche
   ib legal delete <documentId> [flags]
 
 DESCRIPTION
-  Soft-delete (deactivate) a document version (developer/sysadmin only). The row and all acceptance history remain in the database.
+  Soft-delete a document version (developer/sysadmin only): sets status='deleted' (isActive=0) so it is distinguishable from a draft or superseded version in ib legal versions. The row and all acceptance history remain in the database.
   Permissions: requires isSystemAdmin or isDeveloper (server-enforced).
 
 ARGUMENTS
@@ -3701,6 +3701,71 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib legal diff matches snapshot 1`] = `
+"USAGE
+  ib legal diff [<a>] [<b>] [flags]
+
+DESCRIPTION
+  Line diff between two document versions WITHOUT pulling both full bodies into context. Two modes: pass two documentIds (<a> old, <b> new), or --type <name> to diff that type's newest DRAFT against its current ACTIVE version (i.e. what would change if you publish the draft). Returns per-side metadata + added/removed line counts + a compact unified diff (long unchanged runs collapse).
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <a> NUMBER    Old documentId (omit when using --type) (optional)
+  <b> NUMBER    New documentId (omit when using --type) (optional)
+
+FLAGS
+  --type STRING    Diff newest DRAFT vs current ACTIVE of this type (instead of <a> <b>)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  {a: {documentId, typeName, version, status, contentLength}, b: {...}, sameContent, addedLines, removedLines, unified}
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Neither two documentIds nor --type supplied (or both) → pass <a> <b> OR --type <name>
+  exit 5 (HTTP 404)  documentId / type's draft or active not found → check ib legal versions <typeName>
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib legal versions, ib legal drafts, ib legal get
+
+EXAMPLES
+  ib legal diff 4 38
+  ib legal diff --type TOS
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib legal drafts matches snapshot 1`] = `
+"USAGE
+  ib legal drafts [flags]
+
+DESCRIPTION
+  Unpublished DRAFT versions across EVERY type — the cross-type answer to 'is anything staged to publish?' (the draft counterpart of ib legal active). One row per draft; content stripped (read a body via ib legal get, or compare with ib legal diff). Client-side fan-out over ib legal types + ib legal versions --status draft.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{documentId, typeName, version, title, status, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib legal active, ib legal versions, ib legal diff
+
+EXAMPLES
+  ib legal drafts
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib legal get matches snapshot 1`] = `
 "USAGE
   ib legal get <documentId> [flags]
@@ -3727,7 +3792,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 SEE ALSO
-  ib legal versions
+  ib legal versions, ib legal diff
 
 EXAMPLES
   ib legal get 12
@@ -3739,7 +3804,7 @@ exports[`Help snapshots — contract stability > help for ib legal save matches 
   ib legal save [flags]
 
 DESCRIPTION
-  Create a NEW document version (developer/sysadmin only). Versions are IMMUTABLE — any content/title change is a new version; there is no in-place edit. Draft by default (isActive=0); --activate publishes atomically (deactivates prior versions of the same type+tenant). Content from --file (local) or --content (inline; required over /api/cli/exec). --reason required unless --dry-run.
+  Create a NEW document version (developer/sysadmin only). Versions are IMMUTABLE — any content/title change is a new version; there is no in-place edit. Saved as status='draft' (isActive=0) by default; --activate publishes atomically (status='active', archives the prior active version of the same type+tenant). Content from --file (local) or --content (inline; required over /api/cli/exec). --reason required unless --dry-run.
   Permissions: requires isSystemAdmin or isDeveloper (server-enforced).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -3977,7 +4042,7 @@ exports[`Help snapshots — contract stability > help for ib legal versions matc
   ib legal versions <typeName> [flags]
 
 DESCRIPTION
-  All versions of a document type — active, drafts, and superseded history. Content stripped; fetch one version with ib legal get.
+  All versions of a document type, newest first. Every row carries a lifecycle status: draft (saved, never published) | active (live now, also isActive=1) | archived (superseded former-active) | deleted (soft-deleted). Use --status to filter. Content stripped; fetch one version with ib legal get, or compare two with ib legal diff.
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
@@ -3985,22 +4050,24 @@ ARGUMENTS
 
 FLAGS
   --owner NUMBER    Filter by ownerAsiakasId tenant scope
+  --status STRING    Filter by lifecycle status: draft|active|archived|deleted
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{documentId, version, title, isActive, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>
+  ListEnvelope<{documentId, version, title, status, isActive, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 SEE ALSO
-  ib legal get, ib legal activate
+  ib legal get, ib legal diff, ib legal drafts, ib legal activate
 
 EXAMPLES
   ib legal versions TOS
+  ib legal versions TOS --status draft
   ib legal versions BETONIJERRY_TOS
 "
 `;

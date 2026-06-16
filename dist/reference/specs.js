@@ -2125,7 +2125,7 @@ const BASE_COMMAND_SPECS = [
             "ib ohje update LaskupohjaTilaus --body '{\"title\":\"X\",\"htmltext\":\"<p>Y</p>\"}' --reason edit",
         ],
     },
-    // ─── legal (13) — versioned legal documents + acceptance tracking ─────────
+    // ─── legal (15) — versioned legal documents + acceptance tracking ─────────
     {
         command: "ib legal types",
         description: "List legal document types (EULA, TOS, PRIVACY, BETONIJERRY_TOS, ...) with their personSettingTypeId acceptance mapping. A NULL personSettingTypeId means acceptances for that type cannot be tracked.",
@@ -2180,16 +2180,27 @@ const BASE_COMMAND_SPECS = [
     },
     {
         command: "ib legal versions",
-        description: "All versions of a document type — active, drafts, and superseded history. Content stripped; fetch one version with ib legal get.",
+        description: "All versions of a document type, newest first. Every row carries a lifecycle status: draft (saved, never published) | active (live now, also isActive=1) | archived (superseded former-active) | deleted (soft-deleted). Use --status to filter. Content stripped; fetch one version with ib legal get, or compare two with ib legal diff.",
         auth: "any",
         args: [{ name: "typeName", type: "string", description: "Document type name (see ib legal types)" }],
         flags: [
             { name: "owner", type: "number", description: "Filter by ownerAsiakasId tenant scope" },
+            { name: "status", type: "string", description: "Filter by lifecycle status: draft|active|archived|deleted" },
         ],
-        outputShape: "ListEnvelope<{documentId, version, title, isActive, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>",
+        outputShape: "ListEnvelope<{documentId, version, title, status, isActive, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>",
         errors: COMMON_AUTH_ERRORS,
-        seeAlso: ["ib legal get", "ib legal activate"],
-        examples: ["ib legal versions TOS", "ib legal versions BETONIJERRY_TOS"],
+        seeAlso: ["ib legal get", "ib legal diff", "ib legal drafts", "ib legal activate"],
+        examples: ["ib legal versions TOS", "ib legal versions TOS --status draft", "ib legal versions BETONIJERRY_TOS"],
+    },
+    {
+        command: "ib legal drafts",
+        description: "Unpublished DRAFT versions across EVERY type — the cross-type answer to 'is anything staged to publish?' (the draft counterpart of ib legal active). One row per draft; content stripped (read a body via ib legal get, or compare with ib legal diff). Client-side fan-out over ib legal types + ib legal versions --status draft.",
+        auth: "any",
+        flags: [],
+        outputShape: "ListEnvelope<{documentId, typeName, version, title, status, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>",
+        errors: COMMON_AUTH_ERRORS,
+        seeAlso: ["ib legal active", "ib legal versions", "ib legal diff"],
+        examples: ["ib legal drafts"],
     },
     {
         command: "ib legal get",
@@ -2202,12 +2213,32 @@ const BASE_COMMAND_SPECS = [
             apiErr(404, "Document not found", "list ids via ib legal versions <typeName>"),
             ...COMMON_AUTH_ERRORS,
         ],
-        seeAlso: ["ib legal versions"],
+        seeAlso: ["ib legal versions", "ib legal diff"],
         examples: ["ib legal get 12"],
     },
     {
+        command: "ib legal diff",
+        description: "Line diff between two document versions WITHOUT pulling both full bodies into context. Two modes: pass two documentIds (<a> old, <b> new), or --type <name> to diff that type's newest DRAFT against its current ACTIVE version (i.e. what would change if you publish the draft). Returns per-side metadata + added/removed line counts + a compact unified diff (long unchanged runs collapse).",
+        auth: "any",
+        args: [
+            { name: "a", type: "number", required: false, description: "Old documentId (omit when using --type)" },
+            { name: "b", type: "number", required: false, description: "New documentId (omit when using --type)" },
+        ],
+        flags: [
+            { name: "type", type: "string", description: "Diff newest DRAFT vs current ACTIVE of this type (instead of <a> <b>)" },
+        ],
+        outputShape: "{a: {documentId, typeName, version, status, contentLength}, b: {...}, sameContent, addedLines, removedLines, unified}",
+        errors: [
+            { exit: 4, meaning: "Neither two documentIds nor --type supplied (or both)", remedy: "pass <a> <b> OR --type <name>" },
+            apiErr(404, "documentId / type's draft or active not found", "check ib legal versions <typeName>"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        seeAlso: ["ib legal versions", "ib legal drafts", "ib legal get"],
+        examples: ["ib legal diff 4 38", "ib legal diff --type TOS"],
+    },
+    {
         command: "ib legal save",
-        description: "Create a NEW document version (developer/sysadmin only). Versions are IMMUTABLE — any content/title change is a new version; there is no in-place edit. Draft by default (isActive=0); --activate publishes atomically (deactivates prior versions of the same type+tenant). Content from --file (local) or --content (inline; required over /api/cli/exec). --reason required unless --dry-run.",
+        description: "Create a NEW document version (developer/sysadmin only). Versions are IMMUTABLE — any content/title change is a new version; there is no in-place edit. Saved as status='draft' (isActive=0) by default; --activate publishes atomically (status='active', archives the prior active version of the same type+tenant). Content from --file (local) or --content (inline; required over /api/cli/exec). --reason required unless --dry-run.",
         permissions: ["isSystemAdmin or isDeveloper (server-enforced)"],
         tier: "developer",
         flags: [
@@ -2240,7 +2271,7 @@ const BASE_COMMAND_SPECS = [
     },
     {
         command: "ib legal activate",
-        description: "Publish a document version (developer/sysadmin only): atomically deactivates all sibling versions of the same type+tenant and activates this one (also stamps effectiveDate). Use to publish a draft or roll back to an earlier version.",
+        description: "Publish a document version (developer/sysadmin only): atomically archives the current active version of the same type+tenant (status='archived') and activates this one (status='active', isActive=1; also stamps effectiveDate). Use to publish a draft or roll back to an earlier version.",
         permissions: ["isSystemAdmin or isDeveloper (server-enforced)"],
         tier: "developer",
         args: [{ name: "documentId", type: "number", description: "legalDocuments.documentId to activate" }],
@@ -2257,7 +2288,7 @@ const BASE_COMMAND_SPECS = [
     },
     {
         command: "ib legal delete",
-        description: "Soft-delete (deactivate) a document version (developer/sysadmin only). The row and all acceptance history remain in the database.",
+        description: "Soft-delete a document version (developer/sysadmin only): sets status='deleted' (isActive=0) so it is distinguishable from a draft or superseded version in ib legal versions. The row and all acceptance history remain in the database.",
         permissions: ["isSystemAdmin or isDeveloper (server-enforced)"],
         tier: "developer",
         args: [{ name: "documentId", type: "number", description: "legalDocuments.documentId to soft-delete" }],

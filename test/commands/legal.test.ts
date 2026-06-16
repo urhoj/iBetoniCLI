@@ -3,9 +3,11 @@ import {
   runLegalTypes,
   runLegalShow,
   runLegalActive,
+  runLegalDrafts,
   runLegalStatus,
   runLegalVersions,
   runLegalGet,
+  runLegalDiff,
   runLegalSave,
   runLegalActivate,
   runLegalDelete,
@@ -136,6 +138,82 @@ describe("ib legal reads", () => {
     expect(c.get).toHaveBeenCalledWith("/api/legal-documents/TOS/versions");
     expect(out.items[0]).not.toHaveProperty("markdownContent");
     expect(out.count).toBe(1);
+  });
+
+  test("versions --status filters client-side", async () => {
+    const c = mockClient();
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { documentId: 1, status: "active", markdownContent: "A" },
+      { documentId: 2, status: "draft", markdownContent: "B" },
+      { documentId: 3, status: "archived", markdownContent: "C" },
+    ]);
+    const out = await runLegalVersions(c, "TOS", undefined, "draft");
+    expect(out.count).toBe(1);
+    expect(out.items[0]).toMatchObject({ documentId: 2, status: "draft" });
+    expect(out.items[0]).not.toHaveProperty("markdownContent");
+  });
+
+  test("drafts fans out over types and keeps only status=draft", async () => {
+    const c = mockClient();
+    (c.get as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(TYPES) // /types
+      .mockResolvedValueOnce([
+        { documentId: 38, status: "active", markdownContent: "X" },
+        { documentId: 50, status: "draft", version: "3.0", markdownContent: "Y" },
+      ]) // /TOS/versions
+      .mockResolvedValueOnce([{ documentId: 41, status: "active", markdownContent: "Z" }]); // /GLOBAL/versions
+    const out = await runLegalDrafts(c);
+    expect(c.get).toHaveBeenNthCalledWith(1, "/api/legal-documents/types");
+    expect(c.get).toHaveBeenNthCalledWith(2, "/api/legal-documents/TOS/versions");
+    expect(c.get).toHaveBeenNthCalledWith(3, "/api/legal-documents/GLOBAL/versions");
+    expect(out.count).toBe(1);
+    expect(out.items[0]).toMatchObject({ documentId: 50, status: "draft", version: "3.0" });
+    expect(out.items[0]).not.toHaveProperty("markdownContent");
+  });
+
+  test("diff (two ids) gets both docs, strips content, returns line counts", async () => {
+    const c = mockClient();
+    (c.get as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ documentId: 4, typeName: "TOS", status: "archived", markdownContent: "a\nb\nc" })
+      .mockResolvedValueOnce({ documentId: 38, typeName: "TOS", status: "active", markdownContent: "a\nB\nc\nd" });
+    const out = await runLegalDiff(c, { a: 4, b: 38 });
+    expect(c.get).toHaveBeenNthCalledWith(1, "/api/legal-documents/document/4");
+    expect(c.get).toHaveBeenNthCalledWith(2, "/api/legal-documents/document/38");
+    expect(out.a).toMatchObject({ documentId: 4, contentLength: 5 });
+    expect(out.a).not.toHaveProperty("markdownContent");
+    expect(out.sameContent).toBe(false);
+    expect(out.addedLines).toBe(2); // "B" and "d"
+    expect(out.removedLines).toBe(1); // "b"
+  });
+
+  test("diff --type resolves active (old) vs newest draft (new)", async () => {
+    const c = mockClient();
+    (c.get as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce([
+        { documentId: 50, status: "draft" },
+        { documentId: 38, status: "active" },
+        { documentId: 4, status: "archived" },
+      ]) // /TOS/versions
+      .mockResolvedValueOnce({ documentId: 38, markdownContent: "old" }) // active = a
+      .mockResolvedValueOnce({ documentId: 50, markdownContent: "new" }); // draft = b
+    const out = await runLegalDiff(c, { type: "TOS" });
+    expect(c.get).toHaveBeenNthCalledWith(1, "/api/legal-documents/TOS/versions");
+    expect(c.get).toHaveBeenNthCalledWith(2, "/api/legal-documents/document/38");
+    expect(c.get).toHaveBeenNthCalledWith(3, "/api/legal-documents/document/50");
+    expect(out.a).toMatchObject({ documentId: 38 });
+    expect(out.b).toMatchObject({ documentId: 50 });
+  });
+
+  test("diff --type with no draft -> exit 5", async () => {
+    const c = mockClient();
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([{ documentId: 38, status: "active" }]);
+    await expect(runLegalDiff(c, { type: "TOS" })).rejects.toMatchObject({ exitCode: 5 });
+  });
+
+  test("diff --type with no active -> exit 5", async () => {
+    const c = mockClient();
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([{ documentId: 50, status: "draft" }]);
+    await expect(runLegalDiff(c, { type: "TOS" })).rejects.toMatchObject({ exitCode: 5 });
   });
 
   test("get fetches one document by id", async () => {
