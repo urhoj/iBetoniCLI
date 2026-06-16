@@ -7,7 +7,7 @@
  * has a date arg/flag) · ARGUMENTS (when `spec.args` is set) · FLAGS ·
  * WRITE-SAFETY FLAGS (when `spec.writeFlags`) · GLOBAL FLAGS · OUTPUT · ERRORS
  * (each as `exit N (HTTP M)`) · NOTES (when `spec.notes`) · SEE ALSO (when
- * `spec.seeAlso`) · EXAMPLES · AI NOTES (when `spec.detail`). The output is deliberately self-contained so that
+ * `spec.seeAlso`) · EXAMPLES. The output is deliberately self-contained so that
  * an AI consumer can ingest a single command's `--help` and know everything
  * needed to invoke it correctly: positional arguments, auth/permissions,
  * timezone semantics, exhaustive flag list, response shape, error remedies
@@ -25,7 +25,6 @@
 
 import type { Command } from "commander";
 import { GLOSSARY, type GlossaryEntry } from "../reference/domain.js";
-import { feedbackHintFor } from "../reference/feedbackHint.js";
 import { type CallerTier, getCallerTier, isHiddenAtTier } from "../tier.js";
 
 export interface CommandError {
@@ -63,26 +62,6 @@ export interface CommandSpec {
   command: string;
   /** One-paragraph description of what the command does. */
   description: string;
-  /**
-   * Short (~≤80 char) catalog blurb consumed ONLY by the AI-chat command
-   * catalog (puminet5api `ibCatalog.js`, which picks `summary` over the
-   * `description` first line) to cut the re-billed system-prompt prefix on
-   * no-cache LLM providers. `--help` and `ib reference dump` keep the full
-   * `description`. Populated out-of-band from `src/reference/summaries.ts`
-   * (merged onto COMMAND_SPECS), not hand-set per literal. Absent → consumers
-   * fall back to `description`.
-   */
-  summary?: string;
-  /**
-   * Longer-form, on-demand business/AI context (a few short paragraphs, markdown;
-   * curation soft target ~1500 chars, hard test bound MAX_DETAIL_LEN). Surfaced
-   * ONLY by `ib reference detail <cmd>` and the
-   * `AI NOTES` section of `ib <cmd> --help`. Deliberately STRIPPED from
-   * `ib reference dump` and absent from the always-loaded catalog, so it never
-   * re-bloats one-shot ingestion. Populated out-of-band from
-   * `src/reference/details.ts`. The AI pulls it to verify claims / get domain context.
-   */
-  detail?: string;
   /** Backend permission strings (e.g. `auth.page.grid.tilaus.read`). */
   permissions?: string[];
   /**
@@ -235,14 +214,6 @@ export function formatHelp(spec: CommandSpec): string {
   lines.push("EXAMPLES");
   for (const ex of spec.examples) {
     lines.push(`  ${ex}`);
-  }
-
-  if (spec.detail) {
-    lines.push("");
-    lines.push("AI NOTES (business context)");
-    for (const dl of spec.detail.split("\n")) lines.push(dl ? `  ${dl}` : "");
-    lines.push("");
-    lines.push(`  ${feedbackHintFor(spec.command)}`);
   }
 
   return lines.join("\n") + "\n";

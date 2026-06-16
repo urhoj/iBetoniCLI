@@ -5,8 +5,6 @@ import { exitCodeFromStatus } from "../api/errors.js";
 import { MESSAGE_DAILY_SPECS } from "../commands/message/daily/index.js";
 import { MESSAGE_BOARD_SPECS } from "../commands/message/board/index.js";
 import { CHANGELOG_SPECS } from "../commands/changelog/index.js";
-import { COMMAND_SUMMARIES } from "./summaries.js";
-import { COMMAND_DETAILS } from "./details.js";
 /** API error row: derive the exit code from the HTTP status. */
 const apiErr = (http, meaning, remedy) => ({
     http,
@@ -4218,22 +4216,9 @@ const BASE_COMMAND_SPECS = [
     ...CHANGELOG_SPECS,
 ];
 /**
- * The canonical catalogue, with curated AI-catalog `summary` blurbs merged on
- * from `./summaries.ts` (keyed by full command path). Only the AI-chat catalog
- * reads `summary`; `--help` and `ib reference dump` still render the full
- * `description`. Keeping summaries out-of-band leaves the spec literals above
- * untouched. `test/reference/summaries.test.ts` enforces that every summary key
- * matches a real command (no orphans).
+ * The canonical catalogue of every `ib` subcommand. Summaries and details are
+ * now DB-served via `/api/cli/command-catalog` (`ib reference detail get`); the
+ * source-backed tiers have been removed.
  */
-export const COMMAND_SPECS = BASE_COMMAND_SPECS.map((spec) => {
-    const summary = COMMAND_SUMMARIES[spec.command];
-    const detail = COMMAND_DETAILS[spec.command];
-    if (!summary && !detail)
-        return spec;
-    return {
-        ...spec,
-        ...(summary ? { summary } : {}),
-        ...(detail ? { detail } : {}),
-    };
-});
+export const COMMAND_SPECS = BASE_COMMAND_SPECS;
 //# sourceMappingURL=specs.js.map

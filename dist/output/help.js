@@ -7,7 +7,7 @@
  * has a date arg/flag) · ARGUMENTS (when `spec.args` is set) · FLAGS ·
  * WRITE-SAFETY FLAGS (when `spec.writeFlags`) · GLOBAL FLAGS · OUTPUT · ERRORS
  * (each as `exit N (HTTP M)`) · NOTES (when `spec.notes`) · SEE ALSO (when
- * `spec.seeAlso`) · EXAMPLES · AI NOTES (when `spec.detail`). The output is deliberately self-contained so that
+ * `spec.seeAlso`) · EXAMPLES. The output is deliberately self-contained so that
  * an AI consumer can ingest a single command's `--help` and know everything
  * needed to invoke it correctly: positional arguments, auth/permissions,
  * timezone semantics, exhaustive flag list, response shape, error remedies
@@ -23,7 +23,6 @@
  * spec without having to run `ib reference dump`.
  */
 import { GLOSSARY } from "../reference/domain.js";
-import { feedbackHintFor } from "../reference/feedbackHint.js";
 import { getCallerTier, isHiddenAtTier } from "../tier.js";
 /**
  * Render a {@link CommandSpec} as the AI-optimized `--help` text. Output is a
@@ -107,14 +106,6 @@ export function formatHelp(spec) {
     lines.push("EXAMPLES");
     for (const ex of spec.examples) {
         lines.push(`  ${ex}`);
-    }
-    if (spec.detail) {
-        lines.push("");
-        lines.push("AI NOTES (business context)");
-        for (const dl of spec.detail.split("\n"))
-            lines.push(dl ? `  ${dl}` : "");
-        lines.push("");
-        lines.push(`  ${feedbackHintFor(spec.command)}`);
     }
     return lines.join("\n") + "\n";
 }
