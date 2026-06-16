@@ -19,7 +19,10 @@
  *  - keep the discriminating essence: verb + object + the gate/scope that
  *    decides between siblings (e.g. CUSTOMER vs PROVIDER side, developer-only,
  *    LOCAL-only, weather module). Flags/detail live in `--help`.
- *  - aim ≤ ~80 chars; the test caps at MAX_SUMMARY_LEN.
+ *  - aim ≤ ~120 chars; spend the budget on the non-obvious "hook" (gotcha,
+ *    "tool for X" routing cue, scope quirk), NOT a name restatement. Deeper
+ *    business context goes in the detail tier (details.ts), not here. The test
+ *    caps at MAX_SUMMARY_LEN (160).
  *  - a few behavioural directives the proposal called out by name are kept
  *    verbatim-in-spirit even if slightly longer (feedback create's PROACTIVE
  *    filing; person create's --global / --get-or-create).
@@ -29,7 +32,7 @@
  */
 
 /** Max length asserted by the summaries test; keep curation honest. */
-export const MAX_SUMMARY_LEN = 120;
+export const MAX_SUMMARY_LEN = 160;
 
 export const COMMAND_SUMMARIES: Record<string, string> = {
   // ── ai ──────────────────────────────────────────────────────────────────
