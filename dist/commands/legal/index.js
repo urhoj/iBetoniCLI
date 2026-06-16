@@ -3,10 +3,18 @@ import { CliError } from "../../api/errors.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
+import { lineDiff } from "../../textDiff.js";
+/** Lifecycle status values on legalDocuments.status (see backend migration). */
+export const LEGAL_STATUSES = ["draft", "active", "archived", "deleted"];
 const stripContent = (d) => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { markdownContent, ...rest } = d;
     return rest;
+};
+/** Strip content but report its length — the per-side meta used by `ib legal diff`. */
+const diffMeta = (d) => {
+    const len = typeof d.markdownContent === "string" ? d.markdownContent.length : 0;
+    return { ...stripContent(d), contentLength: len };
 };
 export async function runLegalTypes(client) {
     const rows = await client.get("/api/legal-documents/types");
@@ -81,14 +89,72 @@ export async function runLegalStatus(client, personId, ownerAsiakasId) {
         missing: (data.missingAcceptances ?? []).map(stripContent),
     };
 }
-export async function runLegalVersions(client, typeName, ownerAsiakasId) {
+export async function runLegalVersions(client, typeName, ownerAsiakasId, status) {
     const q = ownerAsiakasId != null ? `?ownerAsiakasId=${ownerAsiakasId}` : "";
     const rows = await client.get(`/api/legal-documents/${encodeURIComponent(typeName)}/versions${q}`);
-    const items = (Array.isArray(rows) ? rows : []).map(stripContent);
+    let items = (Array.isArray(rows) ? rows : []).map(stripContent);
+    // Client-side lifecycle filter — the backend returns the full history.
+    if (status)
+        items = items.filter((r) => r.status === status);
+    return { items, nextCursor: null, count: items.length };
+}
+/**
+ * Unpublished DRAFT versions across EVERY type — the cross-type answer to "is
+ * anything staged to publish?". `active` rolls up live docs; this rolls up
+ * drafts. Client-side fan-out over `types` + `versions` (the per-type cached
+ * read), filtered to status='draft'. Content is stripped (read a body via
+ * `ib legal get <documentId>` or compare with `ib legal diff`).
+ */
+export async function runLegalDrafts(client) {
+    const types = await runLegalTypes(client);
+    const perType = await Promise.all(types.items.map((t) => runLegalVersions(client, t.typeName, undefined, "draft").then((v) => v.items)));
+    const items = perType.flat();
     return { items, nextCursor: null, count: items.length };
 }
 export async function runLegalGet(client, documentId) {
     return client.get(`/api/legal-documents/document/${documentId}`);
+}
+/**
+ * Line diff between two document versions. Two modes:
+ *  - explicit `{ a, b }` documentIds — diff a (old) vs b (new);
+ *  - `{ type }` — resolve the type's current ACTIVE (old) vs its newest DRAFT
+ *    (new), i.e. "what would change if I publish the pending draft".
+ *
+ * Computes the diff locally and returns only the changed hunks + counts, so the
+ * two full bodies never enter the caller's context. The action validates that
+ * exactly one mode is supplied.
+ */
+export async function runLegalDiff(client, input) {
+    let docA;
+    let docB;
+    if ("type" in input) {
+        const versions = await runLegalVersions(client, input.type);
+        const active = versions.items.find((r) => r.status === "active");
+        const draft = versions.items.find((r) => r.status === "draft"); // newest first (createdTime DESC)
+        if (!active) {
+            throw new CliError(`Type "${input.type}" has no active version to diff against`, 404, null, 5);
+        }
+        if (!draft) {
+            throw new CliError(`Type "${input.type}" has no draft version to diff`, 404, null, 5);
+        }
+        docA = await runLegalGet(client, Number(active.documentId));
+        docB = await runLegalGet(client, Number(draft.documentId));
+    }
+    else {
+        docA = await runLegalGet(client, input.a);
+        docB = await runLegalGet(client, input.b);
+    }
+    const contentA = typeof docA.markdownContent === "string" ? docA.markdownContent : "";
+    const contentB = typeof docB.markdownContent === "string" ? docB.markdownContent : "";
+    const diff = lineDiff(contentA, contentB);
+    return {
+        a: diffMeta(docA),
+        b: diffMeta(docB),
+        sameContent: diff.sameContent,
+        addedLines: diff.addedLines,
+        removedLines: diff.removedLines,
+        unified: diff.unified,
+    };
 }
 export async function resolveDocumentType(client, typeName) {
     const types = await client.get("/api/legal-documents/types");
@@ -262,12 +328,56 @@ export function registerLegalCommands(parent, getClient) {
     });
     legal
         .command("versions <typeName>")
-        .description("All versions of a document type (active + drafts + history)")
+        .description("All versions of a document type (active + drafts + history); each row carries status")
         .option("--owner <id>", "Filter by ownerAsiakasId tenant scope", Number)
+        .option("--status <status>", `Filter by lifecycle status (${LEGAL_STATUSES.join("|")})`)
         .action(async (typeName, opts) => {
         try {
+            if (opts.status && !LEGAL_STATUSES.includes(opts.status)) {
+                failWith(`Invalid --status "${opts.status}". Valid: ${LEGAL_STATUSES.join(", ")}`, 4);
+            }
             const client = await getClient();
-            writeJson(await runLegalVersions(client, typeName, opts.owner));
+            writeJson(await runLegalVersions(client, typeName, opts.owner, opts.status));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    legal
+        .command("drafts")
+        .description("Unpublished DRAFT versions across all types (status='draft'; content stripped)")
+        .action(async () => {
+        try {
+            const client = await getClient();
+            writeJson(await runLegalDrafts(client));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    legal
+        .command("diff [a] [b]")
+        .description("Line diff: two documentIds (<a> old, <b> new), or --type (newest draft vs active)")
+        .option("--type <typeName>", "Diff the newest DRAFT vs the current ACTIVE version of this type")
+        .action(async (aStr, bStr, opts) => {
+        try {
+            let input;
+            if (opts.type) {
+                if (aStr !== undefined || bStr !== undefined) {
+                    failWith("pass either <a> <b> documentIds OR --type <name>, not both", 4);
+                }
+                input = { type: opts.type };
+            }
+            else {
+                const a = Number(aStr);
+                const b = Number(bStr);
+                if (!Number.isInteger(a) || a <= 0 || !Number.isInteger(b) || b <= 0) {
+                    failWith("provide two positive documentIds (<a> <b>) or use --type <name>", 4);
+                }
+                input = { a, b };
+            }
+            const client = await getClient();
+            writeJson(await runLegalDiff(client, input));
         }
         catch (e) {
             exitWithError(e);
