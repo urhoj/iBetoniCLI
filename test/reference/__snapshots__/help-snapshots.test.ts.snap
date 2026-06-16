@@ -5899,6 +5899,36 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib reference detail matches snapshot 1`] = `
+"USAGE
+  ib reference detail <command...> [flags]
+
+DESCRIPTION
+  On-demand business/AI context for one command (markdown); exit 5 if none.
+The deeper companion to the catalog summary — pull it to verify a claim or understand the domain. NOT in \`ib reference dump\`; also shown as the command's --help AI NOTES.
+  Auth: none (public).
+
+ARGUMENTS
+  <command...> STRING    Command path after \`ib\` (e.g. keikka latest) (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { command, detail, hint } (markdown). exit 5 when unknown or no detail yet.
+
+ERRORS (stderr, exit non-zero)
+  exit 5  Unknown command or no detail yet → \`ib commands\` / \`ib reference dump\` for valid paths; or \`<cmd> --help\`
+
+EXAMPLES
+  ib reference detail keikka latest
+  ib reference detail jerry check-address
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib reference dump matches snapshot 1`] = `
 "USAGE
   ib reference dump [<domain>] [flags]

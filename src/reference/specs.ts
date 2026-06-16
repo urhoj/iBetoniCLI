@@ -3488,6 +3488,35 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib reference detail",
+    description:
+      "On-demand business/AI context for one command (markdown); exit 5 if none.\n" +
+      "The deeper companion to the catalog summary — pull it to verify a claim or " +
+      "understand the domain. NOT in `ib reference dump`; also shown as the command's --help AI NOTES.",
+    auth: "none",
+    args: [
+      {
+        name: "command...",
+        type: "string",
+        required: true,
+        description: "Command path after `ib` (e.g. keikka latest)",
+      },
+    ],
+    flags: [],
+    outputShape: "{ command, detail, hint } (markdown). exit 5 when unknown or no detail yet.",
+    errors: [
+      {
+        exit: 5,
+        meaning: "Unknown command or no detail yet",
+        remedy: "`ib commands` / `ib reference dump` for valid paths; or `<cmd> --help`",
+      },
+    ],
+    examples: [
+      "ib reference detail keikka latest",
+      "ib reference detail jerry check-address",
+    ],
+  },
+  {
     command: "ib commands",
     description:
       "Offline command discovery from the spec catalogue. No args = compact DOMAIN INDEX (~5 KB: every domain with leaf count, glossary blurb, runnable command paths). A domain arg, a filter flag, or --all returns the flat per-command list { command, description, permissions, isWrite }. Lighter than `ib reference dump` (the full surface). No auth, no network.",

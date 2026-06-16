@@ -41,6 +41,7 @@ import { registerHelpCommands } from "./commands/help/index.js";
 import { registerVersionCommand } from "./commands/version/index.js";
 import { registerDoctorCommand } from "./commands/doctor/index.js";
 import { runReferenceDump } from "./reference/dump.js";
+import { runReferenceDetail } from "./reference/detail.js";
 import { buildCommandsList, buildDomainIndex, fullyHiddenDomains } from "./reference/commandsList.js";
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
@@ -198,6 +199,17 @@ export function buildProgram(): Command {
     .action((domain?: string) => {
       try {
         runReferenceDump(domain, getCallerTier());
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+  reference
+    .command("detail")
+    .description("On-demand business/AI context for one command (markdown); exit 5 if none")
+    .argument("<command...>", "Command path after `ib` (e.g. keikka latest)")
+    .action((commandParts: string[]) => {
+      try {
+        writeJson(runReferenceDetail(commandParts, getCallerTier()));
       } catch (e) {
         exitWithError(e);
       }

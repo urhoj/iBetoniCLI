@@ -6,6 +6,7 @@ import { MESSAGE_DAILY_SPECS } from "../commands/message/daily/index.js";
 import { MESSAGE_BOARD_SPECS } from "../commands/message/board/index.js";
 import { CHANGELOG_SPECS } from "../commands/changelog/index.js";
 import { COMMAND_SUMMARIES } from "./summaries.js";
+import { COMMAND_DETAILS } from "./details.js";
 /** API error row: derive the exit code from the HTTP status. */
 const apiErr = (http, meaning, remedy) => ({
     http,
@@ -3240,6 +3241,34 @@ const BASE_COMMAND_SPECS = [
         ],
     },
     {
+        command: "ib reference detail",
+        description: "On-demand business/AI context for one command (markdown); exit 5 if none.\n" +
+            "The deeper companion to the catalog summary — pull it to verify a claim or " +
+            "understand the domain. NOT in `ib reference dump`; also shown as the command's --help AI NOTES.",
+        auth: "none",
+        args: [
+            {
+                name: "command...",
+                type: "string",
+                required: true,
+                description: "Command path after `ib` (e.g. keikka latest)",
+            },
+        ],
+        flags: [],
+        outputShape: "{ command, detail, hint } (markdown). exit 5 when unknown or no detail yet.",
+        errors: [
+            {
+                exit: 5,
+                meaning: "Unknown command or no detail yet",
+                remedy: "`ib commands` / `ib reference dump` for valid paths; or `<cmd> --help`",
+            },
+        ],
+        examples: [
+            "ib reference detail keikka latest",
+            "ib reference detail jerry check-address",
+        ],
+    },
+    {
         command: "ib commands",
         description: "Offline command discovery from the spec catalogue. No args = compact DOMAIN INDEX (~5 KB: every domain with leaf count, glossary blurb, runnable command paths). A domain arg, a filter flag, or --all returns the flat per-command list { command, description, permissions, isWrite }. Lighter than `ib reference dump` (the full surface). No auth, no network.",
         auth: "none",
@@ -4107,6 +4136,13 @@ const BASE_COMMAND_SPECS = [
  */
 export const COMMAND_SPECS = BASE_COMMAND_SPECS.map((spec) => {
     const summary = COMMAND_SUMMARIES[spec.command];
-    return summary ? { ...spec, summary } : spec;
+    const detail = COMMAND_DETAILS[spec.command];
+    if (!summary && !detail)
+        return spec;
+    return {
+        ...spec,
+        ...(summary ? { summary } : {}),
+        ...(detail ? { detail } : {}),
+    };
 });
 //# sourceMappingURL=specs.js.map
