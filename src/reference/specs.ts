@@ -1170,7 +1170,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib worksite search",
     description:
-      "Free-text worksite search (POST /api/tyomaa/search). The query full-text-matches the worksite name, ALL FOUR address lines (street / line 2 / postal code / city), driving instructions, memo, formatted address, worksite number AND the contact person's name / phone / email — so a street fragment like 'Mannerheimintie' finds the worksite. Scoped to the active company. Safe under --read-only (sent as a non-mutating meta request, so it does NOT trip the read-only lock or the acting-as write line).",
+      "Free-text worksite search (POST /api/tyomaa/search). The query full-text-matches the worksite name, ALL FOUR address lines (street / line 2 / postal code / city), driving instructions, memo, formatted address, worksite number AND the contact person's name / phone / email — so a street fragment like 'Mannerheimintie' finds the worksite. Scoped to the active company. Safe under --read-only (sent as a read request — a tenant-scoped read over POST, distinct from a meta/diagnostic call — so it does NOT trip the read-only lock or the acting-as write line).",
     permissions: ["auth.page.tyomaa.read"],
     args: [{ name: "query", type: "string", description: "search string" }],
     flags: [
