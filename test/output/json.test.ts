@@ -49,11 +49,18 @@ describe("JSON output", () => {
     });
   });
 
-  test("writeError on a 404 hints at the deploy-gate ambiguity", () => {
+  test("writeError on a plain 404 hints at resource-not-found + the ROUTE_NOT_FOUND discriminator", () => {
     writeError(new CliError("HTTP 404", 404, null, 5));
     const parsed = JSON.parse(String(stderrSpy.mock.calls.at(-1)![0]));
-    expect(parsed.hint).toMatch(/deploy-gated/);
+    expect(parsed.hint).toMatch(/ROUTE_NOT_FOUND/);
     expect(parsed.hint).toMatch(/ib version/);
+  });
+
+  test("writeError on a 404 with code:ROUTE_NOT_FOUND hints the route is not deployed", () => {
+    writeError(new CliError("Route not found", 404, { code: "ROUTE_NOT_FOUND" }, 5));
+    const parsed = JSON.parse(String(stderrSpy.mock.calls.at(-1)![0]));
+    expect(parsed.code).toBe("ROUTE_NOT_FOUND");
+    expect(parsed.hint).toMatch(/not deployed/i);
   });
 
   test("writeError omits hint when there is none (read-only refusal)", () => {
@@ -134,7 +141,7 @@ describe("JSON output", () => {
       ]);
       writeError(new CliError("HTTP 404", 404, null, 5));
       const parsed = JSON.parse(String(stderrSpy.mock.calls.at(-1)![0]));
-      expect(parsed.hint).toMatch(/deploy-gated/);
+      expect(parsed.hint).toMatch(/ROUTE_NOT_FOUND/);
     });
   });
 });

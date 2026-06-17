@@ -38,6 +38,43 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib ai conversations matches snapshot 1`] = `
+"USAGE
+  ib ai conversations [flags]
+
+DESCRIPTION
+  List recent /ai assistant conversations CROSS-TENANT for audit/browse (compact rows, newest-first, no message bodies). Developer/sysadmin tooling — the way to discover conversationIds to audit without an \`ib feedback\` row pointing at one. Drill into a transcript with \`ib ai conversation <id>\`.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --limit NUMBER    Max rows to return (1-100) (default: 20)
+  --person NUMBER    Filter to one person's conversations (personId)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ conversationId, personId, ownerAsiakasId, entryTime, messageCount }> (truncated:true when the page hit --limit)
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → --limit must be 1-100; --person must be a positive integer
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Deploy-gated: 404 until puminet5api ships the /api/cli/ai/conversations route.
+
+SEE ALSO
+  ib ai conversation, ib feedback list
+
+EXAMPLES
+  ib ai conversations
+  ib ai conversations --limit 50
+  ib ai conversations --person 6233
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib attachment attach matches snapshot 1`] = `
 "USAGE
   ib attachment attach <attachmentId> [flags]

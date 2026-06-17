@@ -3877,7 +3877,34 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     examples: ["ib feedback count", "ib feedback count --scope cli", "ib feedback count --kind legal"],
   },
-  // ─── ai (1) — read AI assistant conversations ────────────────────────────
+  // ─── ai (2) — read AI assistant conversations ────────────────────────────
+  {
+    command: "ib ai conversations",
+    description:
+      "List recent /ai assistant conversations CROSS-TENANT for audit/browse (compact rows, newest-first, no message bodies). Developer/sysadmin tooling — the way to discover conversationIds to audit without an `ib feedback` row pointing at one. Drill into a transcript with `ib ai conversation <id>`.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    tier: "developer",
+    flags: [
+      { name: "limit", type: "number", default: "20", description: "Max rows to return (1-100)" },
+      { name: "person", type: "number", description: "Filter to one person's conversations (personId)" },
+    ],
+    outputShape:
+      "ListEnvelope<{ conversationId, personId, ownerAsiakasId, entryTime, messageCount }> (truncated:true when the page hit --limit)",
+    errors: [
+      { exit: 4, meaning: "Validation", remedy: "--limit must be 1-100; --person must be a positive integer" },
+      apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Deploy-gated: 404 until puminet5api ships the /api/cli/ai/conversations route.",
+    ],
+    seeAlso: ["ib ai conversation", "ib feedback list"],
+    examples: [
+      "ib ai conversations",
+      "ib ai conversations --limit 50",
+      "ib ai conversations --person 6233",
+    ],
+  },
   {
     command: "ib ai conversation",
     description:
