@@ -14,9 +14,8 @@ import {
   DOMAIN_OVERVIEW,
   FEEDBACK_GUIDANCE,
   TOPICS,
-  glossaryForTier,
 } from "./domain.js";
-import type { GlossaryEntry, Topic } from "./domain.js";
+import type { Topic } from "./domain.js";
 import type { CommandSpec } from "../output/help.js";
 import { type CallerTier, visibleSpecs, isHiddenAtTier } from "../tier.js";
 import { emitStdout } from "../output/json.js";
@@ -27,8 +26,8 @@ export interface ReferenceDump {
   generatedAt: string;
   /** Plain-language description of the platform, tenancy model, BetoniJerry. */
   overview: string;
-  /** Core entities + recurring Finnish field names. */
-  glossary: GlossaryEntry[];
+  /** Core entities + recurring Finnish field names (DB-backed; [] when unavailable). */
+  glossary: Array<{ term: string; synonyms: string[]; definition: string | null }>;
   /** When an AI consuming this CLI should proactively file `ib feedback`. */
   feedbackGuidance: typeof FEEDBACK_GUIDANCE;
   /** Offline concept guides for cross-cutting knowledge (`ib help <id>`). */
@@ -75,7 +74,8 @@ function scrubSpecForTier(
  */
 export function buildReference(
   domain?: string,
-  tier: CallerTier = "developer"
+  tier: CallerTier = "developer",
+  glossary: Array<{ term: string; synonyms: string[]; definition: string | null }> = []
 ): ReferenceDump {
   let specs = visibleSpecs(COMMAND_SPECS, tier);
   if (domain) {
@@ -89,7 +89,7 @@ export function buildReference(
     version: packageJson.version,
     generatedAt: new Date().toISOString(),
     overview: DOMAIN_OVERVIEW,
-    glossary: glossaryForTier(tier),
+    glossary,
     feedbackGuidance: FEEDBACK_GUIDANCE,
     topics: TOPICS,
     commands: Object.fromEntries(
@@ -105,6 +105,10 @@ export function buildReference(
  * dropped 2026-06-10: it was ~30% of the dump's bytes (pure indentation) and
  * pushed the customer domain over the 10k-token audit threshold.
  */
-export function runReferenceDump(domain?: string, tier: CallerTier = "developer"): void {
-  emitStdout(JSON.stringify(buildReference(domain, tier)) + "\n");
+export function runReferenceDump(
+  domain?: string,
+  tier: CallerTier = "developer",
+  glossary: Array<{ term: string; synonyms: string[]; definition: string | null }> = []
+): void {
+  emitStdout(JSON.stringify(buildReference(domain, tier, glossary)) + "\n");
 }

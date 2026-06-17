@@ -41,6 +41,7 @@ import { registerHelpCommands } from "./commands/help/index.js";
 import { registerVersionCommand } from "./commands/version/index.js";
 import { registerDoctorCommand } from "./commands/doctor/index.js";
 import { runReferenceDump } from "./reference/dump.js";
+import { runGlossaryList } from "./commands/glossary/index.js";
 import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList } from "./reference/detail.js";
 import { addWriteFlagsToCommand } from "./api/writeFlags.js";
 import { buildCommandsList, buildDomainIndex, fullyHiddenDomains } from "./reference/commandsList.js";
@@ -177,9 +178,18 @@ export function buildProgram() {
         .command("dump")
         .description("Emit the full command surface as JSON on stdout")
         .argument("[domain]", "Restrict the commands map to one domain — the token after `ib` (e.g. keikka)")
-        .action((domain) => {
+        .action(async (domain) => {
         try {
-            runReferenceDump(domain, getCallerTier());
+            let glossary = [];
+            try {
+                const client = await getClient();
+                const res = await runGlossaryList(client, {});
+                glossary = res.items;
+            }
+            catch {
+                glossary = [];
+            }
+            runReferenceDump(domain, getCallerTier(), glossary);
         }
         catch (e) {
             exitWithError(e);

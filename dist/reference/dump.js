@@ -10,7 +10,7 @@
  */
 import { COMMAND_SPECS } from "./specs.js";
 import { assertKnownDomain } from "./commandsList.js";
-import { DOMAIN_OVERVIEW, FEEDBACK_GUIDANCE, TOPICS, glossaryForTier, } from "./domain.js";
+import { DOMAIN_OVERVIEW, FEEDBACK_GUIDANCE, TOPICS, } from "./domain.js";
 import { visibleSpecs, isHiddenAtTier } from "../tier.js";
 import { emitStdout } from "../output/json.js";
 import packageJson from "../../package.json" with { type: "json" };
@@ -49,7 +49,7 @@ function scrubSpecForTier(spec, tier, hiddenCommands) {
  * tier each surviving spec's prose is run through `scrubSpecForTier` so no
  * cross-reference leaks a hidden command path.
  */
-export function buildReference(domain, tier = "developer") {
+export function buildReference(domain, tier = "developer", glossary = []) {
     let specs = visibleSpecs(COMMAND_SPECS, tier);
     if (domain) {
         assertKnownDomain(COMMAND_SPECS, domain, tier);
@@ -60,7 +60,7 @@ export function buildReference(domain, tier = "developer") {
         version: packageJson.version,
         generatedAt: new Date().toISOString(),
         overview: DOMAIN_OVERVIEW,
-        glossary: glossaryForTier(tier),
+        glossary,
         feedbackGuidance: FEEDBACK_GUIDANCE,
         topics: TOPICS,
         commands: Object.fromEntries(specs.map((spec) => [spec.command, scrubSpecForTier(spec, tier, hiddenCommands)])),
@@ -73,7 +73,7 @@ export function buildReference(domain, tier = "developer") {
  * dropped 2026-06-10: it was ~30% of the dump's bytes (pure indentation) and
  * pushed the customer domain over the 10k-token audit threshold.
  */
-export function runReferenceDump(domain, tier = "developer") {
-    emitStdout(JSON.stringify(buildReference(domain, tier)) + "\n");
+export function runReferenceDump(domain, tier = "developer", glossary = []) {
+    emitStdout(JSON.stringify(buildReference(domain, tier, glossary)) + "\n");
 }
 //# sourceMappingURL=dump.js.map

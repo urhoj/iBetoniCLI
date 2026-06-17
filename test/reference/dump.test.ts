@@ -11,21 +11,25 @@ describe("ib reference dump", () => {
     expect(Object.keys(ref.commands)).toContain("ib keikka list");
   });
 
-  test("embeds a domain primer: overview + glossary", () => {
+  test("embeds a domain primer: overview + glossary defaults to []", () => {
     const ref = buildReference();
     expect(typeof ref.overview).toBe("string");
     expect(ref.overview.length).toBeGreaterThan(0);
     expect(ref.overview).toMatch(/BetoniJerry/);
+    // No injected glossary → empty array (DB-backed; no offline bundled copy)
     expect(Array.isArray(ref.glossary)).toBe(true);
-    expect(ref.glossary.length).toBeGreaterThan(0);
-    for (const entry of ref.glossary) {
-      expect(typeof entry.term, "glossary term").toBe("string");
-      expect(entry.term.length).toBeGreaterThan(0);
-      expect(typeof entry.definition, "glossary definition").toBe("string");
-      expect(entry.definition.length).toBeGreaterThan(0);
-    }
-    // term-contains, not exact: the entry is "tilaus / keikka"
-    expect(ref.glossary.some((g) => g.term.includes("keikka"))).toBe(true);
+    expect(ref.glossary).toEqual([]);
+  });
+
+  test("injected glossary appears under the glossary key", () => {
+    const injected = [
+      { term: "keikka", synonyms: ["tilaus"], definition: "A concrete delivery order" },
+      { term: "asiakas", synonyms: [], definition: null },
+    ];
+    const ref = buildReference(undefined, "developer", injected);
+    expect(ref.glossary).toEqual(injected);
+    expect(ref.glossary.length).toBe(2);
+    expect(ref.glossary[0].term).toBe("keikka");
   });
 
   test("every command has flags array, outputShape, errors, examples", () => {
@@ -85,31 +89,35 @@ describe("ib reference dump <domain>", () => {
 });
 
 describe("reference dump tier filtering", () => {
-  test("standard omits developer commands + their glossary entry", () => {
+  test("standard omits developer commands", () => {
     const std = buildReference(undefined, "standard");
     expect(Object.keys(std.commands)).not.toContain("ib ai conversation");
     expect(Object.keys(std.commands)).toContain("ib feedback create");
-    expect(std.glossary.some((g) => g.term.startsWith("ai /"))).toBe(false);
+    // glossary is injected (not bundled) — always [] when nothing passed
+    expect(std.glossary).toEqual([]);
   });
-  test("developer dump retains everything", () => {
+  test("developer dump retains developer commands", () => {
     const dev = buildReference(undefined, "developer");
     expect(Object.keys(dev.commands)).toContain("ib ai conversation");
-    expect(dev.glossary.some((g) => g.term.startsWith("ai /"))).toBe(true);
+    // glossary defaults to [] without injection
+    expect(dev.glossary).toEqual([]);
   });
   test("default tier is developer (back-compat)", () => {
     expect(Object.keys(buildReference().commands)).toContain("ib ai conversation");
   });
-  test("domain-filtered dump at standard retains the tier-filtered (not full) glossary", () => {
-    const std = buildReference(undefined, "standard");
-    const stdDomain = buildReference("keikka", "standard");
-    expect(stdDomain.glossary).toEqual(std.glossary);
-    expect(stdDomain.glossary.some((g) => g.term.startsWith("ai /"))).toBe(false);
+  test("domain-filtered dump carries the injected glossary unchanged", () => {
+    const injected = [{ term: "keikka", synonyms: [], definition: "A delivery order" }];
+    const full = buildReference(undefined, "standard", injected);
+    const narrowed = buildReference("keikka", "standard", injected);
+    expect(narrowed.glossary).toEqual(full.glossary);
+    expect(narrowed.glossary).toEqual(injected);
   });
 });
 
 describe("reference dump leaks no hidden command path (notes/seeAlso/examples)", () => {
   test("standard dump JSON contains NO hidden command path anywhere", () => {
-    const std = JSON.stringify(buildReference(undefined, "standard"));
+    // inject a glossary that mentions no hidden commands (simulates DB fetch)
+    const std = JSON.stringify(buildReference(undefined, "standard", []));
     const hidden = COMMAND_SPECS.filter((s) => s.tier === "developer").map((s) => s.command);
     for (const h of hidden) expect(std).not.toContain(h);
   });
