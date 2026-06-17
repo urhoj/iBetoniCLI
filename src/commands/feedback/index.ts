@@ -26,7 +26,6 @@ const STATUSES = ["open", "reviewed", "applied", "dismissed"] as const;
 type Status = (typeof STATUSES)[number];
 
 const MAX_FREETEXT = 200;
-const CAP = 200;
 const TRUNCATED_FIELDS = ["description", "resolution", "errorText"] as const;
 const TRUNCATE_HINT =
   "description/resolution truncated to 200 chars; ib feedback get <id> for full text";
