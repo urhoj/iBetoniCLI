@@ -36,6 +36,7 @@ import { registerChangelogCommands } from "./commands/changelog/index.js";
 import { registerFeedbackCommands } from "./commands/feedback/index.js";
 import { registerAiCommands } from "./commands/ai/index.js";
 import { registerBugCommands } from "./commands/bug/index.js";
+import { registerGlossaryCommands } from "./commands/glossary/index.js";
 import { registerHelpCommands } from "./commands/help/index.js";
 import { registerVersionCommand } from "./commands/version/index.js";
 import { registerDoctorCommand } from "./commands/doctor/index.js";
@@ -164,6 +165,7 @@ export function buildProgram() {
     registerFeedbackCommands(program, getClient);
     registerAiCommands(program, getClient);
     registerBugCommands(program, getClient);
+    registerGlossaryCommands(program, getClient);
     registerSearchCommands(program, getClient);
     registerAttachmentCommands(program, getClient);
     registerVersionCommand(program, packageJson.version, getEndpoint);

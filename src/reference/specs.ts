@@ -4563,6 +4563,78 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   ...MESSAGE_BOARD_SPECS,
   // ─── changelog ───────────────────────────────────────────────────────────────
   ...CHANGELOG_SPECS,
+  // ─── glossary ────────────────────────────────────────────────────────────────
+  {
+    command: "ib glossary lookup",
+    description: "Resolve a Finnish/colloquial term or synonym to its definition + related commands (DB-backed). Exit 5 if undefined — the miss is recorded for the groomer.",
+    auth: "any",
+    args: [{ name: "term", type: "string", required: true, description: "A word or synonym, e.g. pumppari" }],
+    flags: [],
+    outputShape: "{ term, synonyms[], definition, relatedCommands:[{command,summary}], relatedEntity }",
+    errors: [
+      { http: 404, exit: 5, meaning: "No entry for the term", remedy: "Try `ib glossary list --search <term>`; the miss is queued for definition" },
+      { exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" },
+    ],
+    examples: ["ib glossary lookup pumppari", "ib glossary lookup betoniasema"],
+  },
+  {
+    command: "ib glossary list",
+    description: "List glossary entries; --search filters by term/definition/synonym, --stalest orders least-recently-reviewed first.",
+    auth: "any",
+    args: [],
+    flags: [
+      { name: "search", type: "string", description: "Filter by substring" },
+      { name: "stalest", type: "number", description: "Return up to N entries, stalest first" },
+    ],
+    outputShape: "{ items:[{term,synonyms,definition,relatedCommands,relatedEntity,lastReviewed,runs}], count, truncated? }",
+    errors: [{ exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" }],
+    examples: ["ib glossary list", "ib glossary list --search puomi", "ib glossary list --stalest 10"],
+  },
+  {
+    command: "ib glossary misses",
+    description: "Open lookup misses ranked by frequency — the groomer's queue of undefined terms (developer only).",
+    tier: "developer",
+    auth: "any",
+    args: [],
+    flags: [{ name: "top", type: "number", description: "Return up to N" }],
+    outputShape: "{ items:[{term,count,firstSeen,lastSeen,status}], count, truncated? }",
+    errors: [{ http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" }],
+    examples: ["ib glossary misses --top 20"],
+  },
+  {
+    command: "ib glossary set",
+    description: "Create/update a glossary entry (developer only). Auto-resolves a matching miss.",
+    tier: "developer",
+    auth: "any",
+    mutates: true,
+    writeFlags: true,
+    args: [{ name: "term", type: "string", required: true, description: "Canonical term" }],
+    flags: [
+      { name: "definition", type: "string", description: "One-paragraph definition (≤2000)" },
+      { name: "synonyms", type: "string", description: "Comma-separated aliases incl. inflections" },
+      { name: "related", type: "string", description: 'Comma-separated command paths, e.g. "ib person,ib driver board"' },
+      { name: "entity", type: "string", description: "Related DB entity, e.g. Person / personId" },
+    ],
+    outputShape: "{ term, synonyms, definition, relatedCommands, relatedEntity, runs }",
+    errors: [
+      { http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" },
+      { http: 422, exit: 4, meaning: "definition >2000 chars", remedy: "Shorten the definition" },
+    ],
+    examples: ['ib glossary set valumassa --definition "Pumpattava betonimassa." --synonyms "massaa,valua" --related "ib keikka" --reason "groom"'],
+  },
+  {
+    command: "ib glossary delete",
+    description: "Delete a glossary entry (developer only).",
+    tier: "developer",
+    auth: "any",
+    mutates: true,
+    writeFlags: true,
+    args: [{ name: "term", type: "string", required: true, description: "Canonical term" }],
+    flags: [],
+    outputShape: "{ deleted: 0|1 }",
+    errors: [{ http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" }],
+    examples: ["ib glossary delete obsolete-term --reason cleanup"],
+  },
 ];
 
 /**
