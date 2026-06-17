@@ -198,6 +198,37 @@ describe("ib feedback list", () => {
     await runFeedbackList(mockClient, { scope: "workspace" });
     expect(get).toHaveBeenCalledWith("/api/feedback?scope=workspace");
   });
+
+  test("truncates description/resolution/errorText to 200 chars by default + sets hint", async () => {
+    get.mockResolvedValueOnce([
+      {
+        feedbackId: 1,
+        description: "x".repeat(250),
+        resolution: "y".repeat(300),
+        errorText: "z".repeat(201),
+      },
+    ]);
+    const out = await runFeedbackList(mockClient, {});
+    expect(out.items[0].description).toBe("x".repeat(200) + "...");
+    expect(out.items[0].resolution).toBe("y".repeat(200) + "...");
+    expect(out.items[0].errorText).toBe("z".repeat(200) + "...");
+    expect(out.hint).toMatch(/truncated/);
+  });
+
+  test("--full returns untruncated rows and no hint", async () => {
+    const longDesc = "x".repeat(250);
+    get.mockResolvedValueOnce([{ feedbackId: 1, description: longDesc }]);
+    const out = await runFeedbackList(mockClient, { full: true });
+    expect(out.items[0].description).toBe(longDesc);
+    expect(out.hint).toBeUndefined();
+  });
+
+  test("short rows are unchanged and add no hint", async () => {
+    get.mockResolvedValueOnce([{ feedbackId: 1, description: "short" }]);
+    const out = await runFeedbackList(mockClient, {});
+    expect(out.items[0].description).toBe("short");
+    expect(out.hint).toBeUndefined();
+  });
 });
 
 // ─── get ───────────────────────────────────────────────────────────────────
