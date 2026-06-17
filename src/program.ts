@@ -41,7 +41,7 @@ import { registerGlossaryCommands, runGlossaryList } from "./commands/glossary/i
 import { registerHelpCommands } from "./commands/help/index.js";
 import { registerVersionCommand } from "./commands/version/index.js";
 import { registerDoctorCommand } from "./commands/doctor/index.js";
-import { runReferenceDump } from "./reference/dump.js";
+import { runReferenceDump, projectGlossaryForPrimer } from "./reference/dump.js";
 import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList } from "./reference/detail.js";
 import { addWriteFlagsToCommand } from "./api/writeFlags.js";
 import { buildCommandsList, buildDomainIndex, fullyHiddenDomains } from "./reference/commandsList.js";
@@ -205,7 +205,7 @@ export function buildProgram(): Command {
         try {
           const client = await getClient();
           const res = await runGlossaryList(client, {});
-          glossary = (res.items as Array<{ term: string; synonyms: string[]; definition: string | null }>);
+          glossary = projectGlossaryForPrimer(res.items as Array<Record<string, unknown>>);
         } catch { glossary = []; }
         runReferenceDump(domain, getCallerTier(), glossary);
       } catch (e) {

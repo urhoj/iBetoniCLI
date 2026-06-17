@@ -62,6 +62,26 @@ function scrubSpecForTier(
 }
 
 /**
+ * Project a raw DB glossary item array to the exact shape the dump/--help
+ * primer documents: `{ term, synonyms, definition }` only. Drops any extra
+ * fields the DB layer returns (`relatedCommands`, `relatedEntity`, `runs`,
+ * `lastReviewed`, …) so developer-tier hidden command paths cannot leak
+ * through the glossary of a standard-tier dump or root `--help`.
+ *
+ * Exported as a pure helper so it can be unit-tested independently of the
+ * network layer.
+ */
+export function projectGlossaryForPrimer(
+  items: Array<Record<string, unknown>>
+): Array<{ term: string; synonyms: string[]; definition: string | null }> {
+  return items.map((g) => ({
+    term: g["term"] as string,
+    synonyms: (g["synonyms"] ?? []) as string[],
+    definition: (g["definition"] ?? null) as string | null,
+  }));
+}
+
+/**
  * Build the reference object. Pure — no I/O — so tests can assert on it
  * directly. Commands are keyed by their full path (e.g. `ib keikka list`),
  * matching what an AI assistant sees from `--help`. When `domain` is given,
