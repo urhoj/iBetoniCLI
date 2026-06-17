@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **stdout is JSON, always** — one line, machine-parseable. `--pretty` switches to human tables (cli-table3), `--json` (default) forces JSON.
 - **stderr carries diagnostics and errors** — never mix into stdout.
 - **Exit codes are a documented contract** (`src/api/errors.ts` `exitCodeFromStatus`): `0` success (incl. --help/--version) · `1` generic (bare `ib`/group help render, `auth login` failure, `doctor` not-ok, unexpected runtime errors) · `2` auth (401) · `3` permission (403) · `4` validation (4xx AND parser usage errors, emitted as the JSON envelope with code `USAGE` via `handleParseRejection`) · `5` not-found (404) · `6` server (5xx) · `7` network. Every error path emits the JSON envelope; never call `process.exit()` (Windows-unsafe post-fetch — use `failWith`/`exitWithError`/`process.exitCode`). Preserve this mapping.
-- **`--help` is self-contained** — each command's help lists flags, permissions, output shape, error remedies, and copy-paste examples, so an AI can invoke it correctly from help alone.
+- **`--help` for commands is self-contained** — each command's help renders from bundled `CommandSpec` and lists flags, permissions, output shape, error remedies, and copy-paste examples, so an AI can invoke it correctly from help alone. The root `ib --help` additionally includes a GLOSSARY section fetched live from the DB (`ib glossary`); when offline or tokenless, that section is omitted but the rest of the help renders normally.
 
 ## Commands
 
@@ -79,7 +79,7 @@ The output is TIER-FILTERED: commands tagged `tier: "developer"` are hidden from
 
 ### Group help (computed)
 
-Non-root group commands (`ib keikka`, `ib jerry offer`, …) render `formatGroupHelp` (`src/output/help.ts`) instead of Commander's default: blurb = first `GLOSSARY` entry whose term contains the group's last token (fallback: the Commander description), subcommand table derived by prefix over `COMMAND_SPECS` (leaves show their description's first sentence; subgroups point at their `--help`), DISCOVER footer pointing at `ib reference dump <domain>`. Purely computed — no per-group spec to maintain or drift.
+Non-root group commands (`ib keikka`, `ib jerry offer`, …) render `formatGroupHelp` (`src/output/help.ts`) instead of Commander's default: blurb = `DOMAIN_BLURBS[domain]` if present, otherwise the Commander description; subcommand table derived by prefix over `COMMAND_SPECS` (leaves show their description's first sentence; subgroups point at their `--help`); DISCOVER footer pointing at `ib reference dump <domain>`. Purely computed — no per-group spec to maintain or drift.
 
 ### Tier-gated discovery
 
@@ -99,7 +99,7 @@ One aggregated health report (`src/commands/doctor/index.ts`). Derives identity 
 
 ### `ib help <topic>`
 
-Offline concept guides (`src/commands/help/index.ts`), distinct from each command's `--help`. Sourced from the `TOPICS` table in `src/reference/domain.ts` (one source of truth) — current topics: `roles`, `jerry-lifecycle`, `write-safety`, `exit-codes`, `multi-tenancy`, `log`, `attachments`. No auth, no network: `ib help` returns the list envelope `{ items:[{id,title}], nextCursor, count }`; `ib help <id>` returns `{ id, title, body }` (unknown id → exit 5). `TOPICS` is also embedded in `ib reference dump` under `topics`, and the ids are listed in the `ib --help` footer (via `renderDomainHelp`). The whole group is registered with `program.helpCommand(false)` in `program.ts` — that disables Commander's built-in implicit `help` command so our explicit `help [topic]` action runs; the `-h/--help` option is separate and unaffected.
+Concept guides (`src/commands/help/index.ts`), distinct from each command's `--help`. Sourced from the `TOPICS` table in `src/reference/domain.ts` (one source of truth) — current topics: `roles`, `jerry-lifecycle`, `write-safety`, `exit-codes`, `multi-tenancy`, `log`, `attachments`. Known topics are resolved offline: `ib help` returns the list envelope `{ items:[{id,title}], nextCursor, count }`; `ib help <id>` returns `{ id, title, body }`. **Unknown topic fallback**: when no `TOPICS` entry matches, `runHelpTopic` calls `ib glossary lookup` (DB) and returns the glossary entry's definition as the body — so `ib help <finnish-word>` works for vocabulary too. If the DB returns 404, exit 5 with a hint listing valid topic ids and suggesting `ib glossary lookup <term>`. `TOPICS` is also embedded in `ib reference dump` under `topics`, and the ids are listed in the `ib --help` footer (via `renderDomainHelp`). The whole group is registered with `program.helpCommand(false)` in `program.ts` — that disables Commander's built-in implicit `help` command so our explicit `help [topic]` action runs; the `-h/--help` option is separate and unaffected.
 
 ### `ib vehicle list` filters
 
@@ -118,9 +118,13 @@ Rows are self-describing — each carries `showInGrid`/`firstDate`/`lastDate`/`d
 - Login is OAuth 2.1 + PKCE (`pkce.ts`, `callbackServer.ts`, `login.ts`) opening the system browser.
 - `company switch` / `auth switch` mint a new JWT bound to the target `ownerAsiakasId` and persist it.
 
+### `ib glossary`
+
+The DB-backed domain vocabulary (`src/commands/glossary/index.ts`, backend `/api/cli/glossary/*`). Single source of truth for Finnish/colloquial term definitions, synonyms, and related commands. `lookup <term>` resolves a word or synonym to its entry (exit 5 + miss recorded when unknown); `list` returns all entries with optional `--search`/`--stalest` filters. `set`/`delete`/`misses` are developer-only — the `groom-ib-glossary` skill drives the grooming loop (reads `misses`, calls `set`). The root `ib --help` best-effort prefetches the full list and renders it as the GLOSSARY section (with synonyms shown as `term (syn1, syn2) — definition`); the section is absent offline or when tokenless. `ib reference dump` fetches the same list and embeds it as the `glossary` key.
+
 ### Domain vocabulary (Finnish)
 
-The backend speaks Finnish; the CLI mostly preserves it: `keikka` (delivery order), `asiakas` (customer), `tyomaa` (worksite), `sijainti` (geocoded location), `tila` (status), `pvm` (date), `m3` (cubic metres). Roles map via `ROLE_NAME_BY_TYPEID` / `ROLE_TYPEID_BY_NAME` from `@ibetoni/constants`.
+The backend speaks Finnish; the CLI mostly preserves it: `keikka` (delivery order), `asiakas` (customer), `tyomaa` (worksite), `sijainti` (geocoded location), `tila` (status), `pvm` (date), `m3` (cubic metres). Roles map via `ROLE_NAME_BY_TYPEID` / `ROLE_TYPEID_BY_NAME` from `@ibetoni/constants`. The full live vocabulary with definitions is in `ib glossary` (DB-backed); `DOMAIN_BLURBS` (`src/reference/domain.ts`) is the offline per-domain one-liner source for `ib commands` (domain index) and computed group help.
 
 ## Conventions
 

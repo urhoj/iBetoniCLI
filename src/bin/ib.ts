@@ -28,11 +28,43 @@ program.hook("preAction", (_thisCommand, actionCommand) => {
 // discovery (`ib commands`, `ib reference dump`, root primer) renders at the
 // caller's tier. Fail-closed: any resolution failure → "standard" (privileged
 // subtrees hidden).
+let resolvedAuth: Awaited<ReturnType<typeof resolveAuth>> = null;
 try {
-  const auth = await resolveAuth({ credentialsPath: defaultCredentialsPath() });
-  setCallerTier(resolveCallerTier(auth?.token ?? null));
+  resolvedAuth = await resolveAuth({ credentialsPath: defaultCredentialsPath() });
+  setCallerTier(resolveCallerTier(resolvedAuth?.token ?? null));
 } catch {
   setCallerTier("standard");
+}
+
+// Best-effort prefetch the DB glossary for root `ib --help` / bare `ib` so
+// `renderDomainHelp` can include the GLOSSARY section. Scoped to root help
+// only — subcommand/group help renders from bundled specs and gains nothing.
+// All failures are swallowed: offline, tokenless, or backend-down still
+// renders `--help` correctly (GLOSSARY section simply omitted).
+const wantsRootHelp =
+  process.argv.length <= 2 ||
+  (process.argv.length === 3 && ["--help", "-h"].includes(process.argv[2]!));
+if (wantsRootHelp && resolvedAuth?.token) {
+  try {
+    const [{ createApiClient }, { runGlossaryList }, { setHelpGlossary }] =
+      await Promise.all([
+        import("../api/client.js"),
+        import("../commands/glossary/index.js"),
+        import("../reference/domain.js"),
+      ]);
+    const client = createApiClient({
+      endpoint: resolvedAuth.endpoint,
+      token: resolvedAuth.token,
+      version: program.version() ?? "0.0.0",
+      readOnly: true,
+    });
+    const res = await runGlossaryList(client, {});
+    setHelpGlossary(
+      res.items as Array<{ term: string; synonyms: string[]; definition: string | null }>
+    );
+  } catch {
+    // Glossary unavailable — root help renders without the GLOSSARY section.
+  }
 }
 
 program
