@@ -43,7 +43,7 @@ import { registerDoctorCommand } from "./commands/doctor/index.js";
 import { runReferenceDump, projectGlossaryForPrimer } from "./reference/dump.js";
 import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList } from "./reference/detail.js";
 import { addWriteFlagsToCommand } from "./api/writeFlags.js";
-import { buildCommandsList, buildDomainIndex, fullyHiddenDomains } from "./reference/commandsList.js";
+import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDomain } from "./reference/commandsList.js";
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
@@ -219,10 +219,15 @@ export function buildProgram() {
         .command("list")
         .description("List command-catalog entries, optionally ordered by stalest (DB-backed)")
         .option("--stalest <n>", "Return up to N entries sorted by least-recently reviewed", (v) => Number(v))
+        .option("--domain <d>", "Only commands in this ib domain (e.g. attachment) — narrows BEFORE --stalest")
         .action(async (opts) => {
         try {
+            // Validate the domain offline (exit 4 on unknown) before any network call,
+            // mirroring `ib commands <domain>`.
+            if (opts.domain)
+                assertKnownDomain(COMMAND_SPECS, opts.domain, getCallerTier());
             const client = await getClient();
-            writeJson(await runReferenceDetailList(client, opts.stalest));
+            writeJson(await runReferenceDetailList(client, opts.stalest, opts.domain));
         }
         catch (e) {
             exitWithError(e);

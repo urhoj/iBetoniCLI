@@ -3346,14 +3346,21 @@ const BASE_COMMAND_SPECS = [
                 type: "number",
                 description: "Return up to N entries sorted by least-recently reviewed",
             },
+            {
+                name: "domain",
+                type: "string",
+                description: "Only commands in this ib domain (e.g. attachment) — narrows BEFORE --stalest, so the budget isn't spent on unrelated commands",
+            },
         ],
         outputShape: "{ items: [{ command, summary, lastReviewed, runs }], count }",
         errors: [
             { exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" },
+            { exit: 4, meaning: "Unknown --domain", remedy: "`ib commands` for valid domains" },
         ],
         examples: [
             "ib reference detail list",
             "ib reference detail list --stalest 20",
+            "ib reference detail list --stalest 10 --domain attachment",
         ],
     },
     {

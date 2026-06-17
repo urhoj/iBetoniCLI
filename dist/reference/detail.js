@@ -14,9 +14,14 @@ export async function runReferenceDetail(client, commandParts, tier = getCallerT
     const command = resolveCommand(commandParts, tier);
     return client.get(`/api/cli/command-catalog/${encodeURIComponent(command)}`);
 }
-export async function runReferenceDetailList(client, stalest) {
-    const q = stalest ? `?stalest=${stalest}` : "";
-    return client.get(`/api/cli/command-catalog${q}`);
+export async function runReferenceDetailList(client, stalest, domain) {
+    const p = new URLSearchParams();
+    if (stalest)
+        p.set("stalest", String(stalest));
+    if (domain)
+        p.set("domain", domain);
+    const q = p.toString();
+    return client.get(`/api/cli/command-catalog${q ? `?${q}` : ""}`);
 }
 export async function runReferenceDetailSet(client, commandParts, body, flags = {}, tier = getCallerTier()) {
     // Same client-side visibility gate as the read: an unknown (or tier-hidden)

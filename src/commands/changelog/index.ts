@@ -6,7 +6,7 @@
  * (type, area, files, commit SHAs, linked cliFeedback id, etc.).
  *
  * Commands:
- *   add      POST   /api/changelog   (developer-only; --dry-run is client-side)
+ *   add      POST   /api/changelog   (developer-only; --dry-run is server-side via X-Dry-Run)
  *   list     GET    /api/changelog   (filtered; developer-only)
  *   get      GET    /api/changelog/:id
  *   update   PUT    /api/changelog/:id  (developer-only)
@@ -62,14 +62,15 @@ export interface ChangelogAddBody {
 }
 
 /**
- * POST /api/changelog. --dry-run is CLIENT-side (no server X-Dry-Run guard).
+ * POST /api/changelog. --dry-run is SERVER-side: the request carries X-Dry-Run
+ * and the backend validates the payload (bad enum/date/missing fields still 400)
+ * then echoes `{ dryRun, wouldCreate, validation }` without inserting.
  */
 export async function runChangelogAdd(
   client: ApiClient,
   body: ChangelogAddBody,
   flags: WriteFlags
 ): Promise<unknown> {
-  if (flags.dryRun) return { dryRun: true, wouldAdd: body };
   return client.post<unknown>("/api/changelog", body, {
     headers: writeFlagsToHeaders(flags),
   });
@@ -361,7 +362,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     mutates: true,
-    outputShape: "{ changelogId } | { dryRun, wouldAdd }",
+    outputShape: "{ changelogId } | { dryRun, wouldCreate, validation }",
     errors: [
       {
         http: 403,
@@ -383,7 +384,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       },
     ],
     notes: [
-      "--dry-run is CLIENT-side (no server X-Dry-Run guard).",
+      "--dry-run is SERVER-side (X-Dry-Run): the backend validates the payload then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s under --dry-run.",
       "Developer-gated.",
     ],
     seeAlso: ["ib changelog report", "ib feedback resolve"],

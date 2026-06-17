@@ -1279,7 +1279,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { changelogId } | { dryRun, wouldAdd }
+  { changelogId } | { dryRun, wouldCreate, validation }
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer access required → use a developer token
@@ -1287,7 +1287,7 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
 
 NOTES
-  - --dry-run is CLIENT-side (no server X-Dry-Run guard).
+  - --dry-run is SERVER-side (X-Dry-Run): the backend validates the payload then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s under --dry-run.
   - Developer-gated.
 
 SEE ALSO
@@ -6286,6 +6286,7 @@ DESCRIPTION
 
 FLAGS
   --stalest NUMBER    Return up to N entries sorted by least-recently reviewed
+  --domain STRING    Only commands in this ib domain (e.g. attachment) — narrows BEFORE --stalest, so the budget isn't spent on unrelated commands
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -6295,10 +6296,12 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 2  Not authenticated      → Run \`ib auth login\`
+  exit 4  Unknown --domain       → \`ib commands\` for valid domains
 
 EXAMPLES
   ib reference detail list
   ib reference detail list --stalest 20
+  ib reference detail list --stalest 10 --domain attachment
 "
 `;
 

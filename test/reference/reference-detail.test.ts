@@ -79,4 +79,16 @@ describe("runReferenceDetail", () => {
     await runReferenceDetailList(c);
     expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog");
   });
+
+  test("runReferenceDetailList forwards the domain filter alongside stalest", async () => {
+    const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
+    await runReferenceDetailList(c, 10, "attachment");
+    expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10&domain=attachment");
+  });
+
+  test("runReferenceDetailList sends domain alone when no stalest", async () => {
+    const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
+    await runReferenceDetailList(c, undefined, "attachment");
+    expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog?domain=attachment");
+  });
 });

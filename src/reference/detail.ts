@@ -30,10 +30,14 @@ export async function runReferenceDetail(
 
 export async function runReferenceDetailList(
   client: ApiClient,
-  stalest?: number
+  stalest?: number,
+  domain?: string
 ): Promise<{ items: Array<{ command: string; summary: string | null; lastReviewed: string | null; runs: number }>; count: number }> {
-  const q = stalest ? `?stalest=${stalest}` : "";
-  return client.get(`/api/cli/command-catalog${q}`);
+  const p = new URLSearchParams();
+  if (stalest) p.set("stalest", String(stalest));
+  if (domain) p.set("domain", domain);
+  const q = p.toString();
+  return client.get(`/api/cli/command-catalog${q ? `?${q}` : ""}`);
 }
 
 export async function runReferenceDetailSet(

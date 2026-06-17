@@ -17,11 +17,13 @@ test("add posts the entry with feedback link", async () => {
     expect.objectContaining({ type: "bugfix", area: "cli", feedbackId: 12 }), { headers: {} });
 });
 
-test("add --dry-run never posts", async () => {
+test("add --dry-run posts with X-Dry-Run so the server validates + echoes", async () => {
+  asPost().mockResolvedValue({ dryRun: true, wouldCreate: { type: "feature" }, validation: { ok: true } });
   const r = await runChangelogAdd(client,
     { type: "feature", area: "cli", title: "t", description: "d", entryDate: "2026-06-14" }, { dryRun: true });
+  expect(asPost()).toHaveBeenCalledWith("/api/changelog",
+    expect.objectContaining({ type: "feature" }), { headers: { "X-Dry-Run": "1" } });
   expect(r).toMatchObject({ dryRun: true });
-  expect(asPost()).not.toHaveBeenCalled();
 });
 
 test("report fetches the generated markdown", async () => {
