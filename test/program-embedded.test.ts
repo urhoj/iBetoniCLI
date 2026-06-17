@@ -12,8 +12,8 @@ describe("embedded parser-error routing", () => {
     const c = ctx();
     await runEmbedded(c, async () => {
       const program = buildProgram();
-      const parserText = enableParserThrow(program);
-      await program.parseAsync(["node", "ib", "definitely-not-a-command"]).catch((e) => handleParseRejection(e, parserText));
+      const { parserText, erroringCommand } = enableParserThrow(program);
+      await program.parseAsync(["node", "ib", "definitely-not-a-command"]).catch((e) => handleParseRejection(e, parserText, erroringCommand));
     });
     expect(c.exitCode).not.toBe(null);
     expect(c.stderr.join("").length).toBeGreaterThan(0);

@@ -5,6 +5,7 @@ import {
   handleParseRejection,
 } from "../src/program.js";
 import { CliError } from "../src/api/errors.js";
+import { runArgv } from "../src/runArgv.js";
 
 /**
  * Usage errors are emitted as the standard JSON envelope (code USAGE, exit 4)
@@ -31,10 +32,10 @@ describe("parser errors → JSON envelope", () => {
 
   async function run(argv: string[]): Promise<void> {
     const program = buildProgram();
-    const parserText = enableParserThrow(program);
+    const { parserText, erroringCommand } = enableParserThrow(program);
     await program
       .parseAsync(["node", "ib", ...argv])
-      .catch((err) => handleParseRejection(err, parserText));
+      .catch((err) => handleParseRejection(err, parserText, erroringCommand));
   }
 
   function lastStderrJson(): Record<string, unknown> {
@@ -96,4 +97,19 @@ describe("parser errors → JSON envelope", () => {
     expect(String(stderrSpy.mock.calls.at(-1)![0])).toBe("boom\n");
     expect(process.exitCode).toBe(1);
   });
+});
+
+test("unknown legal subcommand → enriched envelope (#1)", async () => {
+  const { exitCode, stderr } = await runArgv(["legal", "verison"], {
+    token: "",
+    endpoint: "https://example.invalid",
+  });
+  expect(exitCode).toBe(4);
+  const env = JSON.parse(stderr);
+  expect(env.code).toBe("USAGE");
+  expect(env.group).toBe("ib legal");
+  expect(env.unknownCommand).toBe("verison");
+  expect(env.didYouMean).toBe("versions");
+  expect(env.available).toContain("active");
+  expect(env.available).not.toContain("save"); // tokenless → standard tier
 });

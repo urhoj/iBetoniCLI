@@ -15,7 +15,7 @@ const program = buildProgram();
 
 // Throw-instead-of-exit for the parser (usage errors become the JSON envelope
 // in handleParseRejection; help/version pass through) + capture its stderr.
-const parserText = enableParserThrow(program);
+const { parserText, erroringCommand } = enableParserThrow(program);
 
 program.hook("preAction", (_thisCommand, actionCommand) => {
   if (getGlobalOptions(program).pretty) setOutputMode("pretty");
@@ -70,4 +70,4 @@ if (wantsRootHelp && resolvedAuth?.token) {
 
 program
   .parseAsync(process.argv)
-  .catch((err) => handleParseRejection(err, parserText));
+  .catch((err) => handleParseRejection(err, parserText, erroringCommand));

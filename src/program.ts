@@ -49,6 +49,7 @@ import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
 import { writeJson, exitWithError, failWith, emitStdout, emitStderr, setActiveCommandErrors } from "./output/json.js";
+import { buildUnknownCommandEnvelope } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { createApiClient } from "./api/client.js";
 import { CliError } from "./api/errors.js";
@@ -376,8 +377,16 @@ export function applySpecErrors(actionCommand: Command): void {
  * tree is fully built (exitOverride/configureOutput don't propagate to
  * already-created subcommands via inheritance — we walk explicitly).
  */
-export function enableParserThrow(program: Command): () => string {
+export interface ParserHooks {
+  /** Accumulated parser stderr text (help renders, did-you-mean lines, etc.). */
+  parserText: () => string;
+  /** The command that last called _exit — the GROUP for an unknown subcommand. */
+  erroringCommand: () => Command | null;
+}
+
+export function enableParserThrow(program: Command): ParserHooks {
   let captured = "";
+  let erroringCmd: Command | null = null;
   const output = {
     writeErr: (s: string) => {
       captured += s;
@@ -391,12 +400,17 @@ export function enableParserThrow(program: Command): () => string {
     },
   };
   const walk = (cmd: Command): void => {
-    cmd.exitOverride();
+    // A callback that closes over `cmd` captures WHICH command threw, then
+    // throws (Windows-safe: never reaches Commander's internal process.exit).
+    cmd.exitOverride((err) => {
+      erroringCmd = cmd;
+      throw err;
+    });
     cmd.configureOutput(output);
     cmd.commands.forEach(walk);
   };
   walk(program);
-  return () => captured;
+  return { parserText: () => captured, erroringCommand: () => erroringCmd };
 }
 
 /** Commander's error shape under exitOverride (avoid instanceof across copies). */
@@ -441,7 +455,8 @@ function setExit(code: number): void {
  */
 export function handleParseRejection(
   err: unknown,
-  parserText: () => string
+  parserText: () => string,
+  erroringCommand?: () => Command | null
 ): void {
   if (err instanceof CliError) {
     exitWithError(err);
@@ -453,6 +468,21 @@ export function handleParseRejection(
       if (text) emitStderr(text);
       setExit(err.exitCode ?? 0);
       return;
+    }
+    // Unknown subcommand → enriched envelope: siblings + did-you-mean (#1).
+    if (err.code === "commander.unknownCommand" && erroringCommand) {
+      const cmd = erroringCommand();
+      if (cmd) {
+        const token =
+          (Array.isArray(cmd.args) && cmd.args[0]) ||
+          text.match(/unknown command '([^']+)'/)?.[1] ||
+          "";
+        emitStderr(
+          JSON.stringify(buildUnknownCommandEnvelope(cmd, token, getCallerTier())) + "\n"
+        );
+        setExit(4);
+        return;
+      }
     }
     const detail = (text || err.message || "usage error")
       .replace(/^error:\s*/gm, "")

@@ -1,0 +1,126 @@
+/**
+ * Enriched "unknown subcommand" error envelope (CLI usability #1).
+ *
+ * When Commander hits an unknown subcommand under a known group (e.g.
+ * `ib legal list`), the default USAGE envelope only echoes "unknown command
+ * 'list'" — a dead end for an AI caller. This turns the GROUP command that
+ * threw into a structured, actionable envelope: the group's available
+ * (tier-filtered) subcommands plus a fuzzy "did you mean".
+ *
+ * Pure + testable: Commander Command in, envelope out. The erroring command is
+ * captured by enableParserThrow's per-command exitOverride closure (program.ts)
+ * — at the point handleParseRejection runs we no longer have the tree, only the
+ * command that threw.
+ */
+import type { Command } from "commander";
+import { COMMAND_SPECS } from "../reference/specs.js";
+import { isHiddenAtTier, type CallerTier } from "../tier.js";
+
+/** Classic Levenshtein edit distance (two-row). */
+export function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  let curr = new Array<number>(n + 1).fill(0);
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+    }
+    [prev, curr] = [curr, prev];
+  }
+  return prev[n];
+}
+
+/**
+ * Closest name to `target` within an edit-distance threshold, else null.
+ * A prefix match (`acc`→`accept`, target ≥ 2 chars) always wins; otherwise the
+ * minimum edit distance, accepted only when ≤ max(2, floor(len/2)).
+ */
+export function closestName(target: string, names: string[]): string | null {
+  if (!target || names.length === 0) return null;
+  const t = target.toLowerCase();
+  const prefix = names.find((n) => t.length >= 2 && n.toLowerCase().startsWith(t));
+  if (prefix) return prefix;
+  const threshold = Math.max(2, Math.floor(t.length / 2));
+  let best: string | null = null;
+  let bestDist = Infinity;
+  for (const n of names) {
+    const d = levenshtein(t, n.toLowerCase());
+    if (d < bestDist) {
+      bestDist = d;
+      best = n;
+    }
+  }
+  return best !== null && bestDist <= threshold ? best : null;
+}
+
+/** Space-joined path of a command up its parent chain (e.g. "ib legal"). */
+export function commandPath(cmd: Command): string {
+  const parts: string[] = [];
+  for (let c: Command | null = cmd; c; c = c.parent) parts.unshift(c.name());
+  return parts.join(" ");
+}
+
+/**
+ * Visible subcommand names of `cmd` at `tier`. A leaf with a developer-tier
+ * spec is dropped for non-developer callers; a subgroup with no leaf spec of
+ * its own (e.g. `legal type`) stays visible.
+ */
+export function visibleSubcommands(cmd: Command, tier: CallerTier): string[] {
+  const base = commandPath(cmd);
+  return cmd.commands
+    .filter((sub) => {
+      const spec = COMMAND_SPECS.find((s) => s.command === `${base} ${sub.name()}`);
+      return spec ? !isHiddenAtTier(spec, tier) : true;
+    })
+    .map((sub) => sub.name());
+}
+
+export interface UnknownCommandEnvelope {
+  success: false;
+  error: string;
+  code: "USAGE";
+  statusCode: 0;
+  group: string;
+  unknownCommand: string;
+  didYouMean: string | null;
+  available: string[];
+  hint: string;
+}
+
+/**
+ * Build the enriched envelope. `cmd` is the GROUP that threw
+ * commander.unknownCommand; `unknownToken` is the bad token (cmd.args[0]).
+ */
+export function buildUnknownCommandEnvelope(
+  cmd: Command,
+  unknownToken: string,
+  tier: CallerTier
+): UnknownCommandEnvelope {
+  const group = commandPath(cmd);
+  const available = visibleSubcommands(cmd, tier);
+  const didYouMean = closestName(unknownToken, available);
+  const domain = group.split(" ")[1]; // token after `ib`, e.g. legal
+  const discover = domain
+    ? `\`${group} --help\` or \`ib commands ${domain}\``
+    : "`ib --help` or `ib commands`";
+  const suggestion = didYouMean ? `Did you mean \`${group} ${didYouMean}\`? ` : "";
+  return {
+    success: false,
+    error:
+      group === "ib"
+        ? `unknown command "${unknownToken}"`
+        : `unknown command "${unknownToken}" under \`${group}\``,
+    code: "USAGE",
+    statusCode: 0,
+    group,
+    unknownCommand: unknownToken,
+    didYouMean,
+    available,
+    hint: `${suggestion}Available ${cmd.name()} subcommands: ${available.join(", ")}. Run ${discover} to discover them.`,
+  };
+}
