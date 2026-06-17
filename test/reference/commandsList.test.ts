@@ -203,7 +203,7 @@ describe("buildDomainIndex", () => {
     // a domain with no glossary entry degrades to null, not a crash
     const version = env.items.find((i) => i.domain === "version");
     expect(version).toMatchObject({ count: 1, description: null, commands: ["version"] });
-    // pin jerry → BetoniJerry blurb (a GLOSSARY reorder could shadow it via jerryActiveUntil)
+    // pin jerry → BetoniJerry blurb from DOMAIN_BLURBS
     const jerry = env.items.find((i) => i.domain === "jerry");
     expect(jerry?.description).toMatch(/BetoniJerry|request-for-quote/i);
     // regression: "ai" must NOT inherit sijainti's blurb via the "ai" ⊂ "sijainti"

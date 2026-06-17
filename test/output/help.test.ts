@@ -5,7 +5,6 @@ import {
   type CommandSpec,
 } from "../../src/output/help.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
-import { GLOSSARY } from "../../src/reference/domain.js";
 
 const sampleSpec: CommandSpec = {
   command: "ib keikka list",
@@ -85,7 +84,6 @@ describe("formatGroupHelp tier filtering", () => {
       "ib jerry",
       "Jerry",
       COMMAND_SPECS,
-      GLOSSARY,
       "standard"
     );
     expect(std).not.toMatch(/^\s+admin\b/m);
@@ -93,7 +91,6 @@ describe("formatGroupHelp tier filtering", () => {
       "ib jerry",
       "Jerry",
       COMMAND_SPECS,
-      GLOSSARY,
       "developer"
     );
     expect(dev).toContain("admin");
@@ -103,7 +100,6 @@ describe("formatGroupHelp tier filtering", () => {
       "ib schema",
       "Schema",
       COMMAND_SPECS,
-      GLOSSARY,
       "standard"
     );
     expect(std).toContain("not available at your access level");
@@ -112,7 +108,6 @@ describe("formatGroupHelp tier filtering", () => {
       "ib schema",
       "Schema",
       COMMAND_SPECS,
-      GLOSSARY,
       "developer"
     );
     expect(dev).toContain("SUBCOMMANDS");
@@ -122,7 +117,6 @@ describe("formatGroupHelp tier filtering", () => {
       "ib feedback",
       "Feedback",
       COMMAND_SPECS,
-      GLOSSARY,
       "standard"
     );
     expect(std).toContain("create");

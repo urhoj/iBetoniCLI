@@ -139,9 +139,9 @@ export function buildProgram() {
     // `auth` manages credential-store access directly (login/logout/whoami/etc.)
     // and so doesn't take a `getClient` factory.
     registerAuthCommands(program, isReadOnly);
-    // `help` — offline concept guides, no auth. Registered before authenticated
-    // commands so the spec catalogue and wiring tests can find it.
-    registerHelpCommands(program);
+    // `help` — concept guides + DB glossary fallback. Registered before
+    // authenticated commands so the spec catalogue and wiring tests can find it.
+    registerHelpCommands(program, getClient);
     registerCompanyCommands(program, getClient, isReadOnly);
     registerValidateCommands(program, getClient);
     registerKeikkaCommands(program, getClient);

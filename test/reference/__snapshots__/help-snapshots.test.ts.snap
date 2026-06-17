@@ -2748,11 +2748,11 @@ exports[`Help snapshots — contract stability > help for ib help matches snapsh
   ib help [<topic>] [flags]
 
 DESCRIPTION
-  Concept guides for AI users (offline, no auth). No arg lists topic ids; \`ib help <topic>\` prints one guide. Glossary terms (e.g. tila, keikka, ownerAsiakasId) also resolve here.
+  Concept guides for AI users. No arg lists topic ids; \`ib help <topic>\` prints one guide. Unknown topics fall back to \`ib glossary lookup\` (DB-backed).
   Auth: none (public).
 
 ARGUMENTS
-  <topic> STRING    topic id (roles, jerry-lifecycle, write-safety, exit-codes, multi-tenancy) or a GLOSSARY term (tila, keikka, asiakas, ...) (optional)
+  <topic> STRING    topic id (roles, jerry-lifecycle, write-safety, exit-codes, multi-tenancy, log, attachments) or a vocabulary term resolved via the DB glossary (optional)
 
 FLAGS
   (none)
@@ -2764,7 +2764,7 @@ OUTPUT (JSON, stdout)
   no arg: { items:[{id,title}], nextCursor:null, count } | with topic: { id, title, body }
 
 ERRORS (stderr, exit non-zero)
-  exit 5  Unknown topic          → run \`ib help\` to list valid topic ids; the error message also lists the glossary terms
+  exit 5  Unknown topic          → run \`ib help\` to list valid topic ids; or \`ib glossary lookup <term>\` for vocabulary
 
 EXAMPLES
   ib help

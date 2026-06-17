@@ -1,6 +1,6 @@
 import { COMMAND_SPECS } from "./specs.js";
 import { CliError } from "../api/errors.js";
-import { GLOSSARY } from "./domain.js";
+import { domainBlurb } from "./domain.js";
 import { visibleSpecs, domainOf, hiddenDomainsAtTier } from "../tier.js";
 /** Single source for the write classification used by `ib commands`. */
 const isWriteSpec = (s) => s.mutates ?? !!s.writeFlags;
@@ -81,24 +81,10 @@ export function buildCommandsList(filter, tier = "developer") {
  * Bare `ib commands` — a ~5 KB domain INDEX instead of the full flat list
  * (~43 KB at 149 leaves and growing). Progressive-discovery entry point:
  * index → `ib commands <domain>` → `ib <command> --help`. The flat list moved
- * behind `--all` (BREAKING, 2026-06-10). Blurbs reuse the GLOSSARY (same
- * source as group help), so domains without a glossary term get null.
+ * behind `--all` (BREAKING, 2026-06-10). Blurbs come from the offline
+ * {@link DOMAIN_BLURBS} map (via {@link domainBlurb}), so domains without an
+ * entry get null.
  */
-/**
- * Pick the GLOSSARY blurb for a domain. Prefer a WHOLE-WORD match so a domain
- * never inherits a blurb where its name is merely a substring of another term
- * (the "ai" ⊂ "sij**ai**nti" collision — `ai` must get the `ai / conversation`
- * entry, not sijainti's). Fall back to a loose substring match for compound
- * terms with no word boundary before the domain (e.g. `jerry` ⊂ "BetoniJerry").
- * Returns null when no glossary term mentions the domain. Domain names are
- * command tokens (lowercase letters), so they are regex-safe.
- */
-function glossaryBlurbForDomain(domain) {
-    const wholeWord = new RegExp(`\\b${domain}\\b`, "i");
-    return (GLOSSARY.find((g) => wholeWord.test(g.term))?.definition ??
-        GLOSSARY.find((g) => g.term.toLowerCase().includes(domain))?.definition ??
-        null);
-}
 export function buildDomainIndex(specs = COMMAND_SPECS, tier = "developer") {
     const visible = visibleSpecs(specs, tier);
     const items = commandDomains(visible)
@@ -107,7 +93,7 @@ export function buildDomainIndex(specs = COMMAND_SPECS, tier = "developer") {
         return {
             domain,
             count: inDomain.length,
-            description: glossaryBlurbForDomain(domain),
+            description: domainBlurb(domain),
             commands: inDomain.map((s) => s.command.replace(/^ib /, "")),
         };
     })

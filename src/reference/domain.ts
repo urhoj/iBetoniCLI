@@ -4,13 +4,12 @@
  * `specs.ts` teaches an AI how to call each command; this file teaches it what
  * it is operating on (the business, the multi-tenant model, the Finnish entity
  * vocabulary). Both ride along in the single artifact an AI ingests at session
- * start: `ib reference dump` embeds {@link DOMAIN_OVERVIEW} + {@link GLOSSARY}
- * as top-level keys, and `ib --help` renders the same via
+ * start: `ib reference dump` embeds {@link DOMAIN_OVERVIEW} and a DB-fetched
+ * glossary as top-level keys, and `ib --help` renders the same via
  * {@link renderDomainHelp}. One source of truth → the primer can never drift
  * from the CLI it describes.
  */
-import { type CallerTier, hiddenDomainsAtTier } from "../tier.js";
-import { COMMAND_SPECS } from "./specs.js";
+import type { CallerTier } from "../tier.js";
 
 /** One-paragraph description of the platform, tenancy model, and BetoniJerry. */
 export const DOMAIN_OVERVIEW =
@@ -25,140 +24,43 @@ export const DOMAIN_OVERVIEW =
   "betonijerry.fi (their ownerAsiakasId is 1349). Many field names and status " +
   "values are in Finnish.";
 
-export interface GlossaryEntry {
-  /** The term, Finnish first where the field/value is Finnish. */
-  term: string;
-  /** One-line definition, ending with the command group where relevant. */
-  definition: string;
-}
+/**
+ * Offline one-line blurbs per command DOMAIN, for `ib commands` (domain index)
+ * and computed group help. This is CLI-structure documentation (available
+ * without a backend) — distinct from the DB-backed vocabulary glossary
+ * (`ib glossary`), which owns synonyms/definitions and is fetched at runtime.
+ */
+export const DOMAIN_BLURBS: Record<string, string> = {
+  keikka: "Concrete delivery/pumping orders — the central entity.",
+  customer: "Customer companies you deliver to.",
+  worksite: "Construction sites where concrete is delivered.",
+  sijainti: "Geocoded locations — depots, plants, destinations.",
+  vehicle: "Pump and mixer trucks.",
+  person: "System users — drivers, admins, office staff.",
+  driver: "Day-driver board: who drives which vehicle on a date.",
+  company: "The tenant company your token acts as (multi-tenancy).",
+  schedule: "Date-scoped views of keikkas: today / a day / a week.",
+  stats: "Aggregated delivery statistics.",
+  jerry: "BetoniJerry RFQ marketplace: requests, offers, confirmation.",
+  message: "Chat threads, the announcement board, and daily grid notes.",
+  attachment: "Files (photos/PDFs) linked to entities via Azure Blob.",
+  legal: "Versioned legal documents and per-person acceptances.",
+  validate: "Company and person readiness validation profiles.",
+  log: "Field-level audit trail (changeTracker).",
+  cache: "Redis cache inspection/invalidation (developer).",
+  bug: "User-filed bug reports.",
+  feedback: "Quiet CLI/AI friction sink for proposals.",
+  glossary: "Domain glossary — resolve a term/synonym to its meaning + commands.",
+  ohje: "UI help-text content behind HelperIcon.",
+  schema: "SQL schema introspection (developer).",
+  ai: "/ai assistant conversations (developer).",
+  changelog: "Dev changelog entries (developer).",
+  reference: "Machine-readable CLI catalogue (dump / detail).",
+  auth: "Login, logout, token, company switch.",
+  doctor: "Aggregated CLI/connectivity health report.",
+};
 
-/** Core entities and recurring field names an AI will meet in the data. */
-export const GLOSSARY: GlossaryEntry[] = [
-  {
-    term: "tilaus / keikka",
-    definition:
-      "A concrete delivery/pumping order: one job delivered to a worksite in a date/time window. The central entity (`ib keikka …`).",
-  },
-  {
-    term: "asiakas / customer",
-    definition:
-      "A customer company you deliver to (`ib customer …`). NOTE: 'asiakas' is also the word for a tenant company itself — `ib customer` = companies you deliver to, `ib company` = the tenant you act as (see 'company (tenant)').",
-  },
-  {
-    term: "liite / attachment",
-    definition:
-      "A file (photo/PDF/document) in Azure Blob, linked to entities via the generic attachments table — keikka, vehicle, person, customer, worksite, sijainti, tuote, bug report, Jerry request/offer. Managed with `ib attachment …`; bytes move directly between you and Azure via 1h SAS URLs.",
-  },
-  {
-    term: "työmaa / worksite",
-    definition:
-      "A construction site where concrete is delivered (`ib worksite …`).",
-  },
-  {
-    term: "sijainti",
-    definition:
-      "A geocoded location — depot, plant, or customer destination (`ib sijainti …`).",
-  },
-  {
-    term: "betoniasema / tehdas / plant / asema",
-    definition:
-      "A concrete batching plant — sijainti type Betoniasema. plant = factory = tehdas = (betoni)asema, used interchangeably ('Kivikon asemalla' / 'Kivikon tehtaalla' = the Kivikko betoniasema). Plants belong to SUPPLIER companies (Rudus, Lujabetoni, …), not your tenant — list with `ib sijainti plants` (alias: tehtaat), resolve by name with `--search <name>`.",
-  },
-  {
-    term: "ajoneuvo / vehicle / pumppu / auto",
-    definition: "A pump or mixer truck (`ib vehicle …`).",
-  },
-  {
-    term: "henkilö / käyttäjä / person / pumppari / kuljettaja",
-    definition: "A system user: driver, admin, etc. (`ib person …`).",
-  },
-  {
-    term: "company (tenant) / yritys / asiakas",
-    definition:
-      "The active company your token acts on — the multi-tenancy boundary (`ib company …`). Same Finnish word as customer — see 'asiakas / customer'.",
-  },
-  {
-    term: "schedule / aikataulu",
-    definition:
-      "Date-scoped views of keikkas: today / a given day / a week (`ib schedule …`).",
-  },
-  {
-    term: "tila / status",
-    definition:
-      "Finnish for \"status\" — keikka rows carry the numeric keikkaTilaId: " +
-      "-1 Uusi tilaus (new) · 0 Luonnos (draft) · 1 Kesken (in progress) · " +
-      "2 Lähetetty (sent) · 3 Käsittelyssä (being handled) · 4 Toimitusvalmis (ready for delivery) · " +
-      "5 Toimitus meneillään (delivery ongoing) · 6 Toimitus epäonnistui (delivery failed) · " +
-      "7 Epäonnistui (failed) · 8 Peruttu (cancelled) · 9/12/13 Toimitettu (delivered) · " +
-      "10 Poistettu (deleted) · 100 Valmis (complete/closed) · 11/200 Järjestelmätilaus (system row, do not edit). " +
-      "Source of truth: GET /api/tila/list.",
-  },
-  {
-    term: "ownerAsiakasId",
-    definition:
-      "Tenant-owner id derived from your JWT; scopes every list/read.",
-  },
-  {
-    term: "BetoniJerry",
-    definition:
-      "A request-for-quote marketplace for concrete pumping: customers post requests, provider companies bid, the winner is confirmed into a keikka. Also an umbrella tenant (asiakasId 1349) for providers and betonijerry.fi-registered customers (`ib jerry …`).",
-  },
-  {
-    term: "tarjouspyyntö / pumppuRequest",
-    definition:
-      "A BetoniJerry request for a concrete pump (the RFQ). Lifecycle: draft → open → accepted → confirmed (`ib jerry request …`).",
-  },
-  {
-    term: "tarjous / pumppuOffer",
-    definition:
-      "A provider's bid (price, availability, terms) on a pumppuRequest (`ib jerry request offers`).",
-  },
-  {
-    term: "viesti / message",
-    definition:
-      "Conversational chat threads between a customer and a provider/operator, tied to a context (Jerry tarjous now, keikka later) (`ib message chat …`). Distinct from daily grid notes and the announcement board.",
-  },
-  {
-    term: "ilmoitustaulu / announcement board",
-    definition:
-      "Company-wide dated notices (title + body + priority info/warning/urgent) every member sees until they expire — a one-to-many broadcast, tenant-scoped (`ib message board …`, alias `ib message ilmoitustaulu`). Distinct from chat threads and daily grid notes.",
-  },
-  {
-    term: "varikko / depot",
-    definition:
-      "A pumping provider's depot — a sijainti with a delivery radius. Enrolled in BetoniJerry per-varikko via jerryActiveUntil (`ib sijainti set-jerry`).",
-  },
-  {
-    term: "jerryActiveUntil",
-    definition:
-      "sijainti column gating a varikko's BetoniJerry enrolment: future/sentinel datetime = active, NULL = not enrolled, past = expired.",
-  },
-  {
-    term: "log / muutoshistoria / changeTracker",
-    definition:
-      "Field-level audit trail (changeTracker table): every tracked write stores who/when/old→new and the --reason header, scoped per tenant (ownerAsiakasId). Read with `ib log ...` or the per-entity `log` subcommands (`ib keikka log <id>`, `ib person log <id>`, ...).",
-  },
-  {
-    term: "validate",
-    definition:
-      "Validation profiles run as `ib validate`: company profiles (jerry = BetoniJerry provider readiness, betoni = betoni.online customer setup) and the person profile onboarding (is one employee ready to work — työsuhteessa, role, contact, role-required modules). Pass/fail/skip checklists with Finnish details.",
-  },
-  {
-    term: "legal",
-    definition:
-      "Versioned legal documents (TOS, EULA, privacy) in dbo.legalDocuments; per-person acceptances tracked via personSettings (`ib legal …`).",
-  },
-  {
-    term: "vikaraportti / bug report",
-    definition:
-      "A user-filed bug report in the bugReport system: severity/priority/status, a comment thread, GitHub-issue + admin-email workflow, and a developer triage tier (`ib bug …`). Distinct from `ib feedback` (the quiet CLI/AI friction sink).",
-  },
-  {
-    term: "ai / conversation",
-    definition:
-      "An /ai assistant conversation (gptConversations/gptMessages). Developers can read a transcript by id with `ib ai conversation <id>`. Feedback filed from /ai carries the originating id in context.conversationId.",
-  },
-];
+export const domainBlurb = (domain: string): string | null => DOMAIN_BLURBS[domain] ?? null;
 
 /**
  * Guidance for an AI consuming this CLI on WHEN to file feedback. Surfaced in
@@ -239,38 +141,44 @@ export const TOPICS: Topic[] = [
 ];
 
 /**
- * GLOSSARY entries whose term references a domain that is fully hidden at
- * `tier` are dropped from the primer, so a `standard` caller's `--help` /
- * `reference dump` doesn't reintroduce — via the glossary — a command its
- * command list omits. A domain is "hidden" when it has zero visible leaves at
- * `tier`. The domain-extraction + visible/hidden computation is the shared
- * `hiddenDomainsAtTier` helper in `tier.ts` (imported by both this file and
- * commandsList.ts — `tier.ts` depends on neither, so there is no import cycle).
+ * Module-level holder for a DB-fetched glossary, stashed by `bin/ib.ts` before
+ * help renders so `renderDomainHelp` can include it without requiring network
+ * access at render time. When empty, the GLOSSARY section is omitted.
  */
-export function glossaryForTier(tier: CallerTier): GlossaryEntry[] {
-  if (tier === "developer") return GLOSSARY;
-  const hidden = hiddenDomainsAtTier(COMMAND_SPECS, tier);
-  return GLOSSARY.filter(
-    (g) => ![...hidden].some((d) => new RegExp(`\\b${d}\\b`, "i").test(g.term))
-  );
+let helpGlossary: Array<{ term: string; synonyms: string[]; definition: string | null }> = [];
+
+export function setHelpGlossary(
+  g: Array<{ term: string; synonyms: string[]; definition: string | null }>
+): void {
+  helpGlossary = g;
 }
 
 /**
  * Render the primer as a fixed-section text block for `ib --help`. Mirrors the
  * parse-friendly style of `formatHelp` (uppercase section headers, two-space
  * indent) so an AI sees a consistent layout across root and per-command help.
+ * The GLOSSARY section is rendered from the `helpGlossary` holder (DB-fetched
+ * at startup by `bin/ib.ts`) — omitted entirely when the holder is empty
+ * (offline / tokenless).
+ *
+ * The `tier` parameter is accepted for API compatibility (callers pass
+ * `getCallerTier()`) but is not used for glossary filtering now that the
+ * glossary is DB-backed and tier-scoped at the server level.
  */
-export function renderDomainHelp(tier: CallerTier = "developer"): string {
-  const glossary = glossaryForTier(tier);
+export function renderDomainHelp(_tier: CallerTier = "developer"): string {
+  const glossary = helpGlossary;
   const lines: string[] = [];
   lines.push("");
   lines.push("ABOUT");
   lines.push(`  ${DOMAIN_OVERVIEW}`);
-  lines.push("");
-  lines.push("GLOSSARY");
-  const pad = Math.max(...glossary.map((g) => g.term.length));
-  for (const g of glossary) {
-    lines.push(`  ${g.term.padEnd(pad)}  ${g.definition}`);
+  if (glossary.length > 0) {
+    lines.push("");
+    lines.push("GLOSSARY");
+    const pad = Math.max(...glossary.map((g) => g.term.length));
+    for (const g of glossary) {
+      const def = g.definition ?? "";
+      lines.push(`  ${g.term.padEnd(pad)}  ${def}`);
+    }
   }
   lines.push("");
   lines.push("FILING FEEDBACK (AI users — be proactive)");

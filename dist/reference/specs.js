@@ -4005,12 +4005,12 @@ const BASE_COMMAND_SPECS = [
     // ─── help (1) ────────────────────────────────────────────────────────────
     {
         command: "ib help",
-        description: "Concept guides for AI users (offline, no auth). No arg lists topic ids; `ib help <topic>` prints one guide. Glossary terms (e.g. tila, keikka, ownerAsiakasId) also resolve here.",
+        description: "Concept guides for AI users. No arg lists topic ids; `ib help <topic>` prints one guide. Unknown topics fall back to `ib glossary lookup` (DB-backed).",
         auth: "none",
-        args: [{ name: "topic", type: "string", required: false, description: "topic id (roles, jerry-lifecycle, write-safety, exit-codes, multi-tenancy) or a GLOSSARY term (tila, keikka, asiakas, ...)" }],
+        args: [{ name: "topic", type: "string", required: false, description: "topic id (roles, jerry-lifecycle, write-safety, exit-codes, multi-tenancy, log, attachments) or a vocabulary term resolved via the DB glossary" }],
         flags: [],
         outputShape: "no arg: { items:[{id,title}], nextCursor:null, count } | with topic: { id, title, body }",
-        errors: [{ exit: 5, meaning: "Unknown topic", remedy: "run `ib help` to list valid topic ids; the error message also lists the glossary terms" }],
+        errors: [{ exit: 5, meaning: "Unknown topic", remedy: "run `ib help` to list valid topic ids; or `ib glossary lookup <term>` for vocabulary" }],
         examples: ["ib help", "ib help write-safety", "ib help tila"],
     },
     // ─── search (1) ──────────────────────────────────────────────────────────

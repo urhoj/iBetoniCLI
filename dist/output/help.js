@@ -22,7 +22,7 @@
  * subcommand's `--help`, so an AI inspecting a single command sees the full
  * spec without having to run `ib reference dump`.
  */
-import { GLOSSARY } from "../reference/domain.js";
+import { domainBlurb } from "../reference/domain.js";
 import { getCallerTier, isHiddenAtTier } from "../tier.js";
 /**
  * Render a {@link CommandSpec} as the AI-optimized `--help` text. Output is a
@@ -128,13 +128,13 @@ export function hiddenAtTierMessage(path) {
  *
  * Groups have no CommandSpec of their own; everything here is derived — the
  * subcommand table from the spec catalogue (children = unique next token after
- * the group path), the blurb from the first GLOSSARY entry whose term contains
- * the group's last token (falling back to the Commander description), and the
- * footer from the group's domain. Mirrors `formatHelp`'s parse-friendly layout
- * (uppercase sections, two-space indent). No new source of truth → cannot
- * drift from `--help` / `ib reference dump` / `ib commands`.
+ * the group path), the blurb from {@link domainBlurb} for the group's last
+ * token (falling back to the Commander description), and the footer from the
+ * group's domain. Mirrors `formatHelp`'s parse-friendly layout (uppercase
+ * sections, two-space indent). No new source of truth → cannot drift from
+ * `--help` / `ib reference dump` / `ib commands`.
  */
-export function formatGroupHelp(groupPath, fallbackDescription, specs, glossary, tier = "developer") {
+export function formatGroupHelp(groupPath, fallbackDescription, specs, tier = "developer") {
     const prefix = groupPath + " ";
     const depth = groupPath.split(" ").length; // child = token at this index
     const domain = groupPath.split(" ")[1];
@@ -144,8 +144,7 @@ export function formatGroupHelp(groupPath, fallbackDescription, specs, glossary,
     if (children.length === 0)
         return hiddenAtTierMessage(groupPath);
     const byCommand = new Map(specs.map((s) => [s.command, s]));
-    const blurb = glossary.find((g) => g.term.toLowerCase().includes(groupName))?.definition ??
-        fallbackDescription;
+    const blurb = domainBlurb(groupName) ?? fallbackDescription;
     const lines = [];
     lines.push("USAGE");
     lines.push(`  ${groupPath} <command> [flags]`);
@@ -207,7 +206,7 @@ export function attachRichHelp(root, specs) {
             // Non-root group: computed group help (root keeps the domain primer).
             const fallback = cmd.description();
             cmd.configureHelp({
-                formatHelp: () => formatGroupHelp(full, fallback, specs, GLOSSARY, getCallerTier()),
+                formatHelp: () => formatGroupHelp(full, fallback, specs, getCallerTier()),
             });
         }
         for (const sub of cmd.commands)

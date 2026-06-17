@@ -1,7 +1,6 @@
 import { describe, test, expect } from "vitest";
 import { formatGroupHelp } from "../../src/output/help.js";
 import type { CommandSpec } from "../../src/output/help.js";
-import type { GlossaryEntry } from "../../src/reference/domain.js";
 
 const SPECS: CommandSpec[] = [
   {
@@ -38,20 +37,17 @@ const SPECS: CommandSpec[] = [
   },
 ];
 
-const GLOSSARY_SAMPLE: GlossaryEntry[] = [
-  { term: "keikka", definition: "A concrete delivery/pumping order." },
-];
-
 describe("formatGroupHelp", () => {
-  const out = formatGroupHelp("ib keikka", "Keikka commands", SPECS, GLOSSARY_SAMPLE);
+  const out = formatGroupHelp("ib keikka", "Keikka commands", SPECS);
 
   test("renders USAGE for the group", () => {
     expect(out).toContain("USAGE");
     expect(out).toContain("ib keikka <command> [flags]");
   });
 
-  test("blurb comes from the matching glossary term", () => {
-    expect(out).toContain("A concrete delivery/pumping order.");
+  test("blurb comes from DOMAIN_BLURBS for the group domain", () => {
+    // keikka is in DOMAIN_BLURBS: "Concrete delivery/pumping orders — the central entity."
+    expect(out).toContain("Concrete delivery/pumping orders");
   });
 
   test("lists direct leaf children with first-sentence descriptions", () => {
@@ -78,8 +74,8 @@ describe("formatGroupHelp", () => {
     expect(out).toContain("ib help");
   });
 
-  test("falls back to the Commander description when no glossary term matches", () => {
-    const noMatch = formatGroupHelp("ib other", "Other commands", SPECS, GLOSSARY_SAMPLE);
+  test("falls back to the Commander description when no DOMAIN_BLURBS entry matches", () => {
+    const noMatch = formatGroupHelp("ib other", "Other commands", SPECS);
     expect(noMatch).toContain("Other commands");
   });
 
@@ -87,8 +83,7 @@ describe("formatGroupHelp", () => {
     const nested = formatGroupHelp(
       "ib keikka drivers",
       "Driver assignment commands",
-      SPECS,
-      GLOSSARY_SAMPLE
+      SPECS
     );
     expect(nested).toContain("ib keikka drivers <command> [flags]");
     expect(nested).toContain("ib reference dump keikka");

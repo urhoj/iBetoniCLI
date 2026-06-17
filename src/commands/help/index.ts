@@ -1,5 +1,7 @@
 import type { Command } from "commander";
-import { TOPICS, GLOSSARY } from "../../reference/domain.js";
+import { TOPICS } from "../../reference/domain.js";
+import type { ApiClient } from "../../api/client.js";
+import { runGlossaryLookup } from "../glossary/index.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 import { CliError } from "../../api/errors.js";
 
@@ -19,44 +21,54 @@ export function runHelpList(): {
 
 /**
  * `ib help <id>` — return one concept guide `{ id, title, body }` from
- * {@link TOPICS}, falling back to {@link GLOSSARY} terms (e.g. `ib help tila`):
- * glossary entries are domain vocabulary, not concept guides, but `ib help
- * <term>` is the natural first guess so it resolves here too. Compound terms
- * ("asiakas / customer") match on any alias. Offline, no auth. Throws a
- * {@link CliError} mapped to exit 5 (not-found) when nothing matches; the
- * message lists the valid topic ids AND glossary terms.
+ * {@link TOPICS}. Known topics are resolved offline. Unknown ids fall back to
+ * an async DB glossary lookup (`ib glossary lookup`), so `ib help <term>` works
+ * for vocabulary too. Throws a {@link CliError} mapped to exit 5 (not-found)
+ * when nothing matches.
  */
-export function runHelpTopic(id: string): { id: string; title: string; body: string } {
+export async function runHelpTopic(
+  id: string,
+  getClient: () => Promise<ApiClient>
+): Promise<{ id: string; title: string; body: string }> {
   const t = TOPICS.find((x) => x.id === id);
   if (t) return { id: t.id, title: t.title, body: t.body };
-  const needle = id.toLowerCase();
-  const g = GLOSSARY.find((x) =>
-    x.term.split("/").some((alias) => alias.trim().toLowerCase() === needle)
-  );
-  if (g) return { id, title: `${g.term} (glossary)`, body: g.definition };
-  const ids = TOPICS.map((x) => x.id).join(", ");
-  const terms = GLOSSARY.map((x) => x.term).join(", ");
-  throw new CliError(
-    `unknown topic: ${id}. Valid topics: ${ids}. Glossary terms (also resolvable here): ${terms}`,
-    0,
-    null,
-    5
-  );
+  // Fallback: the natural `ib help <word>` guess resolves from the DB glossary.
+  try {
+    const client = await getClient();
+    const e = await runGlossaryLookup(client, id);
+    return { id, title: `${e.term} (glossary)`, body: e.definition ?? "" };
+  } catch (err) {
+    if (err instanceof CliError && err.exitCode === 5) {
+      const ids = TOPICS.map((x) => x.id).join(", ");
+      throw new CliError(
+        `unknown topic: ${id}. Valid topics: ${ids}. For vocabulary try \`ib glossary lookup ${id}\`.`,
+        0,
+        null,
+        5
+      );
+    }
+    throw err;
+  }
 }
 
 /**
- * Register the offline `ib help [topic]` command (no `getClient` — needs no
- * auth). NOTE: Commander's built-in implicit `help` command is disabled in
- * `program.ts` via `program.helpCommand(false)` so this explicit command's
- * action runs; the `-h/--help` option is separate and unaffected.
+ * Register the `ib help [topic]` command. NOTE: Commander's built-in implicit
+ * `help` command is disabled in `program.ts` via `program.helpCommand(false)`
+ * so this explicit command's action runs; the `-h/--help` option is separate
+ * and unaffected. Unknown topics fall back to `ib glossary lookup` (DB).
  */
-export function registerHelpCommands(program: Command): void {
+export function registerHelpCommands(
+  program: Command,
+  getClient: () => Promise<ApiClient>
+): void {
   program
     .command("help [topic]")
-    .description("Concept guides for AI users (offline). No arg = list topics.")
-    .action((topic?: string) => {
+    .description(
+      "Concept guides for AI users; an unknown topic falls back to `ib glossary lookup`."
+    )
+    .action(async (topic?: string) => {
       try {
-        writeJson(topic ? runHelpTopic(topic) : runHelpList());
+        writeJson(topic ? await runHelpTopic(topic, getClient) : runHelpList());
       } catch (e) {
         exitWithError(e);
       }

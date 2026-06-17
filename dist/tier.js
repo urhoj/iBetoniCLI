@@ -41,9 +41,9 @@ export function domainOf(command) {
 /**
  * Domains every visible leaf of which is hidden at `tier` — i.e. the whole
  * domain has zero visible leaves and should disappear from discovery
- * (e.g. ai/schema/changelog at "standard"). Empty at "developer". Single source
- * for the root-help command filter (`fullyHiddenDomains`) and the primer
- * glossary filter (`glossaryForTier`), which must stay in lock-step.
+ * (e.g. ai/schema/changelog at "standard"). Empty at "developer". Used by
+ * the root-help command filter (`fullyHiddenDomains`) and the domain index
+ * builder in `commandsList.ts`.
  */
 export function hiddenDomainsAtTier(specs, tier) {
     const visible = new Set(visibleSpecs(specs, tier).map((s) => domainOf(s.command)));

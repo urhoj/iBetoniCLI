@@ -24,7 +24,7 @@
  */
 
 import type { Command } from "commander";
-import { GLOSSARY, type GlossaryEntry } from "../reference/domain.js";
+import { domainBlurb } from "../reference/domain.js";
 import { type CallerTier, getCallerTier, isHiddenAtTier } from "../tier.js";
 
 export interface CommandError {
@@ -242,17 +242,16 @@ export function hiddenAtTierMessage(path: string): string {
  *
  * Groups have no CommandSpec of their own; everything here is derived — the
  * subcommand table from the spec catalogue (children = unique next token after
- * the group path), the blurb from the first GLOSSARY entry whose term contains
- * the group's last token (falling back to the Commander description), and the
- * footer from the group's domain. Mirrors `formatHelp`'s parse-friendly layout
- * (uppercase sections, two-space indent). No new source of truth → cannot
- * drift from `--help` / `ib reference dump` / `ib commands`.
+ * the group path), the blurb from {@link domainBlurb} for the group's last
+ * token (falling back to the Commander description), and the footer from the
+ * group's domain. Mirrors `formatHelp`'s parse-friendly layout (uppercase
+ * sections, two-space indent). No new source of truth → cannot drift from
+ * `--help` / `ib reference dump` / `ib commands`.
  */
 export function formatGroupHelp(
   groupPath: string,
   fallbackDescription: string,
   specs: CommandSpec[],
-  glossary: GlossaryEntry[],
   tier: CallerTier = "developer"
 ): string {
   const prefix = groupPath + " ";
@@ -267,9 +266,7 @@ export function formatGroupHelp(
   if (children.length === 0) return hiddenAtTierMessage(groupPath);
   const byCommand = new Map(specs.map((s) => [s.command, s]));
 
-  const blurb =
-    glossary.find((g) => g.term.toLowerCase().includes(groupName))?.definition ??
-    fallbackDescription;
+  const blurb = domainBlurb(groupName) ?? fallbackDescription;
 
   const lines: string[] = [];
   lines.push("USAGE");
@@ -334,7 +331,7 @@ export function attachRichHelp(root: Command, specs: CommandSpec[]): void {
       const fallback = cmd.description();
       cmd.configureHelp({
         formatHelp: () =>
-          formatGroupHelp(full, fallback, specs, GLOSSARY, getCallerTier()),
+          formatGroupHelp(full, fallback, specs, getCallerTier()),
       });
     }
     for (const sub of cmd.commands) walk(sub, [...path, cmd.name()]);

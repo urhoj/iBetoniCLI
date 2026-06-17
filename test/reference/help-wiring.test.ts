@@ -3,7 +3,6 @@ import type { Command } from "commander";
 import { buildProgram } from "../../src/program.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
 import { formatHelp, formatGroupHelp } from "../../src/output/help.js";
-import { GLOSSARY } from "../../src/reference/domain.js";
 
 /** Collect every leaf+group command in the tree as its full path → Command. */
 function collectCommands(root: Command): Map<string, Command> {
@@ -39,7 +38,7 @@ describe("Rich --help wiring — real command tree", () => {
     for (const [path, cmd] of commands) {
       if (path === "ib" || cmd.commands.length === 0) continue;
       expect(cmd.helpInformation(), path).toBe(
-        formatGroupHelp(path, cmd.description(), COMMAND_SPECS, GLOSSARY)
+        formatGroupHelp(path, cmd.description(), COMMAND_SPECS)
       );
     }
   });
