@@ -224,6 +224,36 @@ export async function runFeedbackGet(
   return client.get<Record<string, unknown>>(`/api/feedback/${id}`);
 }
 
+/**
+ * Client-side aggregate of /api/feedback for the cheapest "is there anything?"
+ * answer. Fetches up to the 200-row cap (optionally pre-filtered by
+ * kind/scope) and buckets by status/kind/scope. Flags `truncated` if the table
+ * exceeds the cap (won't happen at current row counts; kept honest).
+ */
+export async function runFeedbackCount(
+  client: ApiClient,
+  opts: { kind?: string; scope?: string }
+): Promise<Record<string, unknown>> {
+  const rows = await fetchRows(client, { kind: opts.kind, scope: opts.scope, limit: CAP });
+  const byStatus: Record<string, number> = { open: 0, reviewed: 0, applied: 0, dismissed: 0 };
+  const byKind: Record<string, number> = {};
+  const byScope: Record<string, number> = {};
+  for (const r of rows) {
+    const s = String(r.status ?? "");
+    if (s in byStatus) byStatus[s] += 1;
+    const k = String(r.kind ?? "unknown");
+    byKind[k] = (byKind[k] ?? 0) + 1;
+    const sc = String(r.scope ?? "unknown");
+    byScope[sc] = (byScope[sc] ?? 0) + 1;
+  }
+  const out: Record<string, unknown> = { total: rows.length, byStatus, byKind, byScope };
+  if (rows.length >= CAP) {
+    out.truncated = true;
+    out.hint = "count is a lower bound — fetch hit the 200-row cap";
+  }
+  return out;
+}
+
 /** Project a resolved row to the compact write-ack fields (resolution capped). */
 function compactAck(row: Record<string, unknown>): Record<string, unknown> {
   const ack: Record<string, unknown> = {};

@@ -4,6 +4,7 @@ import {
   runFeedbackList,
   runFeedbackGet,
   runFeedbackResolve,
+  runFeedbackCount,
 } from "../../src/commands/feedback/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -349,5 +350,44 @@ describe("ib feedback resolve", () => {
     put.mockResolvedValueOnce({ feedbackId: 42, status: "applied", description: "huge original" });
     const out = await runFeedbackResolve(mockClient, 42, { status: "applied", full: true });
     expect(out).toMatchObject({ feedbackId: 42, status: "applied", description: "huge original" });
+  });
+});
+
+// ─── count ───────────────────────────────────────────────────────────────────
+
+describe("ib feedback count", () => {
+  test("aggregates by status, kind, scope", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 1, status: "open", kind: "improvement", scope: "cli" },
+      { feedbackId: 2, status: "open", kind: "bug", scope: "app" },
+      { feedbackId: 3, status: "applied", kind: "improvement", scope: "cli" },
+    ]);
+    const out = await runFeedbackCount(mockClient, {});
+    expect(get).toHaveBeenCalledWith("/api/feedback?limit=200");
+    expect(out).toMatchObject({
+      total: 3,
+      byStatus: { open: 2, reviewed: 0, applied: 1, dismissed: 0 },
+      byKind: { improvement: 2, bug: 1 },
+      byScope: { cli: 2, app: 1 },
+    });
+  });
+
+  test("forwards --kind and --scope filters", async () => {
+    get.mockResolvedValueOnce([]);
+    await runFeedbackCount(mockClient, { kind: "bug", scope: "cli" });
+    expect(get).toHaveBeenCalledWith("/api/feedback?kind=bug&scope=cli&limit=200");
+  });
+
+  test("flags truncated when the fetch hits the 200-row cap", async () => {
+    const rows = Array.from({ length: 200 }, (_, i) => ({
+      feedbackId: i,
+      status: "open",
+      kind: "bug",
+      scope: "cli",
+    }));
+    get.mockResolvedValueOnce(rows);
+    const out = await runFeedbackCount(mockClient, {});
+    expect(out.truncated).toBe(true);
+    expect(out.hint).toMatch(/lower bound/);
   });
 });
