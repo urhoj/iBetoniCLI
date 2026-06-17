@@ -26,6 +26,7 @@ const STATUSES = ["open", "reviewed", "applied", "dismissed"] as const;
 type Status = (typeof STATUSES)[number];
 
 const MAX_FREETEXT = 200;
+const CAP = 200;
 const TRUNCATED_FIELDS = ["description", "resolution", "errorText"] as const;
 const TRUNCATE_HINT =
   "description/resolution truncated to 200 chars; ib feedback get <id> for full text";
@@ -127,10 +128,35 @@ export async function runFeedbackCreate(
 }
 
 /**
- * GET /api/feedback — developer-only. Projects rows into the `{ items,
- * nextCursor, count }` envelope. Long free-text (description/resolution/
- * errorText) is capped at 200 chars unless `--full`; when anything was cut the
- * envelope carries a `hint` pointing at `ib feedback get <id>`.
+ * Resolve the requested status filter into a list of statuses, or null for no
+ * filter. `--unresolved` = open + reviewed. `--status` may be a single value or
+ * a comma-separated list. Conflicting/unknown values exit 4.
+ */
+function resolveStatuses(opts: { status?: string; unresolved?: boolean }): string[] | null {
+  if (opts.unresolved && opts.status) {
+    throw new CliError("Use either --unresolved or --status, not both", 400, null, 4);
+  }
+  if (opts.unresolved) return ["open", "reviewed"];
+  if (opts.status) {
+    const list = opts.status
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    for (const s of list) {
+      if (!STATUSES.includes(s as Status)) {
+        throw new CliError(`--status must be one of: ${STATUSES.join(", ")}`, 400, null, 4);
+      }
+    }
+    return list.length ? list : null;
+  }
+  return null;
+}
+
+/**
+ * GET /api/feedback — developer-only. One status (or none) is a single
+ * server-filtered GET. `--unresolved` / a CSV `--status` fan out to one GET per
+ * status, merged newest-first and sliced [offset, offset+limit) client-side.
+ * Long free-text is capped at 200 chars unless `--full`.
  */
 export async function runFeedbackList(
   client: ApiClient,
@@ -140,10 +166,38 @@ export async function runFeedbackList(
     scope?: string;
     limit?: number;
     offset?: number;
+    unresolved?: boolean;
     full?: boolean;
   }
 ): Promise<ListEnvelope<Record<string, unknown>>> {
-  let items = await fetchRows(client, opts);
+  const statuses = resolveStatuses(opts);
+  let items: Record<string, unknown>[];
+  let truncated = false;
+
+  if (!statuses || statuses.length <= 1) {
+    items = await fetchRows(client, {
+      status: statuses?.[0],
+      kind: opts.kind,
+      scope: opts.scope,
+      limit: opts.limit,
+      offset: opts.offset,
+    });
+  } else {
+    const pages = await Promise.all(
+      statuses.map((s) =>
+        fetchRows(client, { status: s, kind: opts.kind, scope: opts.scope, limit: CAP })
+      )
+    );
+    if (pages.some((p) => p.length >= CAP)) truncated = true;
+    const merged = pages
+      .flat()
+      .sort((a, b) => Number(b.feedbackId) - Number(a.feedbackId));
+    const offset = opts.offset ?? 0;
+    const limit = opts.limit ?? 50;
+    if (merged.length > offset + limit) truncated = true;
+    items = merged.slice(offset, offset + limit);
+  }
+
   let cut = false;
   if (!opts.full) {
     items = items.map((r) => {
@@ -157,6 +211,7 @@ export async function runFeedbackList(
     nextCursor: null,
     count: items.length,
   };
+  if (truncated) env.truncated = true;
   if (cut) env.hint = TRUNCATE_HINT;
   return env;
 }

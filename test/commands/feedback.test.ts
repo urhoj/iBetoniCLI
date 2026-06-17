@@ -229,6 +229,46 @@ describe("ib feedback list", () => {
     expect(out.items[0].description).toBe("short");
     expect(out.hint).toBeUndefined();
   });
+
+  test("--unresolved fetches open+reviewed and merges newest-first", async () => {
+    get.mockResolvedValueOnce([{ feedbackId: 3, status: "open" }]); // open page
+    get.mockResolvedValueOnce([{ feedbackId: 5, status: "reviewed" }]); // reviewed page
+    const out = await runFeedbackList(mockClient, { unresolved: true });
+    expect(get).toHaveBeenNthCalledWith(1, "/api/feedback?status=open&limit=200");
+    expect(get).toHaveBeenNthCalledWith(2, "/api/feedback?status=reviewed&limit=200");
+    expect(out.items.map((r) => r.feedbackId)).toEqual([5, 3]);
+  });
+
+  test("CSV --status open,applied fetches each and merges desc", async () => {
+    get.mockResolvedValueOnce([{ feedbackId: 1 }]); // open
+    get.mockResolvedValueOnce([{ feedbackId: 9 }]); // applied
+    const out = await runFeedbackList(mockClient, { status: "open,applied" });
+    expect(get).toHaveBeenNthCalledWith(1, "/api/feedback?status=open&limit=200");
+    expect(get).toHaveBeenNthCalledWith(2, "/api/feedback?status=applied&limit=200");
+    expect(out.items.map((r) => r.feedbackId)).toEqual([9, 1]);
+  });
+
+  test("multi-status forwards --kind to every page", async () => {
+    get.mockResolvedValueOnce([]);
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { unresolved: true, kind: "bug" });
+    expect(get).toHaveBeenNthCalledWith(1, "/api/feedback?status=open&kind=bug&limit=200");
+    expect(get).toHaveBeenNthCalledWith(2, "/api/feedback?status=reviewed&kind=bug&limit=200");
+  });
+
+  test("--unresolved together with --status exits 4 (no fetch)", async () => {
+    await expect(
+      runFeedbackList(mockClient, { unresolved: true, status: "open" })
+    ).rejects.toMatchObject({ exitCode: 4 });
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  test("an unknown status in a CSV exits 4 (no fetch)", async () => {
+    await expect(
+      runFeedbackList(mockClient, { status: "open,bogus" })
+    ).rejects.toMatchObject({ exitCode: 4 });
+    expect(get).not.toHaveBeenCalled();
+  });
 });
 
 // ─── get ───────────────────────────────────────────────────────────────────
