@@ -18,6 +18,7 @@ import {
   runAttachmentDetach,
   runAttachmentUpdate,
   runAttachmentDelete,
+  resolveDetachEntity,
 } from "../../src/commands/attachment/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -70,6 +71,12 @@ describe("ib attachment reads", () => {
     await runAttachmentSearch(c, { missing: true });
     expect(c.get).toHaveBeenCalledWith("/api/cli/attachment/search?missing=1");
   });
+
+  test("search with no filter lists all (no query string)", async () => {
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce(LIST);
+    await runAttachmentSearch(c, {});
+    expect(c.get).toHaveBeenCalledWith("/api/cli/attachment/search");
+  });
 });
 
 describe("resolveEntityTarget", () => {
@@ -83,6 +90,28 @@ describe("resolveEntityTarget", () => {
   test("throws exit-4 CliError on zero or two entity flags", () => {
     expect(() => resolveEntityTarget({})).toThrowError(CliError);
     expect(() => resolveEntityTarget({ keikka: 1, vehicle: 2 })).toThrowError(CliError);
+  });
+});
+
+describe("resolveDetachEntity", () => {
+  test("resolves from an attach-style flag, ignoring the id", () => {
+    expect(resolveDetachEntity(undefined, { keikka: 9001 })).toBe("keikka");
+    expect(resolveDetachEntity(undefined, { bugReport: 3 })).toBe("bugReport");
+  });
+
+  test("resolves from the positional word (incl. kebab form)", () => {
+    expect(resolveDetachEntity("keikka", {})).toBe("keikka");
+    expect(resolveDetachEntity("bug-report", {})).toBe("bugReport");
+  });
+
+  test("allows positional + flag when they agree", () => {
+    expect(resolveDetachEntity("keikka", { keikka: 9001 })).toBe("keikka");
+  });
+
+  test("throws exit-4 CliError on neither, conflicting sources, or two flags", () => {
+    expect(() => resolveDetachEntity(undefined, {})).toThrowError(CliError);
+    expect(() => resolveDetachEntity("keikka", { vehicle: 53 })).toThrowError(CliError);
+    expect(() => resolveDetachEntity(undefined, { keikka: 1, vehicle: 2 })).toThrowError(CliError);
   });
 });
 

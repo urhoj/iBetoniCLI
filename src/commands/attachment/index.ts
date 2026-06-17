@@ -60,6 +60,39 @@ export function normalizeEntityWord(raw: string): string {
   return name;
 }
 
+/**
+ * Resolve the detach target entity from the optional positional word and/or the
+ * attach-style entity flags. Detach NULLs the FK, so the flag's id is irrelevant
+ * — only the entity NAME is used. Accepting `--keikka <id>` lets callers reuse
+ * the exact `attach` syntax (`detach 4711 --keikka 9001`) instead of hitting a
+ * usage error. Exactly one source required; both allowed only when they agree.
+ * Exported for tests.
+ */
+export function resolveDetachEntity(
+  positional: string | undefined,
+  opts: Record<string, unknown>
+): string {
+  const flagHits = ENTITY_OPTS.filter((e) => opts[e.optKey] !== undefined);
+  if (flagHits.length > 1) {
+    failWith(
+      `Only one entity flag allowed (got ${flagHits.length}): ${ENTITY_OPTS.map((e) => e.flag.split(" ")[0]).join(" | ")}`,
+      4
+    );
+  }
+  const fromFlag = flagHits.length === 1 ? flagHits[0].entity : undefined;
+  const fromPositional = positional !== undefined ? normalizeEntityWord(positional) : undefined;
+  if (fromFlag === undefined && fromPositional === undefined) {
+    failWith(
+      `Specify the entity to unlink as a positional word (e.g. 'keikka') or a flag (e.g. --keikka). Valid: ${ENTITY_WORDS.join(", ")}`,
+      4
+    );
+  }
+  if (fromFlag !== undefined && fromPositional !== undefined && fromFlag !== fromPositional) {
+    failWith(`Conflicting entity: positional '${fromPositional}' vs flag '--${fromFlag}' — pass only one`, 4);
+  }
+  return (fromFlag ?? fromPositional) as string;
+}
+
 const MIME_BY_EXT: Record<string, string> = {
   jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp",
   gif: "image/gif", heic: "image/heic", svg: "image/svg+xml",
@@ -367,12 +400,11 @@ export function registerAttachmentCommands(
     });
 
   a.command("search [text]")
-    .description("Search attachments in the active company by file name/comment")
+    .description("Search attachments in the active company by file name/comment; with no text and no --missing, lists ALL active company attachments (like `ib keikka list`)")
     .option("--missing", "Only attachments with NO linked entity (orphans)")
     .option("--limit <n>", "Max rows (capped at 500)", (s: string) => Math.min(Number(s), 500))
     .action(async (text: string | undefined, opts: { missing?: boolean; limit?: number }) => {
       try {
-        if (!text && !opts.missing) failWith("Provide search text or --missing", 4);
         writeJson(await runAttachmentSearch(await getClient(), { q: text, missing: opts.missing, limit: opts.limit }));
       } catch (e) {
         exitWithError(e);
@@ -488,12 +520,14 @@ export function registerAttachmentCommands(
   );
 
   const detachCmd = a
-    .command("detach <attachmentId> <entity>")
-    .description("Unlink an attachment from one entity (keikka|vehicle|person|customer|worksite|sijainti|tuote|bug-report|request|offer). Requires a manager role on the owner company.");
+    .command("detach <attachmentId> [entity]")
+    .description("Unlink an attachment from one entity. Name the entity as a positional word OR an attach-style flag (--keikka 9001 — the id is ignored). Requires a manager role on the owner company.");
+  addEntityFlags(detachCmd);
   addWriteFlagsToCommand(detachCmd).action(
-    async (id: string, entity: string, opts: WriteFlags) => {
+    async (id: string, entity: string | undefined, opts: WriteFlags & Record<string, unknown>) => {
       try {
-        writeJson(await runAttachmentDetach(await getClient(), Number(id), entity, {
+        const entityWord = resolveDetachEntity(entity, opts);
+        writeJson(await runAttachmentDetach(await getClient(), Number(id), entityWord, {
           dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
         }));
       } catch (e) {

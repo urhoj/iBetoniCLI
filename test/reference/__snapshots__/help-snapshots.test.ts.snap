@@ -141,7 +141,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib attachment detach matches snapshot 1`] = `
 "USAGE
-  ib attachment detach <attachmentId> <entity> [flags]
+  ib attachment detach <attachmentId> [<entity>] [flags]
 
 DESCRIPTION
   Unlink an attachment from ONE entity (NULLs that FK). Requires a manager role (Admin / KeikkaHandler / AttachmentHandler / Owner) on the attachment's OWNER company — same gate as the web UI. A fully unlinked attachment appears in \`ib attachment search --missing\`.
@@ -149,10 +149,19 @@ DESCRIPTION
 
 ARGUMENTS
   <attachmentId> NUMBER    attachments.attachmentId (required)
-  <entity> STRING    keikka|vehicle|person|customer|worksite|sijainti|tuote|bug-report|request|offer (required)
+  <entity> STRING    keikka|vehicle|person|customer|worksite|sijainti|tuote|bug-report|request|offer (omit when using a --<entity> flag instead) (optional)
 
 FLAGS
-  (none)
+  --keikka NUMBER    Target keikkaId
+  --vehicle NUMBER    Target vehicleId
+  --person NUMBER    Target personId
+  --customer NUMBER    Target asiakasId
+  --worksite NUMBER    Target tyomaaId
+  --sijainti NUMBER    Target sijaintiId
+  --tuote NUMBER    Target tuoteId
+  --bug-report NUMBER    Target bugReportId
+  --request NUMBER    Jerry pumppuRequestId (request owner only)
+  --offer NUMBER    Jerry pumppuOfferId (provider company only)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -168,10 +177,12 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not owner company or missing manager role → switch to the owner company; need Admin/KeikkaHandler/AttachmentHandler/Owner
   exit 5 (HTTP 404)  Attachment not found   → verify attachmentId
+  exit 4  No entity given, or conflicting positional + flag → name the entity once — positional word OR a --<entity> flag
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
+  - Name the entity as a positional word (\`detach 4711 keikka\`) OR an attach-style flag (\`detach 4711 --keikka 9001\`) — the flag's id is ignored since detach only needs the entity name.
   - Audited via ChangeTracker on the previously-linked entity's timeline.
   - Deploy-gated (404 until the backend ships /api/cli/attachment/*).
 
@@ -180,6 +191,7 @@ SEE ALSO
 
 EXAMPLES
   ib attachment detach 4711 keikka
+  ib attachment detach 4711 --keikka 9001
   ib attachment detach 4711 bug-report --dry-run
 "
 `;
@@ -376,11 +388,11 @@ exports[`Help snapshots — contract stability > help for ib attachment search m
   ib attachment search [<text>] [flags]
 
 DESCRIPTION
-  Search attachments in the ACTIVE company by file name / comment, or list orphans (no linked entity) with --missing.
+  Search attachments in the ACTIVE company by file name / comment, list orphans (no linked entity) with --missing, or — given no text and no --missing — list ALL active company attachments (parity with \`ib keikka list\`).
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
-  <text> STRING    Search text (optional when --missing) (optional)
+  <text> STRING    Search text; omit to list all (or combine with --missing) (optional)
 
 FLAGS
   --missing BOOLEAN    Only attachments with NO linked entity
@@ -393,18 +405,19 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ attachmentId, origFileName, fileName, fileType, fileSize, fileComment, attachTime, liitaLaskuun, attachmentGroupId, attachmentGroupName, attachmentTypeId, attachmentTypeName, keikkaId?, vehicleId?, personId?, asiakasId?, tyomaaId?, sijaintiId?, tuoteId?, bugReportId?, pumppuRequestId?, pumppuOfferId?, entryByPersonId, ownerAsiakasId, imageWidth, imageHeight }>
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Neither text nor --missing given → pass search text or --missing
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
   - Tenant comes from the JWT — there is no company parameter.
+  - No text and no --missing lists every active attachment in the company (capped at --limit; \`truncated:true\` signals more).
   - Deploy-gated (404 until the backend ships /api/cli/attachment/*).
 
 SEE ALSO
   ib attachment list, ib attachment detach
 
 EXAMPLES
+  ib attachment search
   ib attachment search kuormakirja
   ib attachment search --missing
 "
