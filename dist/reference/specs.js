@@ -3481,7 +3481,7 @@ const BASE_COMMAND_SPECS = [
         ],
         examples: ["ib doctor", "ib doctor --endpoint https://api-staging.ibetoni.fi"],
     },
-    // ─── feedback (4) ────────────────────────────────────────────────────────
+    // ─── feedback (5) ────────────────────────────────────────────────────────
     // NOTE on classification: feedback create/resolve carry custom write semantics
     // (meta-exempt create, client-side --dry-run, no idempotency/reason), so they
     // keep writeFlags:false — the standard write-safety block would mis-document
@@ -3524,19 +3524,25 @@ const BASE_COMMAND_SPECS = [
         permissions: ["isSystemAdmin or isDeveloper"],
         tier: "developer",
         flags: [
-            { name: "status", type: "string", description: "open | reviewed | applied | dismissed" },
+            { name: "status", type: "string", description: "open | reviewed | applied | dismissed, or a comma-separated list (e.g. open,reviewed)" },
+            { name: "unresolved", type: "boolean", description: "Shortcut for --status open,reviewed (un-closed items); mutually exclusive with --status" },
             { name: "kind", type: "string", description: "improvement | bug | idea | legal" },
             { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | other" },
             { name: "limit", type: "number", default: "50", description: "Max rows (cap 200)" },
             { name: "offset", type: "number", default: "0", description: "Pagination offset" },
+            { name: "full", type: "boolean", description: "Return untruncated description/resolution (default: each capped at 200 chars)" },
         ],
-        outputShape: "{ items: FeedbackRow[], nextCursor: null, count }",
+        outputShape: "{ items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }",
         errors: [
             apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
-        examples: ["ib feedback list --status open --scope cli", "ib feedback list --kind bug --limit 20"],
+        examples: [
+            "ib feedback list --status open --scope cli",
+            "ib feedback list --unresolved",
+            "ib feedback list --kind bug --limit 20",
+        ],
     },
     {
         command: "ib feedback get",
@@ -3564,8 +3570,9 @@ const BASE_COMMAND_SPECS = [
             { name: "status", type: "string", description: "open | reviewed | applied | dismissed" },
             { name: "note", type: "string", description: "Resolution note stored on the row" },
             { name: "dry-run", type: "boolean", description: "Print the update body without sending (client-side)" },
+            { name: "full", type: "boolean", description: "Return the full updated row instead of the compact ack" },
         ],
-        outputShape: "The updated feedback row. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
+        outputShape: "A compact ack { feedbackId, status, updatedAt, resolution } (resolution capped at 200 chars; the full row with --full). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
         errors: [
             { exit: 4, meaning: "Validation", remedy: "provide --status and/or --note; status must be a known value" },
             apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
@@ -3576,6 +3583,23 @@ const BASE_COMMAND_SPECS = [
             'ib feedback resolve 42 --status applied --note "added row counts in CLI v1.3"',
             'ib feedback resolve 42 --status dismissed --note "by design"',
         ],
+    },
+    {
+        command: "ib feedback count",
+        description: "Aggregate counts of filed feedback by status, kind, and scope (developer-only). The cheapest way to answer \"is there any open feedback?\" — a tiny fixed-size response instead of a row dump. Counts are computed client-side over up to 200 rows.",
+        permissions: ["isSystemAdmin or isDeveloper"],
+        tier: "developer",
+        flags: [
+            { name: "kind", type: "string", description: "improvement | bug | idea | legal — count only this kind" },
+            { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | other — count only this scope" },
+        ],
+        outputShape: "{ total, byStatus: { open, reviewed, applied, dismissed }, byKind, byScope, truncated?, hint? }",
+        errors: [
+            apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
+            apiErr(401, "Token expired", "ib auth refresh"),
+            apiErr(500, "Backend error", "retry with --verbose"),
+        ],
+        examples: ["ib feedback count", "ib feedback count --scope cli", "ib feedback count --kind legal"],
     },
     // ─── ai (1) — read AI assistant conversations ────────────────────────────
     {

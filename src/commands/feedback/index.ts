@@ -341,13 +341,23 @@ export function registerFeedbackCommands(
 
   f.command("list")
     .description("List feedback for triage (developer-only)")
-    .option("--status <status>", "open | reviewed | applied | dismissed")
+    .option("--status <status>", "open | reviewed | applied | dismissed (or a comma-separated list, e.g. open,reviewed)")
+    .option("--unresolved", "Shortcut for --status open,reviewed (un-closed items)")
+    .option("--full", "Return untruncated description/resolution (default: capped at 200 chars)")
     .option("--kind <kind>", "improvement | bug | idea | legal")
     .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | other")
     .option("--limit <n>", "Max rows (default 50, cap 200)", Number)
     .option("--offset <n>", "Pagination offset", Number)
     .action(
-      async (opts: { status?: string; kind?: string; scope?: string; limit?: number; offset?: number }) => {
+      async (opts: {
+        status?: string;
+        kind?: string;
+        scope?: string;
+        limit?: number;
+        offset?: number;
+        unresolved?: boolean;
+        full?: boolean;
+      }) => {
         try {
           writeJson(await runFeedbackList(await getClient(), opts));
         } catch (e) {
@@ -373,10 +383,11 @@ export function registerFeedbackCommands(
     .option("--status <status>", "open | reviewed | applied | dismissed")
     .option("--note <text>", "Resolution note stored on the row")
     .option("--dry-run", "Print the update body without sending (client-side)")
+    .option("--full", "Return the full updated row (default: a compact ack)")
     .action(
       async (
         idStr: string,
-        opts: { status?: string; note?: string; dryRun?: boolean }
+        opts: { status?: string; note?: string; dryRun?: boolean; full?: boolean }
       ) => {
         try {
           writeJson(await runFeedbackResolve(await getClient(), Number(idStr), opts));
@@ -385,4 +396,16 @@ export function registerFeedbackCommands(
         }
       }
     );
+
+  f.command("count")
+    .description("Counts of feedback by status/kind/scope (developer-only)")
+    .option("--kind <kind>", "improvement | bug | idea | legal")
+    .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | other")
+    .action(async (opts: { kind?: string; scope?: string }) => {
+      try {
+        writeJson(await runFeedbackCount(await getClient(), opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
 }

@@ -4,6 +4,7 @@ const KINDS = ["improvement", "bug", "idea", "legal"];
 const SCOPES = ["cli", "app", "jerry", "bsg2", "workspace", "other"];
 const STATUSES = ["open", "reviewed", "applied", "dismissed"];
 const MAX_FREETEXT = 200;
+const CAP = 200;
 const TRUNCATED_FIELDS = ["description", "resolution", "errorText"];
 const TRUNCATE_HINT = "description/resolution truncated to 200 chars; ib feedback get <id> for full text";
 /** Cap a string at MAX_FREETEXT chars, appending "..." when cut. Non-strings
@@ -80,13 +81,62 @@ export async function runFeedbackCreate(client, input) {
     return client.post("/api/feedback", body, { meta: true });
 }
 /**
- * GET /api/feedback — developer-only. Projects rows into the `{ items,
- * nextCursor, count }` envelope. Long free-text (description/resolution/
- * errorText) is capped at 200 chars unless `--full`; when anything was cut the
- * envelope carries a `hint` pointing at `ib feedback get <id>`.
+ * Resolve the requested status filter into a list of statuses, or null for no
+ * filter. `--unresolved` = open + reviewed. `--status` may be a single value or
+ * a comma-separated list. Conflicting/unknown values exit 4.
+ */
+function resolveStatuses(opts) {
+    if (opts.unresolved && opts.status) {
+        throw new CliError("Use either --unresolved or --status, not both", 400, null, 4);
+    }
+    if (opts.unresolved)
+        return ["open", "reviewed"];
+    if (opts.status) {
+        const list = opts.status
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+        for (const s of list) {
+            if (!STATUSES.includes(s)) {
+                throw new CliError(`--status must be one of: ${STATUSES.join(", ")}`, 400, null, 4);
+            }
+        }
+        return list.length ? list : null;
+    }
+    return null;
+}
+/**
+ * GET /api/feedback — developer-only. One status (or none) is a single
+ * server-filtered GET. `--unresolved` / a CSV `--status` fan out to one GET per
+ * status, merged newest-first and sliced [offset, offset+limit) client-side.
+ * Long free-text is capped at 200 chars unless `--full`.
  */
 export async function runFeedbackList(client, opts) {
-    let items = await fetchRows(client, opts);
+    const statuses = resolveStatuses(opts);
+    let items;
+    let truncated = false;
+    if (!statuses || statuses.length <= 1) {
+        items = await fetchRows(client, {
+            status: statuses?.[0],
+            kind: opts.kind,
+            scope: opts.scope,
+            limit: opts.limit,
+            offset: opts.offset,
+        });
+    }
+    else {
+        const pages = await Promise.all(statuses.map((s) => fetchRows(client, { status: s, kind: opts.kind, scope: opts.scope, limit: CAP })));
+        if (pages.some((p) => p.length >= CAP))
+            truncated = true;
+        const merged = pages
+            .flat()
+            .sort((a, b) => Number(b.feedbackId) - Number(a.feedbackId));
+        const offset = opts.offset ?? 0;
+        const limit = opts.limit ?? 50;
+        if (merged.length > offset + limit)
+            truncated = true;
+        items = merged.slice(offset, offset + limit);
+    }
     let cut = false;
     if (!opts.full) {
         items = items.map((r) => {
@@ -101,6 +151,8 @@ export async function runFeedbackList(client, opts) {
         nextCursor: null,
         count: items.length,
     };
+    if (truncated)
+        env.truncated = true;
     if (cut)
         env.hint = TRUNCATE_HINT;
     return env;
@@ -108,6 +160,44 @@ export async function runFeedbackList(client, opts) {
 /** GET /api/feedback/:id — developer-only single row. */
 export async function runFeedbackGet(client, id) {
     return client.get(`/api/feedback/${id}`);
+}
+/**
+ * Client-side aggregate of /api/feedback for the cheapest "is there anything?"
+ * answer. Fetches up to the 200-row cap (optionally pre-filtered by
+ * kind/scope) and buckets by status/kind/scope. Flags `truncated` if the table
+ * exceeds the cap (won't happen at current row counts; kept honest).
+ */
+export async function runFeedbackCount(client, opts) {
+    const rows = await fetchRows(client, { kind: opts.kind, scope: opts.scope, limit: CAP });
+    const byStatus = { open: 0, reviewed: 0, applied: 0, dismissed: 0 };
+    const byKind = {};
+    const byScope = {};
+    for (const r of rows) {
+        const s = String(r.status ?? "");
+        if (s in byStatus)
+            byStatus[s] += 1;
+        const k = String(r.kind ?? "unknown");
+        byKind[k] = (byKind[k] ?? 0) + 1;
+        const sc = String(r.scope ?? "unknown");
+        byScope[sc] = (byScope[sc] ?? 0) + 1;
+    }
+    const out = { total: rows.length, byStatus, byKind, byScope };
+    if (rows.length >= CAP) {
+        out.truncated = true;
+        out.hint = "count is a lower bound — fetch hit the 200-row cap";
+    }
+    return out;
+}
+/** Project a resolved row to the compact write-ack fields (resolution capped). */
+function compactAck(row) {
+    const ack = {};
+    for (const k of ["feedbackId", "status", "updatedAt"]) {
+        if (k in row)
+            ack[k] = row[k];
+    }
+    if ("resolution" in row)
+        ack.resolution = truncateField(row.resolution).value;
+    return ack;
 }
 /**
  * PUT /api/feedback/:id — developer triage (status and/or resolution note).
@@ -129,7 +219,8 @@ export async function runFeedbackResolve(client, id, input) {
     if (input.dryRun) {
         return { dryRun: true, wouldSend: { method: "PUT", path: `/api/feedback/${id}`, body } };
     }
-    return client.put(`/api/feedback/${id}`, body);
+    const row = await client.put(`/api/feedback/${id}`, body);
+    return input.full ? row : compactAck(row);
 }
 /**
  * Register all `ib feedback` subcommands:
@@ -160,7 +251,9 @@ export function registerFeedbackCommands(parent, getClient) {
     });
     f.command("list")
         .description("List feedback for triage (developer-only)")
-        .option("--status <status>", "open | reviewed | applied | dismissed")
+        .option("--status <status>", "open | reviewed | applied | dismissed (or a comma-separated list, e.g. open,reviewed)")
+        .option("--unresolved", "Shortcut for --status open,reviewed (un-closed items)")
+        .option("--full", "Return untruncated description/resolution (default: capped at 200 chars)")
         .option("--kind <kind>", "improvement | bug | idea | legal")
         .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | other")
         .option("--limit <n>", "Max rows (default 50, cap 200)", Number)
@@ -188,9 +281,22 @@ export function registerFeedbackCommands(parent, getClient) {
         .option("--status <status>", "open | reviewed | applied | dismissed")
         .option("--note <text>", "Resolution note stored on the row")
         .option("--dry-run", "Print the update body without sending (client-side)")
+        .option("--full", "Return the full updated row (default: a compact ack)")
         .action(async (idStr, opts) => {
         try {
             writeJson(await runFeedbackResolve(await getClient(), Number(idStr), opts));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    f.command("count")
+        .description("Counts of feedback by status/kind/scope (developer-only)")
+        .option("--kind <kind>", "improvement | bug | idea | legal")
+        .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | other")
+        .action(async (opts) => {
+        try {
+            writeJson(await runFeedbackCount(await getClient(), opts));
         }
         catch (e) {
             exitWithError(e);

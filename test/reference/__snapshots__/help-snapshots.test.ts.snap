@@ -2452,6 +2452,36 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib feedback count matches snapshot 1`] = `
+"USAGE
+  ib feedback count [flags]
+
+DESCRIPTION
+  Aggregate counts of filed feedback by status, kind, and scope (developer-only). The cheapest way to answer "is there any open feedback?" — a tiny fixed-size response instead of a row dump. Counts are computed client-side over up to 200 rows.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --kind STRING    improvement | bug | idea | legal — count only this kind
+  --scope STRING    cli | app | jerry | bsg2 | workspace | other — count only this scope
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { total, byStatus: { open, reviewed, applied, dismissed }, byKind, byScope, truncated?, hint? }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib feedback count
+  ib feedback count --scope cli
+  ib feedback count --kind legal
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib feedback create matches snapshot 1`] = `
 "USAGE
   ib feedback create <description> [flags]
@@ -2533,17 +2563,19 @@ DESCRIPTION
   Permissions: requires isSystemAdmin or isDeveloper.
 
 FLAGS
-  --status STRING    open | reviewed | applied | dismissed
+  --status STRING    open | reviewed | applied | dismissed, or a comma-separated list (e.g. open,reviewed)
+  --unresolved BOOLEAN    Shortcut for --status open,reviewed (un-closed items); mutually exclusive with --status
   --kind STRING    improvement | bug | idea | legal
   --scope STRING    cli | app | jerry | bsg2 | workspace | other
   --limit NUMBER    Max rows (cap 200) (default: 50)
   --offset NUMBER    Pagination offset (default: 0)
+  --full BOOLEAN    Return untruncated description/resolution (default: each capped at 200 chars)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { items: FeedbackRow[], nextCursor: null, count }
+  { items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
@@ -2552,6 +2584,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib feedback list --status open --scope cli
+  ib feedback list --unresolved
   ib feedback list --kind bug --limit 20
 "
 `;
@@ -2571,12 +2604,13 @@ FLAGS
   --status STRING    open | reviewed | applied | dismissed
   --note STRING    Resolution note stored on the row
   --dry-run BOOLEAN    Print the update body without sending (client-side)
+  --full BOOLEAN    Return the full updated row instead of the compact ack
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  The updated feedback row. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
+  A compact ack { feedbackId, status, updatedAt, resolution } (resolution capped at 200 chars; the full row with --full). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
   exit 4  Validation             → provide --status and/or --note; status must be a known value
