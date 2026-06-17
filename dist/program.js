@@ -48,6 +48,7 @@ import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
 import { writeJson, exitWithError, failWith, emitStdout, emitStderr, setActiveCommandErrors } from "./output/json.js";
+import { buildUnknownCommandEnvelope } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { createApiClient } from "./api/client.js";
 import { CliError } from "./api/errors.js";
@@ -297,24 +298,9 @@ export function applySpecErrors(actionCommand) {
     const spec = COMMAND_SPECS.find((s) => s.command === parts.join(" "));
     setActiveCommandErrors(spec?.errors ?? null);
 }
-/**
- * Make every command in the tree THROW a CommanderError instead of calling
- * `process.exit()` for usage errors / help / version, and capture the parser's
- * stderr text (the "error: unknown command …" line, did-you-mean suggestions,
- * error-triggered help renders). Two reasons:
- *
- *  1. Usage errors can then be emitted as the standard JSON error envelope
- *     by {@link handleParseRejection} instead of parser plain text — the last
- *     non-envelope error path (feedback #24).
- *  2. Commander's internal `process.exit()` disappears (Windows-unsafe after
- *     a completed fetch — libuv UV_HANDLE_CLOSING assert, exit 127).
- *
- * Returns a getter for the captured stderr text. Must be called AFTER the
- * tree is fully built (exitOverride/configureOutput don't propagate to
- * already-created subcommands via inheritance — we walk explicitly).
- */
 export function enableParserThrow(program) {
     let captured = "";
+    let erroringCmd = null;
     const output = {
         writeErr: (s) => {
             captured += s;
@@ -328,12 +314,17 @@ export function enableParserThrow(program) {
         },
     };
     const walk = (cmd) => {
-        cmd.exitOverride();
+        // A callback that closes over `cmd` captures WHICH command threw, then
+        // throws (Windows-safe: never reaches Commander's internal process.exit).
+        cmd.exitOverride((err) => {
+            erroringCmd = cmd;
+            throw err;
+        });
         cmd.configureOutput(output);
         cmd.commands.forEach(walk);
     };
     walk(program);
-    return () => captured;
+    return { parserText: () => captured, erroringCommand: () => erroringCmd };
 }
 function isCommanderError(err) {
     return (typeof err === "object" &&
@@ -366,7 +357,7 @@ function setExit(code) {
  *    surface.
  *  - Anything else → plain message, exit 1 (unexpected runtime failure).
  */
-export function handleParseRejection(err, parserText) {
+export function handleParseRejection(err, parserText, erroringCommand) {
     if (err instanceof CliError) {
         exitWithError(err);
         return;
@@ -378,6 +369,18 @@ export function handleParseRejection(err, parserText) {
                 emitStderr(text);
             setExit(err.exitCode ?? 0);
             return;
+        }
+        // Unknown subcommand → enriched envelope: siblings + did-you-mean (#1).
+        if (err.code === "commander.unknownCommand" && erroringCommand) {
+            const cmd = erroringCommand();
+            if (cmd) {
+                const token = (Array.isArray(cmd.args) && cmd.args[0]) ||
+                    text.match(/unknown command '([^']+)'/)?.[1] ||
+                    "";
+                emitStderr(JSON.stringify(buildUnknownCommandEnvelope(cmd, token, getCallerTier())) + "\n");
+                setExit(4);
+                return;
+            }
         }
         const detail = (text || err.message || "usage error")
             .replace(/^error:\s*/gm, "")

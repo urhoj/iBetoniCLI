@@ -2,8 +2,8 @@
  * Enriched "unknown subcommand" error envelope (CLI usability #1).
  *
  * When Commander hits an unknown subcommand under a known group (e.g.
- * `ib legal list`), the default USAGE envelope only echoes "unknown command
- * 'list'" — a dead end for an AI caller. This turns the GROUP command that
+ * `ib legal verison`), the default USAGE envelope only echoes "unknown command
+ * 'verison'" — a dead end for an AI caller. This turns the GROUP command that
  * threw into a structured, actionable envelope: the group's available
  * (tier-filtered) subcommands plus a fuzzy "did you mean".
  *

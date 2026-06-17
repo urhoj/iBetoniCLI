@@ -4,6 +4,7 @@ import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFla
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { lineDiff } from "../../textDiff.js";
+import { validateStructuredJson } from "./validateJson.js";
 /** Lifecycle status values on legalDocuments.status (see backend migration). */
 export const LEGAL_STATUSES = ["draft", "active", "archived", "deleted"];
 const stripContent = (d) => {
@@ -297,6 +298,7 @@ export function registerLegalCommands(parent, getClient) {
     });
     legal
         .command("active")
+        .alias("list")
         .description("Current ACTIVE document of EVERY type (one row per type; hasActive:false where none)")
         .action(async () => {
         try {
@@ -414,7 +416,8 @@ export function registerLegalCommands(parent, getClient) {
         .option("--owner <id>", "ownerAsiakasId tenant scope (e.g. 1349 = BetoniJerry); omit for global", Number)
         .option("--notes <text>", "Internal notes")
         .option("--effective-date <date>", "Effective date YYYY-MM-DD (default: now)")
-        .option("--activate", "Publish immediately (deactivates prior versions). Default: inactive draft");
+        .option("--activate", "Publish immediately (deactivates prior versions). Default: inactive draft")
+        .option("--validate-json", "Validate the embedded ```json block parses to an object before saving (recommended for BETONIJERRY_* structured types)");
     addWriteFlagsToCommand(saveCmd).action(async (opts) => {
         if (!opts.file && !opts.content)
             failWith("Provide --file <path> or --content <markdown>", 4);
@@ -430,6 +433,11 @@ export function registerLegalCommands(parent, getClient) {
             catch {
                 failWith(`Cannot read file: ${opts.file}`, 4);
             }
+        }
+        if (opts.validateJson) {
+            const v = validateStructuredJson(markdownContent);
+            if (!v.ok)
+                failWith(`--validate-json failed: ${v.error}`, 4);
         }
         try {
             const client = await getClient();

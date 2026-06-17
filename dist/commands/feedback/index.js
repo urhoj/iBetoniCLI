@@ -3,6 +3,48 @@ import { writeJson, exitWithError } from "../../output/json.js";
 const KINDS = ["improvement", "bug", "idea", "legal"];
 const SCOPES = ["cli", "app", "jerry", "bsg2", "workspace", "other"];
 const STATUSES = ["open", "reviewed", "applied", "dismissed"];
+const MAX_FREETEXT = 200;
+const TRUNCATED_FIELDS = ["description", "resolution", "errorText"];
+const TRUNCATE_HINT = "description/resolution truncated to 200 chars; ib feedback get <id> for full text";
+/** Cap a string at MAX_FREETEXT chars, appending "..." when cut. Non-strings
+ * pass through untouched. */
+function truncateField(v) {
+    if (typeof v === "string" && v.length > MAX_FREETEXT) {
+        return { value: v.slice(0, MAX_FREETEXT) + "...", cut: true };
+    }
+    return { value: v, cut: false };
+}
+/** Shallow-copy a feedback row with its long free-text fields capped. */
+function compactRow(row) {
+    const out = { ...row };
+    let cut = false;
+    for (const f of TRUNCATED_FIELDS) {
+        if (f in out) {
+            const t = truncateField(out[f]);
+            out[f] = t.value;
+            if (t.cut)
+                cut = true;
+        }
+    }
+    return { row: out, cut };
+}
+/** Build the query string and GET a page of feedback rows (always an array). */
+async function fetchRows(client, params) {
+    const qs = new URLSearchParams();
+    if (params.status)
+        qs.set("status", params.status);
+    if (params.kind)
+        qs.set("kind", params.kind);
+    if (params.scope)
+        qs.set("scope", params.scope);
+    if (params.limit !== undefined)
+        qs.set("limit", String(params.limit));
+    if (params.offset !== undefined)
+        qs.set("offset", String(params.offset));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    const rows = await client.get(`/api/feedback${suffix}`);
+    return Array.isArray(rows) ? rows : [];
+}
 function buildCreateBody(input) {
     const description = input.description?.trim();
     if (!description) {
@@ -38,25 +80,30 @@ export async function runFeedbackCreate(client, input) {
     return client.post("/api/feedback", body, { meta: true });
 }
 /**
- * GET /api/feedback — developer-only. Projects the backend array into the
- * universal `{ items, nextCursor, count }` envelope.
+ * GET /api/feedback — developer-only. Projects rows into the `{ items,
+ * nextCursor, count }` envelope. Long free-text (description/resolution/
+ * errorText) is capped at 200 chars unless `--full`; when anything was cut the
+ * envelope carries a `hint` pointing at `ib feedback get <id>`.
  */
 export async function runFeedbackList(client, opts) {
-    const qs = new URLSearchParams();
-    if (opts.status)
-        qs.set("status", opts.status);
-    if (opts.kind)
-        qs.set("kind", opts.kind);
-    if (opts.scope)
-        qs.set("scope", opts.scope);
-    if (opts.limit !== undefined)
-        qs.set("limit", String(opts.limit));
-    if (opts.offset !== undefined)
-        qs.set("offset", String(opts.offset));
-    const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    const rows = await client.get(`/api/feedback${suffix}`);
-    const items = Array.isArray(rows) ? rows : [];
-    return { items, nextCursor: null, count: items.length };
+    let items = await fetchRows(client, opts);
+    let cut = false;
+    if (!opts.full) {
+        items = items.map((r) => {
+            const c = compactRow(r);
+            if (c.cut)
+                cut = true;
+            return c.row;
+        });
+    }
+    const env = {
+        items,
+        nextCursor: null,
+        count: items.length,
+    };
+    if (cut)
+        env.hint = TRUNCATE_HINT;
+    return env;
 }
 /** GET /api/feedback/:id — developer-only single row. */
 export async function runFeedbackGet(client, id) {

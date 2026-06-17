@@ -2157,8 +2157,9 @@ const BASE_COMMAND_SPECS = [
         flags: [],
         outputShape: "ListEnvelope<{typeName, displayName, personSettingTypeId, hasActive, documentId, version, title, effectiveDate, contentLength}>",
         errors: COMMON_AUTH_ERRORS,
+        notes: ["Also reachable as `ib legal list` (alias) — `active` is the legal group's analog of other domains' `list`."],
         seeAlso: ["ib legal types", "ib legal show"],
-        examples: ["ib legal active"],
+        examples: ["ib legal active", "ib legal list"],
     },
     {
         command: "ib legal status",
@@ -2250,6 +2251,7 @@ const BASE_COMMAND_SPECS = [
             { name: "notes", type: "string", description: "Internal notes" },
             { name: "effective-date", type: "date", description: "Effective date YYYY-MM-DD (default: now)" },
             { name: "activate", type: "boolean", description: "Publish immediately (archives the prior active version). Default: inactive draft" },
+            { name: "validate-json", type: "boolean", description: "Validate the embedded ```json block parses to an object before saving (recommended for BETONIJERRY_* structured types)" },
         ],
         writeFlags: true,
         mutates: true,
@@ -2266,6 +2268,7 @@ const BASE_COMMAND_SPECS = [
         examples: [
             'ib legal save --type TOS --doc-version 2.1 --title Kayttoehdot --file ./tos.md --reason "new clause 7"',
             'ib legal save --type TOS --doc-version 2.1 --title Kayttoehdot --content "# TOS" --activate --dry-run',
+            "ib legal save --type BETONIJERRY_OFFER_ACCEPTANCE --doc-version offer-2026-06-18 --title 'Tarjouksen hyväksyntä' --file offer.md --validate-json --reason 'update CTA copy'",
         ],
     },
     {

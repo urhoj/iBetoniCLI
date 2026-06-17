@@ -10,7 +10,7 @@ import { setCallerTier, resolveCallerTier, getCallerTier } from "./tier.js";
  */
 export async function runArgv(argv, opts) {
     const program = buildProgram();
-    const parserText = enableParserThrow(program);
+    const { parserText, erroringCommand } = enableParserThrow(program);
     // Mirror bin/ib.ts: resolve each command's CommandSpec errors for hint output.
     program.hook("preAction", (_t, actionCommand) => applySpecErrors(actionCommand));
     // Set the caller's visibility tier for this run; restore it in finally so the
@@ -41,7 +41,7 @@ export async function runArgv(argv, opts) {
                 await program.parseAsync(["node", "ib", ...argv]);
             }
             catch (err) {
-                handleParseRejection(err, parserText);
+                handleParseRejection(err, parserText, erroringCommand);
             }
         });
     }

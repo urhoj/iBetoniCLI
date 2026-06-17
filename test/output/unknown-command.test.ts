@@ -40,7 +40,10 @@ describe("buildUnknownCommandEnvelope (#1)", () => {
     expect(env.didYouMean).toBe("versions");
     expect(env.hint).toContain("ib legal --help");
   });
-  test("`list` (no near match) → siblings, no suggestion", () => {
+  test("`list` token (an alias, not a near sibling-name) → no suggestion", () => {
+    // `list` is an ALIAS of `active` post-#3, so a real `ib legal list` routes
+    // to active and never reaches this builder; passed directly here it has no
+    // near canonical-sibling match, so didYouMean is null.
     const env = buildUnknownCommandEnvelope(legalOf(), "list", "developer");
     expect(env.didYouMean).toBeNull();
     expect(env.available).toContain("active");
