@@ -14,6 +14,7 @@
  */
 import type { Command } from "commander";
 import { COMMAND_SPECS } from "../reference/specs.js";
+import { fullyHiddenDomains } from "../reference/commandsList.js";
 import { isHiddenAtTier, type CallerTier } from "../tier.js";
 
 /** Classic Levenshtein edit distance (two-row). */
@@ -72,8 +73,13 @@ export function commandPath(cmd: Command): string {
  */
 export function visibleSubcommands(cmd: Command, tier: CallerTier): string[] {
   const base = commandPath(cmd);
+  // At the root, domain GROUPS (schema/ai/changelog) have no leaf spec of their
+  // own, so the spec-lookup fallback below would keep them visible — apply the
+  // same whole-domain hiding `ib --help` uses (program.ts configureHelp).
+  const fullyHidden = base === "ib" ? fullyHiddenDomains(tier) : new Set<string>();
   return cmd.commands
     .filter((sub) => {
+      if (fullyHidden.has(sub.name())) return false;
       const spec = COMMAND_SPECS.find((s) => s.command === `${base} ${sub.name()}`);
       return spec ? !isHiddenAtTier(spec, tier) : true;
     })
@@ -109,6 +115,10 @@ export function buildUnknownCommandEnvelope(
     ? `\`${group} --help\` or \`ib commands ${domain}\``
     : "`ib --help` or `ib commands`";
   const suggestion = didYouMean ? `Did you mean \`${group} ${didYouMean}\`? ` : "";
+  const availableStr =
+    available.length > 0
+      ? `Available ${cmd.name()} subcommands: ${available.join(", ")}. `
+      : "";
   return {
     success: false,
     error:
@@ -121,6 +131,6 @@ export function buildUnknownCommandEnvelope(
     unknownCommand: unknownToken,
     didYouMean,
     available,
-    hint: `${suggestion}Available ${cmd.name()} subcommands: ${available.join(", ")}. Run ${discover} to discover them.`,
+    hint: `${suggestion}${availableStr}Run ${discover} to discover them.`,
   };
 }

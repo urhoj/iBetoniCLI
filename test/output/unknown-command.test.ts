@@ -58,3 +58,16 @@ describe("visibleSubcommands (#1)", () => {
     expect(visibleSubcommands(legalOf(), "developer")).toContain("save");
   });
 });
+
+describe("visibleSubcommands root tier-hiding (#1)", () => {
+  test("standard tier hides fully-developer domains at root (schema/ai/changelog)", () => {
+    const names = visibleSubcommands(buildProgram(), "standard");
+    expect(names).not.toContain("schema");
+    expect(names).not.toContain("ai");
+    expect(names).not.toContain("changelog");
+    expect(names).toContain("keikka");
+  });
+  test("developer tier keeps the developer-only domains at root", () => {
+    expect(visibleSubcommands(buildProgram(), "developer")).toContain("schema");
+  });
+});
