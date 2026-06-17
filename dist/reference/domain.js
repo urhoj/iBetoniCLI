@@ -139,10 +139,9 @@ export function renderDomainHelp(_tier = "developer") {
         const labels = glossary.map((g) => g.synonyms && g.synonyms.length > 0
             ? `${g.term} (${g.synonyms.join(", ")})`
             : g.term);
-        const pad = Math.max(...labels.map((l) => l.length));
         for (let i = 0; i < glossary.length; i++) {
             const def = glossary[i].definition ?? "";
-            lines.push(`  ${labels[i].padEnd(pad)}  ${def}`);
+            lines.push(`  ${labels[i]} — ${def}`);
         }
     }
     lines.push("");

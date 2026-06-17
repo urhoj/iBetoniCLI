@@ -179,10 +179,9 @@ export function renderDomainHelp(_tier: CallerTier = "developer"): string {
         ? `${g.term} (${g.synonyms.join(", ")})`
         : g.term
     );
-    const pad = Math.max(...labels.map((l) => l.length));
     for (let i = 0; i < glossary.length; i++) {
       const def = glossary[i]!.definition ?? "";
-      lines.push(`  ${labels[i]!.padEnd(pad)}  ${def}`);
+      lines.push(`  ${labels[i]!} — ${def}`);
     }
   }
   lines.push("");
