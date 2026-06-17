@@ -224,10 +224,21 @@ export async function runFeedbackGet(
   return client.get<Record<string, unknown>>(`/api/feedback/${id}`);
 }
 
+/** Project a resolved row to the compact write-ack fields (resolution capped). */
+function compactAck(row: Record<string, unknown>): Record<string, unknown> {
+  const ack: Record<string, unknown> = {};
+  for (const k of ["feedbackId", "status", "updatedAt"]) {
+    if (k in row) ack[k] = row[k];
+  }
+  if ("resolution" in row) ack.resolution = truncateField(row.resolution).value;
+  return ack;
+}
+
 export interface FeedbackResolveInput {
   status?: string;
   note?: string;
   dryRun?: boolean;
+  full?: boolean;
 }
 
 /**
@@ -252,7 +263,8 @@ export async function runFeedbackResolve(
   if (input.dryRun) {
     return { dryRun: true, wouldSend: { method: "PUT", path: `/api/feedback/${id}`, body } };
   }
-  return client.put<Record<string, unknown>>(`/api/feedback/${id}`, body);
+  const row = await client.put<Record<string, unknown>>(`/api/feedback/${id}`, body);
+  return input.full ? row : compactAck(row);
 }
 
 /**

@@ -326,4 +326,28 @@ describe("ib feedback resolve", () => {
       },
     });
   });
+
+  test("returns a compact ack by default (drops description, caps resolution)", async () => {
+    put.mockResolvedValueOnce({
+      feedbackId: 42,
+      status: "applied",
+      updatedAt: "2026-06-17T00:00:00Z",
+      resolution: "z".repeat(250),
+      description: "the huge original description the caller already has",
+    });
+    const out = await runFeedbackResolve(mockClient, 42, { status: "applied" });
+    expect(out).toEqual({
+      feedbackId: 42,
+      status: "applied",
+      updatedAt: "2026-06-17T00:00:00Z",
+      resolution: "z".repeat(200) + "...",
+    });
+    expect(out).not.toHaveProperty("description");
+  });
+
+  test("--full returns the whole updated row", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42, status: "applied", description: "huge original" });
+    const out = await runFeedbackResolve(mockClient, 42, { status: "applied", full: true });
+    expect(out).toMatchObject({ feedbackId: 42, status: "applied", description: "huge original" });
+  });
 });
