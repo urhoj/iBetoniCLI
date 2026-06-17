@@ -474,6 +474,7 @@ export function registerLegalCommands(
 
   legal
     .command("active")
+    .alias("list")
     .description("Current ACTIVE document of EVERY type (one row per type; hasActive:false where none)")
     .action(async () => {
       try {

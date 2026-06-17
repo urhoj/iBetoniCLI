@@ -3828,11 +3828,15 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - Also reachable as \`ib legal list\` (alias) — \`active\` is the legal group's analog of other domains' \`list\`.
+
 SEE ALSO
   ib legal types, ib legal show
 
 EXAMPLES
   ib legal active
+  ib legal list
 "
 `;
 

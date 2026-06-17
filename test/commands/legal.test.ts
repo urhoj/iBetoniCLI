@@ -19,6 +19,7 @@ import {
   runLegalTypeUpdate,
   pickTypeFields,
 } from "../../src/commands/legal/index.js";
+import { buildProgram } from "../../src/program.js";
 import { CliError } from "../../src/api/errors.js";
 import type { ApiClient } from "../../src/api/client.js";
 import type { DecodedClaims } from "../../src/auth/jwt.js";
@@ -416,5 +417,16 @@ describe("ib legal type writes (feedback #31)", () => {
       personSettingTypeId: 44,
     });
     expect(pickTypeFields({})).toEqual({});
+  });
+});
+
+describe("ib legal list alias (#3)", () => {
+  test("`active` is also reachable as `list`", () => {
+    const program = buildProgram();
+    const legal = program.commands.find((c) => c.name() === "legal");
+    expect(legal).toBeDefined();
+    const active = legal!.commands.find((c) => c.name() === "active");
+    expect(active).toBeDefined();
+    expect(active!.aliases()).toContain("list");
   });
 });

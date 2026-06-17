@@ -2334,8 +2334,9 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{typeName, displayName, personSettingTypeId, hasActive, documentId, version, title, effectiveDate, contentLength}>",
     errors: COMMON_AUTH_ERRORS,
+    notes: ["Also reachable as `ib legal list` (alias) — `active` is the legal group's analog of other domains' `list`."],
     seeAlso: ["ib legal types", "ib legal show"],
-    examples: ["ib legal active"],
+    examples: ["ib legal active", "ib legal list"],
   },
   {
     command: "ib legal status",
