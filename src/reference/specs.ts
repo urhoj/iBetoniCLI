@@ -2438,6 +2438,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "notes", type: "string", description: "Internal notes" },
       { name: "effective-date", type: "date", description: "Effective date YYYY-MM-DD (default: now)" },
       { name: "activate", type: "boolean", description: "Publish immediately (archives the prior active version). Default: inactive draft" },
+      { name: "validate-json", type: "boolean", description: "Validate the embedded ```json block parses to an object before saving (recommended for BETONIJERRY_* structured types)" },
     ],
     writeFlags: true,
     mutates: true,
@@ -2454,6 +2455,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: [
       'ib legal save --type TOS --doc-version 2.1 --title Kayttoehdot --file ./tos.md --reason "new clause 7"',
       'ib legal save --type TOS --doc-version 2.1 --title Kayttoehdot --content "# TOS" --activate --dry-run',
+      "ib legal save --type BETONIJERRY_OFFER_ACCEPTANCE --doc-version offer-2026-06-18 --title 'Tarjouksen hyväksyntä' --file offer.md --validate-json --reason 'update CTA copy'",
     ],
   },
   {

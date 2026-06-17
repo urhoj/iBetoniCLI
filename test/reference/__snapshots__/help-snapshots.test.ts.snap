@@ -3998,6 +3998,7 @@ FLAGS
   --notes STRING    Internal notes
   --effective-date DATE    Effective date YYYY-MM-DD (default: now)
   --activate BOOLEAN    Publish immediately (archives the prior active version). Default: inactive draft
+  --validate-json BOOLEAN    Validate the embedded \`\`\`json block parses to an object before saving (recommended for BETONIJERRY_* structured types)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -4026,6 +4027,7 @@ SEE ALSO
 EXAMPLES
   ib legal save --type TOS --doc-version 2.1 --title Kayttoehdot --file ./tos.md --reason "new clause 7"
   ib legal save --type TOS --doc-version 2.1 --title Kayttoehdot --content "# TOS" --activate --dry-run
+  ib legal save --type BETONIJERRY_OFFER_ACCEPTANCE --doc-version offer-2026-06-18 --title 'Tarjouksen hyväksyntä' --file offer.md --validate-json --reason 'update CTA copy'
 "
 `;
 

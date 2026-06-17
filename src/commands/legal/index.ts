@@ -23,6 +23,7 @@ import {
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload, type DecodedClaims } from "../../auth/jwt.js";
 import { lineDiff } from "../../textDiff.js";
+import { validateStructuredJson } from "./validateJson.js";
 
 /** Lifecycle status values on legalDocuments.status (see backend migration). */
 export const LEGAL_STATUSES = ["draft", "active", "archived", "deleted"] as const;
@@ -590,7 +591,8 @@ export function registerLegalCommands(
     .option("--owner <id>", "ownerAsiakasId tenant scope (e.g. 1349 = BetoniJerry); omit for global", Number)
     .option("--notes <text>", "Internal notes")
     .option("--effective-date <date>", "Effective date YYYY-MM-DD (default: now)")
-    .option("--activate", "Publish immediately (deactivates prior versions). Default: inactive draft");
+    .option("--activate", "Publish immediately (deactivates prior versions). Default: inactive draft")
+    .option("--validate-json", "Validate the embedded ```json block parses to an object before saving (recommended for BETONIJERRY_* structured types)");
   addWriteFlagsToCommand(saveCmd).action(
     async (opts: {
       type: string;
@@ -602,6 +604,7 @@ export function registerLegalCommands(
       notes?: string;
       effectiveDate?: string;
       activate?: boolean;
+      validateJson?: boolean;
       dryRun?: boolean;
       reason?: string;
       idempotencyKey?: string;
@@ -616,6 +619,10 @@ export function registerLegalCommands(
         } catch {
           failWith(`Cannot read file: ${opts.file}`, 4);
         }
+      }
+      if (opts.validateJson) {
+        const v = validateStructuredJson(markdownContent);
+        if (!v.ok) failWith(`--validate-json failed: ${v.error}`, 4);
       }
       try {
         const client = await getClient();
