@@ -1266,6 +1266,7 @@ FLAGS
   --repo STRING    Repo/submodule
   --sha STRING    Commit SHAs (CSV)
   --vtag STRING    Version tag
+  --bump-level STRING    App version bump this implies: none|patch|minor|major (default: patch)
   --feedback NUMBER    cliFeedback id this entry resolves
   --sentry STRING    Sentry issue short id or URL this entry fixes (stored, not sent to Sentry)
   --date DATE    Entry date (YYYY-MM-DD|today)
@@ -1356,6 +1357,66 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib changelog list --month 2026-06 --type feature
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib changelog pending matches snapshot 1`] = `
+"USAGE
+  ib changelog pending [flags]
+
+DESCRIPTION
+  Unreleased entries (versionTag IS NULL) + the max bump level they imply. Drives the deploy-time app version bump.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { entries, maxBumpLevel, count }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Developer only         → dev token
+
+EXAMPLES
+  ib changelog pending
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib changelog release matches snapshot 1`] = `
+"USAGE
+  ib changelog release [flags]
+
+DESCRIPTION
+  Stamp all currently-unreleased entries with a version tag (marks them released).
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --vtag STRING    Version tag to stamp (e.g. 1.0.8) (required)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { released, versionTag } | { dryRun, wouldRelease }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Developer only         → dev token
+  exit 4 (HTTP 400)  Validation (missing versionTag) → pass --vtag
+
+NOTES
+  - Developer-gated.
+  - Typically invoked by scripts/apply-release-version.ps1, not by hand.
+
+EXAMPLES
+  ib changelog release --vtag 1.0.8 --reason 'release 1.0.8'
 "
 `;
 

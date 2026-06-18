@@ -1,6 +1,7 @@
-import { test, expect, vi, beforeEach } from "vitest";
+import { test, expect, vi, beforeEach, describe } from "vitest";
 import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, normalizeSentryRef }
   from "../../src/commands/changelog/index.js";
+import type { ChangelogAddBody } from "../../src/commands/changelog/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
 const client = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn() } as unknown as ApiClient;
@@ -88,4 +89,53 @@ test("list normalizes a pasted --sentry url to the short id", async () => {
   asGet().mockResolvedValue([]);
   await runChangelogList(client, { sentry: "https://sentry.io/issues/?query=PUMINET5API-1A2" });
   expect(asGet()).toHaveBeenCalledWith("/api/changelog?sentryIssue=PUMINET5API-1A2");
+});
+
+function mockClient() {
+  return {
+    get: vi.fn(),
+    post: vi.fn().mockResolvedValue({ changelogId: 1 }),
+    put: vi.fn(),
+    delete: vi.fn(),
+    getCurrentToken: vi.fn(),
+  };
+}
+
+describe("changelog add bumpLevel", () => {
+  test("posts bumpLevel in the body", async () => {
+    const client = mockClient();
+    const body: ChangelogAddBody = {
+      type: "feature", area: "cli", title: "t", description: "d",
+      entryDate: "2026-06-18", bumpLevel: "minor",
+    };
+    await runChangelogAdd(client as never, body, {});
+    expect(client.post).toHaveBeenCalledWith(
+      "/api/changelog",
+      expect.objectContaining({ bumpLevel: "minor" }),
+      expect.any(Object)
+    );
+  });
+});
+
+import { runChangelogPending, runChangelogRelease } from "../../src/commands/changelog/index.js";
+
+describe("changelog pending/release", () => {
+  test("pending GETs /api/changelog/pending", async () => {
+    const client = mockClient();
+    client.get.mockResolvedValue({ entries: [], maxBumpLevel: null, count: 0 });
+    const r = await runChangelogPending(client as never);
+    expect(client.get).toHaveBeenCalledWith("/api/changelog/pending");
+    expect(r).toEqual({ entries: [], maxBumpLevel: null, count: 0 });
+  });
+
+  test("release POSTs versionTag with write headers", async () => {
+    const client = mockClient();
+    client.post.mockResolvedValue({ released: 3, versionTag: "1.0.8" });
+    await runChangelogRelease(client as never, "1.0.8", { reason: "release 1.0.8" });
+    expect(client.post).toHaveBeenCalledWith(
+      "/api/changelog/release",
+      { versionTag: "1.0.8" },
+      expect.objectContaining({ headers: expect.any(Object) })
+    );
+  });
 });

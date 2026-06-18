@@ -31,6 +31,7 @@ type Row = Record<string, unknown>;
 
 const TYPES = ["feature", "improvement", "bugfix"];
 const AREAS = ["frontend", "backend", "cli", "database", "cicd"];
+const BUMP_LEVELS = ["none", "patch", "minor", "major"];
 
 /**
  * Normalize a Sentry issue reference: accept a bare short id (e.g. PUMINET5API-1A2)
@@ -57,6 +58,7 @@ export interface ChangelogAddBody {
   repo?: string;
   commitShas?: string;
   versionTag?: string;
+  bumpLevel?: string;
   feedbackId?: number;
   sentryIssue?: string;
 }
@@ -123,11 +125,29 @@ export async function runChangelogReport(
   );
 }
 
-function validateEnums(type?: string, area?: string): void {
+export async function runChangelogPending(client: ApiClient): Promise<unknown> {
+  return client.get<unknown>("/api/changelog/pending");
+}
+
+export async function runChangelogRelease(
+  client: ApiClient,
+  versionTag: string,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>(
+    "/api/changelog/release",
+    { versionTag },
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+function validateEnums(type?: string, area?: string, bumpLevel?: string): void {
   if (type !== undefined && !TYPES.includes(type))
     failWith(`--type must be ${TYPES.join("|")}`, 4);
   if (area !== undefined && !AREAS.includes(area))
     failWith(`--area must be ${AREAS.join("|")}`, 4);
+  if (bumpLevel !== undefined && !BUMP_LEVELS.includes(bumpLevel))
+    failWith(`--bump-level must be ${BUMP_LEVELS.join("|")}`, 4);
 }
 
 export function registerChangelogCommands(
@@ -158,14 +178,15 @@ export function registerChangelogCommands(
       .option("--repo <r>", "Repo/submodule")
       .option("--sha <csv>", "Commit SHAs (CSV)")
       .option("--vtag <s>", "Version tag")
+      .option("--bump-level <l>", "App version bump this implies: none|patch|minor|major", "patch")
       .option("--feedback <id>", "cliFeedback id this resolves", Number)
       .option("--sentry <ref>", "Sentry issue short id or URL this fixes")
       .option("--date <d>", "Entry date (YYYY-MM-DD|today), default today")
   ).action(
     async (
-      o: Record<string, string> & WriteFlags & { feedback?: number; vtag?: string }
+      o: Record<string, string> & WriteFlags & { feedback?: number; vtag?: string; bumpLevel?: string }
     ) => {
-      validateEnums(o.type, o.area);
+      validateEnums(o.type, o.area, o.bumpLevel);
       const entryDate = resolveDate(o.date || "today")!;
       const body: ChangelogAddBody = {
         type: o.type,
@@ -190,6 +211,7 @@ export function registerChangelogCommands(
       if (o.vtag) body.versionTag = o.vtag;
       if (o.feedback !== undefined) body.feedbackId = Number(o.feedback);
       if (o.sentry) body.sentryIssue = normalizeSentryRef(o.sentry);
+      body.bumpLevel = o.bumpLevel || "patch";
       try {
         writeJson(await runChangelogAdd(await getClient(), body, o));
       } catch (e) {
@@ -297,6 +319,33 @@ export function registerChangelogCommands(
         exitWithError(e);
       }
     });
+
+  c.command("pending")
+    .description(
+      "Unreleased entries (versionTag IS NULL) + the max bump level they imply. Drives the deploy-time app version bump."
+    )
+    .action(async () => {
+      try {
+        writeJson(await runChangelogPending(await getClient()));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  addWriteFlagsToCommand(
+    c
+      .command("release")
+      .description(
+        "Stamp all currently-unreleased entries with a version tag (marks them released). Called by the deploy step after a successful version bump."
+      )
+      .requiredOption("--vtag <v>", "Version tag to stamp (e.g. 1.0.8)")
+  ).action(async (o: WriteFlags & { vtag: string }) => {
+    try {
+      writeJson(await runChangelogRelease(await getClient(), o.vtag, o));
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
 }
 
 export const CHANGELOG_SPECS: CommandSpec[] = [
@@ -344,6 +393,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       { name: "repo", type: "string", description: "Repo/submodule" },
       { name: "sha", type: "string", description: "Commit SHAs (CSV)" },
       { name: "vtag", type: "string", description: "Version tag" },
+      { name: "bump-level", type: "string", default: "patch", description: "App version bump this implies: none|patch|minor|major" },
       {
         name: "feedback",
         type: "number",
@@ -550,5 +600,33 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       },
     ],
     examples: ["ib changelog report --month 2026-06"],
+  },
+  {
+    command: "ib changelog pending",
+    description:
+      "Unreleased entries (versionTag IS NULL) + the max bump level they imply. Drives the deploy-time app version bump.",
+    auth: "any",
+    tier: "developer",
+    flags: [],
+    outputShape: "{ entries, maxBumpLevel, count }",
+    errors: [{ http: 403, exit: 3, meaning: "Developer only", remedy: "dev token" }],
+    examples: ["ib changelog pending"],
+  },
+  {
+    command: "ib changelog release",
+    description:
+      "Stamp all currently-unreleased entries with a version tag (marks them released).",
+    auth: "any",
+    tier: "developer",
+    flags: [{ name: "vtag", type: "string", required: true, description: "Version tag to stamp (e.g. 1.0.8)" }],
+    writeFlags: true,
+    mutates: true,
+    outputShape: "{ released, versionTag } | { dryRun, wouldRelease }",
+    errors: [
+      { http: 403, exit: 3, meaning: "Developer only", remedy: "dev token" },
+      { http: 400, exit: 4, meaning: "Validation (missing versionTag)", remedy: "pass --vtag" },
+    ],
+    notes: ["Developer-gated.", "Typically invoked by scripts/apply-release-version.ps1, not by hand."],
+    examples: ["ib changelog release --vtag 1.0.8 --reason 'release 1.0.8'"],
   },
 ];
