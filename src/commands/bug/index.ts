@@ -19,6 +19,7 @@ import { CliError } from "../../api/errors.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders } from "../../api/writeFlags.js";
 import { writeJson, exitWithError } from "../../output/json.js";
+import { parseId } from "../../targets.js";
 
 // ─── enums (mirror puminet4 bugReportConstants + commonLists) ────────────────
 const BUG_TYPES = [
@@ -334,7 +335,7 @@ export function registerBugCommands(
     .description("Fetch one bug report with its comments + attachments")
     .action(async (idStr: string) => {
       try {
-        writeJson(await runBugGet(await getClient(), Number(idStr)));
+        writeJson(await runBugGet(await getClient(), parseId(idStr, "bugId")));
       } catch (e) {
         exitWithError(e);
       }
@@ -348,7 +349,7 @@ export function registerBugCommands(
     .option("--dry-run", "Preview without sending (client-side)")
     .action(async (idStr: string, opts: BugCommentInput) => {
       try {
-        writeJson(await runBugComment(await getClient(), Number(idStr), opts));
+        writeJson(await runBugComment(await getClient(), parseId(idStr, "bugId"), opts));
       } catch (e) {
         exitWithError(e);
       }
@@ -370,7 +371,7 @@ export function registerBugCommands(
     .option("--dry-run", "Preview without sending (client-side)")
     .action(async (idStr: string, opts: BugAdminUpdateInput) => {
       try {
-        writeJson(await runBugAdminUpdate(await getClient(), Number(idStr), opts));
+        writeJson(await runBugAdminUpdate(await getClient(), parseId(idStr, "bugId"), opts));
       } catch (e) {
         exitWithError(e);
       }
@@ -384,7 +385,7 @@ export function registerBugCommands(
     .option("--dry-run", "Preview without sending (client-side)")
     .action(async (idStr: string, opts: BugAdminAssignInput) => {
       try {
-        writeJson(await runBugAdminAssign(await getClient(), Number(idStr), opts));
+        writeJson(await runBugAdminAssign(await getClient(), parseId(idStr, "bugId"), opts));
       } catch (e) {
         exitWithError(e);
       }
@@ -409,7 +410,7 @@ export function registerBugCommands(
     .option("--dry-run", "Preview without sending (client-side)")
     .action(async (idStr: string, opts: BugAdminDeleteInput) => {
       try {
-        writeJson(await runBugAdminDelete(await getClient(), Number(idStr), opts));
+        writeJson(await runBugAdminDelete(await getClient(), parseId(idStr, "bugId"), opts));
       } catch (e) {
         exitWithError(e);
       }

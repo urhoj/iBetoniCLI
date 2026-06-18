@@ -9,6 +9,7 @@ import {
 import { writeJson, exitWithError, failWith } from "../../../output/json.js";
 import { resolveDate } from "../../../dates.js";
 import { resolveAsiakasTarget } from "../../customer/index.js";
+import { parseId } from "../../../targets.js";
 
 type Row = Record<string, unknown>;
 
@@ -313,7 +314,7 @@ export function registerMessageDailyCommands(
       try {
         const client = await getClient();
         writeJson(
-          await runDailyGet(client, opts.asiakas, Number(boxIdStr), opts.date ? toYyyymmdd(opts.date) : undefined)
+          await runDailyGet(client, opts.asiakas, parseId(boxIdStr, "boxId"), opts.date ? toYyyymmdd(opts.date) : undefined)
         );
       } catch (e) {
         exitWithError(e);
@@ -344,7 +345,7 @@ export function registerMessageDailyCommands(
         writeJson(
           await runDailySetMessage(
             client,
-            { boxId: Number(boxIdStr), message: opts.clear ? null : opts.message ?? null, yyyymmdd: toYyyymmdd(opts.date) },
+            { boxId: parseId(boxIdStr, "boxId"), message: opts.clear ? null : opts.message ?? null, yyyymmdd: toYyyymmdd(opts.date) },
             opts
           )
         );
@@ -367,7 +368,7 @@ export function registerMessageDailyCommands(
         writeJson(
           await runDailySaveBox(
             client,
-            { boxId: Number(boxIdStr), boxTitle: opts.title, boxLisatieto: opts.lisatieto ?? null },
+            { boxId: parseId(boxIdStr, "boxId"), boxTitle: opts.title, boxLisatieto: opts.lisatieto ?? null },
             opts
           )
         );
@@ -418,7 +419,7 @@ export function registerMessageDailyCommands(
   ).action(async (boxIdStr: string, opts: WriteFlags) => {
     try {
       const client = await getClient();
-      writeJson(await runDailyDeleteBox(client, Number(boxIdStr), opts));
+      writeJson(await runDailyDeleteBox(client, parseId(boxIdStr, "boxId"), opts));
     } catch (e) {
       exitWithError(e);
     }
@@ -433,7 +434,7 @@ export function registerMessageDailyCommands(
   ).action(async (boxIdStr: string, opts: { to: number } & WriteFlags) => {
     try {
       const client = await getClient();
-      writeJson(await runDailyShare(client, { boxId: Number(boxIdStr), asiakasId: opts.to }, opts));
+      writeJson(await runDailyShare(client, { boxId: parseId(boxIdStr, "boxId"), asiakasId: opts.to }, opts));
     } catch (e) {
       exitWithError(e);
     }
@@ -446,7 +447,7 @@ export function registerMessageDailyCommands(
   ).action(async (idStr: string, opts: WriteFlags) => {
     try {
       const client = await getClient();
-      writeJson(await runDailyUnshare(client, Number(idStr), opts));
+      writeJson(await runDailyUnshare(client, parseId(idStr, "permissionId"), opts));
     } catch (e) {
       exitWithError(e);
     }
@@ -470,7 +471,7 @@ export function registerMessageDailyCommands(
           await runDailyGrant(
             client,
             {
-              boxId: Number(boxIdStr),
+              boxId: parseId(boxIdStr, "boxId"),
               asiakasId: opts.to,
               asiakasPersonSettingTypeId: opts.role,
               dailyMessageBoxAsiakasId: opts.boxAsiakas,
@@ -491,7 +492,7 @@ export function registerMessageDailyCommands(
   ).action(async (idStr: string, opts: WriteFlags) => {
     try {
       const client = await getClient();
-      writeJson(await runDailyRevoke(client, Number(idStr), opts));
+      writeJson(await runDailyRevoke(client, parseId(idStr, "permissionId"), opts));
     } catch (e) {
       exitWithError(e);
     }
@@ -514,7 +515,7 @@ export function registerMessageDailyCommands(
           await runDailyPermSet(
             client,
             {
-              dailyMessageBoxAsiakasPermissionsId: Number(idStr),
+              dailyMessageBoxAsiakasPermissionsId: parseId(idStr, "permissionId"),
               asiakasPersonSettingTypeId: opts.role,
               readOnly: opts.access === "read",
             },

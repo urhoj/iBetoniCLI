@@ -12,6 +12,7 @@ import type { ApiClient } from "../../api/client.js";
 import { CliError } from "../../api/errors.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError } from "../../output/json.js";
+import { parseId } from "../../targets.js";
 
 /** One row of the `ib ai conversations` browse list (no message bodies). */
 export interface AiConversationRow {
@@ -96,7 +97,7 @@ export function registerAiCommands(
     )
     .action(async (idStr: string) => {
       try {
-        writeJson(await runAiConversation(await getClient(), Number(idStr)));
+        writeJson(await runAiConversation(await getClient(), parseId(idStr, "conversationId")));
       } catch (e) {
         exitWithError(e);
       }

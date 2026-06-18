@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { CliError } from "../../api/errors.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { parseId } from "../../targets.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { lineDiff } from "../../textDiff.js";
 import { validateStructuredJson } from "./validateJson.js";
@@ -318,7 +319,9 @@ export function registerLegalCommands(parent, getClient) {
         try {
             const client = await getClient();
             const claims = decodeJwtPayload(client.getCurrentToken());
-            const personId = opts.person ?? claims.personId;
+            const personId = opts.person ??
+                claims.personId ??
+                failWith("could not resolve personId from the active token — pass --person <id>", 4);
             const owner = opts.owner ?? claims.ownerAsiakasId ?? null;
             writeJson(await runLegalStatus(client, personId, owner));
         }
@@ -372,11 +375,11 @@ export function registerLegalCommands(parent, getClient) {
             else {
                 if (opts.owner !== undefined)
                     failWith("--owner only applies with --type", 4);
-                const a = Number(aStr);
-                const b = Number(bStr);
-                if (!Number.isInteger(a) || a <= 0 || !Number.isInteger(b) || b <= 0) {
+                if (aStr === undefined || bStr === undefined) {
                     failWith("provide two positive documentIds (<a> <b>) or use --type <name>", 4);
                 }
+                const a = parseId(aStr, "version");
+                const b = parseId(bStr, "version");
                 input = { a, b };
             }
             const client = await getClient();
@@ -390,10 +393,7 @@ export function registerLegalCommands(parent, getClient) {
         .command("get <documentId>")
         .description("One document version by id, incl. markdown content")
         .action(async (documentIdStr) => {
-        const documentId = Number(documentIdStr);
-        if (!Number.isInteger(documentId) || documentId <= 0) {
-            failWith(`Invalid documentId "${documentIdStr}"`, 4);
-        }
+        const documentId = parseId(documentIdStr, "documentId");
         try {
             const client = await getClient();
             writeJson(await runLegalGet(client, documentId));
@@ -460,10 +460,7 @@ export function registerLegalCommands(parent, getClient) {
         .command("activate <documentId>")
         .description("Publish a version: atomically archives the current active, activates this one");
     addWriteFlagsToCommand(activateCmd).action(async (documentIdStr, opts) => {
-        const documentId = Number(documentIdStr);
-        if (!Number.isInteger(documentId) || documentId <= 0) {
-            failWith(`Invalid documentId "${documentIdStr}"`, 4);
-        }
+        const documentId = parseId(documentIdStr, "documentId");
         if (!opts.dryRun && !opts.reason)
             failWith("Missing required flag: --reason", 4);
         try {
@@ -478,10 +475,7 @@ export function registerLegalCommands(parent, getClient) {
         .command("delete <documentId>")
         .description("Soft-delete (deactivate) a document version");
     addWriteFlagsToCommand(deleteCmd).action(async (documentIdStr, opts) => {
-        const documentId = Number(documentIdStr);
-        if (!Number.isInteger(documentId) || documentId <= 0) {
-            failWith(`Invalid documentId "${documentIdStr}"`, 4);
-        }
+        const documentId = parseId(documentIdStr, "documentId");
         if (!opts.dryRun && !opts.reason)
             failWith("Missing required flag: --reason", 4);
         try {
@@ -523,7 +517,9 @@ export function registerLegalCommands(parent, getClient) {
             const client = await getClient();
             const claims = decodeJwtPayload(client.getCurrentToken());
             assertDeveloperClaims(claims);
-            writeJson(await runLegalAccept(client, typeName, claims.personId, opts));
+            const personId = claims.personId ??
+                failWith("could not resolve personId from the active token", 4);
+            writeJson(await runLegalAccept(client, typeName, personId, opts));
         }
         catch (e) {
             exitWithError(e);

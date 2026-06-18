@@ -2,8 +2,11 @@ import { createRequire } from "node:module";
 import { Buffer } from "node:buffer";
 
 export interface DecodedClaims {
-  personId: number;
-  ownerAsiakasId: number;
+  /** Absent/undefined when the token carries no `personId`/`sub` claim (was
+   * silently `NaN` before, which leaked the literal "NaN" into URLs). */
+  personId: number | undefined;
+  /** Absent/undefined when the token carries no `ownerAsiakasId`/`o` claim. */
+  ownerAsiakasId: number | undefined;
   ownerAsiakasName?: string;
   email?: string;
   issuedFor?: "cli" | "mcp" | "web";
@@ -44,9 +47,16 @@ export function decodeJwtPayload(jwt: string): DecodedClaims {
 
   const globalRoles = (expanded.globalRoles ?? {}) as Record<string, unknown>;
 
+  // A missing claim must surface as `undefined`, not `Number(undefined)` → NaN
+  // (NaN serialises into a URL/query as the literal "NaN").
+  const finite = (v: unknown): number | undefined => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+
   return {
-    personId: Number(expanded.personId ?? expanded.sub),
-    ownerAsiakasId: Number(expanded.ownerAsiakasId ?? expanded.o),
+    personId: finite(expanded.personId ?? expanded.sub),
+    ownerAsiakasId: finite(expanded.ownerAsiakasId ?? expanded.o),
     ownerAsiakasName: expanded.ownerAsiakasName as string | undefined,
     email: expanded.email as string | undefined,
     issuedFor: expanded.issuedFor as "cli" | "mcp" | "web" | undefined,

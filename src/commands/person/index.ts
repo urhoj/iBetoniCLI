@@ -15,6 +15,7 @@ import {
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { roleNameForTypeId, resolveRoleTypeId, explainRole } from "../../roles.js";
+import { parseId, parseOptionalId } from "../../targets.js";
 import { runCompanyList } from "../company/index.js";
 import { CliError } from "../../api/errors.js";
 import { registerPersonDayCommands } from "./day.js";
@@ -315,10 +316,12 @@ export interface PersonMeOutput {
  */
 export async function runPersonMe(client: ApiClient): Promise<PersonMeOutput> {
   const claims = decodeJwtPayload(client.getCurrentToken());
+  const personId =
+    claims.personId ?? failWith("could not resolve personId from the active token", 4);
   const [profile, available] = await Promise.all([
     client.get<{
       personId: number; name: string | null; email: string | null; phone: string | null; roles: number[];
-    }>(`/api/cli/person/get/${claims.personId}`),
+    }>(`/api/cli/person/get/${personId}`),
     client.get<{
       companies: { asiakasId: number; asiakasNimi?: string; name?: string }[]; currentCompanyId: number;
     }>(`/api/company-selection/available`),
@@ -326,7 +329,7 @@ export async function runPersonMe(client: ApiClient): Promise<PersonMeOutput> {
   const companies = available.companies || [];
   const active = companies.find((c) => c.asiakasId === available.currentCompanyId);
   return {
-    personId: claims.personId,
+    personId,
     name: profile.name ?? null,
     email: profile.email ?? claims.email ?? null,
     phone: profile.phone ?? null,
@@ -360,7 +363,10 @@ export async function runPersonCompanies(
   client: ApiClient,
   personId?: number
 ): Promise<ListEnvelope<{ asiakasId: number; name: string | null }>> {
-  const id = personId ?? decodeJwtPayload(client.getCurrentToken()).personId;
+  const id =
+    personId ??
+    decodeJwtPayload(client.getCurrentToken()).personId ??
+    failWith("could not resolve personId from the active token", 4);
   const raw = await client.get<
     UserAsiakasRow[] | { recordset?: UserAsiakasRow[]; recordsets?: UserAsiakasRow[][] }
   >(`/api/person/getUserAsiakasList/${id}`);
@@ -410,7 +416,7 @@ export function registerPersonCommands(
     .action(async (idStr: string) => {
       try {
         const client = await getClient();
-        const result = await runPersonGet(client, Number(idStr));
+        const result = await runPersonGet(client, parseId(idStr, "personId"));
         writeJson(result);
       } catch (e) {
         exitWithError(e);
@@ -573,7 +579,7 @@ export function registerPersonCommands(
     }
     try {
       const client = await getClient();
-      const result = await runPersonUpdate(client, Number(personIdStr), patch, opts);
+      const result = await runPersonUpdate(client, parseId(personIdStr, "personId"), patch, opts);
       writeJson(result);
     } catch (e) {
       exitWithError(e);
@@ -604,7 +610,7 @@ export function registerPersonCommands(
     const ownerAsiakasId = hasGlobal ? null : (opts.asiakas as number);
     try {
       const client = await getClient();
-      const result = await runPersonSetOwner(client, Number(personIdStr), ownerAsiakasId, opts);
+      const result = await runPersonSetOwner(client, parseId(personIdStr, "personId"), ownerAsiakasId, opts);
       writeJson(result);
     } catch (e) {
       exitWithError(e);
@@ -621,7 +627,7 @@ export function registerPersonCommands(
     }
     try {
       const client = await getClient();
-      const result = await runPersonDelete(client, Number(personIdStr), opts);
+      const result = await runPersonDelete(client, parseId(personIdStr, "personId"), opts);
       writeJson(result);
     } catch (e) {
       exitWithError(e);
@@ -640,7 +646,7 @@ export function registerPersonCommands(
     .action(async (personIdStr: string, opts: { asiakas: number }) => {
       try {
         const client = await getClient();
-        const result = await runPersonRoleList(client, Number(personIdStr), opts.asiakas);
+        const result = await runPersonRoleList(client, parseId(personIdStr, "personId"), opts.asiakas);
         writeJson(result);
       } catch (e) {
         exitWithError(e);
@@ -671,7 +677,7 @@ export function registerPersonCommands(
     }
     try {
       const client = await getClient();
-      const result = await runPersonRoleGrant(client, Number(personIdStr), opts.asiakas, roleTypeId, opts);
+      const result = await runPersonRoleGrant(client, parseId(personIdStr, "personId"), opts.asiakas, roleTypeId, opts);
       writeJson(result);
     } catch (e) {
       exitWithError(e);
@@ -702,7 +708,7 @@ export function registerPersonCommands(
     }
     try {
       const client = await getClient();
-      const result = await runPersonRoleRevoke(client, Number(personIdStr), opts.asiakas, roleTypeId, opts);
+      const result = await runPersonRoleRevoke(client, parseId(personIdStr, "personId"), opts.asiakas, roleTypeId, opts);
       writeJson(result);
     } catch (e) {
       exitWithError(e);
@@ -748,7 +754,7 @@ export function registerPersonCommands(
         const client = await getClient();
         const result = await runPersonCompanies(
           client,
-          personIdStr ? Number(personIdStr) : undefined
+          parseOptionalId(personIdStr, "personId")
         );
         writeJson(result);
       } catch (e) {
@@ -767,7 +773,7 @@ export function registerPersonCommands(
     .action(async (personIdStr: string, opts: { owner?: number; limit: number; field?: string }) => {
       try {
         const client = await getClient();
-        const result = await runPersonHistory(client, Number(personIdStr), opts.limit, {
+        const result = await runPersonHistory(client, parseId(personIdStr, "personId"), opts.limit, {
           owner: opts.owner,
           field: opts.field,
         });

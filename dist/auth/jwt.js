@@ -27,9 +27,15 @@ export function decodeJwtPayload(jwt) {
         // Codec unavailable (e.g., during unit tests that mock JWTs). Use raw shape.
     }
     const globalRoles = (expanded.globalRoles ?? {});
+    // A missing claim must surface as `undefined`, not `Number(undefined)` → NaN
+    // (NaN serialises into a URL/query as the literal "NaN").
+    const finite = (v) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : undefined;
+    };
     return {
-        personId: Number(expanded.personId ?? expanded.sub),
-        ownerAsiakasId: Number(expanded.ownerAsiakasId ?? expanded.o),
+        personId: finite(expanded.personId ?? expanded.sub),
+        ownerAsiakasId: finite(expanded.ownerAsiakasId ?? expanded.o),
         ownerAsiakasName: expanded.ownerAsiakasName,
         email: expanded.email,
         issuedFor: expanded.issuedFor,

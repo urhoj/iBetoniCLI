@@ -4,6 +4,7 @@ import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveDate, todayHelsinki, addDaysISO } from "../../dates.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { registerLogAlias } from "../log/index.js";
+import { parseId } from "../../targets.js";
 // Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
 export { resolveDate };
 /**
@@ -231,7 +232,7 @@ export function registerKeikkaCommands(parent, getClient) {
         .action(async (idStr) => {
         try {
             const client = await getClient();
-            const result = await runKeikkaGet(client, Number(idStr));
+            const result = await runKeikkaGet(client, parseId(idStr, "keikkaId"));
             writeJson(result);
         }
         catch (e) {
@@ -244,7 +245,8 @@ export function registerKeikkaCommands(parent, getClient) {
         .action(async (query, opts) => {
         try {
             const client = await getClient();
-            const { ownerAsiakasId } = decodeJwtPayload(client.getCurrentToken());
+            const ownerAsiakasId = decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId ??
+                failWith("could not resolve ownerAsiakasId from the active token", 4);
             const result = await runKeikkaSearch(client, query, ownerAsiakasId, opts.limit);
             writeJson(result);
         }
@@ -281,7 +283,7 @@ export function registerKeikkaCommands(parent, getClient) {
         }
         try {
             const client = await getClient();
-            const result = await runKeikkaUpdate(client, Number(idStr), { status: opts.status }, {
+            const result = await runKeikkaUpdate(client, parseId(idStr, "keikkaId"), { status: opts.status }, {
                 dryRun: opts.dryRun,
                 idempotencyKey: opts.idempotencyKey,
                 reason: opts.reason,
@@ -299,7 +301,7 @@ export function registerKeikkaCommands(parent, getClient) {
     addWriteFlagsToCommand(assignCmd).action(async (idStr, opts) => {
         try {
             const client = await getClient();
-            const result = await runKeikkaDriversAssign(client, Number(idStr), {
+            const result = await runKeikkaDriversAssign(client, parseId(idStr, "keikkaId"), {
                 dryRun: opts.dryRun,
                 idempotencyKey: opts.idempotencyKey,
                 reason: opts.reason,

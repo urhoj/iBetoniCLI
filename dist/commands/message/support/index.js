@@ -1,5 +1,6 @@
 import { CliError } from "../../../api/errors.js";
 import { writeJson, exitWithError } from "../../../output/json.js";
+import { parseId } from "../../../targets.js";
 const STATUSES = ["open", "resolved", "all"];
 const CONTEXT_TYPES = ["pumppuRequest", "keikka"];
 /**
@@ -130,7 +131,7 @@ export function registerMessageSupportCommands(parent, getClient) {
         .option("--dry-run", "Print the update body without sending (client-side)")
         .action(async (threadIdStr, opts) => {
         try {
-            writeJson(await runSupportResolve(await getClient(), Number(threadIdStr), opts));
+            writeJson(await runSupportResolve(await getClient(), parseId(threadIdStr, "threadId"), opts));
         }
         catch (e) {
             exitWithError(e);

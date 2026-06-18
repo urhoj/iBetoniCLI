@@ -1,6 +1,7 @@
 import { CliError } from "../../api/errors.js";
 import { writeFlagsToHeaders } from "../../api/writeFlags.js";
 import { writeJson, exitWithError } from "../../output/json.js";
+import { parseId } from "../../targets.js";
 // ─── enums (mirror puminet4 bugReportConstants + commonLists) ────────────────
 const BUG_TYPES = [
     "ui-display-issue",
@@ -228,7 +229,7 @@ export function registerBugCommands(parent, getClient) {
         .description("Fetch one bug report with its comments + attachments")
         .action(async (idStr) => {
         try {
-            writeJson(await runBugGet(await getClient(), Number(idStr)));
+            writeJson(await runBugGet(await getClient(), parseId(idStr, "bugId")));
         }
         catch (e) {
             exitWithError(e);
@@ -242,7 +243,7 @@ export function registerBugCommands(parent, getClient) {
         .option("--dry-run", "Preview without sending (client-side)")
         .action(async (idStr, opts) => {
         try {
-            writeJson(await runBugComment(await getClient(), Number(idStr), opts));
+            writeJson(await runBugComment(await getClient(), parseId(idStr, "bugId"), opts));
         }
         catch (e) {
             exitWithError(e);
@@ -263,7 +264,7 @@ export function registerBugCommands(parent, getClient) {
         .option("--dry-run", "Preview without sending (client-side)")
         .action(async (idStr, opts) => {
         try {
-            writeJson(await runBugAdminUpdate(await getClient(), Number(idStr), opts));
+            writeJson(await runBugAdminUpdate(await getClient(), parseId(idStr, "bugId"), opts));
         }
         catch (e) {
             exitWithError(e);
@@ -277,7 +278,7 @@ export function registerBugCommands(parent, getClient) {
         .option("--dry-run", "Preview without sending (client-side)")
         .action(async (idStr, opts) => {
         try {
-            writeJson(await runBugAdminAssign(await getClient(), Number(idStr), opts));
+            writeJson(await runBugAdminAssign(await getClient(), parseId(idStr, "bugId"), opts));
         }
         catch (e) {
             exitWithError(e);
@@ -302,7 +303,7 @@ export function registerBugCommands(parent, getClient) {
         .option("--dry-run", "Preview without sending (client-side)")
         .action(async (idStr, opts) => {
         try {
-            writeJson(await runBugAdminDelete(await getClient(), Number(idStr), opts));
+            writeJson(await runBugAdminDelete(await getClient(), parseId(idStr, "bugId"), opts));
         }
         catch (e) {
             exitWithError(e);

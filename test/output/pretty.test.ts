@@ -22,6 +22,15 @@ describe("pretty output", () => {
     expect(out).toContain("(no results)");
   });
 
+  test("renderList does not crash on empty items with a non-zero/absent count", () => {
+    // A backend page can report total-count semantics or an out-of-range cursor:
+    // items:[] while count != 0. Guarding on `count===0` (the old bug) would then
+    // deref items[0] and throw. Guard on the array instead.
+    expect(renderList({ items: [], nextCursor: null, count: 42 })).toContain("(no results)");
+    const noCount = { items: [], nextCursor: null } as unknown as Parameters<typeof renderList>[0];
+    expect(renderList(noCount)).toContain("(no results)");
+  });
+
   test("renderRecord formats a single record", () => {
     const out = renderRecord({ keikkaId: 9001, pvm: "2026-06-01" });
     expect(out).toMatch(/keikkaId.*9001/);

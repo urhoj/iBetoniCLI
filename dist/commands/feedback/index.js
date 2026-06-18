@@ -1,5 +1,6 @@
 import { CliError } from "../../api/errors.js";
 import { writeJson, exitWithError } from "../../output/json.js";
+import { parseId } from "../../targets.js";
 const KINDS = ["improvement", "bug", "idea", "legal"];
 const SCOPES = ["cli", "app", "jerry", "bsg2", "workspace", "other"];
 const STATUSES = ["open", "reviewed", "applied", "dismissed"];
@@ -270,7 +271,7 @@ export function registerFeedbackCommands(parent, getClient) {
         .description("Fetch one feedback row by id (developer-only)")
         .action(async (idStr) => {
         try {
-            writeJson(await runFeedbackGet(await getClient(), Number(idStr)));
+            writeJson(await runFeedbackGet(await getClient(), parseId(idStr, "feedbackId")));
         }
         catch (e) {
             exitWithError(e);
@@ -284,7 +285,7 @@ export function registerFeedbackCommands(parent, getClient) {
         .option("--full", "Return the full updated row (default: a compact ack)")
         .action(async (idStr, opts) => {
         try {
-            writeJson(await runFeedbackResolve(await getClient(), Number(idStr), opts));
+            writeJson(await runFeedbackResolve(await getClient(), parseId(idStr, "feedbackId"), opts));
         }
         catch (e) {
             exitWithError(e);

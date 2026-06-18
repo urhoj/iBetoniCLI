@@ -9,6 +9,7 @@ import {
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveAsiakasTarget } from "../customer/index.js";
+import { parseId } from "../../targets.js";
 
 type Row = Record<string, unknown>;
 
@@ -406,7 +407,7 @@ export function registerJerryCommands(
     .action(async (idStr: string, opts: { provider?: boolean }) => {
       try {
         const client = await getClient();
-        writeJson(await runJerryRequestGet(client, Number(idStr), !!opts.provider));
+        writeJson(await runJerryRequestGet(client, parseId(idStr, "requestId"), !!opts.provider));
       } catch (e) {
         exitWithError(e);
       }
@@ -418,7 +419,7 @@ export function registerJerryCommands(
     .action(async (idStr: string) => {
       try {
         const client = await getClient();
-        writeJson(await runJerryRequestOffers(client, Number(idStr)));
+        writeJson(await runJerryRequestOffers(client, parseId(idStr, "requestId")));
       } catch (e) {
         exitWithError(e);
       }
@@ -514,7 +515,7 @@ export function registerJerryCommands(
       if (opts.maintainsOrderInfo !== undefined) body.maintainsOrderInfo = opts.maintainsOrderInfo;
       try {
         const client = await getClient();
-        writeJson(await runJerryOfferCreate(client, Number(idStr), body, opts));
+        writeJson(await runJerryOfferCreate(client, parseId(idStr, "requestId"), body, opts));
       } catch (e) {
         exitWithError(e);
       }
@@ -529,7 +530,7 @@ export function registerJerryCommands(
     requireReason(opts);
     try {
       const client = await getClient();
-      writeJson(await runJerryOfferSend(client, Number(idStr), Number(offerIdStr), opts));
+      writeJson(await runJerryOfferSend(client, parseId(idStr, "requestId"), parseId(offerIdStr, "offerId"), opts));
     } catch (e) {
       exitWithError(e);
     }
@@ -543,7 +544,7 @@ export function registerJerryCommands(
     requireReason(opts);
     try {
       const client = await getClient();
-      writeJson(await runJerryOfferAccept(client, Number(idStr), Number(offerIdStr), opts));
+      writeJson(await runJerryOfferAccept(client, parseId(idStr, "requestId"), parseId(offerIdStr, "offerId"), opts));
     } catch (e) {
       exitWithError(e);
     }
@@ -566,7 +567,7 @@ export function registerJerryCommands(
       if (opts.pumppu !== undefined) body.pumppuId = opts.pumppu;
       try {
         const client = await getClient();
-        writeJson(await runJerryOfferConfirm(client, Number(idStr), Number(offerIdStr), body, opts));
+        writeJson(await runJerryOfferConfirm(client, parseId(idStr, "requestId"), parseId(offerIdStr, "offerId"), body, opts));
       } catch (e) {
         exitWithError(e);
       }

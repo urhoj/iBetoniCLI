@@ -8,6 +8,7 @@ import {
 } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
+import { parseId } from "../../targets.js";
 
 /** Expand `now` to the current ISO timestamp; pass any other value through. */
 function resolveTime(input: string): string {
@@ -229,7 +230,7 @@ export function registerWeatherCommands(
     .action(async (idStr: string, opts: { forceRefresh?: boolean }) => {
       try {
         const client = await getClient();
-        writeJson(await runWeatherWorksite(client, Number(idStr), !!opts.forceRefresh));
+        writeJson(await runWeatherWorksite(client, parseId(idStr, "tyomaaId"), !!opts.forceRefresh));
       } catch (e) {
         exitWithError(e);
       }

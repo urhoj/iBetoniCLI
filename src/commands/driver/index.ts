@@ -8,6 +8,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
+import { parseId } from "../../targets.js";
 
 type Row = Record<string, unknown>;
 
@@ -137,7 +138,7 @@ export function registerDriverCommands(
     .description("The day driver assigned to a vehicle on a date")
     .action(async (vehicleIdStr: string, date: string) => {
       try {
-        writeJson(await runDriverWho(await getClient(), Number(vehicleIdStr), date));
+        writeJson(await runDriverWho(await getClient(), parseId(vehicleIdStr, "vehicleId"), date));
       } catch (e) {
         exitWithError(e);
       }

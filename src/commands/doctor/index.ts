@@ -22,8 +22,8 @@ export interface DoctorReport {
   endpoint: string;
   readOnly: boolean;
   auth: {
-    personId: number;
-    ownerAsiakasId: number;
+    personId: number | null;
+    ownerAsiakasId: number | null;
     ownerAsiakasName: string | null;
     email: string | null;
     issuedFor: string | null;
@@ -84,8 +84,8 @@ export async function runDoctor(opts: {
     endpoint,
     readOnly,
     auth: {
-      personId: claims.personId,
-      ownerAsiakasId: claims.ownerAsiakasId,
+      personId: claims.personId ?? null,
+      ownerAsiakasId: claims.ownerAsiakasId ?? null,
       ownerAsiakasName: claims.ownerAsiakasName ?? null,
       email: claims.email ?? null,
       issuedFor: claims.issuedFor ?? null,

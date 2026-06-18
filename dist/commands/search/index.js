@@ -1,4 +1,4 @@
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { CliError } from "../../api/errors.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { runCustomerSearch } from "../customer/index.js";
@@ -169,7 +169,8 @@ export function buildSearchSources(client, query, limit, myCompanies = false) {
         },
         vehicle: () => runVehicleSearch(client, query, limit), // active company only
         keikka: async () => {
-            const { ownerAsiakasId } = decodeJwtPayload(client.getCurrentToken());
+            const ownerAsiakasId = decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId ??
+                failWith("could not resolve ownerAsiakasId from the active token", 4);
             return runKeikkaSearch(client, query, ownerAsiakasId, limit); // active company only
         },
         // Sijainti resolution must see OTHER companies' rows too (supplier

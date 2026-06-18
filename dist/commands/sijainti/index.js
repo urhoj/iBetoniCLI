@@ -4,6 +4,7 @@ import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { CliError } from "../../api/errors.js";
+import { parseId } from "../../targets.js";
 /**
  * Sentinel `jerryActiveUntil` value meaning "enrolled in BetoniJerry, no end
  * date" — matches the EditSijainti toggle (a future/sentinel datetime = active,
@@ -533,7 +534,7 @@ export function registerSijaintiCommands(parent, getClient) {
         .action(async (idStr) => {
         try {
             const client = await getClient();
-            const result = await runSijaintiGet(client, Number(idStr));
+            const result = await runSijaintiGet(client, parseId(idStr, "sijaintiId"));
             writeJson(result);
         }
         catch (e) {
@@ -674,7 +675,7 @@ export function registerSijaintiCommands(parent, getClient) {
         }
         try {
             const client = await getClient();
-            const result = await runSijaintiSetJerry(client, Number(idStr), !!opts.on, {
+            const result = await runSijaintiSetJerry(client, parseId(idStr, "sijaintiId"), !!opts.on, {
                 dryRun: opts.dryRun,
                 idempotencyKey: opts.idempotencyKey,
                 reason: opts.reason,
@@ -693,7 +694,7 @@ export function registerSijaintiCommands(parent, getClient) {
         }
         try {
             const client = await getClient();
-            const result = await runSijaintiDelete(client, Number(idStr), opts);
+            const result = await runSijaintiDelete(client, parseId(idStr, "sijaintiId"), opts);
             writeJson(result);
         }
         catch (e) {
@@ -708,7 +709,7 @@ export function registerSijaintiCommands(parent, getClient) {
         }
         try {
             const client = await getClient();
-            const result = await runSijaintiUndelete(client, Number(idStr), opts);
+            const result = await runSijaintiUndelete(client, parseId(idStr, "sijaintiId"), opts);
             writeJson(result);
         }
         catch (e) {

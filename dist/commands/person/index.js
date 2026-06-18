@@ -4,6 +4,7 @@ import { writeJson, exitWithError, failWith, errorMessage, } from "../../output/
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { roleNameForTypeId, resolveRoleTypeId, explainRole } from "../../roles.js";
+import { parseId, parseOptionalId } from "../../targets.js";
 import { runCompanyList } from "../company/index.js";
 import { CliError } from "../../api/errors.js";
 import { registerPersonDayCommands } from "./day.js";
@@ -199,14 +200,15 @@ export async function runPersonRoleRevoke(client, personId, asiakasId, roleTypeI
  */
 export async function runPersonMe(client) {
     const claims = decodeJwtPayload(client.getCurrentToken());
+    const personId = claims.personId ?? failWith("could not resolve personId from the active token", 4);
     const [profile, available] = await Promise.all([
-        client.get(`/api/cli/person/get/${claims.personId}`),
+        client.get(`/api/cli/person/get/${personId}`),
         client.get(`/api/company-selection/available`),
     ]);
     const companies = available.companies || [];
     const active = companies.find((c) => c.asiakasId === available.currentCompanyId);
     return {
-        personId: claims.personId,
+        personId,
         name: profile.name ?? null,
         email: profile.email ?? claims.email ?? null,
         phone: profile.phone ?? null,
@@ -228,7 +230,9 @@ export async function runPersonMe(client) {
  * GET /api/person/getUserAsiakasList/:personId; defensive unwrap of mssql shapes.
  */
 export async function runPersonCompanies(client, personId) {
-    const id = personId ?? decodeJwtPayload(client.getCurrentToken()).personId;
+    const id = personId ??
+        decodeJwtPayload(client.getCurrentToken()).personId ??
+        failWith("could not resolve personId from the active token", 4);
     const raw = await client.get(`/api/person/getUserAsiakasList/${id}`);
     let rows = [];
     if (Array.isArray(raw)) {
@@ -271,7 +275,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .action(async (idStr) => {
         try {
             const client = await getClient();
-            const result = await runPersonGet(client, Number(idStr));
+            const result = await runPersonGet(client, parseId(idStr, "personId"));
             writeJson(result);
         }
         catch (e) {
@@ -407,7 +411,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         }
         try {
             const client = await getClient();
-            const result = await runPersonUpdate(client, Number(personIdStr), patch, opts);
+            const result = await runPersonUpdate(client, parseId(personIdStr, "personId"), patch, opts);
             writeJson(result);
         }
         catch (e) {
@@ -434,7 +438,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         const ownerAsiakasId = hasGlobal ? null : opts.asiakas;
         try {
             const client = await getClient();
-            const result = await runPersonSetOwner(client, Number(personIdStr), ownerAsiakasId, opts);
+            const result = await runPersonSetOwner(client, parseId(personIdStr, "personId"), ownerAsiakasId, opts);
             writeJson(result);
         }
         catch (e) {
@@ -449,7 +453,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         }
         try {
             const client = await getClient();
-            const result = await runPersonDelete(client, Number(personIdStr), opts);
+            const result = await runPersonDelete(client, parseId(personIdStr, "personId"), opts);
             writeJson(result);
         }
         catch (e) {
@@ -467,7 +471,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .action(async (personIdStr, opts) => {
         try {
             const client = await getClient();
-            const result = await runPersonRoleList(client, Number(personIdStr), opts.asiakas);
+            const result = await runPersonRoleList(client, parseId(personIdStr, "personId"), opts.asiakas);
             writeJson(result);
         }
         catch (e) {
@@ -497,7 +501,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         }
         try {
             const client = await getClient();
-            const result = await runPersonRoleGrant(client, Number(personIdStr), opts.asiakas, roleTypeId, opts);
+            const result = await runPersonRoleGrant(client, parseId(personIdStr, "personId"), opts.asiakas, roleTypeId, opts);
             writeJson(result);
         }
         catch (e) {
@@ -527,7 +531,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         }
         try {
             const client = await getClient();
-            const result = await runPersonRoleRevoke(client, Number(personIdStr), opts.asiakas, roleTypeId, opts);
+            const result = await runPersonRoleRevoke(client, parseId(personIdStr, "personId"), opts.asiakas, roleTypeId, opts);
             writeJson(result);
         }
         catch (e) {
@@ -569,7 +573,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .action(async (personIdStr) => {
         try {
             const client = await getClient();
-            const result = await runPersonCompanies(client, personIdStr ? Number(personIdStr) : undefined);
+            const result = await runPersonCompanies(client, parseOptionalId(personIdStr, "personId"));
             writeJson(result);
         }
         catch (e) {
@@ -585,7 +589,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .action(async (personIdStr, opts) => {
         try {
             const client = await getClient();
-            const result = await runPersonHistory(client, Number(personIdStr), opts.limit, {
+            const result = await runPersonHistory(client, parseId(personIdStr, "personId"), opts.limit, {
                 owner: opts.owner,
                 field: opts.field,
             });

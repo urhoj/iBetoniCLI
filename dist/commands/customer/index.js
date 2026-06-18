@@ -4,7 +4,7 @@ import { writeJson, exitWithError, failWith, errorMessage, setExitCode, } from "
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveRoleTypeId } from "../../roles.js";
-import { resolveTarget } from "../../targets.js";
+import { resolveTarget, parseId } from "../../targets.js";
 import { runPersonRoleList } from "../person/index.js";
 /**
  * GET /api/cli/customer/list with the universal list envelope shape.
@@ -674,7 +674,7 @@ export function registerCustomerCommands(parent, getClient) {
         .action(async (idStr) => {
         try {
             const client = await getClient();
-            const result = await runCustomerGet(client, Number(idStr));
+            const result = await runCustomerGet(client, parseId(idStr, "asiakasId"));
             writeJson(result);
         }
         catch (e) {
@@ -686,7 +686,7 @@ export function registerCustomerCommands(parent, getClient) {
         .action(async (idStr) => {
         try {
             const client = await getClient();
-            writeJson(await runCustomerWorksites(client, Number(idStr)));
+            writeJson(await runCustomerWorksites(client, parseId(idStr, "asiakasId")));
         }
         catch (e) {
             exitWithError(e);
@@ -829,7 +829,7 @@ export function registerCustomerCommands(parent, getClient) {
         .action(async (idStr, opts) => {
         try {
             const client = await getClient();
-            writeJson(await runCustomerHistory(client, Number(idStr), opts.limit));
+            writeJson(await runCustomerHistory(client, parseId(idStr, "asiakasId"), opts.limit));
         }
         catch (e) {
             exitWithError(e);
@@ -904,7 +904,7 @@ export function registerCustomerCommands(parent, getClient) {
     addWriteFlagsToCommand(updateCmd).action(async (idStr, opts) => {
         try {
             const client = await getClient();
-            const asiakasId = Number(idStr);
+            const asiakasId = parseId(idStr, "asiakasId");
             const current = await runCustomerGet(client, asiakasId);
             const prh = opts.fromPrh ? await runCustomerPrhById(client, opts.fromPrh) : undefined;
             const body = buildAsiakasUpdateBody(current, opts, prh);
@@ -970,7 +970,7 @@ export function registerCustomerCommands(parent, getClient) {
         try {
             const client = await getClient();
             const ownerAsiakasId = await resolveCurrentOwnerAsiakasId(client);
-            const result = await runCustomerDelete(client, Number(asiakasIdStr), ownerAsiakasId, opts);
+            const result = await runCustomerDelete(client, parseId(asiakasIdStr, "asiakasId"), ownerAsiakasId, opts);
             writeJson(result);
         }
         catch (e) {

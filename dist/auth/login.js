@@ -61,6 +61,9 @@ export async function performLogin(opts) {
     const tokenBody = (await tokenRes.json());
     // 6. Decode JWT for identity claims.
     const payload = decodeJwtPayload(tokenBody.access_token);
+    if (payload.personId === undefined || payload.ownerAsiakasId === undefined) {
+        throw new Error("Login token is missing personId/ownerAsiakasId claims — cannot persist credentials");
+    }
     // 7. Persist credentials.
     const store = createStore(opts.credentialsPath);
     const now = new Date();

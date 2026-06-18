@@ -3,7 +3,7 @@ import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { registerLogAlias } from "../log/index.js";
-import { resolveTarget } from "../../targets.js";
+import { resolveTarget, parseId } from "../../targets.js";
 /**
  * GET /api/cli/worksite/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
@@ -180,8 +180,8 @@ export async function runWorksiteDelete(client, tyomaaId, flags) {
  */
 export function resolveOwnerAsiakasId(client) {
     const token = client.getCurrentToken();
-    const owner = token ? decodeJwtPayload(token).ownerAsiakasId : NaN;
-    if (!Number.isFinite(owner) || owner < 1) {
+    const owner = token ? decodeJwtPayload(token).ownerAsiakasId : undefined;
+    if (owner === undefined || !Number.isFinite(owner) || owner < 1) {
         throw new Error("Could not derive ownerAsiakasId from the active session token");
     }
     return owner;
@@ -263,7 +263,7 @@ export function registerWorksiteCommands(parent, getClient) {
         .action(async (idStr, opts) => {
         try {
             const client = await getClient();
-            const result = await runWorksiteGet(client, Number(idStr), {
+            const result = await runWorksiteGet(client, parseId(idStr, "tyomaaId"), {
                 includeBuilding: opts.includeBuilding,
                 includeCameras: opts.includeCameras,
             });
@@ -278,7 +278,7 @@ export function registerWorksiteCommands(parent, getClient) {
         .action(async (idStr) => {
         try {
             const client = await getClient();
-            const result = await runWorksiteMetrics(client, Number(idStr));
+            const result = await runWorksiteMetrics(client, parseId(idStr, "tyomaaId"));
             writeJson(result);
         }
         catch (e) {
@@ -292,7 +292,7 @@ export function registerWorksiteCommands(parent, getClient) {
         .action(async (idStr) => {
         try {
             const client = await getClient();
-            writeJson(await runWorksiteDatesList(client, Number(idStr)));
+            writeJson(await runWorksiteDatesList(client, parseId(idStr, "tyomaaId")));
         }
         catch (e) {
             exitWithError(e);
@@ -354,7 +354,7 @@ export function registerWorksiteCommands(parent, getClient) {
             const client = await getClient();
             const ownerAsiakasId = resolveOwnerAsiakasId(client);
             const parsed = parseJsonBodyFlag(opts.body);
-            const result = await runWorksiteUpdate(client, { tyomaaId: Number(idStr), ownerAsiakasId, yyyymmdd: opts.yyyymmdd }, parsed, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason });
+            const result = await runWorksiteUpdate(client, { tyomaaId: parseId(idStr, "tyomaaId"), ownerAsiakasId, yyyymmdd: opts.yyyymmdd }, parsed, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason });
             writeJson(result);
         }
         catch (e) {
@@ -369,7 +369,7 @@ export function registerWorksiteCommands(parent, getClient) {
         }
         try {
             const client = await getClient();
-            const result = await runWorksiteDelete(client, Number(tyomaaIdStr), opts);
+            const result = await runWorksiteDelete(client, parseId(tyomaaIdStr, "tyomaaId"), opts);
             writeJson(result);
         }
         catch (e) {
@@ -380,7 +380,7 @@ export function registerWorksiteCommands(parent, getClient) {
         .description("Re-geocode a worksite from Google Maps")).action(async (idStr, opts) => {
         try {
             const client = await getClient();
-            writeJson(await runWorksiteRefreshLocation(client, Number(idStr), opts));
+            writeJson(await runWorksiteRefreshLocation(client, parseId(idStr, "tyomaaId"), opts));
         }
         catch (e) {
             exitWithError(e);
@@ -394,7 +394,7 @@ export function registerWorksiteCommands(parent, getClient) {
         }
         try {
             const client = await getClient();
-            writeJson(await runWorksiteSetGeofence(client, Number(idStr), opts.radius, opts));
+            writeJson(await runWorksiteSetGeofence(client, parseId(idStr, "tyomaaId"), opts.radius, opts));
         }
         catch (e) {
             exitWithError(e);
@@ -404,7 +404,7 @@ export function registerWorksiteCommands(parent, getClient) {
         .description("Refresh Helsinki building data for a worksite")).action(async (idStr, opts) => {
         try {
             const client = await getClient();
-            writeJson(await runWorksiteHelsinkiFetch(client, Number(idStr), opts));
+            writeJson(await runWorksiteHelsinkiFetch(client, parseId(idStr, "tyomaaId"), opts));
         }
         catch (e) {
             exitWithError(e);

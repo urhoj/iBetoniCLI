@@ -2,6 +2,7 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFla
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveAsiakasTarget } from "../customer/index.js";
+import { parseId } from "../../targets.js";
 /**
  * Wrap a backend array into the universal `{ items, nextCursor, count }` list
  * envelope. The BetoniJerry endpoints return bare arrays (sendSuccess sends raw
@@ -245,7 +246,7 @@ export function registerJerryCommands(parent, getClient) {
         .action(async (idStr, opts) => {
         try {
             const client = await getClient();
-            writeJson(await runJerryRequestGet(client, Number(idStr), !!opts.provider));
+            writeJson(await runJerryRequestGet(client, parseId(idStr, "requestId"), !!opts.provider));
         }
         catch (e) {
             exitWithError(e);
@@ -257,7 +258,7 @@ export function registerJerryCommands(parent, getClient) {
         .action(async (idStr) => {
         try {
             const client = await getClient();
-            writeJson(await runJerryRequestOffers(client, Number(idStr)));
+            writeJson(await runJerryRequestOffers(client, parseId(idStr, "requestId")));
         }
         catch (e) {
             exitWithError(e);
@@ -331,7 +332,7 @@ export function registerJerryCommands(parent, getClient) {
             body.maintainsOrderInfo = opts.maintainsOrderInfo;
         try {
             const client = await getClient();
-            writeJson(await runJerryOfferCreate(client, Number(idStr), body, opts));
+            writeJson(await runJerryOfferCreate(client, parseId(idStr, "requestId"), body, opts));
         }
         catch (e) {
             exitWithError(e);
@@ -343,7 +344,7 @@ export function registerJerryCommands(parent, getClient) {
         requireReason(opts);
         try {
             const client = await getClient();
-            writeJson(await runJerryOfferSend(client, Number(idStr), Number(offerIdStr), opts));
+            writeJson(await runJerryOfferSend(client, parseId(idStr, "requestId"), parseId(offerIdStr, "offerId"), opts));
         }
         catch (e) {
             exitWithError(e);
@@ -355,7 +356,7 @@ export function registerJerryCommands(parent, getClient) {
         requireReason(opts);
         try {
             const client = await getClient();
-            writeJson(await runJerryOfferAccept(client, Number(idStr), Number(offerIdStr), opts));
+            writeJson(await runJerryOfferAccept(client, parseId(idStr, "requestId"), parseId(offerIdStr, "offerId"), opts));
         }
         catch (e) {
             exitWithError(e);
@@ -372,7 +373,7 @@ export function registerJerryCommands(parent, getClient) {
             body.pumppuId = opts.pumppu;
         try {
             const client = await getClient();
-            writeJson(await runJerryOfferConfirm(client, Number(idStr), Number(offerIdStr), body, opts));
+            writeJson(await runJerryOfferConfirm(client, parseId(idStr, "requestId"), parseId(offerIdStr, "offerId"), body, opts));
         }
         catch (e) {
             exitWithError(e);

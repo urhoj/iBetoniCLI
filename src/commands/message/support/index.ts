@@ -22,6 +22,7 @@ import type { ApiClient } from "../../../api/client.js";
 import { CliError } from "../../../api/errors.js";
 import type { ListEnvelope } from "../../../api/envelopes.js";
 import { writeJson, exitWithError } from "../../../output/json.js";
+import { parseId } from "../../../targets.js";
 
 const STATUSES = ["open", "resolved", "all"] as const;
 type StatusFilter = (typeof STATUSES)[number];
@@ -202,7 +203,7 @@ export function registerMessageSupportCommands(
     .option("--dry-run", "Print the update body without sending (client-side)")
     .action(async (threadIdStr: string, opts: { reopen?: boolean; dryRun?: boolean }) => {
       try {
-        writeJson(await runSupportResolve(await getClient(), Number(threadIdStr), opts));
+        writeJson(await runSupportResolve(await getClient(), parseId(threadIdStr, "threadId"), opts));
       } catch (e) {
         exitWithError(e);
       }

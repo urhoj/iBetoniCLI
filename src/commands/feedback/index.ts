@@ -17,6 +17,7 @@ import type { ApiClient } from "../../api/client.js";
 import { CliError } from "../../api/errors.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError } from "../../output/json.js";
+import { parseId } from "../../targets.js";
 
 const KINDS = ["improvement", "bug", "idea", "legal"] as const;
 type Kind = (typeof KINDS)[number];
@@ -370,7 +371,7 @@ export function registerFeedbackCommands(
     .description("Fetch one feedback row by id (developer-only)")
     .action(async (idStr: string) => {
       try {
-        writeJson(await runFeedbackGet(await getClient(), Number(idStr)));
+        writeJson(await runFeedbackGet(await getClient(), parseId(idStr, "feedbackId")));
       } catch (e) {
         exitWithError(e);
       }
@@ -390,7 +391,7 @@ export function registerFeedbackCommands(
         opts: { status?: string; note?: string; dryRun?: boolean; full?: boolean }
       ) => {
         try {
-          writeJson(await runFeedbackResolve(await getClient(), Number(idStr), opts));
+          writeJson(await runFeedbackResolve(await getClient(), parseId(idStr, "feedbackId"), opts));
         } catch (e) {
           exitWithError(e);
         }

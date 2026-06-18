@@ -30,3 +30,19 @@ describe("decodeJwtPayload globalRoles", () => {
     expect(claims.isDeveloper).toBe(false);
   });
 });
+
+describe("decodeJwtPayload numeric ids", () => {
+  test("absent personId/ownerAsiakasId decode to undefined, not NaN", () => {
+    const claims = decodeJwtPayload(fakeJwt({ email: "a@b.fi" }));
+    expect(claims.personId).toBeUndefined();
+    expect(claims.ownerAsiakasId).toBeUndefined();
+    // The bug: Number(undefined) → NaN, which interpolates into URLs as "NaN".
+    expect(Number.isNaN(claims.personId as number)).toBe(false);
+  });
+
+  test("present ids decode to numbers", () => {
+    const claims = decodeJwtPayload(fakeJwt({ personId: 5, ownerAsiakasId: 10 }));
+    expect(claims.personId).toBe(5);
+    expect(claims.ownerAsiakasId).toBe(10);
+  });
+});

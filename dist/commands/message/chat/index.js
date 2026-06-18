@@ -1,6 +1,7 @@
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../../output/json.js";
 import { resolveThreadId } from "./resolveThread.js";
+import { parseOptionalId } from "../../../targets.js";
 /** Wrap a backend array into the universal `{ items, nextCursor, count }` envelope. */
 function toEnvelope(value) {
     const items = Array.isArray(value) ? value : [];
@@ -81,7 +82,7 @@ export async function runChatMarkRead(client, threadId) {
 /** Resolve the {@link ThreadTarget} from a positional + --tarjous option. */
 function targetFrom(threadIdStr, opts) {
     return {
-        thread: threadIdStr !== undefined ? Number(threadIdStr) : undefined,
+        thread: parseOptionalId(threadIdStr, "threadId"),
         tarjous: opts.tarjous,
     };
 }

@@ -2,6 +2,7 @@ import { CliError } from "../../api/errors.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
+import { parseId } from "../../targets.js";
 /** Expand `now` to the current ISO timestamp; pass any other value through. */
 function resolveTime(input) {
     return input === "now" ? new Date().toISOString() : input;
@@ -155,7 +156,7 @@ export function registerWeatherCommands(parent, getClient) {
         .action(async (idStr, opts) => {
         try {
             const client = await getClient();
-            writeJson(await runWeatherWorksite(client, Number(idStr), !!opts.forceRefresh));
+            writeJson(await runWeatherWorksite(client, parseId(idStr, "tyomaaId"), !!opts.forceRefresh));
         }
         catch (e) {
             exitWithError(e);

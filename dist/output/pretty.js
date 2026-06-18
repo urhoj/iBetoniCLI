@@ -74,7 +74,11 @@ function fittedOptions(natural) {
     return colWidths ? { colWidths, wordWrap: true, wrapOnWordBoundary: false } : {};
 }
 export function renderList(envelope) {
-    if (envelope.count === 0)
+    // Guard on the actual array, not `count`: a backend page can report a
+    // non-zero/absent `count` (total-count semantics, or an out-of-range cursor)
+    // while `items` is empty — trusting `count` here would deref items[0] and
+    // crash pretty mode with a raw TypeError.
+    if (envelope.items.length === 0)
         return chalk.dim("(no results)");
     const headers = Object.keys(envelope.items[0]);
     const rows = envelope.items.map((item) => headers.map((h) => formatCell(item[h])));

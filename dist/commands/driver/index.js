@@ -1,6 +1,7 @@
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
+import { parseId } from "../../targets.js";
 /** YYYY-MM-DD (or today/yesterday/tomorrow) → integer yyyymmdd. */
 function toYyyymmdd(date) {
     return Number(resolveDate(date).replace(/-/g, ""));
@@ -81,7 +82,7 @@ export function registerDriverCommands(parent, getClient) {
         .description("The day driver assigned to a vehicle on a date")
         .action(async (vehicleIdStr, date) => {
         try {
-            writeJson(await runDriverWho(await getClient(), Number(vehicleIdStr), date));
+            writeJson(await runDriverWho(await getClient(), parseId(vehicleIdStr, "vehicleId"), date));
         }
         catch (e) {
             exitWithError(e);

@@ -16,6 +16,7 @@ import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { CliError } from "../../api/errors.js";
+import { parseId } from "../../targets.js";
 
 /**
  * Sentinel `jerryActiveUntil` value meaning "enrolled in BetoniJerry, no end
@@ -732,7 +733,7 @@ export function registerSijaintiCommands(
     .action(async (idStr: string) => {
       try {
         const client = await getClient();
-        const result = await runSijaintiGet(client, Number(idStr));
+        const result = await runSijaintiGet(client, parseId(idStr, "sijaintiId"));
         writeJson(result);
       } catch (e) {
         exitWithError(e);
@@ -926,7 +927,7 @@ export function registerSijaintiCommands(
         const client = await getClient();
         const result = await runSijaintiSetJerry(
           client,
-          Number(idStr),
+          parseId(idStr, "sijaintiId"),
           !!opts.on,
           {
             dryRun: opts.dryRun,
@@ -954,7 +955,7 @@ export function registerSijaintiCommands(
     }
     try {
       const client = await getClient();
-      const result = await runSijaintiDelete(client, Number(idStr), opts);
+      const result = await runSijaintiDelete(client, parseId(idStr, "sijaintiId"), opts);
       writeJson(result);
     } catch (e) {
       exitWithError(e);
@@ -973,7 +974,7 @@ export function registerSijaintiCommands(
     }
     try {
       const client = await getClient();
-      const result = await runSijaintiUndelete(client, Number(idStr), opts);
+      const result = await runSijaintiUndelete(client, parseId(idStr, "sijaintiId"), opts);
       writeJson(result);
     } catch (e) {
       exitWithError(e);

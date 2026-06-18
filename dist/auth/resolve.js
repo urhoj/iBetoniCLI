@@ -15,8 +15,8 @@ export async function resolveAuth(opts) {
         let ownerAsiakasId = null;
         try {
             const claims = decodeJwtPayload(process.env.IB_TOKEN);
-            personId = Number.isFinite(claims.personId) ? claims.personId : null;
-            ownerAsiakasId = Number.isFinite(claims.ownerAsiakasId) ? claims.ownerAsiakasId : null;
+            personId = claims.personId ?? null;
+            ownerAsiakasId = claims.ownerAsiakasId ?? null;
         }
         catch {
             // Malformed token — caller will get 401 from API and exit.

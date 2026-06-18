@@ -9,6 +9,31 @@ import { CliError, exitCodeFromStatus } from "./errors.js";
  */
 const BETONIJERRY_UMBRELLA_ASIAKAS_ID = 1349;
 
+/**
+ * Derive a human/agent-readable message from a parsed error body. `sendError`
+ * returns `{ error: "<string>" }`, but other layers (rate-limit, oauth) may
+ * nest it (`{ error: { message, code } }`) or send `{ message }`. The old
+ * `String(parsed.error)` turned a nested object into the literal
+ * `"[object Object]"`, defeating the machine-parseable-error contract — so dig
+ * out a real string before falling back to `HTTP <status>`.
+ */
+function errorMessageFromBody(parsed: unknown, status: number): string {
+  const fallback = `HTTP ${status}`;
+  if (typeof parsed === "string" && parsed) return parsed;
+  if (!parsed || typeof parsed !== "object") return fallback;
+  const body = parsed as Record<string, unknown>;
+  const err = body.error ?? body.message;
+  if (typeof err === "string" && err) return err;
+  if (err && typeof err === "object") {
+    const nested =
+      (err as Record<string, unknown>).message ??
+      (err as Record<string, unknown>).error;
+    if (typeof nested === "string" && nested) return nested;
+    return JSON.stringify(err);
+  }
+  return fallback;
+}
+
 interface ApiClientOptions {
   endpoint: string;
   token: string;
@@ -190,9 +215,7 @@ export function createApiClient({
       : await res.text().catch(() => "");
     if (!res.ok) {
       throw new CliError(
-        typeof parsed === "object" && parsed && "error" in parsed
-          ? String((parsed as { error: string }).error)
-          : `HTTP ${res.status}`,
+        errorMessageFromBody(parsed, res.status),
         res.status,
         parsed,
         exitCodeFromStatus(res.status)

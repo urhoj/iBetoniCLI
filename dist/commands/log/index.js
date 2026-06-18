@@ -1,6 +1,7 @@
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
+import { parseId, parseOptionalId } from "../../targets.js";
 import { CHANGE_ENTITY_TYPES, findEntityType, isKnownEntityType, runLogTypes, } from "./entityTypes.js";
 function projectRow(r) {
     const item = {
@@ -138,7 +139,7 @@ export function registerLogAlias(group, getClient, entityType, idArgName, descri
         .action(async (idStr, opts) => {
         try {
             const client = await getClient();
-            writeJson(await runLogEntity(client, entityType, Number(idStr), opts.limit, {
+            writeJson(await runLogEntity(client, entityType, parseId(idStr, "entityId"), opts.limit, {
                 owner: opts.owner,
                 field: opts.field,
             }));
@@ -159,7 +160,7 @@ export function registerLogCommands(parent, getClient) {
         .action(async (entityType, entityIdStr, opts) => {
         try {
             const client = await getClient();
-            writeJson(await runLogEntity(client, entityType, Number(entityIdStr), opts.limit, {
+            writeJson(await runLogEntity(client, entityType, parseId(entityIdStr, "entityId"), opts.limit, {
                 owner: opts.owner,
                 field: opts.field,
             }));
@@ -239,7 +240,7 @@ export function registerLogCommands(parent, getClient) {
         .action(async (personIdStr, opts) => {
         try {
             const client = await getClient();
-            writeJson(await runLogUser(client, personIdStr ? Number(personIdStr) : null, opts.limit, {
+            writeJson(await runLogUser(client, parseOptionalId(personIdStr, "personId") ?? null, opts.limit, {
                 owner: opts.owner,
             }));
         }

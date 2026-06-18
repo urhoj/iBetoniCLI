@@ -82,6 +82,56 @@ describe("ApiClient", () => {
     });
   });
 
+  test("error message is extracted from a NESTED error object (not '[object Object]')", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: { message: "Too many requests", code: "RATE_LIMITED" } }),
+        { status: 429, headers: { "content-type": "application/json" } }
+      )
+    );
+    const client = createApiClient({
+      endpoint: "https://api.example.com",
+      token: "x",
+      version: "1.0.0",
+    });
+    await expect(client.get("/api/x")).rejects.toMatchObject({
+      name: "CliError",
+      message: "Too many requests",
+    });
+  });
+
+  test("error message falls back to top-level `message` when there is no `error`", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: "boom" }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      })
+    );
+    const client = createApiClient({
+      endpoint: "https://api.example.com",
+      token: "x",
+      version: "1.0.0",
+    });
+    await expect(client.get("/api/x")).rejects.toMatchObject({ message: "boom" });
+  });
+
+  test("a structured error with no string field stringifies (never '[object Object]')", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: { code: "WEIRD" } }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      })
+    );
+    const client = createApiClient({
+      endpoint: "https://api.example.com",
+      token: "x",
+      version: "1.0.0",
+    });
+    const err = await client.get("/api/x").catch((e) => e as Error);
+    expect(err.message).not.toContain("[object Object]");
+    expect(err.message).toContain("WEIRD");
+  });
+
   test("network failure throws CliError with exitCode 7", async () => {
     mockFetch.mockRejectedValueOnce(new TypeError("fetch failed"));
     const client = createApiClient({

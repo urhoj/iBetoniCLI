@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import {
   type WriteFlags,
@@ -9,6 +9,7 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
+import { parseId } from "../../targets.js";
 import { CliError } from "../../api/errors.js";
 import { diffFields } from "../../diff.js";
 import { registerLogAlias } from "../log/index.js";
@@ -325,7 +326,9 @@ export async function runVehicleCreate(
   fields: VehicleWriteFields,
   flags: WriteFlags
 ): Promise<unknown> {
-  const { ownerAsiakasId } = decodeJwtPayload(client.getCurrentToken());
+  const ownerAsiakasId =
+    decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId ??
+    failWith("could not resolve ownerAsiakasId from the active token", 4);
   if (flags.dryRun) {
     return client.post(
       `/api/vehicle/new/${ownerAsiakasId}`,
@@ -512,7 +515,7 @@ export function registerVehicleCommands(
     .action(async (idStr: string) => {
       try {
         const client = await getClient();
-        const result = await runVehicleGet(client, Number(idStr));
+        const result = await runVehicleGet(client, parseId(idStr, "vehicleId"));
         writeJson(result);
       } catch (e) {
         exitWithError(e);
@@ -524,7 +527,7 @@ export function registerVehicleCommands(
     .action(async (idStr: string) => {
       try {
         const client = await getClient();
-        const result = await runVehicleStatus(client, Number(idStr));
+        const result = await runVehicleStatus(client, parseId(idStr, "vehicleId"));
         writeJson(result);
       } catch (e) {
         exitWithError(e);
@@ -538,7 +541,7 @@ export function registerVehicleCommands(
     .action(async (idStr: string, opts: VehicleDriversFilter) => {
       try {
         const client = await getClient();
-        const result = await runVehicleDrivers(client, Number(idStr), {
+        const result = await runVehicleDrivers(client, parseId(idStr, "vehicleId"), {
           from: resolveDate(opts.from),
           to: resolveDate(opts.to),
         });
@@ -588,7 +591,7 @@ export function registerVehicleCommands(
     .action(async (idStr: string, opts: VehicleDayFilter) => {
       try {
         const client = await getClient();
-        writeJson(await runVehicleTimeline(client, Number(idStr), { date: resolveDate(opts.date) }));
+        writeJson(await runVehicleTimeline(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) }));
       } catch (e) {
         exitWithError(e);
       }
@@ -706,7 +709,7 @@ export function registerVehicleCommands(
       try {
         const result = await runVehicleUpdate(
           await getClient(),
-          Number(idStr),
+          parseId(idStr, "vehicleId"),
           {
             vehicleRegNo: opts.reg,
             vehicleNimi: opts.name,
@@ -741,7 +744,7 @@ export function registerVehicleCommands(
     .description("List a vehicle's dates")
     .action(async (idStr: string) => {
       try {
-        writeJson(await runVehicleDatesList(await getClient(), Number(idStr)));
+        writeJson(await runVehicleDatesList(await getClient(), parseId(idStr, "vehicleId")));
       } catch (e) {
         exitWithError(e);
       }
@@ -766,7 +769,7 @@ export function registerVehicleCommands(
     .action(async (idStr: string, opts: VehicleDayFilter) => {
       try {
         const client = await getClient();
-        writeJson(await runVehicleRoute(client, Number(idStr), { date: resolveDate(opts.date) }));
+        writeJson(await runVehicleRoute(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) }));
       } catch (e) {
         exitWithError(e);
       }
@@ -791,7 +794,7 @@ export function registerVehicleCommands(
       try {
         const result = await runVehicleDriversAssign(
           await getClient(),
-          Number(idStr),
+          parseId(idStr, "vehicleId"),
           opts.person,
           opts.date,
           {
@@ -818,7 +821,7 @@ export function registerVehicleCommands(
       try {
         const client = await getClient();
         writeJson(
-          await runVehicleVisits(client, filterType, Number(idStr), {
+          await runVehicleVisits(client, filterType, parseId(idStr, "vehicleId"), {
             days: opts.days,
             date: opts.date ? resolveDate(opts.date) : undefined,
           })

@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { CliError } from "../../api/errors.js";
 
@@ -80,7 +80,9 @@ export function registerValidateCommands(
             return;
           }
           const asiakasId =
-            opts.asiakas ?? decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId;
+            opts.asiakas ??
+            decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId ??
+            failWith("could not resolve asiakasId from the active token — pass --asiakas <id>", 4);
           if (opts.person != null) {
             writeJson(
               await runValidatePerson(client, opts.profile ?? "onboarding", asiakasId, opts.person)

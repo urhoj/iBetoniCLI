@@ -11,6 +11,7 @@ import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveDate, todayHelsinki, addDaysISO } from "../../dates.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { registerLogAlias } from "../log/index.js";
+import { parseId } from "../../targets.js";
 
 // Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
 export { resolveDate };
@@ -341,7 +342,7 @@ export function registerKeikkaCommands(
     .action(async (idStr: string) => {
       try {
         const client = await getClient();
-        const result = await runKeikkaGet(client, Number(idStr));
+        const result = await runKeikkaGet(client, parseId(idStr, "keikkaId"));
         writeJson(result);
       } catch (e) {
         exitWithError(e);
@@ -354,7 +355,9 @@ export function registerKeikkaCommands(
     .action(async (query: string, opts: { limit?: number }) => {
       try {
         const client = await getClient();
-        const { ownerAsiakasId } = decodeJwtPayload(client.getCurrentToken());
+        const ownerAsiakasId =
+          decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId ??
+          failWith("could not resolve ownerAsiakasId from the active token", 4);
         const result = await runKeikkaSearch(client, query, ownerAsiakasId, opts.limit);
         writeJson(result);
       } catch (e) {
@@ -412,7 +415,7 @@ export function registerKeikkaCommands(
         const client = await getClient();
         const result = await runKeikkaUpdate(
           client,
-          Number(idStr),
+          parseId(idStr, "keikkaId"),
           { status: opts.status },
           {
             dryRun: opts.dryRun,
@@ -442,7 +445,7 @@ export function registerKeikkaCommands(
     ) => {
       try {
         const client = await getClient();
-        const result = await runKeikkaDriversAssign(client, Number(idStr), {
+        const result = await runKeikkaDriversAssign(client, parseId(idStr, "keikkaId"), {
           dryRun: opts.dryRun,
           idempotencyKey: opts.idempotencyKey,
           reason: opts.reason,

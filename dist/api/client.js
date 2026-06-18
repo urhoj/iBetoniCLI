@@ -7,6 +7,33 @@ import { CliError, exitCodeFromStatus } from "./errors.js";
  * free of the CJS constants require on its hot path.
  */
 const BETONIJERRY_UMBRELLA_ASIAKAS_ID = 1349;
+/**
+ * Derive a human/agent-readable message from a parsed error body. `sendError`
+ * returns `{ error: "<string>" }`, but other layers (rate-limit, oauth) may
+ * nest it (`{ error: { message, code } }`) or send `{ message }`. The old
+ * `String(parsed.error)` turned a nested object into the literal
+ * `"[object Object]"`, defeating the machine-parseable-error contract — so dig
+ * out a real string before falling back to `HTTP <status>`.
+ */
+function errorMessageFromBody(parsed, status) {
+    const fallback = `HTTP ${status}`;
+    if (typeof parsed === "string" && parsed)
+        return parsed;
+    if (!parsed || typeof parsed !== "object")
+        return fallback;
+    const body = parsed;
+    const err = body.error ?? body.message;
+    if (typeof err === "string" && err)
+        return err;
+    if (err && typeof err === "object") {
+        const nested = err.message ??
+            err.error;
+        if (typeof nested === "string" && nested)
+            return nested;
+        return JSON.stringify(err);
+    }
+    return fallback;
+}
 export function createApiClient({ endpoint, token, version, requestId, onRefresh, readOnly = false, actingAs, quiet = false, }) {
     const platform = `${process.platform} node-${process.versions.node}`;
     const userAgent = `ib-cli/${version} (${platform})`;
@@ -101,9 +128,7 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
             ? await res.json().catch(() => null)
             : await res.text().catch(() => "");
         if (!res.ok) {
-            throw new CliError(typeof parsed === "object" && parsed && "error" in parsed
-                ? String(parsed.error)
-                : `HTTP ${res.status}`, res.status, parsed, exitCodeFromStatus(res.status));
+            throw new CliError(errorMessageFromBody(parsed, res.status), res.status, parsed, exitCodeFromStatus(res.status));
         }
         return parsed;
     }

@@ -1,5 +1,6 @@
 import { CliError } from "../../api/errors.js";
 import { writeJson, exitWithError } from "../../output/json.js";
+import { parseId } from "../../targets.js";
 /** GET /api/cli/ai/conversation/:id — developer-only, cross-tenant full transcript. */
 export async function runAiConversation(client, id) {
     if (!Number.isInteger(id) || id <= 0) {
@@ -54,7 +55,7 @@ export function registerAiCommands(parent, getClient) {
         .description("Fetch the full transcript of an /ai conversation by id (developer-only, cross-tenant)")
         .action(async (idStr) => {
         try {
-            writeJson(await runAiConversation(await getClient(), Number(idStr)));
+            writeJson(await runAiConversation(await getClient(), parseId(idStr, "conversationId")));
         }
         catch (e) {
             exitWithError(e);

@@ -16,6 +16,7 @@ import type { ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
+import { parseId, parseOptionalId } from "../../targets.js";
 import {
   CHANGE_ENTITY_TYPES,
   findEntityType,
@@ -252,7 +253,7 @@ export function registerLogAlias(
       try {
         const client = await getClient();
         writeJson(
-          await runLogEntity(client, entityType, Number(idStr), opts.limit, {
+          await runLogEntity(client, entityType, parseId(idStr, "entityId"), opts.limit, {
             owner: opts.owner,
             field: opts.field,
           })
@@ -291,7 +292,7 @@ export function registerLogCommands(
         try {
           const client = await getClient();
           writeJson(
-            await runLogEntity(client, entityType, Number(entityIdStr), opts.limit, {
+            await runLogEntity(client, entityType, parseId(entityIdStr, "entityId"), opts.limit, {
               owner: opts.owner,
               field: opts.field,
             })
@@ -436,7 +437,7 @@ export function registerLogCommands(
         try {
           const client = await getClient();
           writeJson(
-            await runLogUser(client, personIdStr ? Number(personIdStr) : null, opts.limit, {
+            await runLogUser(client, parseOptionalId(personIdStr, "personId") ?? null, opts.limit, {
               owner: opts.owner,
             })
           );

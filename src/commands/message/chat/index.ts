@@ -4,6 +4,7 @@ import type { ListEnvelope } from "../../../api/envelopes.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../../output/json.js";
 import { resolveThreadId, type ThreadTarget } from "./resolveThread.js";
+import { parseOptionalId } from "../../../targets.js";
 
 type Row = Record<string, unknown>;
 
@@ -120,7 +121,7 @@ export async function runChatMarkRead(
 /** Resolve the {@link ThreadTarget} from a positional + --tarjous option. */
 function targetFrom(threadIdStr: string | undefined, opts: { tarjous?: number }): ThreadTarget {
   return {
-    thread: threadIdStr !== undefined ? Number(threadIdStr) : undefined,
+    thread: parseOptionalId(threadIdStr, "threadId"),
     tarjous: opts.tarjous,
   };
 }
