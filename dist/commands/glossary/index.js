@@ -1,6 +1,6 @@
 /**
  * `ib glossary` — the DB-backed domain glossary (synonym-aware vocabulary).
- * lookup/list are open; set/delete/misses/lint are developer-only. Backend:
+ * lookup/list are open; set/import/lint/delete/misses are developer-only. Backend:
  * /api/cli/glossary/*. The vocabulary is the single source of truth in the DB.
  * Key behaviors: lookup <term> → exit 5 + miss recorded on 404, did-you-mean
  * hints via /glossary?search=, comma-separated terms → batch lookup; set is a

@@ -2941,16 +2941,17 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib jerry request list",
     description:
-      "List BetoniJerry pump requests (tarjouspyynnöt). Default --mine returns the caller's own requests (GET /api/pumppuRequests/mine). --open returns the provider inbox of open requests (GET /api/pumppuRequests/open) and requires a provider company (isPumppuToimittaja); customer PII is masked there until your offer is accepted. --status (CSV) and --limit apply to --mine only.",
+      "List BetoniJerry pump requests (tarjouspyynnöt). Default --mine returns the caller's own requests (GET /api/pumppuRequests/mine). --open returns the provider inbox of open requests (GET /api/pumppuRequests/open) and requires a provider company (isPumppuToimittaja); customer PII is masked there until your offer is accepted. Add --all to --open to browse the WHOLE marketplace (forwards ?scope=all): every live open/no_supply request beyond your varikko delivery area, distance-sorted, with distanceKm/isOutOfArea/isNoSupply (capped at 200, truncated flag). --status (CSV) and --limit apply to --mine only.",
     permissions: ["--open: provider company (isPumppuToimittaja)"],
     flags: [
       { name: "open", type: "boolean", description: "Provider inbox of open requests (provider role)" },
+      { name: "all", type: "boolean", description: "With --open: browse the whole marketplace — open/no_supply requests beyond your varikko delivery area (adds distanceKm/isOutOfArea/isNoSupply); forwards ?scope=all" },
       { name: "mine", type: "boolean", description: "Your own requests (default)" },
       { name: "status", type: "string", description: "Filter --mine by status (CSV: open,pending_verification,accepted,cancelled,expired,no_supply)" },
       { name: "limit", type: "number", default: "100", description: "Max rows for --mine (server caps at 200)" },
     ],
     outputShape:
-      "ListEnvelope<{ pumppuRequestId, status, createdAt, sentAt?, osoite, formattedAddress, totalM3|maaraM3, ... }> (fields differ between --mine and --open; --open is PII-masked)",
+      "ListEnvelope<{ pumppuRequestId, status, createdAt, sentAt?, osoite, formattedAddress, totalM3|maaraM3, ... }> (fields differ between --mine and --open; --open is PII-masked; --open --all adds distanceKm/isOutOfArea/isNoSupply)",
     errors: [
       apiErr(403, "Not a provider (for --open)", "switch to a provider company, or use --mine"),
       ...COMMON_AUTH_ERRORS,
@@ -2958,6 +2959,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: [
       "ib jerry request list",
       "ib jerry request list --open",
+      "ib jerry request list --open --all",
       "ib jerry request list --mine --status open,accepted --limit 50",
     ],
   },

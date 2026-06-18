@@ -77,6 +77,28 @@ describe("ib jerry request", () => {
     expect(result).toEqual({ items: [], nextCursor: null, count: 0 });
   });
 
+  test("list --open --all forwards ?scope=all and flags truncation at 200", async () => {
+    const rows = Array.from({ length: 200 }, (_, i) => ({
+      pumppuRequestId: i + 1,
+      status: "open",
+      distanceKm: i,
+      isOutOfArea: true,
+      isNoSupply: false,
+    }));
+    get.mockResolvedValueOnce(rows);
+    const result = await runJerryRequestList(mockClient, { open: true, all: true });
+    expect(get).toHaveBeenCalledWith("/api/pumppuRequests/open?scope=all");
+    expect(result.count).toBe(200);
+    expect(result.truncated).toBe(true);
+  });
+
+  test("list --open without --all does not set truncated", async () => {
+    get.mockResolvedValueOnce([{ pumppuRequestId: 1 }]);
+    const result = await runJerryRequestList(mockClient, { open: true });
+    expect(get).toHaveBeenCalledWith("/api/pumppuRequests/open");
+    expect(result.truncated).toBeUndefined();
+  });
+
   test("get (default) hits the customer recap path", async () => {
     get.mockResolvedValueOnce({ pumppuRequestId: 4012 });
     await runJerryRequestGet(mockClient, 4012, false);

@@ -22,7 +22,14 @@ function toEnvelope(value) {
  */
 export async function runJerryRequestList(client, opts) {
     if (opts.open) {
-        return toEnvelope(await client.get("/api/pumppuRequests/open"));
+        // --all forwards ?scope=all: the whole marketplace (open + no_supply) beyond
+        // the caller's varikko delivery area, with distanceKm/isOutOfArea/isNoSupply.
+        const suffix = opts.all ? "?scope=all" : "";
+        const env = toEnvelope(await client.get(`/api/pumppuRequests/open${suffix}`));
+        // Server caps the marketplace at 200 and exposes no cursor — flag truncation.
+        if (opts.all && env.count >= 200)
+            env.truncated = true;
+        return env;
     }
     const params = new URLSearchParams();
     if (opts.status)
@@ -227,6 +234,7 @@ export function registerJerryCommands(parent, getClient) {
         .command("list")
         .description("List pump requests (--mine default, or --open provider inbox)")
         .option("--open", "Provider inbox: open requests (requires provider role)")
+        .option("--all", "With --open: browse the whole marketplace — open/no_supply requests beyond your varikko delivery area (adds distanceKm/isOutOfArea/isNoSupply)")
         .option("--mine", "Your own requests (default)")
         .option("--status <csv>", "Filter --mine by status (CSV)")
         .option("--limit <n>", "Max rows for --mine", (v) => Math.min(Number(v), 200))

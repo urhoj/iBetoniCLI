@@ -3562,11 +3562,12 @@ exports[`Help snapshots — contract stability > help for ib jerry request list 
   ib jerry request list [flags]
 
 DESCRIPTION
-  List BetoniJerry pump requests (tarjouspyynnöt). Default --mine returns the caller's own requests (GET /api/pumppuRequests/mine). --open returns the provider inbox of open requests (GET /api/pumppuRequests/open) and requires a provider company (isPumppuToimittaja); customer PII is masked there until your offer is accepted. --status (CSV) and --limit apply to --mine only.
+  List BetoniJerry pump requests (tarjouspyynnöt). Default --mine returns the caller's own requests (GET /api/pumppuRequests/mine). --open returns the provider inbox of open requests (GET /api/pumppuRequests/open) and requires a provider company (isPumppuToimittaja); customer PII is masked there until your offer is accepted. Add --all to --open to browse the WHOLE marketplace (forwards ?scope=all): every live open/no_supply request beyond your varikko delivery area, distance-sorted, with distanceKm/isOutOfArea/isNoSupply (capped at 200, truncated flag). --status (CSV) and --limit apply to --mine only.
   Permissions: requires --open: provider company (isPumppuToimittaja).
 
 FLAGS
   --open BOOLEAN    Provider inbox of open requests (provider role)
+  --all BOOLEAN    With --open: browse the whole marketplace — open/no_supply requests beyond your varikko delivery area (adds distanceKm/isOutOfArea/isNoSupply); forwards ?scope=all
   --mine BOOLEAN    Your own requests (default)
   --status STRING    Filter --mine by status (CSV: open,pending_verification,accepted,cancelled,expired,no_supply)
   --limit NUMBER    Max rows for --mine (server caps at 200) (default: 100)
@@ -3575,7 +3576,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ pumppuRequestId, status, createdAt, sentAt?, osoite, formattedAddress, totalM3|maaraM3, ... }> (fields differ between --mine and --open; --open is PII-masked)
+  ListEnvelope<{ pumppuRequestId, status, createdAt, sentAt?, osoite, formattedAddress, totalM3|maaraM3, ... }> (fields differ between --mine and --open; --open is PII-masked; --open --all adds distanceKm/isOutOfArea/isNoSupply)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a provider (for --open) → switch to a provider company, or use --mine
@@ -3585,6 +3586,7 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib jerry request list
   ib jerry request list --open
+  ib jerry request list --open --all
   ib jerry request list --mine --status open,accepted --limit 50
 "
 `;
