@@ -1,6 +1,7 @@
 import { describe, test, expect, vi } from "vitest";
 import {
   runGlossaryLookup, runGlossaryList, runGlossarySet, runGlossaryMisses, runGlossaryLookupBatch,
+  mergeSetInput, runGlossaryImport,
 } from "../../src/commands/glossary/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -115,5 +116,28 @@ describe("glossary lookup batch", () => {
   test("non-404 error propagates (not swallowed as found:false)", async () => {
     const get = vi.fn(async () => { throw new CliError("auth", 401, null, 2); });
     await expect(runGlossaryLookupBatch(mkClient({ get }), ["x"])).rejects.toBeInstanceOf(CliError);
+  });
+});
+
+describe("glossary set/import JSON input", () => {
+  test("mergeSetInput: flags override JSON; arrays → csv", () => {
+    const out = mergeSetInput(
+      { definition: "d", synonyms: ["a", "b"], relatedCommands: ["ib x"], relatedEntity: "E" },
+      { synonyms: "z" }
+    );
+    expect(out).toEqual({ definition: "d", synonyms: "z", related: "ib x", entity: "E" });
+  });
+
+  test("runGlossaryImport: PUTs each entry, reports ok/failed", async () => {
+    const put = vi.fn(async (p: string) => ({ term: p.split("/").pop() }));
+    const res = await runGlossaryImport(
+      mkClient({ put }),
+      [{ term: "loma", definition: "d1", synonyms: ["lomat"] }, { definition: "no term" }],
+      { reason: "r" }
+    );
+    expect(res.ok).toBe(1);
+    expect(res.failed).toBe(1);
+    expect(put).toHaveBeenCalledTimes(1);
+    expect(put.mock.calls[0][1]).toMatchObject({ definition: "d1", synonyms: ["lomat"] });
   });
 });

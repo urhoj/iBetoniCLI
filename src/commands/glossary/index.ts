@@ -4,9 +4,10 @@
  * /api/cli/glossary/*. The vocabulary is the single source of truth in the DB
  * (not bundled in betonicli) and is groomed via `ib glossary set`.
  */
+import { readFileSync } from "node:fs";
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson, exitWithError, failWith, errorMessage } from "../../output/json.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, type WriteFlags } from "../../api/writeFlags.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { CliError } from "../../api/errors.js";
@@ -21,6 +22,48 @@ interface GlossaryEntry {
 
 const splitList = (s?: string): string[] =>
   (s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+
+const arrToCsv = (v: unknown): string | undefined =>
+  Array.isArray(v) ? v.join(",") : (typeof v === "string" ? v : undefined);
+
+export function mergeSetInput(
+  json: Record<string, unknown>,
+  flags: { definition?: string; synonyms?: string; related?: string; entity?: string }
+): { definition?: string; synonyms?: string; related?: string; entity?: string } {
+  return {
+    definition: flags.definition ?? (json.definition as string | undefined),
+    synonyms: flags.synonyms ?? arrToCsv(json.synonyms),
+    related: flags.related ?? arrToCsv(json.relatedCommands ?? json.related),
+    entity: flags.entity ?? ((json.relatedEntity ?? json.entity) as string | undefined),
+  };
+}
+
+export function readJsonInput(path: string): unknown {
+  const raw = path === "-" ? readFileSync(0, "utf8") : readFileSync(path, "utf8");
+  return JSON.parse(raw);
+}
+
+export async function runGlossaryImport(
+  client: ApiClient,
+  entries: Array<Record<string, unknown>>,
+  flags: WriteFlags & { updateOnly?: boolean }
+): Promise<{ results: Array<{ term: string | null; ok: boolean; error?: string }>; ok: number; failed: number }> {
+  const results: Array<{ term: string | null; ok: boolean; error?: string }> = [];
+  for (const e of entries) {
+    const term = (e.term as string) ?? null;
+    if (!term) { results.push({ term: null, ok: false, error: "missing term" }); continue; }
+    const inp = mergeSetInput(e, {});
+    try {
+      await runGlossarySet(client, term,
+        { definition: inp.definition, synonyms: inp.synonyms, related: inp.related, entity: inp.entity, updateOnly: flags.updateOnly },
+        { dryRun: flags.dryRun, idempotencyKey: flags.idempotencyKey, reason: flags.reason });
+      results.push({ term, ok: true });
+    } catch (err) {
+      results.push({ term, ok: false, error: errorMessage(err) });
+    }
+  }
+  return { results, ok: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok).length };
+}
 
 export async function runGlossaryLookup(client: ApiClient, term: string): Promise<GlossaryEntry> {
   try {
@@ -168,13 +211,38 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
     .option("--synonyms <list>", "Comma-separated aliases incl. inflections")
     .option("--related <list>", 'Comma-separated command paths, e.g. "ib person,ib driver board"')
     .option("--entity <e>", "Related DB entity, e.g. Person / personId")
-    .option("--update-only", "Only update an existing term; do not create a new one (404 if absent)");
+    .option("--update-only", "Only update an existing term; do not create a new one (404 if absent)")
+    .option("--from-json <file>", "Read fields from a JSON object file (or - for stdin); explicit flags override");
   addWriteFlagsToCommand(set).action(
-    async (term: string, opts: { definition?: string; synonyms?: string; related?: string; entity?: string; updateOnly?: boolean; dryRun?: boolean; idempotencyKey?: string; reason?: string }) => {
+    async (term: string, opts: { definition?: string; synonyms?: string; related?: string; entity?: string; updateOnly?: boolean; fromJson?: string; dryRun?: boolean; idempotencyKey?: string; reason?: string }) => {
+      let merged: { definition?: string; synonyms?: string; related?: string; entity?: string } =
+        { definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity };
+      if (opts.fromJson) {
+        let json: Record<string, unknown>;
+        try { json = readJsonInput(opts.fromJson) as Record<string, unknown>; }
+        catch { failWith("--from-json: not valid JSON", 4); }
+        merged = mergeSetInput(json, { definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity });
+      }
       try {
         writeJson(await runGlossarySet(await getClient(), term,
-          { definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity, updateOnly: opts.updateOnly },
+          { definition: merged.definition, synonyms: merged.synonyms, related: merged.related, entity: merged.entity, updateOnly: opts.updateOnly },
           { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
+      } catch (e) { exitWithError(e); }
+    });
+
+  const imp = glossary
+    .command("import")
+    .description("Bulk create/update entries from a JSON array file (developer only). Avoids shell argv mangling of Finnish ä/ö.")
+    .argument("<file>", "JSON array file of {term, definition, synonyms?, related?, entity?} (or - for stdin)");
+  addWriteFlagsToCommand(imp)
+    .option("--update-only", "Only update existing terms; never insert")
+    .action(async (file: string, opts: WriteFlags & { updateOnly?: boolean }) => {
+      let arr: unknown;
+      try { arr = readJsonInput(file); } catch { failWith("import: file is not valid JSON", 4); }
+      if (!Array.isArray(arr)) { failWith("import: JSON root must be an array", 4); }
+      try {
+        writeJson(await runGlossaryImport(await getClient(), arr as Array<Record<string, unknown>>,
+          { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason, updateOnly: opts.updateOnly }));
       } catch (e) { exitWithError(e); }
     });
 

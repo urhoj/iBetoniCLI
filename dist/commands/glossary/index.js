@@ -1,7 +1,46 @@
-import { writeJson, exitWithError } from "../../output/json.js";
+/**
+ * `ib glossary` — the DB-backed domain glossary (synonym-aware vocabulary).
+ * lookup/list are open; set/delete/misses are developer-only. Backend:
+ * /api/cli/glossary/*. The vocabulary is the single source of truth in the DB
+ * (not bundled in betonicli) and is groomed via `ib glossary set`.
+ */
+import { readFileSync } from "node:fs";
+import { writeJson, exitWithError, failWith, errorMessage } from "../../output/json.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../api/writeFlags.js";
 import { CliError } from "../../api/errors.js";
 const splitList = (s) => (s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+const arrToCsv = (v) => Array.isArray(v) ? v.join(",") : (typeof v === "string" ? v : undefined);
+export function mergeSetInput(json, flags) {
+    return {
+        definition: flags.definition ?? json.definition,
+        synonyms: flags.synonyms ?? arrToCsv(json.synonyms),
+        related: flags.related ?? arrToCsv(json.relatedCommands ?? json.related),
+        entity: flags.entity ?? (json.relatedEntity ?? json.entity),
+    };
+}
+export function readJsonInput(path) {
+    const raw = path === "-" ? readFileSync(0, "utf8") : readFileSync(path, "utf8");
+    return JSON.parse(raw);
+}
+export async function runGlossaryImport(client, entries, flags) {
+    const results = [];
+    for (const e of entries) {
+        const term = e.term ?? null;
+        if (!term) {
+            results.push({ term: null, ok: false, error: "missing term" });
+            continue;
+        }
+        const inp = mergeSetInput(e, {});
+        try {
+            await runGlossarySet(client, term, { definition: inp.definition, synonyms: inp.synonyms, related: inp.related, entity: inp.entity, updateOnly: flags.updateOnly }, { dryRun: flags.dryRun, idempotencyKey: flags.idempotencyKey, reason: flags.reason });
+            results.push({ term, ok: true });
+        }
+        catch (err) {
+            results.push({ term, ok: false, error: errorMessage(err) });
+        }
+    }
+    return { results, ok: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok).length };
+}
 export async function runGlossaryLookup(client, term) {
     try {
         return await client.get(`/api/cli/glossary/lookup/${encodeURIComponent(term)}`);
@@ -139,10 +178,46 @@ export function registerGlossaryCommands(program, getClient) {
         .option("--synonyms <list>", "Comma-separated aliases incl. inflections")
         .option("--related <list>", 'Comma-separated command paths, e.g. "ib person,ib driver board"')
         .option("--entity <e>", "Related DB entity, e.g. Person / personId")
-        .option("--update-only", "Only update an existing term; do not create a new one (404 if absent)");
+        .option("--update-only", "Only update an existing term; do not create a new one (404 if absent)")
+        .option("--from-json <file>", "Read fields from a JSON object file (or - for stdin); explicit flags override");
     addWriteFlagsToCommand(set).action(async (term, opts) => {
+        let merged = { definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity };
+        if (opts.fromJson) {
+            let json;
+            try {
+                json = readJsonInput(opts.fromJson);
+            }
+            catch {
+                failWith("--from-json: not valid JSON", 4);
+            }
+            merged = mergeSetInput(json, { definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity });
+        }
         try {
-            writeJson(await runGlossarySet(await getClient(), term, { definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity, updateOnly: opts.updateOnly }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
+            writeJson(await runGlossarySet(await getClient(), term, { definition: merged.definition, synonyms: merged.synonyms, related: merged.related, entity: merged.entity, updateOnly: opts.updateOnly }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    const imp = glossary
+        .command("import")
+        .description("Bulk create/update entries from a JSON array file (developer only). Avoids shell argv mangling of Finnish ä/ö.")
+        .argument("<file>", "JSON array file of {term, definition, synonyms?, related?, entity?} (or - for stdin)");
+    addWriteFlagsToCommand(imp)
+        .option("--update-only", "Only update existing terms; never insert")
+        .action(async (file, opts) => {
+        let arr;
+        try {
+            arr = readJsonInput(file);
+        }
+        catch {
+            failWith("import: file is not valid JSON", 4);
+        }
+        if (!Array.isArray(arr)) {
+            failWith("import: JSON root must be an array", 4);
+        }
+        try {
+            writeJson(await runGlossaryImport(await getClient(), arr, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason, updateOnly: opts.updateOnly }));
         }
         catch (e) {
             exitWithError(e);
