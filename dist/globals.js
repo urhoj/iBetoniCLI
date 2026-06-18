@@ -11,7 +11,7 @@ export function addGlobalOptions(cmd) {
         .option("--json", "Force JSON output (default)")
         .option("--read-only", "Block all writes this session (also via IB_READ_ONLY=1)")
         .option("--company <id>", "Run this one command in another company's context (ephemeral switch, not persisted)")
-        .option("--stats", "Print API (and SQL, when available) timing for this command to stderr");
+        .option("--stats", "Print API, SQL, and cache hit/miss timing for this command to stderr");
 }
 export function getGlobalOptions(cmd) {
     const o = cmd.opts();

@@ -1,5 +1,15 @@
 function empty() {
-    return { enabled: false, apiMs: 0, apiReqCount: 0, sqlMs: 0, sqlProcCount: 0, sqlSeen: false };
+    return {
+        enabled: false,
+        apiMs: 0,
+        apiReqCount: 0,
+        sqlMs: 0,
+        sqlProcCount: 0,
+        sqlSeen: false,
+        cacheHits: 0,
+        cacheMisses: 0,
+        cacheSeen: false,
+    };
 }
 let acc = empty();
 export function enableStats() {
@@ -11,23 +21,44 @@ export function statsEnabled() {
 export function resetStats() {
     acc = empty();
 }
-/** Parse a `Server-Timing` header for the `sql` metric. Best-effort, never throws. */
+/**
+ * Parse a `Server-Timing` header for the backend's `sql` / `cacheHit` /
+ * `cacheMiss` metrics. Best-effort, never throws. Encoding (set by puminet5api
+ * `app.js`): `sql;dur=<ms>;desc="<n> procs", cacheHit;dur=<n>, cacheMiss;dur=<n>`
+ * — counts ride in `dur` for trivial numeric parsing.
+ */
 export function parseServerTiming(header) {
     if (!header)
         return {};
     const out = {};
-    // Metrics are comma-separated; find the `sql` one.
     for (const part of header.split(",")) {
         const segs = part.split(";").map((s) => s.trim());
-        if (segs[0] !== "sql")
+        const name = segs[0];
+        if (name !== "sql" && name !== "cacheHit" && name !== "cacheMiss")
             continue;
+        let dur;
+        let procCount;
         for (const seg of segs.slice(1)) {
             const durMatch = /^dur=([0-9.]+)$/.exec(seg);
             if (durMatch)
-                out.sqlMs = Number(durMatch[1]);
+                dur = Number(durMatch[1]);
             const descMatch = /^desc="?(\d+) procs"?$/.exec(seg);
             if (descMatch)
-                out.sqlProcCount = Number(descMatch[1]);
+                procCount = Number(descMatch[1]);
+        }
+        if (name === "sql") {
+            if (dur !== undefined)
+                out.sqlMs = dur;
+            if (procCount !== undefined)
+                out.sqlProcCount = procCount;
+        }
+        else if (name === "cacheHit") {
+            if (dur !== undefined)
+                out.cacheHits = dur;
+        }
+        else if (name === "cacheMiss") {
+            if (dur !== undefined)
+                out.cacheMisses = dur;
         }
     }
     return out;
@@ -44,6 +75,11 @@ export function recordRequest(info) {
     }
     if (t.sqlProcCount !== undefined)
         acc.sqlProcCount += t.sqlProcCount;
+    if (t.cacheHits !== undefined || t.cacheMisses !== undefined) {
+        acc.cacheHits += t.cacheHits ?? 0;
+        acc.cacheMisses += t.cacheMisses ?? 0;
+        acc.cacheSeen = true;
+    }
 }
 /** Build the stderr stats line, or null when disabled / no requests were made. */
 export function buildStatsLine(pretty) {
@@ -54,7 +90,8 @@ export function buildStatsLine(pretty) {
         const sqlPart = acc.sqlSeen
             ? ` sql=${acc.sqlMs}ms (${acc.sqlProcCount} procs, executeQuery-path-only)`
             : "";
-        return `[ib] stats: api=${acc.apiMs}ms${reqPart}${sqlPart}`;
+        const cachePart = acc.cacheSeen ? ` cache=${acc.cacheHits} hit / ${acc.cacheMisses} miss` : "";
+        return `[ib] stats: api=${acc.apiMs}ms${reqPart}${sqlPart}${cachePart}`;
     }
     const stats = { apiMs: acc.apiMs };
     if (acc.apiReqCount > 1)
@@ -63,6 +100,10 @@ export function buildStatsLine(pretty) {
         stats.sqlMs = acc.sqlMs;
         stats.sqlProcCount = acc.sqlProcCount;
         stats.sqlCoverage = "executeQuery-path-only";
+    }
+    if (acc.cacheSeen) {
+        stats.cacheHits = acc.cacheHits;
+        stats.cacheMisses = acc.cacheMisses;
     }
     return JSON.stringify({ stats });
 }
