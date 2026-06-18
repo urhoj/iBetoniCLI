@@ -18,4 +18,15 @@ describe("glossary lint", () => {
     expect(issues).toContain("empty-definition");  // lomaa
     expect(issues).toContain("near-duplicate");    // loma ~ lomaa (distance 1)
   });
+
+  test("flags synonym-collision and no-anchor", () => {
+    const findings = lintEntries([
+      { term: "asiakas", synonyms: [], definition: "customer", relatedCommands: [{ command: "ib customer", summary: null }], relatedEntity: "Asiakas" } as any,
+      { term: "company", synonyms: ["asiakas"], definition: "tenant", relatedCommands: [{ command: "ib company", summary: null }], relatedEntity: "Asiakas" } as any,
+      { term: "orphan", synonyms: [], definition: "x", relatedCommands: [], relatedEntity: null } as any,
+    ]);
+    const issues = findings.map((f) => f.issue);
+    expect(issues).toContain("synonym-collision"); // company's synonym 'asiakas' == another term
+    expect(issues).toContain("no-anchor");          // orphan: no relatedCommands, no relatedEntity
+  });
 });

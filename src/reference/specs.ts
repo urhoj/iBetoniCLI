@@ -4760,10 +4760,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [
       { name: "search", type: "string", description: "Filter by substring" },
       { name: "stalest", type: "number", description: "Return up to N entries, stalest first" },
+      { name: "domain", type: "string", description: "Filter to a domain (exact match)" },
+      { name: "related", type: "string", description: "Filter to terms whose relatedCommands contain this substring" },
     ],
-    outputShape: "{ items:[{term,synonyms,definition,relatedCommands,relatedEntity,lastReviewed,runs}], count, truncated? }",
+    outputShape: "{ items:[{term,synonyms,definition,relatedCommands:[{command,summary}],relatedEntity,domain,lastReviewed,runs}], count, truncated? }",
     errors: [{ exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" }],
-    examples: ["ib glossary list", "ib glossary list --search puomi", "ib glossary list --stalest 10"],
+    examples: ["ib glossary list", "ib glossary list --search puomi", "ib glossary list --stalest 10", "ib glossary list --domain vacation"],
   },
   {
     command: "ib glossary misses",
@@ -4789,10 +4791,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "synonyms", type: "string", description: "Comma-separated aliases incl. inflections" },
       { name: "related", type: "string", description: 'Comma-separated command paths, e.g. "ib person,ib driver board"' },
       { name: "entity", type: "string", description: "Related DB entity, e.g. Person / personId" },
+      { name: "domain", type: "string", description: "Domain grouping (e.g. vacation)" },
       { name: "update-only", type: "boolean", description: "Only update an existing term; do not create a new one (404 if absent)" },
       { name: "from-json", type: "string", description: "Read fields from a JSON object file (or - for stdin); flags override" },
     ],
-    outputShape: "{ term, synonyms, definition, relatedCommands, relatedEntity, runs }",
+    outputShape: "{ term, synonyms, definition, relatedCommands, relatedEntity, domain, runs }",
     errors: [
       { http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" },
       { http: 404, exit: 5, meaning: "Term not found (with --update-only)", remedy: "Omit --update-only to create the entry" },
@@ -4808,12 +4811,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     auth: "any",
     mutates: true,
     writeFlags: true,
-    args: [{ name: "file", type: "string", required: true, description: "JSON array file of {term, definition, synonyms?, relatedCommands?, relatedEntity?} objects (or - for stdin)" }],
+    args: [{ name: "file", type: "string", required: true, description: "JSON array file of {term, definition, synonyms?, relatedCommands?, relatedEntity?, domain?} objects (or - for stdin)" }],
     flags: [
       { name: "update-only", type: "boolean", description: "Only update existing terms; never insert" },
     ],
     outputShape: "{ results: [{term, ok, error?}], ok, failed }",
-    notes: ["Each entry must have a `term` field; entries missing it are counted as failed.", "Synonyms and relatedCommands may be arrays (passed as-is to the backend) or comma-separated strings.", "Avoids shell argv mangling of Finnish ä/ö — pass UTF-8 JSON instead of quoting on the command line."],
+    notes: ["Each entry must have a `term` field; entries missing it are counted as failed.", "Synonyms and relatedCommands may be arrays (arrays are accepted and converted to a comma list internally) or comma-separated strings.", "Avoids shell argv mangling of Finnish ä/ö — pass UTF-8 JSON instead of quoting on the command line."],
     errors: [
       { http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" },
       { exit: 4, meaning: "File is not valid JSON or root is not an array", remedy: "Check the file path and JSON syntax" },

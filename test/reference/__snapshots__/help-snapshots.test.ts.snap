@@ -2777,7 +2777,7 @@ DESCRIPTION
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
-  <file> STRING    JSON array file of {term, definition, synonyms?, relatedCommands?, relatedEntity?} objects (or - for stdin) (required)
+  <file> STRING    JSON array file of {term, definition, synonyms?, relatedCommands?, relatedEntity?, domain?} objects (or - for stdin) (required)
 
 FLAGS
   --update-only BOOLEAN    Only update existing terms; never insert
@@ -2799,7 +2799,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - Each entry must have a \`term\` field; entries missing it are counted as failed.
-  - Synonyms and relatedCommands may be arrays (passed as-is to the backend) or comma-separated strings.
+  - Synonyms and relatedCommands may be arrays (arrays are accepted and converted to a comma list internally) or comma-separated strings.
   - Avoids shell argv mangling of Finnish ä/ö — pass UTF-8 JSON instead of quoting on the command line.
 
 EXAMPLES
@@ -2844,12 +2844,14 @@ DESCRIPTION
 FLAGS
   --search STRING    Filter by substring
   --stalest NUMBER    Return up to N entries, stalest first
+  --domain STRING    Filter to a domain (exact match)
+  --related STRING    Filter to terms whose relatedCommands contain this substring
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { items:[{term,synonyms,definition,relatedCommands,relatedEntity,lastReviewed,runs}], count, truncated? }
+  { items:[{term,synonyms,definition,relatedCommands:[{command,summary}],relatedEntity,domain,lastReviewed,runs}], count, truncated? }
 
 ERRORS (stderr, exit non-zero)
   exit 2  Not authenticated      → Run \`ib auth login\`
@@ -2858,6 +2860,7 @@ EXAMPLES
   ib glossary list
   ib glossary list --search puomi
   ib glossary list --stalest 10
+  ib glossary list --domain vacation
 "
 `;
 
@@ -2936,6 +2939,7 @@ FLAGS
   --synonyms STRING    Comma-separated aliases incl. inflections
   --related STRING    Comma-separated command paths, e.g. "ib person,ib driver board"
   --entity STRING    Related DB entity, e.g. Person / personId
+  --domain STRING    Domain grouping (e.g. vacation)
   --update-only BOOLEAN    Only update an existing term; do not create a new one (404 if absent)
   --from-json STRING    Read fields from a JSON object file (or - for stdin); flags override
 
@@ -2948,7 +2952,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { term, synonyms, definition, relatedCommands, relatedEntity, runs }
+  { term, synonyms, definition, relatedCommands, relatedEntity, domain, runs }
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a developer        → Developer access required

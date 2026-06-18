@@ -17,6 +17,7 @@ export function mergeSetInput(json, flags) {
         synonyms: flags.synonyms ?? arrToCsv(json.synonyms),
         related: flags.related ?? arrToCsv(json.relatedCommands ?? json.related),
         entity: flags.entity ?? (json.relatedEntity ?? json.entity),
+        domain: flags.domain ?? json.domain,
     };
 }
 export function readJsonInput(path) {
@@ -33,7 +34,7 @@ export async function runGlossaryImport(client, entries, flags) {
         }
         const inp = mergeSetInput(e, {});
         try {
-            await runGlossarySet(client, term, { definition: inp.definition, synonyms: inp.synonyms, related: inp.related, entity: inp.entity, updateOnly: flags.updateOnly }, { dryRun: flags.dryRun, idempotencyKey: flags.idempotencyKey, reason: flags.reason });
+            await runGlossarySet(client, term, { definition: inp.definition, synonyms: inp.synonyms, related: inp.related, entity: inp.entity, domain: inp.domain, updateOnly: flags.updateOnly }, { dryRun: flags.dryRun, idempotencyKey: flags.idempotencyKey, reason: flags.reason });
             results.push({ term, ok: true });
         }
         catch (err) {
@@ -99,6 +100,10 @@ export async function runGlossaryList(client, opts) {
         q.set("search", opts.search);
     if (opts.stalest)
         q.set("stalest", String(opts.stalest));
+    if (opts.domain)
+        q.set("domain", opts.domain);
+    if (opts.related)
+        q.set("related", opts.related);
     const qs = q.toString();
     const res = await client.get(`/api/cli/glossary${qs ? `?${qs}` : ""}`);
     return { items: res.items, nextCursor: null, count: res.count, truncated: opts.stalest != null };
@@ -110,6 +115,7 @@ export async function runGlossarySet(client, term, opts, flags = {}) {
         synonyms: splitList(opts.synonyms),
         relatedCommands: splitList(opts.related),
         relatedEntity: opts.entity ?? null,
+        domain: opts.domain ?? null,
     }, { headers });
 }
 export async function runGlossaryMisses(client, top) {
@@ -151,6 +157,8 @@ export function registerGlossaryCommands(program, getClient) {
         .description("List glossary entries; --search filters, --stalest orders least-recently-reviewed first")
         .option("--search <s>", "Filter by term/definition/synonym substring")
         .option("--stalest <n>", "Return up to N entries, stalest first", (v) => Number(v))
+        .option("--domain <d>", "Filter to a domain (exact match)")
+        .option("--related <substr>", "Filter to terms whose relatedCommands contain this substring")
         .action(async (opts) => {
         try {
             writeJson(await runGlossaryList(await getClient(), opts));
@@ -194,10 +202,11 @@ export function registerGlossaryCommands(program, getClient) {
         .option("--synonyms <list>", "Comma-separated aliases incl. inflections")
         .option("--related <list>", 'Comma-separated command paths, e.g. "ib person,ib driver board"')
         .option("--entity <e>", "Related DB entity, e.g. Person / personId")
+        .option("--domain <d>", "Domain grouping (e.g. vacation)")
         .option("--update-only", "Only update an existing term; do not create a new one (404 if absent)")
         .option("--from-json <file>", "Read fields from a JSON object file (or - for stdin); explicit flags override");
     addWriteFlagsToCommand(set).action(async (term, opts) => {
-        let merged = { definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity };
+        let merged = { definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity, domain: opts.domain };
         if (opts.fromJson) {
             let json;
             try {
@@ -206,10 +215,10 @@ export function registerGlossaryCommands(program, getClient) {
             catch {
                 failWith("--from-json: not valid JSON", 4);
             }
-            merged = mergeSetInput(json, { definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity });
+            merged = mergeSetInput(json, { definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity, domain: opts.domain });
         }
         try {
-            writeJson(await runGlossarySet(await getClient(), term, { definition: merged.definition, synonyms: merged.synonyms, related: merged.related, entity: merged.entity, updateOnly: opts.updateOnly }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
+            writeJson(await runGlossarySet(await getClient(), term, { definition: merged.definition, synonyms: merged.synonyms, related: merged.related, entity: merged.entity, domain: merged.domain, updateOnly: opts.updateOnly }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
         }
         catch (e) {
             exitWithError(e);

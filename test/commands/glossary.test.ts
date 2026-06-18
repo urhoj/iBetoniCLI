@@ -31,7 +31,7 @@ describe("ib glossary", () => {
       { reason: "groom" });
     expect(put).toHaveBeenCalledWith(
       "/api/cli/glossary/valumassa",
-      { definition: "x", synonyms: ["massaa", "valua"], relatedCommands: ["ib keikka", "ib stats"], relatedEntity: "Keikka" },
+      { definition: "x", synonyms: ["massaa", "valua"], relatedCommands: ["ib keikka", "ib stats"], relatedEntity: "Keikka", domain: null },
       { headers: { "X-Action-Reason": "groom" } });
   });
 
@@ -139,5 +139,26 @@ describe("glossary set/import JSON input", () => {
     expect(res.failed).toBe(1);
     expect(put).toHaveBeenCalledTimes(1);
     expect(put.mock.calls[0][1]).toMatchObject({ definition: "d1", synonyms: ["lomat"] });
+  });
+});
+
+describe("glossary domain filters", () => {
+  test("list forwards --domain and --related as query params", async () => {
+    const get = vi.fn().mockResolvedValue({ items: [], count: 0 });
+    await runGlossaryList(mkClient({ get }), { domain: "vacation", related: "ib person day" });
+    const url = get.mock.calls[0][0] as string;
+    expect(url).toContain("domain=vacation");
+    expect(url).toContain("related=ib+person+day");
+  });
+
+  test("set sends domain in the PUT body", async () => {
+    const put = vi.fn().mockResolvedValue({ term: "loma" });
+    await runGlossarySet(mkClient({ put }), "loma", { definition: "d", domain: "vacation" });
+    expect(put.mock.calls[0][1]).toMatchObject({ domain: "vacation" });
+  });
+
+  test("mergeSetInput threads domain (flag overrides json)", () => {
+    expect(mergeSetInput({ domain: "j" }, {}).domain).toBe("j");
+    expect(mergeSetInput({ domain: "j" }, { domain: "f" }).domain).toBe("f");
   });
 });
