@@ -90,4 +90,12 @@ describe("ib glossary", () => {
     const callArgs = put.mock.calls[0]![2] as { headers: Record<string, string> };
     expect(callArgs.headers).not.toHaveProperty("X-Update-Only");
   });
+
+  test("runGlossaryLookup propagates a non-404 error unchanged", async () => {
+    const err = new CliError("auth", 401, null, 2);
+    const get = vi.fn().mockRejectedValue(err);
+    await expect(runGlossaryLookup(mkClient({ get }), "pumppari")).rejects.toBe(err);
+    // suggestion search must NOT be attempted for a non-404 error
+    expect(get).toHaveBeenCalledTimes(1);
+  });
 });

@@ -112,7 +112,7 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
     .action(async (term: string | undefined) => {
       if (!term) {
         // Bare `ib glossary` with no subcommand and no term — show group help.
-        glossary.help();
+        glossary.outputHelp();
         return;
       }
       try { writeJson(await runGlossaryLookup(await getClient(), term)); } catch (e) { exitWithError(e); }

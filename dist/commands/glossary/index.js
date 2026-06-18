@@ -76,7 +76,7 @@ export function registerGlossaryCommands(program, getClient) {
         .action(async (term) => {
         if (!term) {
             // Bare `ib glossary` with no subcommand and no term — show group help.
-            glossary.help();
+            glossary.outputHelp();
             return;
         }
         try {
