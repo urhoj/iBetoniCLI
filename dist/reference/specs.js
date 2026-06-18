@@ -3949,6 +3949,73 @@ const BASE_COMMAND_SPECS = [
             },
         ];
     })(),
+    // ─── perf (4) — SQL slow-query monitoring ────────────────────────────────
+    ...(() => {
+        const DEV_PERMS = ["isSystemAdmin or isDeveloper"];
+        const devErrors = [
+            apiErr(401, "Token expired", "ib auth refresh"),
+            apiErr(403, "Not a developer", "requires isSystemAdmin or isDeveloper"),
+            apiErr(500, "Backend error", "retry with --verbose"),
+        ];
+        const COVERAGE_NOTE = "SQL durations cover the executeQuery (cache-runner) path only — raw getConnection() queries are not timed.";
+        return [
+            {
+                command: "ib perf slow",
+                description: "Recent slow queries from the collector's Redis ring buffer (procedure, durationMs, entity, params, timestamp). Developer-only.",
+                permissions: DEV_PERMS,
+                tier: "developer",
+                flags: [
+                    { name: "limit", type: "number", default: "50", description: "Max rows" },
+                    { name: "env", type: "string", description: "Environment buffer to read (default: backend's current env; discover via `ib perf config`)" },
+                ],
+                outputShape: "ListEnvelope<{ procedure, durationMs, entity, params, timestamp }> & { totalCount?, environment? } (+truncated:true when the page filled the limit)",
+                errors: devErrors,
+                notes: [COVERAGE_NOTE, "Threshold to be 'slow' is the collector's SLOW_QUERY_THRESHOLD_MS (default 1000ms) — see `ib perf config`."],
+                seeAlso: ["ib perf stats", "ib perf config"],
+                examples: ["ib perf slow", "ib perf slow --limit 20 --env production"],
+            },
+            {
+                command: "ib perf stats",
+                description: "Aggregate slow-query stats: top procedures (count/avgMs), avg/max/min duration, by-entity breakdown, lifetime totalCount. Developer-only.",
+                permissions: DEV_PERMS,
+                tier: "developer",
+                flags: [{ name: "env", type: "string", description: "Environment buffer to read (default: backend's current env)" }],
+                outputShape: "{ totalSlowQueries, bufferedQueries, avgDuration, maxDuration, minDuration, topProcedures:[{ name, count, avgMs }], byEntity, since, threshold, sentryThreshold, environment }",
+                errors: devErrors,
+                notes: [COVERAGE_NOTE],
+                seeAlso: ["ib perf slow", "ib perf config"],
+                examples: ["ib perf stats", "ib perf stats --env staging"],
+            },
+            {
+                command: "ib perf config",
+                description: "Slow-query collector configuration (enabled, threshold, sentryThreshold, maxEntries, current environment) plus availableEnvironments that have data. Developer-only.",
+                permissions: DEV_PERMS,
+                tier: "developer",
+                flags: [],
+                outputShape: "{ enabled, threshold, sentryThreshold, maxEntries, environment, availableEnvironments:[string] }",
+                errors: devErrors,
+                seeAlso: ["ib perf slow", "ib perf stats"],
+                examples: ["ib perf config"],
+            },
+            {
+                command: "ib perf clear",
+                description: "Clear the slow-query buffer for one environment. Previews with --dry-run (client-side); --reason recommended for the audit log. Developer-only; refused under --read-only.",
+                permissions: DEV_PERMS,
+                tier: "developer",
+                mutates: true,
+                writeFlags: true,
+                flags: [{ name: "env", type: "string", description: "Environment buffer to clear (default: backend's current env)" }],
+                outputShape: "execute: { cleared:true, environment, message } | --dry-run: { dryRun:true, wouldClear:{ method, path } }",
+                errors: [
+                    ...devErrors,
+                    { exit: 3, meaning: "Blocked by read-only mode", remedy: "clearing needs a session without --read-only/IB_READ_ONLY" },
+                ],
+                notes: ["The DELETE route honours no server-side X-Dry-Run — --dry-run is resolved CLIENT-SIDE (never sends)."],
+                seeAlso: ["ib perf stats"],
+                examples: ['ib perf clear --env staging --reason "reset after load test"', "ib perf clear --dry-run"],
+            },
+        ];
+    })(),
     // ─── log (6) ─────────────────────────────────────────────────────────────
     {
         command: "ib log entity",

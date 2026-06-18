@@ -5604,6 +5604,146 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib perf clear matches snapshot 1`] = `
+"USAGE
+  ib perf clear [flags]
+
+DESCRIPTION
+  Clear the slow-query buffer for one environment. Previews with --dry-run (client-side); --reason recommended for the audit log. Developer-only; refused under --read-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --env STRING    Environment buffer to clear (default: backend's current env)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  execute: { cleared:true, environment, message } | --dry-run: { dryRun:true, wouldClear:{ method, path } }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 3  Blocked by read-only mode → clearing needs a session without --read-only/IB_READ_ONLY
+
+NOTES
+  - The DELETE route honours no server-side X-Dry-Run — --dry-run is resolved CLIENT-SIDE (never sends).
+
+SEE ALSO
+  ib perf stats
+
+EXAMPLES
+  ib perf clear --env staging --reason "reset after load test"
+  ib perf clear --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib perf config matches snapshot 1`] = `
+"USAGE
+  ib perf config [flags]
+
+DESCRIPTION
+  Slow-query collector configuration (enabled, threshold, sentryThreshold, maxEntries, current environment) plus availableEnvironments that have data. Developer-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { enabled, threshold, sentryThreshold, maxEntries, environment, availableEnvironments:[string] }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib perf slow, ib perf stats
+
+EXAMPLES
+  ib perf config
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib perf slow matches snapshot 1`] = `
+"USAGE
+  ib perf slow [flags]
+
+DESCRIPTION
+  Recent slow queries from the collector's Redis ring buffer (procedure, durationMs, entity, params, timestamp). Developer-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --limit NUMBER    Max rows (default: 50)
+  --env STRING    Environment buffer to read (default: backend's current env; discover via \`ib perf config\`)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ procedure, durationMs, entity, params, timestamp }> & { totalCount?, environment? } (+truncated:true when the page filled the limit)
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - SQL durations cover the executeQuery (cache-runner) path only — raw getConnection() queries are not timed.
+  - Threshold to be 'slow' is the collector's SLOW_QUERY_THRESHOLD_MS (default 1000ms) — see \`ib perf config\`.
+
+SEE ALSO
+  ib perf stats, ib perf config
+
+EXAMPLES
+  ib perf slow
+  ib perf slow --limit 20 --env production
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib perf stats matches snapshot 1`] = `
+"USAGE
+  ib perf stats [flags]
+
+DESCRIPTION
+  Aggregate slow-query stats: top procedures (count/avgMs), avg/max/min duration, by-entity breakdown, lifetime totalCount. Developer-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --env STRING    Environment buffer to read (default: backend's current env)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { totalSlowQueries, bufferedQueries, avgDuration, maxDuration, minDuration, topProcedures:[{ name, count, avgMs }], byEntity, since, threshold, sentryThreshold, environment }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - SQL durations cover the executeQuery (cache-runner) path only — raw getConnection() queries are not timed.
+
+SEE ALSO
+  ib perf slow, ib perf config
+
+EXAMPLES
+  ib perf stats
+  ib perf stats --env staging
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib person companies matches snapshot 1`] = `
 "USAGE
   ib person companies [<personId>] [flags]

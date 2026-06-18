@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { CliError, exitCodeFromStatus } from "./errors.js";
+import { recordRequest, statsEnabled } from "../stats.js";
 /**
  * BetoniJerry umbrella tenant (`@ibetoni/constants` BETONIJERRY.OWNER_ASIAKAS_ID).
  * Writes resolved against it touch the shared umbrella org, so the acting-as
@@ -103,6 +104,7 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
         // Read-over-POST requests skip this — they don't mutate tenant data.
         if (method !== "GET" && !opts.meta && !opts.read)
             announceActingAs();
+        const startedAt = Date.now();
         let res = await fetchOrNetworkError(method, path, body, opts);
         // Single-retry refresh path: only the first 401 triggers a refresh+retry.
         // A second consecutive 401 (post-refresh) falls through to the normal
@@ -119,6 +121,12 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
             }
             currentToken = newToken;
             res = await fetchOrNetworkError(method, path, body, opts);
+        }
+        // Per-invocation timing for the global --stats flag (best-effort; never
+        // alters the result). Records the round-trip incl. any refresh retry, plus
+        // the backend's Server-Timing SQL metric when present.
+        if (statsEnabled()) {
+            recordRequest({ apiMs: Date.now() - startedAt, serverTiming: res.headers.get("Server-Timing") });
         }
         const contentType = res.headers.get("content-type") || "";
         // Guard the body parse: a non-OK response can carry an empty or malformed
