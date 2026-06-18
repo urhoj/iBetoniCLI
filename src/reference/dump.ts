@@ -26,8 +26,13 @@ export interface ReferenceDump {
   generatedAt: string;
   /** Plain-language description of the platform, tenancy model, BetoniJerry. */
   overview: string;
-  /** Core entities + recurring Finnish field names (DB-backed; [] when unavailable). */
-  glossary: Array<{ term: string; synonyms: string[]; definition: string | null }>;
+  /**
+   * Vocabulary INDEX — term + synonyms ONLY (DB-backed; [] when unavailable).
+   * Definitions are intentionally omitted so the dump stays small as the glossary
+   * grows (it ships in every full dump, root `--help`, and AI primer). Fetch a
+   * definition on demand: `ib glossary lookup <term>` (one) / `ib glossary list` (all).
+   */
+  glossary: Array<{ term: string; synonyms: string[] }>;
   /** When an AI consuming this CLI should proactively file `ib feedback`. */
   feedbackGuidance: typeof FEEDBACK_GUIDANCE;
   /** Offline concept guides for cross-cutting knowledge (`ib help <id>`). */
@@ -62,22 +67,26 @@ function scrubSpecForTier(
 }
 
 /**
- * Project a raw DB glossary item array to the exact shape the dump/--help
- * primer documents: `{ term, synonyms, definition }` only. Drops any extra
- * fields the DB layer returns (`relatedCommands`, `relatedEntity`, `runs`,
- * `lastReviewed`, …) so developer-tier hidden command paths cannot leak
- * through the glossary of a standard-tier dump or root `--help`.
+ * Project a raw DB glossary item array to the vocabulary INDEX the dump/--help
+ * primer documents: `{ term, synonyms }` only. The `definition` is deliberately
+ * dropped here — it is the bulk of each entry's bytes and rides in every full
+ * dump, the root `--help` GLOSSARY, and the AI primer, so as the glossary grows
+ * it would bloat all three. The term+synonyms index is enough for an AI to map
+ * any colloquial/Finnish word to a canonical term, then fetch the definition on
+ * demand via `ib glossary lookup <term>` (or `ib glossary list` for all). Also
+ * drops the other DB fields (`relatedCommands`, `relatedEntity`, `runs`,
+ * `lastReviewed`, `domain`, …) so developer-tier data cannot leak through the
+ * glossary of a standard-tier dump or root `--help`.
  *
  * Exported as a pure helper so it can be unit-tested independently of the
  * network layer.
  */
 export function projectGlossaryForPrimer(
   items: Array<Record<string, unknown>>
-): Array<{ term: string; synonyms: string[]; definition: string | null }> {
+): Array<{ term: string; synonyms: string[] }> {
   return items.map((g) => ({
     term: g["term"] as string,
     synonyms: (g["synonyms"] ?? []) as string[],
-    definition: (g["definition"] ?? null) as string | null,
   }));
 }
 
@@ -97,7 +106,7 @@ export function projectGlossaryForPrimer(
 export function buildReference(
   domain?: string | string[],
   tier: CallerTier = "developer",
-  glossary: Array<{ term: string; synonyms: string[]; definition: string | null }> = []
+  glossary: Array<{ term: string; synonyms: string[] }> = []
 ): ReferenceDump {
   let specs = visibleSpecs(COMMAND_SPECS, tier);
   const domains = domain == null ? [] : Array.isArray(domain) ? domain : [domain];
@@ -139,7 +148,7 @@ export function buildReference(
 export function runReferenceDump(
   domain?: string | string[],
   tier: CallerTier = "developer",
-  glossary: Array<{ term: string; synonyms: string[]; definition: string | null }> = [],
+  glossary: Array<{ term: string; synonyms: string[] }> = [],
   commandsOnly = false
 ): void {
   const ref = buildReference(domain, tier, glossary);

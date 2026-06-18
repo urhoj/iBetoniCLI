@@ -2928,20 +2928,20 @@ exports[`Help snapshots — contract stability > help for ib glossary set matche
   ib glossary set <term> [flags]
 
 DESCRIPTION
-  Create/update a glossary entry (developer only). Auto-resolves a matching miss.
+  Create/update a glossary entry (developer only). PARTIAL update: only the fields you pass change — omit a flag to KEEP its current value, pass an empty value to CLEAR it. Auto-resolves a matching miss.
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
   <term> STRING    Canonical term (required)
 
 FLAGS
-  --definition STRING    One-paragraph definition (≤2000)
-  --synonyms STRING    Comma-separated aliases incl. inflections
-  --related STRING    Comma-separated command paths, e.g. "ib person,ib driver board"
-  --entity STRING    Related DB entity, e.g. Person / personId
-  --domain STRING    Domain grouping (e.g. vacation)
+  --definition STRING    One-paragraph definition (≤2000). Omit to keep current.
+  --synonyms STRING    Comma-separated aliases incl. inflections. Omit to keep; pass "" to clear.
+  --related STRING    Comma-separated command paths, e.g. "ib person,ib driver board". Omit to keep; pass "" to clear.
+  --entity STRING    Related DB entity, e.g. Person / personId. Omit to keep.
+  --domain STRING    Domain grouping (e.g. vacation). Omit to keep.
   --update-only BOOLEAN    Only update an existing term; do not create a new one (404 if absent)
-  --from-json STRING    Read fields from a JSON object file (or - for stdin); flags override
+  --from-json STRING    Read fields from a JSON object file (or - for stdin); flags override. Only keys present in the object are written (others kept).
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -2960,8 +2960,13 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 422)  definition >2000 chars → Shorten the definition
   exit 4  --from-json file is not valid JSON or not readable → Check the file path and contents
 
+NOTES
+  - PARTIAL (PATCH) semantics: an omitted flag is NOT sent, so the backend preserves the existing value — you can update just one field (e.g. only --synonyms) without re-sending the definition. To CLEAR a field pass an empty value: \`--synonyms ""\` empties the list, \`--entity ""\` blanks it. To OVERWRITE, pass the new value.
+  - Requires the partial-aware backend (COALESCE save proc) deployed; against an older backend an omitted field is still overwritten to empty/null — re-send all fields (or use --from-json) until the backend is updated.
+
 EXAMPLES
   ib glossary set valumassa --definition "Pumpattava betonimassa." --synonyms "massaa,valua" --related "ib keikka" --reason "groom"
+  ib glossary set puomi --synonyms "boom,nollakone,puomiton" --reason "add synonyms only"
   ib glossary set pumppari --definition "Updated def." --update-only --reason "groom"
   ib glossary set loma --from-json loma.json --reason "groom"
 "
@@ -6681,7 +6686,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { version, generatedAt, overview, glossary, topics, feedbackGuidance, commands: { '<command>': CommandSpec } } — with --commands-only: { version, generatedAt, commands }
+  { version, generatedAt, overview, glossary, topics, feedbackGuidance, commands: { '<command>': CommandSpec } } — with --commands-only: { version, generatedAt, commands }. NOTE: \`glossary\` is the term+synonyms INDEX only ({ term, synonyms }[]) — definitions are NOT inlined (they would bloat the dump as the glossary grows); fetch a definition with \`ib glossary lookup <term>\` or all of them with \`ib glossary list\`.
 
 ERRORS (stderr, exit non-zero)
   exit 4  Unknown domain         → run \`ib commands\` (no arg) to see valid domains

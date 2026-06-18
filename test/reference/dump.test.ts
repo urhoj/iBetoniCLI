@@ -23,8 +23,8 @@ describe("ib reference dump", () => {
 
   test("injected glossary appears under the glossary key", () => {
     const injected = [
-      { term: "keikka", synonyms: ["tilaus"], definition: "A concrete delivery order" },
-      { term: "asiakas", synonyms: [], definition: null },
+      { term: "keikka", synonyms: ["tilaus"] },
+      { term: "asiakas", synonyms: [] },
     ];
     const ref = buildReference(undefined, "developer", injected);
     expect(ref.glossary).toEqual(injected);
@@ -156,7 +156,7 @@ describe("reference dump tier filtering", () => {
     expect(Object.keys(buildReference().commands)).toContain("ib ai conversation");
   });
   test("domain-filtered dump carries the injected glossary unchanged", () => {
-    const injected = [{ term: "keikka", synonyms: [], definition: "A delivery order" }];
+    const injected = [{ term: "keikka", synonyms: [] }];
     const full = buildReference(undefined, "standard", injected);
     const narrowed = buildReference("keikka", "standard", injected);
     expect(narrowed.glossary).toEqual(full.glossary);
@@ -201,17 +201,19 @@ describe("projectGlossaryForPrimer — glossary projection security", () => {
       },
     ];
     const projected = projectGlossaryForPrimer(rawItems);
-    // Must contain ONLY term, synonyms, definition — no extra keys.
+    // Must contain ONLY term, synonyms — definition is dropped (kept out of the
+    // primer to bound dump size), as are all other DB fields.
     for (const item of projected) {
-      expect(Object.keys(item)).toEqual(["term", "synonyms", "definition"]);
+      expect(Object.keys(item)).toEqual(["term", "synonyms"]);
+      expect("definition" in item).toBe(false);
       expect("relatedCommands" in item).toBe(false);
       expect("relatedEntity" in item).toBe(false);
       expect("runs" in item).toBe(false);
       expect("lastReviewed" in item).toBe(false);
     }
     // Values are preserved correctly.
-    expect(projected[0]).toEqual({ term: "ai", synonyms: [], definition: "AI assistant interface" });
-    expect(projected[1]).toEqual({ term: "keikka", synonyms: ["tilaus"], definition: "A concrete delivery order" });
+    expect(projected[0]).toEqual({ term: "ai", synonyms: [] });
+    expect(projected[1]).toEqual({ term: "keikka", synonyms: ["tilaus"] });
   });
 
   test("projected glossary injected into standard dump does not leak hidden command paths", () => {
@@ -227,7 +229,8 @@ describe("projectGlossaryForPrimer — glossary projection security", () => {
     const std = JSON.stringify(buildReference(undefined, "standard", projected));
     // The hidden command path must NOT appear anywhere in the dump output.
     expect(std).not.toContain("ib ai conversation");
-    // But the term and definition should be present.
+    // The term should be present; the definition is intentionally dropped.
     expect(std).toContain('"term":"ai"');
+    expect(std).not.toContain("AI assistant interface");
   });
 });

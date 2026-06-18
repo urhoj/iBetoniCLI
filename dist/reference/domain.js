@@ -136,13 +136,11 @@ export function renderDomainHelp(_tier = "developer") {
     lines.push(`  ${DOMAIN_OVERVIEW}`);
     if (glossary.length > 0) {
         lines.push("");
-        lines.push("GLOSSARY");
-        const labels = glossary.map((g) => g.synonyms && g.synonyms.length > 0
-            ? `${g.term} (${g.synonyms.join(", ")})`
-            : g.term);
-        for (let i = 0; i < glossary.length; i++) {
-            const def = glossary[i].definition ?? "";
-            lines.push(`  ${labels[i]} — ${def}`);
+        lines.push("GLOSSARY (term + synonyms; run `ib glossary lookup <term>` for the definition)");
+        for (const g of glossary) {
+            lines.push(g.synonyms && g.synonyms.length > 0
+                ? `  ${g.term} (${g.synonyms.join(", ")})`
+                : `  ${g.term}`);
         }
     }
     lines.push("");

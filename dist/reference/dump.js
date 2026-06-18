@@ -39,11 +39,16 @@ function scrubSpecForTier(spec, tier, hiddenCommands) {
     return out;
 }
 /**
- * Project a raw DB glossary item array to the exact shape the dump/--help
- * primer documents: `{ term, synonyms, definition }` only. Drops any extra
- * fields the DB layer returns (`relatedCommands`, `relatedEntity`, `runs`,
- * `lastReviewed`, …) so developer-tier hidden command paths cannot leak
- * through the glossary of a standard-tier dump or root `--help`.
+ * Project a raw DB glossary item array to the vocabulary INDEX the dump/--help
+ * primer documents: `{ term, synonyms }` only. The `definition` is deliberately
+ * dropped here — it is the bulk of each entry's bytes and rides in every full
+ * dump, the root `--help` GLOSSARY, and the AI primer, so as the glossary grows
+ * it would bloat all three. The term+synonyms index is enough for an AI to map
+ * any colloquial/Finnish word to a canonical term, then fetch the definition on
+ * demand via `ib glossary lookup <term>` (or `ib glossary list` for all). Also
+ * drops the other DB fields (`relatedCommands`, `relatedEntity`, `runs`,
+ * `lastReviewed`, `domain`, …) so developer-tier data cannot leak through the
+ * glossary of a standard-tier dump or root `--help`.
  *
  * Exported as a pure helper so it can be unit-tested independently of the
  * network layer.
@@ -52,7 +57,6 @@ export function projectGlossaryForPrimer(items) {
     return items.map((g) => ({
         term: g["term"],
         synonyms: (g["synonyms"] ?? []),
-        definition: (g["definition"] ?? null),
     }));
 }
 /**

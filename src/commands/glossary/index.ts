@@ -144,17 +144,19 @@ export async function runGlossarySet(
   flags: WriteFlags = {}
 ): Promise<unknown> {
   const headers = { ...writeFlagsToHeaders(flags), ...(opts.updateOnly ? { "X-Update-Only": "1" } : {}) };
-  return client.put(
-    `/api/cli/glossary/${encodeURIComponent(term)}`,
-    {
-      definition: opts.definition,
-      synonyms: splitList(opts.synonyms),
-      relatedCommands: splitList(opts.related),
-      relatedEntity: opts.entity ?? null,
-      domain: opts.domain ?? null,
-    },
-    { headers }
-  );
+  // PARTIAL update (PATCH): send ONLY the fields the caller actually passed. An
+  // omitted flag is left out of the body entirely, so the backend preserves the
+  // current value (COALESCE). An EMPTY value clears: `--synonyms ""` -> [] (clear),
+  // `--entity ""` -> "" (clear). `--from-json` / `import` set every field present
+  // in the object. NOTE: preservation needs the partial-aware backend deployed;
+  // against an older backend an omitted field is still overwritten to empty/null.
+  const body: Record<string, unknown> = {};
+  if (opts.definition !== undefined) body.definition = opts.definition;
+  if (opts.synonyms !== undefined) body.synonyms = splitList(opts.synonyms);
+  if (opts.related !== undefined) body.relatedCommands = splitList(opts.related);
+  if (opts.entity !== undefined) body.relatedEntity = opts.entity;
+  if (opts.domain !== undefined) body.domain = opts.domain;
+  return client.put(`/api/cli/glossary/${encodeURIComponent(term)}`, body, { headers });
 }
 
 export async function runGlossaryMisses(client: ApiClient, top?: number): Promise<ListEnvelope<unknown>> {
@@ -224,13 +226,13 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
 
   const set = glossary
     .command("set")
-    .description("Create/update a glossary entry (developer only)")
+    .description("Create/update a glossary entry — PARTIAL: only fields you pass change; omit to keep, \"\" to clear (developer only)")
     .argument("<term>", "Canonical term")
-    .option("--definition <d>", "One-paragraph definition")
-    .option("--synonyms <list>", "Comma-separated aliases incl. inflections")
-    .option("--related <list>", 'Comma-separated command paths, e.g. "ib person,ib driver board"')
-    .option("--entity <e>", "Related DB entity, e.g. Person / personId")
-    .option("--domain <d>", "Domain grouping (e.g. vacation)")
+    .option("--definition <d>", "One-paragraph definition (omit to keep current)")
+    .option("--synonyms <list>", 'Comma-separated aliases incl. inflections (omit to keep; "" to clear)')
+    .option("--related <list>", 'Comma-separated command paths, e.g. "ib person,ib driver board" (omit to keep; "" to clear)')
+    .option("--entity <e>", "Related DB entity, e.g. Person / personId (omit to keep)")
+    .option("--domain <d>", "Domain grouping (e.g. vacation) (omit to keep)")
     .option("--update-only", "Only update an existing term; do not create a new one (404 if absent)")
     .option("--from-json <file>", "Read fields from a JSON object file (or - for stdin); explicit flags override");
   addWriteFlagsToCommand(set).action(

@@ -208,7 +208,7 @@ export function buildProgram(): Command {
     )
     .action(async (domains: string[], opts: { commandsOnly?: boolean }) => {
       try {
-        let glossary: Array<{ term: string; synonyms: string[]; definition: string | null }> = [];
+        let glossary: Array<{ term: string; synonyms: string[] }> = [];
         // --commands-only drops the primer entirely, so the glossary fetch (the
         // only network call this command makes) is pure waste — skip it.
         if (!opts.commandsOnly) {

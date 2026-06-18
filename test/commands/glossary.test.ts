@@ -24,15 +24,51 @@ describe("ib glossary", () => {
     expect(r).toEqual({ items: [{ term: "tila" }], nextCursor: null, count: 1, truncated: true });
   });
 
-  test("set PUTs body + write headers and splits comma lists", async () => {
+  test("set PUTs body + write headers and splits comma lists (omitted domain not sent)", async () => {
     const put = vi.fn().mockResolvedValue({ term: "valumassa" });
     await runGlossarySet(mkClient({ put }), "valumassa",
       { definition: "x", synonyms: "massaa, valua", related: "ib keikka, ib stats", entity: "Keikka" },
       { reason: "groom" });
+    // --domain was not passed → its key is OMITTED from the body (partial update),
+    // so the backend preserves the current domain.
     expect(put).toHaveBeenCalledWith(
       "/api/cli/glossary/valumassa",
-      { definition: "x", synonyms: ["massaa", "valua"], relatedCommands: ["ib keikka", "ib stats"], relatedEntity: "Keikka", domain: null },
+      { definition: "x", synonyms: ["massaa", "valua"], relatedCommands: ["ib keikka", "ib stats"], relatedEntity: "Keikka" },
       { headers: { "X-Action-Reason": "groom" } });
+  });
+
+  // ── Partial update (PATCH): only provided fields are sent ───────────────────
+
+  test("set sends ONLY the fields provided (omitted flags absent from body → preserved)", async () => {
+    const put = vi.fn().mockResolvedValue({ term: "puomi" });
+    await runGlossarySet(mkClient({ put }), "puomi", { synonyms: "boom,nollakone" }, { reason: "syn only" });
+    const body = put.mock.calls[0]![1] as Record<string, unknown>;
+    expect(body).toEqual({ synonyms: ["boom", "nollakone"] });
+    // none of the other fields leak in as null/[] (which would overwrite them)
+    expect("definition" in body).toBe(false);
+    expect("relatedCommands" in body).toBe(false);
+    expect("relatedEntity" in body).toBe(false);
+    expect("domain" in body).toBe(false);
+  });
+
+  test("set with empty --synonyms sends [] (explicit clear, key present)", async () => {
+    const put = vi.fn().mockResolvedValue({ term: "puomi" });
+    await runGlossarySet(mkClient({ put }), "puomi", { synonyms: "" }, { reason: "clear" });
+    const body = put.mock.calls[0]![1] as Record<string, unknown>;
+    expect(body).toEqual({ synonyms: [] });
+  });
+
+  test("set with empty --entity sends \"\" (explicit clear, not omitted)", async () => {
+    const put = vi.fn().mockResolvedValue({ term: "puomi" });
+    await runGlossarySet(mkClient({ put }), "puomi", { entity: "" }, { reason: "clear" });
+    const body = put.mock.calls[0]![1] as Record<string, unknown>;
+    expect(body).toEqual({ relatedEntity: "" });
+  });
+
+  test("set with no content flags sends an empty body (touches only lastReviewed/runs server-side)", async () => {
+    const put = vi.fn().mockResolvedValue({ term: "puomi" });
+    await runGlossarySet(mkClient({ put }), "puomi", {}, { reason: "touch" });
+    expect(put.mock.calls[0]![1]).toEqual({});
   });
 
   test("misses hits the dev endpoint with top", async () => {
