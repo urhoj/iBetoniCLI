@@ -28,6 +28,13 @@ export interface GlobalOptions {
    * grant`, `customer person add`) — their required flag became unsatisfiable.
    */
   asiakas: number | null;
+  /**
+   * Per-invocation timing. When set, the client measures each request's
+   * round-trip and emits one stderr stats line at the end of the command
+   * (API time always; SQL time when the backend sends a Server-Timing header).
+   * Never touches stdout. Set via `--stats`.
+   */
+  stats: boolean;
 }
 
 /** Truthy spellings accepted for the IB_READ_ONLY environment variable. */
@@ -48,7 +55,8 @@ export function addGlobalOptions(cmd: Command): Command {
     .option(
       "--company <id>",
       "Run this one command in another company's context (ephemeral switch, not persisted)"
-    );
+    )
+    .option("--stats", "Print API (and SQL, when available) timing for this command to stderr");
 }
 
 export function getGlobalOptions(cmd: Command): GlobalOptions {
@@ -61,6 +69,7 @@ export function getGlobalOptions(cmd: Command): GlobalOptions {
     json?: boolean;
     readOnly?: boolean;
     company?: string;
+    stats?: boolean;
   }>();
   const envReadOnly = READ_ONLY_ENV_TRUE.has(
     (process.env.IB_READ_ONLY ?? "").trim().toLowerCase()
@@ -92,6 +101,7 @@ export function getGlobalOptions(cmd: Command): GlobalOptions {
     json: !!o.json,
     readOnly: !!o.readOnly || envReadOnly,
     asiakas,
+    stats: !!o.stats,
   };
 }
 

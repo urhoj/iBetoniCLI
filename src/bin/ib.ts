@@ -6,6 +6,7 @@ import {
   applySpecErrors,
 } from "../program.js";
 import { getGlobalOptions } from "../globals.js";
+import { enableStats, flushStats } from "../stats.js";
 import { setOutputMode } from "../output/json.js";
 import { resolveAuth } from "../auth/resolve.js";
 import { defaultCredentialsPath } from "../auth/store.js";
@@ -19,6 +20,7 @@ const { parserText, erroringCommand } = enableParserThrow(program);
 
 program.hook("preAction", (_thisCommand, actionCommand) => {
   if (getGlobalOptions(program).pretty) setOutputMode("pretty");
+  if (getGlobalOptions(program).stats) enableStats();
   // Resolve the running command's CommandSpec so error envelopes can echo ITS
   // documented per-error remedy as `hint` (feedback #25). Shared with runArgv.
   applySpecErrors(actionCommand);
@@ -68,6 +70,7 @@ if (wantsRootHelp && resolvedAuth?.token) {
   }
 }
 
-program
+await program
   .parseAsync(process.argv)
   .catch((err) => handleParseRejection(err, parserText, erroringCommand));
+flushStats({ pretty: getGlobalOptions(program).pretty });

@@ -10,7 +10,8 @@ export function addGlobalOptions(cmd) {
         .option("--pretty", "Human-readable output (default is JSON)")
         .option("--json", "Force JSON output (default)")
         .option("--read-only", "Block all writes this session (also via IB_READ_ONLY=1)")
-        .option("--company <id>", "Run this one command in another company's context (ephemeral switch, not persisted)");
+        .option("--company <id>", "Run this one command in another company's context (ephemeral switch, not persisted)")
+        .option("--stats", "Print API (and SQL, when available) timing for this command to stderr");
 }
 export function getGlobalOptions(cmd) {
     const o = cmd.opts();
@@ -37,6 +38,7 @@ export function getGlobalOptions(cmd) {
         json: !!o.json,
         readOnly: !!o.readOnly || envReadOnly,
         asiakas,
+        stats: !!o.stats,
     };
 }
 export function resolveEndpoint(g, profileEndpoint) {
