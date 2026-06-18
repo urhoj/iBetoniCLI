@@ -31,8 +31,8 @@ export interface GlobalOptions {
   /**
    * Per-invocation timing. When set, the client measures each request's
    * round-trip and emits one stderr stats line at the end of the command
-   * (API time always; SQL time when the backend sends a Server-Timing header).
-   * Never touches stdout. Set via `--stats`.
+   * (API time always; SQL time and cache hit/miss counts when the backend
+   * sends a Server-Timing header). Never touches stdout. Set via `--stats`.
    */
   stats: boolean;
 }

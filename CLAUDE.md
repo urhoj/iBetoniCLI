@@ -132,6 +132,27 @@ The DB-backed domain vocabulary (`src/commands/glossary/index.ts`, backend `/api
 
 **Primer glossary is the term+synonyms INDEX only (no definitions).** Both the root `ib --help` GLOSSARY section (rendered `term (syn1, syn2)`) and `ib reference dump`'s `glossary` key carry `{ term, synonyms }` — definitions are deliberately dropped (`projectGlossaryForPrimer`) so they don't bloat every dump / help / AI primer as the glossary grows. Fetch a definition on demand with `ib glossary lookup <term>` (one) or `ib glossary list` (all). The `/ai` loop is unaffected — it has its own top-30-by-`runs` glossary message (`puminet5api modules/gpt/ib/ibGlossary.js`). Both primer surfaces are absent offline / tokenless.
 
+### `ib perf` — SQL slow-query monitoring
+
+`src/commands/perf/index.ts` — four `tier:"developer"` commands over the EXISTING `/api/admin/slow-queries*` routes (no backend deploy needed; the routes predate the group). All hidden from non-developer / tokenless callers in every discovery surface.
+
+- `ib perf slow [--limit N] [--env name]` — recent slow queries from the Redis ring buffer as a `ListEnvelope` (`truncated:true` when the page filled the limit). `durationMs` is the row field (the backend sends `duration`, renamed in `runPerfSlow`); rows also carry `procedure`/`entity`/`params`/`timestamp`, plus envelope-level `totalCount`/`environment`.
+- `ib perf stats [--env name]` — aggregate stats (top procedures by count/avgMs, avg/max/min, by-entity, lifetime `totalSlowQueries`).
+- `ib perf config` — collector config (`enabled`/`threshold`/`sentryThreshold`/`maxEntries`); folds in `availableEnvironments` via a second GET to `/environments` (`Promise.all` with the config GET).
+- `ib perf clear [--env name] --reason <r>` — DELETE the buffer. `--dry-run` is **client-side only** (the route honours no `X-Dry-Run`): it resolves before any fetch and returns `{ dryRun:true, wouldClear:{ method, path } }`. Blocked under `--read-only` / `IB_READ_ONLY`.
+
+All three reads build their query suffix through one `qs()` helper. Coverage caveat (shared with `--stats`): only `executeQuery`-path stored procs are timed/collected — raw `getConnection()` queries are not.
+
+### Global `--stats` flag
+
+`src/stats.ts` — a process-singleton accumulator. `--stats` (resolved in `globals.ts` → `GlobalOptions.stats`, enabled in `bin/ib.ts`'s preAction) makes `src/api/client.ts` time each request and `recordRequest` it; `bin/ib.ts` calls `flushStats` once after `parseAsync`, emitting ONE line to **stderr** — never stdout (the JSON data contract is preserved; same channel as the acting-as write diagnostic). Three dimensions, summed across all requests in the invocation:
+
+- `apiMs` — wall-clock round-trip (incl. any 401-refresh retry); always present. `apiReqCount` added (JSON) when >1.
+- `sqlMs` / `sqlProcCount` / `sqlCoverage:"executeQuery-path-only"` — only when the backend emits a `Server-Timing: sql;dur=…;desc="N procs"` header (deploy-gated; absent on routes that don't hit the cache runner).
+- `cacheHits` / `cacheMisses` — only when the backend emits `cacheHit`/`cacheMiss` Server-Timing metrics. Deliberately **absent** (not `0/0`) on routes that did no cached read, so raw-query routes don't read as "all misses". A cache hit shows `sqlMs:0` (no proc ran) with `cacheHits:1` — the pair disambiguates "served from cache" from "no SQL".
+
+`--pretty` renders a human line: `[ib] stats: api=120ms sql=45ms (3 procs, executeQuery-path-only) cache=2 hit / 1 miss`. JSON mode emits `{"stats":{…}}`. The backend half lives in `puminet5api` (`modules/monitoring/requestSqlTiming.js` AsyncLocalStorage scope + `app.js` `Server-Timing` response wrapper).
+
 ### Domain vocabulary (Finnish)
 
 The backend speaks Finnish; the CLI mostly preserves it: `keikka` (delivery order), `asiakas` (customer), `tyomaa` (worksite), `sijainti` (geocoded location), `tila` (status), `pvm` (date), `m3` (cubic metres). Roles map via `ROLE_NAME_BY_TYPEID` / `ROLE_TYPEID_BY_NAME` from `@ibetoni/constants`. The full live vocabulary with definitions is in `ib glossary` (DB-backed); `DOMAIN_BLURBS` (`src/reference/domain.ts`) is the offline per-domain one-liner source for `ib commands` (domain index) and computed group help.

@@ -27,8 +27,14 @@ interface SlowQueryRow {
   timestamp: string;
 }
 
-function envQuery(env?: string): string {
-  return env ? `?env=${encodeURIComponent(env)}` : "";
+/** Build a `?k=v&...` query suffix from defined params (one idiom for all reads). */
+function qs(params: Record<string, string | number | undefined>): string {
+  const u = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined) u.set(k, String(v));
+  }
+  const s = u.toString();
+  return s ? `?${s}` : "";
 }
 
 /** GET recent slow queries → ListEnvelope. `truncated` when the page filled the limit. */
@@ -36,13 +42,9 @@ export async function runPerfSlow(
   client: ApiClient,
   opts: { limit?: number; env?: string }
 ): Promise<ListEnvelope<SlowQueryRow> & { totalCount?: number; environment?: string }> {
-  const qs = new URLSearchParams();
-  if (opts.limit !== undefined) qs.set("limit", String(opts.limit));
-  if (opts.env) qs.set("env", opts.env);
-  const suffix = qs.toString() ? `?${qs.toString()}` : "";
   const res = await client.get<{
     data: { queries?: RawSlow[]; totalCount?: number; environment?: string };
-  }>(`/api/admin/slow-queries${suffix}`);
+  }>(`/api/admin/slow-queries${qs({ limit: opts.limit, env: opts.env })}`);
   const d = res.data ?? {};
   const items: SlowQueryRow[] = (d.queries ?? []).map((r) => ({
     procedure: r.procedure,
@@ -65,7 +67,7 @@ export async function runPerfSlow(
 /** GET aggregate slow-query stats (top procedures, avg/max, by-entity). */
 export async function runPerfStats(client: ApiClient, opts: { env?: string }): Promise<unknown> {
   const res = await client.get<{ data: unknown }>(
-    `/api/admin/slow-queries/stats${envQuery(opts.env)}`
+    `/api/admin/slow-queries/stats${qs({ env: opts.env })}`
   );
   return res.data;
 }
@@ -84,7 +86,7 @@ export async function runPerfClear(
   client: ApiClient,
   opts: { env?: string; reason?: string; idempotencyKey?: string; dryRun?: boolean }
 ): Promise<unknown> {
-  const path = `/api/admin/slow-queries${envQuery(opts.env)}`;
+  const path = `/api/admin/slow-queries${qs({ env: opts.env })}`;
   if (opts.dryRun) {
     return { dryRun: true, wouldClear: { method: "DELETE", path } };
   }

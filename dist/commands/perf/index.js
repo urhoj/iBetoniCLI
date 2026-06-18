@@ -1,17 +1,18 @@
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../api/writeFlags.js";
 import { writeJson, exitWithError } from "../../output/json.js";
-function envQuery(env) {
-    return env ? `?env=${encodeURIComponent(env)}` : "";
+/** Build a `?k=v&...` query suffix from defined params (one idiom for all reads). */
+function qs(params) {
+    const u = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+        if (v !== undefined)
+            u.set(k, String(v));
+    }
+    const s = u.toString();
+    return s ? `?${s}` : "";
 }
 /** GET recent slow queries → ListEnvelope. `truncated` when the page filled the limit. */
 export async function runPerfSlow(client, opts) {
-    const qs = new URLSearchParams();
-    if (opts.limit !== undefined)
-        qs.set("limit", String(opts.limit));
-    if (opts.env)
-        qs.set("env", opts.env);
-    const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    const res = await client.get(`/api/admin/slow-queries${suffix}`);
+    const res = await client.get(`/api/admin/slow-queries${qs({ limit: opts.limit, env: opts.env })}`);
     const d = res.data ?? {};
     const items = (d.queries ?? []).map((r) => ({
         procedure: r.procedure,
@@ -32,7 +33,7 @@ export async function runPerfSlow(client, opts) {
 }
 /** GET aggregate slow-query stats (top procedures, avg/max, by-entity). */
 export async function runPerfStats(client, opts) {
-    const res = await client.get(`/api/admin/slow-queries/stats${envQuery(opts.env)}`);
+    const res = await client.get(`/api/admin/slow-queries/stats${qs({ env: opts.env })}`);
     return res.data;
 }
 /** GET collector config + the list of environments that have data. */
@@ -45,7 +46,7 @@ export async function runPerfConfig(client) {
 }
 /** DELETE the buffer. --dry-run resolves CLIENT-SIDE (the route honours no X-Dry-Run). */
 export async function runPerfClear(client, opts) {
-    const path = `/api/admin/slow-queries${envQuery(opts.env)}`;
+    const path = `/api/admin/slow-queries${qs({ env: opts.env })}`;
     if (opts.dryRun) {
         return { dryRun: true, wouldClear: { method: "DELETE", path } };
     }
