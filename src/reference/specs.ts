@@ -4833,6 +4833,19 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     errors: [{ http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" }],
     examples: ["ib glossary delete obsolete-term --reason cleanup"],
   },
+  {
+    command: "ib glossary lint",
+    description: "Audit entries: dead relatedCommands, near-duplicate terms, empty fields (developer only).",
+    tier: "developer",
+    auth: "any",
+    args: [],
+    flags: [
+      { name: "strict", type: "boolean", description: "Exit 1 if any warn-level finding exists (for CI)" },
+    ],
+    outputShape: "ListEnvelope<{ term, issue, detail, severity }>",
+    errors: [{ http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" }],
+    examples: ["ib glossary lint"],
+  },
 ];
 
 /**

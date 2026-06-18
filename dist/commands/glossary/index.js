@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { writeJson, exitWithError, failWith, errorMessage } from "../../output/json.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../api/writeFlags.js";
 import { CliError } from "../../api/errors.js";
+import { runGlossaryLint } from "./lint.js";
 const splitList = (s) => (s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
 const arrToCsv = (v) => Array.isArray(v) ? v.join(",") : (typeof v === "string" ? v : undefined);
 export function mergeSetInput(json, flags) {
@@ -165,6 +166,21 @@ export function registerGlossaryCommands(program, getClient) {
         .action(async (opts) => {
         try {
             writeJson(await runGlossaryMisses(await getClient(), opts.top));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    glossary
+        .command("lint")
+        .description("Audit entries: dead relatedCommands, near-duplicate terms, empty fields (developer only)")
+        .option("--strict", "Exit 1 if any warn-level finding exists (for CI)")
+        .action(async (opts) => {
+        try {
+            const res = await runGlossaryLint(await getClient());
+            writeJson(res);
+            if (opts.strict && res.items.some((f) => f.severity === "warn"))
+                process.exitCode = 1;
         }
         catch (e) {
             exitWithError(e);

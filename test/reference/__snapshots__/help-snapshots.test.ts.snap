@@ -2808,6 +2808,31 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib glossary lint matches snapshot 1`] = `
+"USAGE
+  ib glossary lint [flags]
+
+DESCRIPTION
+  Audit entries: dead relatedCommands, near-duplicate terms, empty fields (developer only).
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --strict BOOLEAN    Exit 1 if any warn-level finding exists (for CI)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ term, issue, detail, severity }>
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a developer        → Developer access required
+
+EXAMPLES
+  ib glossary lint
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib glossary list matches snapshot 1`] = `
 "USAGE
   ib glossary list [flags]

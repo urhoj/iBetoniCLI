@@ -11,6 +11,7 @@ import { writeJson, exitWithError, failWith, errorMessage } from "../../output/j
 import { addWriteFlagsToCommand, writeFlagsToHeaders, type WriteFlags } from "../../api/writeFlags.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { CliError } from "../../api/errors.js";
+import { runGlossaryLint } from "./lint.js";
 
 interface GlossaryEntry {
   term: string;
@@ -201,6 +202,18 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
     .option("--top <n>", "Return up to N", (v: string) => Number(v))
     .action(async (opts: { top?: number }) => {
       try { writeJson(await runGlossaryMisses(await getClient(), opts.top)); } catch (e) { exitWithError(e); }
+    });
+
+  glossary
+    .command("lint")
+    .description("Audit entries: dead relatedCommands, near-duplicate terms, empty fields (developer only)")
+    .option("--strict", "Exit 1 if any warn-level finding exists (for CI)")
+    .action(async (opts: { strict?: boolean }) => {
+      try {
+        const res = await runGlossaryLint(await getClient());
+        writeJson(res);
+        if (opts.strict && res.items.some((f) => f.severity === "warn")) process.exitCode = 1;
+      } catch (e) { exitWithError(e); }
     });
 
   const set = glossary
