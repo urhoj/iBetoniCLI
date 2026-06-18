@@ -20,6 +20,8 @@ import type { CommandSpec } from "../output/help.js";
 import { type CallerTier, visibleSpecs, isHiddenAtTier } from "../tier.js";
 import { emitStdout } from "../output/json.js";
 import packageJson from "../../package.json" with { type: "json" };
+import type { ApiClient } from "../api/client.js";
+import { runGlossaryList } from "../commands/glossary/index.js";
 
 export interface ReferenceDump {
   version: string;
@@ -88,6 +90,23 @@ export function projectGlossaryForPrimer(
     term: g["term"] as string,
     synonyms: (g["synonyms"] ?? []) as string[],
   }));
+}
+
+/**
+ * Best-effort fetch of the DB glossary projected to the primer shape
+ * ({term,synonyms,definition} only — strips developer-tier-leaking fields).
+ * Returns [] on any failure (offline/tokenless/route-not-deployed). Shared by
+ * the root `--help` prefetch (bin/ib.ts) and the `reference dump` action.
+ */
+export async function fetchPrimerGlossary(
+  client: ApiClient
+): Promise<Array<{ term: string; synonyms: string[] }>> {
+  try {
+    const res = await runGlossaryList(client, {});
+    return projectGlossaryForPrimer(res.items as Array<Record<string, unknown>>);
+  } catch {
+    return [];
+  }
 }
 
 /**

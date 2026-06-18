@@ -37,11 +37,11 @@ import { registerChangelogCommands } from "./commands/changelog/index.js";
 import { registerFeedbackCommands } from "./commands/feedback/index.js";
 import { registerAiCommands } from "./commands/ai/index.js";
 import { registerBugCommands } from "./commands/bug/index.js";
-import { registerGlossaryCommands, runGlossaryList } from "./commands/glossary/index.js";
+import { registerGlossaryCommands } from "./commands/glossary/index.js";
 import { registerHelpCommands } from "./commands/help/index.js";
 import { registerVersionCommand } from "./commands/version/index.js";
 import { registerDoctorCommand } from "./commands/doctor/index.js";
-import { runReferenceDump, projectGlossaryForPrimer } from "./reference/dump.js";
+import { runReferenceDump, fetchPrimerGlossary } from "./reference/dump.js";
 import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList } from "./reference/detail.js";
 import { addWriteFlagsToCommand } from "./api/writeFlags.js";
 import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDomain } from "./reference/commandsList.js";
@@ -188,9 +188,7 @@ export function buildProgram() {
             // only network call this command makes) is pure waste — skip it.
             if (!opts.commandsOnly) {
                 try {
-                    const client = await getClient();
-                    const res = await runGlossaryList(client, {});
-                    glossary = projectGlossaryForPrimer(res.items);
+                    glossary = await fetchPrimerGlossary(await getClient());
                 }
                 catch {
                     glossary = [];

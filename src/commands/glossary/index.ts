@@ -19,6 +19,9 @@ interface GlossaryEntry {
   definition: string | null;
   relatedCommands: Array<{ command: string; summary: string | null }>;
   relatedEntity: string | null;
+  domain: string | null;
+  lastReviewed: string | null;
+  runs: number;
 }
 
 const splitList = (s?: string): string[] =>
@@ -133,8 +136,8 @@ export async function runGlossaryList(
   if (opts.domain) q.set("domain", opts.domain);
   if (opts.related) q.set("related", opts.related);
   const qs = q.toString();
-  const res = await client.get(`/api/cli/glossary${qs ? `?${qs}` : ""}`);
-  return { items: (res as { items: unknown[] }).items, nextCursor: null, count: (res as { count: number }).count, truncated: opts.stalest != null };
+  const res = await client.get<{ items: unknown[]; count: number }>(`/api/cli/glossary${qs ? `?${qs}` : ""}`);
+  return { items: res.items, nextCursor: null, count: res.count, truncated: opts.stalest != null };
 }
 
 export async function runGlossarySet(
@@ -160,8 +163,8 @@ export async function runGlossarySet(
 }
 
 export async function runGlossaryMisses(client: ApiClient, top?: number): Promise<ListEnvelope<unknown>> {
-  const res = await client.get(`/api/cli/glossary/misses${top ? `?top=${top}` : ""}`);
-  return { items: (res as { items: unknown[] }).items, nextCursor: null, count: (res as { count: number }).count, truncated: top != null };
+  const res = await client.get<{ items: unknown[]; count: number }>(`/api/cli/glossary/misses${top ? `?top=${top}` : ""}`);
+  return { items: res.items, nextCursor: null, count: res.count, truncated: top != null };
 }
 
 export async function runGlossaryDelete(client: ApiClient, term: string, flags: WriteFlags = {}): Promise<unknown> {

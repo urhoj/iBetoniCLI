@@ -40,20 +40,16 @@ const wantsRootHelp = process.argv.length <= 2 ||
     (process.argv.length === 3 && ["--help", "-h"].includes(process.argv[2]));
 if (wantsRootHelp && resolvedAuth?.token) {
     try {
-        const [{ createApiClient }, { runGlossaryList }, { setHelpGlossary }, { projectGlossaryForPrimer }] = await Promise.all([
-            import("../api/client.js"),
-            import("../commands/glossary/index.js"),
-            import("../reference/domain.js"),
-            import("../reference/dump.js"),
-        ]);
+        const { createApiClient } = await import("../api/client.js");
+        const { fetchPrimerGlossary } = await import("../reference/dump.js");
+        const { setHelpGlossary } = await import("../reference/domain.js");
         const client = createApiClient({
             endpoint: resolvedAuth.endpoint,
             token: resolvedAuth.token,
             version: program.version() ?? "0.0.0",
             readOnly: true,
         });
-        const res = await runGlossaryList(client, {});
-        setHelpGlossary(projectGlossaryForPrimer(res.items));
+        setHelpGlossary(await fetchPrimerGlossary(client));
     }
     catch {
         // Glossary unavailable — root help renders without the GLOSSARY section.

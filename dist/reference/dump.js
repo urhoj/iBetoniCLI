@@ -14,6 +14,7 @@ import { DOMAIN_OVERVIEW, FEEDBACK_GUIDANCE, TOPICS, } from "./domain.js";
 import { visibleSpecs, isHiddenAtTier } from "../tier.js";
 import { emitStdout } from "../output/json.js";
 import packageJson from "../../package.json" with { type: "json" };
+import { runGlossaryList } from "../commands/glossary/index.js";
 /**
  * For a non-developer tier, strip cross-references (seeAlso / notes / examples)
  * that name a command hidden at that tier — otherwise the dump's prose teaches a
@@ -58,6 +59,21 @@ export function projectGlossaryForPrimer(items) {
         term: g["term"],
         synonyms: (g["synonyms"] ?? []),
     }));
+}
+/**
+ * Best-effort fetch of the DB glossary projected to the primer shape
+ * ({term,synonyms,definition} only — strips developer-tier-leaking fields).
+ * Returns [] on any failure (offline/tokenless/route-not-deployed). Shared by
+ * the root `--help` prefetch (bin/ib.ts) and the `reference dump` action.
+ */
+export async function fetchPrimerGlossary(client) {
+    try {
+        const res = await runGlossaryList(client, {});
+        return projectGlossaryForPrimer(res.items);
+    }
+    catch {
+        return [];
+    }
 }
 /**
  * Build the reference object. Pure — no I/O — so tests can assert on it
