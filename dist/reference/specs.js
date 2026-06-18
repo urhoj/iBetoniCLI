@@ -1295,15 +1295,17 @@ const BASE_COMMAND_SPECS = [
         command: "ib person day statuses",
         description: "List the day-status types (vacation/sick/free/…) for the active company",
         auth: "any",
-        flags: [],
-        outputShape: "ListEnvelope<{ statusId, code, name, pois, vakioVapaa }>",
+        flags: [
+            { name: "full", type: "boolean", description: "Include prefix/style/description/active/ownerAsiakasId" },
+        ],
+        outputShape: "ListEnvelope<{ statusId, code, name, pois, vakioVapaa }>; with --full also { description, prefix, style, active, ownerAsiakasId }",
         errors: [...COMMON_AUTH_ERRORS],
         notes: [
             "Use to map a status name to its id for `ib person day set --status`.",
             "pois=true marks an absence (vacation/sick); statuses are company-configurable.",
         ],
         seeAlso: ["ib person day set", "ib driver absences"],
-        examples: ["ib person day statuses", "ib person day statuses --pretty"],
+        examples: ["ib person day statuses", "ib person day statuses --pretty", "ib person day statuses --full"],
     },
     {
         command: "ib person day get",

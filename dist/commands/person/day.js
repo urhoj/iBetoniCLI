@@ -21,16 +21,28 @@ function toYyyymmdd(date) {
     return Number(resolveDate(date).replace(/-/g, ""));
 }
 /** GET /api/personPvm/statusList/:asiakasId — the day-status types for the active company. */
-export async function runPersonDayStatuses(client) {
+export async function runPersonDayStatuses(client, opts = {}) {
     const asiakasId = ownerAsiakasIdOf(client);
     const rows = await client.get(`/api/personPvm/statusList/${asiakasId}`);
-    const items = (rows || []).map((r) => ({
-        statusId: Number(r.personPvmStatusId),
-        code: r.personPvmStatus ?? null,
-        name: r.personPvmStatusName ?? null,
-        pois: !!r.pois,
-        vakioVapaa: !!r.vakioVapaa,
-    }));
+    const items = (rows || []).map((r) => {
+        const base = {
+            statusId: Number(r.personPvmStatusId),
+            code: r.personPvmStatus ?? null,
+            name: r.personPvmStatusName ?? null,
+            pois: !!r.pois,
+            vakioVapaa: !!r.vakioVapaa,
+        };
+        if (!opts.full)
+            return base;
+        return {
+            ...base,
+            description: r.personPvmStatusDescription ?? null,
+            prefix: r.prefix ?? null,
+            style: r.style ?? null,
+            active: !!r.active,
+            ownerAsiakasId: r.ownerAsiakasId != null ? Number(r.ownerAsiakasId) : null,
+        };
+    });
     return { items, nextCursor: null, count: items.length };
 }
 /** GET /api/personPvm/list/:asiakasId — a person's day rows over [from, to] (to defaults to from). */
@@ -152,9 +164,10 @@ export function registerPersonDayCommands(person, getClient) {
     day
         .command("statuses")
         .description("List the day-status types (vacation/sick/free/…) for the active company")
-        .action(async () => {
+        .option("--full", "Include prefix/style/description/active/ownerAsiakasId")
+        .action(async (opts) => {
         try {
-            writeJson(await runPersonDayStatuses(await getClient()));
+            writeJson(await runPersonDayStatuses(await getClient(), { full: opts.full }));
         }
         catch (e) {
             exitWithError(e);

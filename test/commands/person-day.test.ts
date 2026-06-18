@@ -141,6 +141,33 @@ describe("runPersonDaySet", () => {
   });
 });
 
+function tokenWith(payload: object): string {
+  const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  return `${b64({ alg: "HS256" })}.${b64(payload)}.sig`;
+}
+
+describe("statuses --full", () => {
+  test("statuses --full surfaces prefix/style/description/active/ownerAsiakasId", async () => {
+    const client = {
+      get: vi.fn().mockResolvedValue([
+        { personPvmStatusId: 4, personPvmStatus: "Pois, loma", personPvmStatusName: "Loma",
+          personPvmStatusDescription: null, pois: true, vakioVapaa: false,
+          prefix: "L", style: "indianred", active: true, ownerAsiakasId: 8 },
+      ]),
+      getCurrentToken: vi.fn().mockReturnValue(tokenWith({ ownerAsiakasId: 8 })),
+    } as any;
+
+    const full = await runPersonDayStatuses(client, { full: true });
+    expect(full.items[0]).toMatchObject({
+      statusId: 4, code: "Pois, loma", name: "Loma", pois: true, vakioVapaa: false,
+      description: null, prefix: "L", style: "indianred", active: true, ownerAsiakasId: 8,
+    });
+
+    const lean = await runPersonDayStatuses(client, {});
+    expect(lean.items[0]).not.toHaveProperty("prefix");
+  });
+});
+
 describe("runPersonDayClear", () => {
   test("dry-run resolves the row, returns wouldDelete, never DELETEs", async () => {
     const c = makeClient();

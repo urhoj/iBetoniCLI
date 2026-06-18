@@ -6020,13 +6020,13 @@ DESCRIPTION
   Auth: requires login (any authenticated user).
 
 FLAGS
-  (none)
+  --full BOOLEAN    Include prefix/style/description/active/ownerAsiakasId
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ statusId, code, name, pois, vakioVapaa }>
+  ListEnvelope<{ statusId, code, name, pois, vakioVapaa }>; with --full also { description, prefix, style, active, ownerAsiakasId }
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -6042,6 +6042,7 @@ SEE ALSO
 EXAMPLES
   ib person day statuses
   ib person day statuses --pretty
+  ib person day statuses --full
 "
 `;
 

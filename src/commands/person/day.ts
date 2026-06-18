@@ -40,20 +40,39 @@ export interface StatusRow {
   pois: boolean;
   vakioVapaa: boolean;
 }
+export interface StatusRowFull extends StatusRow {
+  description: string | null;
+  prefix: string | null;
+  style: string | null;
+  active: boolean;
+  ownerAsiakasId: number | null;
+}
 
 /** GET /api/personPvm/statusList/:asiakasId — the day-status types for the active company. */
 export async function runPersonDayStatuses(
-  client: ApiClient
-): Promise<ListEnvelope<StatusRow>> {
+  client: ApiClient,
+  opts: { full?: boolean } = {}
+): Promise<ListEnvelope<StatusRow | StatusRowFull>> {
   const asiakasId = ownerAsiakasIdOf(client);
   const rows = await client.get<Row[]>(`/api/personPvm/statusList/${asiakasId}`);
-  const items: StatusRow[] = (rows || []).map((r) => ({
-    statusId: Number(r.personPvmStatusId),
-    code: (r.personPvmStatus as string) ?? null,
-    name: (r.personPvmStatusName as string) ?? null,
-    pois: !!r.pois,
-    vakioVapaa: !!r.vakioVapaa,
-  }));
+  const items = (rows || []).map((r) => {
+    const base: StatusRow = {
+      statusId: Number(r.personPvmStatusId),
+      code: (r.personPvmStatus as string) ?? null,
+      name: (r.personPvmStatusName as string) ?? null,
+      pois: !!r.pois,
+      vakioVapaa: !!r.vakioVapaa,
+    };
+    if (!opts.full) return base;
+    return {
+      ...base,
+      description: (r.personPvmStatusDescription as string) ?? null,
+      prefix: (r.prefix as string) ?? null,
+      style: (r.style as string) ?? null,
+      active: !!r.active,
+      ownerAsiakasId: r.ownerAsiakasId != null ? Number(r.ownerAsiakasId) : null,
+    } as StatusRowFull;
+  });
   return { items, nextCursor: null, count: items.length };
 }
 
@@ -208,9 +227,10 @@ export function registerPersonDayCommands(
   day
     .command("statuses")
     .description("List the day-status types (vacation/sick/free/…) for the active company")
-    .action(async () => {
+    .option("--full", "Include prefix/style/description/active/ownerAsiakasId")
+    .action(async (opts: { full?: boolean }) => {
       try {
-        writeJson(await runPersonDayStatuses(await getClient()));
+        writeJson(await runPersonDayStatuses(await getClient(), { full: opts.full }));
       } catch (e) {
         exitWithError(e);
       }
