@@ -4762,13 +4762,15 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "synonyms", type: "string", description: "Comma-separated aliases incl. inflections" },
       { name: "related", type: "string", description: 'Comma-separated command paths, e.g. "ib person,ib driver board"' },
       { name: "entity", type: "string", description: "Related DB entity, e.g. Person / personId" },
+      { name: "update-only", type: "boolean", description: "Only update an existing term; do not create a new one (404 if absent)" },
     ],
     outputShape: "{ term, synonyms, definition, relatedCommands, relatedEntity, runs }",
     errors: [
       { http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" },
+      { http: 404, exit: 5, meaning: "Term not found (with --update-only)", remedy: "Omit --update-only to create the entry" },
       { http: 422, exit: 4, meaning: "definition >2000 chars", remedy: "Shorten the definition" },
     ],
-    examples: ['ib glossary set valumassa --definition "Pumpattava betonimassa." --synonyms "massaa,valua" --related "ib keikka" --reason "groom"'],
+    examples: ['ib glossary set valumassa --definition "Pumpattava betonimassa." --synonyms "massaa,valua" --related "ib keikka" --reason "groom"', 'ib glossary set pumppari --definition "Updated def." --update-only --reason "groom"'],
   },
   {
     command: "ib glossary delete",

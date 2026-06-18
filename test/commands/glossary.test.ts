@@ -3,6 +3,7 @@ import {
   runGlossaryLookup, runGlossaryList, runGlossarySet, runGlossaryMisses,
 } from "../../src/commands/glossary/index.js";
 import type { ApiClient } from "../../src/api/client.js";
+import { CliError } from "../../src/api/errors.js";
 
 const mkClient = (over: Partial<ApiClient> = {}): ApiClient =>
   ({ get: vi.fn(), put: vi.fn(), delete: vi.fn(), post: vi.fn(), getCurrentToken: vi.fn(), ...over } as unknown as ApiClient);
@@ -37,5 +38,56 @@ describe("ib glossary", () => {
     const get = vi.fn().mockResolvedValue({ items: [], count: 0 });
     await runGlossaryMisses(mkClient({ get }), 10);
     expect(get).toHaveBeenCalledWith("/api/cli/glossary/misses?top=10");
+  });
+
+  // ── Change B: did-you-mean on lookup miss ──────────────────────────────────
+
+  test("lookup miss with suggestions includes Did you mean in error message", async () => {
+    const get = vi.fn().mockImplementation((url: string) => {
+      if (url.startsWith("/api/cli/glossary/lookup/")) {
+        return Promise.reject(new CliError("not found", 404, null, 5));
+      }
+      // Search returns one suggestion
+      return Promise.resolve({ items: [{ term: "pumppari" }], count: 1 });
+    });
+    const err = await runGlossaryLookup(mkClient({ get }), "pumppari").catch((e) => e);
+    expect(err).toBeInstanceOf(CliError);
+    expect((err as CliError).exitCode).toBe(5);
+    expect((err as CliError).message).toContain("Did you mean: pumppari");
+  });
+
+  test("lookup miss with no suggestions has no Did you mean in error message", async () => {
+    const get = vi.fn().mockImplementation((url: string) => {
+      if (url.startsWith("/api/cli/glossary/lookup/")) {
+        return Promise.reject(new CliError("not found", 404, null, 5));
+      }
+      return Promise.resolve({ items: [], count: 0 });
+    });
+    const err = await runGlossaryLookup(mkClient({ get }), "xyz").catch((e) => e);
+    expect(err).toBeInstanceOf(CliError);
+    expect((err as CliError).exitCode).toBe(5);
+    expect((err as CliError).message).not.toContain("Did you mean");
+  });
+
+  // ── Change C: --update-only flag on set ────────────────────────────────────
+
+  test("set with updateOnly:true sends X-Update-Only header", async () => {
+    const put = vi.fn().mockResolvedValue({ term: "pumppari" });
+    await runGlossarySet(mkClient({ put }), "pumppari",
+      { definition: "def", updateOnly: true },
+      { reason: "groom" });
+    expect(put).toHaveBeenCalledWith(
+      "/api/cli/glossary/pumppari",
+      expect.any(Object),
+      { headers: expect.objectContaining({ "X-Update-Only": "1" }) });
+  });
+
+  test("set without updateOnly does not send X-Update-Only header", async () => {
+    const put = vi.fn().mockResolvedValue({ term: "pumppari" });
+    await runGlossarySet(mkClient({ put }), "pumppari",
+      { definition: "def" },
+      { reason: "groom" });
+    const callArgs = put.mock.calls[0]![2] as { headers: Record<string, string> };
+    expect(callArgs.headers).not.toHaveProperty("X-Update-Only");
   });
 });
