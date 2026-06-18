@@ -26,6 +26,7 @@ export const DOMAIN_BLURBS = {
     company: "The tenant company your token acts as (multi-tenancy).",
     schedule: "Date-scoped views of keikkas: today / a day / a week.",
     stats: "Aggregated delivery statistics.",
+    perf: "SQL slow-query monitoring (developer).",
     jerry: "BetoniJerry RFQ marketplace: requests, offers, confirmation.",
     message: "Chat threads, the announcement board, and daily grid notes.",
     attachment: "Files (photos/PDFs) linked to entities via Azure Blob.",
