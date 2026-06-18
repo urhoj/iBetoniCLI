@@ -148,6 +148,9 @@ export const TOPICS: Topic[] = [
  */
 let helpGlossary: Array<{ term: string; synonyms: string[] }> = [];
 
+/** Stash the DB-fetched glossary for renderDomainHelp; called by bin/ib.ts before
+ * parseAsync on root --help so the synchronous Commander render can include the
+ * GLOSSARY section. Empty → section omitted. */
 export function setHelpGlossary(
   g: Array<{ term: string; synonyms: string[] }>
 ): void {

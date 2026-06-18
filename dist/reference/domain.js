@@ -113,6 +113,9 @@ export const TOPICS = [
  * access at render time. When empty, the GLOSSARY section is omitted.
  */
 let helpGlossary = [];
+/** Stash the DB-fetched glossary for renderDomainHelp; called by bin/ib.ts before
+ * parseAsync on root --help so the synchronous Commander render can include the
+ * GLOSSARY section. Empty → section omitted. */
 export function setHelpGlossary(g) {
     helpGlossary = g;
 }

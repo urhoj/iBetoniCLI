@@ -62,7 +62,7 @@ export function projectGlossaryForPrimer(items) {
 }
 /**
  * Best-effort fetch of the DB glossary projected to the primer shape
- * ({term,synonyms,definition} only — strips developer-tier-leaking fields).
+ * ({term,synonyms} only — strips definition and developer-tier-leaking fields).
  * Returns [] on any failure (offline/tokenless/route-not-deployed). Shared by
  * the root `--help` prefetch (bin/ib.ts) and the `reference dump` action.
  */

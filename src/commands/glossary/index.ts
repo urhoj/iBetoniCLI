@@ -1,8 +1,13 @@
 /**
  * `ib glossary` — the DB-backed domain glossary (synonym-aware vocabulary).
- * lookup/list are open; set/delete/misses are developer-only. Backend:
- * /api/cli/glossary/*. The vocabulary is the single source of truth in the DB
- * (not bundled in betonicli) and is groomed via `ib glossary set`.
+ * lookup/list are open; set/delete/misses/lint are developer-only. Backend:
+ * /api/cli/glossary/*. The vocabulary is the single source of truth in the DB.
+ * Key behaviors: lookup <term> → exit 5 + miss recorded on 404, did-you-mean
+ * hints via /glossary?search=, comma-separated terms → batch lookup; set is a
+ * PARTIAL update (omitted flags preserved via COALESCE; "" clears), --update-only
+ * 404s instead of inserting, --from-json reads one object; import bulk-sets a
+ * JSON array (avoids Finnish ä/ö shell mangling); lint audits dead
+ * relatedCommands, near-duplicates, empty fields.
  */
 import { readFileSync } from "node:fs";
 import type { Command } from "commander";
@@ -30,6 +35,13 @@ const splitList = (s?: string): string[] =>
 const arrToCsv = (v: unknown): string | undefined =>
   Array.isArray(v) ? v.join(",") : (typeof v === "string" ? v : undefined);
 
+/**
+ * Merge fields from a parsed JSON object with explicit CLI flags.
+ * Flags take precedence over the JSON values — an explicitly-passed flag always
+ * wins regardless of what the JSON file contains. Fields absent from both json
+ * and flags are left `undefined` (omitted from the PATCH body, so the backend
+ * COALESCE preserves the current DB value).
+ */
 export function mergeSetInput(
   json: Record<string, unknown>,
   flags: { definition?: string; synonyms?: string; related?: string; entity?: string; domain?: string }
@@ -48,6 +60,14 @@ export function readJsonInput(path: string): unknown {
   return JSON.parse(raw);
 }
 
+/**
+ * Bulk-set entries from a pre-parsed JSON array. Runs sequentially (one PUT per
+ * entry) so individual failures don't abort the batch — each result records
+ * `ok: true/false` and, on failure, the `error` message. The summary counts are
+ * returned; callers can check `failed > 0` to decide whether to exit non-zero.
+ * Entries missing `term` are recorded as `{ term: null, ok: false }` without a
+ * network round-trip.
+ */
 export async function runGlossaryImport(
   client: ApiClient,
   entries: Array<Record<string, unknown>>,
@@ -70,6 +90,13 @@ export async function runGlossaryImport(
   return { results, ok: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok).length };
 }
 
+/**
+ * Resolve a single term to its glossary entry. On a 404 (exit 5), the miss is
+ * recorded server-side, then this function enriches the CliError with did-you-mean
+ * hints by querying /glossary?search= (full term + 5-char prefix in parallel).
+ * The enriched CliError is re-thrown — callers see exit 5 with the hint appended
+ * to the message. Network errors during hint fetching are silently ignored.
+ */
 export async function runGlossaryLookup(client: ApiClient, term: string): Promise<GlossaryEntry> {
   try {
     return await client.get(`/api/cli/glossary/lookup/${encodeURIComponent(term)}`);
@@ -108,6 +135,13 @@ export async function runGlossaryLookup(client: ApiClient, term: string): Promis
   }
 }
 
+/**
+ * Resolve multiple terms in parallel (the comma-separated lookup path). Unlike
+ * `runGlossaryLookup`, a 404 for an individual term is swallowed and returned as
+ * `{ term, found: false, entry: null }` so the batch always resolves — other
+ * non-404 errors are re-thrown. Duplicate terms are deduplicated by the caller
+ * before this function is reached (the Commander action uses a Set).
+ */
 export async function runGlossaryLookupBatch(
   client: ApiClient,
   terms: string[]
