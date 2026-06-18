@@ -46,13 +46,22 @@ export async function runJerryRequestList(
   opts: JerryRequestListOpts
 ): Promise<ListEnvelope<Row>> {
   if (opts.open) {
-    // --all forwards ?scope=all: the whole marketplace (open + no_supply) beyond
-    // the caller's varikko delivery area, with distanceKm/isOutOfArea/isNoSupply.
-    const suffix = opts.all ? "?scope=all" : "";
-    const env = toEnvelope(await client.get<unknown>(`/api/pumppuRequests/open${suffix}`));
-    // Server caps the marketplace at 200 and exposes no cursor — flag truncation.
-    if (opts.all && env.count >= 200) env.truncated = true;
-    return env;
+    if (opts.all) {
+      // Whole-marketplace browse (?scope=all): open + no_supply beyond the
+      // caller's varikko delivery area, with distanceKm/isOutOfArea/isNoSupply.
+      // The backend returns { requests, truncated } so the 200-row cap is exact,
+      // not inferred from length.
+      const data = await client.get<{ requests?: unknown; truncated?: boolean }>(
+        "/api/pumppuRequests/open?scope=all"
+      );
+      const items = Array.isArray(data?.requests) ? (data.requests as Row[]) : [];
+      return { items, nextCursor: null, count: items.length, truncated: !!data?.truncated };
+    }
+    return toEnvelope(await client.get<unknown>("/api/pumppuRequests/open"));
+  }
+  // --all only narrows the provider inbox; --mine has no whole-marketplace scope.
+  if (opts.all) {
+    failWith("--all only applies with --open (whole-marketplace browse)", 4);
   }
   const params = new URLSearchParams();
   if (opts.status) params.set("status", opts.status);
