@@ -39,9 +39,15 @@ export function registerValidateCommands(parent, getClient) {
         .option("--asiakas <id>", "Target asiakasId (default: active company)", Number)
         .option("--person <id>", "Validate this person as an employee of the company", Number)
         .option("--profile <p>", "Profile id (company: jerry|betoni; person: onboarding [default])")
+        .option("--keikka <id>", "Validate this keikka against the reminders-drawer rules (alias of ib keikka validate <id>)", Number)
         .action(async (action, opts) => {
         try {
             const client = await getClient();
+            if (opts.keikka != null) {
+                const { runKeikkaValidate } = await import("../keikka/index.js");
+                writeJson(await runKeikkaValidate(client, { keikkaId: opts.keikka }));
+                return;
+            }
             if (action === "list") {
                 writeJson(await runValidateProfiles(client));
                 return;

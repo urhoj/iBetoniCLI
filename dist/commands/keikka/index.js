@@ -172,6 +172,19 @@ export async function runKeikkaDriversAssign(client, keikkaId, flags) {
     return client.post(`/api/keikka/defaultDriver/assign/${keikkaId}`, {}, { headers: writeFlagsToHeaders(flags) });
 }
 /**
+ * GET /api/cli/keikka/validate/:keikkaId (single) or
+ * GET /api/cli/keikka/validate?date=YYYY-MM-DD (day).
+ */
+export async function runKeikkaValidate(client, opts) {
+    if (opts.date) {
+        return client.get(`/api/cli/keikka/validate?date=${encodeURIComponent(opts.date)}`);
+    }
+    if (opts.keikkaId != null) {
+        return client.get(`/api/cli/keikka/validate/${opts.keikkaId}`);
+    }
+    return failWith("Pass a keikkaId or --date <YYYY-MM-DD>", 4);
+}
+/**
  * Register `ib keikka` subcommands on the parent commander instance:
  *   - list     filterable by --from/--to/--customer/--vehicle/--worksite/--status/--limit/--cursor
  *   - get      single keikka by id
@@ -248,6 +261,25 @@ export function registerKeikkaCommands(parent, getClient) {
             const ownerAsiakasId = decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId ??
                 failWith("could not resolve ownerAsiakasId from the active token", 4);
             const result = await runKeikkaSearch(client, query, ownerAsiakasId, opts.limit);
+            writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    k.command("validate [keikkaId]")
+        .description("Validate a keikka (or a whole day with --date) against the reminders-drawer rules")
+        .option("--date <date>", "Validate every keikka for this date (YYYY-MM-DD or today/yesterday/tomorrow)")
+        .action(async (idStr, opts) => {
+        try {
+            const client = await getClient();
+            if (opts.date && idStr) {
+                failWith("Pass either a keikkaId or --date, not both", 4);
+            }
+            const result = await runKeikkaValidate(client, {
+                keikkaId: idStr ? parseId(idStr, "keikkaId") : undefined,
+                date: opts.date ? resolveDate(opts.date) : undefined,
+            });
             writeJson(result);
         }
         catch (e) {

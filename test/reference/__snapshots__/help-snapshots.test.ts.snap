@@ -3835,6 +3835,46 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib keikka validate matches snapshot 1`] = `
+"USAGE
+  ib keikka validate [<keikkaId>] [flags]
+
+DESCRIPTION
+  Validate a keikka (or a whole day with --date) against the reminders-drawer rules
+  Permissions: requires auth.page.grid.tilaus.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+ARGUMENTS
+  <keikkaId> NUMBER    keikkaId to validate (omit when using --date) (optional)
+
+FLAGS
+  --date DATE    Validate every keikka for this date (YYYY-MM-DD or today/yesterday/tomorrow)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  single: { keikkaId, isValid, validationEnabled, summary:{totalIssues,critical,high,medium,low,notification,categories}, issues:[{type,message,priority,priorityName,category,categoryName,field}] } | day: { items:[<single>], count, dayTotals:{totalIssues,critical,invalidKeikkas}, validationEnabled }
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  Keikka not found       → verify keikkaId
+  exit 4 (HTTP 400)  Bad date / keikkaId    → use YYYY-MM-DD or a positive integer
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - validationEnabled is the per-company grid master toggle; rules run regardless. Single 404 if the keikka is not visible; day mode validates every keikka for the date.
+
+SEE ALSO
+  ib validate, ib keikka get
+
+EXAMPLES
+  ib keikka validate 9001
+  ib keikka validate --date today
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib legal accept matches snapshot 1`] = `
 "USAGE
   ib legal accept [<typeName>] [flags]
@@ -7424,6 +7464,7 @@ FLAGS
   --asiakas NUMBER    Target asiakasId (default: active company)
   --person NUMBER    Validate this person as an employee (switches to person validation)
   --profile STRING    Profile id (company: jerry|betoni, required; person: onboarding, default)
+  --keikka NUMBER    Validate this keikka against the reminders-drawer rules (alias of \`ib keikka validate <id>\`)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -7452,6 +7493,7 @@ EXAMPLES
   ib validate --asiakas 8 --profile betoni
   ib validate --asiakas 8 --person 10
   ib validate --person 10 --profile onboarding
+  ib validate --keikka 9001
 "
 `;
 

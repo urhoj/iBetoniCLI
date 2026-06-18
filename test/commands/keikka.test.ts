@@ -2,6 +2,7 @@ import { describe, test, expect, vi, beforeEach } from "vitest";
 import {
   runKeikkaUpdate,
   runKeikkaLatest,
+  runKeikkaValidate,
 } from "../../src/commands/keikka/index.js";
 import { todayHelsinki, addDaysISO } from "../../src/dates.js";
 import type { ApiClient } from "../../src/api/client.js";
@@ -95,5 +96,22 @@ describe("ib keikka latest (windowed backward search)", () => {
     expect(getMock).toHaveBeenCalledTimes(2); // 7-day window + 3-day remainder
     const last = new URL("http://x" + String(getMock.mock.calls.at(-1)![0]));
     expect(last.searchParams.get("from")).toBe(addDaysISO(today, -9));
+  });
+});
+
+describe("runKeikkaValidate", () => {
+  test("single: GETs /api/cli/keikka/validate/:id", async () => {
+    const get = vi.fn().mockResolvedValue({ keikkaId: 9001, isValid: true, issues: [] });
+    const client = { get } as any;
+    const out = await runKeikkaValidate(client, { keikkaId: 9001 });
+    expect(get).toHaveBeenCalledWith("/api/cli/keikka/validate/9001");
+    expect(out).toEqual({ keikkaId: 9001, isValid: true, issues: [] });
+  });
+
+  test("day: GETs /api/cli/keikka/validate?date=", async () => {
+    const get = vi.fn().mockResolvedValue({ items: [], count: 0, dayTotals: {} });
+    const client = { get } as any;
+    await runKeikkaValidate(client, { date: "2026-06-18" });
+    expect(get).toHaveBeenCalledWith("/api/cli/keikka/validate?date=2026-06-18");
   });
 });

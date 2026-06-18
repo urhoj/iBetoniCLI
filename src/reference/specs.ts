@@ -430,6 +430,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "asiakas", type: "number", description: "Target asiakasId (default: active company)" },
       { name: "person", type: "number", description: "Validate this person as an employee (switches to person validation)" },
       { name: "profile", type: "string", description: "Profile id (company: jerry|betoni, required; person: onboarding, default)" },
+      { name: "keikka", type: "number", description: "Validate this keikka against the reminders-drawer rules (alias of `ib keikka validate <id>`)" },
     ],
     outputShape:
       "list: ListEnvelope<{ id, titleFi, description, entity:'company'|'person' }>. company: { entity:'company', profile, asiakasId, asiakasNimi, ok, summary, checks[] }. person: { entity:'person', profile, asiakasId, asiakasNimi, personId, personNimi, ok, summary, checks:[{ id, severity, status:'pass'|'fail'|'skip', titleFi, detail? }] }.",
@@ -452,6 +453,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ib validate --asiakas 8 --profile betoni",
       "ib validate --asiakas 8 --person 10",
       "ib validate --person 10 --profile onboarding",
+      "ib validate --keikka 9001",
     ],
   },
   {
@@ -687,6 +689,28 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     seeAlso: ["ib log entity", "ib log by-entity-date"],
     examples: ["ib keikka log 12345", "ib keikka log 12345 --field kuskit"],
+  },
+  {
+    command: "ib keikka validate",
+    description:
+      "Validate a keikka (or a whole day with --date) against the reminders-drawer rules",
+    permissions: ["auth.page.grid.tilaus.read"],
+    args: [{ name: "keikkaId", type: "number", required: false, description: "keikkaId to validate (omit when using --date)" }],
+    flags: [
+      { name: "date", type: "date", description: "Validate every keikka for this date (YYYY-MM-DD or today/yesterday/tomorrow)" },
+    ],
+    outputShape:
+      "single: { keikkaId, isValid, validationEnabled, summary:{totalIssues,critical,high,medium,low,notification,categories}, issues:[{type,message,priority,priorityName,category,categoryName,field}] } | day: { items:[<single>], count, dayTotals:{totalIssues,critical,invalidKeikkas}, validationEnabled }",
+    errors: [
+      apiErr(404, "Keikka not found", "verify keikkaId"),
+      apiErr(400, "Bad date / keikkaId", "use YYYY-MM-DD or a positive integer"),
+      ...permErrors("auth.page.grid.tilaus.read"),
+    ],
+    notes: [
+      "validationEnabled is the per-company grid master toggle; rules run regardless. Single 404 if the keikka is not visible; day mode validates every keikka for the date.",
+    ],
+    seeAlso: ["ib validate", "ib keikka get"],
+    examples: ["ib keikka validate 9001", "ib keikka validate --date today"],
   },
 
   // ─── stats (1) ───────────────────────────────────────────────────────────
