@@ -636,7 +636,7 @@ const BASE_COMMAND_SPECS = [
         flags: [
             { name: "date", type: "date", description: "Validate every keikka for this date (YYYY-MM-DD or today/yesterday/tomorrow)" },
         ],
-        outputShape: "single: { keikkaId, isValid, validationEnabled, summary:{totalIssues,critical,high,medium,low,notification,categories}, issues:[{type,message,priority,priorityName,category,categoryName,field}] } | day: { items:[<single>], count, dayTotals:{totalIssues,critical,invalidKeikkas}, validationEnabled }",
+        outputShape: "single: { keikkaId, isValid, validationEnabled, summary:{totalIssues,critical,high,medium,low,notification,categories}, issues:[{type,message,priority,priorityName,category,categoryName,field}] } | day: { items:[{ keikkaId, isValid, summary, issues }], count, dayTotals:{totalIssues,critical,invalidKeikkas}, validationEnabled }",
         errors: [
             apiErr(404, "Keikka not found", "verify keikkaId"),
             apiErr(400, "Bad date / keikkaId", "use YYYY-MM-DD or a positive integer"),
