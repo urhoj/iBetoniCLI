@@ -2814,15 +2814,19 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { term, synonyms[], definition, relatedCommands:[{command,summary}], relatedEntity }
+  single term: { term, synonyms[], definition, relatedCommands:[{command,summary}], relatedEntity } | batch (a,b,c): ListEnvelope<{ term, found, entry }>
 
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  No entry for the term  → Try \`ib glossary list --search <term>\`; the miss is queued for definition
   exit 2  Not authenticated      → Run \`ib auth login\`
 
+NOTES
+  - Comma-separated terms (a,b,c) run a batch lookup returning a ListEnvelope of {term,found,entry}; a single term keeps the single-entry shape.
+
 EXAMPLES
   ib glossary lookup pumppari
   ib glossary lookup betoniasema
+  ib glossary lookup loma,saikku,pyhä
 "
 `;
 

@@ -4744,12 +4744,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     auth: "any",
     args: [{ name: "term", type: "string", required: true, description: "A word or synonym, e.g. pumppari" }],
     flags: [],
-    outputShape: "{ term, synonyms[], definition, relatedCommands:[{command,summary}], relatedEntity }",
+    outputShape: "single term: { term, synonyms[], definition, relatedCommands:[{command,summary}], relatedEntity } | batch (a,b,c): ListEnvelope<{ term, found, entry }>",
+    notes: ["Comma-separated terms (a,b,c) run a batch lookup returning a ListEnvelope of {term,found,entry}; a single term keeps the single-entry shape."],
     errors: [
       { http: 404, exit: 5, meaning: "No entry for the term", remedy: "Try `ib glossary list --search <term>`; the miss is queued for definition" },
       { exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" },
     ],
-    examples: ["ib glossary lookup pumppari", "ib glossary lookup betoniasema"],
+    examples: ["ib glossary lookup pumppari", "ib glossary lookup betoniasema", "ib glossary lookup loma,saikku,pyhä"],
   },
   {
     command: "ib glossary list",

@@ -60,6 +60,24 @@ export async function runGlossaryLookup(client: ApiClient, term: string): Promis
   }
 }
 
+export async function runGlossaryLookupBatch(
+  client: ApiClient,
+  terms: string[]
+): Promise<ListEnvelope<{ term: string; found: boolean; entry: GlossaryEntry | null }>> {
+  const items = await Promise.all(
+    terms.map(async (term) => {
+      try {
+        const entry = await client.get<GlossaryEntry>(`/api/cli/glossary/lookup/${encodeURIComponent(term)}`);
+        return { term, found: true, entry };
+      } catch (e) {
+        if (e instanceof CliError && e.statusCode === 404) return { term, found: false, entry: null };
+        throw e;
+      }
+    })
+  );
+  return { items, nextCursor: null, count: items.length };
+}
+
 export async function runGlossaryList(
   client: ApiClient,
   opts: { search?: string; stalest?: number }
@@ -115,7 +133,14 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
         glossary.outputHelp();
         return;
       }
-      try { writeJson(await runGlossaryLookup(await getClient(), term)); } catch (e) { exitWithError(e); }
+      try {
+        if (term.includes(",")) {
+          const terms = [...new Set(term.split(",").map((t) => t.trim()).filter(Boolean))];
+          writeJson(await runGlossaryLookupBatch(await getClient(), terms));
+        } else {
+          writeJson(await runGlossaryLookup(await getClient(), term));
+        }
+      } catch (e) { exitWithError(e); }
     });
 
   glossary

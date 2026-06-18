@@ -39,6 +39,20 @@ export async function runGlossaryLookup(client, term) {
         throw e;
     }
 }
+export async function runGlossaryLookupBatch(client, terms) {
+    const items = await Promise.all(terms.map(async (term) => {
+        try {
+            const entry = await client.get(`/api/cli/glossary/lookup/${encodeURIComponent(term)}`);
+            return { term, found: true, entry };
+        }
+        catch (e) {
+            if (e instanceof CliError && e.statusCode === 404)
+                return { term, found: false, entry: null };
+            throw e;
+        }
+    }));
+    return { items, nextCursor: null, count: items.length };
+}
 export async function runGlossaryList(client, opts) {
     const q = new URLSearchParams();
     if (opts.search)
@@ -80,7 +94,13 @@ export function registerGlossaryCommands(program, getClient) {
             return;
         }
         try {
-            writeJson(await runGlossaryLookup(await getClient(), term));
+            if (term.includes(",")) {
+                const terms = [...new Set(term.split(",").map((t) => t.trim()).filter(Boolean))];
+                writeJson(await runGlossaryLookupBatch(await getClient(), terms));
+            }
+            else {
+                writeJson(await runGlossaryLookup(await getClient(), term));
+            }
         }
         catch (e) {
             exitWithError(e);

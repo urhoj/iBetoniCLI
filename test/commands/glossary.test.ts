@@ -1,6 +1,6 @@
 import { describe, test, expect, vi } from "vitest";
 import {
-  runGlossaryLookup, runGlossaryList, runGlossarySet, runGlossaryMisses,
+  runGlossaryLookup, runGlossaryList, runGlossarySet, runGlossaryMisses, runGlossaryLookupBatch,
 } from "../../src/commands/glossary/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -97,5 +97,23 @@ describe("ib glossary", () => {
     await expect(runGlossaryLookup(mkClient({ get }), "pumppari")).rejects.toBe(err);
     // suggestion search must NOT be attempted for a non-404 error
     expect(get).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("glossary lookup batch", () => {
+  test("returns per-term found flags; 404 → found:false (no throw)", async () => {
+    const get = vi.fn(async (path: string) => {
+      if (path.includes("loma")) return { term: "loma", synonyms: [], definition: "x", relatedCommands: [], relatedEntity: null };
+      throw new CliError("not found", 404, null, 5);
+    });
+    const res = await runGlossaryLookupBatch(mkClient({ get }), ["loma", "nope"]);
+    expect(res.count).toBe(2);
+    expect(res.items.find((i) => i.term === "loma")).toMatchObject({ found: true });
+    expect(res.items.find((i) => i.term === "nope")).toMatchObject({ found: false, entry: null });
+  });
+
+  test("non-404 error propagates (not swallowed as found:false)", async () => {
+    const get = vi.fn(async () => { throw new CliError("auth", 401, null, 2); });
+    await expect(runGlossaryLookupBatch(mkClient({ get }), ["x"])).rejects.toBeInstanceOf(CliError);
   });
 });
