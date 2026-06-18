@@ -88,6 +88,56 @@ describe("ib reference dump <domain>", () => {
   });
 });
 
+describe("ib reference dump <domain...> (multiple domains)", () => {
+  test("an array of domains keeps every listed group's commands under one primer", () => {
+    const ref = buildReference(["keikka", "vehicle"]);
+    const cmds = Object.keys(ref.commands);
+    expect(cmds.length).toBeGreaterThan(0);
+    expect(cmds.some((c) => c.startsWith("ib keikka"))).toBe(true);
+    expect(cmds.some((c) => c.startsWith("ib vehicle"))).toBe(true);
+    // nothing outside the two requested domains
+    expect(cmds.every((c) => /^ib (keikka|vehicle)\b/.test(c))).toBe(true);
+    // single primer retained
+    expect(ref.overview).toMatch(/BetoniJerry/);
+  });
+
+  test("an empty array behaves like no domain (full surface)", () => {
+    expect(Object.keys(buildReference([]).commands)).toEqual(
+      Object.keys(buildReference().commands)
+    );
+  });
+
+  test("a single bad domain among good ones still exit-4s", () => {
+    expect(() => buildReference(["keikka", "nope"])).toThrowError(/unknown domain: nope/);
+  });
+});
+
+describe("ib reference dump --commands-only", () => {
+  test("emits only { version, generatedAt, commands } — no primer", () => {
+    const spy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    runReferenceDump("keikka", "developer", [], true);
+    const out = spy.mock.calls[0][0] as string;
+    spy.mockRestore();
+    const parsed = JSON.parse(out);
+    expect(Object.keys(parsed).sort()).toEqual(["commands", "generatedAt", "version"]);
+    expect(parsed.overview).toBeUndefined();
+    expect(parsed.glossary).toBeUndefined();
+    expect(parsed.topics).toBeUndefined();
+    expect(parsed.feedbackGuidance).toBeUndefined();
+    expect(Object.keys(parsed.commands).every((c) => c.startsWith("ib keikka"))).toBe(true);
+  });
+
+  test("without --commands-only the primer is present (regression guard)", () => {
+    const spy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    runReferenceDump("keikka", "developer", []);
+    const out = spy.mock.calls[0][0] as string;
+    spy.mockRestore();
+    const parsed = JSON.parse(out);
+    expect(parsed.overview).toBeTruthy();
+    expect("feedbackGuidance" in parsed).toBe(true);
+  });
+});
+
 describe("reference dump tier filtering", () => {
   test("standard omits developer commands", () => {
     const std = buildReference(undefined, "standard");

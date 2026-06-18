@@ -91,4 +91,16 @@ describe("runReferenceDetail", () => {
     await runReferenceDetailList(c, undefined, "attachment");
     expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog?domain=attachment");
   });
+
+  test("runReferenceDetailList appends withDetail=1 when requested", async () => {
+    const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
+    await runReferenceDetailList(c, 10, "attachment", true);
+    expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10&domain=attachment&withDetail=1");
+  });
+
+  test("runReferenceDetailList omits withDetail when false (default slim shape)", async () => {
+    const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
+    await runReferenceDetailList(c, 10, undefined, false);
+    expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10");
+  });
 });

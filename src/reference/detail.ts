@@ -31,11 +31,24 @@ export async function runReferenceDetail(
 export async function runReferenceDetailList(
   client: ApiClient,
   stalest?: number,
-  domain?: string
-): Promise<{ items: Array<{ command: string; summary: string | null; lastReviewed: string | null; runs: number }>; count: number }> {
+  domain?: string,
+  withDetail = false
+): Promise<{
+  items: Array<{
+    command: string;
+    summary: string | null;
+    lastReviewed: string | null;
+    runs: number;
+    // Present only when `withDetail` is set AND the backend that serves it is
+    // deployed; the per-row detail text otherwise lives behind `detail get`.
+    detail?: string | null;
+  }>;
+  count: number;
+}> {
   const p = new URLSearchParams();
   if (stalest) p.set("stalest", String(stalest));
   if (domain) p.set("domain", domain);
+  if (withDetail) p.set("withDetail", "1");
   const q = p.toString();
   return client.get(`/api/cli/command-catalog${q ? `?${q}` : ""}`);
 }

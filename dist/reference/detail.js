@@ -14,12 +14,14 @@ export async function runReferenceDetail(client, commandParts, tier = getCallerT
     const command = resolveCommand(commandParts, tier);
     return client.get(`/api/cli/command-catalog/${encodeURIComponent(command)}`);
 }
-export async function runReferenceDetailList(client, stalest, domain) {
+export async function runReferenceDetailList(client, stalest, domain, withDetail = false) {
     const p = new URLSearchParams();
     if (stalest)
         p.set("stalest", String(stalest));
     if (domain)
         p.set("domain", domain);
+    if (withDetail)
+        p.set("withDetail", "1");
     const q = p.toString();
     return client.get(`/api/cli/command-catalog${q ? `?${q}` : ""}`);
 }

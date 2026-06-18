@@ -3537,20 +3537,27 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib reference dump",
     description:
-      "Emit the full command surface as JSON (version, generatedAt, overview, glossary, topics, feedbackGuidance, commands map). Read by AI assistants for one-shot CLI ingestion. Pass a domain (the token after `ib`, e.g. keikka) to narrow the commands map to one group — the primer (overview/glossary/topics) is always retained, so a filtered dump stays self-contained.",
+      "Emit the full command surface as JSON (version, generatedAt, overview, glossary, topics, feedbackGuidance, commands map). Read by AI assistants for one-shot CLI ingestion. Pass one or more domains (the token after `ib`, e.g. keikka) to narrow the commands map to those groups — the primer (overview/glossary/topics) is retained once, so a filtered dump stays self-contained. `--commands-only` drops the primer and emits just { version, generatedAt, commands } (and skips the glossary fetch) for callers that only need the specs.",
     auth: "none",
     args: [
       {
-        name: "domain",
+        name: "domain...",
         type: "string",
         required: false,
         description:
-          "Restrict the commands map to one domain (the token after `ib`, e.g. keikka). Unknown domain exits 4 listing valid domains.",
+          "Restrict the commands map to one or more domains (the token after `ib`, e.g. keikka). Multiple domains share a single primer. Unknown domain exits 4 listing valid domains.",
       },
     ],
-    flags: [],
+    flags: [
+      {
+        name: "commands-only",
+        type: "boolean",
+        description:
+          "Emit only { version, generatedAt, commands } — drop the overview/glossary/topics/feedbackGuidance primer and skip the glossary DB fetch (no token needed). ~50% fewer bytes per dump.",
+      },
+    ],
     outputShape:
-      "{ version, generatedAt, overview, glossary, topics, feedbackGuidance, commands: { '<command>': CommandSpec } }",
+      "{ version, generatedAt, overview, glossary, topics, feedbackGuidance, commands: { '<command>': CommandSpec } } — with --commands-only: { version, generatedAt, commands }",
     errors: [
       { exit: 4, meaning: "Unknown domain", remedy: "run `ib commands` (no arg) to see valid domains" },
       { exit: 1, meaning: "I/O error", remedy: "retry; check stdout pipe" },
@@ -3558,6 +3565,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: [
       "ib reference dump",
       "ib reference dump keikka",
+      "ib reference dump ai attachment --commands-only",
       "ib reference dump | jq .version",
     ],
   },
@@ -3606,8 +3614,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         type: "string",
         description: "Only commands in this ib domain (e.g. attachment) — narrows BEFORE --stalest, so the budget isn't spent on unrelated commands",
       },
+      {
+        name: "with-detail",
+        type: "boolean",
+        description: "Include each entry's full detail text (adds a `detail` field per item), folding the per-command `reference detail get` into this one call. Needs the backend deployed; on an old backend the field is simply absent.",
+      },
     ],
-    outputShape: "{ items: [{ command, summary, lastReviewed, runs }], count }",
+    outputShape: "{ items: [{ command, summary, lastReviewed, runs, detail? }], count } — `detail` present only with --with-detail",
     errors: [
       { exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" },
       { exit: 4, meaning: "Unknown --domain", remedy: "`ib commands` for valid domains" },
@@ -3616,6 +3629,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ib reference detail list",
       "ib reference detail list --stalest 20",
       "ib reference detail list --stalest 10 --domain attachment",
+      "ib reference detail list --stalest 10 --domain attachment --with-detail",
     ],
   },
   {

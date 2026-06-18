@@ -84,23 +84,27 @@ export function projectGlossaryForPrimer(
 /**
  * Build the reference object. Pure — no I/O — so tests can assert on it
  * directly. Commands are keyed by their full path (e.g. `ib keikka list`),
- * matching what an AI assistant sees from `--help`. When `domain` is given,
- * the commands map is narrowed to that group (the token after `ib`) while the
- * primer (overview/glossary/topics/feedbackGuidance) is kept in full — it is
- * small, high-value context that keeps a filtered dump self-contained.
- * Unknown domain → exit-4 CliError (via assertKnownDomain). At a non-developer
- * tier each surviving spec's prose is run through `scrubSpecForTier` so no
- * cross-reference leaks a hidden command path.
+ * matching what an AI assistant sees from `--help`. When one or more `domain`s
+ * are given, the commands map is narrowed to those groups (the token after
+ * `ib`) while the primer (overview/glossary/topics/feedbackGuidance) is kept in
+ * full — it is small, high-value context that keeps a filtered dump
+ * self-contained, and emitted ONCE no matter how many domains are passed (so
+ * `dump ai attachment` beats two single-domain dumps). Unknown domain → exit-4
+ * CliError (via assertKnownDomain). At a non-developer tier each surviving
+ * spec's prose is run through `scrubSpecForTier` so no cross-reference leaks a
+ * hidden command path.
  */
 export function buildReference(
-  domain?: string,
+  domain?: string | string[],
   tier: CallerTier = "developer",
   glossary: Array<{ term: string; synonyms: string[]; definition: string | null }> = []
 ): ReferenceDump {
   let specs = visibleSpecs(COMMAND_SPECS, tier);
-  if (domain) {
-    assertKnownDomain(COMMAND_SPECS, domain, tier);
-    specs = specs.filter((s) => s.command.split(" ")[1] === domain);
+  const domains = domain == null ? [] : Array.isArray(domain) ? domain : [domain];
+  if (domains.length) {
+    for (const d of domains) assertKnownDomain(COMMAND_SPECS, d, tier);
+    const wanted = new Set(domains);
+    specs = specs.filter((s) => wanted.has(s.command.split(" ")[1]));
   }
   const hiddenCommands = COMMAND_SPECS.filter((s) => isHiddenAtTier(s, tier)).map(
     (s) => s.command
@@ -121,14 +125,26 @@ export function buildReference(
 /**
  * Write the reference dump as SINGLE-LINE JSON to stdout (the CLI's stdout
  * contract: one machine-parseable line). Used by the `ib reference dump`
- * subcommand (optionally narrowed to one `domain`). Pretty-printing was
+ * subcommand (optionally narrowed to one or more `domain`s). Pretty-printing was
  * dropped 2026-06-10: it was ~30% of the dump's bytes (pure indentation) and
  * pushed the customer domain over the 10k-token audit threshold.
+ *
+ * `commandsOnly` strips the primer (overview/glossary/topics/feedbackGuidance)
+ * and emits only `{ version, generatedAt, commands }` — the ~2-3 KB of static
+ * discovery scaffolding is pure overhead for a caller (e.g. the
+ * optimize-ib-summaries cron) that already knows the domain context and just
+ * needs the command specs. The caller also skips the glossary DB fetch in that
+ * mode (no token needed), so this is both fewer bytes and one fewer round-trip.
  */
 export function runReferenceDump(
-  domain?: string,
+  domain?: string | string[],
   tier: CallerTier = "developer",
-  glossary: Array<{ term: string; synonyms: string[]; definition: string | null }> = []
+  glossary: Array<{ term: string; synonyms: string[]; definition: string | null }> = [],
+  commandsOnly = false
 ): void {
-  emitStdout(JSON.stringify(buildReference(domain, tier, glossary)) + "\n");
+  const ref = buildReference(domain, tier, glossary);
+  const out = commandsOnly
+    ? { version: ref.version, generatedAt: ref.generatedAt, commands: ref.commands }
+    : ref;
+  emitStdout(JSON.stringify(out) + "\n");
 }

@@ -197,18 +197,26 @@ export function buildProgram(): Command {
     .command("dump")
     .description("Emit the full command surface as JSON on stdout")
     .argument(
-      "[domain]",
-      "Restrict the commands map to one domain — the token after `ib` (e.g. keikka)"
+      "[domain...]",
+      "Restrict the commands map to one or more domains — the token after `ib` (e.g. keikka). Multiple domains share a single primer."
     )
-    .action(async (domain?: string) => {
+    .option(
+      "--commands-only",
+      "Emit only { version, generatedAt, commands } — drop the overview/glossary/topics/feedbackGuidance primer (and skip the glossary DB fetch)"
+    )
+    .action(async (domains: string[], opts: { commandsOnly?: boolean }) => {
       try {
         let glossary: Array<{ term: string; synonyms: string[]; definition: string | null }> = [];
-        try {
-          const client = await getClient();
-          const res = await runGlossaryList(client, {});
-          glossary = projectGlossaryForPrimer(res.items as Array<Record<string, unknown>>);
-        } catch { glossary = []; }
-        runReferenceDump(domain, getCallerTier(), glossary);
+        // --commands-only drops the primer entirely, so the glossary fetch (the
+        // only network call this command makes) is pure waste — skip it.
+        if (!opts.commandsOnly) {
+          try {
+            const client = await getClient();
+            const res = await runGlossaryList(client, {});
+            glossary = projectGlossaryForPrimer(res.items as Array<Record<string, unknown>>);
+          } catch { glossary = []; }
+        }
+        runReferenceDump(domains, getCallerTier(), glossary, opts.commandsOnly ?? false);
       } catch (e) {
         exitWithError(e);
       }
@@ -245,13 +253,14 @@ export function buildProgram(): Command {
     )
     .option("--stalest <n>", "Return up to N entries sorted by least-recently reviewed", (v: string) => Number(v))
     .option("--domain <d>", "Only commands in this ib domain (e.g. attachment) — narrows BEFORE --stalest")
-    .action(async (opts: { stalest?: number; domain?: string }) => {
+    .option("--with-detail", "Include each entry's full detail text, folding the per-command `reference detail get` into one call (needs the backend deployed)")
+    .action(async (opts: { stalest?: number; domain?: string; withDetail?: boolean }) => {
       try {
         // Validate the domain offline (exit 4 on unknown) before any network call,
         // mirroring `ib commands <domain>`.
         if (opts.domain) assertKnownDomain(COMMAND_SPECS, opts.domain, getCallerTier());
         const client = await getClient();
-        writeJson(await runReferenceDetailList(client, opts.stalest, opts.domain));
+        writeJson(await runReferenceDetailList(client, opts.stalest, opts.domain, opts.withDetail ?? false));
       } catch (e) {
         exitWithError(e);
       }

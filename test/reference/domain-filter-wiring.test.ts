@@ -38,4 +38,16 @@ describe("domain positional wiring", () => {
     // glossary is DB-fetched at runtime; in offline tests it defaults to []
     expect(Array.isArray(ref.glossary)).toBe(true);
   });
+
+  test("ib reference dump <d1> <d2> --commands-only: both groups, no primer", async () => {
+    // --commands-only skips the glossary fetch, so this parses fully offline.
+    const ref = JSON.parse(
+      await runCapture(["reference", "dump", "keikka", "vehicle", "--commands-only"])
+    );
+    expect(Object.keys(ref).sort()).toEqual(["commands", "generatedAt", "version"]);
+    const cmds = Object.keys(ref.commands);
+    expect(cmds.some((c) => c.startsWith("ib keikka"))).toBe(true);
+    expect(cmds.some((c) => c.startsWith("ib vehicle"))).toBe(true);
+    expect(cmds.every((c) => /^ib (keikka|vehicle)\b/.test(c))).toBe(true);
+  });
 });
