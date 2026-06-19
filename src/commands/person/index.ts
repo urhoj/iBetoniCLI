@@ -23,6 +23,7 @@ import {
 } from "../notification/index.js";
 import { CliError } from "../../api/errors.js";
 import { registerPersonDayCommands } from "./day.js";
+import { registerPersonEmailCommands } from "./email.js";
 
 export interface PersonListFilter {
   role?: string;
@@ -399,6 +400,7 @@ export function registerPersonCommands(
 ): void {
   const p = parent.command("person").description("Person commands");
   registerPersonDayCommands(p, getClient);
+  registerPersonEmailCommands(p, getClient);
 
   p.command("list")
     .description("List persons")
