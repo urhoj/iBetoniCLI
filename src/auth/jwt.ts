@@ -15,6 +15,12 @@ export interface DecodedClaims {
   /** From JWT `globalRoles` — used by `ib legal accept` dev-gate. */
   isSystemAdmin: boolean;
   isDeveloper: boolean;
+  /**
+   * True when the ACTIVE company (`ownerAsiakasId`) grants `asiakasAdmin` or
+   * `hrAdmin`. Drives the "admin" visibility tier (e.g. `ib notification fcm`).
+   * False on short/absent tokens (fail-closed to non-admin).
+   */
+  isActiveCompanyAdmin: boolean;
 }
 
 /**
@@ -54,6 +60,19 @@ export function decodeJwtPayload(jwt: string): DecodedClaims {
     return Number.isFinite(n) ? n : undefined;
   };
 
+  // Active-company admin: asiakasesWithTypes carries role NAMES per company;
+  // read the entry for ownerAsiakasId (the active tenant). asiakasAdmin/hrAdmin
+  // mirror canSendCliNotification's gate. Absent/short token → false.
+  const owner = finite(expanded.ownerAsiakasId ?? expanded.o);
+  const companies = Array.isArray(expanded.asiakasesWithTypes)
+    ? (expanded.asiakasesWithTypes as Array<{ asiakasId?: unknown; roles?: unknown }>)
+    : [];
+  const activeRoles = companies
+    .filter((c) => finite(c?.asiakasId) === owner)
+    .flatMap((c) => (Array.isArray(c?.roles) ? (c.roles as unknown[]) : []));
+  const isActiveCompanyAdmin =
+    activeRoles.includes("asiakasAdmin") || activeRoles.includes("hrAdmin");
+
   return {
     personId: finite(expanded.personId ?? expanded.sub),
     ownerAsiakasId: finite(expanded.ownerAsiakasId ?? expanded.o),
@@ -63,5 +82,6 @@ export function decodeJwtPayload(jwt: string): DecodedClaims {
     exp: typeof expanded.exp === "number" ? expanded.exp : undefined,
     isSystemAdmin: globalRoles.isSystemAdmin === true,
     isDeveloper: globalRoles.isDeveloper === true,
+    isActiveCompanyAdmin,
   };
 }

@@ -46,3 +46,32 @@ describe("decodeJwtPayload numeric ids", () => {
     expect(claims.ownerAsiakasId).toBe(10);
   });
 });
+
+function jwt(payload: Record<string, unknown>): string {
+  const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  return `${b64({ alg: "none" })}.${b64(payload)}.sig`;
+}
+
+describe("decodeJwtPayload — isActiveCompanyAdmin", () => {
+  test("asiakasAdmin on the active company → true", () => {
+    const token = jwt({
+      ownerAsiakasId: 8,
+      asiakasesWithTypes: [
+        { asiakasId: 8, roles: ["asiakasAdmin", "keikkaHandler"] },
+        { asiakasId: 9, roles: ["keikkaViewer"] },
+      ],
+    });
+    expect(decodeJwtPayload(token).isActiveCompanyAdmin).toBe(true);
+  });
+  test("hrAdmin on the active company → true", () => {
+    const token = jwt({ ownerAsiakasId: 8, asiakasesWithTypes: [{ asiakasId: 8, roles: ["hrAdmin"] }] });
+    expect(decodeJwtPayload(token).isActiveCompanyAdmin).toBe(true);
+  });
+  test("admin only on a DIFFERENT company → false (active-company scoped)", () => {
+    const token = jwt({ ownerAsiakasId: 8, asiakasesWithTypes: [{ asiakasId: 9, roles: ["asiakasAdmin"] }] });
+    expect(decodeJwtPayload(token).isActiveCompanyAdmin).toBe(false);
+  });
+  test("no asiakasesWithTypes → false (fail-closed)", () => {
+    expect(decodeJwtPayload(jwt({ ownerAsiakasId: 8 })).isActiveCompanyAdmin).toBe(false);
+  });
+});
