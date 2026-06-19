@@ -6251,6 +6251,116 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib person email add matches snapshot 1`] = `
+"USAGE
+  ib person email add <person> <email> [flags]
+
+DESCRIPTION
+  Add an ALTERNATIVE email to a person (the personEmails one-to-many; the primary is managed via \`ib person update\`). Tenant-scoped: self, a person owned by your active company, or any person for developers/sysadmins; global persons only by self/developer. Emails are globally unique. Requires --reason.
+  Permissions: requires auth.page.person.edit.
+
+ARGUMENTS
+  <person> STRING    personId or a name resolved within your active company (required)
+  <email> STRING    alternative email to add (<=250 chars) (required)
+
+FLAGS
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { personId, personEmail, added: boolean } · dry-run: { dryRun:true, wouldAdd:{ personId, personEmail } }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Equals the primary email, or invalid/too-long email → manage the primary via \`ib person update\`; check the address
+  exit 5 (HTTP 404)  Person not found / out of your tenant → verify the person is in your active company (or switch company)
+  exit 4 (HTTP 409)  Email already belongs to another person (globally unique) → use a different address
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.person.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib person email add 5351 matti.alt@example.com --reason 'secondary contact'
+  ib person email add 5351 matti.alt@example.com --reason preview --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person email list matches snapshot 1`] = `
+"USAGE
+  ib person email list <person> [flags]
+
+DESCRIPTION
+  List a person's email addresses — the primary (main:1, person.personEmail) plus any alternatives (main:0, personEmails). Read-only; tenant-scoped to your active company (out-of-scope personId → 404).
+  Permissions: requires auth.page.person.read.
+
+ARGUMENTS
+  <person> STRING    personId or a name resolved within your active company (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ email, main: 0|1 }> (main:1 = primary, main:0 = alternative)
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  Person not found / out of your tenant → verify the person is in your active company (or switch company)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.person.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib person email list 5351
+  ib person email list 'Matti Virtanen'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person email remove matches snapshot 1`] = `
+"USAGE
+  ib person email remove <person> <email> [flags]
+
+DESCRIPTION
+  Remove an ALTERNATIVE email from a person (personEmails only — cannot remove the primary). Idempotent. Tenant-scoped like \`ib person email add\`. Requires --reason.
+  Permissions: requires auth.page.person.edit.
+
+ARGUMENTS
+  <person> STRING    personId or a name resolved within your active company (required)
+  <email> STRING    alternative email to remove (required)
+
+FLAGS
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  backend delete result · dry-run: { dryRun:true, wouldDelete:{ personId, personEmail } }
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  Person not found / out of your tenant → verify the person is in your active company (or switch company)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.person.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib person email remove 5351 matti.alt@example.com --reason 'no longer valid'
+  ib person email remove 5351 matti.alt@example.com --reason preview --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib person get matches snapshot 1`] = `
 "USAGE
   ib person get <personId> [flags]
