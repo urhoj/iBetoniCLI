@@ -36,6 +36,21 @@ describe("resolveCallerTier", () => {
   test("malformed token → standard (fail-closed)", () => {
     expect(resolveCallerTier("not-a-jwt")).toBe("standard");
   });
+  test("active-company admin (no global role) → admin", () => {
+    const token = jwt({
+      ownerAsiakasId: 8,
+      asiakasesWithTypes: [{ asiakasId: 8, roles: ["asiakasAdmin"] }],
+    });
+    expect(resolveCallerTier(token)).toBe("admin");
+  });
+  test("developer outranks admin", () => {
+    const token = jwt({
+      globalRoles: { isDeveloper: true },
+      ownerAsiakasId: 8,
+      asiakasesWithTypes: [{ asiakasId: 8, roles: ["asiakasAdmin"] }],
+    });
+    expect(resolveCallerTier(token)).toBe("developer");
+  });
 });
 
 describe("isHiddenAtTier / visibleSpecs", () => {
@@ -70,5 +85,26 @@ describe("ambient tier holder", () => {
   test("set/get round-trips", () => {
     setCallerTier("standard");
     expect(getCallerTier()).toBe("standard");
+  });
+});
+
+describe("ladder ranking", () => {
+  const specs = [
+    { command: "ib dev", tier: "developer" as const },
+    { command: "ib adm", tier: "admin" as const },
+    { command: "ib open" },
+  ];
+  test("standard sees only untagged", () => {
+    expect(visibleSpecs(specs, "standard").map((s) => s.command)).toEqual(["ib open"]);
+  });
+  test("admin sees admin + untagged, not developer", () => {
+    expect(visibleSpecs(specs, "admin").map((s) => s.command)).toEqual(["ib adm", "ib open"]);
+  });
+  test("developer sees everything", () => {
+    expect(visibleSpecs(specs, "developer")).toHaveLength(3);
+  });
+  test("admin leaf hidden from standard, visible to admin", () => {
+    expect(isHiddenAtTier(specs[1], "standard")).toBe(true);
+    expect(isHiddenAtTier(specs[1], "admin")).toBe(false);
   });
 });

@@ -15,32 +15,34 @@
  */
 import { decodeJwtPayload } from "./auth/jwt.js";
 
-export type CallerTier = "developer" | "standard";
+export type CallerTier = "developer" | "admin" | "standard";
+/** What a CommandSpec.tier may declare. A caller is never "tagged"; only commands are. */
+export type SpecTier = "admin" | "developer";
 
-/** Stateless: map a JWT (or none) to a visibility tier. Fail-closed on missing/bad/malformed token. */
+const CALLER_RANK: Record<CallerTier, number> = { standard: 0, admin: 1, developer: 2 };
+const specRank = (tier: SpecTier | undefined): number =>
+  tier === "developer" ? 2 : tier === "admin" ? 1 : 0;
+
+/** Stateless: map a JWT (or none) to a visibility tier. Fail-closed on missing/bad token. */
 export function resolveCallerTier(token: string | null | undefined): CallerTier {
   if (!token) return "standard";
   try {
     const claims = decodeJwtPayload(token);
-    return claims.isDeveloper || claims.isSystemAdmin ? "developer" : "standard";
+    if (claims.isDeveloper || claims.isSystemAdmin) return "developer";
+    if (claims.isActiveCompanyAdmin) return "admin";
+    return "standard";
   } catch {
     return "standard";
   }
 }
 
-/** A developer-tier command is hidden from any non-developer caller. */
-export function isHiddenAtTier(
-  spec: { tier?: "developer" },
-  tier: CallerTier
-): boolean {
-  return spec.tier === "developer" && tier !== "developer";
+/** A command is hidden when its required tier outranks the caller's tier. */
+export function isHiddenAtTier(spec: { tier?: SpecTier }, tier: CallerTier): boolean {
+  return specRank(spec.tier) > CALLER_RANK[tier];
 }
 
 /** Keep only the specs visible at `tier`. */
-export function visibleSpecs<T extends { tier?: "developer" }>(
-  specs: T[],
-  tier: CallerTier
-): T[] {
+export function visibleSpecs<T extends { tier?: SpecTier }>(specs: T[], tier: CallerTier): T[] {
   return specs.filter((s) => !isHiddenAtTier(s, tier));
 }
 
@@ -56,7 +58,7 @@ export function domainOf(command: string): string {
  * the root-help command filter (`fullyHiddenDomains`) and the domain index
  * builder in `commandsList.ts`.
  */
-export function hiddenDomainsAtTier<T extends { command: string; tier?: "developer" }>(
+export function hiddenDomainsAtTier<T extends { command: string; tier?: SpecTier }>(
   specs: T[],
   tier: CallerTier
 ): Set<string> {
