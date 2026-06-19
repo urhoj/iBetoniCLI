@@ -71,7 +71,8 @@ export function decodeJwtPayload(jwt: string): DecodedClaims {
     .filter((c) => finite(c?.asiakasId) === owner)
     .flatMap((c) => (Array.isArray(c?.roles) ? (c.roles as unknown[]) : []));
   const isActiveCompanyAdmin =
-    activeRoles.includes("asiakasAdmin") || activeRoles.includes("hrAdmin");
+    owner !== undefined &&
+    (activeRoles.includes("asiakasAdmin") || activeRoles.includes("hrAdmin"));
 
   return {
     personId: finite(expanded.personId ?? expanded.sub),

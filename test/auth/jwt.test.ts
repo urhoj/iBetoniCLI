@@ -74,4 +74,8 @@ describe("decodeJwtPayload — isActiveCompanyAdmin", () => {
   test("no asiakasesWithTypes → false (fail-closed)", () => {
     expect(decodeJwtPayload(jwt({ ownerAsiakasId: 8 })).isActiveCompanyAdmin).toBe(false);
   });
+  test("no ownerAsiakasId + entry without asiakasId → false (fail-closed guard)", () => {
+    const token = jwt({ asiakasesWithTypes: [{ roles: ["asiakasAdmin"] }] });
+    expect(decodeJwtPayload(token).isActiveCompanyAdmin).toBe(false);
+  });
 });
