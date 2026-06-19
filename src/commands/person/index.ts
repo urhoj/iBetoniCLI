@@ -17,6 +17,10 @@ import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { roleNameForTypeId, resolveRoleTypeId, explainRole } from "../../roles.js";
 import { parseId, parseOptionalId } from "../../targets.js";
 import { runCompanyList } from "../company/index.js";
+import {
+  runNotificationFcmSend,
+  parseJsonObject,
+} from "../notification/index.js";
 import { CliError } from "../../api/errors.js";
 import { registerPersonDayCommands } from "./day.js";
 
@@ -463,6 +467,46 @@ export function registerPersonCommands(
         }
       }
     );
+
+  const notifyCmd = p
+    .command("notify <person>")
+    .description(
+      "Send an FCM push to a person (alias for `ib notification fcm send --person`). " +
+        "Admin/HR only. <person> is a personId or a name resolved within your company. " +
+        "--dry-run previews recipient + device count."
+    )
+    .requiredOption("--title <text>", "Notification title")
+    .requiredOption("--body <text>", "Notification body")
+    .option(
+      "--data <json>",
+      "Extra FCM data payload as a JSON object",
+      parseJsonObject
+    );
+  addWriteFlagsToCommand(notifyCmd).action(
+    async (
+      person: string,
+      opts: WriteFlags & {
+        title: string;
+        body: string;
+        data?: Record<string, unknown>;
+      }
+    ) => {
+      try {
+        const result = await runNotificationFcmSend(
+          await getClient(),
+          { person, title: opts.title, body: opts.body, data: opts.data },
+          {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+          }
+        );
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
 
   const createCmd = p
     .command("create")

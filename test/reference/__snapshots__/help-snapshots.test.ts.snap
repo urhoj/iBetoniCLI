@@ -5692,6 +5692,53 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib notification fcm send matches snapshot 1`] = `
+"USAGE
+  ib notification fcm send [flags]
+
+DESCRIPTION
+  Send an FCM push notification to one person's registered devices. Admin/HR-gated server-side; the recipient is scoped to your company (a cross-tenant personId returns 404, not a push). --dry-run previews the recipient + active device count without sending.
+  Permissions: requires company admin (isAsiakasAdmin) or HR admin (isHRAdmin) on the active company, or global sysadmin (server-enforced).
+
+FLAGS
+  --person STRING    Recipient personId, or a name resolved within your company (required)
+  --title STRING    Notification title (required)
+  --body STRING    Notification body (required)
+  --data STRING    Extra FCM data payload as a JSON object (e.g. '{"url":"/grid"}')
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success, messageUuid, personId, name, devicesTargeted, successCount, failureCount, activeDeviceCount } | { dryRun:true, wouldSend:{ personId, name, title, body, deviceCount } } (with --dry-run)
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Missing/invalid field (no --title/--body, bad --person, ambiguous name, non-object --data) → supply --title/--body and an unambiguous --person
+  exit 3 (HTTP 403)  Not Admin/HR on the active company → switch to a company where you are admin/HR (ib company switch)
+  exit 5 (HTTP 404)  Recipient not found in your company → check the personId / name belongs to your company
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Requires company admin (isAsiakasAdmin) or HR admin (isHRAdmin) on the active company, or a global sysadmin.
+  - A non-numeric --person is resolved via the company-scoped person search: 0 matches → exit 5, >1 → exit 4 listing candidates (re-run with the personId).
+  - Returns success:false (HTTP 400) when the person has no registered devices ('Ei rekisteröityjä laitteita').
+  - Deploy-gated: 404 until puminet5api ships /api/cli/notification/*.
+
+SEE ALSO
+  ib person notify, ib person search
+
+EXAMPLES
+  ib notification fcm send --person 6233 --title 'Keikka siirretty' --body 'Huomisen keikka alkaa klo 8'
+  ib notification fcm send --person 'Juha Urho' --title Muistutus --body 'Tarkista aikataulu' --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib ohje get matches snapshot 1`] = `
 "USAGE
   ib ohje get <helpId> [flags]
@@ -6325,6 +6372,52 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib person me
   ib person me --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib person notify matches snapshot 1`] = `
+"USAGE
+  ib person notify <person> [flags]
+
+DESCRIPTION
+  Send an FCM push to a person — ergonomic alias for \`ib notification fcm send --person <person>\`. Admin/HR-gated. <person> is a personId or a name resolved within your company. --dry-run previews recipient + device count.
+  Permissions: requires company admin (isAsiakasAdmin) or HR admin (isHRAdmin) on the active company, or global sysadmin (server-enforced).
+
+ARGUMENTS
+  <person> STRING    Recipient personId, or a name resolved within your company (required)
+
+FLAGS
+  --title STRING    Notification title (required)
+  --body STRING    Notification body (required)
+  --data STRING    Extra FCM data payload as a JSON object
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  Same as \`ib notification fcm send\` (delegates to it).
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Missing/invalid field (no --title/--body, ambiguous name, non-object --data) → supply --title/--body and an unambiguous person
+  exit 3 (HTTP 403)  Not Admin/HR on the active company → switch to a company where you are admin/HR
+  exit 5 (HTTP 404)  Recipient not found in your company → check the personId / name
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Thin alias — same gate, name resolution, and output as \`ib notification fcm send\`. Deploy-gated.
+
+SEE ALSO
+  ib notification fcm send
+
+EXAMPLES
+  ib person notify 6233 --title 'Keikka siirretty' --body 'Alkaa klo 8'
+  ib person notify 'Juha Urho' --title Muistutus --body Tarkista --dry-run
 "
 `;
 

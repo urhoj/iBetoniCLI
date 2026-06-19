@@ -1838,6 +1838,68 @@ const BASE_COMMAND_SPECS = [
         seeAlso: ["ib driver assign", "ib driver who"],
         examples: ["ib driver clear --vehicle 53 --date today --reason 'sick leave'"],
     },
+    // ─── notification (2) ─────────────────────────────────────────────────────
+    {
+        command: "ib notification fcm send",
+        description: "Send an FCM push notification to one person's registered devices. Admin/HR-gated server-side; the recipient is scoped to your company (a cross-tenant personId returns 404, not a push). --dry-run previews the recipient + active device count without sending.",
+        permissions: [
+            "company admin (isAsiakasAdmin) or HR admin (isHRAdmin) on the active company, or global sysadmin (server-enforced)",
+        ],
+        flags: [
+            { name: "person", type: "string", description: "Recipient personId, or a name resolved within your company", required: true },
+            { name: "title", type: "string", description: "Notification title", required: true },
+            { name: "body", type: "string", description: "Notification body", required: true },
+            { name: "data", type: "string", description: "Extra FCM data payload as a JSON object (e.g. '{\"url\":\"/grid\"}')" },
+        ],
+        writeFlags: true,
+        outputShape: "{ success, messageUuid, personId, name, devicesTargeted, successCount, failureCount, activeDeviceCount } | { dryRun:true, wouldSend:{ personId, name, title, body, deviceCount } } (with --dry-run)",
+        errors: [
+            apiErr(400, "Missing/invalid field (no --title/--body, bad --person, ambiguous name, non-object --data)", "supply --title/--body and an unambiguous --person"),
+            apiErr(403, "Not Admin/HR on the active company", "switch to a company where you are admin/HR (ib company switch)"),
+            apiErr(404, "Recipient not found in your company", "check the personId / name belongs to your company"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        notes: [
+            "Requires company admin (isAsiakasAdmin) or HR admin (isHRAdmin) on the active company, or a global sysadmin.",
+            "A non-numeric --person is resolved via the company-scoped person search: 0 matches → exit 5, >1 → exit 4 listing candidates (re-run with the personId).",
+            "Returns success:false (HTTP 400) when the person has no registered devices ('Ei rekisteröityjä laitteita').",
+            "Deploy-gated: 404 until puminet5api ships /api/cli/notification/*.",
+        ],
+        seeAlso: ["ib person notify", "ib person search"],
+        examples: [
+            "ib notification fcm send --person 6233 --title 'Keikka siirretty' --body 'Huomisen keikka alkaa klo 8'",
+            "ib notification fcm send --person 'Juha Urho' --title Muistutus --body 'Tarkista aikataulu' --dry-run",
+        ],
+    },
+    {
+        command: "ib person notify",
+        description: "Send an FCM push to a person — ergonomic alias for `ib notification fcm send --person <person>`. Admin/HR-gated. <person> is a personId or a name resolved within your company. --dry-run previews recipient + device count.",
+        permissions: [
+            "company admin (isAsiakasAdmin) or HR admin (isHRAdmin) on the active company, or global sysadmin (server-enforced)",
+        ],
+        args: [
+            { name: "person", type: "string", description: "Recipient personId, or a name resolved within your company" },
+        ],
+        flags: [
+            { name: "title", type: "string", description: "Notification title", required: true },
+            { name: "body", type: "string", description: "Notification body", required: true },
+            { name: "data", type: "string", description: "Extra FCM data payload as a JSON object" },
+        ],
+        writeFlags: true,
+        outputShape: "Same as `ib notification fcm send` (delegates to it).",
+        errors: [
+            apiErr(400, "Missing/invalid field (no --title/--body, ambiguous name, non-object --data)", "supply --title/--body and an unambiguous person"),
+            apiErr(403, "Not Admin/HR on the active company", "switch to a company where you are admin/HR"),
+            apiErr(404, "Recipient not found in your company", "check the personId / name"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        notes: ["Thin alias — same gate, name resolution, and output as `ib notification fcm send`. Deploy-gated."],
+        seeAlso: ["ib notification fcm send"],
+        examples: [
+            "ib person notify 6233 --title 'Keikka siirretty' --body 'Alkaa klo 8'",
+            "ib person notify 'Juha Urho' --title Muistutus --body Tarkista --dry-run",
+        ],
+    },
     // ─── sijainti (12) ───────────────────────────────────────────────────────
     {
         command: "ib sijainti list",

@@ -20,6 +20,7 @@ import { registerWorksiteCommands } from "./commands/worksite/index.js";
 import { registerPersonCommands } from "./commands/person/index.js";
 import { registerVehicleCommands } from "./commands/vehicle/index.js";
 import { registerDriverCommands } from "./commands/driver/index.js";
+import { registerNotificationCommands } from "./commands/notification/index.js";
 import { registerSijaintiCommands } from "./commands/sijainti/index.js";
 import { registerOhjeCommands } from "./commands/ohje/index.js";
 import { registerLegalCommands } from "./commands/legal/index.js";
@@ -164,6 +165,7 @@ export function buildProgram(): Command {
   registerPersonCommands(program, getClient, getClientForAsiakas);
   registerVehicleCommands(program, getClient);
   registerDriverCommands(program, getClient);
+  registerNotificationCommands(program, getClient);
   registerSijaintiCommands(program, getClient);
   registerOhjeCommands(program, getClient);
   registerLegalCommands(program, getClient);
