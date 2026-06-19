@@ -1853,9 +1853,9 @@ const BASE_COMMAND_SPECS = [
             { name: "data", type: "string", description: "Extra FCM data payload as a JSON object (e.g. '{\"url\":\"/grid\"}')" },
         ],
         writeFlags: true,
-        outputShape: "{ success, messageUuid, personId, name, devicesTargeted, successCount, failureCount, activeDeviceCount } | { dryRun:true, wouldSend:{ personId, name, title, body, deviceCount } } (with --dry-run)",
+        outputShape: "{ success, reason:'SENT'|'NO_DEVICES'|'DELIVERY_FAILED', personId, name, devicesTargeted, messageUuid?, successCount?, failureCount?, hint? } | { dryRun:true, wouldSend:{ personId, name, title, body, deviceCount } } (with --dry-run)",
         errors: [
-            apiErr(400, "Missing/invalid field (no --title/--body, bad --person, ambiguous name, non-object --data)", "supply --title/--body and an unambiguous --person"),
+            apiErr(400, "Invalid request: missing --title/--body, bad --person, ambiguous name, or non-object --data (NOT 'no devices' — that is a 200, see notes)", "supply --title/--body and an unambiguous --person"),
             apiErr(403, "Not Admin/HR on the active company", "switch to a company where you are admin/HR (ib company switch)"),
             apiErr(404, "Recipient not found in your company", "check the personId / name belongs to your company"),
             ...COMMON_AUTH_ERRORS,
@@ -1863,8 +1863,7 @@ const BASE_COMMAND_SPECS = [
         notes: [
             "Requires company admin (isAsiakasAdmin) or HR admin (isHRAdmin) on the active company, or a global sysadmin.",
             "A non-numeric --person is resolved via the company-scoped person search: 0 matches → exit 5, >1 → exit 4 listing candidates (re-run with the personId).",
-            "Returns success:false (HTTP 400) when the person has no registered devices ('Ei rekisteröityjä laitteita').",
-            "Deploy-gated: 404 until puminet5api ships /api/cli/notification/*.",
+            "The send OUTCOME is reported at HTTP 200 (exit 0) via `reason` — NOT as an error: SENT, NO_DEVICES (the person has no registered FCM device — a benign no-op), or DELIVERY_FAILED (all devices failed). Inspect `success`/`reason`/`hint`, not the exit code; a 4xx means the REQUEST was bad (validation/permission/recipient), not that delivery failed.",
         ],
         seeAlso: ["ib person notify", "ib person search"],
         examples: [
