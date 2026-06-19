@@ -1842,6 +1842,7 @@ const BASE_COMMAND_SPECS = [
     {
         command: "ib notification fcm send",
         description: "Send an FCM push notification to one person's registered devices. Admin/HR-gated server-side; the recipient is scoped to your company (a cross-tenant personId returns 404, not a push). --dry-run previews the recipient + active device count without sending.",
+        tier: "admin",
         permissions: [
             "company admin (isAsiakasAdmin) or HR admin (isHRAdmin) on the active company, or global sysadmin (server-enforced)",
         ],
@@ -1874,6 +1875,7 @@ const BASE_COMMAND_SPECS = [
     {
         command: "ib person notify",
         description: "Send an FCM push to a person — ergonomic alias for `ib notification fcm send --person <person>`. Admin/HR-gated. <person> is a personId or a name resolved within your company. --dry-run previews recipient + device count.",
+        tier: "admin",
         permissions: [
             "company admin (isAsiakasAdmin) or HR admin (isHRAdmin) on the active company, or global sysadmin (server-enforced)",
         ],

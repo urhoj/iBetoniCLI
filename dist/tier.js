@@ -14,21 +14,27 @@
  * the real per-caller tier is always set before argv is parsed.
  */
 import { decodeJwtPayload } from "./auth/jwt.js";
-/** Stateless: map a JWT (or none) to a visibility tier. Fail-closed on missing/bad/malformed token. */
+const CALLER_RANK = { standard: 0, admin: 1, developer: 2 };
+const specRank = (tier) => tier === "developer" ? 2 : tier === "admin" ? 1 : 0;
+/** Stateless: map a JWT (or none) to a visibility tier. Fail-closed on missing/bad token. */
 export function resolveCallerTier(token) {
     if (!token)
         return "standard";
     try {
         const claims = decodeJwtPayload(token);
-        return claims.isDeveloper || claims.isSystemAdmin ? "developer" : "standard";
+        if (claims.isDeveloper || claims.isSystemAdmin)
+            return "developer";
+        if (claims.isActiveCompanyAdmin)
+            return "admin";
+        return "standard";
     }
     catch {
         return "standard";
     }
 }
-/** A developer-tier command is hidden from any non-developer caller. */
+/** A command is hidden when its required tier outranks the caller's tier. */
 export function isHiddenAtTier(spec, tier) {
-    return spec.tier === "developer" && tier !== "developer";
+    return specRank(spec.tier) > CALLER_RANK[tier];
 }
 /** Keep only the specs visible at `tier`. */
 export function visibleSpecs(specs, tier) {

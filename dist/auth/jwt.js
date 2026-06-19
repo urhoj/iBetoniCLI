@@ -33,6 +33,18 @@ export function decodeJwtPayload(jwt) {
         const n = Number(v);
         return Number.isFinite(n) ? n : undefined;
     };
+    // Active-company admin: asiakasesWithTypes carries role NAMES per company;
+    // read the entry for ownerAsiakasId (the active tenant). asiakasAdmin/hrAdmin
+    // mirror canSendCliNotification's gate. Absent/short token → false.
+    const owner = finite(expanded.ownerAsiakasId ?? expanded.o);
+    const companies = Array.isArray(expanded.asiakasesWithTypes)
+        ? expanded.asiakasesWithTypes
+        : [];
+    const activeRoles = companies
+        .filter((c) => finite(c?.asiakasId) === owner)
+        .flatMap((c) => (Array.isArray(c?.roles) ? c.roles : []));
+    const isActiveCompanyAdmin = owner !== undefined &&
+        (activeRoles.includes("asiakasAdmin") || activeRoles.includes("hrAdmin"));
     return {
         personId: finite(expanded.personId ?? expanded.sub),
         ownerAsiakasId: finite(expanded.ownerAsiakasId ?? expanded.o),
@@ -42,6 +54,7 @@ export function decodeJwtPayload(jwt) {
         exp: typeof expanded.exp === "number" ? expanded.exp : undefined,
         isSystemAdmin: globalRoles.isSystemAdmin === true,
         isDeveloper: globalRoles.isDeveloper === true,
+        isActiveCompanyAdmin,
     };
 }
 //# sourceMappingURL=jwt.js.map
