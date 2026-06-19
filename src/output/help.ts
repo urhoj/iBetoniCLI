@@ -72,16 +72,12 @@ export interface CommandSpec {
    */
   auth?: "none" | "any";
   /**
-   * Minimum GLOBAL role tier required to even SEE this command in discovery
-   * (`ib commands`, group/leaf `--help`, `ib reference dump`). Absent = visible
-   * to everyone (default; the server still enforces real permissions).
-   * `"developer"` = needs a global isDeveloper/isSystemAdmin token; eligible to
-   * be hidden from non-developer / tokenless callers. Per-tenant company-admin
-   * commands stay ABSENT (a non-developer admin legitimately runs them). The
-   * `permissions[]` prose remains the human-readable detail; `tier` is purely
-   * the machine-readable visibility gate. See `src/tier.ts`.
+   * Minimum tier required to SEE this command in discovery (not what can run it —
+   * the server enforces real permissions). `"developer"` → global dev/sysadmin only;
+   * `"admin"` → active-company admin/HR (or higher); absent → visible to everyone.
+   * Machine-readable visibility gate; see `src/tier.ts` (`SpecTier`).
    */
-  tier?: "developer";
+  tier?: "admin" | "developer";
   /** Positional arguments rendered in USAGE and the ARGUMENTS section. */
   args?: CommandArg[];
   /** Command-specific flags rendered in the FLAGS section. */
