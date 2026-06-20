@@ -3159,6 +3159,22 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib jerry request cancel",
+    description:
+      "Cancel your OWN pump request (customer-side) — allowed only while no live offer exists (POST /api/pumppuRequests/:id/cancel). Sets status='cancelled'. Requires --reason.",
+    args: [{ name: "requestId", type: "number", description: "pumppuRequestId you own" }],
+    flags: [{ name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" }],
+    writeFlags: true,
+    outputShape:
+      "{ success: true, status: 'cancelled' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
+    errors: [
+      apiErr(404, "Request not found / not yours", "verify the requestId and that you own it"),
+      apiErr(409, "Already has offers", "cannot cancel once an offer arrived"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ['ib jerry request cancel 88 --reason "tilaus peruuntui"'],
+  },
+  {
     command: "ib jerry offer create",
     description:
       "Create or update (upsert) YOUR offer on a request (POST /api/pumppuRequests/:id/offers). Provider company only (isPumppuToimittaja). A new offer starts as 'draft' (invisible to the customer) — make it visible with `ib jerry offer send`. Re-running while the offer is still draft/pending edits it in place; once accepted/rejected/withdrawn it is final (409). --price-cents is the canonical price (integer cents, 1..99999900) matching exactly what the API stores; --maintains-order-info (true|false) overrides the provider default for this offer only (omit to inherit). Requires --reason.",

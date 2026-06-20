@@ -200,6 +200,20 @@ export interface JerryRequestCreateBody {
 }
 
 /**
+ * Cancel the caller's OWN request (customer-side; POST /api/pumppuRequests/:id/cancel).
+ * Allowed only while no live offer exists (server enforces). Sets status 'cancelled'.
+ */
+export async function runJerryRequestCancel(
+  client: ApiClient,
+  id: number,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>(`/api/pumppuRequests/${id}/cancel`, {}, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/**
  * Create a customer pump request / tarjouspyyntö (POST /api/pumppuRequests).
  * CUSTOMER side — distinct from `runJerryOfferCreate` (the provider bid). The
  * backend geocodes `osoite` and inserts the request as status:'open', visible
@@ -490,6 +504,20 @@ export function registerJerryCommands(
       }
     }
   );
+
+  addWriteFlagsToCommand(
+    request
+      .command("cancel <requestId>")
+      .description("Cancel your OWN request (customer) — only while no offers received. Requires --reason.")
+  ).action(async (idStr: string, opts: WriteOpts) => {
+    requireReason(opts);
+    try {
+      const client = await getClient();
+      writeJson(await runJerryRequestCancel(client, parseId(idStr, "requestId"), opts));
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
 
   // offer ──────────────────────────────────────────────────────────────────────
   const offer = j.command("offer").description("Act on offers (create/send/accept/confirm)");

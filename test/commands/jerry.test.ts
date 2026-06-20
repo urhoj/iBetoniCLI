@@ -4,6 +4,7 @@ import {
   runJerryRequestGet,
   runJerryRequestOffers,
   runJerryRequestCreate,
+  runJerryRequestCancel,
   runJerryCounts,
   runJerryCheckAddress,
   runJerryProviderSettingsGet,
@@ -18,6 +19,7 @@ import {
   runJerryOfferConfirm,
 } from "../../src/commands/jerry/index.js";
 import type { ApiClient } from "../../src/api/client.js";
+import type { WriteFlags } from "../../src/api/writeFlags.js";
 
 const mockClient = {
   get: vi.fn(),
@@ -350,5 +352,18 @@ describe("ib jerry offer", () => {
       { scheduledAt: "2026-06-15T08:00:00Z", pumppuId: 7 },
       { headers: { "X-Action-Reason": "confirm" } }
     );
+  });
+});
+
+describe("ib jerry request cancel", () => {
+  test("request cancel posts to /:id/cancel with write headers", async () => {
+    post.mockResolvedValueOnce({ success: true, status: "cancelled" });
+    const result = await runJerryRequestCancel(mockClient, 88, { reason: "peruttu" } as WriteFlags);
+    expect(post).toHaveBeenCalledWith(
+      "/api/pumppuRequests/88/cancel",
+      {},
+      expect.objectContaining({ headers: expect.any(Object) })
+    );
+    expect(result).toEqual({ success: true, status: "cancelled" });
   });
 });
