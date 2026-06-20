@@ -421,6 +421,34 @@ export async function runJerryAdminRequestOffers(
   return toEnvelope(await client.get<unknown>(`/api/admin/jerry-requests/${id}/offers`));
 }
 
+// ─── admin request write commands ────────────────────────────────────────────
+
+/**
+ * Factory for admin request status-transition commands (expire/cancel/resend).
+ * POSTs to /api/admin/jerry-requests/:id/:action with write-safety headers.
+ */
+const adminReqWrite = (action: string) =>
+  (client: ApiClient, id: number, flags: WriteFlags): Promise<unknown> =>
+    client.post<unknown>(`/api/admin/jerry-requests/${id}/${action}`, {}, { headers: writeFlagsToHeaders(flags) });
+
+/** Force-expire an open/no_supply/pending_verification request (POST /api/admin/jerry-requests/:id/expire). System-admin only. */
+export const runJerryAdminRequestExpire = adminReqWrite("expire");
+
+/** Cancel any request as admin (POST /api/admin/jerry-requests/:id/cancel). System-admin only. */
+export const runJerryAdminRequestCancel = adminReqWrite("cancel");
+
+/** Re-run provider fan-out for a request (POST /api/admin/jerry-requests/:id/resend). System-admin only. */
+export const runJerryAdminRequestResend = adminReqWrite("resend");
+
+/** Delete a draft request (admin; DELETE /api/admin/jerry-requests/:id). System-admin only. */
+export async function runJerryAdminRequestDelete(
+  client: ApiClient,
+  id: number,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.delete<unknown>(`/api/admin/jerry-requests/${id}`, { headers: writeFlagsToHeaders(flags) });
+}
+
 // ─── registration ────────────────────────────────────────────────────────────
 
 type WriteOpts = WriteFlags;
@@ -879,4 +907,19 @@ export function registerJerryCommands(
         exitWithError(e);
       }
     });
+
+  const adminReqAction = (name: string, desc: string, run: (c: ApiClient, id: number, f: WriteOpts) => Promise<unknown>) =>
+    addWriteFlagsToCommand(admin.command(`${name} <requestId>`).description(desc))
+      .action(async (idStr: string, opts: WriteOpts) => {
+        requireReason(opts);
+        try {
+          const client = await getClient();
+          writeJson(await run(client, parseId(idStr, "requestId"), opts));
+        } catch (e) { exitWithError(e); }
+      });
+
+  adminReqAction("request-expire", "Force-expire a request (admin). Requires --reason.", runJerryAdminRequestExpire);
+  adminReqAction("request-cancel", "Cancel any request (admin). Requires --reason.", runJerryAdminRequestCancel);
+  adminReqAction("request-resend", "Re-run provider fan-out for a request (admin). Requires --reason.", runJerryAdminRequestResend);
+  adminReqAction("request-delete", "Delete a draft request (admin). Requires --reason.", runJerryAdminRequestDelete);
 }

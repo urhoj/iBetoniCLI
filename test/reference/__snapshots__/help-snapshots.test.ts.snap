@@ -3140,6 +3140,115 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib jerry admin request-cancel matches snapshot 1`] = `
+"USAGE
+  ib jerry admin request-cancel <requestId> [flags]
+
+DESCRIPTION
+  Cancel any request regardless of state (POST /api/admin/jerry-requests/:id/cancel). status → cancelled. System-admin only. Requires --reason.
+  Permissions: requires isSystemAdmin.
+
+ARGUMENTS
+  <requestId> NUMBER    pumppuRequestId (required)
+
+FLAGS
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success: true, status: 'cancelled' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
+  exit 4 (HTTP 409)  Wrong state            → request not in a cancellable state
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry admin request-cancel 41 --reason "customer request"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry admin request-delete matches snapshot 1`] = `
+"USAGE
+  ib jerry admin request-delete <requestId> [flags]
+
+DESCRIPTION
+  Delete a draft request permanently (DELETE /api/admin/jerry-requests/:id). Only draft/cancelled requests may be deleted. System-admin only. Requires --reason.
+  Permissions: requires isSystemAdmin.
+
+ARGUMENTS
+  <requestId> NUMBER    pumppuRequestId (required)
+
+FLAGS
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success: true } or { dryRun: true, wouldDelete: { pumppuRequestId } }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
+  exit 5 (HTTP 404)  Request not found      → verify pumppuRequestId
+  exit 4 (HTTP 409)  Wrong state            → only draft/cancelled requests may be deleted
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry admin request-delete 41 --reason "cleanup draft"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry admin request-expire matches snapshot 1`] = `
+"USAGE
+  ib jerry admin request-expire <requestId> [flags]
+
+DESCRIPTION
+  Force-expire an open/no_supply/pending_verification request (POST /api/admin/jerry-requests/:id/expire). status → expired. System-admin only. Requires --reason.
+  Permissions: requires isSystemAdmin.
+
+ARGUMENTS
+  <requestId> NUMBER    pumppuRequestId (required)
+
+FLAGS
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success: true, status: 'expired' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
+  exit 4 (HTTP 409)  Wrong state            → request not in an expirable state
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry admin request-expire 41 --reason "abandoned"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib jerry admin request-offers matches snapshot 1`] = `
 "USAGE
   ib jerry admin request-offers <requestId> [flags]
@@ -3168,6 +3277,42 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib jerry admin request-offers 41
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry admin request-resend matches snapshot 1`] = `
+"USAGE
+  ib jerry admin request-resend <requestId> [flags]
+
+DESCRIPTION
+  Re-run provider fan-out for a request (POST /api/admin/jerry-requests/:id/resend). Re-notifies eligible providers. System-admin only. Requires --reason.
+  Permissions: requires isSystemAdmin.
+
+ARGUMENTS
+  <requestId> NUMBER    pumppuRequestId (required)
+
+FLAGS
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success: true, sentCount } or { dryRun: true, wouldUpdate: { pumppuRequestId, action: 'resend' } }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
+  exit 4 (HTTP 409)  Wrong state            → request not in a resendable state
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry admin request-resend 41 --reason "retry fanout"
 "
 `;
 

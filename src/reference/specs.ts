@@ -3515,6 +3515,63 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     errors: [apiErr(400, "Invalid id", "pass a numeric requestId"), apiErr(403, "Not a system admin", "use a system-admin token"), ...COMMON_AUTH_ERRORS],
     examples: ["ib jerry admin request-offers 41"],
   },
+  {
+    command: "ib jerry admin request-expire",
+    description:
+      "Force-expire an open/no_supply/pending_verification request (POST /api/admin/jerry-requests/:id/expire). status → expired. System-admin only. Requires --reason.",
+    permissions: ["isSystemAdmin"],
+    tier: "developer",
+    args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
+    flags: [{ name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" }],
+    writeFlags: true,
+    outputShape: "{ success: true, status: 'expired' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
+    errors: [apiErr(403, "Not a system admin", "use a system-admin token"), apiErr(409, "Wrong state", "request not in an expirable state"), ...COMMON_AUTH_ERRORS],
+    examples: ['ib jerry admin request-expire 41 --reason "abandoned"'],
+  },
+  {
+    command: "ib jerry admin request-cancel",
+    description:
+      "Cancel any request regardless of state (POST /api/admin/jerry-requests/:id/cancel). status → cancelled. System-admin only. Requires --reason.",
+    permissions: ["isSystemAdmin"],
+    tier: "developer",
+    args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
+    flags: [{ name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" }],
+    writeFlags: true,
+    outputShape: "{ success: true, status: 'cancelled' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
+    errors: [apiErr(403, "Not a system admin", "use a system-admin token"), apiErr(409, "Wrong state", "request not in a cancellable state"), ...COMMON_AUTH_ERRORS],
+    examples: ['ib jerry admin request-cancel 41 --reason "customer request"'],
+  },
+  {
+    command: "ib jerry admin request-resend",
+    description:
+      "Re-run provider fan-out for a request (POST /api/admin/jerry-requests/:id/resend). Re-notifies eligible providers. System-admin only. Requires --reason.",
+    permissions: ["isSystemAdmin"],
+    tier: "developer",
+    args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
+    flags: [{ name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" }],
+    writeFlags: true,
+    outputShape: "{ success: true, sentCount } or { dryRun: true, wouldUpdate: { pumppuRequestId, action: 'resend' } }",
+    errors: [apiErr(403, "Not a system admin", "use a system-admin token"), apiErr(409, "Wrong state", "request not in a resendable state"), ...COMMON_AUTH_ERRORS],
+    examples: ['ib jerry admin request-resend 41 --reason "retry fanout"'],
+  },
+  {
+    command: "ib jerry admin request-delete",
+    description:
+      "Delete a draft request permanently (DELETE /api/admin/jerry-requests/:id). Only draft/cancelled requests may be deleted. System-admin only. Requires --reason.",
+    permissions: ["isSystemAdmin"],
+    tier: "developer",
+    args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
+    flags: [{ name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" }],
+    writeFlags: true,
+    outputShape: "{ success: true } or { dryRun: true, wouldDelete: { pumppuRequestId } }",
+    errors: [
+      apiErr(403, "Not a system admin", "use a system-admin token"),
+      apiErr(404, "Request not found", "verify pumppuRequestId"),
+      apiErr(409, "Wrong state", "only draft/cancelled requests may be deleted"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ['ib jerry admin request-delete 41 --reason "cleanup draft"'],
+  },
 
   // ─── schema (7) — developer-only SQL introspection ─────────────────────────
   ...((): CommandSpec[] => {

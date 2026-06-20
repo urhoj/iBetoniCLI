@@ -20,6 +20,10 @@ import {
   runJerryOfferWithdraw,
   runJerryAdminRequests,
   runJerryAdminRequestOffers,
+  runJerryAdminRequestExpire,
+  runJerryAdminRequestCancel,
+  runJerryAdminRequestResend,
+  runJerryAdminRequestDelete,
 } from "../../src/commands/jerry/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import type { WriteFlags } from "../../src/api/writeFlags.js";
@@ -412,5 +416,32 @@ describe("ib jerry request list --provider", () => {
     get.mockResolvedValueOnce({ counts: {}, requests: [] });
     await runJerryRequestList(mockClient, { provider: true });
     expect(get).toHaveBeenCalledWith("/api/pumppuRequests/provider-list?tab=avoimet");
+  });
+});
+
+describe("ib jerry admin request write commands", () => {
+  test("admin request-expire posts to /:id/expire with headers", async () => {
+    post.mockResolvedValueOnce({ success: true, status: "expired" });
+    await runJerryAdminRequestExpire(mockClient, 41, { reason: "stuck" } as WriteFlags);
+    expect(post).toHaveBeenCalledWith("/api/admin/jerry-requests/41/expire", {}, expect.objectContaining({ headers: expect.any(Object) }));
+  });
+
+  test("admin request-cancel posts to /:id/cancel with headers", async () => {
+    post.mockResolvedValueOnce({ success: true, status: "cancelled" });
+    await runJerryAdminRequestCancel(mockClient, 41, { reason: "admin override" } as WriteFlags);
+    expect(post).toHaveBeenCalledWith("/api/admin/jerry-requests/41/cancel", {}, expect.objectContaining({ headers: expect.any(Object) }));
+  });
+
+  test("admin request-resend posts to /:id/resend with headers", async () => {
+    post.mockResolvedValueOnce({ success: true, sentCount: 3 });
+    await runJerryAdminRequestResend(mockClient, 41, { reason: "retry fanout" } as WriteFlags);
+    expect(post).toHaveBeenCalledWith("/api/admin/jerry-requests/41/resend", {}, expect.objectContaining({ headers: expect.any(Object) }));
+  });
+
+  test("admin request-delete calls DELETE with headers", async () => {
+    const del = mockClient.delete as ReturnType<typeof vi.fn>;
+    del.mockResolvedValueOnce({ success: true });
+    await runJerryAdminRequestDelete(mockClient, 41, { reason: "cleanup" } as WriteFlags);
+    expect(del).toHaveBeenCalledWith("/api/admin/jerry-requests/41", expect.objectContaining({ headers: expect.any(Object) }));
   });
 });
