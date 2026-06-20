@@ -3407,6 +3407,44 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib jerry offer withdraw matches snapshot 1`] = `
+"USAGE
+  ib jerry offer withdraw <requestId> <offerId> [flags]
+
+DESCRIPTION
+  Withdraw YOUR sent offer before the customer accepts it (POST /:id/offers/:offerId/withdraw). pending → withdrawn. Provider-only; you must own the offer. Requires --reason.
+  Permissions: requires isProvider.
+
+ARGUMENTS
+  <requestId> NUMBER    pumppuRequestId (required)
+  <offerId> NUMBER    your pumppuOfferId (required)
+
+FLAGS
+  --reason STRING    Audit-log reason (REQUIRED)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success: true, status: 'withdrawn' } or { dryRun: true, wouldUpdate: { pumppuOfferId, status } }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a provider         → use a pump-company token
+  exit 5 (HTTP 404)  Offer not found / not yours → verify requestId + offerId
+  exit 4 (HTTP 409)  Already resolved       → cannot withdraw once accepted/confirmed
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry offer withdraw 77 5 --reason "kalusto varattu"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib jerry provider-settings get matches snapshot 1`] = `
 "USAGE
   ib jerry provider-settings get [flags]

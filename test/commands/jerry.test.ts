@@ -17,6 +17,7 @@ import {
   runJerryOfferSend,
   runJerryOfferAccept,
   runJerryOfferConfirm,
+  runJerryOfferWithdraw,
 } from "../../src/commands/jerry/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import type { WriteFlags } from "../../src/api/writeFlags.js";
@@ -365,5 +366,18 @@ describe("ib jerry request cancel", () => {
       expect.objectContaining({ headers: expect.any(Object) })
     );
     expect(result).toEqual({ success: true, status: "cancelled" });
+  });
+});
+
+describe("ib jerry offer withdraw", () => {
+  test("offer withdraw posts to /:id/offers/:offerId/withdraw with headers", async () => {
+    post.mockResolvedValueOnce({ success: true, status: "withdrawn" });
+    const result = await runJerryOfferWithdraw(mockClient, 77, 5, { reason: "peruttu" } as WriteFlags);
+    expect(post).toHaveBeenCalledWith(
+      "/api/pumppuRequests/77/offers/5/withdraw",
+      {},
+      expect.objectContaining({ headers: expect.any(Object) })
+    );
+    expect(result).toEqual({ success: true, status: "withdrawn" });
   });
 });

@@ -3287,6 +3287,27 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib jerry offer withdraw",
+    description:
+      "Withdraw YOUR sent offer before the customer accepts it (POST /:id/offers/:offerId/withdraw). pending → withdrawn. Provider-only; you must own the offer. Requires --reason.",
+    permissions: ["isProvider"],
+    args: [
+      { name: "requestId", type: "number", description: "pumppuRequestId" },
+      { name: "offerId", type: "number", description: "your pumppuOfferId" },
+    ],
+    flags: [{ name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" }],
+    writeFlags: true,
+    outputShape:
+      "{ success: true, status: 'withdrawn' } or { dryRun: true, wouldUpdate: { pumppuOfferId, status } }",
+    errors: [
+      apiErr(403, "Not a provider", "use a pump-company token"),
+      apiErr(404, "Offer not found / not yours", "verify requestId + offerId"),
+      apiErr(409, "Already resolved", "cannot withdraw once accepted/confirmed"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ['ib jerry offer withdraw 77 5 --reason "kalusto varattu"'],
+  },
+  {
     command: "ib jerry counts",
     description:
       "Lifecycle counts. Default --mine returns the customer view (GET /api/pumppuRequests/mine/counts: draft/open/pending_verification/accepted/cancelled/expired/no_supply). --provider returns the provider badge counts (GET /api/pumppuRequests/provider-counts: avoimet/tarjotut/voitetut/voitetutActionRequired/paattyneet) and requires a provider company.",

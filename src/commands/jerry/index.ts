@@ -150,6 +150,23 @@ export async function runJerryOfferSend(
 }
 
 /**
+ * Withdraw your sent offer before the customer accepts it
+ * (pending → withdrawn; POST /:id/offers/:offerId/withdraw). Provider-only; own offer.
+ */
+export async function runJerryOfferWithdraw(
+  client: ApiClient,
+  id: number,
+  offerId: number,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>(
+    `/api/pumppuRequests/${id}/offers/${offerId}/withdraw`,
+    {},
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
  * Accept an offer (customer-side; POST /:id/offers/:offerId/accept). Flips this
  * offer to 'accepted', sibling offers to 'rejected', and the request to
  * 'accepted'. Caller must own the request.
@@ -618,6 +635,20 @@ export function registerJerryCommands(
       }
     }
   );
+
+  addWriteFlagsToCommand(
+    offer
+      .command("withdraw <requestId> <offerId>")
+      .description("Withdraw your sent offer before the customer accepts (pending → withdrawn; provider). Requires --reason.")
+  ).action(async (idStr: string, offerIdStr: string, opts: WriteOpts) => {
+    requireReason(opts);
+    try {
+      const client = await getClient();
+      writeJson(await runJerryOfferWithdraw(client, parseId(idStr, "requestId"), parseId(offerIdStr, "offerId"), opts));
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
 
   // counts ─────────────────────────────────────────────────────────────────────
   j.command("counts")
