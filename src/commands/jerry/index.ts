@@ -10,6 +10,7 @@ import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveAsiakasTarget } from "../customer/index.js";
 import { parseId } from "../../targets.js";
+import { resolveDate } from "../../dates.js";
 
 type Row = Record<string, unknown>;
 
@@ -381,6 +382,43 @@ export async function runJerryAdminToggle(
     {},
     { headers: writeFlagsToHeaders(flags) }
   );
+}
+
+export interface JerryAdminRequestsOpts {
+  status?: string;
+  from?: string;
+  to?: string;
+  customer?: number;
+  provider?: number;
+  limit?: number;
+}
+
+/** Admin request list (GET /api/admin/jerry-requests). System-admin only. */
+export async function runJerryAdminRequests(
+  client: ApiClient,
+  opts: JerryAdminRequestsOpts
+): Promise<ListEnvelope<Row>> {
+  const params = new URLSearchParams();
+  if (opts.status) params.set("status", opts.status);
+  if (opts.from) params.set("from", opts.from);
+  if (opts.to) params.set("to", opts.to);
+  if (opts.customer !== undefined) params.set("customerId", String(opts.customer));
+  if (opts.provider !== undefined) params.set("providerId", String(opts.provider));
+  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
+  const qs = params.toString();
+  const data = await client.get<{ requests?: unknown; truncated?: boolean }>(
+    `/api/admin/jerry-requests${qs ? `?${qs}` : ""}`
+  );
+  const items = Array.isArray(data?.requests) ? (data.requests as Row[]) : [];
+  return { items, nextCursor: null, count: items.length, truncated: !!data?.truncated };
+}
+
+/** Offers on one request, admin view (GET /api/admin/jerry-requests/:id/offers). */
+export async function runJerryAdminRequestOffers(
+  client: ApiClient,
+  id: number
+): Promise<ListEnvelope<Row>> {
+  return toEnvelope(await client.get<unknown>(`/api/admin/jerry-requests/${id}/offers`));
 }
 
 // ─── registration ────────────────────────────────────────────────────────────
@@ -811,4 +849,34 @@ export function registerJerryCommands(
       exitWithError(e);
     }
   });
+
+  admin
+    .command("requests")
+    .description("System-wide tarjouspyyntö list with offer summary (filters)")
+    .option("--status <csv>", "Status filter CSV (open,accepted,...)")
+    .option("--from <date>", "createdAt from (YYYY-MM-DD / today / yesterday)", resolveDate)
+    .option("--to <date>", "createdAt to (inclusive)", resolveDate)
+    .option("--customer <id>", "Filter by customer asiakasId", Number)
+    .option("--provider <id>", "Filter by provider asiakasId", Number)
+    .option("--limit <n>", "Max rows (max 300)", (v: string) => Math.min(Number(v), 300))
+    .action(async (opts: JerryAdminRequestsOpts) => {
+      try {
+        const client = await getClient();
+        writeJson(await runJerryAdminRequests(client, opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  admin
+    .command("request-offers <requestId>")
+    .description("All offers on one request (admin view, no masking)")
+    .action(async (idStr: string) => {
+      try {
+        const client = await getClient();
+        writeJson(await runJerryAdminRequestOffers(client, parseId(idStr, "requestId")));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
 }

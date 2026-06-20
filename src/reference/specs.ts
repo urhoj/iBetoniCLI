@@ -3483,6 +3483,38 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     examples: ['ib jerry admin disable 1402 --reason "offboard provider"', "ib jerry admin disable --asiakas 1402 --dry-run"],
   },
+  {
+    command: "ib jerry admin requests",
+    description:
+      "System-wide tarjouspyyntö list with offer summary — date, customer, placing operator, worksite, m³, status, offer count, accepted/best price (GET /api/admin/jerry-requests). Filters: --status (CSV), --from/--to (createdAt), --customer, --provider, --limit. System-admin only.",
+    permissions: ["isSystemAdmin"],
+    tier: "developer",
+    flags: [
+      { name: "status", type: "string", description: "Status CSV (open,accepted,…)" },
+      { name: "from", type: "string", description: "createdAt from (YYYY-MM-DD/today/yesterday)" },
+      { name: "to", type: "string", description: "createdAt to (inclusive)" },
+      { name: "customer", type: "number", description: "Customer asiakasId" },
+      { name: "provider", type: "number", description: "Provider asiakasId" },
+      { name: "limit", type: "number", default: "300", description: "Max rows (max 300)" },
+    ],
+    outputShape:
+      "ListEnvelope<{ pumppuRequestId, status, createdAt, customerNimi, operatorName, osoite, totalM3, offerCount, acceptedPriceCents, bestPriceCents }>",
+    errors: [apiErr(403, "Not a system admin", "use a system-admin token"), ...COMMON_AUTH_ERRORS],
+    examples: ["ib jerry admin requests --status open,accepted", "ib jerry admin requests --provider 1402 --from 2026-06-01"],
+  },
+  {
+    command: "ib jerry admin request-offers",
+    description:
+      "All offers on one request (admin view, no PII masking): offering company, contact, price, status, scheduledAt/keikka (GET /api/admin/jerry-requests/:id/offers). System-admin only.",
+    permissions: ["isSystemAdmin"],
+    tier: "developer",
+    args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
+    flags: [],
+    outputShape:
+      "ListEnvelope<{ pumppuOfferId, providerAsiakasId, providerNimi, providerContactName, priceCents, vatPercent, status, scheduledAt, keikkaId }>",
+    errors: [apiErr(400, "Invalid id", "pass a numeric requestId"), apiErr(403, "Not a system admin", "use a system-admin token"), ...COMMON_AUTH_ERRORS],
+    examples: ["ib jerry admin request-offers 41"],
+  },
 
   // ─── schema (7) — developer-only SQL introspection ─────────────────────────
   ...((): CommandSpec[] => {

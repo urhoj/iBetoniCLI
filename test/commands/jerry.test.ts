@@ -18,6 +18,8 @@ import {
   runJerryOfferAccept,
   runJerryOfferConfirm,
   runJerryOfferWithdraw,
+  runJerryAdminRequests,
+  runJerryAdminRequestOffers,
 } from "../../src/commands/jerry/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import type { WriteFlags } from "../../src/api/writeFlags.js";
@@ -285,6 +287,22 @@ describe("ib jerry admin", () => {
       {},
       { headers: { "X-Dry-Run": "1" } }
     );
+  });
+
+  test("admin requests forwards filters and wraps requests in an envelope", async () => {
+    get.mockResolvedValueOnce({ requests: [{ pumppuRequestId: 1 }], truncated: false });
+    const result = await runJerryAdminRequests(mockClient, { status: "open,accepted", customer: 5 });
+    expect(get).toHaveBeenCalledWith(
+      "/api/admin/jerry-requests?status=open%2Caccepted&customerId=5"
+    );
+    expect(result).toEqual({ items: [{ pumppuRequestId: 1 }], nextCursor: null, count: 1, truncated: false });
+  });
+
+  test("admin request-offers wraps the offers array", async () => {
+    get.mockResolvedValueOnce([{ pumppuOfferId: 9 }]);
+    const result = await runJerryAdminRequestOffers(mockClient, 1);
+    expect(get).toHaveBeenCalledWith("/api/admin/jerry-requests/1/offers");
+    expect(result.count).toBe(1);
   });
 });
 
