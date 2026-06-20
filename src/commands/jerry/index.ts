@@ -32,6 +32,8 @@ export interface JerryRequestListOpts {
   status?: string;
   limit?: number;
   all?: boolean;
+  provider?: boolean;
+  tab?: string;
 }
 
 /**
@@ -45,6 +47,14 @@ export async function runJerryRequestList(
   client: ApiClient,
   opts: JerryRequestListOpts
 ): Promise<ListEnvelope<Row>> {
+  if (opts.provider) {
+    const tab = opts.tab || "avoimet";
+    const data = await client.get<{ requests?: unknown }>(
+      `/api/pumppuRequests/provider-list?tab=${encodeURIComponent(tab)}`
+    );
+    const items = Array.isArray(data?.requests) ? (data.requests as Row[]) : [];
+    return { items, nextCursor: null, count: items.length };
+  }
   if (opts.open) {
     if (opts.all) {
       // Whole-marketplace browse (?scope=all): open + no_supply beyond the
@@ -439,6 +449,8 @@ export function registerJerryCommands(
     .option("--mine", "Your own requests (default)")
     .option("--status <csv>", "Filter --mine by status (CSV)")
     .option("--limit <n>", "Max rows for --mine", (v: string) => Math.min(Number(v), 200))
+    .option("--provider", "Provider lifecycle view via /provider-list (incl. your sent offers)")
+    .option("--tab <tab>", "With --provider: avoimet|tarjotut|voitetut|paattyneet|kokomarkkina (default avoimet)")
     .action(async (opts: JerryRequestListOpts) => {
       try {
         const client = await getClient();

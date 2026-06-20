@@ -3074,6 +3074,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "mine", type: "boolean", description: "Your own requests (default)" },
       { name: "status", type: "string", description: "Filter --mine by status (CSV: open,pending_verification,accepted,cancelled,expired,no_supply)" },
       { name: "limit", type: "number", default: "100", description: "Max rows for --mine (server caps at 200)" },
+      { name: "provider", type: "boolean", description: "Provider lifecycle view via /provider-list (incl. sent offers)" },
+      { name: "tab", type: "string", description: "With --provider: avoimet|tarjotut|voitetut|paattyneet|kokomarkkina" },
     ],
     outputShape:
       "ListEnvelope<{ pumppuRequestId, status, createdAt, sentAt?, osoite, formattedAddress, totalM3|maaraM3, ... }> (fields differ between --mine and --open; --open is PII-masked; --open --all adds distanceKm/isOutOfArea/isNoSupply)",
@@ -3086,6 +3088,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ib jerry request list --open",
       "ib jerry request list --open --all",
       "ib jerry request list --mine --status open,accepted --limit 50",
+      "ib jerry request list --provider --tab tarjotut",
     ],
   },
   {

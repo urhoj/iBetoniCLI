@@ -381,3 +381,18 @@ describe("ib jerry offer withdraw", () => {
     expect(result).toEqual({ success: true, status: "withdrawn" });
   });
 });
+
+describe("ib jerry request list --provider", () => {
+  test("list --provider --tab tarjotut hits provider-list and unwraps requests", async () => {
+    get.mockResolvedValueOnce({ counts: {}, requests: [{ pumppuRequestId: 5 }] });
+    const result = await runJerryRequestList(mockClient, { provider: true, tab: "tarjotut" });
+    expect(get).toHaveBeenCalledWith("/api/pumppuRequests/provider-list?tab=tarjotut");
+    expect(result.count).toBe(1);
+  });
+
+  test("list --provider defaults to tab=avoimet", async () => {
+    get.mockResolvedValueOnce({ counts: {}, requests: [] });
+    await runJerryRequestList(mockClient, { provider: true });
+    expect(get).toHaveBeenCalledWith("/api/pumppuRequests/provider-list?tab=avoimet");
+  });
+});

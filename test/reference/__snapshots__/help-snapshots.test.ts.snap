@@ -3644,6 +3644,8 @@ FLAGS
   --mine BOOLEAN    Your own requests (default)
   --status STRING    Filter --mine by status (CSV: open,pending_verification,accepted,cancelled,expired,no_supply)
   --limit NUMBER    Max rows for --mine (server caps at 200) (default: 100)
+  --provider BOOLEAN    Provider lifecycle view via /provider-list (incl. sent offers)
+  --tab STRING    With --provider: avoimet|tarjotut|voitetut|paattyneet|kokomarkkina
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -3661,6 +3663,7 @@ EXAMPLES
   ib jerry request list --open
   ib jerry request list --open --all
   ib jerry request list --mine --status open,accepted --limit 50
+  ib jerry request list --provider --tab tarjotut
 "
 `;
 
