@@ -3303,7 +3303,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { success: true, sentCount } or { dryRun: true, wouldUpdate: { pumppuRequestId, action: 'resend' } }
+  { success: true, status: 'open' | 'no_supply' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token

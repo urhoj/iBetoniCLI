@@ -3550,7 +3550,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" }],
     writeFlags: true,
-    outputShape: "{ success: true, sentCount } or { dryRun: true, wouldUpdate: { pumppuRequestId, action: 'resend' } }",
+    outputShape: "{ success: true, status: 'open' | 'no_supply' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
     errors: [apiErr(403, "Not a system admin", "use a system-admin token"), apiErr(409, "Wrong state", "request not in a resendable state"), ...COMMON_AUTH_ERRORS],
     examples: ['ib jerry admin request-resend 41 --reason "retry fanout"'],
   },
