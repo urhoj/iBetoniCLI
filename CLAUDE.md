@@ -113,6 +113,19 @@ Rows are self-describing — each carries `showInGrid`/`firstDate`/`lastDate`/`d
 
 `list` caps each row's `description`/`resolution`/`errorText` at 200 chars by default (full text via `ib feedback get <id>` or `--full`); when anything was cut the envelope carries a `hint`. `--unresolved` (= `--status open,reviewed`) and a comma-separated `--status` fan out to one GET per status, merged newest-first client-side. `resolve` returns a compact ack `{ feedbackId, status, updatedAt, resolution }` by default (`--full` for the whole row). `ib feedback count` returns `{ total, byStatus, byKind, byScope }` aggregated client-side — the cheap "is there anything open?" call. All four are client-side only (no backend change).
 
+### `ib message chat` — conversational thread CLI
+
+`src/commands/message/chat/index.ts`. Six leaves over `/api/messages/threads/*` (Jerry tarjous threads now, keikka later):
+
+- `threads` — inbox (GET `/threads/mine`); `--unread`/`--tarjous` filter client-side.
+- `thread [id]` — metadata + participants.
+- `list [id]` — messages oldest-first; does NOT mark read.
+- `send [id] --body` — POST a message. `--dry-run` is **client-side only** (GETs participants, echoes `wouldSend`; the route has no `X-Dry-Run` guard, so a real POST would persist). `--reason` → `sourceNote`.
+- `mark-read [id]` — stamps `lastReadAt`.
+- `delete <messageId> --thread|--tarjous` — **soft-delete** (sets `isDeleted=1`; row kept for audit, invisible on every read). Authorization: a sysadmin/developer may moderate (delete any) in an accessible thread; everyone else may delete only their OWN message and only while **unanswered** (no later reply from a different participant → 409). Idempotent → `{ deleted:true }` or `{ deleted:true, alreadyDeleted:true }`. Emits a `message:deleted` socket event. `--dry-run` is **client-side only** (lists thread, echoes `wouldDelete`, no DELETE issued).
+
+Every thread-targeting leaf resolves its thread from a raw `threadId` positional OR `--tarjous <pumppuRequestId>` via `resolveThreadId` (`./resolveThread.ts`); a tarjous with multiple threads requires an explicit `threadId`. `--tarjous` resolves through `/threads/mine`, so a non-participant moderator must pass the raw `--thread <id>`. send/mark-read/delete are writes (blocked under `--read-only`). The DELETE route is **deploy-gated** in `puminet5api`.
+
 ### Auth & credentials (`src/auth/`)
 
 - `resolve.ts` — `IB_TOKEN` env var wins (CI, non-refreshable); else the credentials file. Returns `null` if neither exists.
