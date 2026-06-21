@@ -1,5 +1,8 @@
 import { test, expect, vi, beforeEach, describe } from "vitest";
-import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, normalizeSentryRef, normalizeLanguage }
+import { writeFileSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, normalizeSentryRef, normalizeLanguage, readJsonInput }
   from "../../src/commands/changelog/index.js";
 import type { ChangelogAddBody } from "../../src/commands/changelog/index.js";
 import type { ApiClient } from "../../src/api/client.js";
@@ -179,5 +182,28 @@ describe("changelog release --map", () => {
       { map },
       expect.objectContaining({ headers: expect.any(Object) })
     );
+  });
+});
+
+describe("readJsonInput BOM handling", () => {
+  test("parses a JSON array file that has a UTF-8 BOM (PowerShell Out-File -Encoding utf8)", () => {
+    const p = join(tmpdir(), "ib-map-bom-test.json");
+    const payload = [{ changelogId: 7, versionTag: "puminet5api@0.62.13" }];
+    writeFileSync(p, "\uFEFF" + JSON.stringify(payload), "utf8");
+    try {
+      expect(readJsonInput(p)).toEqual(payload);
+    } finally {
+      unlinkSync(p);
+    }
+  });
+  test("parses a JSON array file with no BOM", () => {
+    const p = join(tmpdir(), "ib-map-nobom-test.json");
+    const payload = [{ changelogId: 8, versionTag: "puminet4@0.62.10" }];
+    writeFileSync(p, JSON.stringify(payload), "utf8");
+    try {
+      expect(readJsonInput(p)).toEqual(payload);
+    } finally {
+      unlinkSync(p);
+    }
   });
 });

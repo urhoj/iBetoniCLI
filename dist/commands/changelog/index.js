@@ -2,8 +2,8 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFla
 import { readFileSync } from "node:fs";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
-function readJsonInput(path) {
-    const raw = path === "-" ? readFileSync(0, "utf8") : readFileSync(path, "utf8");
+export function readJsonInput(path) {
+    const raw = (path === "-" ? readFileSync(0, "utf8") : readFileSync(path, "utf8")).replace(/^\uFEFF/, "");
     return JSON.parse(raw);
 }
 const TYPES = ["feature", "improvement", "bugfix"];

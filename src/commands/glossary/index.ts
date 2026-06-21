@@ -70,7 +70,7 @@ export function mergeSetInput(
 }
 
 export function readJsonInput(path: string): unknown {
-  const raw = path === "-" ? readFileSync(0, "utf8") : readFileSync(path, "utf8");
+  const raw = (path === "-" ? readFileSync(0, "utf8") : readFileSync(path, "utf8")).replace(/^\uFEFF/, "");
   return JSON.parse(raw);
 }
 
