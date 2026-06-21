@@ -282,9 +282,12 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
     .option("--entity <e>", "Related DB entity, e.g. Person / personId (omit to keep)")
     .option("--domain <d>", "Domain grouping (e.g. vacation) (omit to keep)")
     .option("--update-only", "Only update an existing term; do not create a new one (404 if absent)")
-    .option("--from-json <file>", "Read fields from a JSON object file (or - for stdin); explicit flags override");
+    .option("--from-json <file>", "Read fields from a JSON object file (or - for stdin); explicit flags override")
+    .option("--add-synonyms <list>", "Comma-separated synonyms to ADD (no full resend; excl. --synonyms)")
+    .option("--remove-synonyms <list>", "Comma-separated synonyms to REMOVE by name (excl. --synonyms)")
+    .option("--append-definition <text>", "Append a clause to the current definition (excl. --definition)");
   addWriteFlagsToCommand(set).action(
-    async (term: string, opts: { definition?: string; synonyms?: string; related?: string; entity?: string; domain?: string; updateOnly?: boolean; fromJson?: string; dryRun?: boolean; idempotencyKey?: string; reason?: string }) => {
+    async (term: string, opts: { definition?: string; synonyms?: string; related?: string; entity?: string; domain?: string; updateOnly?: boolean; fromJson?: string; dryRun?: boolean; idempotencyKey?: string; reason?: string; addSynonyms?: string; removeSynonyms?: string; appendDefinition?: string }) => {
       let merged: { definition?: string; synonyms?: string; related?: string; entity?: string; domain?: string } =
         { definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity, domain: opts.domain };
       if (opts.fromJson) {
@@ -295,7 +298,9 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
       }
       try {
         writeJson(await runGlossarySet(await getClient(), term,
-          { definition: merged.definition, synonyms: merged.synonyms, related: merged.related, entity: merged.entity, domain: merged.domain, updateOnly: opts.updateOnly },
+          { definition: merged.definition, synonyms: merged.synonyms, related: merged.related, entity: merged.entity, domain: merged.domain,
+            addSynonyms: opts.addSynonyms, removeSynonyms: opts.removeSynonyms, appendDefinition: opts.appendDefinition,
+            updateOnly: opts.updateOnly },
           { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
       } catch (e) { exitWithError(e); }
     });

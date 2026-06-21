@@ -2946,6 +2946,9 @@ FLAGS
   --domain STRING    Domain grouping (e.g. vacation). Omit to keep.
   --update-only BOOLEAN    Only update an existing term; do not create a new one (404 if absent)
   --from-json STRING    Read fields from a JSON object file (or - for stdin); flags override. Only keys present in the object are written (others kept).
+  --add-synonyms STRING    Comma-separated synonyms to ADD to the existing list — no full resend. Excl. --synonyms.
+  --remove-synonyms STRING    Comma-separated synonyms to REMOVE by name (idempotent). Excl. --synonyms.
+  --append-definition STRING    Append a clause to the current definition (single-space join; re-appending identical text is a no-op). Excl. --definition.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -2961,18 +2964,22 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a developer        → Developer access required
   exit 5 (HTTP 404)  Term not found (with --update-only) → Omit --update-only to create the entry
+  exit 5 (HTTP 404)  append/add/remove on a non-existent term → Create the term first (set --definition …); append requires an existing entry
   exit 4 (HTTP 422)  definition >2000 chars → Shorten the definition
   exit 4  --from-json file is not valid JSON or not readable → Check the file path and contents
 
 NOTES
   - PARTIAL (PATCH) semantics: an omitted flag is NOT sent, so the backend preserves the existing value — you can update just one field (e.g. only --synonyms) without re-sending the definition. To CLEAR a field pass an empty value: \`--synonyms ""\` empties the list, \`--entity ""\` blanks it. To OVERWRITE, pass the new value.
   - Requires the partial-aware backend (COALESCE save proc) deployed; against an older backend an omitted field is still overwritten to empty/null — re-send all fields (or use --from-json) until the backend is updated.
+  - Append mode (--add-synonyms / --remove-synonyms / --append-definition) edits in place without re-sending the whole field — built for no-filesystem callers (MCP ib_exec, /api/cli/exec) that can't use --from-json. The merge runs server-side and the target term must already exist (404 otherwise). Deploy-gated: against an un-updated backend these flags no-op (the value is preserved, not corrupted).
 
 EXAMPLES
   ib glossary set valumassa --definition "Pumpattava betonimassa." --synonyms "massaa,valua" --related "ib keikka" --reason "groom"
   ib glossary set puomi --synonyms "boom,nollakone,puomiton" --reason "add synonyms only"
   ib glossary set pumppari --definition "Updated def." --update-only --reason "groom"
   ib glossary set loma --from-json loma.json --reason "groom"
+  ib glossary set puomi --add-synonyms "nollakone" --reason "add one synonym"
+  ib glossary set tilaus --append-definition "Convention: UI says tilaus, code says keikka." --reason "append clause"
 "
 `;
 
