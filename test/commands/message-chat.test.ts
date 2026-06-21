@@ -7,6 +7,7 @@ import {
   runChatMarkRead,
   runChatDelete,
   runChatEdit,
+  runChatRestore,
 } from "../../src/commands/message/chat/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -235,6 +236,42 @@ describe("runChatEdit", () => {
     asGet().mockResolvedValueOnce([{ messageId: 8, body: "x" }]);
     await expect(
       runChatEdit(mockClient, 42, 999, { body: "uusi", dryRun: true })
+    ).rejects.toMatchObject({ exitCode: 5 });
+  });
+});
+
+describe("runChatRestore", () => {
+  const asPost = () => mockClient.post as ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    asGet().mockReset();
+    asPost().mockReset();
+  });
+
+  test("a real restore POSTs to the restore endpoint with write headers", async () => {
+    asPost().mockResolvedValueOnce({ messageId: 7, threadId: 42, restored: true });
+    await runChatRestore(mockClient, 42, 7, { reason: "oops" });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/messages/threads/42/messages/7/restore",
+      {},
+      { headers: { "X-Action-Reason": "oops" } }
+    );
+  });
+
+  test("--dry-run lists deleted messages + returns wouldRestore, never POSTs", async () => {
+    asGet().mockResolvedValueOnce([{ messageId: 7, body: "x", isDeleted: true }]);
+    const res = (await runChatRestore(mockClient, 42, 7, { dryRun: true })) as {
+      dryRun: boolean;
+      wouldRestore: { messageId: number };
+    };
+    expect(mockClient.get).toHaveBeenCalledWith("/api/messages/threads/42/messages?includeDeleted=1");
+    expect(mockClient.post).not.toHaveBeenCalled();
+    expect(res.wouldRestore).toEqual({ messageId: 7 });
+  });
+
+  test("--dry-run on a message not among deleted exits 5", async () => {
+    asGet().mockResolvedValueOnce([{ messageId: 8, isDeleted: true }]);
+    await expect(
+      runChatRestore(mockClient, 42, 999, { dryRun: true })
     ).rejects.toMatchObject({ exitCode: 5 });
   });
 });

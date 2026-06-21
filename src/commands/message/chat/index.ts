@@ -201,6 +201,39 @@ export async function runChatEdit(
   );
 }
 
+/** Options for {@link runChatRestore}. */
+export interface ChatRestoreOpts {
+  reason?: string;
+  idempotencyKey?: string;
+  dryRun?: boolean;
+}
+
+/**
+ * POST /api/messages/threads/:id/messages/:messageId/restore — un-soft-delete.
+ *
+ * `--dry-run` is CLIENT-SIDE: lists deleted messages (?includeDeleted=1), finds
+ * the target, returns wouldRestore without POSTing (works under --read-only). A
+ * miss → exit 5. Server-side: author or sysadmin/developer.
+ */
+export async function runChatRestore(
+  client: ApiClient,
+  threadId: number,
+  messageId: number,
+  opts: ChatRestoreOpts
+): Promise<unknown> {
+  if (opts.dryRun) {
+    const list = await runChatList(client, threadId, { deleted: true });
+    const target = list.items.find((m) => Number(m.messageId) === messageId);
+    if (!target) failWith(`Message ${messageId} not found among deleted in thread ${threadId}`, 5);
+    return { dryRun: true, threadId, wouldRestore: { messageId } };
+  }
+  return client.post<unknown>(
+    `/api/messages/threads/${threadId}/messages/${messageId}/restore`,
+    {},
+    { headers: writeFlagsToHeaders({ idempotencyKey: opts.idempotencyKey, reason: opts.reason }) }
+  );
+}
+
 /** Resolve the {@link ThreadTarget} from a positional + --tarjous option. */
 function targetFrom(threadIdStr: string | undefined, opts: { tarjous?: number }): ThreadTarget {
   return {
@@ -398,6 +431,32 @@ export function registerMessageChatCommands(
         const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
         writeJson(await runChatEdit(client, id, messageId, {
           body, reason: opts.reason, idempotencyKey: opts.idempotencyKey, dryRun: opts.dryRun,
+        }));
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
+
+  const restoreCmd = c
+    .command("restore <messageId>")
+    .description(
+      "Restore (un-delete) a soft-deleted chat message. Author or developer. --dry-run previews via the deleted list (no restore)."
+    )
+    .option("--thread <id>", "Thread id the message belongs to", Number)
+    .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
+  addWriteFlagsToCommand(restoreCmd).action(
+    async (
+      messageIdStr: string,
+      opts: { thread?: number; tarjous?: number; dryRun?: boolean; idempotencyKey?: string; reason?: string }
+    ) => {
+      const messageId = parseOptionalId(messageIdStr, "messageId");
+      if (messageId === undefined) failWith("messageId is required", 4);
+      try {
+        const client = await getClient();
+        const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
+        writeJson(await runChatRestore(client, id, messageId, {
+          reason: opts.reason, idempotencyKey: opts.idempotencyKey, dryRun: opts.dryRun,
         }));
       } catch (e) {
         exitWithError(e);

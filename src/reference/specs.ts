@@ -4786,7 +4786,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ib search jäteasema --in sijainti",
     ],
   },
-  // ─── message chat (7) ────────────────────────────────────────────────────
+  // ─── message chat (8) ────────────────────────────────────────────────────
   {
     command: "ib message chat threads",
     description:
@@ -4986,6 +4986,35 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: [
       'ib message chat edit 7 --thread 3 --body "korjattu teksti" --reason typo',
       'ib message chat edit 7 --tarjous 23 --body "korjattu" --dry-run',
+    ],
+  },
+  {
+    command: "ib message chat restore",
+    description:
+      "Restore a soft-deleted chat message (POST /api/messages/threads/:id/messages/:messageId/restore; isDeleted=0). The author OR a sysadmin/developer may restore. Idempotent (already-active → alreadyActive:true). Emits message:restored. Find deleted ids with `ib message chat list --deleted`. --dry-run previews CLIENT-SIDE via the deleted list.",
+    auth: "any",
+    args: [{ name: "messageId", type: "number", required: true, description: "Message id to restore (the message PK)" }],
+    flags: [
+      { name: "thread", type: "number", description: "Thread id the message belongs to" },
+      { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+    ],
+    writeFlags: true,
+    outputShape:
+      "{ messageId, threadId, restored:true } (+ alreadyActive:true if not deleted) · { dryRun:true, threadId, wouldRestore:{ messageId } } on --dry-run",
+    errors: [
+      apiErr(403, "Not the author (and not a developer)", "you can only restore your own messages"),
+      apiErr(404, "Thread or message not found", "check the threadId/messageId"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Deleted messages are hidden from the normal list — use `ib message chat list --deleted` to find ids.",
+      "--dry-run lists deleted messages to confirm the target; it never restores (works under --read-only).",
+      "Deploy-gated: the restore route must be deployed to the target backend.",
+    ],
+    seeAlso: ["ib message chat delete", "ib message chat list"],
+    examples: [
+      "ib message chat restore 7 --thread 3 --reason \"deleted by mistake\"",
+      "ib message chat restore 7 --tarjous 23 --dry-run",
     ],
   },
   // ─── message support (4) ──────────────────────────────────────────────────
