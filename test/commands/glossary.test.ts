@@ -178,6 +178,26 @@ describe("glossary set/import JSON input", () => {
   });
 });
 
+describe("glossary list terms-only", () => {
+  test("list --terms-only projects items to {term, synonyms} only", async () => {
+    const get = vi.fn().mockResolvedValue({
+      items: [{ term: "tila", synonyms: ["status"], definition: "d", relatedCommands: [], domain: "x", runs: 3 }],
+      count: 1,
+    });
+    const r = await runGlossaryList(mkClient({ get }), { termsOnly: true });
+    expect(r.items).toEqual([{ term: "tila", synonyms: ["status"] }]);
+  });
+
+  test("list without --terms-only returns items unchanged", async () => {
+    const get = vi.fn().mockResolvedValue({
+      items: [{ term: "tila", synonyms: ["status"], definition: "d" }],
+      count: 1,
+    });
+    const r = await runGlossaryList(mkClient({ get }), {});
+    expect(r.items[0]).toHaveProperty("definition", "d");
+  });
+});
+
 describe("glossary domain filters", () => {
   test("list forwards --domain and --related as query params", async () => {
     const get = vi.fn().mockResolvedValue({ items: [], count: 0 });

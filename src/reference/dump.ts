@@ -21,7 +21,8 @@ import { type CallerTier, visibleSpecs, isHiddenAtTier } from "../tier.js";
 import { emitStdout } from "../output/json.js";
 import packageJson from "../../package.json" with { type: "json" };
 import type { ApiClient } from "../api/client.js";
-import { runGlossaryList } from "../commands/glossary/index.js";
+import { runGlossaryList, projectGlossaryForPrimer } from "../commands/glossary/index.js";
+export { projectGlossaryForPrimer };
 
 export interface ReferenceDump {
   version: string;
@@ -66,30 +67,6 @@ function scrubSpecForTier(
   if (spec.notes) out.notes = spec.notes.filter((n) => !mentionsHidden(n));
   if (spec.examples) out.examples = spec.examples.filter((e) => !mentionsHidden(e));
   return out;
-}
-
-/**
- * Project a raw DB glossary item array to the vocabulary INDEX the dump/--help
- * primer documents: `{ term, synonyms }` only. The `definition` is deliberately
- * dropped here — it is the bulk of each entry's bytes and rides in every full
- * dump, the root `--help` GLOSSARY, and the AI primer, so as the glossary grows
- * it would bloat all three. The term+synonyms index is enough for an AI to map
- * any colloquial/Finnish word to a canonical term, then fetch the definition on
- * demand via `ib glossary lookup <term>` (or `ib glossary list` for all). Also
- * drops the other DB fields (`relatedCommands`, `relatedEntity`, `runs`,
- * `lastReviewed`, `domain`, …) so developer-tier data cannot leak through the
- * glossary of a standard-tier dump or root `--help`.
- *
- * Exported as a pure helper so it can be unit-tested independently of the
- * network layer.
- */
-export function projectGlossaryForPrimer(
-  items: Array<Record<string, unknown>>
-): Array<{ term: string; synonyms: string[] }> {
-  return items.map((g) => ({
-    term: g["term"] as string,
-    synonyms: (g["synonyms"] ?? []) as string[],
-  }));
 }
 
 /**

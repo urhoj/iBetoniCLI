@@ -36,6 +36,20 @@ const arrToCsv = (v: unknown): string | undefined =>
   Array.isArray(v) ? v.join(",") : (typeof v === "string" ? v : undefined);
 
 /**
+ * Project glossary rows to the {term, synonyms} INDEX shape — strips definition
+ * and developer-tier-leaking fields. Shared by `glossary list --terms-only` and
+ * the primer/dump (re-exported from reference/dump.ts for existing consumers).
+ */
+export function projectGlossaryForPrimer(
+  items: Array<Record<string, unknown>>
+): Array<{ term: string; synonyms: string[] }> {
+  return items.map((g) => ({
+    term: g["term"] as string,
+    synonyms: (g["synonyms"] ?? []) as string[],
+  }));
+}
+
+/**
  * Merge fields from a parsed JSON object with explicit CLI flags.
  * Flags take precedence over the JSON values — an explicitly-passed flag always
  * wins regardless of what the JSON file contains. Fields absent from both json
@@ -162,7 +176,7 @@ export async function runGlossaryLookupBatch(
 
 export async function runGlossaryList(
   client: ApiClient,
-  opts: { search?: string; stalest?: number; domain?: string; related?: string }
+  opts: { search?: string; stalest?: number; domain?: string; related?: string; termsOnly?: boolean }
 ): Promise<ListEnvelope<unknown>> {
   const q = new URLSearchParams();
   if (opts.search) q.set("search", opts.search);
@@ -171,7 +185,10 @@ export async function runGlossaryList(
   if (opts.related) q.set("related", opts.related);
   const qs = q.toString();
   const res = await client.get<{ items: unknown[]; count: number }>(`/api/cli/glossary${qs ? `?${qs}` : ""}`);
-  return { items: res.items, nextCursor: null, count: res.count, truncated: opts.stalest != null };
+  const items = opts.termsOnly
+    ? projectGlossaryForPrimer(res.items as Array<Record<string, unknown>>)
+    : res.items;
+  return { items, nextCursor: null, count: res.count, truncated: opts.stalest != null };
 }
 
 export async function runGlossarySet(
