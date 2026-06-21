@@ -177,9 +177,17 @@ export async function runGlossaryList(
 export async function runGlossarySet(
   client: ApiClient,
   term: string,
-  opts: { definition?: string; synonyms?: string; related?: string; entity?: string; updateOnly?: boolean; domain?: string },
+  opts: { definition?: string; synonyms?: string; related?: string; entity?: string; updateOnly?: boolean; domain?: string;
+    addSynonyms?: string; removeSynonyms?: string; appendDefinition?: string },
   flags: WriteFlags = {}
 ): Promise<unknown> {
+  // Append flags edit in place; they cannot combine with their overwrite twin.
+  if (opts.definition !== undefined && opts.appendDefinition !== undefined) {
+    failWith("--definition and --append-definition are mutually exclusive", 4);
+  }
+  if (opts.synonyms !== undefined && (opts.addSynonyms !== undefined || opts.removeSynonyms !== undefined)) {
+    failWith("--synonyms and --add-synonyms/--remove-synonyms are mutually exclusive", 4);
+  }
   const headers = { ...writeFlagsToHeaders(flags), ...(opts.updateOnly ? { "X-Update-Only": "1" } : {}) };
   // PARTIAL update (PATCH): send ONLY the fields the caller actually passed. An
   // omitted flag is left out of the body entirely, so the backend preserves the
@@ -193,6 +201,9 @@ export async function runGlossarySet(
   if (opts.related !== undefined) body.relatedCommands = splitList(opts.related);
   if (opts.entity !== undefined) body.relatedEntity = opts.entity;
   if (opts.domain !== undefined) body.domain = opts.domain;
+  if (opts.addSynonyms !== undefined) body.addSynonyms = splitList(opts.addSynonyms);
+  if (opts.removeSynonyms !== undefined) body.removeSynonyms = splitList(opts.removeSynonyms);
+  if (opts.appendDefinition !== undefined) body.appendDefinition = opts.appendDefinition;
   return client.put(`/api/cli/glossary/${encodeURIComponent(term)}`, body, { headers });
 }
 

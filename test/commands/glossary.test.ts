@@ -198,3 +198,32 @@ describe("glossary domain filters", () => {
     expect(mergeSetInput({ domain: "j" }, { domain: "f" }).domain).toBe("f");
   });
 });
+
+describe("glossary append flags", () => {
+  test("set sends addSynonyms/removeSynonyms/appendDefinition body keys (synonyms split)", async () => {
+    const put = vi.fn().mockResolvedValue({ term: "puomi" });
+    await runGlossarySet(mkClient({ put }), "puomi",
+      { addSynonyms: "a, b", removeSynonyms: "c", appendDefinition: "More text." },
+      { reason: "append" });
+    const body = put.mock.calls[0]![1] as Record<string, unknown>;
+    expect(body).toEqual({ addSynonyms: ["a", "b"], removeSynonyms: ["c"], appendDefinition: "More text." });
+  });
+
+  test("set rejects --definition + --append-definition (exit 4, no PUT)", async () => {
+    const put = vi.fn();
+    const err = await runGlossarySet(mkClient({ put }), "puomi",
+      { definition: "x", appendDefinition: "y" }).catch((e) => e);
+    expect(err).toBeInstanceOf(CliError);
+    expect((err as CliError).exitCode).toBe(4);
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  test("set rejects --synonyms + --add-synonyms (exit 4, no PUT)", async () => {
+    const put = vi.fn();
+    const err = await runGlossarySet(mkClient({ put }), "puomi",
+      { synonyms: "a", addSynonyms: "b" }).catch((e) => e);
+    expect(err).toBeInstanceOf(CliError);
+    expect((err as CliError).exitCode).toBe(4);
+    expect(put).not.toHaveBeenCalled();
+  });
+});
