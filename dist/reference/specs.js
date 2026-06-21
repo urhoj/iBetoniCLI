@@ -37,9 +37,10 @@ const ATTACHMENT_ENTITY_FLAGS = [
     { name: "bug-report", type: "number", description: "Target bugReportId" },
     { name: "request", type: "number", description: "Jerry pumppuRequestId (request owner only)" },
     { name: "offer", type: "number", description: "Jerry pumppuOfferId (provider company only)" },
+    { name: "message", type: "number", description: "Target messageId (chat message; attach = message author, read = thread participant)" },
 ];
-const ATTACHMENT_ROW = "{ attachmentId, origFileName, fileName, fileType, fileSize, fileComment, attachTime, liitaLaskuun, attachmentGroupId, attachmentGroupName, attachmentTypeId, attachmentTypeName, keikkaId?, vehicleId?, personId?, asiakasId?, tyomaaId?, sijaintiId?, tuoteId?, bugReportId?, pumppuRequestId?, pumppuOfferId?, entryByPersonId, ownerAsiakasId, imageWidth, imageHeight }";
-const ENTITY_FLAG_NOTE = "Exactly ONE entity flag selects the target (--keikka | --vehicle | --person | --customer | --worksite | --sijainti | --tuote | --bug-report | --request | --offer).";
+const ATTACHMENT_ROW = "{ attachmentId, origFileName, fileName, fileType, fileSize, fileComment, attachTime, liitaLaskuun, attachmentGroupId, attachmentGroupName, attachmentTypeId, attachmentTypeName, keikkaId?, vehicleId?, personId?, asiakasId?, tyomaaId?, sijaintiId?, tuoteId?, bugReportId?, pumppuRequestId?, pumppuOfferId?, messageId?, entryByPersonId, ownerAsiakasId, imageWidth, imageHeight }";
+const ENTITY_FLAG_NOTE = "Exactly ONE entity flag selects the target (--keikka | --vehicle | --person | --customer | --worksite | --sijainti | --tuote | --bug-report | --request | --offer | --message).";
 const DEPLOY_NOTE = "Deploy-gated (404 until the backend ships /api/cli/attachment/*).";
 /** Appended to capped-list outputShapes — single-sources the wording + backend date. */
 const TRUNCATED_NOTE = " (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)";
@@ -115,6 +116,7 @@ const BASE_COMMAND_SPECS = [
             "ib attachment upload ./site.jpg --keikka 9001 --comment \"pohjakuva\"",
             "ib attachment upload ./tarjous.pdf --offer 567 --reason \"offer docs\"",
             "ib attachment upload ./x.pdf --vehicle 53 --dry-run",
+            "ib attachment upload ./kuva.jpg --message 9 --comment \"liite viestiin\"",
         ],
     },
     {
