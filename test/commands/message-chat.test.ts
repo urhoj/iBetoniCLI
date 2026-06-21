@@ -8,6 +8,7 @@ import {
   runChatDelete,
   runChatEdit,
   runChatRestore,
+  runChatSearch,
 } from "../../src/commands/message/chat/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -273,5 +274,22 @@ describe("runChatRestore", () => {
     await expect(
       runChatRestore(mockClient, 42, 999, { dryRun: true })
     ).rejects.toMatchObject({ exitCode: 5 });
+  });
+});
+
+describe("runChatSearch", () => {
+  beforeEach(() => asGet().mockReset());
+
+  test("GETs /search with encoded q (no limit)", async () => {
+    asGet().mockResolvedValueOnce([{ messageId: 1, body: "hei maailma" }]);
+    const res = await runChatSearch(mockClient, "hei maailma", {});
+    expect(mockClient.get).toHaveBeenCalledWith("/api/messages/search?q=hei%20maailma");
+    expect(res.count).toBe(1);
+  });
+
+  test("adds limit when given", async () => {
+    asGet().mockResolvedValueOnce([]);
+    await runChatSearch(mockClient, "abc", { limit: 20 });
+    expect(mockClient.get).toHaveBeenCalledWith("/api/messages/search?q=abc&limit=20");
   });
 });

@@ -4788,7 +4788,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ib search jäteasema --in sijainti",
     ],
   },
-  // ─── message chat (8) ────────────────────────────────────────────────────
+  // ─── message chat (9) ────────────────────────────────────────────────────
   {
     command: "ib message chat threads",
     description:
@@ -5017,6 +5017,30 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: [
       "ib message chat restore 7 --thread 3 --reason \"deleted by mistake\"",
       "ib message chat restore 7 --tarjous 23 --dry-run",
+    ],
+  },
+  {
+    command: "ib message chat search",
+    description:
+      "Search your own chat messages by body text (GET /api/messages/search). Scoped to threads you participate in (the participant JOIN is the tenant boundary); non-deleted only; newest first. q min 2 chars; --limit default 50, max 200.",
+    auth: "any",
+    args: [{ name: "query", type: "string", required: true, description: "Body substring to search for (min 2 chars)" }],
+    flags: [{ name: "limit", type: "number", default: "50", description: "Max results (server max 200)" }],
+    outputShape:
+      "ListEnvelope<{ messageId, threadId, contextType, contextId, senderPersonId, body, createdAt, personFirstName, personLastName }>",
+    errors: [
+      apiErr(400, "Query too short", "q must be at least 2 characters"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Only your own threads are searched — the participant JOIN is the tenant boundary.",
+      "Substring (LIKE) match; literal % / _ in the query are matched literally.",
+      "Deploy-gated: the /search route must be deployed to the target backend.",
+    ],
+    seeAlso: ["ib message chat list", "ib message chat threads"],
+    examples: [
+      'ib message chat search "betoni"',
+      'ib message chat search "ajoyhteys" --limit 20',
     ],
   },
   // ─── message support (4) ──────────────────────────────────────────────────
