@@ -1397,11 +1397,12 @@ exports[`Help snapshots — contract stability > help for ib changelog release m
   ib changelog release [flags]
 
 DESCRIPTION
-  Stamp all currently-unreleased entries with a version tag (marks them released).
+  Stamp unreleased entries with a version tag (marks them released). Called by scripts/apply-release-version.ps1. Use --vtag to stamp them all with one tag, or --map for precise per-entry repo@version tags.
   Auth: requires login (any authenticated user).
 
 FLAGS
-  --vtag STRING    Version tag to stamp (e.g. 1.0.8) (required)
+  --vtag STRING    Single version tag to stamp on all pending entries (e.g. 1.0.8)
+  --map STRING    JSON file (or -): [{changelogId, versionTag}] for precise per-entry stamping
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -1412,18 +1413,20 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { released, versionTag } | { dryRun, wouldRelease }
+  { released, versionTag } | { released, mode:'map' } | { dryRun, wouldRelease }
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
-  exit 4 (HTTP 400)  Validation (missing versionTag) → pass --vtag
+  exit 4 (HTTP 400)  Validation (need --vtag or --map) → pass exactly one of --vtag/--map
 
 NOTES
   - Developer-gated.
+  - Provide exactly one of --vtag (one tag for all) or --map (precise per-entry repo@version).
   - Typically invoked by scripts/apply-release-version.ps1, not by hand.
 
 EXAMPLES
   ib changelog release --vtag 1.0.8 --reason 'release 1.0.8'
+  ib changelog release --map ./stampMap.json --reason 'release'
 "
 `;
 

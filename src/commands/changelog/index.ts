@@ -24,8 +24,14 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
+import { readFileSync } from "node:fs";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
+
+function readJsonInput(path: string): unknown {
+  const raw = path === "-" ? readFileSync(0, "utf8") : readFileSync(path, "utf8");
+  return JSON.parse(raw);
+}
 
 type Row = Record<string, unknown>;
 
@@ -139,6 +145,18 @@ export async function runChangelogRelease(
   return client.post<unknown>(
     "/api/changelog/release",
     { versionTag },
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+export async function runChangelogReleaseMap(
+  client: ApiClient,
+  map: Array<{ changelogId: number; versionTag: string }>,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>(
+    "/api/changelog/release",
+    { map },
     { headers: writeFlagsToHeaders(flags) }
   );
 }
@@ -352,12 +370,27 @@ export function registerChangelogCommands(
     c
       .command("release")
       .description(
-        "Stamp all currently-unreleased entries with a version tag (marks them released). Called by the deploy step after a successful version bump."
+        "Stamp unreleased entries with a version tag (marks them released). Called by scripts/apply-release-version.ps1. Use --vtag to stamp them all with one tag, or --map for precise per-entry repo@version tags."
       )
-      .requiredOption("--vtag <v>", "Version tag to stamp (e.g. 1.0.8)")
-  ).action(async (o: WriteFlags & { vtag: string }) => {
+      .option("--vtag <v>", "Single version tag to stamp on every pending entry (e.g. 1.0.8)")
+      .option("--map <file>", "JSON file (or - for stdin): [{changelogId, versionTag}] for precise per-entry stamping")
+  ).action(async (o: WriteFlags & { vtag?: string; map?: string }) => {
+    if ((o.vtag ? 1 : 0) + (o.map ? 1 : 0) !== 1) {
+      failWith("provide exactly one of --vtag or --map", 4);
+    }
     try {
-      writeJson(await runChangelogRelease(await getClient(), o.vtag, o));
+      if (o.map) {
+        let arr: unknown;
+        try { arr = readJsonInput(o.map); } catch { failWith("--map: not valid JSON", 4); }
+        if (!Array.isArray(arr)) failWith("--map: JSON root must be an array of {changelogId, versionTag}", 4);
+        writeJson(await runChangelogReleaseMap(
+          await getClient(),
+          arr as Array<{ changelogId: number; versionTag: string }>,
+          o
+        ));
+      } else {
+        writeJson(await runChangelogRelease(await getClient(), o.vtag as string, o));
+      }
     } catch (e) {
       exitWithError(e);
     }
@@ -642,18 +675,28 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
   {
     command: "ib changelog release",
     description:
-      "Stamp all currently-unreleased entries with a version tag (marks them released).",
+      "Stamp unreleased entries with a version tag (marks them released). Called by scripts/apply-release-version.ps1. Use --vtag to stamp them all with one tag, or --map for precise per-entry repo@version tags.",
     auth: "any",
     tier: "developer",
-    flags: [{ name: "vtag", type: "string", required: true, description: "Version tag to stamp (e.g. 1.0.8)" }],
+    flags: [
+      { name: "vtag", type: "string", description: "Single version tag to stamp on all pending entries (e.g. 1.0.8)" },
+      { name: "map", type: "string", description: "JSON file (or -): [{changelogId, versionTag}] for precise per-entry stamping" },
+    ],
     writeFlags: true,
     mutates: true,
-    outputShape: "{ released, versionTag } | { dryRun, wouldRelease }",
+    outputShape: "{ released, versionTag } | { released, mode:'map' } | { dryRun, wouldRelease }",
     errors: [
       { http: 403, exit: 3, meaning: "Developer only", remedy: "dev token" },
-      { http: 400, exit: 4, meaning: "Validation (missing versionTag)", remedy: "pass --vtag" },
+      { http: 400, exit: 4, meaning: "Validation (need --vtag or --map)", remedy: "pass exactly one of --vtag/--map" },
     ],
-    notes: ["Developer-gated.", "Typically invoked by scripts/apply-release-version.ps1, not by hand."],
-    examples: ["ib changelog release --vtag 1.0.8 --reason 'release 1.0.8'"],
+    notes: [
+      "Developer-gated.",
+      "Provide exactly one of --vtag (one tag for all) or --map (precise per-entry repo@version).",
+      "Typically invoked by scripts/apply-release-version.ps1, not by hand.",
+    ],
+    examples: [
+      "ib changelog release --vtag 1.0.8 --reason 'release 1.0.8'",
+      "ib changelog release --map ./stampMap.json --reason 'release'",
+    ],
   },
 ];

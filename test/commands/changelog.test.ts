@@ -142,7 +142,7 @@ describe("changelog add bumpLevel", () => {
   });
 });
 
-import { runChangelogPending, runChangelogRelease } from "../../src/commands/changelog/index.js";
+import { runChangelogPending, runChangelogRelease, runChangelogReleaseMap } from "../../src/commands/changelog/index.js";
 
 describe("changelog pending/release", () => {
   test("pending GETs /api/changelog/pending", async () => {
@@ -160,6 +160,23 @@ describe("changelog pending/release", () => {
     expect(client.post).toHaveBeenCalledWith(
       "/api/changelog/release",
       { versionTag: "1.0.8" },
+      expect.objectContaining({ headers: expect.any(Object) })
+    );
+  });
+});
+
+describe("changelog release --map", () => {
+  test("posts { map } to /api/changelog/release with write headers", async () => {
+    const c = mockClient();
+    c.post.mockResolvedValue({ released: 2, mode: "map" });
+    const map = [
+      { changelogId: 7, versionTag: "puminet5api@0.62.13" },
+      { changelogId: 8, versionTag: "puminet4@0.62.10" },
+    ];
+    await runChangelogReleaseMap(c as never, map, { reason: "release" });
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/changelog/release",
+      { map },
       expect.objectContaining({ headers: expect.any(Object) })
     );
   });
