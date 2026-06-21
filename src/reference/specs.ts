@@ -5150,6 +5150,151 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ib message support resolve 42 --reopen",
     ],
   },
+  // ─── message thread (5) ──────────────────────────────────────────────────────
+  {
+    command: "ib message thread archive",
+    description:
+      "Archive a thread (POST /api/messages/threads/:id/archive). Sets archivedAt — the thread becomes read-only; send/edit/restore then 409. Idempotent (already archived → alreadyArchived:true). Manager-gated: owning-company admin or sysadmin/developer.",
+    auth: "any",
+    args: [{ name: "threadId", type: "number", required: false, description: "Thread id (omit when using --tarjous)" }],
+    flags: [
+      { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+    ],
+    writeFlags: true,
+    outputShape: "{ threadId, archived:true } (+ alreadyArchived:true if already archived)",
+    errors: [
+      apiErr(403, "Not a manager of this thread", "requires owning-company admin role or sysadmin/developer"),
+      apiErr(404, "Thread not found", "check the threadId via `ib message chat threads`"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.",
+      "Archived thread is read-only — send/edit/restore return 409 until reopened.",
+      "Idempotent: archiving an already-archived thread returns alreadyArchived:true (no error).",
+      "Deploy-gated: the archive route must be deployed to the target backend.",
+    ],
+    seeAlso: ["ib message thread reopen", "ib message chat send"],
+    examples: [
+      "ib message thread archive 3 --reason \"case closed\"",
+      "ib message thread archive --tarjous 23",
+    ],
+  },
+  {
+    command: "ib message thread reopen",
+    description:
+      "Reopen an archived thread (POST /api/messages/threads/:id/reopen). Clears archivedAt so messages can be sent again. Idempotent (already open → alreadyOpen:true). Manager-gated: owning-company admin or sysadmin/developer.",
+    auth: "any",
+    args: [{ name: "threadId", type: "number", required: false, description: "Thread id (omit when using --tarjous)" }],
+    flags: [
+      { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+    ],
+    writeFlags: true,
+    outputShape: "{ threadId, archived:false } (+ alreadyOpen:true if already open)",
+    errors: [
+      apiErr(403, "Not a manager of this thread", "requires owning-company admin role or sysadmin/developer"),
+      apiErr(404, "Thread not found", "check the threadId via `ib message chat threads`"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.",
+      "Idempotent: reopening an already-open thread returns alreadyOpen:true (no error).",
+      "Deploy-gated: the reopen route must be deployed to the target backend.",
+    ],
+    seeAlso: ["ib message thread archive", "ib message chat send"],
+    examples: [
+      "ib message thread reopen 3 --reason \"new information\"",
+      "ib message thread reopen --tarjous 23",
+    ],
+  },
+  {
+    command: "ib message thread rename",
+    description:
+      'Set or clear the thread title (PATCH /api/messages/threads/:id; body { title }). Title max 200 chars; empty string clears it (sets to NULL). Manager-gated: owning-company admin or sysadmin/developer. Requires the messageThread.title migration to have run on the DB before the rename route is deployed.',
+    auth: "any",
+    args: [{ name: "threadId", type: "number", required: false, description: "Thread id (omit when using --tarjous)" }],
+    flags: [
+      { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+      { name: "title", type: "string", required: true, description: 'New thread title (max 200 chars; "" clears)' },
+    ],
+    writeFlags: true,
+    outputShape: "{ threadId, title } (title is null when cleared)",
+    errors: [
+      apiErr(400, "Title too long", "max 200 characters"),
+      apiErr(403, "Not a manager of this thread", "requires owning-company admin role or sysadmin/developer"),
+      apiErr(404, "Thread not found", "check the threadId via `ib message chat threads`"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.",
+      'Pass --title "" to clear the title (sets messageThread.title = NULL).',
+      "Deploy-gated: requires the messageThread.title migration (2026-06-21-messageThread-title.sql) to run on the DB BEFORE the rename route deploys — otherwise the backend 500s on missing column.",
+    ],
+    seeAlso: ["ib message chat thread", "ib message thread archive"],
+    examples: [
+      'ib message thread rename 3 --title "Betonijerry #42 — toimitus valmis"',
+      'ib message thread rename --tarjous 23 --title ""',
+    ],
+  },
+  {
+    command: "ib message thread participant add",
+    description:
+      "Add a colleague to a thread (POST /api/messages/threads/:id/participants; body { personId, role? }). The person must be a member of the thread's owning company (asiakasPerson membership check — the privacy gate; cross-company adds are blocked at 403). Idempotent via MERGE (reactivates a soft-left row). Manager-gated.",
+    auth: "any",
+    args: [{ name: "threadId", type: "number", required: false, description: "Thread id (omit when using --tarjous)" }],
+    flags: [
+      { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+      { name: "person", type: "number", required: true, description: "personId to add" },
+      { name: "role", type: "string", description: "Participant role (customer|pumppu|betoni|lattia|support|provider; default pumppu)" },
+    ],
+    writeFlags: true,
+    outputShape: "{ threadId, personId, role, added:true }",
+    errors: [
+      apiErr(403, "Not a manager of this thread", "requires owning-company admin role or sysadmin/developer"),
+      apiErr(403, "Person not in owning company", "the person must be a member of thread.ownerAsiakasId (asiakasPerson membership — privacy gate; cross-company adds are blocked)"),
+      apiErr(404, "Thread not found", "check the threadId via `ib message chat threads`"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.",
+      "Privacy gate: the added person must be a member of the thread's owning company (asiakasPerson JOIN). Cross-company adds are blocked at 403.",
+      "Idempotent: re-adding a participant who left reactivates the row (sets leftAt = NULL) and updates role.",
+      "Deploy-gated: the participants route must be deployed to the target backend.",
+    ],
+    seeAlso: ["ib message thread participant remove", "ib message chat thread"],
+    examples: [
+      "ib message thread participant add 3 --person 42",
+      "ib message thread participant add 3 --person 42 --role pumppu --reason \"added to cover\"",
+      "ib message thread participant add --tarjous 23 --person 42",
+    ],
+  },
+  {
+    command: "ib message thread participant remove",
+    description:
+      "Soft-remove a participant from a thread (DELETE /api/messages/threads/:id/participants/:personId; sets leftAt = now). Manager-gated: owning-company admin or sysadmin/developer.",
+    auth: "any",
+    args: [{ name: "threadId", type: "number", required: false, description: "Thread id (omit when using --tarjous)" }],
+    flags: [
+      { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+      { name: "person", type: "number", required: true, description: "personId to remove" },
+    ],
+    writeFlags: true,
+    outputShape: "{ threadId, personId, removed:true|false } (removed:false when the participant was already gone)",
+    errors: [
+      apiErr(403, "Not a manager of this thread", "requires owning-company admin role or sysadmin/developer"),
+      apiErr(404, "Thread not found", "check the threadId via `ib message chat threads`"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.",
+      "Soft-remove: sets leftAt = now (the row is kept for audit). removed:false when the participant had already left.",
+      "Deploy-gated: the participants route must be deployed to the target backend.",
+    ],
+    seeAlso: ["ib message thread participant add", "ib message chat thread"],
+    examples: [
+      "ib message thread participant remove 3 --person 42 --reason \"left project\"",
+      "ib message thread participant remove --tarjous 23 --person 42",
+    ],
+  },
   // ─── message daily (11) — co-located specs (see import at top) ──────────────
   ...MESSAGE_DAILY_SPECS,
   // ─── message board (6) — co-located specs (see import at top) ───────────────

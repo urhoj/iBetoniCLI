@@ -4,6 +4,7 @@ import { registerMessageChatCommands } from "./chat/index.js";
 import { registerMessageDailyCommands } from "./daily/index.js";
 import { registerMessageBoardCommands } from "./board/index.js";
 import { registerMessageSupportCommands } from "./support/index.js";
+import { registerMessageThreadCommands } from "./thread/index.js";
 
 /**
  * Register the `ib message` umbrella — communication systems grouped for
@@ -31,4 +32,5 @@ export function registerMessageCommands(
   registerMessageDailyCommands(m, getClient);
   registerMessageBoardCommands(m, getClient);
   registerMessageSupportCommands(m, getClient);
+  registerMessageThreadCommands(m, getClient);
 }
