@@ -2856,6 +2856,7 @@ FLAGS
   --stalest NUMBER    Return up to N entries, stalest first
   --domain STRING    Filter to a domain (exact match)
   --related STRING    Filter to terms whose relatedCommands contain this substring
+  --terms-only BOOLEAN    Return only {term, synonyms} per entry — the cheap INDEX view (strips definitions); use to discover which terms exist.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -2866,11 +2867,15 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 2  Not authenticated      → Run \`ib auth login\`
 
+NOTES
+  - --terms-only is client-side: it strips each row to {term, synonyms} after the server-side filters apply. Use it instead of a full list to discover terms cheaply (the full list returns every definition).
+
 EXAMPLES
   ib glossary list
   ib glossary list --search puomi
   ib glossary list --stalest 10
   ib glossary list --domain vacation
+  ib glossary list --terms-only
 "
 `;
 

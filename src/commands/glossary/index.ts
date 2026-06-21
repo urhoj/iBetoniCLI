@@ -265,6 +265,7 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
     .option("--stalest <n>", "Return up to N entries, stalest first", (v: string) => Number(v))
     .option("--domain <d>", "Filter to a domain (exact match)")
     .option("--related <substr>", "Filter to terms whose relatedCommands contain this substring")
+    .option("--terms-only", "Return only {term, synonyms} per entry (cheap index view; strips definitions)")
     .action(async (opts: { search?: string; stalest?: number; domain?: string; related?: string }) => {
       try { writeJson(await runGlossaryList(await getClient(), opts)); } catch (e) { exitWithError(e); }
     });
