@@ -20,6 +20,7 @@ import {
   runJerryOfferWithdraw,
   runJerryAdminRequests,
   runJerryAdminRequestOffers,
+  runJerryAdminRequestGet,
   runJerryAdminRequestExpire,
   runJerryAdminRequestCancel,
   runJerryAdminRequestResend,
@@ -443,5 +444,12 @@ describe("ib jerry admin request write commands", () => {
     del.mockResolvedValueOnce({ success: true });
     await runJerryAdminRequestDelete(mockClient, 41, { reason: "cleanup" } as WriteFlags);
     expect(del).toHaveBeenCalledWith("/api/admin/jerry-requests/41", expect.objectContaining({ headers: expect.any(Object) }));
+  });
+
+  test("admin request-get GETs the single-request path", async () => {
+    get.mockResolvedValueOnce({ pumppuRequestId: 41, status: "open" });
+    const result = await runJerryAdminRequestGet(mockClient, 41);
+    expect(get).toHaveBeenCalledWith("/api/admin/jerry-requests/41");
+    expect(result).toEqual({ pumppuRequestId: 41, status: "open" });
   });
 });

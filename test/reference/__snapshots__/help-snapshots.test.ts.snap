@@ -3248,6 +3248,38 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib jerry admin request-get matches snapshot 1`] = `
+"USAGE
+  ib jerry admin request-get <requestId> [flags]
+
+DESCRIPTION
+  One request's full detail — date, customer, placing operator, worksite, m³, status, offer count, accepted/best price (GET /api/admin/jerry-requests/:id). For the offers use \`ib jerry admin request-offers\`. System-admin only.
+  Permissions: requires isSystemAdmin.
+
+ARGUMENTS
+  <requestId> NUMBER    pumppuRequestId (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { pumppuRequestId, status, createdAt, sentAt, expiresAt, totalM3, kayttokohde, customerAsiakasId, customerNimi, operatorName, osoite, offerCount, acceptedPriceCents, bestPriceCents }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Invalid id             → pass a numeric requestId
+  exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
+  exit 5 (HTTP 404)  Request not found      → verify pumppuRequestId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry admin request-get 41
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib jerry admin request-offers matches snapshot 1`] = `
 "USAGE
   ib jerry admin request-offers <requestId> [flags]

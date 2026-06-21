@@ -3503,6 +3503,24 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib jerry admin requests --status open,accepted", "ib jerry admin requests --provider 1402 --from 2026-06-01"],
   },
   {
+    command: "ib jerry admin request-get",
+    description:
+      "One request's full detail — date, customer, placing operator, worksite, m³, status, offer count, accepted/best price (GET /api/admin/jerry-requests/:id). For the offers use `ib jerry admin request-offers`. System-admin only.",
+    permissions: ["isSystemAdmin"],
+    tier: "developer",
+    args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
+    flags: [],
+    outputShape:
+      "{ pumppuRequestId, status, createdAt, sentAt, expiresAt, totalM3, kayttokohde, customerAsiakasId, customerNimi, operatorName, osoite, offerCount, acceptedPriceCents, bestPriceCents }",
+    errors: [
+      apiErr(400, "Invalid id", "pass a numeric requestId"),
+      apiErr(403, "Not a system admin", "use a system-admin token"),
+      apiErr(404, "Request not found", "verify pumppuRequestId"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ["ib jerry admin request-get 41"],
+  },
+  {
     command: "ib jerry admin request-offers",
     description:
       "All offers on one request (admin view, no PII masking): offering company, contact, price, status, scheduledAt/keikka (GET /api/admin/jerry-requests/:id/offers). System-admin only.",
