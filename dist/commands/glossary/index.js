@@ -143,6 +143,13 @@ export async function runGlossaryList(client, opts) {
     return { items: res.items, nextCursor: null, count: res.count, truncated: opts.stalest != null };
 }
 export async function runGlossarySet(client, term, opts, flags = {}) {
+    // Append flags edit in place; they cannot combine with their overwrite twin.
+    if (opts.definition !== undefined && opts.appendDefinition !== undefined) {
+        failWith("--definition and --append-definition are mutually exclusive", 4);
+    }
+    if (opts.synonyms !== undefined && (opts.addSynonyms !== undefined || opts.removeSynonyms !== undefined)) {
+        failWith("--synonyms and --add-synonyms/--remove-synonyms are mutually exclusive", 4);
+    }
     const headers = { ...writeFlagsToHeaders(flags), ...(opts.updateOnly ? { "X-Update-Only": "1" } : {}) };
     // PARTIAL update (PATCH): send ONLY the fields the caller actually passed. An
     // omitted flag is left out of the body entirely, so the backend preserves the
@@ -161,6 +168,12 @@ export async function runGlossarySet(client, term, opts, flags = {}) {
         body.relatedEntity = opts.entity;
     if (opts.domain !== undefined)
         body.domain = opts.domain;
+    if (opts.addSynonyms !== undefined)
+        body.addSynonyms = splitList(opts.addSynonyms);
+    if (opts.removeSynonyms !== undefined)
+        body.removeSynonyms = splitList(opts.removeSynonyms);
+    if (opts.appendDefinition !== undefined)
+        body.appendDefinition = opts.appendDefinition;
     return client.put(`/api/cli/glossary/${encodeURIComponent(term)}`, body, { headers });
 }
 export async function runGlossaryMisses(client, top) {
@@ -249,7 +262,10 @@ export function registerGlossaryCommands(program, getClient) {
         .option("--entity <e>", "Related DB entity, e.g. Person / personId (omit to keep)")
         .option("--domain <d>", "Domain grouping (e.g. vacation) (omit to keep)")
         .option("--update-only", "Only update an existing term; do not create a new one (404 if absent)")
-        .option("--from-json <file>", "Read fields from a JSON object file (or - for stdin); explicit flags override");
+        .option("--from-json <file>", "Read fields from a JSON object file (or - for stdin); explicit flags override")
+        .option("--add-synonyms <list>", "Comma-separated synonyms to ADD (no full resend; excl. --synonyms)")
+        .option("--remove-synonyms <list>", "Comma-separated synonyms to REMOVE by name (excl. --synonyms)")
+        .option("--append-definition <text>", "Append a clause to the current definition (excl. --definition)");
     addWriteFlagsToCommand(set).action(async (term, opts) => {
         let merged = { definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity, domain: opts.domain };
         if (opts.fromJson) {
@@ -263,7 +279,9 @@ export function registerGlossaryCommands(program, getClient) {
             merged = mergeSetInput(json, { definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity, domain: opts.domain });
         }
         try {
-            writeJson(await runGlossarySet(await getClient(), term, { definition: merged.definition, synonyms: merged.synonyms, related: merged.related, entity: merged.entity, domain: merged.domain, updateOnly: opts.updateOnly }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
+            writeJson(await runGlossarySet(await getClient(), term, { definition: merged.definition, synonyms: merged.synonyms, related: merged.related, entity: merged.entity, domain: merged.domain,
+                addSynonyms: opts.addSynonyms, removeSynonyms: opts.removeSynonyms, appendDefinition: opts.appendDefinition,
+                updateOnly: opts.updateOnly }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
         }
         catch (e) {
             exitWithError(e);
