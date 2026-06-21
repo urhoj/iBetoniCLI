@@ -3253,6 +3253,22 @@ const BASE_COMMAND_SPECS = [
         examples: ["ib jerry admin requests --status open,accepted", "ib jerry admin requests --provider 1402 --from 2026-06-01"],
     },
     {
+        command: "ib jerry admin request-get",
+        description: "One request's full detail — date, customer, placing operator, worksite, m³, status, offer count, accepted/best price (GET /api/admin/jerry-requests/:id). For the offers use `ib jerry admin request-offers`. System-admin only.",
+        permissions: ["isSystemAdmin"],
+        tier: "developer",
+        args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
+        flags: [],
+        outputShape: "{ pumppuRequestId, status, createdAt, sentAt, expiresAt, totalM3, kayttokohde, customerAsiakasId, customerNimi, operatorName, osoite, offerCount, acceptedPriceCents, bestPriceCents }",
+        errors: [
+            apiErr(400, "Invalid id", "pass a numeric requestId"),
+            apiErr(403, "Not a system admin", "use a system-admin token"),
+            apiErr(404, "Request not found", "verify pumppuRequestId"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        examples: ["ib jerry admin request-get 41"],
+    },
+    {
         command: "ib jerry admin request-offers",
         description: "All offers on one request (admin view, no PII masking): offering company, contact, price, status, scheduledAt/keikka (GET /api/admin/jerry-requests/:id/offers). System-admin only.",
         permissions: ["isSystemAdmin"],
@@ -3277,7 +3293,7 @@ const BASE_COMMAND_SPECS = [
     },
     {
         command: "ib jerry admin request-cancel",
-        description: "Cancel any request regardless of state (POST /api/admin/jerry-requests/:id/cancel). status → cancelled. System-admin only. Requires --reason.",
+        description: "Cancel a non-terminal, non-accepted request (POST /api/admin/jerry-requests/:id/cancel). status → cancelled. Already cancelled/expired/accepted → 409 (an accepted request has a confirmed offer/keikka and is not cancellable here). System-admin only. Requires --reason.",
         permissions: ["isSystemAdmin"],
         tier: "developer",
         args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
@@ -3301,7 +3317,7 @@ const BASE_COMMAND_SPECS = [
     },
     {
         command: "ib jerry admin request-delete",
-        description: "Delete a draft request permanently (DELETE /api/admin/jerry-requests/:id). Only draft/cancelled requests may be deleted. System-admin only. Requires --reason.",
+        description: "Delete a DRAFT request permanently (DELETE /api/admin/jerry-requests/:id). Only status='draft' rows are deletable; a non-draft or missing id returns 404. System-admin only. Requires --reason.",
         permissions: ["isSystemAdmin"],
         tier: "developer",
         args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
@@ -3310,8 +3326,7 @@ const BASE_COMMAND_SPECS = [
         outputShape: "{ success: true } or { dryRun: true, wouldDelete: { pumppuRequestId } }",
         errors: [
             apiErr(403, "Not a system admin", "use a system-admin token"),
-            apiErr(404, "Request not found", "verify pumppuRequestId"),
-            apiErr(409, "Wrong state", "only draft/cancelled requests may be deleted"),
+            apiErr(404, "Not a draft / not found", "only status='draft' rows are deletable; non-draft or missing id → 404"),
             ...COMMON_AUTH_ERRORS,
         ],
         examples: ['ib jerry admin request-delete 41 --reason "cleanup draft"'],

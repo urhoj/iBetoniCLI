@@ -32,6 +32,7 @@ type Row = Record<string, unknown>;
 const TYPES = ["feature", "improvement", "bugfix"];
 const AREAS = ["frontend", "backend", "cli", "database", "cicd"];
 const BUMP_LEVELS = ["none", "patch", "minor", "major"];
+const LANGUAGES = ["fi", "en"]; // devChangelog.language is CHAR(2) NOT NULL DEFAULT 'fi'
 
 /**
  * Normalize a Sentry issue reference: accept a bare short id (e.g. PUMINET5API-1A2)
@@ -61,6 +62,7 @@ export interface ChangelogAddBody {
   bumpLevel?: string;
   feedbackId?: number;
   sentryIssue?: string;
+  language?: string;
 }
 
 /**
@@ -150,6 +152,14 @@ function validateEnums(type?: string, area?: string, bumpLevel?: string): void {
     failWith(`--bump-level must be ${BUMP_LEVELS.join("|")}`, 4);
 }
 
+/** Normalize --language to a validated lowercase fi|en, or undefined when not passed. Exits 4 on a bad code. */
+export function normalizeLanguage(lang?: string): string | undefined {
+  if (lang === undefined) return undefined;
+  const v = lang.trim().toLowerCase();
+  if (!LANGUAGES.includes(v)) failWith(`--language must be ${LANGUAGES.join("|")}`, 4);
+  return v;
+}
+
 export function registerChangelogCommands(
   parent: Command,
   getClient: () => Promise<ApiClient>
@@ -182,6 +192,7 @@ export function registerChangelogCommands(
       .option("--feedback <id>", "cliFeedback id this resolves", Number)
       .option("--sentry <ref>", "Sentry issue short id or URL this fixes")
       .option("--date <d>", "Entry date (YYYY-MM-DD|today), default today")
+      .option("--language <l>", "Entry language (fi|en), default fi")
   ).action(
     async (
       o: Record<string, string> & WriteFlags & { feedback?: number; vtag?: string; bumpLevel?: string }
@@ -211,6 +222,8 @@ export function registerChangelogCommands(
       if (o.vtag) body.versionTag = o.vtag;
       if (o.feedback !== undefined) body.feedbackId = Number(o.feedback);
       if (o.sentry) body.sentryIssue = normalizeSentryRef(o.sentry);
+      const addLang = normalizeLanguage(o.language);
+      if (addLang) body.language = addLang;
       body.bumpLevel = o.bumpLevel || "patch";
       try {
         writeJson(await runChangelogAdd(await getClient(), body, o));
@@ -266,6 +279,7 @@ export function registerChangelogCommands(
       .option("--sha <csv>", "Commit SHAs (CSV)")
       .option("--vtag <s>", "Version tag")
       .option("--date <d>", "Entry date (YYYY-MM-DD|today)")
+      .option("--language <l>", "Entry language (fi|en)")
   ).action(async (id: string, o: Record<string, string> & WriteFlags & { vtag?: string }) => {
     validateEnums(o.type, o.area);
     const patch: Partial<ChangelogAddBody> = {};
@@ -293,6 +307,8 @@ export function registerChangelogCommands(
     if (o.sha) patch.commitShas = o.sha;
     if (o.vtag) patch.versionTag = o.vtag;
     if (o.date) patch.entryDate = resolveDate(o.date)!;
+    const updLang = normalizeLanguage(o.language);
+    if (updLang) patch.language = updLang;
     try {
       writeJson(
         await runChangelogUpdate(await getClient(), Number(id), patch, o)
@@ -409,6 +425,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         type: "date",
         description: "Entry date (YYYY-MM-DD|today)",
       },
+      { name: "language", type: "string", description: "Entry language (fi|en), default fi" },
     ],
     writeFlags: true,
     mutates: true,
@@ -556,6 +573,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         type: "date",
         description: "Entry date (YYYY-MM-DD|today)",
       },
+      { name: "language", type: "string", description: "Entry language (fi|en)" },
     ],
     writeFlags: true,
     mutates: true,
@@ -567,8 +585,17 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         meaning: "Developer only",
         remedy: "dev token",
       },
+      {
+        http: 400,
+        exit: 4,
+        meaning: "Validation (bad enum/language)",
+        remedy: "language must be fi|en",
+      },
     ],
-    examples: ['ib changelog update 7 --status "Deployed prod"'],
+    examples: [
+      'ib changelog update 7 --status "Deployed prod"',
+      "ib changelog update 386 --language en",
+    ],
   },
   {
     command: "ib changelog report",

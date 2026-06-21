@@ -1,5 +1,5 @@
 import { test, expect, vi, beforeEach, describe } from "vitest";
-import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, normalizeSentryRef }
+import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, normalizeSentryRef, normalizeLanguage }
   from "../../src/commands/changelog/index.js";
 import type { ChangelogAddBody } from "../../src/commands/changelog/index.js";
 import type { ApiClient } from "../../src/api/client.js";
@@ -56,6 +56,31 @@ test("update --dry-run never puts", async () => {
   const r = await runChangelogUpdate(client, 7, { status: "Deployed" }, { dryRun: true });
   expect(r).toMatchObject({ dryRun: true, wouldUpdate: { id: 7, patch: { status: "Deployed" } } });
   expect(asPut()).not.toHaveBeenCalled();
+});
+
+test("update puts language in the patch body", async () => {
+  asPut().mockResolvedValue({ changelogId: 7, language: "en" });
+  await runChangelogUpdate(client, 7, { language: "en" }, {});
+  expect(asPut()).toHaveBeenCalledWith("/api/changelog/7",
+    expect.objectContaining({ language: "en" }), { headers: {} });
+});
+
+test("add posts language in the body", async () => {
+  asPost().mockResolvedValue({ changelogId: 9 });
+  await runChangelogAdd(client,
+    { type: "feature", area: "cli", title: "t", description: "d", entryDate: "2026-06-21", language: "en" }, {});
+  expect(asPost()).toHaveBeenCalledWith("/api/changelog",
+    expect.objectContaining({ language: "en" }), { headers: {} });
+});
+
+test("normalizeLanguage lowercases, trims, and passes undefined through", () => {
+  expect(normalizeLanguage("EN")).toBe("en");
+  expect(normalizeLanguage("  fi ")).toBe("fi");
+  expect(normalizeLanguage(undefined)).toBeUndefined();
+});
+
+test("normalizeLanguage rejects an unsupported code (exit 4)", () => {
+  expect(() => normalizeLanguage("de")).toThrow(/fi\|en/);
 });
 
 test("normalizeSentryRef returns a bare short id unchanged", () => {

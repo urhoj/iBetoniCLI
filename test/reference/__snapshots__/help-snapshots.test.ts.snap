@@ -1270,6 +1270,7 @@ FLAGS
   --feedback NUMBER    cliFeedback id this entry resolves
   --sentry STRING    Sentry issue short id or URL this entry fixes (stored, not sent to Sentry)
   --date DATE    Entry date (YYYY-MM-DD|today)
+  --language STRING    Entry language (fi|en), default fi
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -1472,6 +1473,7 @@ FLAGS
   --sha STRING    Commit SHAs (CSV)
   --vtag STRING    Version tag
   --date DATE    Entry date (YYYY-MM-DD|today)
+  --language STRING    Entry language (fi|en)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -1486,9 +1488,11 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
+  exit 4 (HTTP 400)  Validation (bad enum/language) → language must be fi|en
 
 EXAMPLES
   ib changelog update 7 --status "Deployed prod"
+  ib changelog update 386 --language en
 "
 `;
 

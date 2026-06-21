@@ -231,6 +231,10 @@ export async function runJerryAdminRequests(client, opts) {
     const items = Array.isArray(data?.requests) ? data.requests : [];
     return { items, nextCursor: null, count: items.length, truncated: !!data?.truncated };
 }
+/** One request's full detail, admin view (GET /api/admin/jerry-requests/:id). System-admin only. */
+export async function runJerryAdminRequestGet(client, id) {
+    return client.get(`/api/admin/jerry-requests/${id}`);
+}
 /** Offers on one request, admin view (GET /api/admin/jerry-requests/:id/offers). */
 export async function runJerryAdminRequestOffers(client, id) {
     return toEnvelope(await client.get(`/api/admin/jerry-requests/${id}/offers`));
@@ -624,6 +628,18 @@ export function registerJerryCommands(parent, getClient) {
         try {
             const client = await getClient();
             writeJson(await runJerryAdminRequests(client, opts));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    admin
+        .command("request-get <requestId>")
+        .description("One request's full detail (admin view)")
+        .action(async (idStr) => {
+        try {
+            const client = await getClient();
+            writeJson(await runJerryAdminRequestGet(client, parseId(idStr, "requestId")));
         }
         catch (e) {
             exitWithError(e);
