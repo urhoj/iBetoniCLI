@@ -4786,7 +4786,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ib search jäteasema --in sijainti",
     ],
   },
-  // ─── message chat (6) ────────────────────────────────────────────────────
+  // ─── message chat (7) ────────────────────────────────────────────────────
   {
     command: "ib message chat threads",
     description:
@@ -4952,6 +4952,38 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: [
       'ib message chat delete 5 --thread 3 --reason "test cleanup"',
       "ib message chat delete 5 --tarjous 23 --dry-run",
+    ],
+  },
+  {
+    command: "ib message chat edit",
+    description:
+      "Edit a chat message's body (PATCH /api/messages/threads/:id/messages/:messageId). Author-only and only while unanswered (no later reply from a different participant). Moderators cannot edit. Sets editedAt, emits message:edited, no-ops if the body is unchanged. --dry-run previews the from→to diff CLIENT-SIDE.",
+    auth: "any",
+    args: [{ name: "messageId", type: "number", required: true, description: "Message id to edit (the message PK)" }],
+    flags: [
+      { name: "thread", type: "number", description: "Thread id the message belongs to" },
+      { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
+      { name: "body", type: "string", required: true, description: "New message text (max 4000 chars)" },
+    ],
+    writeFlags: true,
+    outputShape:
+      "{ messageId, threadId, senderPersonId, body, editedAt, ... } (enriched row) · { messageId, threadId, unchanged:true } on no-op · { dryRun:true, threadId, wouldEdit:{ messageId, from, to } } on --dry-run",
+    errors: [
+      apiErr(400, "Empty / too-long body", "body is required, max 4000 chars"),
+      apiErr(403, "Not the author", "you can only edit your own messages"),
+      apiErr(404, "Thread or message not found", "check the threadId/messageId"),
+      apiErr(409, "Answered or deleted", "you cannot edit a message that was replied to, or a deleted one"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Author-only — no moderator override (rewriting another person's words is worse than deleting).",
+      "--dry-run lists the thread to show the diff; it never PATCHes (works under --read-only).",
+      "Deploy-gated: the PATCH route must be deployed to the target backend.",
+    ],
+    seeAlso: ["ib message chat send", "ib message chat delete"],
+    examples: [
+      'ib message chat edit 7 --thread 3 --body "korjattu teksti" --reason typo',
+      'ib message chat edit 7 --tarjous 23 --body "korjattu" --dry-run',
     ],
   },
   // ─── message support (4) ──────────────────────────────────────────────────

@@ -161,6 +161,44 @@ export async function runChatDelete(
   );
 }
 
+/** Options for {@link runChatEdit}. */
+export interface ChatEditOpts {
+  body: string;
+  reason?: string;
+  idempotencyKey?: string;
+  dryRun?: boolean;
+}
+
+/**
+ * PATCH /api/messages/threads/:id/messages/:messageId — edit a message body.
+ *
+ * `--dry-run` is CLIENT-SIDE: lists the thread, finds the target, returns the
+ * from→to diff without issuing the PATCH (works under --read-only). A miss →
+ * exit 5. Server-side this is author-only and only while unanswered.
+ */
+export async function runChatEdit(
+  client: ApiClient,
+  threadId: number,
+  messageId: number,
+  opts: ChatEditOpts
+): Promise<unknown> {
+  if (opts.dryRun) {
+    const list = await runChatList(client, threadId, {});
+    const target = list.items.find((m) => Number(m.messageId) === messageId);
+    if (!target) failWith(`Message ${messageId} not found in thread ${threadId}`, 5);
+    return {
+      dryRun: true,
+      threadId,
+      wouldEdit: { messageId, from: target.body ?? null, to: opts.body },
+    };
+  }
+  return client.patch<unknown>(
+    `/api/messages/threads/${threadId}/messages/${messageId}`,
+    { body: opts.body },
+    { headers: writeFlagsToHeaders({ idempotencyKey: opts.idempotencyKey, reason: opts.reason }) }
+  );
+}
+
 /** Resolve the {@link ThreadTarget} from a positional + --tarjous option. */
 function targetFrom(threadIdStr: string | undefined, opts: { tarjous?: number }): ThreadTarget {
   return {
@@ -326,6 +364,36 @@ export function registerMessageChatCommands(
             dryRun: opts.dryRun,
           })
         );
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
+
+  const editCmd = c
+    .command("edit <messageId>")
+    .description(
+      "Edit a chat message's body. Author-only and only while unanswered. --dry-run previews the from→to diff CLIENT-SIDE (no edit)."
+    )
+    .option("--thread <id>", "Thread id the message belongs to", Number)
+    .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
+    .requiredOption("--body <text>", "New message text (max 4000 chars)");
+  addWriteFlagsToCommand(editCmd).action(
+    async (
+      messageIdStr: string,
+      opts: { thread?: number; tarjous?: number; body: string; dryRun?: boolean; idempotencyKey?: string; reason?: string }
+    ) => {
+      const messageId = parseOptionalId(messageIdStr, "messageId");
+      if (messageId === undefined) failWith("messageId is required", 4);
+      const body = String(opts.body ?? "").trim();
+      if (!body) failWith("Message body cannot be empty", 4);
+      if (body.length > 4000) failWith("Message body too long (max 4000 chars)", 4);
+      try {
+        const client = await getClient();
+        const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
+        writeJson(await runChatEdit(client, id, messageId, {
+          body, reason: opts.reason, idempotencyKey: opts.idempotencyKey, dryRun: opts.dryRun,
+        }));
       } catch (e) {
         exitWithError(e);
       }

@@ -6,6 +6,7 @@ import {
   runChatSend,
   runChatMarkRead,
   runChatDelete,
+  runChatEdit,
 } from "../../src/commands/message/chat/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -14,6 +15,7 @@ const mockClient = {
   post: vi.fn(),
   put: vi.fn(),
   delete: vi.fn(),
+  patch: vi.fn(),
   getCurrentToken: vi.fn(),
 } as unknown as ApiClient;
 const asGet = () => mockClient.get as ReturnType<typeof vi.fn>;
@@ -190,5 +192,41 @@ describe("runChatDelete", () => {
       runChatDelete(mockClient, 42, 999, { dryRun: true })
     ).rejects.toMatchObject({ exitCode: 5 });
     expect(mockClient.delete).not.toHaveBeenCalled();
+  });
+});
+
+describe("runChatEdit", () => {
+  const asPatch = () => mockClient.patch as ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    asGet().mockReset();
+    asPatch().mockReset();
+  });
+
+  test("a real edit PATCHes body + write headers", async () => {
+    asPatch().mockResolvedValueOnce({ messageId: 7, threadId: 42, body: "uusi", editedAt: "x" });
+    await runChatEdit(mockClient, 42, 7, { body: "uusi", reason: "fix typo" });
+    expect(mockClient.patch).toHaveBeenCalledWith(
+      "/api/messages/threads/42/messages/7",
+      { body: "uusi" },
+      { headers: { "X-Action-Reason": "fix typo" } }
+    );
+  });
+
+  test("--dry-run lists the thread + returns wouldEdit diff, never PATCHes", async () => {
+    asGet().mockResolvedValueOnce([{ messageId: 7, body: "vanha" }]);
+    const res = (await runChatEdit(mockClient, 42, 7, { body: "uusi", dryRun: true })) as {
+      dryRun: boolean;
+      wouldEdit: { messageId: number; from: unknown; to: string };
+    };
+    expect(mockClient.get).toHaveBeenCalledWith("/api/messages/threads/42/messages");
+    expect(mockClient.patch).not.toHaveBeenCalled();
+    expect(res.wouldEdit).toEqual({ messageId: 7, from: "vanha", to: "uusi" });
+  });
+
+  test("--dry-run on a missing message exits 5", async () => {
+    asGet().mockResolvedValueOnce([{ messageId: 8, body: "x" }]);
+    await expect(
+      runChatEdit(mockClient, 42, 999, { body: "uusi", dryRun: true })
+    ).rejects.toMatchObject({ exitCode: 5 });
   });
 });
