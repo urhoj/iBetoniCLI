@@ -29,9 +29,12 @@ export async function runChatThread(client, threadId) {
 /**
  * GET /api/messages/threads/:id/messages → messages, oldest first. Does NOT
  * mark the thread read. `--since` backfills (ISO); `--limit` caps (server max 500).
+ * `--deleted` adds `?includeDeleted=1` (own deleted rows; all rows for developers).
  */
 export async function runChatList(client, threadId, opts) {
     const params = new URLSearchParams();
+    if (opts.deleted)
+        params.set("includeDeleted", "1");
     if (opts.since)
         params.set("since", opts.since);
     if (opts.limit !== undefined)
@@ -107,6 +110,44 @@ export async function runChatDelete(client, threadId, messageId, opts) {
     }
     return client.delete(`/api/messages/threads/${threadId}/messages/${messageId}`, { headers: writeFlagsToHeaders({ idempotencyKey: opts.idempotencyKey, reason: opts.reason }) });
 }
+/**
+ * PATCH /api/messages/threads/:id/messages/:messageId — edit a message body.
+ *
+ * `--dry-run` is CLIENT-SIDE: lists the thread, finds the target, returns the
+ * from→to diff without issuing the PATCH (works under --read-only). A miss →
+ * exit 5. Server-side this is author-only and only while unanswered.
+ */
+export async function runChatEdit(client, threadId, messageId, opts) {
+    if (opts.dryRun) {
+        const list = await runChatList(client, threadId, {});
+        const target = list.items.find((m) => Number(m.messageId) === messageId);
+        if (!target)
+            failWith(`Message ${messageId} not found in thread ${threadId}`, 5);
+        return {
+            dryRun: true,
+            threadId,
+            wouldEdit: { messageId, from: target.body ?? null, to: opts.body },
+        };
+    }
+    return client.patch(`/api/messages/threads/${threadId}/messages/${messageId}`, { body: opts.body }, { headers: writeFlagsToHeaders({ idempotencyKey: opts.idempotencyKey, reason: opts.reason }) });
+}
+/**
+ * POST /api/messages/threads/:id/messages/:messageId/restore — un-soft-delete.
+ *
+ * `--dry-run` is CLIENT-SIDE: lists deleted messages (?includeDeleted=1), finds
+ * the target, returns wouldRestore without POSTing (works under --read-only). A
+ * miss → exit 5. Server-side: author or sysadmin/developer.
+ */
+export async function runChatRestore(client, threadId, messageId, opts) {
+    if (opts.dryRun) {
+        const list = await runChatList(client, threadId, { deleted: true });
+        const target = list.items.find((m) => Number(m.messageId) === messageId);
+        if (!target)
+            failWith(`Message ${messageId} not found among deleted in thread ${threadId}`, 5);
+        return { dryRun: true, threadId, wouldRestore: { messageId } };
+    }
+    return client.post(`/api/messages/threads/${threadId}/messages/${messageId}/restore`, {}, { headers: writeFlagsToHeaders({ idempotencyKey: opts.idempotencyKey, reason: opts.reason }) });
+}
 /** Resolve the {@link ThreadTarget} from a positional + --tarjous option. */
 function targetFrom(threadIdStr, opts) {
     return {
@@ -118,13 +159,15 @@ function targetFrom(threadIdStr, opts) {
  * Register `ib message chat` — conversational threads over /api/messages/*:
  *   threads              inbox (your threads, unread + last-message preview)
  *   thread [id]          one thread's meta + participants
- *   list [id]            messages in a thread (does NOT mark read)
+ *   list [id]            messages in a thread (does NOT mark read); --deleted includes soft-deleted
  *   send [id] --body     send a message (client-side --dry-run; --reason→sourceNote)
  *   mark-read [id]       stamp lastReadAt
  *   delete <messageId>   soft-delete a message (author-if-unanswered / dev moderation)
+ *   edit <messageId>     edit message body (author-if-unanswered; client-side --dry-run)
+ *   restore <messageId>  un-soft-delete a message (author or developer; client-side --dry-run)
  *
  * Every thread-targeting leaf accepts a raw threadId OR --tarjous <pumppuRequestId>.
- * send/mark-read/delete are writes (blocked under --read-only by the client write-lock).
+ * send/mark-read/delete/edit/restore are writes (blocked under --read-only by the client write-lock).
  */
 export function registerMessageChatCommands(parent, getClient) {
     const c = parent
@@ -161,6 +204,7 @@ export function registerMessageChatCommands(parent, getClient) {
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
         .option("--since <iso>", "Only messages created after this ISO timestamp")
         .option("--limit <n>", "Max messages (default 100, server max 500)", Number)
+        .option("--deleted", "Include soft-deleted messages (your own; all for developers)")
         .action(async (threadIdStr, opts) => {
         try {
             const client = await getClient();
@@ -234,6 +278,52 @@ export function registerMessageChatCommands(parent, getClient) {
                 reason: opts.reason,
                 idempotencyKey: opts.idempotencyKey,
                 dryRun: opts.dryRun,
+            }));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    const editCmd = c
+        .command("edit <messageId>")
+        .description("Edit a chat message's body. Author-only and only while unanswered. --dry-run previews the from→to diff CLIENT-SIDE (no edit).")
+        .option("--thread <id>", "Thread id the message belongs to", Number)
+        .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
+        .requiredOption("--body <text>", "New message text (max 4000 chars)");
+    addWriteFlagsToCommand(editCmd).action(async (messageIdStr, opts) => {
+        const messageId = parseOptionalId(messageIdStr, "messageId");
+        if (messageId === undefined)
+            failWith("messageId is required", 4);
+        const body = String(opts.body ?? "").trim();
+        if (!body)
+            failWith("Message body cannot be empty", 4);
+        if (body.length > 4000)
+            failWith("Message body too long (max 4000 chars)", 4);
+        try {
+            const client = await getClient();
+            const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
+            writeJson(await runChatEdit(client, id, messageId, {
+                body, reason: opts.reason, idempotencyKey: opts.idempotencyKey, dryRun: opts.dryRun,
+            }));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    const restoreCmd = c
+        .command("restore <messageId>")
+        .description("Restore (un-delete) a soft-deleted chat message. Author or developer. --dry-run previews via the deleted list (no restore).")
+        .option("--thread <id>", "Thread id the message belongs to", Number)
+        .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
+    addWriteFlagsToCommand(restoreCmd).action(async (messageIdStr, opts) => {
+        const messageId = parseOptionalId(messageIdStr, "messageId");
+        if (messageId === undefined)
+            failWith("messageId is required", 4);
+        try {
+            const client = await getClient();
+            const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
+            writeJson(await runChatRestore(client, id, messageId, {
+                reason: opts.reason, idempotencyKey: opts.idempotencyKey, dryRun: opts.dryRun,
             }));
         }
         catch (e) {

@@ -5333,6 +5333,55 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib message chat edit matches snapshot 1`] = `
+"USAGE
+  ib message chat edit <messageId> [flags]
+
+DESCRIPTION
+  Edit a chat message's body (PATCH /api/messages/threads/:id/messages/:messageId). Author-only and only while unanswered (no later reply from a different participant). Moderators cannot edit. Sets editedAt, emits message:edited, no-ops if the body is unchanged. --dry-run previews the from→to diff CLIENT-SIDE.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <messageId> NUMBER    Message id to edit (the message PK) (required)
+
+FLAGS
+  --thread NUMBER    Thread id the message belongs to
+  --tarjous NUMBER    Resolve the thread from this pumppuRequestId
+  --body STRING    New message text (max 4000 chars) (required)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { messageId, threadId, senderPersonId, body, editedAt, ... } (enriched row) · { messageId, threadId, unchanged:true } on no-op · { dryRun:true, threadId, wouldEdit:{ messageId, from, to } } on --dry-run
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Empty / too-long body  → body is required, max 4000 chars
+  exit 3 (HTTP 403)  Not the author         → you can only edit your own messages
+  exit 5 (HTTP 404)  Thread or message not found → check the threadId/messageId
+  exit 4 (HTTP 409)  Answered or deleted    → you cannot edit a message that was replied to, or a deleted one
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Author-only — no moderator override (rewriting another person's words is worse than deleting).
+  - --dry-run lists the thread to show the diff; it never PATCHes (works under --read-only).
+  - Deploy-gated: the PATCH route must be deployed to the target backend.
+
+SEE ALSO
+  ib message chat send, ib message chat delete
+
+EXAMPLES
+  ib message chat edit 7 --thread 3 --body "korjattu teksti" --reason typo
+  ib message chat edit 7 --tarjous 23 --body "korjattu" --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib message chat list matches snapshot 1`] = `
 "USAGE
   ib message chat list [<threadId>] [flags]
@@ -5348,6 +5397,7 @@ FLAGS
   --tarjous NUMBER    Resolve the thread from this pumppuRequestId
   --since STRING    Only messages created after this ISO timestamp
   --limit NUMBER    Max messages (server max 500) (default: 100)
+  --deleted BOOLEAN    Include soft-deleted messages (your own; all for developers)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -5363,6 +5413,7 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - Reading does NOT stamp lastReadAt — safe for an AI to browse without clearing your unread badge.
   - source/sourceNote are null until the provenance backend change is deployed.
+  - --deleted sets ?includeDeleted=1: you see your own deleted rows, developers see all; rows carry isDeleted.
 
 SEE ALSO
   ib message chat send, ib message chat mark-read
@@ -5408,6 +5459,52 @@ SEE ALSO
 EXAMPLES
   ib message chat mark-read 42
   ib message chat mark-read --tarjous 23
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib message chat restore matches snapshot 1`] = `
+"USAGE
+  ib message chat restore <messageId> [flags]
+
+DESCRIPTION
+  Restore a soft-deleted chat message (POST /api/messages/threads/:id/messages/:messageId/restore; isDeleted=0). The author OR a sysadmin/developer may restore. Idempotent (already-active → alreadyActive:true). Emits message:restored. Find deleted ids with \`ib message chat list --deleted\`. --dry-run previews CLIENT-SIDE via the deleted list.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <messageId> NUMBER    Message id to restore (the message PK) (required)
+
+FLAGS
+  --thread NUMBER    Thread id the message belongs to
+  --tarjous NUMBER    Resolve the thread from this pumppuRequestId
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { messageId, threadId, restored:true } (+ alreadyActive:true if not deleted) · { dryRun:true, threadId, wouldRestore:{ messageId } } on --dry-run
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not the author (and not a developer) → you can only restore your own messages
+  exit 5 (HTTP 404)  Thread or message not found → check the threadId/messageId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Deleted messages are hidden from the normal list — use \`ib message chat list --deleted\` to find ids.
+  - --dry-run lists deleted messages to confirm the target; it never restores (works under --read-only).
+  - Deploy-gated: the restore route must be deployed to the target backend.
+
+SEE ALSO
+  ib message chat delete, ib message chat list
+
+EXAMPLES
+  ib message chat restore 7 --thread 3 --reason "deleted by mistake"
+  ib message chat restore 7 --tarjous 23 --dry-run
 "
 `;
 
