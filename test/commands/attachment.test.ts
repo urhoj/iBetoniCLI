@@ -87,6 +87,10 @@ describe("resolveEntityTarget", () => {
     expect(resolveEntityTarget({ offer: 567 })).toEqual({ entity: "offer", entityId: 567 });
   });
 
+  test("resolves --message", () => {
+    expect(resolveEntityTarget({ message: 9 })).toEqual({ entity: "message", entityId: 9 });
+  });
+
   test("throws exit-4 CliError on zero or two entity flags", () => {
     expect(() => resolveEntityTarget({})).toThrowError(CliError);
     expect(() => resolveEntityTarget({ keikka: 1, vehicle: 2 })).toThrowError(CliError);

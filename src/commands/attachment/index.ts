@@ -22,6 +22,7 @@ const ENTITY_OPTS: { optKey: string; flag: string; entity: string; blurb: string
   { optKey: "bugReport", flag: "--bug-report <id>", entity: "bugReport", blurb: "bugReportId" },
   { optKey: "request", flag: "--request <id>", entity: "request", blurb: "Jerry pumppuRequestId" },
   { optKey: "offer", flag: "--offer <id>", entity: "offer", blurb: "Jerry pumppuOfferId" },
+  { optKey: "message", flag: "--message <id>", entity: "message", blurb: "chat messageId (attach = message author)" },
 ];
 const ENTITY_WORDS = ENTITY_OPTS.map((e) => e.entity);
 
