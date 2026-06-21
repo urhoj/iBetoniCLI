@@ -43,6 +43,17 @@ export async function runChatList(client, threadId, opts) {
     return toEnvelope(await client.get(`/api/messages/threads/${threadId}/messages${qs ? `?${qs}` : ""}`));
 }
 /**
+ * GET /api/messages/search?q=&limit= — search the caller's own messages by body
+ * text across all their threads, newest first. Read-only. Uses manual
+ * encodeURIComponent (the backend qs parser does not decode "+" to a space).
+ */
+export async function runChatSearch(client, query, opts) {
+    const parts = [`q=${encodeURIComponent(query)}`];
+    if (opts.limit !== undefined)
+        parts.push(`limit=${opts.limit}`);
+    return toEnvelope(await client.get(`/api/messages/search?${parts.join("&")}`));
+}
+/**
  * POST /api/messages/threads/:id/messages — send a message.
  *
  * `--dry-run` is CLIENT-SIDE: the route has no X-Dry-Run guard
@@ -160,6 +171,7 @@ function targetFrom(threadIdStr, opts) {
  *   threads              inbox (your threads, unread + last-message preview)
  *   thread [id]          one thread's meta + participants
  *   list [id]            messages in a thread (does NOT mark read); --deleted includes soft-deleted
+ *   search <query>       search your own messages by body text across all threads (newest first)
  *   send [id] --body     send a message (client-side --dry-run; --reason→sourceNote)
  *   mark-read [id]       stamp lastReadAt
  *   delete <messageId>   soft-delete a message (author-if-unanswered / dev moderation)
@@ -210,6 +222,18 @@ export function registerMessageChatCommands(parent, getClient) {
             const client = await getClient();
             const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
             writeJson(await runChatList(client, id, opts));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    c.command("search <query>")
+        .description("Search your own messages by body text across all your threads (newest first)")
+        .option("--limit <n>", "Max results (default 50, server max 200)", Number)
+        .action(async (query, opts) => {
+        try {
+            const client = await getClient();
+            writeJson(await runChatSearch(client, query, opts));
         }
         catch (e) {
             exitWithError(e);
