@@ -2,6 +2,7 @@ import { registerMessageChatCommands } from "./chat/index.js";
 import { registerMessageDailyCommands } from "./daily/index.js";
 import { registerMessageBoardCommands } from "./board/index.js";
 import { registerMessageSupportCommands } from "./support/index.js";
+import { registerMessageThreadCommands } from "./thread/index.js";
 /**
  * Register the `ib message` umbrella — communication systems grouped for
  * discovery (see spec §3). Four coherent sibling sub-groups, sharing only the
@@ -23,5 +24,6 @@ export function registerMessageCommands(parent, getClient) {
     registerMessageDailyCommands(m, getClient);
     registerMessageBoardCommands(m, getClient);
     registerMessageSupportCommands(m, getClient);
+    registerMessageThreadCommands(m, getClient);
 }
 //# sourceMappingURL=index.js.map
