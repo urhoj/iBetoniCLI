@@ -4827,10 +4827,14 @@ const BASE_COMMAND_SPECS = [
             { name: "stalest", type: "number", description: "Return up to N entries, stalest first" },
             { name: "domain", type: "string", description: "Filter to a domain (exact match)" },
             { name: "related", type: "string", description: "Filter to terms whose relatedCommands contain this substring" },
+            { name: "terms-only", type: "boolean", description: "Return only {term, synonyms} per entry — the cheap INDEX view (strips definitions); use to discover which terms exist." },
         ],
         outputShape: "{ items:[{term,synonyms,definition,relatedCommands:[{command,summary}],relatedEntity,domain,lastReviewed,runs}], count, truncated? }",
+        notes: [
+            "--terms-only is client-side: it strips each row to {term, synonyms} after the server-side filters apply. Use it instead of a full list to discover terms cheaply (the full list returns every definition).",
+        ],
         errors: [{ exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" }],
-        examples: ["ib glossary list", "ib glossary list --search puomi", "ib glossary list --stalest 10", "ib glossary list --domain vacation"],
+        examples: ["ib glossary list", "ib glossary list --search puomi", "ib glossary list --stalest 10", "ib glossary list --domain vacation", "ib glossary list --terms-only"],
     },
     {
         command: "ib glossary misses",

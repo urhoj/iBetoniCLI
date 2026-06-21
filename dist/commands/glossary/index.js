@@ -17,6 +17,17 @@ import { runGlossaryLint } from "./lint.js";
 const splitList = (s) => (s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
 const arrToCsv = (v) => Array.isArray(v) ? v.join(",") : (typeof v === "string" ? v : undefined);
 /**
+ * Project glossary rows to the {term, synonyms} INDEX shape — strips definition
+ * and developer-tier-leaking fields. Shared by `glossary list --terms-only` and
+ * the primer/dump (re-exported from reference/dump.ts for existing consumers).
+ */
+export function projectGlossaryForPrimer(items) {
+    return items.map((g) => ({
+        term: g["term"],
+        synonyms: (g["synonyms"] ?? []),
+    }));
+}
+/**
  * Merge fields from a parsed JSON object with explicit CLI flags.
  * Flags take precedence over the JSON values — an explicitly-passed flag always
  * wins regardless of what the JSON file contains. Fields absent from both json
@@ -140,7 +151,10 @@ export async function runGlossaryList(client, opts) {
         q.set("related", opts.related);
     const qs = q.toString();
     const res = await client.get(`/api/cli/glossary${qs ? `?${qs}` : ""}`);
-    return { items: res.items, nextCursor: null, count: res.count, truncated: opts.stalest != null };
+    const items = opts.termsOnly
+        ? projectGlossaryForPrimer(res.items)
+        : res.items;
+    return { items, nextCursor: null, count: res.count, truncated: opts.stalest != null };
 }
 export async function runGlossarySet(client, term, opts, flags = {}) {
     // Append flags edit in place; they cannot combine with their overwrite twin.
@@ -217,6 +231,7 @@ export function registerGlossaryCommands(program, getClient) {
         .option("--stalest <n>", "Return up to N entries, stalest first", (v) => Number(v))
         .option("--domain <d>", "Filter to a domain (exact match)")
         .option("--related <substr>", "Filter to terms whose relatedCommands contain this substring")
+        .option("--terms-only", "Return only {term, synonyms} per entry (cheap index view; strips definitions)")
         .action(async (opts) => {
         try {
             writeJson(await runGlossaryList(await getClient(), opts));
