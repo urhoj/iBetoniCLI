@@ -3145,7 +3145,7 @@ exports[`Help snapshots — contract stability > help for ib jerry admin request
   ib jerry admin request-cancel <requestId> [flags]
 
 DESCRIPTION
-  Cancel any request regardless of state (POST /api/admin/jerry-requests/:id/cancel). status → cancelled. System-admin only. Requires --reason.
+  Cancel a non-terminal, non-accepted request (POST /api/admin/jerry-requests/:id/cancel). status → cancelled. Already cancelled/expired/accepted → 409 (an accepted request has a confirmed offer/keikka and is not cancellable here). System-admin only. Requires --reason.
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
@@ -3181,7 +3181,7 @@ exports[`Help snapshots — contract stability > help for ib jerry admin request
   ib jerry admin request-delete <requestId> [flags]
 
 DESCRIPTION
-  Delete a draft request permanently (DELETE /api/admin/jerry-requests/:id). Only draft/cancelled requests may be deleted. System-admin only. Requires --reason.
+  Delete a DRAFT request permanently (DELETE /api/admin/jerry-requests/:id). Only status='draft' rows are deletable; a non-draft or missing id returns 404. System-admin only. Requires --reason.
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
@@ -3203,8 +3203,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
-  exit 5 (HTTP 404)  Request not found      → verify pumppuRequestId
-  exit 4 (HTTP 409)  Wrong state            → only draft/cancelled requests may be deleted
+  exit 5 (HTTP 404)  Not a draft / not found → only status='draft' rows are deletable; non-draft or missing id → 404
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 

@@ -3531,7 +3531,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin request-cancel",
     description:
-      "Cancel any request regardless of state (POST /api/admin/jerry-requests/:id/cancel). status → cancelled. System-admin only. Requires --reason.",
+      "Cancel a non-terminal, non-accepted request (POST /api/admin/jerry-requests/:id/cancel). status → cancelled. Already cancelled/expired/accepted → 409 (an accepted request has a confirmed offer/keikka and is not cancellable here). System-admin only. Requires --reason.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
@@ -3557,7 +3557,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin request-delete",
     description:
-      "Delete a draft request permanently (DELETE /api/admin/jerry-requests/:id). Only draft/cancelled requests may be deleted. System-admin only. Requires --reason.",
+      "Delete a DRAFT request permanently (DELETE /api/admin/jerry-requests/:id). Only status='draft' rows are deletable; a non-draft or missing id returns 404. System-admin only. Requires --reason.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
@@ -3566,8 +3566,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape: "{ success: true } or { dryRun: true, wouldDelete: { pumppuRequestId } }",
     errors: [
       apiErr(403, "Not a system admin", "use a system-admin token"),
-      apiErr(404, "Request not found", "verify pumppuRequestId"),
-      apiErr(409, "Wrong state", "only draft/cancelled requests may be deleted"),
+      apiErr(404, "Not a draft / not found", "only status='draft' rows are deletable; non-draft or missing id → 404"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ['ib jerry admin request-delete 41 --reason "cleanup draft"'],
