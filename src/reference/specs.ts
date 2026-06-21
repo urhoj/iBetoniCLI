@@ -4846,6 +4846,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
       { name: "since", type: "string", description: "Only messages created after this ISO timestamp" },
       { name: "limit", type: "number", default: "100", description: "Max messages (server max 500)" },
+      { name: "deleted", type: "boolean", description: "Include soft-deleted messages (your own; all for developers)" },
     ],
     outputShape:
       "ListEnvelope<{ messageId, threadId, senderPersonId, senderAsiakasId, kind, body, source, sourceNote, createdAt, editedAt, personFirstName, personLastName, senderAsiakasNimi }>",
@@ -4856,6 +4857,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       "Reading does NOT stamp lastReadAt — safe for an AI to browse without clearing your unread badge.",
       "source/sourceNote are null until the provenance backend change is deployed.",
+      "--deleted sets ?includeDeleted=1: you see your own deleted rows, developers see all; rows carry isDeleted.",
     ],
     seeAlso: ["ib message chat send", "ib message chat mark-read"],
     examples: [

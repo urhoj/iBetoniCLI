@@ -42,13 +42,15 @@ export async function runChatThread(client: ApiClient, threadId: number): Promis
 /**
  * GET /api/messages/threads/:id/messages → messages, oldest first. Does NOT
  * mark the thread read. `--since` backfills (ISO); `--limit` caps (server max 500).
+ * `--deleted` adds `?includeDeleted=1` (own deleted rows; all rows for developers).
  */
 export async function runChatList(
   client: ApiClient,
   threadId: number,
-  opts: { since?: string; limit?: number }
+  opts: { since?: string; limit?: number; deleted?: boolean }
 ): Promise<ListEnvelope<Row>> {
   const params = new URLSearchParams();
+  if (opts.deleted) params.set("includeDeleted", "1");
   if (opts.since) params.set("since", opts.since);
   if (opts.limit !== undefined) params.set("limit", String(opts.limit));
   const qs = params.toString();
@@ -211,13 +213,15 @@ function targetFrom(threadIdStr: string | undefined, opts: { tarjous?: number })
  * Register `ib message chat` — conversational threads over /api/messages/*:
  *   threads              inbox (your threads, unread + last-message preview)
  *   thread [id]          one thread's meta + participants
- *   list [id]            messages in a thread (does NOT mark read)
+ *   list [id]            messages in a thread (does NOT mark read); --deleted includes soft-deleted
  *   send [id] --body     send a message (client-side --dry-run; --reason→sourceNote)
  *   mark-read [id]       stamp lastReadAt
  *   delete <messageId>   soft-delete a message (author-if-unanswered / dev moderation)
+ *   edit <messageId>     edit message body (author-if-unanswered; client-side --dry-run)
+ *   restore <messageId>  un-soft-delete a message (author or developer; client-side --dry-run)
  *
  * Every thread-targeting leaf accepts a raw threadId OR --tarjous <pumppuRequestId>.
- * send/mark-read/delete are writes (blocked under --read-only by the client write-lock).
+ * send/mark-read/delete/edit/restore are writes (blocked under --read-only by the client write-lock).
  */
 export function registerMessageChatCommands(
   parent: Command,
@@ -258,10 +262,11 @@ export function registerMessageChatCommands(
     .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
     .option("--since <iso>", "Only messages created after this ISO timestamp")
     .option("--limit <n>", "Max messages (default 100, server max 500)", Number)
+    .option("--deleted", "Include soft-deleted messages (your own; all for developers)")
     .action(
       async (
         threadIdStr: string | undefined,
-        opts: { tarjous?: number; since?: string; limit?: number }
+        opts: { tarjous?: number; since?: string; limit?: number; deleted?: boolean }
       ) => {
         try {
           const client = await getClient();

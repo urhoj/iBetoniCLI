@@ -76,6 +76,14 @@ describe("runChatList", () => {
       "/api/messages/threads/42/messages?since=2026-06-14T10%3A00%3A00Z&limit=20"
     );
   });
+
+  test("--deleted adds includeDeleted=1", async () => {
+    asGet().mockResolvedValueOnce([]);
+    await runChatList(mockClient, 42, { deleted: true });
+    expect(mockClient.get).toHaveBeenCalledWith(
+      "/api/messages/threads/42/messages?includeDeleted=1"
+    );
+  });
 });
 
 describe("runChatSend", () => {
