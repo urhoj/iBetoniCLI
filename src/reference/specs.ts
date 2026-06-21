@@ -4769,7 +4769,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ib search jäteasema --in sijainti",
     ],
   },
-  // ─── message chat (5) ────────────────────────────────────────────────────
+  // ─── message chat (6) ────────────────────────────────────────────────────
   {
     command: "ib message chat threads",
     description:
@@ -4903,6 +4903,39 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     seeAlso: ["ib message chat list", "ib message chat threads"],
     examples: ["ib message chat mark-read 42", "ib message chat mark-read --tarjous 23"],
+  },
+  {
+    command: "ib message chat delete",
+    description:
+      "Soft-delete a chat message (DELETE /api/messages/threads/:id/messages/:messageId; sets isDeleted=1, so it vanishes from every read). The author may delete their OWN message only while it is unanswered (no later reply from another participant); a sysadmin/developer may moderate any message in a thread they can access. --dry-run previews CLIENT-SIDE.",
+    auth: "any",
+    args: [
+      { name: "messageId", type: "number", required: true, description: "Message id to delete (the message PK)" },
+    ],
+    flags: [
+      { name: "thread", type: "number", description: "Thread id the message belongs to" },
+      { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId (one match required)" },
+    ],
+    writeFlags: true,
+    outputShape:
+      "{ messageId, threadId, deleted:true } (+ alreadyDeleted:true if already gone) · { dryRun:true, threadId, wouldDelete:{ messageId, body, senderPersonId } } on --dry-run",
+    errors: [
+      apiErr(403, "Not the author (and not a developer)", "you can only delete your own messages"),
+      apiErr(409, "Already answered", "a message someone replied to after cannot be retracted — delete the newest first"),
+      apiErr(404, "Thread or message not found", "check the threadId/messageId"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Soft-delete: the row is kept for audit but is filtered from list/threads/unread (all carry isDeleted=0). There is no hard delete.",
+      "--dry-run only issues a GET (thread messages) to echo the target — it works under --read-only and never deletes (the route has no X-Dry-Run guard).",
+      "Locate the thread with --thread <id> or --tarjous <id>; a tarjous with multiple threads requires --thread.",
+      "Deploy-gated: the DELETE route must be deployed to the target backend before this works.",
+    ],
+    seeAlso: ["ib message chat send", "ib message chat list"],
+    examples: [
+      'ib message chat delete 5 --thread 3 --reason "test cleanup"',
+      "ib message chat delete 5 --tarjous 23 --dry-run",
+    ],
   },
   // ─── message support (3) ──────────────────────────────────────────────────
   {

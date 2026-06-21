@@ -3,6 +3,7 @@ import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveAsiakasTarget } from "../customer/index.js";
 import { parseId } from "../../targets.js";
+import { resolveDate } from "../../dates.js";
 /**
  * Wrap a backend array into the universal `{ items, nextCursor, count }` list
  * envelope. The BetoniJerry endpoints return bare arrays (sendSuccess sends raw
@@ -21,6 +22,12 @@ function toEnvelope(value) {
  * the universal list envelope.
  */
 export async function runJerryRequestList(client, opts) {
+    if (opts.provider) {
+        const tab = opts.tab || "avoimet";
+        const data = await client.get(`/api/pumppuRequests/provider-list?tab=${encodeURIComponent(tab)}`);
+        const items = Array.isArray(data?.requests) ? data.requests : [];
+        return { items, nextCursor: null, count: items.length };
+    }
     if (opts.open) {
         if (opts.all) {
             // Whole-marketplace browse (?scope=all): open + no_supply beyond the
@@ -84,6 +91,13 @@ export async function runJerryOfferSend(client, id, offerId, flags) {
     return client.post(`/api/pumppuRequests/${id}/offers/${offerId}/send`, {}, { headers: writeFlagsToHeaders(flags) });
 }
 /**
+ * Withdraw your sent offer before the customer accepts it
+ * (pending → withdrawn; POST /:id/offers/:offerId/withdraw). Provider-only; own offer.
+ */
+export async function runJerryOfferWithdraw(client, id, offerId, flags) {
+    return client.post(`/api/pumppuRequests/${id}/offers/${offerId}/withdraw`, {}, { headers: writeFlagsToHeaders(flags) });
+}
+/**
  * Accept an offer (customer-side; POST /:id/offers/:offerId/accept). Flips this
  * offer to 'accepted', sibling offers to 'rejected', and the request to
  * 'accepted'. Caller must own the request.
@@ -98,6 +112,15 @@ export async function runJerryOfferAccept(client, id, offerId, flags) {
  */
 export async function runJerryOfferConfirm(client, id, offerId, body, flags) {
     return client.post(`/api/pumppuRequests/${id}/offers/${offerId}/confirm`, body, { headers: writeFlagsToHeaders(flags) });
+}
+/**
+ * Cancel the caller's OWN request (customer-side; POST /api/pumppuRequests/:id/cancel).
+ * Allowed only while no live offer exists (server enforces). Sets status 'cancelled'.
+ */
+export async function runJerryRequestCancel(client, id, flags) {
+    return client.post(`/api/pumppuRequests/${id}/cancel`, {}, {
+        headers: writeFlagsToHeaders(flags),
+    });
 }
 /**
  * Create a customer pump request / tarjouspyyntö (POST /api/pumppuRequests).
@@ -188,6 +211,46 @@ export async function runJerryAdminToggle(client, asiakasId, on, flags) {
     const action = on ? "enable" : "disable";
     return client.post(`/api/admin/jerry-companies/${asiakasId}/${action}`, {}, { headers: writeFlagsToHeaders(flags) });
 }
+/** Admin request list (GET /api/admin/jerry-requests). System-admin only. */
+export async function runJerryAdminRequests(client, opts) {
+    const params = new URLSearchParams();
+    if (opts.status)
+        params.set("status", opts.status);
+    if (opts.from)
+        params.set("from", opts.from);
+    if (opts.to)
+        params.set("to", opts.to);
+    if (opts.customer !== undefined)
+        params.set("customerId", String(opts.customer));
+    if (opts.provider !== undefined)
+        params.set("providerId", String(opts.provider));
+    if (opts.limit !== undefined)
+        params.set("limit", String(opts.limit));
+    const qs = params.toString();
+    const data = await client.get(`/api/admin/jerry-requests${qs ? `?${qs}` : ""}`);
+    const items = Array.isArray(data?.requests) ? data.requests : [];
+    return { items, nextCursor: null, count: items.length, truncated: !!data?.truncated };
+}
+/** Offers on one request, admin view (GET /api/admin/jerry-requests/:id/offers). */
+export async function runJerryAdminRequestOffers(client, id) {
+    return toEnvelope(await client.get(`/api/admin/jerry-requests/${id}/offers`));
+}
+// ─── admin request write commands ────────────────────────────────────────────
+/**
+ * Factory for admin request status-transition commands (expire/cancel/resend).
+ * POSTs to /api/admin/jerry-requests/:id/:action with write-safety headers.
+ */
+const adminReqWrite = (action) => (client, id, flags) => client.post(`/api/admin/jerry-requests/${id}/${action}`, {}, { headers: writeFlagsToHeaders(flags) });
+/** Force-expire an open/no_supply/pending_verification request (POST /api/admin/jerry-requests/:id/expire). System-admin only. */
+export const runJerryAdminRequestExpire = adminReqWrite("expire");
+/** Cancel any request as admin (POST /api/admin/jerry-requests/:id/cancel). System-admin only. */
+export const runJerryAdminRequestCancel = adminReqWrite("cancel");
+/** Re-run provider fan-out for a request (POST /api/admin/jerry-requests/:id/resend). System-admin only. */
+export const runJerryAdminRequestResend = adminReqWrite("resend");
+/** Delete a draft request (admin; DELETE /api/admin/jerry-requests/:id). System-admin only. */
+export async function runJerryAdminRequestDelete(client, id, flags) {
+    return client.delete(`/api/admin/jerry-requests/${id}`, { headers: writeFlagsToHeaders(flags) });
+}
 /** Enforce a required --reason at the CLI layer (exit 4), matching the lifecycle commands. */
 function requireReason(opts) {
     if (!opts.reason) {
@@ -244,6 +307,8 @@ export function registerJerryCommands(parent, getClient) {
         .option("--mine", "Your own requests (default)")
         .option("--status <csv>", "Filter --mine by status (CSV)")
         .option("--limit <n>", "Max rows for --mine", (v) => Math.min(Number(v), 200))
+        .option("--provider", "Provider lifecycle view via /provider-list (incl. your sent offers)")
+        .option("--tab <tab>", "With --provider: avoimet|tarjotut|voitetut|paattyneet|kokomarkkina (default avoimet)")
         .action(async (opts) => {
         try {
             const client = await getClient();
@@ -309,6 +374,18 @@ export function registerJerryCommands(parent, getClient) {
         try {
             const client = await getClient();
             writeJson(await runJerryRequestCreate(client, body, opts));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    addWriteFlagsToCommand(request
+        .command("cancel <requestId>")
+        .description("Cancel your OWN request (customer) — only while no offers received. Requires --reason.")).action(async (idStr, opts) => {
+        requireReason(opts);
+        try {
+            const client = await getClient();
+            writeJson(await runJerryRequestCancel(client, parseId(idStr, "requestId"), opts));
         }
         catch (e) {
             exitWithError(e);
@@ -388,6 +465,18 @@ export function registerJerryCommands(parent, getClient) {
         try {
             const client = await getClient();
             writeJson(await runJerryOfferConfirm(client, parseId(idStr, "requestId"), parseId(offerIdStr, "offerId"), body, opts));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    addWriteFlagsToCommand(offer
+        .command("withdraw <requestId> <offerId>")
+        .description("Withdraw your sent offer before the customer accepts (pending → withdrawn; provider). Requires --reason.")).action(async (idStr, offerIdStr, opts) => {
+        requireReason(opts);
+        try {
+            const client = await getClient();
+            writeJson(await runJerryOfferWithdraw(client, parseId(idStr, "requestId"), parseId(offerIdStr, "offerId"), opts));
         }
         catch (e) {
             exitWithError(e);
@@ -522,5 +611,50 @@ export function registerJerryCommands(parent, getClient) {
             exitWithError(e);
         }
     });
+    admin
+        .command("requests")
+        .description("System-wide tarjouspyyntö list with offer summary (filters)")
+        .option("--status <csv>", "Status filter CSV (open,accepted,...)")
+        .option("--from <date>", "createdAt from (YYYY-MM-DD / today / yesterday)", resolveDate)
+        .option("--to <date>", "createdAt to (inclusive)", resolveDate)
+        .option("--customer <id>", "Filter by customer asiakasId", Number)
+        .option("--provider <id>", "Filter by provider asiakasId", Number)
+        .option("--limit <n>", "Max rows (max 300)", (v) => Math.min(Number(v), 300))
+        .action(async (opts) => {
+        try {
+            const client = await getClient();
+            writeJson(await runJerryAdminRequests(client, opts));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    admin
+        .command("request-offers <requestId>")
+        .description("All offers on one request (admin view, no masking)")
+        .action(async (idStr) => {
+        try {
+            const client = await getClient();
+            writeJson(await runJerryAdminRequestOffers(client, parseId(idStr, "requestId")));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    const adminReqAction = (name, desc, run) => addWriteFlagsToCommand(admin.command(`${name} <requestId>`).description(desc))
+        .action(async (idStr, opts) => {
+        requireReason(opts);
+        try {
+            const client = await getClient();
+            writeJson(await run(client, parseId(idStr, "requestId"), opts));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    adminReqAction("request-expire", "Force-expire a request (admin). Requires --reason.", runJerryAdminRequestExpire);
+    adminReqAction("request-cancel", "Cancel any request (admin). Requires --reason.", runJerryAdminRequestCancel);
+    adminReqAction("request-resend", "Re-run provider fan-out for a request (admin). Requires --reason.", runJerryAdminRequestResend);
+    adminReqAction("request-delete", "Delete a draft request (admin). Requires --reason.", runJerryAdminRequestDelete);
 }
 //# sourceMappingURL=index.js.map

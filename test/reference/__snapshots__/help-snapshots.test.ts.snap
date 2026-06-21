@@ -5250,6 +5250,54 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib message chat delete matches snapshot 1`] = `
+"USAGE
+  ib message chat delete <messageId> [flags]
+
+DESCRIPTION
+  Soft-delete a chat message (DELETE /api/messages/threads/:id/messages/:messageId; sets isDeleted=1, so it vanishes from every read). The author may delete their OWN message only while it is unanswered (no later reply from another participant); a sysadmin/developer may moderate any message in a thread they can access. --dry-run previews CLIENT-SIDE.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <messageId> NUMBER    Message id to delete (the message PK) (required)
+
+FLAGS
+  --thread NUMBER    Thread id the message belongs to
+  --tarjous NUMBER    Resolve the thread from this pumppuRequestId (one match required)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { messageId, threadId, deleted:true } (+ alreadyDeleted:true if already gone) · { dryRun:true, threadId, wouldDelete:{ messageId, body, senderPersonId } } on --dry-run
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not the author (and not a developer) → you can only delete your own messages
+  exit 4 (HTTP 409)  Already answered       → a message someone replied to after cannot be retracted — delete the newest first
+  exit 5 (HTTP 404)  Thread or message not found → check the threadId/messageId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Soft-delete: the row is kept for audit but is filtered from list/threads/unread (all carry isDeleted=0). There is no hard delete.
+  - --dry-run only issues a GET (thread messages) to echo the target — it works under --read-only and never deletes (the route has no X-Dry-Run guard).
+  - Locate the thread with --thread <id> or --tarjous <id>; a tarjous with multiple threads requires --thread.
+  - Deploy-gated: the DELETE route must be deployed to the target backend before this works.
+
+SEE ALSO
+  ib message chat send, ib message chat list
+
+EXAMPLES
+  ib message chat delete 5 --thread 3 --reason "test cleanup"
+  ib message chat delete 5 --tarjous 23 --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib message chat list matches snapshot 1`] = `
 "USAGE
   ib message chat list [<threadId>] [flags]

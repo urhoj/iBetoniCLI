@@ -5,6 +5,7 @@ import {
   runChatList,
   runChatSend,
   runChatMarkRead,
+  runChatDelete,
 } from "../../src/commands/message/chat/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -140,5 +141,54 @@ describe("runChatMarkRead", () => {
     asPost().mockResolvedValueOnce({ lastReadAt: "2026-06-14T12:00:00Z" });
     await runChatMarkRead(mockClient, 42);
     expect(mockClient.post).toHaveBeenCalledWith("/api/messages/threads/42/read", {});
+  });
+});
+
+describe("runChatDelete", () => {
+  const asDelete = () => mockClient.delete as ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    asGet().mockReset();
+    asDelete().mockReset();
+  });
+
+  test("a real delete DELETEs the message with write headers", async () => {
+    asDelete().mockResolvedValueOnce({ messageId: 7, threadId: 42, deleted: true });
+    await runChatDelete(mockClient, 42, 7, { reason: "cleanup", idempotencyKey: "k1" });
+    expect(mockClient.delete).toHaveBeenCalledWith("/api/messages/threads/42/messages/7", {
+      headers: { "Idempotency-Key": "k1", "X-Action-Reason": "cleanup" },
+    });
+  });
+
+  test("a real delete with no write flags sends empty headers", async () => {
+    asDelete().mockResolvedValueOnce({ deleted: true });
+    await runChatDelete(mockClient, 42, 7, {});
+    expect(mockClient.delete).toHaveBeenCalledWith("/api/messages/threads/42/messages/7", {
+      headers: {},
+    });
+  });
+
+  test("--dry-run lists the thread and returns wouldDelete, never DELETEs", async () => {
+    asGet().mockResolvedValueOnce([
+      { messageId: 7, body: "hei", senderPersonId: 10 },
+      { messageId: 8, body: "moi", senderPersonId: 10 },
+    ]);
+    const res = (await runChatDelete(mockClient, 42, 7, { dryRun: true })) as {
+      dryRun: boolean;
+      threadId: number;
+      wouldDelete: { messageId: number; body: unknown; senderPersonId: unknown };
+    };
+    expect(mockClient.get).toHaveBeenCalledWith("/api/messages/threads/42/messages");
+    expect(mockClient.delete).not.toHaveBeenCalled();
+    expect(res.dryRun).toBe(true);
+    expect(res.threadId).toBe(42);
+    expect(res.wouldDelete).toEqual({ messageId: 7, body: "hei", senderPersonId: 10 });
+  });
+
+  test("--dry-run on a missing message throws exit 5", async () => {
+    asGet().mockResolvedValueOnce([{ messageId: 8, body: "moi" }]);
+    await expect(
+      runChatDelete(mockClient, 42, 999, { dryRun: true })
+    ).rejects.toMatchObject({ exitCode: 5 });
+    expect(mockClient.delete).not.toHaveBeenCalled();
   });
 });

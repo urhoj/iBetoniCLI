@@ -79,6 +79,34 @@ export async function runChatSend(client, threadId, opts) {
 export async function runChatMarkRead(client, threadId) {
     return client.post(`/api/messages/threads/${threadId}/read`, {});
 }
+/**
+ * DELETE /api/messages/threads/:id/messages/:messageId — soft-delete a message.
+ *
+ * `--dry-run` is CLIENT-SIDE: it lists the thread (a GET, so it works under
+ * --read-only) and echoes the target as `wouldDelete`, issuing NO delete — the
+ * route has no X-Dry-Run guard, so a "dry-run" that DELETEd would really delete.
+ * A miss → exit 5. A real delete issues DELETE with the write-safety headers and
+ * is naturally blocked by the read-only write-lock. Server-side the author may
+ * delete only an unanswered own message; a developer may moderate any.
+ */
+export async function runChatDelete(client, threadId, messageId, opts) {
+    if (opts.dryRun) {
+        const list = await runChatList(client, threadId, {});
+        const target = list.items.find((m) => Number(m.messageId) === messageId);
+        if (!target)
+            failWith(`Message ${messageId} not found in thread ${threadId}`, 5);
+        return {
+            dryRun: true,
+            threadId,
+            wouldDelete: {
+                messageId,
+                body: target.body ?? null,
+                senderPersonId: target.senderPersonId ?? null,
+            },
+        };
+    }
+    return client.delete(`/api/messages/threads/${threadId}/messages/${messageId}`, { headers: writeFlagsToHeaders({ idempotencyKey: opts.idempotencyKey, reason: opts.reason }) });
+}
 /** Resolve the {@link ThreadTarget} from a positional + --tarjous option. */
 function targetFrom(threadIdStr, opts) {
     return {
@@ -93,9 +121,10 @@ function targetFrom(threadIdStr, opts) {
  *   list [id]            messages in a thread (does NOT mark read)
  *   send [id] --body     send a message (client-side --dry-run; --reason→sourceNote)
  *   mark-read [id]       stamp lastReadAt
+ *   delete <messageId>   soft-delete a message (author-if-unanswered / dev moderation)
  *
  * Every thread-targeting leaf accepts a raw threadId OR --tarjous <pumppuRequestId>.
- * send/mark-read are writes (blocked under --read-only by the client write-lock).
+ * send/mark-read/delete are writes (blocked under --read-only by the client write-lock).
  */
 export function registerMessageChatCommands(parent, getClient) {
     const c = parent
@@ -181,6 +210,31 @@ export function registerMessageChatCommands(parent, getClient) {
             const client = await getClient();
             const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
             writeJson(await runChatMarkRead(client, id));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    const deleteCmd = c
+        .command("delete <messageId>")
+        .description("Soft-delete a chat message. Author may delete own only while unanswered; a developer may moderate. --dry-run previews CLIENT-SIDE (no delete).")
+        .option("--thread <id>", "Thread id the message belongs to", Number)
+        .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
+    addWriteFlagsToCommand(deleteCmd).action(async (messageIdStr, opts) => {
+        const messageId = parseOptionalId(messageIdStr, "messageId");
+        if (messageId === undefined)
+            failWith("messageId is required", 4);
+        try {
+            const client = await getClient();
+            const id = await resolveThreadId(client, {
+                thread: opts.thread,
+                tarjous: opts.tarjous,
+            });
+            writeJson(await runChatDelete(client, id, messageId, {
+                reason: opts.reason,
+                idempotencyKey: opts.idempotencyKey,
+                dryRun: opts.dryRun,
+            }));
         }
         catch (e) {
             exitWithError(e);
