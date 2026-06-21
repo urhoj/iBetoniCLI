@@ -5988,6 +5988,41 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib message support mine matches snapshot 1`] = `
+"USAGE
+  ib message support mine [flags]
+
+DESCRIPTION
+  Your own company's support threads (audience='support', owned by your active company), newest first. The operator-facing companion to the developer-only inbox — any member of the owning company may list them. Filter by lifecycle status. Projects GET /api/messages/support/mine into the list envelope; each row carries a caller-scoped unreadCount.
+
+FLAGS
+  --status STRING    open | resolved | all (default: open)
+  --limit NUMBER    Max rows
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { items: SupportThreadRow[], nextCursor: null, count, truncated }
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → --status must be open|resolved|all
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 5 (HTTP 404)  Route not deployed     → the /support/mine backend may not be deployed yet
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Read a thread's messages with \`ib message chat list <threadId>\` and reply with \`ib message chat send <threadId> --body ...\`. Open (or append to) a new escalation with \`ib message support contact\`.
+
+SEE ALSO
+  ib message support contact, ib message chat list
+
+EXAMPLES
+  ib message support mine
+  ib message support mine --status all --limit 50
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib message support resolve matches snapshot 1`] = `
 "USAGE
   ib message support resolve <threadId> [flags]

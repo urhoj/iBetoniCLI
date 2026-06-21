@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import {
   runSupportInbox,
+  runSupportMine,
   runSupportContact,
   runSupportResolve,
 } from "../../src/commands/message/support/index.js";
@@ -53,6 +54,36 @@ describe("ib message support inbox", () => {
       exitCode: 4,
     });
     await expect(runSupportInbox(mockClient, { status: "bogus" })).rejects.toBeInstanceOf(CliError);
+    expect(get).not.toHaveBeenCalled();
+  });
+});
+
+// ─── mine ────────────────────────────────────────────────────────────────────
+
+describe("ib message support mine", () => {
+  test("defaults status=open and projects to the list envelope", async () => {
+    get.mockResolvedValueOnce({ items: [{ threadId: 5, unreadCount: 2 }], count: 1, truncated: false });
+    const out = await runSupportMine(mockClient, {});
+    expect(get).toHaveBeenCalledWith("/api/messages/support/mine?status=open");
+    expect(out).toEqual({
+      items: [{ threadId: 5, unreadCount: 2 }],
+      nextCursor: null,
+      count: 1,
+      truncated: false,
+    });
+  });
+
+  test("forwards status + limit query params and truncated flag", async () => {
+    get.mockResolvedValueOnce({ items: [{ threadId: 9 }], count: 7, truncated: true });
+    const out = await runSupportMine(mockClient, { status: "all", limit: 5 });
+    expect(get).toHaveBeenCalledWith("/api/messages/support/mine?status=all&limit=5");
+    expect(out).toMatchObject({ count: 7, truncated: true });
+  });
+
+  test("a bad --status exits 4, no GET", async () => {
+    await expect(runSupportMine(mockClient, { status: "bogus" })).rejects.toMatchObject({
+      exitCode: 4,
+    });
     expect(get).not.toHaveBeenCalled();
   });
 });

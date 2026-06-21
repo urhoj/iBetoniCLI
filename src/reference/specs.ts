@@ -4937,7 +4937,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ib message chat delete 5 --tarjous 23 --dry-run",
     ],
   },
-  // ─── message support (3) ──────────────────────────────────────────────────
+  // ─── message support (4) ──────────────────────────────────────────────────
   {
     command: "ib message support inbox",
     description:
@@ -4962,6 +4962,30 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: [
       "ib message support inbox",
       "ib message support inbox --status all --limit 50",
+    ],
+  },
+  {
+    command: "ib message support mine",
+    description:
+      "Your own company's support threads (audience='support', owned by your active company), newest first. The operator-facing companion to the developer-only inbox — any member of the owning company may list them. Filter by lifecycle status. Projects GET /api/messages/support/mine into the list envelope; each row carries a caller-scoped unreadCount.",
+    flags: [
+      { name: "status", type: "string", default: "open", description: "open | resolved | all" },
+      { name: "limit", type: "number", description: "Max rows" },
+    ],
+    outputShape: "{ items: SupportThreadRow[], nextCursor: null, count, truncated }",
+    errors: [
+      { exit: 4, meaning: "Validation", remedy: "--status must be open|resolved|all" },
+      apiErr(401, "Token expired", "ib auth refresh"),
+      apiErr(404, "Route not deployed", "the /support/mine backend may not be deployed yet"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    notes: [
+      "Read a thread's messages with `ib message chat list <threadId>` and reply with `ib message chat send <threadId> --body ...`. Open (or append to) a new escalation with `ib message support contact`.",
+    ],
+    seeAlso: ["ib message support contact", "ib message chat list"],
+    examples: [
+      "ib message support mine",
+      "ib message support mine --status all --limit 50",
     ],
   },
   {

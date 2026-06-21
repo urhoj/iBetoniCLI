@@ -59,6 +59,35 @@ export async function runSupportInbox(
   };
 }
 
+/**
+ * GET /api/messages/support/mine — the CALLER's own company's support threads
+ * (operator-facing companion to the developer-only inbox; any member of the
+ * owning company may list them). Projects the backend `{ items, count,
+ * truncated }` into the universal list envelope.
+ */
+export async function runSupportMine(
+  client: ApiClient,
+  opts: { status?: string; limit?: number }
+): Promise<ListEnvelope<Row>> {
+  const status = opts.status ?? "open";
+  if (!STATUSES.includes(status as StatusFilter)) {
+    throw new CliError(`--status must be one of: ${STATUSES.join(", ")}`, 400, null, 4);
+  }
+  const qs = new URLSearchParams();
+  qs.set("status", status);
+  if (opts.limit !== undefined) qs.set("limit", String(opts.limit));
+  const res = await client.get<{ items?: Row[]; count?: number; truncated?: boolean }>(
+    `/api/messages/support/mine?${qs.toString()}`
+  );
+  const items = Array.isArray(res?.items) ? res.items : [];
+  return {
+    items,
+    nextCursor: null,
+    count: typeof res?.count === "number" ? res.count : items.length,
+    truncated: Boolean(res?.truncated),
+  };
+}
+
 export interface SupportContactInput {
   contextType: string;
   contextId: number;
@@ -151,6 +180,19 @@ export function registerMessageSupportCommands(
     .action(async (opts: { status?: string; limit?: number }) => {
       try {
         writeJson(await runSupportInbox(await getClient(), opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  support
+    .command("mine")
+    .description("Your own company's support threads (open | resolved | all)")
+    .option("--status <status>", "open | resolved | all", "open")
+    .option("--limit <n>", "Max rows", Number)
+    .action(async (opts: { status?: string; limit?: number }) => {
+      try {
+        writeJson(await runSupportMine(await getClient(), opts));
       } catch (e) {
         exitWithError(e);
       }
