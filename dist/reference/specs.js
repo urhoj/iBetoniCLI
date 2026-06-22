@@ -2228,14 +2228,20 @@ const BASE_COMMAND_SPECS = [
     },
     {
         command: "ib ohje list",
-        description: "List every UI help-text entry (the whole helps table). Useful to discover helpIds before `ib ohje get`/`update`. The HTTP route is unauthenticated, but ib calls it with your session token.",
+        description: "List every UI help-text entry (the whole helps table). Useful to discover helpIds before `ib ohje get`/`update`. The full table is LARGE (~115 KB — every row's htmltext), so AI callers should shape it CLIENT-SIDE: --empty-shorttext (grooming backfill targets), --fields (column projection that drops the big htmltext), --sort field:dir. Order applied: filter → sort → limit → project. The HTTP route is unauthenticated, but ib calls it with your session token.",
         auth: "any",
         flags: [
-            { name: "limit", type: "number", description: "Max rows to return (client-side cap)" },
+            { name: "limit", type: "number", description: "Max rows to return (client-side cap, after filter+sort)" },
+            { name: "empty-shorttext", type: "boolean", description: "Only rows whose shorttext is blank (grooming backfill targets)" },
+            { name: "fields", type: "string", description: "Comma-separated columns to keep, e.g. helpId,title,shorttext,accessCount (drops the large htmltext)" },
+            { name: "sort", type: "string", description: "Sort by a column, e.g. accessCount:desc (numeric fields compare numerically)" },
         ],
-        outputShape: "ListEnvelope<{ helpId, title, shorttext, htmltext, img }>",
+        outputShape: "ListEnvelope<{ helpId, title, shorttext, htmltext, img, accessCount, … }> (rows projected to --fields when set)",
         errors: [apiErr(500, "Backend error", "retry with --verbose")],
-        examples: ["ib ohje list", "ib ohje list --limit 10 --pretty"],
+        examples: [
+            "ib ohje list --limit 10 --pretty",
+            "ib ohje list --empty-shorttext --fields helpId,title,accessCount --sort accessCount:desc",
+        ],
     },
     {
         command: "ib ohje update",
@@ -2252,11 +2258,12 @@ const BASE_COMMAND_SPECS = [
             { name: "shorttext", type: "string", description: "Short text" },
             { name: "htmltext", type: "string", description: "HTML body shown in the modal" },
             { name: "img", type: "string", description: "Image reference (pass \"\" to clear it to null)" },
+            { name: "must-exist", type: "boolean", description: "Fail (exit 4) instead of creating a new row when the helpId has no entry — guards against a typo'd helpId silently spawning a junk row" },
         ],
         writeFlags: true,
-        outputShape: "{ success: true, message } (raw backend response) or { dryRun: true, helpId, current, proposed }",
+        outputShape: "{ success: true, helpId, created, written: {helpId,title,shorttext,htmltext,img}, htmltextLength, response } — `created` is true when no prior row existed (a parallel groomer can spot an unexpected insert); or { dryRun: true, helpId, created, current, proposed }",
         errors: [
-            { exit: 4, meaning: "Missing --reason / invalid helpId", remedy: "pass --reason; helpId must be 1–250 characters" },
+            { exit: 4, meaning: "Missing --reason / invalid helpId / --must-exist on a missing row", remedy: "pass --reason; helpId 1–250 chars; drop --must-exist to create" },
             apiErr(400, "Validation failed", "title ≤500, htmltext ≤10000, helpId 1–250 chars"),
             apiErr(403, "Permission denied", "needs isHelperEditor or system-admin/developer"),
             ...COMMON_AUTH_ERRORS,
@@ -2264,7 +2271,7 @@ const BASE_COMMAND_SPECS = [
         examples: [
             'ib ohje update LaskupohjaTilaus --title "Laskupohja" --htmltext "<p>Ohje…</p>" --reason "content fix"',
             'ib ohje update LaskupohjaTilaus --dry-run --title "New title"',
-            "ib ohje update LaskupohjaTilaus --body '{\"title\":\"X\",\"htmltext\":\"<p>Y</p>\"}' --reason edit",
+            'ib ohje update "käyttöikä" --shorttext "Betonin käyttöikä" --must-exist --reason groom',
         ],
     },
     // ─── legal (15) — versioned legal documents + acceptance tracking ─────────

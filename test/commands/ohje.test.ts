@@ -58,12 +58,39 @@ describe("ib ohje get/list", () => {
 
   test("runOhjeList caps rows client-side when limit is set", async () => {
     asGet().mockResolvedValueOnce([{ helpId: "A" }, { helpId: "B" }, { helpId: "C" }]);
-    const res = await runOhjeList(mockClient, 2);
+    const res = await runOhjeList(mockClient, { limit: 2 });
     expect(res).toEqual({
       items: [{ helpId: "A" }, { helpId: "B" }],
       nextCursor: null,
       count: 2,
     });
+  });
+
+  test("runOhjeList --empty-shorttext keeps only blank-shorttext rows", async () => {
+    asGet().mockResolvedValueOnce([
+      { helpId: "A", shorttext: "has" },
+      { helpId: "B", shorttext: "" },
+      { helpId: "C", shorttext: "  " },
+      { helpId: "D" },
+    ]);
+    const res = await runOhjeList(mockClient, { emptyShorttext: true });
+    expect(res.items.map((r) => r.helpId)).toEqual(["B", "C", "D"]);
+  });
+
+  test("runOhjeList --fields projects to the requested columns only", async () => {
+    asGet().mockResolvedValueOnce([{ helpId: "A", title: "t", htmltext: "big", accessCount: 5 }]);
+    const res = await runOhjeList(mockClient, { fields: ["helpId", "accessCount"] });
+    expect(res.items).toEqual([{ helpId: "A", accessCount: 5 }]);
+  });
+
+  test("runOhjeList --sort accessCount:desc sorts numerically (then limit)", async () => {
+    asGet().mockResolvedValueOnce([
+      { helpId: "A", accessCount: 5 },
+      { helpId: "B", accessCount: 50 },
+      { helpId: "C", accessCount: 12 },
+    ]);
+    const res = await runOhjeList(mockClient, { sort: "accessCount:desc", limit: 2 });
+    expect(res.items.map((r) => r.helpId)).toEqual(["B", "C"]);
   });
 });
 
@@ -179,7 +206,40 @@ describe("ib ohje update", () => {
       { helpId: "X", title: "Old", shorttext: "s", htmltext: "<p>new</p>", img: null },
       { headers: { "X-Action-Reason": "content fix" } }
     );
-    expect(res).toEqual({ success: true, message: "ok" });
+    expect(res).toMatchObject({
+      success: true,
+      helpId: "X",
+      created: false,
+      written: { helpId: "X", htmltext: "<p>new</p>" },
+      htmltextLength: "<p>new</p>".length,
+      response: { success: true, message: "ok" },
+    });
+  });
+
+  test("created:true and echoes the written body when the helpId is new", async () => {
+    asGet().mockResolvedValueOnce([]); // no current row
+    asPut().mockResolvedValueOnce({ success: true, message: "ok" });
+    const res = await runOhjeUpdate(
+      mockClient,
+      "BrandNew",
+      { shorttext: "s", htmltext: "h" },
+      { reason: "r" }
+    );
+    expect(res).toMatchObject({
+      success: true,
+      helpId: "BrandNew",
+      created: true,
+      written: { helpId: "BrandNew", shorttext: "s", htmltext: "h", title: "", img: null },
+      htmltextLength: 1,
+    });
+  });
+
+  test("--must-exist refuses (exit 4) to create a new row, never PUTs", async () => {
+    asGet().mockResolvedValueOnce([]); // no current row
+    await expect(
+      runOhjeUpdate(mockClient, "Typo", { shorttext: "s" }, { reason: "r" }, { mustExist: true })
+    ).rejects.toThrow(/must-exist/i);
+    expect(mockClient.put).not.toHaveBeenCalled();
   });
 });
 

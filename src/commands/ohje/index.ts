@@ -67,19 +67,58 @@ export async function runOhjeGet(
   return Array.isArray(rows) ? rows[0] ?? null : (rows as OhjeRecord | null);
 }
 
+/** Client-side shaping for {@link runOhjeList} (the route has no query params). */
+export interface OhjeListOptions {
+  /** Cap rows AFTER filter+sort (preview a few without dumping every htmltext). */
+  limit?: number;
+  /** Keep only rows whose `shorttext` is blank — the grooming backfill targets. */
+  emptyShorttext?: boolean;
+  /** Project each row to just these columns (e.g. skip the large `htmltext`). */
+  fields?: string[];
+  /** `"field:dir"` (e.g. `accessCount:desc`); numeric fields compare numerically. */
+  sort?: string;
+}
+
 /**
  * GET /api/helps/getAll — every UI help entry, projected into the universal
- * list envelope so `--pretty` renders it as a table. The route returns no limit
- * param, so `limit` (when set) caps the rows CLIENT-SIDE — handy to preview a
- * few entries without dumping every (potentially large) htmltext.
+ * list envelope so `--pretty` renders it as a table. The route accepts no query
+ * params, so `--empty-shorttext` / `--fields` / `--sort` / `--limit` are applied
+ * CLIENT-SIDE here. This is important for AI callers: the full table is ~115 KB
+ * (191 rows × full htmltext), so `--empty-shorttext --fields helpId,title,accessCount`
+ * is the cheap one-step fetch for grooming instead of dumping everything.
+ * Order: filter → sort → limit → project.
  */
 export async function runOhjeList(
   client: ApiClient,
-  limit?: number
+  opts: OhjeListOptions = {}
 ): Promise<ListEnvelope<OhjeRecord>> {
   const rows = await client.get<OhjeRecord[]>("/api/helps/getAll");
-  const all = Array.isArray(rows) ? rows : [];
-  const items = limit && limit > 0 ? all.slice(0, limit) : all;
+  let all = Array.isArray(rows) ? rows : [];
+  if (opts.emptyShorttext) {
+    all = all.filter((r) => !String(r.shorttext ?? "").trim());
+  }
+  if (opts.sort) {
+    const [field, dirRaw] = opts.sort.split(":");
+    const desc = (dirRaw ?? "asc").toLowerCase() === "desc";
+    all = [...all].sort((a, b) => {
+      const av = a[field];
+      const bv = b[field];
+      const c =
+        typeof av === "number" && typeof bv === "number"
+          ? av - bv
+          : String(av ?? "").localeCompare(String(bv ?? ""));
+      return desc ? -c : c;
+    });
+  }
+  let items: OhjeRecord[] =
+    opts.limit && opts.limit > 0 ? all.slice(0, opts.limit) : all;
+  if (opts.fields && opts.fields.length) {
+    items = items.map((r) => {
+      const projected: Record<string, unknown> = {};
+      for (const f of opts.fields!) projected[f] = r[f];
+      return projected as OhjeRecord;
+    });
+  }
   return { items, nextCursor: null, count: items.length };
 }
 
@@ -144,16 +183,37 @@ export async function runOhjeUpdate(
   client: ApiClient,
   helpId: string,
   fields: OhjeFields,
-  flags: WriteFlags
+  flags: WriteFlags,
+  opts: { mustExist?: boolean } = {}
 ): Promise<unknown> {
   const current = await runOhjeGet(client, helpId);
+  // The GET already tells us whether a row exists — surface it so callers can
+  // detect an UNEXPECTED insert (a typo'd Finnish helpId silently creates a junk
+  // row otherwise). `--must-exist` turns that into a hard failure instead.
+  const created = current === null;
+  if (opts.mustExist && created) {
+    failWith(
+      `helpId "${helpId}" has no existing row and --must-exist was set (refusing to create a new entry)`,
+      4
+    );
+  }
   const proposed = buildOhjeBody(current, helpId, fields);
   if (flags.dryRun) {
-    return { dryRun: true, helpId, current, proposed };
+    return { dryRun: true, helpId, created, current, proposed };
   }
-  return client.put<unknown>("/api/helps/update", proposed, {
+  const response = await client.put<unknown>("/api/helps/update", proposed, {
     headers: writeFlagsToHeaders(flags),
   });
+  // Echo what was written (the merged row) + a length so a parallel grooming
+  // agent can spot a truncation/encoding issue without a separate `ohje get`.
+  return {
+    success: true,
+    helpId,
+    created,
+    written: proposed,
+    htmltextLength: (proposed.htmltext ?? "").length,
+    response,
+  };
 }
 
 /**
@@ -192,17 +252,36 @@ export function registerOhjeCommands(
     });
 
   o.command("list")
-    .description("List every UI help entry (GET /api/helps/getAll). Reads are public.")
-    .option("--limit <n>", "Max rows to return (client-side cap)", (v: string) => Number(v))
-    .action(async (opts: { limit?: number }) => {
-      try {
-        const client = await getClient();
-        const result = await runOhjeList(client, opts.limit);
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
+    .description(
+      "List every UI help entry (GET /api/helps/getAll). Reads are public. The full " +
+        "table is large (~115 KB), so use the client-side shapers to keep output small: " +
+        "--empty-shorttext (grooming backfill targets), --fields (column projection, skips " +
+        "htmltext), --sort field:dir. Order applied: filter → sort → limit → project."
+    )
+    .option("--limit <n>", "Max rows to return (client-side cap, after filter+sort)", (v: string) => Number(v))
+    .option("--empty-shorttext", "Only rows whose shorttext is blank (grooming backfill targets)")
+    .option(
+      "--fields <cols>",
+      "Comma-separated columns to keep, e.g. helpId,title,shorttext,accessCount (drops the large htmltext)",
+      (v: string) => v.split(",").map((s) => s.trim()).filter(Boolean)
+    )
+    .option("--sort <field:dir>", "Sort by a column, e.g. accessCount:desc (numeric fields compare numerically)")
+    .action(
+      async (opts: {
+        limit?: number;
+        emptyShorttext?: boolean;
+        fields?: string[];
+        sort?: string;
+      }) => {
+        try {
+          const client = await getClient();
+          const result = await runOhjeList(client, opts);
+          writeJson(result);
+        } catch (e) {
+          exitWithError(e);
+        }
       }
-    });
+    );
 
   const updateCmd = o
     .command("update <helpId>")
@@ -220,7 +299,12 @@ export function registerOhjeCommands(
     .option("--title <s>", "Help title (otsikko)")
     .option("--shorttext <s>", "Short text (shorttext)")
     .option("--htmltext <s>", "HTML body shown in the modal (htmltext)")
-    .option("--img <s>", "Image reference (img)");
+    .option("--img <s>", "Image reference (img)")
+    .option(
+      "--must-exist",
+      "Fail (exit 4) if no row exists for this helpId instead of upserting a new one " +
+        "(guards against a typo'd helpId silently creating a junk row)"
+    );
   addWriteFlagsToCommand(updateCmd).action(
     async (
       helpId: string,
@@ -230,6 +314,7 @@ export function registerOhjeCommands(
         shorttext?: string;
         htmltext?: string;
         img?: string;
+        mustExist?: boolean;
         dryRun?: boolean;
         idempotencyKey?: string;
         reason?: string;
@@ -246,11 +331,17 @@ export function registerOhjeCommands(
       try {
         const client = await getClient();
         const fields = buildOhjeFields(opts);
-        const result = await runOhjeUpdate(client, helpId, fields, {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        });
+        const result = await runOhjeUpdate(
+          client,
+          helpId,
+          fields,
+          {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+          },
+          { mustExist: opts.mustExist }
+        );
         writeJson(result);
       } catch (e) {
         exitWithError(e);

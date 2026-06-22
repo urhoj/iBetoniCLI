@@ -320,7 +320,7 @@ export const CHANGELOG_SPECS = [
                 name: "description",
                 type: "string",
                 required: true,
-                description: "Kuvaus",
+                description: "Kuvaus (free length — the column is nvarchar(max), no practical cap)",
             },
             { name: "benefits", type: "string", description: "Hyödyt" },
             { name: "impact", type: "string", description: "Vaikutus" },
