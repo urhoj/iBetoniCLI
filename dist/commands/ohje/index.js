@@ -1,8 +1,16 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
-/** Charset the backend sanitizer (helps.get / helps.update) accepts for a helpId. */
-const HELP_ID_RE = /^[A-Za-z0-9_-]+$/;
+/**
+ * helpId validity: any non-empty string up to the `dbo.helps.helpId` column
+ * width (nvarchar 250). The backend binds it as a parameter (no string-built
+ * SQL), so no charset restriction is needed — real helpIds contain `:`, spaces,
+ * commas, and Finnish letters (e.g. `tila:2`, `"XC3, XC4, XF1"`, `käyttöikä`).
+ */
+const HELP_ID_MAX = 250;
+export function isValidHelpId(s) {
+    return typeof s === "string" && s.length > 0 && s.length <= HELP_ID_MAX;
+}
 /**
  * GET /api/helps/get/:helpId — the content shown in a HelperIcon modal. The
  * backend returns a recordset (array); we surface the first row, or `null` when
@@ -96,8 +104,8 @@ export function registerOhjeCommands(parent, getClient) {
     o.command("get <helpId>")
         .description("Get one UI help entry by helpId (GET /api/helps/get/:helpId)")
         .action(async (helpId) => {
-        if (!HELP_ID_RE.test(helpId)) {
-            failWith(`Invalid helpId "${helpId}" — only [A-Za-z0-9_-] are allowed`, 4);
+        if (!isValidHelpId(helpId)) {
+            failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
         }
         try {
             const client = await getClient();
@@ -134,8 +142,8 @@ export function registerOhjeCommands(parent, getClient) {
         .option("--htmltext <s>", "HTML body shown in the modal (htmltext)")
         .option("--img <s>", "Image reference (img)");
     addWriteFlagsToCommand(updateCmd).action(async (helpId, opts) => {
-        if (!HELP_ID_RE.test(helpId)) {
-            failWith(`Invalid helpId "${helpId}" — only [A-Za-z0-9_-] are allowed`, 4);
+        if (!isValidHelpId(helpId)) {
+            failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
         }
         // --reason is required for an actual write; a --dry-run preview is
         // read-only, so it does not need a justification.

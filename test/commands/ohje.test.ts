@@ -5,6 +5,7 @@ import {
   runOhjeUpdate,
   buildOhjeBody,
   buildOhjeFields,
+  isValidHelpId,
 } from "../../src/commands/ohje/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -179,5 +180,19 @@ describe("ib ohje update", () => {
       { headers: { "X-Action-Reason": "content fix" } }
     );
     expect(res).toEqual({ success: true, message: "ok" });
+  });
+});
+
+describe("isValidHelpId", () => {
+  test("accepts colon / space / comma / Finnish helpIds", () => {
+    expect(isValidHelpId("tila:2")).toBe(true);
+    expect(isValidHelpId("laskutuksen muuttujat")).toBe(true);
+    expect(isValidHelpId("käyttöikä")).toBe(true);
+    expect(isValidHelpId("XC3, XC4, XF1")).toBe(true);
+    expect(isValidHelpId("LaskupohjaTilaus")).toBe(true);
+  });
+  test("rejects empty and over-long (>250)", () => {
+    expect(isValidHelpId("")).toBe(false);
+    expect(isValidHelpId("x".repeat(251))).toBe(false);
   });
 });

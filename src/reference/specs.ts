@@ -2397,7 +2397,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [],
     outputShape: "{ helpId, title, shorttext, htmltext, img } | null",
     errors: [
-      { exit: 4, meaning: "Invalid helpId", remedy: "helpId may contain only [A-Za-z0-9_-]" },
+      { exit: 4, meaning: "Invalid helpId", remedy: "helpId must be 1–250 characters" },
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: ["ib ohje get LaskupohjaTilaus", "ib ohje get LaskupohjaTilaus --pretty"],
@@ -2435,8 +2435,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ success: true, message } (raw backend response) or { dryRun: true, helpId, current, proposed }",
     errors: [
-      { exit: 4, meaning: "Missing --reason / invalid helpId", remedy: "pass --reason; helpId may contain only [A-Za-z0-9_-]" },
-      apiErr(400, "Validation failed", "title ≤500, htmltext ≤10000, helpId [A-Za-z0-9_-]"),
+      { exit: 4, meaning: "Missing --reason / invalid helpId", remedy: "pass --reason; helpId must be 1–250 characters" },
+      apiErr(400, "Validation failed", "title ≤500, htmltext ≤10000, helpId 1–250 chars"),
       apiErr(403, "Permission denied", "needs isHelperEditor or system-admin/developer"),
       ...COMMON_AUTH_ERRORS,
     ],

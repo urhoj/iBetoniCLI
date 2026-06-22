@@ -41,8 +41,16 @@ export interface OhjeFields {
   img?: string | null;
 }
 
-/** Charset the backend sanitizer (helps.get / helps.update) accepts for a helpId. */
-const HELP_ID_RE = /^[A-Za-z0-9_-]+$/;
+/**
+ * helpId validity: any non-empty string up to the `dbo.helps.helpId` column
+ * width (nvarchar 250). The backend binds it as a parameter (no string-built
+ * SQL), so no charset restriction is needed — real helpIds contain `:`, spaces,
+ * commas, and Finnish letters (e.g. `tila:2`, `"XC3, XC4, XF1"`, `käyttöikä`).
+ */
+const HELP_ID_MAX = 250;
+export function isValidHelpId(s: string): boolean {
+  return typeof s === "string" && s.length > 0 && s.length <= HELP_ID_MAX;
+}
 
 /**
  * GET /api/helps/get/:helpId — the content shown in a HelperIcon modal. The
@@ -171,8 +179,8 @@ export function registerOhjeCommands(
   o.command("get <helpId>")
     .description("Get one UI help entry by helpId (GET /api/helps/get/:helpId)")
     .action(async (helpId: string) => {
-      if (!HELP_ID_RE.test(helpId)) {
-        failWith(`Invalid helpId "${helpId}" — only [A-Za-z0-9_-] are allowed`, 4);
+      if (!isValidHelpId(helpId)) {
+        failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
       }
       try {
         const client = await getClient();
@@ -227,8 +235,8 @@ export function registerOhjeCommands(
         reason?: string;
       }
     ) => {
-      if (!HELP_ID_RE.test(helpId)) {
-        failWith(`Invalid helpId "${helpId}" — only [A-Za-z0-9_-] are allowed`, 4);
+      if (!isValidHelpId(helpId)) {
+        failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
       }
       // --reason is required for an actual write; a --dry-run preview is
       // read-only, so it does not need a justification.
