@@ -10,6 +10,7 @@ const TYPES = ["feature", "improvement", "bugfix"];
 const AREAS = ["frontend", "backend", "cli", "database", "cicd"];
 const BUMP_LEVELS = ["none", "patch", "minor", "major"];
 const LANGUAGES = ["fi", "en"]; // devChangelog.language is CHAR(2) NOT NULL DEFAULT 'fi'
+const SOURCES = ["human", "routine"];
 /**
  * Normalize a Sentry issue reference: accept a bare short id (e.g. PUMINET5API-1A2)
  * or extract one from a pasted URL/string; otherwise trim and cap at 64 chars to fit
@@ -38,7 +39,7 @@ export async function runChangelogList(client, opts) {
     // `feedbackId` filter (controller passes req.query straight to listEntries).
     const keyMap = {
         month: "month", type: "type", area: "area", repo: "repo", feedback: "feedbackId",
-        sentry: "sentryIssue", limit: "limit",
+        sentry: "sentryIssue", source: "source", limit: "limit",
     };
     for (const [optKey, apiKey] of Object.entries(keyMap)) {
         if (opts[optKey] !== undefined)
@@ -71,13 +72,15 @@ export async function runChangelogRelease(client, versionTag, flags) {
 export async function runChangelogReleaseMap(client, map, flags) {
     return client.post("/api/changelog/release", { map }, { headers: writeFlagsToHeaders(flags) });
 }
-function validateEnums(type, area, bumpLevel) {
+export function validateEnums(type, area, bumpLevel, source) {
     if (type !== undefined && !TYPES.includes(type))
         failWith(`--type must be ${TYPES.join("|")}`, 4);
     if (area !== undefined && !AREAS.includes(area))
         failWith(`--area must be ${AREAS.join("|")}`, 4);
     if (bumpLevel !== undefined && !BUMP_LEVELS.includes(bumpLevel))
         failWith(`--bump-level must be ${BUMP_LEVELS.join("|")}`, 4);
+    if (source !== undefined && !SOURCES.includes(source))
+        failWith(`--source must be ${SOURCES.join("|")}`, 4);
 }
 /** Normalize --language to a validated lowercase fi|en, or undefined when not passed. Exits 4 on a bad code. */
 export function normalizeLanguage(lang) {
@@ -110,9 +113,10 @@ export function registerChangelogCommands(parent, getClient) {
         .option("--bump-level <l>", "App version bump this implies: none|patch|minor|major", "patch")
         .option("--feedback <id>", "cliFeedback id this resolves", Number)
         .option("--sentry <ref>", "Sentry issue short id or URL this fixes")
+        .option("--source <s>", "Source: human|routine (default: human)")
         .option("--date <d>", "Entry date (YYYY-MM-DD|today), default today")
         .option("--language <l>", "Entry language (fi|en), default fi")).action(async (o) => {
-        validateEnums(o.type, o.area, o.bumpLevel);
+        validateEnums(o.type, o.area, o.bumpLevel, o.source);
         const entryDate = resolveDate(o.date || "today");
         const body = {
             type: o.type,
@@ -144,6 +148,8 @@ export function registerChangelogCommands(parent, getClient) {
             body.feedbackId = Number(o.feedback);
         if (o.sentry)
             body.sentryIssue = normalizeSentryRef(o.sentry);
+        if (o.source)
+            body.source = o.source;
         const addLang = normalizeLanguage(o.language);
         if (addLang)
             body.language = addLang;
@@ -163,6 +169,7 @@ export function registerChangelogCommands(parent, getClient) {
         .option("--repo <r>", "Repo/submodule")
         .option("--feedback <id>", "Entries linked to a feedback id", Number)
         .option("--sentry <ref>", "Entries linked to a Sentry issue short id")
+        .option("--source <s>", "human|routine")
         .option("--limit <n>", "Max rows", Number)
         .action(async (o) => {
         try {
@@ -197,9 +204,10 @@ export function registerChangelogCommands(parent, getClient) {
         .option("--repo <r>", "Repo/submodule")
         .option("--sha <csv>", "Commit SHAs (CSV)")
         .option("--vtag <s>", "Version tag")
+        .option("--source <s>", "Source: human|routine")
         .option("--date <d>", "Entry date (YYYY-MM-DD|today)")
         .option("--language <l>", "Entry language (fi|en)")).action(async (id, o) => {
-        validateEnums(o.type, o.area);
+        validateEnums(o.type, o.area, undefined, o.source);
         const patch = {};
         for (const k of [
             "type",
@@ -211,6 +219,7 @@ export function registerChangelogCommands(parent, getClient) {
             "status",
             "severity",
             "repo",
+            "source",
         ]) {
             if (o[k] !== undefined)
                 patch[k] = o[k];
@@ -346,6 +355,11 @@ export const CHANGELOG_SPECS = [
                 description: "Sentry issue short id or URL this entry fixes (stored, not sent to Sentry)",
             },
             {
+                name: "source",
+                type: "string",
+                description: "Source: human (default) | routine (automated AI-routine entry)",
+            },
+            {
                 name: "date",
                 type: "date",
                 description: "Entry date (YYYY-MM-DD|today)",
@@ -413,6 +427,7 @@ export const CHANGELOG_SPECS = [
                 type: "string",
                 description: "linked Sentry issue short id",
             },
+            { name: "source", type: "string", description: "human|routine" },
             { name: "limit", type: "number", description: "Max rows" },
         ],
         outputShape: "ListEnvelope<entry>",
@@ -493,6 +508,7 @@ export const CHANGELOG_SPECS = [
             { name: "repo", type: "string", description: "Repo/submodule" },
             { name: "sha", type: "string", description: "Commit SHAs (CSV)" },
             { name: "vtag", type: "string", description: "Version tag" },
+            { name: "source", type: "string", description: "Source: human|routine" },
             {
                 name: "date",
                 type: "date",

@@ -2,7 +2,7 @@ import { test, expect, vi, beforeEach, describe } from "vitest";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, normalizeSentryRef, normalizeLanguage, readJsonInput }
+import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, normalizeSentryRef, normalizeLanguage, readJsonInput, validateEnums }
   from "../../src/commands/changelog/index.js";
 import type { ChangelogAddBody } from "../../src/commands/changelog/index.js";
 import type { ApiClient } from "../../src/api/client.js";
@@ -182,6 +182,27 @@ describe("changelog release --map", () => {
       { map },
       expect.objectContaining({ headers: expect.any(Object) })
     );
+  });
+});
+
+describe("changelog --source flag", () => {
+  test("add --source routine puts source in the POST body", async () => {
+    const c = mockClient();
+    await runChangelogAdd(c as never,
+      { type: "feature", area: "cli", title: "t", description: "d", entryDate: "2026-06-22", source: "routine" }, {});
+    expect(c.post).toHaveBeenCalledWith("/api/changelog",
+      expect.objectContaining({ source: "routine" }), expect.any(Object));
+  });
+
+  test("add --source xxx fails validation (exit 4)", () => {
+    expect(() => validateEnums(undefined, undefined, undefined, "xxx")).toThrow(/human\|routine/);
+  });
+
+  test("list --source routine maps to the source query param", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue([]);
+    await runChangelogList(c as never, { source: "routine" });
+    expect(c.get).toHaveBeenCalledWith("/api/changelog?source=routine");
   });
 });
 

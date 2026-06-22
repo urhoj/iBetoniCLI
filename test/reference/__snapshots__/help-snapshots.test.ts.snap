@@ -1275,6 +1275,7 @@ FLAGS
   --bump-level STRING    App version bump this implies: none|patch|minor|major (default: patch)
   --feedback NUMBER    cliFeedback id this entry resolves
   --sentry STRING    Sentry issue short id or URL this entry fixes (stored, not sent to Sentry)
+  --source STRING    Source: human (default) | routine (automated AI-routine entry)
   --date DATE    Entry date (YYYY-MM-DD|today)
   --language STRING    Entry language (fi|en), default fi
 
@@ -1351,6 +1352,7 @@ FLAGS
   --repo STRING    Repo/submodule
   --feedback NUMBER    linked feedback id
   --sentry STRING    linked Sentry issue short id
+  --source STRING    human|routine
   --limit NUMBER    Max rows
 
 GLOBAL FLAGS
@@ -1481,6 +1483,7 @@ FLAGS
   --repo STRING    Repo/submodule
   --sha STRING    Commit SHAs (CSV)
   --vtag STRING    Version tag
+  --source STRING    Source: human|routine
   --date DATE    Entry date (YYYY-MM-DD|today)
   --language STRING    Entry language (fi|en)
 
