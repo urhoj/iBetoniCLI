@@ -22,4 +22,28 @@ describe("ib reference detail (DB-backed)", () => {
     await runReferenceDetailList(c, 10);
     expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10");
   });
+
+  test("set sends aiConfidence + needsHumanReview when provided", async () => {
+    const c = client({ put: vi.fn().mockResolvedValue({ command: "ib keikka list", runs: 1 }) });
+    await runReferenceDetailSet(c, ["keikka", "list"], { summary: "s", aiConfidence: 80, needsHumanReview: true });
+    expect((c as any).put).toHaveBeenCalledWith(
+      "/api/cli/command-catalog/ib%20keikka%20list",
+      { summary: "s", aiConfidence: 80, needsHumanReview: true },
+      expect.anything()
+    );
+  });
+
+  test("set omits aiConfidence key when not provided (backend resets)", async () => {
+    const c = client({ put: vi.fn().mockResolvedValue({}) });
+    await runReferenceDetailSet(c, ["keikka", "list"], { summary: "s" });
+    const body = (c as any).put.mock.calls[0][1];
+    expect("aiConfidence" in body).toBe(false);
+    expect("needsHumanReview" in body).toBe(false);
+  });
+
+  test("list passes needsReview + maxConfidence", async () => {
+    const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
+    await runReferenceDetailList(c, 10, undefined, false, true, 90);
+    expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10&needsReview=1&maxConfidence=90");
+  });
 });

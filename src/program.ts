@@ -46,6 +46,7 @@ import { registerDoctorCommand } from "./commands/doctor/index.js";
 import { runReferenceDump, fetchPrimerGlossary } from "./reference/dump.js";
 import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList } from "./reference/detail.js";
 import { addWriteFlagsToCommand } from "./api/writeFlags.js";
+import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "./assess.js";
 import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDomain } from "./reference/commandsList.js";
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
@@ -246,25 +247,26 @@ export function buildProgram(): Command {
       }
     });
 
-  detail
-    .command("list")
-    .description(
-      "List command-catalog entries, optionally ordered by stalest (DB-backed)"
-    )
-    .option("--stalest <n>", "Return up to N entries sorted by least-recently reviewed", (v: string) => Number(v))
-    .option("--domain <d>", "Only commands in this ib domain (e.g. attachment) — narrows BEFORE --stalest")
-    .option("--with-detail", "Include each entry's full detail text, folding the per-command `reference detail get` into one call (needs the backend deployed)")
-    .action(async (opts: { stalest?: number; domain?: string; withDetail?: boolean }) => {
-      try {
-        // Validate the domain offline (exit 4 on unknown) before any network call,
-        // mirroring `ib commands <domain>`.
-        if (opts.domain) assertKnownDomain(COMMAND_SPECS, opts.domain, getCallerTier());
-        const client = await getClient();
-        writeJson(await runReferenceDetailList(client, opts.stalest, opts.domain, opts.withDetail ?? false));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+  addNeedsReviewFlags(
+    detail
+      .command("list")
+      .description(
+        "List command-catalog entries, optionally ordered by stalest (DB-backed)"
+      )
+      .option("--stalest <n>", "Return up to N entries sorted by least-recently reviewed", (v: string) => Number(v))
+      .option("--domain <d>", "Only commands in this ib domain (e.g. attachment) — narrows BEFORE --stalest")
+      .option("--with-detail", "Include each entry's full detail text, folding the per-command `reference detail get` into one call (needs the backend deployed)")
+  ).action(async (opts: { stalest?: number; domain?: string; withDetail?: boolean; needsReview?: boolean; maxConfidence?: number }) => {
+    try {
+      // Validate the domain offline (exit 4 on unknown) before any network call,
+      // mirroring `ib commands <domain>`.
+      if (opts.domain) assertKnownDomain(COMMAND_SPECS, opts.domain, getCallerTier());
+      const client = await getClient();
+      writeJson(await runReferenceDetailList(client, opts.stalest, opts.domain, opts.withDetail ?? false, opts.needsReview ?? false, opts.maxConfidence));
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
 
   const detailSet = detail
     .command("set")
@@ -274,23 +276,26 @@ export function buildProgram(): Command {
     .argument("<command...>", "Command path after `ib` (e.g. keikka latest)")
     .option("--summary <text>", "Short one-line summary stored in the catalog")
     .option("--detail <text>", "Full markdown business-context detail");
-  addWriteFlagsToCommand(detailSet).action(
+  addWriteFlagsToCommand(addAssessWriteFlags(detailSet)).action(
     async (
       commandParts: string[],
       opts: {
         summary?: string;
         detail?: string;
+        aiConfidence?: number;
+        needsHumanReview?: boolean;
         dryRun?: boolean;
         idempotencyKey?: string;
         reason?: string;
       }
     ) => {
+      assertAiConfidence(opts.aiConfidence);
       try {
         const client = await getClient();
         const result = await runReferenceDetailSet(
           client,
           commandParts,
-          { summary: opts.summary, detail: opts.detail },
+          { summary: opts.summary, detail: opts.detail, aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview },
           {
             dryRun: opts.dryRun,
             idempotencyKey: opts.idempotencyKey,

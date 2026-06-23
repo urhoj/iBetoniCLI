@@ -9,6 +9,7 @@ import { COMMAND_SPECS } from "./specs.js";
 import { CliError } from "../api/errors.js";
 import { type CallerTier, visibleSpecs, getCallerTier } from "../tier.js";
 import { writeFlagsToHeaders, type WriteFlags } from "../api/writeFlags.js";
+import type { AssessFlags } from "../assess.js";
 
 function resolveCommand(commandParts: string[], tier: CallerTier): string {
   // Be liberal in what we accept. Every discovery surface — including this
@@ -40,13 +41,17 @@ export async function runReferenceDetailList(
   client: ApiClient,
   stalest?: number,
   domain?: string,
-  withDetail = false
+  withDetail = false,
+  needsReview = false,
+  maxConfidence?: number
 ): Promise<{
   items: Array<{
     command: string;
     summary: string | null;
     lastReviewed: string | null;
     runs: number;
+    aiConfidence?: number | null;
+    needsHumanReview?: boolean | null;
     // Present only when `withDetail` is set AND the backend that serves it is
     // deployed; the per-row detail text otherwise lives behind `detail get`.
     detail?: string | null;
@@ -57,6 +62,8 @@ export async function runReferenceDetailList(
   if (stalest) p.set("stalest", String(stalest));
   if (domain) p.set("domain", domain);
   if (withDetail) p.set("withDetail", "1");
+  if (needsReview) p.set("needsReview", "1");
+  if (needsReview && maxConfidence != null) p.set("maxConfidence", String(maxConfidence));
   const q = p.toString();
   return client.get(`/api/cli/command-catalog${q ? `?${q}` : ""}`);
 }
@@ -64,14 +71,19 @@ export async function runReferenceDetailList(
 export async function runReferenceDetailSet(
   client: ApiClient,
   commandParts: string[],
-  body: { summary?: string; detail?: string },
+  body: { summary?: string; detail?: string } & AssessFlags,
   flags: WriteFlags = {},
   tier: CallerTier = getCallerTier()
 ): Promise<unknown> {
   // Same client-side visibility gate as the read: an unknown (or tier-hidden)
   // command exits 5 before any write leaves the process.
   const command = resolveCommand(commandParts, tier);
-  return client.put(`/api/cli/command-catalog/${encodeURIComponent(command)}`, body, {
+  const payload: Record<string, unknown> = {};
+  if (body.summary !== undefined) payload.summary = body.summary;
+  if (body.detail !== undefined) payload.detail = body.detail;
+  if (body.aiConfidence !== undefined) payload.aiConfidence = body.aiConfidence;
+  if (body.needsHumanReview) payload.needsHumanReview = true;
+  return client.put(`/api/cli/command-catalog/${encodeURIComponent(command)}`, payload, {
     headers: writeFlagsToHeaders(flags),
   });
 }

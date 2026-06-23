@@ -3927,8 +3927,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         type: "boolean",
         description: "Include each entry's full detail text (adds a `detail` field per item), folding the per-command `reference detail get` into this one call. Needs the backend deployed; on an old backend the field is simply absent.",
       },
+      { name: "needs-review", type: "boolean", description: "Only rows still needing grooming: aiConfidence below the threshold (or unassessed) AND not parked, oldest-first." },
+      { name: "max-confidence", type: "number", description: "Threshold for --needs-review (default 90)." },
     ],
-    outputShape: "{ items: [{ command, summary, lastReviewed, runs, detail? }], count } — `detail` present only with --with-detail",
+    outputShape: "{ items: [{ command, summary, lastReviewed, runs, aiConfidence, needsHumanReview, detail? }], count } — `detail` present only with --with-detail",
     errors: [
       { exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" },
       { exit: 4, meaning: "Unknown --domain", remedy: "`ib commands` for valid domains" },
@@ -3938,6 +3940,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ib reference detail list --stalest 20",
       "ib reference detail list --stalest 10 --domain attachment",
       "ib reference detail list --stalest 10 --domain attachment --with-detail",
+      "ib reference detail list --needs-review --max-confidence 90",
     ],
   },
   {
@@ -3967,6 +3970,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         type: "string",
         description: "Full markdown business-context detail",
       },
+      { name: "ai-confidence", type: "number", description: "Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score." },
+      { name: "needs-human-review", type: "boolean", description: "Park the row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked." },
     ],
     outputShape: "{ command, runs, … } (backend response)",
     errors: [
