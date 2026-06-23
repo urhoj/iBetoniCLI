@@ -13,6 +13,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Exit codes are a documented contract** (`src/api/errors.ts` `exitCodeFromStatus`): `0` success (incl. --help/--version) · `1` generic (bare `ib`/group help render, `auth login` failure, `doctor` not-ok, unexpected runtime errors) · `2` auth (401) · `3` permission (403) · `4` validation (4xx AND parser usage errors, emitted as the JSON envelope with code `USAGE` via `handleParseRejection`) · `5` not-found (404) · `6` server (5xx) · `7` network. Every error path emits the JSON envelope; never call `process.exit()` (Windows-unsafe post-fetch — use `failWith`/`exitWithError`/`process.exitCode`). Preserve this mapping.
 - **`--help` for commands is self-contained** — each command's help renders from bundled `CommandSpec` and lists flags, permissions, output shape, error remedies, and copy-paste examples, so an AI can invoke it correctly from help alone. The root `ib --help` additionally includes a GLOSSARY section fetched live from the DB (`ib glossary`); when offline or tokenless, that section is omitted but the rest of the help renders normally.
 
+## iB MCP
+
+- Treat the iB MCP connector as a primary tool for verifying live betoni.online data and current operational state before making assumptions.
+- If iB MCP auth is stale or broken, recover with local `ib auth login`, then retry the MCP call.
+- Do not expect `ib auth *` to work through MCP. Use the local CLI for auth and MCP for the actual tenant-scoped reads and writes.
+- When identity or company context matters, verify it from current iB data or local CLI auth state instead of assuming an earlier session is still valid.
+
 ## Commands
 
 Run from the `betonicli/` directory:
