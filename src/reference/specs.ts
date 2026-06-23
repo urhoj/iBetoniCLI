@@ -2412,12 +2412,15 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "empty-shorttext", type: "boolean", description: "Only rows whose shorttext is blank (grooming backfill targets)" },
       { name: "fields", type: "string", description: "Comma-separated columns to keep, e.g. helpId,title,shorttext,accessCount (drops the large htmltext)" },
       { name: "sort", type: "string", description: "Sort by a column, e.g. accessCount:desc (numeric fields compare numerically)" },
+      { name: "needs-review", type: "boolean", description: "Only help rows still needing grooming: aiConfidence below the threshold (or unassessed) AND not parked, oldest-first by lastModifiedTime." },
+      { name: "max-confidence", type: "number", description: "Threshold for --needs-review (default 90)." },
     ],
-    outputShape: "ListEnvelope<{ helpId, title, shorttext, htmltext, img, accessCount, … }> (rows projected to --fields when set)",
+    outputShape: "ListEnvelope<{ helpId, title, shorttext, htmltext, img, accessCount, aiConfidence, needsHumanReview, … }> (rows projected to --fields when set)",
     errors: [apiErr(500, "Backend error", "retry with --verbose")],
     examples: [
       "ib ohje list --limit 10 --pretty",
       "ib ohje list --empty-shorttext --fields helpId,title,accessCount --sort accessCount:desc",
+      "ib ohje list --needs-review --fields helpId,title,aiConfidence,shorttext",
     ],
   },
   {
@@ -2437,6 +2440,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "htmltext", type: "string", description: "HTML body shown in the modal" },
       { name: "img", type: "string", description: "Image reference (pass \"\" to clear it to null)" },
       { name: "must-exist", type: "boolean", description: "Fail (exit 4) instead of creating a new row when the helpId has no entry — guards against a typo'd helpId silently spawning a junk row" },
+      { name: "ai-confidence", type: "number", description: "Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score and re-open the row." },
+      { name: "needs-human-review", type: "boolean", description: "Park the help row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked." },
     ],
     writeFlags: true,
     outputShape:

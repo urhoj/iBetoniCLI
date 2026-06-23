@@ -256,3 +256,43 @@ describe("isValidHelpId", () => {
     expect(isValidHelpId("x".repeat(251))).toBe(false);
   });
 });
+
+function client(over: Record<string, unknown> = {}) {
+  return { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn(), ...over } as never;
+}
+
+describe("ib ohje aiConfidence", () => {
+  test("update sends aiConfidence + needsHumanReview from flags, not from the current row", async () => {
+    const c = client({
+      get: vi.fn().mockResolvedValue([{ helpId: "x", title: "T", shorttext: "s", htmltext: "<p>h</p>", aiConfidence: 42 }]),
+      put: vi.fn().mockResolvedValue({ success: true }),
+    });
+    await runOhjeUpdate(c, "x", { shorttext: "new" }, { reason: "groom" }, {}, { aiConfidence: 88 });
+    const body = (c as any).put.mock.calls[0][1];
+    expect(body.aiConfidence).toBe(88);            // from the flag
+    expect(body.shorttext).toBe("new");
+    expect(body.title).toBe("T");                  // GET-merged content survives
+  });
+
+  test("update WITHOUT --ai-confidence omits the key (backend resets to NULL)", async () => {
+    const c = client({
+      get: vi.fn().mockResolvedValue([{ helpId: "x", title: "T", shorttext: "s", htmltext: "<p>h</p>", aiConfidence: 42 }]),
+      put: vi.fn().mockResolvedValue({ success: true }),
+    });
+    await runOhjeUpdate(c, "x", { shorttext: "new" }, { reason: "edit" });
+    const body = (c as any).put.mock.calls[0][1];
+    expect("aiConfidence" in body).toBe(false);     // NOT carried back from the row's 42
+  });
+
+  test("list --needs-review filters by aiConfidence and skips parked rows", async () => {
+    const rows = [
+      { helpId: "a", aiConfidence: 95, lastModifiedTime: "2026-01-01" },
+      { helpId: "b", aiConfidence: 40, lastModifiedTime: "2026-01-02" },
+      { helpId: "c", aiConfidence: null, lastModifiedTime: "2026-01-03" },
+      { helpId: "d", aiConfidence: 10, needsHumanReview: true, lastModifiedTime: "2026-01-04" },
+    ];
+    const c = client({ get: vi.fn().mockResolvedValue(rows) });
+    const out = await runOhjeList(c, { needsReview: true });
+    expect(out.items.map((r: any) => r.helpId)).toEqual(["b", "c"]);
+  });
+});
