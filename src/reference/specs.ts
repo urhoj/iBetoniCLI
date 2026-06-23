@@ -5339,13 +5339,15 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "domain", type: "string", description: "Filter to a domain (exact match)" },
       { name: "related", type: "string", description: "Filter to terms whose relatedCommands contain this substring" },
       { name: "terms-only", type: "boolean", description: "Return only {term, synonyms} per entry — the cheap INDEX view (strips definitions); use to discover which terms exist." },
+      { name: "needs-review", type: "boolean", description: "Only terms still needing grooming: aiConfidence below the threshold (or unassessed) AND not parked, oldest-first." },
+      { name: "max-confidence", type: "number", description: "Threshold for --needs-review (default 90)." },
     ],
-    outputShape: "{ items:[{term,synonyms,definition,relatedCommands:[{command,summary}],relatedEntity,domain,lastReviewed,runs}], count, truncated? }",
+    outputShape: "{ items:[{term,synonyms,definition,relatedCommands:[{command,summary}],relatedEntity,domain,lastReviewed,runs,aiConfidence,needsHumanReview}], count, truncated? }",
     notes: [
       "--terms-only is client-side: it strips each row to {term, synonyms} after the server-side filters apply. Use it instead of a full list to discover terms cheaply (the full list returns every definition).",
     ],
     errors: [{ exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" }],
-    examples: ["ib glossary list", "ib glossary list --search puomi", "ib glossary list --stalest 10", "ib glossary list --domain vacation", "ib glossary list --terms-only"],
+    examples: ["ib glossary list", "ib glossary list --search puomi", "ib glossary list --stalest 10", "ib glossary list --domain vacation", "ib glossary list --terms-only", "ib glossary list --needs-review"],
   },
   {
     command: "ib glossary misses",
@@ -5377,6 +5379,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "add-synonyms", type: "string", description: "Comma-separated synonyms to ADD to the existing list — no full resend. Excl. --synonyms." },
       { name: "remove-synonyms", type: "string", description: "Comma-separated synonyms to REMOVE by name (idempotent). Excl. --synonyms." },
       { name: "append-definition", type: "string", description: "Append a clause to the current definition (single-space join; re-appending identical text is a no-op). Excl. --definition." },
+      { name: "ai-confidence", type: "number", description: "Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score." },
+      { name: "needs-human-review", type: "boolean", description: "Park the term for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked." },
     ],
     outputShape: "{ term, synonyms, definition, relatedCommands, relatedEntity, domain, runs }",
     notes: [

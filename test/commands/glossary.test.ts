@@ -246,4 +246,28 @@ describe("glossary append flags", () => {
     expect((err as CliError).exitCode).toBe(4);
     expect(put).not.toHaveBeenCalled();
   });
+
+  test("set sends aiConfidence + needsHumanReview when provided", async () => {
+    const put = vi.fn().mockResolvedValue({ term: "valumassa" });
+    await runGlossarySet(mkClient({ put }), "valumassa",
+      { definition: "x", aiConfidence: 75, needsHumanReview: true },
+      { reason: "groom" });
+    const body = put.mock.calls[0][1];
+    expect(body.aiConfidence).toBe(75);
+    expect(body.needsHumanReview).toBe(true);
+  });
+
+  test("set omits aiConfidence when not provided", async () => {
+    const put = vi.fn().mockResolvedValue({});
+    await runGlossarySet(mkClient({ put }), "valumassa", { definition: "x" }, { reason: "groom" });
+    const body = put.mock.calls[0][1];
+    expect("aiConfidence" in body).toBe(false);
+    expect("needsHumanReview" in body).toBe(false);
+  });
+
+  test("list passes needsReview + maxConfidence", async () => {
+    const get = vi.fn().mockResolvedValue({ items: [], count: 0 });
+    await runGlossaryList(mkClient({ get }), { needsReview: true, maxConfidence: 90 });
+    expect(get).toHaveBeenCalledWith("/api/cli/glossary?needsReview=1&maxConfidence=90");
+  });
 });

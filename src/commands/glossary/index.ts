@@ -17,6 +17,7 @@ import { addWriteFlagsToCommand, writeFlagsToHeaders, type WriteFlags } from "..
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { CliError } from "../../api/errors.js";
 import { runGlossaryLint } from "./lint.js";
+import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "../../assess.js";
 
 interface GlossaryEntry {
   term: string;
@@ -176,13 +177,15 @@ export async function runGlossaryLookupBatch(
 
 export async function runGlossaryList(
   client: ApiClient,
-  opts: { search?: string; stalest?: number; domain?: string; related?: string; termsOnly?: boolean }
+  opts: { search?: string; stalest?: number; domain?: string; related?: string; termsOnly?: boolean; needsReview?: boolean; maxConfidence?: number }
 ): Promise<ListEnvelope<unknown>> {
   const q = new URLSearchParams();
   if (opts.search) q.set("search", opts.search);
   if (opts.stalest) q.set("stalest", String(opts.stalest));
   if (opts.domain) q.set("domain", opts.domain);
   if (opts.related) q.set("related", opts.related);
+  if (opts.needsReview) q.set("needsReview", "1");
+  if (opts.needsReview && opts.maxConfidence != null) q.set("maxConfidence", String(opts.maxConfidence));
   const qs = q.toString();
   const res = await client.get<{ items: unknown[]; count: number }>(`/api/cli/glossary${qs ? `?${qs}` : ""}`);
   const items = opts.termsOnly
@@ -195,7 +198,7 @@ export async function runGlossarySet(
   client: ApiClient,
   term: string,
   opts: { definition?: string; synonyms?: string; related?: string; entity?: string; updateOnly?: boolean; domain?: string;
-    addSynonyms?: string; removeSynonyms?: string; appendDefinition?: string },
+    addSynonyms?: string; removeSynonyms?: string; appendDefinition?: string; aiConfidence?: number; needsHumanReview?: boolean },
   flags: WriteFlags = {}
 ): Promise<unknown> {
   // Append flags edit in place; they cannot combine with their overwrite twin.
@@ -221,6 +224,8 @@ export async function runGlossarySet(
   if (opts.addSynonyms !== undefined) body.addSynonyms = splitList(opts.addSynonyms);
   if (opts.removeSynonyms !== undefined) body.removeSynonyms = splitList(opts.removeSynonyms);
   if (opts.appendDefinition !== undefined) body.appendDefinition = opts.appendDefinition;
+  if (opts.aiConfidence !== undefined) body.aiConfidence = opts.aiConfidence;
+  if (opts.needsHumanReview) body.needsHumanReview = true;
   return client.put(`/api/cli/glossary/${encodeURIComponent(term)}`, body, { headers });
 }
 
@@ -258,17 +263,18 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
       } catch (e) { exitWithError(e); }
     });
 
-  glossary
-    .command("list")
-    .description("List glossary entries; --search filters, --stalest orders least-recently-reviewed first")
-    .option("--search <s>", "Filter by term/definition/synonym substring")
-    .option("--stalest <n>", "Return up to N entries, stalest first", (v: string) => Number(v))
-    .option("--domain <d>", "Filter to a domain (exact match)")
-    .option("--related <substr>", "Filter to terms whose relatedCommands contain this substring")
-    .option("--terms-only", "Return only {term, synonyms} per entry (cheap index view; strips definitions)")
-    .action(async (opts: { search?: string; stalest?: number; domain?: string; related?: string }) => {
-      try { writeJson(await runGlossaryList(await getClient(), opts)); } catch (e) { exitWithError(e); }
-    });
+  addNeedsReviewFlags(
+    glossary
+      .command("list")
+      .description("List glossary entries; --search filters, --stalest orders least-recently-reviewed first")
+      .option("--search <s>", "Filter by term/definition/synonym substring")
+      .option("--stalest <n>", "Return up to N entries, stalest first", (v: string) => Number(v))
+      .option("--domain <d>", "Filter to a domain (exact match)")
+      .option("--related <substr>", "Filter to terms whose relatedCommands contain this substring")
+      .option("--terms-only", "Return only {term, synonyms} per entry (cheap index view; strips definitions)")
+  ).action(async (opts: { search?: string; stalest?: number; domain?: string; related?: string; termsOnly?: boolean; needsReview?: boolean; maxConfidence?: number }) => {
+    try { writeJson(await runGlossaryList(await getClient(), opts)); } catch (e) { exitWithError(e); }
+  });
 
   glossary
     .command("misses")
@@ -304,8 +310,9 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
     .option("--add-synonyms <list>", "Comma-separated synonyms to ADD (no full resend; excl. --synonyms)")
     .option("--remove-synonyms <list>", "Comma-separated synonyms to REMOVE by name (excl. --synonyms)")
     .option("--append-definition <text>", "Append a clause to the current definition (excl. --definition)");
-  addWriteFlagsToCommand(set).action(
-    async (term: string, opts: { definition?: string; synonyms?: string; related?: string; entity?: string; domain?: string; updateOnly?: boolean; fromJson?: string; dryRun?: boolean; idempotencyKey?: string; reason?: string; addSynonyms?: string; removeSynonyms?: string; appendDefinition?: string }) => {
+  addWriteFlagsToCommand(addAssessWriteFlags(set)).action(
+    async (term: string, opts: { definition?: string; synonyms?: string; related?: string; entity?: string; domain?: string; updateOnly?: boolean; fromJson?: string; dryRun?: boolean; idempotencyKey?: string; reason?: string; addSynonyms?: string; removeSynonyms?: string; appendDefinition?: string; aiConfidence?: number; needsHumanReview?: boolean }) => {
+      assertAiConfidence(opts.aiConfidence);
       let merged: { definition?: string; synonyms?: string; related?: string; entity?: string; domain?: string } =
         { definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity, domain: opts.domain };
       if (opts.fromJson) {
@@ -318,7 +325,7 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
         writeJson(await runGlossarySet(await getClient(), term,
           { definition: merged.definition, synonyms: merged.synonyms, related: merged.related, entity: merged.entity, domain: merged.domain,
             addSynonyms: opts.addSynonyms, removeSynonyms: opts.removeSynonyms, appendDefinition: opts.appendDefinition,
-            updateOnly: opts.updateOnly },
+            updateOnly: opts.updateOnly, aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview },
           { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
       } catch (e) { exitWithError(e); }
     });
