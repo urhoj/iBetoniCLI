@@ -14,6 +14,7 @@ import { writeJson, exitWithError, failWith, errorMessage } from "../../output/j
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../api/writeFlags.js";
 import { CliError } from "../../api/errors.js";
 import { runGlossaryLint } from "./lint.js";
+import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "../../assess.js";
 const splitList = (s) => (s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
 const arrToCsv = (v) => Array.isArray(v) ? v.join(",") : (typeof v === "string" ? v : undefined);
 /**
@@ -149,6 +150,10 @@ export async function runGlossaryList(client, opts) {
         q.set("domain", opts.domain);
     if (opts.related)
         q.set("related", opts.related);
+    if (opts.needsReview)
+        q.set("needsReview", "1");
+    if (opts.needsReview && opts.maxConfidence != null)
+        q.set("maxConfidence", String(opts.maxConfidence));
     const qs = q.toString();
     const res = await client.get(`/api/cli/glossary${qs ? `?${qs}` : ""}`);
     const items = opts.termsOnly
@@ -188,6 +193,10 @@ export async function runGlossarySet(client, term, opts, flags = {}) {
         body.removeSynonyms = splitList(opts.removeSynonyms);
     if (opts.appendDefinition !== undefined)
         body.appendDefinition = opts.appendDefinition;
+    if (opts.aiConfidence !== undefined)
+        body.aiConfidence = opts.aiConfidence;
+    if (opts.needsHumanReview)
+        body.needsHumanReview = true;
     return client.put(`/api/cli/glossary/${encodeURIComponent(term)}`, body, { headers });
 }
 export async function runGlossaryMisses(client, top) {
@@ -224,15 +233,14 @@ export function registerGlossaryCommands(program, getClient) {
             exitWithError(e);
         }
     });
-    glossary
+    addNeedsReviewFlags(glossary
         .command("list")
         .description("List glossary entries; --search filters, --stalest orders least-recently-reviewed first")
         .option("--search <s>", "Filter by term/definition/synonym substring")
         .option("--stalest <n>", "Return up to N entries, stalest first", (v) => Number(v))
         .option("--domain <d>", "Filter to a domain (exact match)")
         .option("--related <substr>", "Filter to terms whose relatedCommands contain this substring")
-        .option("--terms-only", "Return only {term, synonyms} per entry (cheap index view; strips definitions)")
-        .action(async (opts) => {
+        .option("--terms-only", "Return only {term, synonyms} per entry (cheap index view; strips definitions)")).action(async (opts) => {
         try {
             writeJson(await runGlossaryList(await getClient(), opts));
         }
@@ -281,7 +289,8 @@ export function registerGlossaryCommands(program, getClient) {
         .option("--add-synonyms <list>", "Comma-separated synonyms to ADD (no full resend; excl. --synonyms)")
         .option("--remove-synonyms <list>", "Comma-separated synonyms to REMOVE by name (excl. --synonyms)")
         .option("--append-definition <text>", "Append a clause to the current definition (excl. --definition)");
-    addWriteFlagsToCommand(set).action(async (term, opts) => {
+    addWriteFlagsToCommand(addAssessWriteFlags(set)).action(async (term, opts) => {
+        assertAiConfidence(opts.aiConfidence);
         let merged = { definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity, domain: opts.domain };
         if (opts.fromJson) {
             let json;
@@ -296,7 +305,7 @@ export function registerGlossaryCommands(program, getClient) {
         try {
             writeJson(await runGlossarySet(await getClient(), term, { definition: merged.definition, synonyms: merged.synonyms, related: merged.related, entity: merged.entity, domain: merged.domain,
                 addSynonyms: opts.addSynonyms, removeSynonyms: opts.removeSynonyms, appendDefinition: opts.appendDefinition,
-                updateOnly: opts.updateOnly }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
+                updateOnly: opts.updateOnly, aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
         }
         catch (e) {
             exitWithError(e);

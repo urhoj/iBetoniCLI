@@ -2445,7 +2445,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     outputShape:
-      "{ success: true, helpId, created, written: {helpId,title,shorttext,htmltext,img}, htmltextLength, response } — `created` is true when no prior row existed (a parallel groomer can spot an unexpected insert); or { dryRun: true, helpId, created, current, proposed }",
+      "{ success: true, helpId, created, written: {helpId,title,shorttext,htmltext,img, aiConfidence?, needsHumanReview?}, htmltextLength, response } — `created` is true when no prior row existed (a parallel groomer can spot an unexpected insert); aiConfidence/needsHumanReview present in `written` only when those flags were passed; or { dryRun: true, helpId, created, current, proposed }",
     errors: [
       { exit: 4, meaning: "Missing --reason / invalid helpId / --must-exist on a missing row", remedy: "pass --reason; helpId 1–250 chars; drop --must-exist to create" },
       apiErr(400, "Validation failed", "title ≤500, htmltext ≤10000, helpId 1–250 chars"),

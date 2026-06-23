@@ -1,6 +1,7 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
+import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "../../assess.js";
 /**
  * helpId validity: any non-empty string up to the `dbo.helps.helpId` column
  * width (nvarchar 250). The backend binds it as a parameter (no string-built
@@ -34,6 +35,17 @@ export async function runOhjeList(client, opts = {}) {
     let all = Array.isArray(rows) ? rows : [];
     if (opts.emptyShorttext) {
         all = all.filter((r) => !String(r.shorttext ?? "").trim());
+    }
+    if (opts.needsReview) {
+        const max = opts.maxConfidence ?? 90;
+        all = all.filter((r) => {
+            const c = r.aiConfidence;
+            const below = c == null || (typeof c === "number" && c < max);
+            const parked = r.needsHumanReview === true || r.needsHumanReview === 1;
+            return below && !parked;
+        });
+        if (!opts.sort)
+            opts = { ...opts, sort: "lastModifiedTime:asc" };
     }
     if (opts.sort) {
         const [field, dirRaw] = opts.sort.split(":");
@@ -103,7 +115,7 @@ export function buildOhjeBody(current, helpId, fields) {
  * the full row (see buildOhjeBody) so untouched columns survive. Server-side
  * requires isHelperEditor (or system-admin/developer).
  */
-export async function runOhjeUpdate(client, helpId, fields, flags, opts = {}) {
+export async function runOhjeUpdate(client, helpId, fields, flags, opts = {}, assess = {}) {
     const current = await runOhjeGet(client, helpId);
     // The GET already tells us whether a row exists — surface it so callers can
     // detect an UNEXPECTED insert (a typo'd Finnish helpId silently creates a junk
@@ -113,10 +125,18 @@ export async function runOhjeUpdate(client, helpId, fields, flags, opts = {}) {
         failWith(`helpId "${helpId}" has no existing row and --must-exist was set (refusing to create a new entry)`, 4);
     }
     const proposed = buildOhjeBody(current, helpId, fields);
+    // aiConfidence/needsHumanReview come ONLY from the flags — never from `current`.
+    // buildOhjeBody emits just the 5 content columns, so an omitted --ai-confidence
+    // leaves the key out of the body and the backend resets the stored score to NULL.
+    const payload = { ...proposed };
+    if (assess.aiConfidence !== undefined)
+        payload.aiConfidence = assess.aiConfidence;
+    if (assess.needsHumanReview)
+        payload.needsHumanReview = true;
     if (flags.dryRun) {
-        return { dryRun: true, helpId, created, current, proposed };
+        return { dryRun: true, helpId, created, current, proposed: payload };
     }
-    const response = await client.put("/api/helps/update", proposed, {
+    const response = await client.put("/api/helps/update", payload, {
         headers: writeFlagsToHeaders(flags),
     });
     // Echo what was written (the merged row) + a length so a parallel grooming
@@ -125,7 +145,7 @@ export async function runOhjeUpdate(client, helpId, fields, flags, opts = {}) {
         success: true,
         helpId,
         created,
-        written: proposed,
+        written: payload,
         htmltextLength: (proposed.htmltext ?? "").length,
         response,
     };
@@ -159,7 +179,7 @@ export function registerOhjeCommands(parent, getClient) {
             exitWithError(e);
         }
     });
-    o.command("list")
+    addNeedsReviewFlags(o.command("list")
         .description("List every UI help entry (GET /api/helps/getAll). Reads are public. The full " +
         "table is large (~115 KB), so use the client-side shapers to keep output small: " +
         "--empty-shorttext (grooming backfill targets), --fields (column projection, skips " +
@@ -167,7 +187,7 @@ export function registerOhjeCommands(parent, getClient) {
         .option("--limit <n>", "Max rows to return (client-side cap, after filter+sort)", (v) => Number(v))
         .option("--empty-shorttext", "Only rows whose shorttext is blank (grooming backfill targets)")
         .option("--fields <cols>", "Comma-separated columns to keep, e.g. helpId,title,shorttext,accessCount (drops the large htmltext)", (v) => v.split(",").map((s) => s.trim()).filter(Boolean))
-        .option("--sort <field:dir>", "Sort by a column, e.g. accessCount:desc (numeric fields compare numerically)")
+        .option("--sort <field:dir>", "Sort by a column, e.g. accessCount:desc (numeric fields compare numerically)"))
         .action(async (opts) => {
         try {
             const client = await getClient();
@@ -192,10 +212,11 @@ export function registerOhjeCommands(parent, getClient) {
         .option("--img <s>", "Image reference (img)")
         .option("--must-exist", "Fail (exit 4) if no row exists for this helpId instead of upserting a new one " +
         "(guards against a typo'd helpId silently creating a junk row)");
-    addWriteFlagsToCommand(updateCmd).action(async (helpId, opts) => {
+    addWriteFlagsToCommand(addAssessWriteFlags(updateCmd)).action(async (helpId, opts) => {
         if (!isValidHelpId(helpId)) {
             failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
         }
+        assertAiConfidence(opts.aiConfidence);
         // --reason is required for an actual write; a --dry-run preview is
         // read-only, so it does not need a justification.
         if (!opts.dryRun && !opts.reason) {
@@ -208,7 +229,7 @@ export function registerOhjeCommands(parent, getClient) {
                 dryRun: opts.dryRun,
                 idempotencyKey: opts.idempotencyKey,
                 reason: opts.reason,
-            }, { mustExist: opts.mustExist });
+            }, { mustExist: opts.mustExist }, { aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview });
             writeJson(result);
         }
         catch (e) {

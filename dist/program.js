@@ -45,6 +45,7 @@ import { registerDoctorCommand } from "./commands/doctor/index.js";
 import { runReferenceDump, fetchPrimerGlossary } from "./reference/dump.js";
 import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList } from "./reference/detail.js";
 import { addWriteFlagsToCommand } from "./api/writeFlags.js";
+import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "./assess.js";
 import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDomain } from "./reference/commandsList.js";
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
@@ -222,20 +223,19 @@ export function buildProgram() {
             exitWithError(e);
         }
     });
-    detail
+    addNeedsReviewFlags(detail
         .command("list")
         .description("List command-catalog entries, optionally ordered by stalest (DB-backed)")
         .option("--stalest <n>", "Return up to N entries sorted by least-recently reviewed", (v) => Number(v))
         .option("--domain <d>", "Only commands in this ib domain (e.g. attachment) — narrows BEFORE --stalest")
-        .option("--with-detail", "Include each entry's full detail text, folding the per-command `reference detail get` into one call (needs the backend deployed)")
-        .action(async (opts) => {
+        .option("--with-detail", "Include each entry's full detail text, folding the per-command `reference detail get` into one call (needs the backend deployed)")).action(async (opts) => {
         try {
             // Validate the domain offline (exit 4 on unknown) before any network call,
             // mirroring `ib commands <domain>`.
             if (opts.domain)
                 assertKnownDomain(COMMAND_SPECS, opts.domain, getCallerTier());
             const client = await getClient();
-            writeJson(await runReferenceDetailList(client, opts.stalest, opts.domain, opts.withDetail ?? false));
+            writeJson(await runReferenceDetailList(client, opts.stalest, opts.domain, opts.withDetail ?? false, opts.needsReview ?? false, opts.maxConfidence));
         }
         catch (e) {
             exitWithError(e);
@@ -247,10 +247,11 @@ export function buildProgram() {
         .argument("<command...>", "Command path after `ib` (e.g. keikka latest)")
         .option("--summary <text>", "Short one-line summary stored in the catalog")
         .option("--detail <text>", "Full markdown business-context detail");
-    addWriteFlagsToCommand(detailSet).action(async (commandParts, opts) => {
+    addWriteFlagsToCommand(addAssessWriteFlags(detailSet)).action(async (commandParts, opts) => {
+        assertAiConfidence(opts.aiConfidence);
         try {
             const client = await getClient();
-            const result = await runReferenceDetailSet(client, commandParts, { summary: opts.summary, detail: opts.detail }, {
+            const result = await runReferenceDetailSet(client, commandParts, { summary: opts.summary, detail: opts.detail, aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }, {
                 dryRun: opts.dryRun,
                 idempotencyKey: opts.idempotencyKey,
                 reason: opts.reason,

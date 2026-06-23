@@ -22,7 +22,7 @@ export async function runReferenceDetail(client, commandParts, tier = getCallerT
     const command = resolveCommand(commandParts, tier);
     return client.get(`/api/cli/command-catalog/${encodeURIComponent(command)}`);
 }
-export async function runReferenceDetailList(client, stalest, domain, withDetail = false) {
+export async function runReferenceDetailList(client, stalest, domain, withDetail = false, needsReview = false, maxConfidence) {
     const p = new URLSearchParams();
     if (stalest)
         p.set("stalest", String(stalest));
@@ -30,6 +30,10 @@ export async function runReferenceDetailList(client, stalest, domain, withDetail
         p.set("domain", domain);
     if (withDetail)
         p.set("withDetail", "1");
+    if (needsReview)
+        p.set("needsReview", "1");
+    if (needsReview && maxConfidence != null)
+        p.set("maxConfidence", String(maxConfidence));
     const q = p.toString();
     return client.get(`/api/cli/command-catalog${q ? `?${q}` : ""}`);
 }
@@ -37,7 +41,16 @@ export async function runReferenceDetailSet(client, commandParts, body, flags = 
     // Same client-side visibility gate as the read: an unknown (or tier-hidden)
     // command exits 5 before any write leaves the process.
     const command = resolveCommand(commandParts, tier);
-    return client.put(`/api/cli/command-catalog/${encodeURIComponent(command)}`, body, {
+    const payload = {};
+    if (body.summary !== undefined)
+        payload.summary = body.summary;
+    if (body.detail !== undefined)
+        payload.detail = body.detail;
+    if (body.aiConfidence !== undefined)
+        payload.aiConfidence = body.aiConfidence;
+    if (body.needsHumanReview)
+        payload.needsHumanReview = true;
+    return client.put(`/api/cli/command-catalog/${encodeURIComponent(command)}`, payload, {
         headers: writeFlagsToHeaders(flags),
     });
 }
