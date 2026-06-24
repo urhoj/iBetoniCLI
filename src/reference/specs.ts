@@ -2078,10 +2078,16 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         "Recipient personId not found in your company",
         "check the personId / name belongs to your company"
       ),
+      apiErr(
+        422,
+        "Email provider (SendGrid) rejected the send — e.g. the From address/domain is not a verified Sender Identity (notably --from-brand betonijerry until betonijerry.fi is authenticated in SendGrid)",
+        "a provider/config issue, not your request — authenticate the sending domain in SendGrid (Sender Authentication); the exact SendGrid reason is in the error message"
+      ),
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
       "Recipient: a value containing '@' is sent as a raw address; otherwise it is a personId or a name resolved via the company-scoped person search (0 matches → exit 5, >1 → exit 4).",
+      "A SendGrid send failure returns 422 with the real provider message (the CDN masks origin 5xx, so 4xx is used to keep the message readable) — it is NOT a caller auth/validation error despite the 4xx code.",
       "--from-brand betonijerry sends as noreply@betonijerry.fi via a DIRECT send that bypasses the BetoniJerry demo-mode reroute — so a deliverability/spam test actually reaches the target inbox.",
       "Useful for spam-score testing: send to a mail-tester.com address and read the SPF/DKIM/DMARC + SpamAssassin score.",
       "Deploy-gated: the /api/cli/notification/email/send route must be deployed before this works.",
