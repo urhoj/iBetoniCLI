@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { CliError, exitCodeFromStatus } from "../../api/errors.js";
@@ -103,11 +104,48 @@ export async function runNotificationFcmSend(
   });
 }
 
+export interface NotifyEmailInput {
+  /** personId (numeric), a name to resolve within the caller's company, or a raw email (contains "@"). */
+  recipient: string;
+  subject: string;
+  text?: string;
+  html?: string;
+  fromBrand?: "betoni" | "betonijerry";
+}
+
+/**
+ * POST /api/cli/notification/email/send — send an email to one person (resolved
+ * within the caller's company) or a raw address. Admin/HR/developer-gated
+ * server-side. A recipient containing "@" is sent as a raw address; otherwise it
+ * is resolved to a personId. `--from-brand` picks the (whitelisted) sender.
+ */
+export async function runNotificationEmailSend(
+  client: ApiClient,
+  input: NotifyEmailInput,
+  flags: WriteFlags
+): Promise<unknown> {
+  const body: Record<string, unknown> = {
+    subject: input.subject,
+    fromBrand: input.fromBrand ?? "betoni",
+  };
+  if (input.text !== undefined) body.text = input.text;
+  if (input.html !== undefined) body.html = input.html;
+
+  const r = input.recipient.trim();
+  if (r.includes("@")) {
+    body.email = r;
+  } else {
+    body.personId = await resolvePersonRef(client, r);
+  }
+  return client.post("/api/cli/notification/email/send", body, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
 /**
  * Register `ib notification` — outbound notifications to people.
- * Phase 1: `notification fcm send` (FCM push). Email / in-app channels are
- * future subgroups (`notification email|inapp …`). Admin/HR-gated server-side;
- * `src/reference/specs.ts` is the source of truth for flags/permissions/output.
+ * Subgroups: `notification fcm send` (FCM push), `notification email send` (email channel).
+ * Admin/HR-gated server-side; `src/reference/specs.ts` is the source of truth for flags/permissions/output.
  */
 export function registerNotificationCommands(
   parent: Command,
@@ -115,7 +153,7 @@ export function registerNotificationCommands(
 ): void {
   const n = parent
     .command("notification")
-    .description("Outbound notifications (push) to people");
+    .description("Outbound notifications (push, email) to people");
 
   const fcm = n
     .command("fcm")
@@ -155,6 +193,80 @@ export function registerNotificationCommands(
             body: opts.body,
             data: opts.data,
           },
+          {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+          }
+        );
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    }
+  );
+
+  const email = n
+    .command("email")
+    .description("Email channel — send an email to a person or address");
+
+  const emailSend = email
+    .command("send <recipient>")
+    .description(
+      "Send an email to a personId/name (resolved in your company) or a raw address (Admin/HR/developer only). One of --body/--html required. --dry-run previews the resolved recipient + sender."
+    )
+    .requiredOption("--subject <text>", "Email subject")
+    .option("--body <text>", "Plain-text body (auto-wrapped to HTML)")
+    .option("--html <file>", "Path to an HTML file to send as the HTML body")
+    .option(
+      "--from-brand <brand>",
+      "Sender identity: betoni (default, noreply@ibetoni.fi) or betonijerry (noreply@betonijerry.fi)",
+      "betoni"
+    );
+  addWriteFlagsToCommand(emailSend).action(
+    async (
+      recipient: string,
+      opts: WriteFlags & {
+        subject: string;
+        body?: string;
+        html?: string;
+        fromBrand?: string;
+      }
+    ) => {
+      try {
+        if (!opts.body && !opts.html) {
+          throw new CliError(
+            "one of --body or --html is required",
+            400,
+            null,
+            exitCodeFromStatus(400)
+          );
+        }
+        const brand = opts.fromBrand ?? "betoni";
+        if (brand !== "betoni" && brand !== "betonijerry") {
+          throw new CliError(
+            "--from-brand must be 'betoni' or 'betonijerry'",
+            400,
+            null,
+            exitCodeFromStatus(400)
+          );
+        }
+        let html: string | undefined;
+        if (opts.html) {
+          try {
+            html = readFileSync(opts.html, "utf8");
+          } catch {
+            throw new CliError(
+              `cannot read --html file: ${opts.html}`,
+              400,
+              null,
+              exitCodeFromStatus(400)
+            );
+          }
+        }
+        const result = await runNotificationEmailSend(
+          await getClient(),
+          { recipient, subject: opts.subject, text: opts.body, html, fromBrand: brand },
           {
             dryRun: opts.dryRun,
             idempotencyKey: opts.idempotencyKey,

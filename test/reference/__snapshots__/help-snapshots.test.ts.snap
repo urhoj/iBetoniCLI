@@ -6494,6 +6494,57 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib notification email send matches snapshot 1`] = `
+"USAGE
+  ib notification email send <recipient> [flags]
+
+DESCRIPTION
+  Send an email to one person (resolved within your company) or a raw address. Admin/HR/developer-gated server-side. Pick the sender domain with --from-brand (betoni=noreply@ibetoni.fi default, betonijerry=noreply@betonijerry.fi bypassing the demo reroute). One of --body/--html required; --dry-run previews the resolved recipient + sender without sending.
+  Permissions: requires company admin (isAsiakasAdmin), HR admin (isHRAdmin), or global developer/sysadmin (server-enforced).
+
+ARGUMENTS
+  <recipient> STRING    personId, a name resolved within your company, or a raw email address (contains '@') (required)
+
+FLAGS
+  --subject STRING    Email subject (required)
+  --body STRING    Plain-text body (auto-wrapped to HTML)
+  --html STRING    Path to an HTML file sent as the HTML body (avoids argv mangling of ä/ö)
+  --from-brand STRING    Sender identity: betoni (default, noreply@ibetoni.fi) or betonijerry (noreply@betonijerry.fi)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { sent:true, to, from, subject } | { dryRun:true, wouldSend:{ to, from, subject, hasHtml } } (with --dry-run)
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Missing --subject, neither --body nor --html, bad --from-brand, recipient has no email on file, or both/neither of personId+email → supply --subject, one of --body/--html, and a valid --from-brand
+  exit 3 (HTTP 403)  Not Admin/HR/developer → switch to a company where you are admin/HR (ib company switch), or use a developer/sysadmin token
+  exit 5 (HTTP 404)  Recipient personId not found in your company → check the personId / name belongs to your company
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Recipient: a value containing '@' is sent as a raw address; otherwise it is a personId or a name resolved via the company-scoped person search (0 matches → exit 5, >1 → exit 4).
+  - --from-brand betonijerry sends as noreply@betonijerry.fi via a DIRECT send that bypasses the BetoniJerry demo-mode reroute — so a deliverability/spam test actually reaches the target inbox.
+  - Useful for spam-score testing: send to a mail-tester.com address and read the SPF/DKIM/DMARC + SpamAssassin score.
+  - Deploy-gated: the /api/cli/notification/email/send route must be deployed before this works.
+
+SEE ALSO
+  ib notification fcm send, ib person email list
+
+EXAMPLES
+  ib notification email send web-xxxxx@srv1.mail-tester.com --subject 'deliverability test' --body 'testing' --from-brand betonijerry --reason 'spam check'
+  ib notification email send 'Juha Urho' --subject Tiedote --html ./notice.html
+  ib notification email send 5351 --subject Test --body Hi --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib notification fcm send matches snapshot 1`] = `
 "USAGE
   ib notification fcm send [flags]

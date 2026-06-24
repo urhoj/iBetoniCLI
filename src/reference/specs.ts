@@ -2029,6 +2029,71 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib notification email send",
+    description:
+      "Send an email to one person (resolved within your company) or a raw address. Admin/HR/developer-gated server-side. Pick the sender domain with --from-brand (betoni=noreply@ibetoni.fi default, betonijerry=noreply@betonijerry.fi bypassing the demo reroute). One of --body/--html required; --dry-run previews the resolved recipient + sender without sending.",
+    tier: "admin",
+    permissions: [
+      "company admin (isAsiakasAdmin), HR admin (isHRAdmin), or global developer/sysadmin (server-enforced)",
+    ],
+    args: [
+      {
+        name: "recipient",
+        type: "string",
+        description:
+          "personId, a name resolved within your company, or a raw email address (contains '@')",
+      },
+    ],
+    flags: [
+      { name: "subject", type: "string", description: "Email subject", required: true },
+      { name: "body", type: "string", description: "Plain-text body (auto-wrapped to HTML)" },
+      {
+        name: "html",
+        type: "string",
+        description: "Path to an HTML file sent as the HTML body (avoids argv mangling of ä/ö)",
+      },
+      {
+        name: "from-brand",
+        type: "string",
+        description:
+          "Sender identity: betoni (default, noreply@ibetoni.fi) or betonijerry (noreply@betonijerry.fi)",
+      },
+    ],
+    writeFlags: true,
+    outputShape:
+      "{ sent:true, to, from, subject } | { dryRun:true, wouldSend:{ to, from, subject, hasHtml } } (with --dry-run)",
+    errors: [
+      apiErr(
+        400,
+        "Missing --subject, neither --body nor --html, bad --from-brand, recipient has no email on file, or both/neither of personId+email",
+        "supply --subject, one of --body/--html, and a valid --from-brand"
+      ),
+      apiErr(
+        403,
+        "Not Admin/HR/developer",
+        "switch to a company where you are admin/HR (ib company switch), or use a developer/sysadmin token"
+      ),
+      apiErr(
+        404,
+        "Recipient personId not found in your company",
+        "check the personId / name belongs to your company"
+      ),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Recipient: a value containing '@' is sent as a raw address; otherwise it is a personId or a name resolved via the company-scoped person search (0 matches → exit 5, >1 → exit 4).",
+      "--from-brand betonijerry sends as noreply@betonijerry.fi via a DIRECT send that bypasses the BetoniJerry demo-mode reroute — so a deliverability/spam test actually reaches the target inbox.",
+      "Useful for spam-score testing: send to a mail-tester.com address and read the SPF/DKIM/DMARC + SpamAssassin score.",
+      "Deploy-gated: the /api/cli/notification/email/send route must be deployed before this works.",
+    ],
+    seeAlso: ["ib notification fcm send", "ib person email list"],
+    examples: [
+      "ib notification email send web-xxxxx@srv1.mail-tester.com --subject 'deliverability test' --body 'testing' --from-brand betonijerry --reason 'spam check'",
+      "ib notification email send 'Juha Urho' --subject Tiedote --html ./notice.html",
+      "ib notification email send 5351 --subject Test --body Hi --dry-run",
+    ],
+  },
+  {
     command: "ib person notify",
     description:
       "Send an FCM push to a person — ergonomic alias for `ib notification fcm send --person <person>`. Admin/HR-gated. <person> is a personId or a name resolved within your company. --dry-run previews recipient + device count.",

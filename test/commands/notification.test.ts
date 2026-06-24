@@ -3,6 +3,7 @@ import {
   parseJsonObject,
   resolvePersonRef,
   runNotificationFcmSend,
+  runNotificationEmailSend,
 } from "../../src/commands/notification/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -104,6 +105,50 @@ describe("runNotificationFcmSend", () => {
       "/api/cli/notification/fcm/send",
       { title: "T", body: "B", personId: 6233, data: { url: "/grid" } },
       { headers: { "X-Dry-Run": "1" } }
+    );
+  });
+});
+
+describe("runNotificationEmailSend", () => {
+  test("raw email recipient posts {email} with default brand + reason header", async () => {
+    post().mockResolvedValueOnce({ sent: true });
+    await runNotificationEmailSend(
+      c,
+      { recipient: "test@srv1.mail-tester.com", subject: "S", text: "B", fromBrand: "betoni" },
+      { reason: "spam-test" }
+    );
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/cli/notification/email/send",
+      { subject: "S", fromBrand: "betoni", text: "B", email: "test@srv1.mail-tester.com" },
+      { headers: { "X-Action-Reason": "spam-test" } }
+    );
+  });
+
+  test("name recipient resolves then posts {personId}; html + dry-run", async () => {
+    post()
+      .mockResolvedValueOnce([
+        { personId: 6233, personFirstName: "Juha", personLastName: "Urho" },
+      ]) // search
+      .mockResolvedValueOnce({ sent: true }); // send
+    await runNotificationEmailSend(
+      c,
+      { recipient: "Juha Urho", subject: "S", html: "<p>hi</p>", fromBrand: "betonijerry" },
+      { dryRun: true }
+    );
+    expect(c.post).toHaveBeenLastCalledWith(
+      "/api/cli/notification/email/send",
+      { subject: "S", fromBrand: "betonijerry", html: "<p>hi</p>", personId: 6233 },
+      { headers: { "X-Dry-Run": "1" } }
+    );
+  });
+
+  test("numeric recipient passes straight through (no search) and defaults brand", async () => {
+    post().mockResolvedValueOnce({ sent: true });
+    await runNotificationEmailSend(c, { recipient: "6233", subject: "S", text: "B" }, {});
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/cli/notification/email/send",
+      { subject: "S", fromBrand: "betoni", text: "B", personId: 6233 },
+      { headers: {} }
     );
   });
 });
