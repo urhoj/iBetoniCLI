@@ -24,6 +24,7 @@ import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { parseId } from "../../targets.js";
 import { decodeJwtPayload, type DecodedClaims } from "../../auth/jwt.js";
 import { lineDiff } from "../../textDiff.js";
+import { applyTextEdit, parseEditOp, type TextEditOp } from "../../textEdit.js";
 import { validateStructuredJson } from "./validateJson.js";
 
 /** Lifecycle status values on legalDocuments.status (see backend migration). */
@@ -280,6 +281,61 @@ export async function runLegalSave(
   return client.post<unknown>("/api/legal-documents/save", body, {
     headers: writeFlagsToHeaders(flags),
   });
+}
+
+/**
+ * Edit-mode `legal save`: in-field partial edit of the CURRENT ACTIVE document's
+ * markdown, saved as a NEW immutable version (versions are never mutated in
+ * place). Fetches the active doc (typeName implies the tenant), applies the edit
+ * locally, then `--dry-run` returns the field diff WITHOUT writing (client-side,
+ * safe-by-construction), or a real run delegates to `runLegalSave`. `--title`
+ * defaults to the current doc's title when omitted.
+ */
+export async function runLegalSaveWithEdit(
+  client: ApiClient,
+  type: string,
+  op: TextEditOp,
+  fields: {
+    version: string;
+    title?: string;
+    ownerAsiakasId?: number;
+    notes?: string;
+    effectiveDate?: string;
+    activate?: boolean;
+  },
+  flags: WriteFlags
+): Promise<unknown> {
+  const current = await runLegalShow(client, type, false); // /current/:type ; 404 → CliError exit 5
+  const before = typeof current.markdownContent === "string" ? current.markdownContent : "";
+  const { next, matchCount } = applyTextEdit(before, op);
+  if (flags.dryRun) {
+    const diff = lineDiff(before, next);
+    return {
+      dryRun: true,
+      type,
+      field: "markdownContent",
+      ...(matchCount !== undefined ? { matchCount } : {}),
+      addedLines: diff.addedLines,
+      removedLines: diff.removedLines,
+      sameContent: diff.sameContent,
+      unified: diff.unified,
+    };
+  }
+  const title = fields.title ?? (typeof current.title === "string" ? current.title : "");
+  return runLegalSave(
+    client,
+    {
+      typeName: type,
+      version: fields.version,
+      title,
+      markdownContent: next,
+      ownerAsiakasId: fields.ownerAsiakasId,
+      notes: fields.notes,
+      effectiveDate: fields.effectiveDate,
+      activate: fields.activate,
+    },
+    flags
+  );
 }
 
 export async function runLegalActivate(
@@ -586,7 +642,7 @@ export function registerLegalCommands(
     // and would shadow it (enforced by the root-option reuse test in
     // test/reference/help-wiring.test.ts).
     .requiredOption("--doc-version <v>", "Version string, e.g. 2.0")
-    .requiredOption("--title <title>", "Document title")
+    .option("--title <title>", "Document title (required for a full save; defaults to the current doc's title in --replace/--append/--prepend edit mode)")
     .option("--file <path>", "Read markdown content from a local file")
     .option("--content <markdown>", "Inline markdown content (use over /api/cli/exec — no local FS there)")
     .option("--owner <id>", "ownerAsiakasId tenant scope (e.g. 1349 = BetoniJerry); omit for global", Number)
@@ -594,11 +650,17 @@ export function registerLegalCommands(
     .option("--effective-date <date>", "Effective date YYYY-MM-DD (default: now)")
     .option("--activate", "Publish immediately (deactivates prior versions). Default: inactive draft")
     .option("--validate-json", "Validate the embedded ```json block parses to an object before saving (recommended for BETONIJERRY_* structured types)");
+  saveCmd
+    .option("--replace <text>", "Edit mode: replace this literal text in the current ACTIVE version's markdown (must match exactly once unless --all)")
+    .option("--with <text>", "Replacement text for --replace (use \"\" to delete the matched text)")
+    .option("--append <text>", "Edit mode: append this text to the end of the current markdown (verbatim — include your own newline)")
+    .option("--prepend <text>", "Edit mode: prepend this text to the start of the current markdown (verbatim)")
+    .option("--all", "With --replace: substitute every occurrence instead of erroring on multiple matches");
   addWriteFlagsToCommand(saveCmd).action(
     async (opts: {
       type: string;
       docVersion: string;
-      title: string;
+      title?: string;
       file?: string;
       content?: string;
       owner?: number;
@@ -609,8 +671,46 @@ export function registerLegalCommands(
       dryRun?: boolean;
       reason?: string;
       idempotencyKey?: string;
+      replace?: string;
+      with?: string;
+      append?: string;
+      prepend?: string;
+      all?: boolean;
     }) => {
+      const editOp = parseEditOp({
+        replace: opts.replace, with: opts.with,
+        append: opts.append, prepend: opts.prepend, all: opts.all,
+      });
+      if (editOp) {
+        if (opts.file || opts.content) {
+          failWith("edit mode (--replace/--append/--prepend) is mutually exclusive with --file/--content", 4);
+        }
+        if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
+        try {
+          const client = await getClient();
+          writeJson(
+            await runLegalSaveWithEdit(
+              client,
+              opts.type,
+              editOp,
+              {
+                version: opts.docVersion,
+                title: opts.title,
+                ownerAsiakasId: opts.owner,
+                notes: opts.notes,
+                effectiveDate: opts.effectiveDate,
+                activate: !!opts.activate,
+              },
+              { dryRun: opts.dryRun, reason: opts.reason, idempotencyKey: opts.idempotencyKey }
+            )
+          );
+        } catch (e) {
+          exitWithError(e);
+        }
+        return;
+      }
       if (!opts.file && !opts.content) failWith("Provide --file <path> or --content <markdown>", 4);
+      if (!opts.title) failWith("Missing required flag: --title", 4);
       if (opts.file && opts.content) failWith("--file and --content are mutually exclusive", 4);
       if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
       let markdownContent = opts.content ?? "";
@@ -633,7 +733,7 @@ export function registerLegalCommands(
             {
               typeName: opts.type,
               version: opts.docVersion,
-              title: opts.title,
+              title: opts.title!, // guarded above: failWith exits if undefined
               markdownContent,
               ownerAsiakasId: opts.owner,
               notes: opts.notes,

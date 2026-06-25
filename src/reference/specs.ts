@@ -2667,7 +2667,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [
       { name: "type", type: "string", required: true, description: "Document type name (see ib legal types)" },
       { name: "doc-version", type: "string", required: true, description: "Version string, e.g. 2.0 (NOT --version — that is the global CLI version flag)" },
-      { name: "title", type: "string", required: true, description: "Document title" },
+      { name: "title", type: "string", description: "Document title (required for a full save; defaults to the current doc's title in edit mode)" },
       { name: "file", type: "string", description: "Read markdown content from a local file" },
       { name: "content", type: "string", description: "Inline markdown content (use over /api/cli/exec — no local FS there)" },
       { name: "owner", type: "number", description: "ownerAsiakasId tenant scope (1349 = BetoniJerry); omit for global" },
@@ -2675,10 +2675,15 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "effective-date", type: "date", description: "Effective date YYYY-MM-DD (default: now)" },
       { name: "activate", type: "boolean", description: "Publish immediately (archives the prior active version). Default: inactive draft" },
       { name: "validate-json", type: "boolean", description: "Validate the embedded ```json block parses to an object before saving (recommended for BETONIJERRY_* structured types)" },
+      { name: "replace", type: "string", description: "Edit mode: replace this literal text in the current ACTIVE version's markdown (must match exactly once unless --all)" },
+      { name: "with", type: "string", description: "Replacement for --replace (\"\" deletes the matched text)" },
+      { name: "append", type: "string", description: "Edit mode: append text to the end of the current markdown (verbatim)" },
+      { name: "prepend", type: "string", description: "Edit mode: prepend text to the start of the current markdown (verbatim)" },
+      { name: "all", type: "boolean", description: "With --replace: substitute every occurrence instead of erroring on multiple matches" },
     ],
     writeFlags: true,
     mutates: true,
-    outputShape: "{documentId, success} | dry-run: {dryRun: true, wouldCreate: {...}, validation}",
+    outputShape: "{documentId, success} | dry-run: {dryRun: true, wouldCreate: {...}, validation} | edit dry-run: {dryRun:true, type, field:\"markdownContent\", matchCount?, addedLines, removedLines, sameContent, unified}",
     errors: [
       { exit: 4, meaning: "Missing --reason / no content / --file unreadable or combined with --content", remedy: "pass --file OR --content, and --reason unless --dry-run" },
       apiErr(400, "Required fields missing", "provide --type --doc-version --title and content"),
@@ -2692,6 +2697,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       'ib legal save --type TOS --doc-version 2.1 --title Kayttoehdot --file ./tos.md --reason "new clause 7"',
       'ib legal save --type TOS --doc-version 2.1 --title Kayttoehdot --content "# TOS" --activate --dry-run',
       "ib legal save --type BETONIJERRY_OFFER_ACCEPTANCE --doc-version offer-2026-06-18 --title 'Tarjouksen hyväksyntä' --file offer.md --validate-json --reason 'update CTA copy'",
+      'ib legal save --type TOS --doc-version 2.1 --replace "14 vrk" --with "30 vrk" --reason "extend payment term" --dry-run',
     ],
   },
   {

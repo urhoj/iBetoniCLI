@@ -9,6 +9,7 @@ import {
   runLegalGet,
   runLegalDiff,
   runLegalSave,
+  runLegalSaveWithEdit,
   runLegalActivate,
   runLegalDelete,
   runLegalAcceptances,
@@ -428,5 +429,55 @@ describe("ib legal list alias (#3)", () => {
     const active = legal!.commands.find((c) => c.name() === "active");
     expect(active).toBeDefined();
     expect(active!.aliases()).toContain("list");
+  });
+});
+
+describe("ib legal save — edit mode (in-field partial)", () => {
+  const ACTIVE = {
+    documentId: 7, typeName: "TOS", version: "2.0", title: "Käyttöehdot",
+    markdownContent: "# TOS\n\nMaksuaika on 14 vrk.\n",
+  };
+
+  test("--replace --dry-run returns a field diff and never POSTs", async () => {
+    const c = mockClient();
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue(ACTIVE);
+    const out = await runLegalSaveWithEdit(
+      c, "TOS",
+      { kind: "replace", find: "14 vrk", replacement: "30 vrk" },
+      { version: "2.1" },
+      { dryRun: true }
+    ) as Record<string, unknown>;
+    expect(c.post).not.toHaveBeenCalled();
+    expect(out).toMatchObject({ dryRun: true, type: "TOS", field: "markdownContent", matchCount: 1 });
+    expect(String(out.unified)).toContain("- Maksuaika on 14 vrk.");
+    expect(String(out.unified)).toContain("+ Maksuaika on 30 vrk.");
+  });
+
+  test("real edit saves a NEW version with the merged content; title defaults to current", async () => {
+    const c = mockClient();
+    (c.get as ReturnType<typeof vi.fn>).mockImplementation((url: string) =>
+      url.includes("/current/")
+        ? Promise.resolve(ACTIVE)
+        : Promise.resolve(TYPES) // resolveDocumentType inside runLegalSave
+    );
+    (c.post as ReturnType<typeof vi.fn>).mockResolvedValue({ documentId: 8, success: true });
+    await runLegalSaveWithEdit(
+      c, "TOS",
+      { kind: "append", text: "\n\n## Liite\nUusi kohta." },
+      { version: "2.1" }, // no title → defaults to ACTIVE.title
+      { reason: "add appendix" }
+    );
+    const [path, body] = (c.post as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(path).toBe("/api/legal-documents/save");
+    expect(body).toMatchObject({ version: "2.1", title: "Käyttöehdot" });
+    expect(String((body as Record<string, unknown>).markdownContent)).toContain("## Liite");
+  });
+
+  test("no active version → exit 5", async () => {
+    const c = mockClient();
+    (c.get as ReturnType<typeof vi.fn>).mockRejectedValue(new CliError("not found", 404, null, 5));
+    await expect(
+      runLegalSaveWithEdit(c, "TOS", { kind: "append", text: "x" }, { version: "2.1" }, { reason: "r" })
+    ).rejects.toThrow();
   });
 });

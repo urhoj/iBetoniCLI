@@ -4611,7 +4611,7 @@ DESCRIPTION
 FLAGS
   --type STRING    Document type name (see ib legal types) (required)
   --doc-version STRING    Version string, e.g. 2.0 (NOT --version — that is the global CLI version flag) (required)
-  --title STRING    Document title (required)
+  --title STRING    Document title (required for a full save; defaults to the current doc's title in edit mode)
   --file STRING    Read markdown content from a local file
   --content STRING    Inline markdown content (use over /api/cli/exec — no local FS there)
   --owner NUMBER    ownerAsiakasId tenant scope (1349 = BetoniJerry); omit for global
@@ -4619,6 +4619,11 @@ FLAGS
   --effective-date DATE    Effective date YYYY-MM-DD (default: now)
   --activate BOOLEAN    Publish immediately (archives the prior active version). Default: inactive draft
   --validate-json BOOLEAN    Validate the embedded \`\`\`json block parses to an object before saving (recommended for BETONIJERRY_* structured types)
+  --replace STRING    Edit mode: replace this literal text in the current ACTIVE version's markdown (must match exactly once unless --all)
+  --with STRING    Replacement for --replace ("" deletes the matched text)
+  --append STRING    Edit mode: append text to the end of the current markdown (verbatim)
+  --prepend STRING    Edit mode: prepend text to the start of the current markdown (verbatim)
+  --all BOOLEAN    With --replace: substitute every occurrence instead of erroring on multiple matches
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -4629,7 +4634,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  {documentId, success} | dry-run: {dryRun: true, wouldCreate: {...}, validation}
+  {documentId, success} | dry-run: {dryRun: true, wouldCreate: {...}, validation} | edit dry-run: {dryRun:true, type, field:"markdownContent", matchCount?, addedLines, removedLines, sameContent, unified}
 
 ERRORS (stderr, exit non-zero)
   exit 4  Missing --reason / no content / --file unreadable or combined with --content → pass --file OR --content, and --reason unless --dry-run
@@ -4648,6 +4653,7 @@ EXAMPLES
   ib legal save --type TOS --doc-version 2.1 --title Kayttoehdot --file ./tos.md --reason "new clause 7"
   ib legal save --type TOS --doc-version 2.1 --title Kayttoehdot --content "# TOS" --activate --dry-run
   ib legal save --type BETONIJERRY_OFFER_ACCEPTANCE --doc-version offer-2026-06-18 --title 'Tarjouksen hyväksyntä' --file offer.md --validate-json --reason 'update CTA copy'
+  ib legal save --type TOS --doc-version 2.1 --replace "14 vrk" --with "30 vrk" --reason "extend payment term" --dry-run
 "
 `;
 
