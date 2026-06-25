@@ -5,6 +5,8 @@ import {
   runSijaintiDelete,
   runSijaintiUndelete,
   runSijaintiSetJerry,
+  runSijaintiSaveLatLng,
+  persistSijaintiCoords,
   buildSijaintiBody,
   applySijaintiCreateDefaults,
   extractGeocodeLatLng,
@@ -66,6 +68,76 @@ describe("ib sijainti create/update", () => {
       body,
       { headers: { "X-Action-Reason": "tower split" } }
     );
+  });
+});
+
+describe("sijainti coordinate persistence (updateLatLng)", () => {
+  const mPost = () => mockClient.post as ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    mPost().mockReset();
+  });
+
+  test("runSijaintiSaveLatLng: POST /api/geocode/updateLatLng/:id with {lat,lng} + flag headers (no placeId)", async () => {
+    mPost().mockResolvedValueOnce({ success: true });
+    await runSijaintiSaveLatLng(mockClient, 4242, 60.17, 24.94, { reason: "manual coords" });
+    expect(mPost()).toHaveBeenCalledWith(
+      "/api/geocode/updateLatLng/4242",
+      { lat: 60.17, lng: 24.94 },
+      { headers: { "X-Action-Reason": "manual coords" } }
+    );
+  });
+
+  test("persistSijaintiCoords: persists coords then echoes { lat, lng, coordsPersisted:true }", async () => {
+    mPost().mockResolvedValueOnce({ success: true });
+    const out = await persistSijaintiCoords(
+      mockClient,
+      { sijaintiId: 4242, success: true },
+      4242,
+      { lat: 60.17, lng: 24.94 },
+      {}
+    );
+    expect(mPost()).toHaveBeenCalledWith(
+      "/api/geocode/updateLatLng/4242",
+      { lat: 60.17, lng: 24.94 },
+      { headers: {} }
+    );
+    expect(out).toEqual({ sijaintiId: 4242, success: true, lat: 60.17, lng: 24.94, coordsPersisted: true });
+  });
+
+  test("persistSijaintiCoords: no coords → returns result untouched, no write", async () => {
+    const result = { sijaintiId: 7, success: true };
+    const out = await persistSijaintiCoords(mockClient, result, 7, {}, {});
+    expect(out).toBe(result);
+    expect(mPost()).not.toHaveBeenCalled();
+  });
+
+  test("persistSijaintiCoords: dry-run echoes coords but never writes (coordsPersisted:false)", async () => {
+    const out = await persistSijaintiCoords(
+      mockClient,
+      { dryRun: true, wouldCreate: {} },
+      undefined,
+      { lat: 60.17, lng: 24.94 },
+      { dryRun: true }
+    );
+    expect(mPost()).not.toHaveBeenCalled();
+    expect(out).toMatchObject({ lat: 60.17, lng: 24.94, coordsPersisted: false });
+  });
+
+  test("persistSijaintiCoords: coerces string coords; partial/invalid coords are ignored", async () => {
+    mPost().mockResolvedValueOnce({ success: true });
+    const out = await persistSijaintiCoords(
+      mockClient,
+      { sijaintiId: 9 },
+      9,
+      { lat: "60.17", lng: "24.94" },
+      {}
+    );
+    expect(out).toMatchObject({ lat: 60.17, lng: 24.94, coordsPersisted: true });
+
+    const partial = { sijaintiId: 9 };
+    const out2 = await persistSijaintiCoords(mockClient, partial, 9, { lat: 60.17 }, {});
+    expect(out2).toBe(partial);
+    expect(mPost()).toHaveBeenCalledTimes(1); // only the first (full) call wrote
   });
 });
 

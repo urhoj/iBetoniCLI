@@ -138,6 +138,42 @@ export async function runSijaintiUpdate(client, body, flags) {
     });
 }
 /**
+ * POST /api/geocode/updateLatLng/:sijaintiId — persist a sijainti's coordinates.
+ * The `sijainti_add` / `sijainti_save` procs bind NO lat/lng, so the add/update
+ * routes silently drop coordinates; this is the dedicated route the FE
+ * EditSijainti calls right after create/update for exactly that reason
+ * (puminet4 EditSijainti.jsx → saveLatLng). No placeId is sent (matching the
+ * FE), so a manual/CLI coordinate write never fabricates a Google place_id.
+ */
+export async function runSijaintiSaveLatLng(client, sijaintiId, lat, lng, flags) {
+    return client.post(`/api/geocode/updateLatLng/${sijaintiId}`, { lat, lng }, { headers: writeFlagsToHeaders(flags) });
+}
+/**
+ * After a create/update whose proc dropped the coordinates, persist them via
+ * {@link runSijaintiSaveLatLng} (the FE's create→saveLatLng flow) and return the
+ * result echo with `{ lat, lng, coordsPersisted }` attached — so geocoding
+ * success is verifiable without a follow-up read. No coords / a dry-run / no
+ * resolved sijaintiId → the coords are echoed but `coordsPersisted:false` and no
+ * write is issued (dry-run stays write-free; works under --read-only's GET-only
+ * lock only when not actually persisting). Coords coerced from the (possibly
+ * string) body values; only a finite lat AND lng trigger persistence.
+ */
+export async function persistSijaintiCoords(client, result, sijaintiId, coords, flags) {
+    const lat = Number(coords.lat);
+    const lng = Number(coords.lng);
+    const hasCoords = coords.lat != null &&
+        coords.lng != null &&
+        Number.isFinite(lat) &&
+        Number.isFinite(lng);
+    if (!hasCoords)
+        return result;
+    const base = result && typeof result === "object" ? { ...result } : {};
+    if (flags.dryRun || !sijaintiId)
+        return { ...base, lat, lng, coordsPersisted: false };
+    await runSijaintiSaveLatLng(client, sijaintiId, lat, lng, flags);
+    return { ...base, lat, lng, coordsPersisted: true };
+}
+/**
  * Default BetoniJerry delivery radius (km) applied when a varikko is enrolled
  * (`--on`) but has no usable `maxDeliveryDistance` — enrolling with 0 km would
  * cover nothing. Mid-range of the typical 30–80 km a varikko serves.
@@ -545,7 +581,9 @@ export function registerSijaintiCommands(parent, getClient) {
         .command("create")
         .description("Create a new sijainti (POST /api/geocode/sijainti/add). Required: --name, --type. " +
         "--lyh defaults to --name (≤50 chars), --max-distance to 50, --asiakas to your active company. " +
-        "--geocode auto-fills lat/lng from the address when coordinates are not given. " +
+        "--geocode resolves lat/lng from the address when coordinates are not given. " +
+        "Coordinates (--lat/--lng or --geocode) are persisted via a follow-up updateLatLng " +
+        "call and echoed back as { lat, lng, coordsPersisted } so geocoding is verifiable. " +
         "Use typed flags or --body JSON (typed flags win).")
         .option("--body <json>", "JSON object forwarded as the request body")
         .option("--name <n>", "sijaintiNimi (required)")
@@ -556,7 +594,7 @@ export function registerSijaintiCommands(parent, getClient) {
         .option("--lyh <s>", "sijaintiLyh — short code/abbreviation (≤50 chars; defaults to --name)")
         .option("--max-distance <n>", "maxDeliveryDistance in km (default 50)", Number)
         .option("--asiakas <id>", "Owner asiakasId (defaults to your active company)", Number)
-        .option("--geocode", "Auto-fill lat/lng from the address via Google Maps when coordinates are not given");
+        .option("--geocode", "Resolve lat/lng from the address via Google Maps when coordinates are not given (then persisted + echoed)");
     addWriteFlagsToCommand(createCmd).action(async (opts) => {
         try {
             const client = await getClient();
@@ -585,8 +623,9 @@ export function registerSijaintiCommands(parent, getClient) {
             if (missing.length > 0) {
                 failWith(`create requires: ${missing.join(", ")}`, 4);
             }
-            // --geocode: eagerly resolve lat/lng from the address (otherwise the row
-            // is created without coordinates and a nightly job backfills them later).
+            // --geocode: resolve lat/lng from the address up front so the coords can
+            // be persisted (the add proc itself binds no lat/lng — see
+            // persistSijaintiCoords) and a ZERO_RESULTS address fails fast here.
             if (opts.geocode && (body.lat === undefined || body.lat === null || body.lng === undefined || body.lng === null)) {
                 const address = typeof body.sijaintiOsoite1 === "string" ? body.sijaintiOsoite1 : "";
                 if (!address) {
@@ -601,12 +640,18 @@ export function registerSijaintiCommands(parent, getClient) {
                 body.lat = coords.lat;
                 body.lng = coords.lng;
             }
-            const result = await runSijaintiCreate(client, body, {
+            const flags = {
                 dryRun: opts.dryRun,
                 idempotencyKey: opts.idempotencyKey,
                 reason: opts.reason,
-            });
-            writeJson(result);
+            };
+            const result = await runSijaintiCreate(client, body, flags);
+            // The add proc drops lat/lng; persist them via the dedicated updateLatLng
+            // route (the FE's create→saveLatLng flow) and echo { lat, lng, coordsPersisted }.
+            const newId = !opts.dryRun
+                ? result?.sijaintiId
+                : undefined;
+            writeJson(await persistSijaintiCoords(client, result, newId, { lat: body.lat, lng: body.lng }, flags));
         }
         catch (e) {
             exitWithError(e);
@@ -614,7 +659,8 @@ export function registerSijaintiCommands(parent, getClient) {
     });
     const updateCmd = s
         .command("update")
-        .description("Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Typed flags win over --body.")
+        .description("Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Typed flags win over --body. " +
+        "--lat/--lng are persisted via a follow-up updateLatLng call (the save proc itself drops them) and echoed as { lat, lng, coordsPersisted }.")
         .option("--body <json>", "JSON object forwarded as the request body")
         .option("--id <sijaintiId>", "Target sijaintiId", Number)
         .option("--name <n>", "sijaintiNimi")
@@ -643,12 +689,16 @@ export function registerSijaintiCommands(parent, getClient) {
             if (body.sijaintiId === undefined) {
                 failWith("update requires sijaintiId — pass --id or include it in --body", 4);
             }
-            const result = await runSijaintiUpdate(client, body, {
+            const flags = {
                 dryRun: opts.dryRun,
                 idempotencyKey: opts.idempotencyKey,
                 reason: opts.reason,
-            });
-            writeJson(result);
+            };
+            const result = await runSijaintiUpdate(client, body, flags);
+            // The save proc drops lat/lng; persist them via the dedicated updateLatLng
+            // route (the FE's update→saveLatLng flow) and echo { lat, lng, coordsPersisted }.
+            const sijaintiId = !opts.dryRun ? Number(body.sijaintiId) : undefined;
+            writeJson(await persistSijaintiCoords(client, result, sijaintiId, { lat: body.lat, lng: body.lng }, flags));
         }
         catch (e) {
             exitWithError(e);

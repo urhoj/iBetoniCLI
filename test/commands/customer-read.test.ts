@@ -5,6 +5,7 @@ import {
   runCustomerSearch,
   runCustomerModulesReport,
   runCustomerWorksites,
+  projectCustomerRow,
 } from "../../src/commands/customer/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -124,6 +125,87 @@ describe("ib customer list/get/search", () => {
     });
     const out = await runCustomerList(mockClient, { limit: 1 });
     expect(out).toMatchObject({ truncated: true });
+  });
+
+  test("runCustomerList: appends fields and sijaintiTypes when set", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [], nextCursor: null, count: 0,
+    });
+    await runCustomerList(mockClient, {
+      ids: [26],
+      include: ["sijainnit"],
+      fields: ["name", "address"],
+      sijaintiTypes: [1, 2],
+    });
+    expect(mockClient.get).toHaveBeenCalledWith(
+      "/api/cli/customer/list?ids=26&include=sijainnit&fields=name%2Caddress&sijaintiTypes=1%2C2"
+    );
+  });
+
+  test("runCustomerList: re-applies fields/sijainti-types client-side over a full backend row", async () => {
+    // Simulate an OLDER backend that ignored the params and returned full rows.
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [
+        {
+          asiakasId: 26,
+          name: "Rudus",
+          yTunnus: "1-1",
+          city: "Helsinki",
+          companyDescription: "concrete",
+          sijainnit: [
+            { sijaintiId: 1, sijaintiTypeId: 1, name: "Asema A" },
+            { sijaintiId: 2, sijaintiTypeId: 9, name: "Jäteasema" },
+          ],
+        },
+      ],
+      nextCursor: null,
+      count: 1,
+    });
+    const out = await runCustomerList(mockClient, {
+      ids: [26],
+      include: ["sijainnit"],
+      fields: ["name"],
+      sijaintiTypes: [1],
+    });
+    expect(out.items).toEqual([
+      {
+        asiakasId: 26,
+        name: "Rudus",
+        sijainnit: [{ sijaintiId: 1, sijaintiTypeId: 1, name: "Asema A" }],
+      },
+    ]);
+  });
+
+  test("projectCustomerRow: keeps asiakasId, projects requested fields, preserves include arrays", () => {
+    const row = {
+      asiakasId: 26,
+      name: "Rudus",
+      yTunnus: "1-1",
+      city: "Helsinki",
+      contacts: [{ personId: 9, name: "X" }],
+      sijainnit: [{ sijaintiId: 1, sijaintiTypeId: 2 }],
+    };
+    expect(projectCustomerRow(row, ["name"], undefined)).toEqual({
+      asiakasId: 26,
+      name: "Rudus",
+      contacts: [{ personId: 9, name: "X" }],
+      sijainnit: [{ sijaintiId: 1, sijaintiTypeId: 2 }],
+    });
+  });
+
+  test("projectCustomerRow: filters sijainnit by type; returns row unchanged with no opts", () => {
+    const row = {
+      asiakasId: 26,
+      sijainnit: [
+        { sijaintiId: 1, sijaintiTypeId: 1 },
+        { sijaintiId: 2, sijaintiTypeId: 9 },
+      ],
+    };
+    expect(projectCustomerRow(row, undefined, [1])).toEqual({
+      asiakasId: 26,
+      sijainnit: [{ sijaintiId: 1, sijaintiTypeId: 1 }],
+    });
+    expect(projectCustomerRow(row, undefined, undefined)).toBe(row);
   });
 
   test("runCustomerModulesReport: GET /api/cli/customer/modules/1349, returns state verbatim", async () => {

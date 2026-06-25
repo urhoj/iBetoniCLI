@@ -760,6 +760,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "full", type: "boolean", description: "Return full customer fields + companyDescription (not just id/name/ytunnus/type)" },
       { name: "ids", type: "string", description: "Comma-separated asiakasIds to return ALL of (max 1000) — preferred for targeted/incremental fetches" },
       { name: "include", type: "string", description: "Expand each row with per-customer arrays: contacts and/or sijainnit (CSV; best with --full)" },
+      { name: "fields", type: "string", description: "Project each customer to just these columns (CSV; asiakasId always kept, contacts/sijainnit arrays preserved) — cuts the diff payload" },
+      { name: "sijainti-types", type: "string", description: "With --include sijainnit: keep only these sijaintiTypeId rows (CSV, e.g. 1,2) — filtered server-side so a 45-location supplier's irrelevant rows are never fetched" },
     ],
     outputShape:
       "ListEnvelope<{ asiakasId, name, yTunnus, type }> + truncated:boolean · with --full the items add { address, postalCode, city, email, contactPersonId, shortName, comment, companyDescription } · with --include each item adds contacts:[{personId,name,phone,email,contactPersonTypeId}] and/or sijainnit:[{sijaintiId,name,lyh,address,sijaintiTypeId,maxDeliveryDistance,jerryActiveUntil}] · with --ids the response adds missing:[{asiakasId, reason:'not_owned'|'not_found'}] for requested ids that didn't return",
@@ -769,6 +771,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "--full returns every flat-customer field + the jerry companyDescription in one call (diff a whole tenant without N×`customer get`).",
       "--ids 1,2,3 restricts to specific asiakasIds and returns ALL of them (NOT capped at the default 100 — bounded by the ids list, max 1000) — the efficient way to refresh only the rows you care about.",
       "Without --ids the list is capped (default 100 / max 500) and `truncated:true` flags when you hit the cap (narrow with --ids or raise --limit).",
+      "--fields / --sijainti-types trim what you ingest: project to the columns you diff and keep only the location types you care about (e.g. varikko/asema). Server-side on a deployed backend, with a client-side fallback so they work pre-deploy.",
     ],
     examples: [
       "ib customer list",
@@ -776,6 +779,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ib customer list --full",
       "ib customer list --ids 26,42,1349 --full",
       "ib customer list --ids 26,42 --full --include contacts,sijainnit",
+      "ib customer list --ids 26 --full --fields name,address,postalCode,city,contactPersonId,companyDescription",
+      "ib customer list --ids 26 --include sijainnit --sijainti-types 1,2",
     ],
   },
   {
@@ -2274,24 +2279,25 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib sijainti create",
     description:
-      "Create a new sijainti (POST /api/geocode/sijainti/add). REQUIRED: --name (sijaintiNimi) and --type (sijaintiTypeId). The CLI auto-fills the other NOT NULL columns the add proc needs: --lyh defaults to --name (truncated to 50 chars), --max-distance to 50, and --asiakas to your active company. Provide typed flags or --body JSON; typed flags win over --body.",
+      "Create a new sijainti (POST /api/geocode/sijainti/add). REQUIRED: --name (sijaintiNimi) and --type (sijaintiTypeId). The CLI auto-fills the other NOT NULL columns the add proc needs: --lyh defaults to --name (truncated to 50 chars), --max-distance to 50, and --asiakas to your active company. Coordinates (--lat/--lng or --geocode) are persisted via a follow-up updateLatLng call (the add proc binds no lat/lng) and echoed as { lat, lng, coordsPersisted } so geocoding is verifiable without a re-read. Provide typed flags or --body JSON; typed flags win over --body.",
     permissions: ["auth.page.sijainnit.edit"],
     flags: [
       { name: "body", type: "json", description: "JSON object with the new sijainti fields (optional if typed flags given)" },
       { name: "name", type: "string", description: "sijaintiNimi (REQUIRED)" },
       { name: "address", type: "string", description: "sijaintiOsoite1 (street)" },
       { name: "type", type: "number", description: "sijaintiTypeId (REQUIRED; see `ib sijainti types`)" },
-      { name: "lat", type: "number", description: "Latitude" },
-      { name: "lng", type: "number", description: "Longitude" },
+      { name: "lat", type: "number", description: "Latitude (persisted via updateLatLng + echoed)" },
+      { name: "lng", type: "number", description: "Longitude (persisted via updateLatLng + echoed)" },
       { name: "lyh", type: "string", description: "sijaintiLyh — short code/abbreviation, ≤50 chars (defaults to --name)" },
       { name: "max-distance", type: "number", description: "maxDeliveryDistance in km (default 50)" },
       { name: "asiakas", type: "number", description: "Owner asiakasId (defaults to your active company)" },
-      { name: "geocode", type: "boolean", description: "Auto-fill lat/lng from the address via Google Maps when coordinates are not given" },
+      { name: "geocode", type: "boolean", description: "Resolve lat/lng from the address via Google Maps when coordinates are not given (then persisted + echoed)" },
     ],
     writeFlags: true,
-    outputShape: "{ sijaintiId, ... } (raw backend response)",
+    outputShape: "{ sijaintiId, success, lat?, lng?, coordsPersisted? } — lat/lng/coordsPersisted present when coordinates were given (coordsPersisted:false on --dry-run)",
     errors: [
       apiErr(400, "Validation failed", "fix --body fields"),
+      apiErr(400, 'Address could not be geocoded (--geocode, status ZERO_RESULTS)', "supply a fuller --address or pass --lat/--lng directly"),
       ...permErrors("auth.page.sijainnit.edit"),
     ],
     examples: [
@@ -2304,7 +2310,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib sijainti update",
     description:
-      "Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Provide typed flags or --body JSON; typed flags win over --body.",
+      "Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. --lat/--lng are persisted via a follow-up updateLatLng call (the save proc itself binds no lat/lng) and echoed as { lat, lng, coordsPersisted }. Provide typed flags or --body JSON; typed flags win over --body.",
     permissions: ["auth.page.sijainnit.edit"],
     flags: [
       { name: "body", type: "json", description: "JSON object with fields to update (optional if typed flags given)" },
@@ -2312,13 +2318,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "name", type: "string", description: "sijaintiNimi" },
       { name: "address", type: "string", description: "sijaintiOsoite1 (street)" },
       { name: "type", type: "number", description: "sijaintiTypeId" },
-      { name: "lat", type: "number", description: "Latitude" },
-      { name: "lng", type: "number", description: "Longitude" },
+      { name: "lat", type: "number", description: "Latitude (persisted via updateLatLng + echoed)" },
+      { name: "lng", type: "number", description: "Longitude (persisted via updateLatLng + echoed)" },
       { name: "lyh", type: "string", description: "sijaintiLyh — short code/abbreviation (≤50 chars)" },
       { name: "max-distance", type: "number", description: "maxDeliveryDistance in km" },
     ],
     writeFlags: true,
-    outputShape: "{ ok: true, ... } (raw backend response)",
+    outputShape: "{ ok: true, ..., lat?, lng?, coordsPersisted? } — lat/lng/coordsPersisted present when --lat/--lng were given",
     errors: [
       apiErr(400, "Validation failed", "fix --body fields"),
       apiErr(404, "Sijainti not found", "verify sijaintiId"),

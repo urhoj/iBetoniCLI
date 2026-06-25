@@ -29,6 +29,47 @@ export interface CustomerListFilter {
   ids?: number[];
   /** Expand each row with per-customer arrays — "contacts" and/or "sijainnit". */
   include?: string[];
+  /** Project each row to just these columns (asiakasId always kept; include-arrays preserved). */
+  fields?: string[];
+  /** With --include sijainnit: keep only these sijaintiTypeId location rows. */
+  sijaintiTypes?: number[];
+}
+
+/**
+ * Client-side fallback for `customer list --fields` / `--sijainti-types`:
+ * filter the row's `sijainnit` array by sijaintiTypeId, then project the row to
+ * `fields` (asiakasId + any requested scalar columns are always kept, and the
+ * `contacts`/`sijainnit` include-arrays are preserved regardless of --fields).
+ * Pure — exercised directly in tests. On a backend that already
+ * projected/filtered server-side this is a no-op; on an older backend it makes
+ * the flags work anyway (belt-and-suspenders, mirroring `sijainti list --search`).
+ */
+export function projectCustomerRow(
+  row: Record<string, unknown>,
+  fields?: string[],
+  sijaintiTypes?: number[]
+): Record<string, unknown> {
+  let out: Record<string, unknown> = row;
+  if (sijaintiTypes && sijaintiTypes.length > 0 && Array.isArray(row.sijainnit)) {
+    const allowed = new Set(sijaintiTypes);
+    out = {
+      ...row,
+      sijainnit: (row.sijainnit as Array<Record<string, unknown>>).filter((s) =>
+        allowed.has(Number(s.sijaintiTypeId))
+      ),
+    };
+  }
+  if (fields && fields.length > 0) {
+    const projected: Record<string, unknown> = { asiakasId: out.asiakasId };
+    for (const f of fields) {
+      if (f !== "asiakasId" && f in out) projected[f] = out[f];
+    }
+    // Include-arrays are governed by --include, not --fields — keep them.
+    if ("contacts" in out) projected.contacts = out.contacts;
+    if ("sijainnit" in out) projected.sijainnit = out.sijainnit;
+    out = projected;
+  }
+  return out;
 }
 
 /**
@@ -48,10 +89,22 @@ export async function runCustomerList(
   if (opts.full) params.set("full", "1");
   if (opts.ids && opts.ids.length > 0) params.set("ids", opts.ids.join(","));
   if (opts.include && opts.include.length > 0) params.set("include", opts.include.join(","));
+  if (opts.fields && opts.fields.length > 0) params.set("fields", opts.fields.join(","));
+  if (opts.sijaintiTypes && opts.sijaintiTypes.length > 0)
+    params.set("sijaintiTypes", opts.sijaintiTypes.join(","));
   const qs = params.toString();
-  return client.get<ListEnvelope<Record<string, unknown>>>(
+  const env = await client.get<ListEnvelope<Record<string, unknown>>>(
     `/api/cli/customer/list${qs ? `?${qs}` : ""}`
   );
+  // Re-apply --fields / --sijainti-types CLIENT-SIDE too, so the flags trim the
+  // payload even against a backend that predates the server-side push-down. On a
+  // deployed backend the rows already arrive projected/filtered, so this is a no-op.
+  if ((opts.fields?.length || opts.sijaintiTypes?.length) && Array.isArray(env.items)) {
+    env.items = env.items.map((row) =>
+      projectCustomerRow(row, opts.fields, opts.sijaintiTypes)
+    );
+  }
+  return env;
 }
 
 /** The flat customer record returned by GET /api/cli/customer/get/:id (extended). */
@@ -1013,7 +1066,9 @@ export function registerCustomerCommands(
     .option("--full", "Return full customer fields + companyDescription (not just id/name/ytunnus/type)")
     .option("--ids <csv>", "Comma-separated asiakasIds to return (e.g. 1,2,3)")
     .option("--include <csv>", "Expand each row with per-customer arrays: contacts and/or sijainnit (best with --full)")
-    .action(async (opts: CustomerListFilter & { full?: boolean; ids?: string; include?: string }) => {
+    .option("--fields <csv>", "Project each customer to just these columns (asiakasId always kept; contacts/sijainnit arrays preserved) — trims the diff payload")
+    .option("--sijainti-types <csv>", "With --include sijainnit: keep only these sijaintiTypeId rows (e.g. 1,2) — filtered server-side")
+    .action(async (opts: CustomerListFilter & { full?: boolean; ids?: string; include?: string; fields?: string; sijaintiTypes?: string }) => {
       try {
         const client = await getClient();
         const ids =
@@ -1024,12 +1079,22 @@ export function registerCustomerCommands(
           typeof opts.include === "string"
             ? opts.include.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
             : undefined;
+        const fields =
+          typeof opts.fields === "string"
+            ? opts.fields.split(",").map((s) => s.trim()).filter(Boolean)
+            : undefined;
+        const sijaintiTypes =
+          typeof opts.sijaintiTypes === "string"
+            ? opts.sijaintiTypes.split(",").map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0)
+            : undefined;
         const result = await runCustomerList(client, {
           limit: opts.limit,
           cursor: opts.cursor,
           full: opts.full,
           ids,
           include,
+          fields,
+          sijaintiTypes,
         });
         writeJson(result);
       } catch (e) {

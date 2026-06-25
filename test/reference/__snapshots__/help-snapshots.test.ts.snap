@@ -1833,6 +1833,8 @@ FLAGS
   --full BOOLEAN    Return full customer fields + companyDescription (not just id/name/ytunnus/type)
   --ids STRING    Comma-separated asiakasIds to return ALL of (max 1000) — preferred for targeted/incremental fetches
   --include STRING    Expand each row with per-customer arrays: contacts and/or sijainnit (CSV; best with --full)
+  --fields STRING    Project each customer to just these columns (CSV; asiakasId always kept, contacts/sijainnit arrays preserved) — cuts the diff payload
+  --sijainti-types STRING    With --include sijainnit: keep only these sijaintiTypeId rows (CSV, e.g. 1,2) — filtered server-side so a 45-location supplier's irrelevant rows are never fetched
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -1850,6 +1852,7 @@ NOTES
   - --full returns every flat-customer field + the jerry companyDescription in one call (diff a whole tenant without N×\`customer get\`).
   - --ids 1,2,3 restricts to specific asiakasIds and returns ALL of them (NOT capped at the default 100 — bounded by the ids list, max 1000) — the efficient way to refresh only the rows you care about.
   - Without --ids the list is capped (default 100 / max 500) and \`truncated:true\` flags when you hit the cap (narrow with --ids or raise --limit).
+  - --fields / --sijainti-types trim what you ingest: project to the columns you diff and keep only the location types you care about (e.g. varikko/asema). Server-side on a deployed backend, with a client-side fallback so they work pre-deploy.
 
 EXAMPLES
   ib customer list
@@ -1857,6 +1860,8 @@ EXAMPLES
   ib customer list --full
   ib customer list --ids 26,42,1349 --full
   ib customer list --ids 26,42 --full --include contacts,sijainnit
+  ib customer list --ids 26 --full --fields name,address,postalCode,city,contactPersonId,companyDescription
+  ib customer list --ids 26 --include sijainnit --sijainti-types 1,2
 "
 `;
 
@@ -8176,7 +8181,7 @@ exports[`Help snapshots — contract stability > help for ib sijainti create mat
   ib sijainti create [flags]
 
 DESCRIPTION
-  Create a new sijainti (POST /api/geocode/sijainti/add). REQUIRED: --name (sijaintiNimi) and --type (sijaintiTypeId). The CLI auto-fills the other NOT NULL columns the add proc needs: --lyh defaults to --name (truncated to 50 chars), --max-distance to 50, and --asiakas to your active company. Provide typed flags or --body JSON; typed flags win over --body.
+  Create a new sijainti (POST /api/geocode/sijainti/add). REQUIRED: --name (sijaintiNimi) and --type (sijaintiTypeId). The CLI auto-fills the other NOT NULL columns the add proc needs: --lyh defaults to --name (truncated to 50 chars), --max-distance to 50, and --asiakas to your active company. Coordinates (--lat/--lng or --geocode) are persisted via a follow-up updateLatLng call (the add proc binds no lat/lng) and echoed as { lat, lng, coordsPersisted } so geocoding is verifiable without a re-read. Provide typed flags or --body JSON; typed flags win over --body.
   Permissions: requires auth.page.sijainnit.edit.
 
 FLAGS
@@ -8184,12 +8189,12 @@ FLAGS
   --name STRING    sijaintiNimi (REQUIRED)
   --address STRING    sijaintiOsoite1 (street)
   --type NUMBER    sijaintiTypeId (REQUIRED; see \`ib sijainti types\`)
-  --lat NUMBER    Latitude
-  --lng NUMBER    Longitude
+  --lat NUMBER    Latitude (persisted via updateLatLng + echoed)
+  --lng NUMBER    Longitude (persisted via updateLatLng + echoed)
   --lyh STRING    sijaintiLyh — short code/abbreviation, ≤50 chars (defaults to --name)
   --max-distance NUMBER    maxDeliveryDistance in km (default 50)
   --asiakas NUMBER    Owner asiakasId (defaults to your active company)
-  --geocode BOOLEAN    Auto-fill lat/lng from the address via Google Maps when coordinates are not given
+  --geocode BOOLEAN    Resolve lat/lng from the address via Google Maps when coordinates are not given (then persisted + echoed)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -8200,10 +8205,11 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { sijaintiId, ... } (raw backend response)
+  { sijaintiId, success, lat?, lng?, coordsPersisted? } — lat/lng/coordsPersisted present when coordinates were given (coordsPersisted:false on --dry-run)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed      → fix --body fields
+  exit 4 (HTTP 400)  Address could not be geocoded (--geocode, status ZERO_RESULTS) → supply a fuller --address or pass --lat/--lng directly
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -8548,7 +8554,7 @@ exports[`Help snapshots — contract stability > help for ib sijainti update mat
   ib sijainti update [flags]
 
 DESCRIPTION
-  Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Provide typed flags or --body JSON; typed flags win over --body.
+  Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. --lat/--lng are persisted via a follow-up updateLatLng call (the save proc itself binds no lat/lng) and echoed as { lat, lng, coordsPersisted }. Provide typed flags or --body JSON; typed flags win over --body.
   Permissions: requires auth.page.sijainnit.edit.
 
 FLAGS
@@ -8557,8 +8563,8 @@ FLAGS
   --name STRING    sijaintiNimi
   --address STRING    sijaintiOsoite1 (street)
   --type NUMBER    sijaintiTypeId
-  --lat NUMBER    Latitude
-  --lng NUMBER    Longitude
+  --lat NUMBER    Latitude (persisted via updateLatLng + echoed)
+  --lng NUMBER    Longitude (persisted via updateLatLng + echoed)
   --lyh STRING    sijaintiLyh — short code/abbreviation (≤50 chars)
   --max-distance NUMBER    maxDeliveryDistance in km
 
@@ -8571,7 +8577,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { ok: true, ... } (raw backend response)
+  { ok: true, ..., lat?, lng?, coordsPersisted? } — lat/lng/coordsPersisted present when --lat/--lng were given
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed      → fix --body fields
