@@ -274,7 +274,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     seeAlso: ["ib attachment list", "ib attachment detach"],
     examples: ["ib attachment search", "ib attachment search kuormakirja", "ib attachment search --missing"],
   },
-  // ─── auth (5) ────────────────────────────────────────────────────────────
+  // ─── auth (6) ────────────────────────────────────────────────────────────
   {
     command: "ib auth login",
     description:
@@ -367,6 +367,43 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { exit: 2, meaning: "Refresh failed", remedy: "ib auth login to re-authenticate" },
     ],
     examples: ["ib auth refresh"],
+  },
+  {
+    command: "ib auth impersonate",
+    description:
+      "Impersonate another person: mint a 10-minute impersonation JWT for the target and persist it as the active credential (your own login is stashed for restore). `--end` restores it; `--extend` renews 10 more minutes. Server-gated by canImpersonate (systemAdmin/roleManager, same-tenant admin over a non-admin target, or an explicit grant). Local CLI only — denied over the exec/MCP bridge.",
+    auth: "any",
+    mutates: true,
+    tier: "admin",
+    args: [
+      { name: "personId", type: "number", required: false, description: "Target personId (or use --email). Omit with --end/--extend." },
+    ],
+    flags: [
+      { name: "email", type: "string", description: "Target email (alternative to the personId positional)" },
+      { name: "end", type: "boolean", description: "End the active impersonation session and restore your own login" },
+      { name: "extend", type: "boolean", description: "Extend the active impersonation session by 10 minutes" },
+    ],
+    outputShape:
+      "start: { ok:true, impersonating:{ personId, actorPersonId, expiresAt } }. --end: { ok:true, restored:{ personId } }. --extend: { ok:true, expiresAt }.",
+    errors: [
+      { exit: 2, meaning: "Not logged in", remedy: "ib auth login" },
+      apiErr(403, "Impersonation not allowed for the target", "needs systemAdmin/roleManager, same-tenant admin, or a grant"),
+      apiErr(404, "Target person not found", "check the personId / email"),
+      { exit: 3, meaning: "Read-only mode active (--read-only / IB_READ_ONLY)", remedy: "impersonation persists a rotated JWT; drop read-only" },
+      { exit: 4, meaning: "No active session (--end/--extend), or neither personId nor --email given", remedy: "start with `ib auth impersonate <personId>`" },
+    ],
+    notes: [
+      "Persists a 10-minute impersonation JWT as the active credential — blocked under read-only (exit 3).",
+      "Auto-refresh-on-401 is disabled while impersonating (it would escalate to a 7-day login); a 401 surfaces — re-run impersonate or `--extend`.",
+      "`ib auth whoami` shows an `impersonating` block while a session is active.",
+      "Local CLI only — the `auth` group is denied over /api/cli/exec and MCP ib_exec.",
+    ],
+    examples: [
+      "ib auth impersonate 6233",
+      "ib auth impersonate --email someone@example.com",
+      "ib auth impersonate --extend",
+      "ib auth impersonate --end",
+    ],
   },
 
   // ─── company (4) ─────────────────────────────────────────────────────────

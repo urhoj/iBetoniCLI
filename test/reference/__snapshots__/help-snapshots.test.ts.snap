@@ -642,6 +642,49 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib auth impersonate matches snapshot 1`] = `
+"USAGE
+  ib auth impersonate [<personId>] [flags]
+
+DESCRIPTION
+  Impersonate another person: mint a 10-minute impersonation JWT for the target and persist it as the active credential (your own login is stashed for restore). \`--end\` restores it; \`--extend\` renews 10 more minutes. Server-gated by canImpersonate (systemAdmin/roleManager, same-tenant admin over a non-admin target, or an explicit grant). Local CLI only — denied over the exec/MCP bridge.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <personId> NUMBER    Target personId (or use --email). Omit with --end/--extend. (optional)
+
+FLAGS
+  --email STRING    Target email (alternative to the personId positional)
+  --end BOOLEAN    End the active impersonation session and restore your own login
+  --extend BOOLEAN    Extend the active impersonation session by 10 minutes
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  start: { ok:true, impersonating:{ personId, actorPersonId, expiresAt } }. --end: { ok:true, restored:{ personId } }. --extend: { ok:true, expiresAt }.
+
+ERRORS (stderr, exit non-zero)
+  exit 2  Not logged in          → ib auth login
+  exit 3 (HTTP 403)  Impersonation not allowed for the target → needs systemAdmin/roleManager, same-tenant admin, or a grant
+  exit 5 (HTTP 404)  Target person not found → check the personId / email
+  exit 3  Read-only mode active (--read-only / IB_READ_ONLY) → impersonation persists a rotated JWT; drop read-only
+  exit 4  No active session (--end/--extend), or neither personId nor --email given → start with \`ib auth impersonate <personId>\`
+
+NOTES
+  - Persists a 10-minute impersonation JWT as the active credential — blocked under read-only (exit 3).
+  - Auto-refresh-on-401 is disabled while impersonating (it would escalate to a 7-day login); a 401 surfaces — re-run impersonate or \`--extend\`.
+  - \`ib auth whoami\` shows an \`impersonating\` block while a session is active.
+  - Local CLI only — the \`auth\` group is denied over /api/cli/exec and MCP ib_exec.
+
+EXAMPLES
+  ib auth impersonate 6233
+  ib auth impersonate --email someone@example.com
+  ib auth impersonate --extend
+  ib auth impersonate --end
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib auth login matches snapshot 1`] = `
 "USAGE
   ib auth login [flags]
