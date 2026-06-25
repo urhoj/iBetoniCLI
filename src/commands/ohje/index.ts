@@ -413,6 +413,9 @@ export function registerOhjeCommands(
         replace: opts.replace, with: opts.with,
         append: opts.append, prepend: opts.prepend, all: opts.all,
       });
+      if (opts.field !== undefined && !editOp) {
+        failWith("--field only applies in edit mode (--replace / --append / --prepend)", 4);
+      }
       if (editOp) {
         if (opts.body || opts.title || opts.shorttext || opts.htmltext || opts.img !== undefined) {
           failWith("edit mode (--replace/--append/--prepend) cannot be combined with --body/--title/--shorttext/--htmltext/--img", 4);

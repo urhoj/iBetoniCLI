@@ -306,6 +306,9 @@ export function buildProgram(): Command {
         replace: opts.replace, with: opts.with,
         append: opts.append, prepend: opts.prepend, all: opts.all,
       });
+      if (opts.field !== undefined && !editOp) {
+        failWith("--field only applies in edit mode (--replace / --append / --prepend)", 4);
+      }
       if (editOp) {
         if (opts.summary !== undefined || opts.detail !== undefined) {
           failWith("edit mode (--replace/--append/--prepend) cannot be combined with --summary/--detail", 4);

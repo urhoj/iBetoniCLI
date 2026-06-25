@@ -161,5 +161,6 @@ describe("ib reference detail set — edit mode (in-field partial)", () => {
       { summary: "Lists orders (cached)" },
       { headers: { "X-Action-Reason": "tweak summary" } }
     );
+    expect(c.put).toHaveBeenCalledTimes(1);
   });
 });
