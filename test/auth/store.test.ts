@@ -1,8 +1,9 @@
 import { describe, test, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, existsSync, statSync } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createStore } from "../../src/auth/store.js";
+import { createStore, type CredentialsProfile } from "../../src/auth/store.js";
 
 describe("credentials store", () => {
   let dir: string;
@@ -54,7 +55,7 @@ describe("credentials store", () => {
     expect(existsSync(file)).toBe(false);
   });
 
-  test("save() writes file with 0600 permissions on POSIX", async () => {
+  test("save() writes file with 0600 permissions on POSIX (existing)", async () => {
     if (process.platform === "win32") return; // skip on Windows; ACL is owner-only by file inheritance
     const file = join(dir, "credentials.json");
     const store = createStore(file);
@@ -71,3 +72,33 @@ describe("credentials store", () => {
     expect(statSync(file).mode & 0o777).toBe(0o600);
   });
 });
+
+{
+  let dir: string;
+  let path: string;
+  const base: CredentialsProfile = {
+    jwt: "j", refreshToken: "r", issuedAt: "i", expiresAt: "e",
+    personId: 1, ownerAsiakasId: 2, ownerAsiakasName: "n", endpoint: "https://x",
+  };
+
+  beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), "ibstore-")); path = join(dir, "credentials.json"); });
+  afterEach(async () => { await rm(dir, { recursive: true, force: true }); });
+
+  describe("store impersonation + remove", () => {
+    test("persists and reads back the impersonation marker", async () => {
+      const s = createStore(path);
+      await s.save({ ...base, impersonation: { actorPersonId: 10, sessionId: "abc" } });
+      const loaded = await s.load();
+      expect(loaded?.impersonation).toEqual({ actorPersonId: 10, sessionId: "abc" });
+    });
+
+    test("remove deletes one profile, leaving others", async () => {
+      const s = createStore(path);
+      await s.save(base, "_impersonator");
+      await s.save(base, "default");
+      await s.remove("_impersonator");
+      expect(await s.load("_impersonator")).toBeNull();
+      expect(await s.load("default")).not.toBeNull();
+    });
+  });
+}

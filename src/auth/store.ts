@@ -11,6 +11,8 @@ export interface CredentialsProfile {
   ownerAsiakasId: number;
   ownerAsiakasName: string;
   endpoint: string;
+  /** Present only when this profile is an active impersonation session. */
+  impersonation?: { actorPersonId: number; sessionId: string };
 }
 
 interface CredentialsFile {
@@ -23,6 +25,7 @@ export interface CredentialsStore {
   load(profile?: string): Promise<CredentialsProfile | null>;
   save(creds: CredentialsProfile, profile?: string): Promise<void>;
   clear(): Promise<void>;
+  remove(profile: string): Promise<void>;
 }
 
 export function createStore(path: string): CredentialsStore {
@@ -56,6 +59,21 @@ export function createStore(path: string): CredentialsStore {
     },
     async clear(): Promise<void> {
       if (existsSync(path)) await unlink(path);
+    },
+    async remove(profile: string): Promise<void> {
+      if (!existsSync(path)) return;
+      let file: CredentialsFile;
+      try {
+        file = JSON.parse(await readFile(path, "utf8")) as CredentialsFile;
+      } catch {
+        return; // corrupt — nothing to remove
+      }
+      if (file.profiles) delete file.profiles[profile];
+      if (file.activeProfile === profile) file.activeProfile = "default";
+      await writeFile(path, JSON.stringify(file, null, 2), { mode: 0o600 });
+      if (process.platform !== "win32") {
+        await chmod(path, 0o600);
+      }
     },
   };
 }
