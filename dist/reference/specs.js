@@ -1328,7 +1328,7 @@ const BASE_COMMAND_SPECS = [
         description: "Your own profile, your roles aggregated across all your companies, and the companies you can act on. Derives identity from the JWT (works with IB_TOKEN). For the roles scoped to a single company, use `person role list --asiakas`.",
         auth: "any",
         flags: [],
-        outputShape: "{ personId, name, email, phone, activeCompany:{asiakasId,name}, roles:[{roleTypeId,role}], companies:[{asiakasId,name,current}] }",
+        outputShape: "{ personId, name, email, phone, activeCompany:{asiakasId,name}, tier:'developer'|'admin'|'standard', roles:[{roleTypeId,role}], companies:[{asiakasId,name,current}], impersonating?:{actorPersonId,sessionId} } — `tier` is the capability/discovery gate (the MCP-reachable equivalent of `auth whoami`'s tier); `impersonating` present only when acting as another person.",
         errors: [...COMMON_AUTH_ERRORS],
         examples: ["ib person me", "ib person me --pretty"],
     },
@@ -3944,7 +3944,7 @@ const BASE_COMMAND_SPECS = [
         description: "Aggregated 'is my setup working' health check, and the first-contact orientation for MCP / `/api/cli/exec` callers (where the `auth` group — incl. `auth whoami` — is denied). Derives identity + tier + switchable companies from the active JWT (works for both file- and IB_TOKEN-sessions), reports token expiry, pings the public /api/version for connectivity + which build is live, and does ONE authenticated read to prove the token is accepted by this endpoint. Read-only. Exits 1 when the aggregate `ok` is false.",
         auth: "any",
         flags: [],
-        outputShape: "{ ok:boolean, cli, endpoint, readOnly, auth:{ personId, email, tier:'developer'|'admin'|'standard', ownerAsiakasId, ownerAsiakasName, companies:{ asiakasId, roles }[], issuedFor, tokenExp, tokenExpired }, connectivity:VersionReport, authProbe:{ ok, status?, error? } } — `tier` = capability/discovery gate; `companies` = `company switch` targets.",
+        outputShape: "{ ok:boolean, cli, endpoint, readOnly, auth:{ personId, email, tier:'developer'|'admin'|'standard', ownerAsiakasId, ownerAsiakasName, companies:{ asiakasId, roles }[], issuedFor, tokenExp, tokenExpired, impersonating?:{actorPersonId,sessionId} }, connectivity:VersionReport, authProbe:{ ok, status?, error? } } — `tier` = capability/discovery gate; `companies` = `company switch` targets; `impersonating` present only when the token acts as another person.",
         errors: [
             { exit: 1, meaning: "Not healthy", remedy: "inspect connectivity / authProbe / tokenExpired in the report" },
             { exit: 2, meaning: "Not logged in", remedy: "ib auth login (or set IB_TOKEN)" },

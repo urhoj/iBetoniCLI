@@ -2334,7 +2334,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { ok:boolean, cli, endpoint, readOnly, auth:{ personId, email, tier:'developer'|'admin'|'standard', ownerAsiakasId, ownerAsiakasName, companies:{ asiakasId, roles }[], issuedFor, tokenExp, tokenExpired }, connectivity:VersionReport, authProbe:{ ok, status?, error? } } — \`tier\` = capability/discovery gate; \`companies\` = \`company switch\` targets.
+  { ok:boolean, cli, endpoint, readOnly, auth:{ personId, email, tier:'developer'|'admin'|'standard', ownerAsiakasId, ownerAsiakasName, companies:{ asiakasId, roles }[], issuedFor, tokenExp, tokenExpired, impersonating?:{actorPersonId,sessionId} }, connectivity:VersionReport, authProbe:{ ok, status?, error? } } — \`tier\` = capability/discovery gate; \`companies\` = \`company switch\` targets; \`impersonating\` present only when the token acts as another person.
 
 ERRORS (stderr, exit non-zero)
   exit 1  Not healthy            → inspect connectivity / authProbe / tokenExpired in the report
@@ -7440,7 +7440,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { personId, name, email, phone, activeCompany:{asiakasId,name}, roles:[{roleTypeId,role}], companies:[{asiakasId,name,current}] }
+  { personId, name, email, phone, activeCompany:{asiakasId,name}, tier:'developer'|'admin'|'standard', roles:[{roleTypeId,role}], companies:[{asiakasId,name,current}], impersonating?:{actorPersonId,sessionId} } — \`tier\` is the capability/discovery gate (the MCP-reachable equivalent of \`auth whoami\`'s tier); \`impersonating\` present only when acting as another person.
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh

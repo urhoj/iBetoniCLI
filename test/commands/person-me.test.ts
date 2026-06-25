@@ -44,6 +44,31 @@ describe("runPersonMe", () => {
       { asiakasId: 1349, name: "BetoniJerry", current: true },
       { asiakasId: 26, name: "Kalle Urho Oy", current: false },
     ]);
+    // No globalRoles / admin roles on the token → standard tier; no imp claim.
+    expect(result.tier).toBe("standard");
+    expect(result.impersonating).toBeUndefined();
+  });
+
+  test("surfaces tier (from globalRoles) and an active impersonation session", async () => {
+    const payload = Buffer.from(
+      JSON.stringify({
+        personId: 6233,
+        ownerAsiakasId: 1349,
+        email: "sys@x.fi",
+        globalRoles: { isDeveloper: true },
+        imp: 999,
+        imp_sid: "sess-abc",
+      })
+    ).toString("base64url");
+    (mockClient.getCurrentToken as ReturnType<typeof vi.fn>).mockReturnValue(
+      `eyJhbGciOiJIUzI1NiJ9.${payload}.sig`
+    );
+    (mockClient.get as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ personId: 6233, name: "System Jerry", email: "sys@x.fi", phone: "+358", roles: [] })
+      .mockResolvedValueOnce({ companies: [{ asiakasId: 1349, asiakasNimi: "BetoniJerry" }], currentCompanyId: 1349 });
+    const result = await runPersonMe(mockClient);
+    expect(result.tier).toBe("developer");
+    expect(result.impersonating).toEqual({ actorPersonId: 999, sessionId: "sess-abc" });
   });
 });
 

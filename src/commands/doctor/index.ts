@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { writeJson, exitWithError, setExitCode } from "../../output/json.js";
-import { decodeJwtPayload } from "../../auth/jwt.js";
+import { decodeJwtPayload, impersonationFromClaims, type ImpersonationInfo } from "../../auth/jwt.js";
 import { resolveCallerTier } from "../../tier.js";
 import type { CallerTier } from "../../tier.js";
 import { runVersion, type VersionReport } from "../version/index.js";
@@ -35,6 +35,8 @@ export interface DoctorReport {
     issuedFor: string | null;
     tokenExp: string | null;
     tokenExpired: boolean | null;
+    /** Present only when this token is an impersonation JWT (acting as another person). */
+    impersonating?: ImpersonationInfo;
   };
   connectivity: VersionReport;
   authProbe: { ok: boolean; status?: number; error?: string };
@@ -63,6 +65,7 @@ export async function runDoctor(opts: {
   const tier = resolveCallerTier(token);
   const tokenExp = claims.exp ? new Date(claims.exp * 1000).toISOString() : null;
   const tokenExpired = claims.exp != null ? claims.exp * 1000 < now : null;
+  const impersonating = impersonationFromClaims(claims);
 
   // Connectivity (public, no auth) — reuse the version probe.
   const connectivity = await runVersion({
@@ -101,6 +104,7 @@ export async function runDoctor(opts: {
       issuedFor: claims.issuedFor ?? null,
       tokenExp,
       tokenExpired,
+      ...(impersonating ? { impersonating } : {}),
     },
     connectivity,
     authProbe,

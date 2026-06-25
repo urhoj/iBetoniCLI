@@ -108,3 +108,21 @@ export function decodeJwtPayload(jwt: string): DecodedClaims {
     companies: companyList,
   };
 }
+
+/** The orientation shape for an active impersonation session. */
+export interface ImpersonationInfo {
+  actorPersonId: number;
+  sessionId: string;
+}
+
+/**
+ * Project the impersonation claims (`imp`/`imp_sid`) into the orientation shape
+ * shared by `auth whoami`, `doctor`, and `person me`. Returns `undefined` on a
+ * normal (non-impersonation) token. Kept in one place so the three surfaces
+ * can't drift in how they report "am I acting as someone else?".
+ */
+export function impersonationFromClaims(claims: DecodedClaims): ImpersonationInfo | undefined {
+  return claims.imp != null
+    ? { actorPersonId: claims.imp, sessionId: claims.imp_sid ?? "" }
+    : undefined;
+}

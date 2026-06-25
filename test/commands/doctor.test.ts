@@ -93,6 +93,22 @@ describe("runDoctor", () => {
       { asiakasId: 8, roles: ["asiakasAdmin"] },
       { asiakasId: 26, roles: [] },
     ]);
+    // A normal token carries no imp claim → impersonating omitted.
+    expect(report.auth.impersonating).toBeUndefined();
+  });
+
+  test("surfaces an active impersonation session (imp/imp_sid claims)", async () => {
+    const payload = { ...claims(FUTURE_EXP), imp: 999, imp_sid: "sess-xyz" };
+    const client = mockClient(makeJwt(payload), async () => ({ companies: [], currentCompanyId: 8 }));
+    const report = await runDoctor({
+      client,
+      endpoint: "https://api.example.com",
+      cliVersion: "1.2.3",
+      readOnly: false,
+      nowMs: NOW,
+      fetchImpl: reachableFetch(),
+    });
+    expect(report.auth.impersonating).toEqual({ actorPersonId: 999, sessionId: "sess-xyz" });
   });
 
   test("unreachable endpoint → ok false", async () => {

@@ -12,7 +12,12 @@ import {
   failWith,
   errorMessage,
 } from "../../output/json.js";
-import { decodeJwtPayload } from "../../auth/jwt.js";
+import {
+  decodeJwtPayload,
+  impersonationFromClaims,
+  type ImpersonationInfo,
+} from "../../auth/jwt.js";
+import { resolveCallerTier, type CallerTier } from "../../tier.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { roleNameForTypeId, resolveRoleTypeId, explainRole } from "../../roles.js";
 import { parseId, parseOptionalId } from "../../targets.js";
@@ -307,8 +312,16 @@ export interface PersonMeOutput {
   email: string | null;
   phone: string | null;
   activeCompany: { asiakasId: number; name: string | null };
+  /**
+   * The caller's capability/discovery tier (developer > admin > standard) —
+   * which command subtrees even exist for it. The MCP-reachable equivalent of
+   * `auth whoami`'s `tier` (the `auth` group is denied over /api/cli/exec).
+   */
+  tier: CallerTier;
   roles: { roleTypeId: number; role: string | null }[];
   companies: { asiakasId: number; name: string; current: boolean }[];
+  /** Present only when the active token is an impersonation JWT (acting as another person). */
+  impersonating?: ImpersonationInfo;
 }
 
 /**
@@ -320,7 +333,9 @@ export interface PersonMeOutput {
  * scoped); use `person role list --asiakas <id>` for one company's roles.
  */
 export async function runPersonMe(client: ApiClient): Promise<PersonMeOutput> {
-  const claims = decodeJwtPayload(client.getCurrentToken());
+  const token = client.getCurrentToken();
+  const claims = decodeJwtPayload(token);
+  const impersonating = impersonationFromClaims(claims);
   const personId =
     claims.personId ?? failWith("could not resolve personId from the active token", 4);
   const [profile, available] = await Promise.all([
@@ -342,12 +357,14 @@ export async function runPersonMe(client: ApiClient): Promise<PersonMeOutput> {
       asiakasId: available.currentCompanyId,
       name: active?.asiakasNimi ?? active?.name ?? null,
     },
+    tier: resolveCallerTier(token),
     roles: (profile.roles || []).map((t) => ({ roleTypeId: t, role: roleNameForTypeId(t) })),
     companies: companies.map((c) => ({
       asiakasId: c.asiakasId,
       name: c.asiakasNimi ?? c.name ?? "",
       current: c.asiakasId === available.currentCompanyId,
     })),
+    ...(impersonating ? { impersonating } : {}),
   };
 }
 

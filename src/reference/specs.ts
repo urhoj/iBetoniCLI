@@ -1447,7 +1447,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     auth: "any",
     flags: [],
     outputShape:
-      "{ personId, name, email, phone, activeCompany:{asiakasId,name}, roles:[{roleTypeId,role}], companies:[{asiakasId,name,current}] }",
+      "{ personId, name, email, phone, activeCompany:{asiakasId,name}, tier:'developer'|'admin'|'standard', roles:[{roleTypeId,role}], companies:[{asiakasId,name,current}], impersonating?:{actorPersonId,sessionId} } — `tier` is the capability/discovery gate (the MCP-reachable equivalent of `auth whoami`'s tier); `impersonating` present only when acting as another person.",
     errors: [...COMMON_AUTH_ERRORS],
     examples: ["ib person me", "ib person me --pretty"],
   },
@@ -4261,7 +4261,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     auth: "any",
     flags: [],
     outputShape:
-      "{ ok:boolean, cli, endpoint, readOnly, auth:{ personId, email, tier:'developer'|'admin'|'standard', ownerAsiakasId, ownerAsiakasName, companies:{ asiakasId, roles }[], issuedFor, tokenExp, tokenExpired }, connectivity:VersionReport, authProbe:{ ok, status?, error? } } — `tier` = capability/discovery gate; `companies` = `company switch` targets.",
+      "{ ok:boolean, cli, endpoint, readOnly, auth:{ personId, email, tier:'developer'|'admin'|'standard', ownerAsiakasId, ownerAsiakasName, companies:{ asiakasId, roles }[], issuedFor, tokenExp, tokenExpired, impersonating?:{actorPersonId,sessionId} }, connectivity:VersionReport, authProbe:{ ok, status?, error? } } — `tier` = capability/discovery gate; `companies` = `company switch` targets; `impersonating` present only when the token acts as another person.",
     errors: [
       { exit: 1, meaning: "Not healthy", remedy: "inspect connectivity / authProbe / tokenExpired in the report" },
       { exit: 2, meaning: "Not logged in", remedy: "ib auth login (or set IB_TOKEN)" },

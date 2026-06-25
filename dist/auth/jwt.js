@@ -66,4 +66,15 @@ export function decodeJwtPayload(jwt) {
         companies: companyList,
     };
 }
+/**
+ * Project the impersonation claims (`imp`/`imp_sid`) into the orientation shape
+ * shared by `auth whoami`, `doctor`, and `person me`. Returns `undefined` on a
+ * normal (non-impersonation) token. Kept in one place so the three surfaces
+ * can't drift in how they report "am I acting as someone else?".
+ */
+export function impersonationFromClaims(claims) {
+    return claims.imp != null
+        ? { actorPersonId: claims.imp, sessionId: claims.imp_sid ?? "" }
+        : undefined;
+}
 //# sourceMappingURL=jwt.js.map

@@ -1,7 +1,8 @@
 import { unwrapRows } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith, errorMessage, } from "../../output/json.js";
-import { decodeJwtPayload } from "../../auth/jwt.js";
+import { decodeJwtPayload, impersonationFromClaims, } from "../../auth/jwt.js";
+import { resolveCallerTier } from "../../tier.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { roleNameForTypeId, resolveRoleTypeId, explainRole } from "../../roles.js";
 import { parseId, parseOptionalId } from "../../targets.js";
@@ -201,7 +202,9 @@ export async function runPersonRoleRevoke(client, personId, asiakasId, roleTypeI
  * scoped); use `person role list --asiakas <id>` for one company's roles.
  */
 export async function runPersonMe(client) {
-    const claims = decodeJwtPayload(client.getCurrentToken());
+    const token = client.getCurrentToken();
+    const claims = decodeJwtPayload(token);
+    const impersonating = impersonationFromClaims(claims);
     const personId = claims.personId ?? failWith("could not resolve personId from the active token", 4);
     const [profile, available] = await Promise.all([
         client.get(`/api/cli/person/get/${personId}`),
@@ -218,12 +221,14 @@ export async function runPersonMe(client) {
             asiakasId: available.currentCompanyId,
             name: active?.asiakasNimi ?? active?.name ?? null,
         },
+        tier: resolveCallerTier(token),
         roles: (profile.roles || []).map((t) => ({ roleTypeId: t, role: roleNameForTypeId(t) })),
         companies: companies.map((c) => ({
             asiakasId: c.asiakasId,
             name: c.asiakasNimi ?? c.name ?? "",
             current: c.asiakasId === available.currentCompanyId,
         })),
+        ...(impersonating ? { impersonating } : {}),
     };
 }
 /**

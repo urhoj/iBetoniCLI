@@ -1,5 +1,5 @@
 import { writeJson, exitWithError, setExitCode } from "../../output/json.js";
-import { decodeJwtPayload } from "../../auth/jwt.js";
+import { decodeJwtPayload, impersonationFromClaims } from "../../auth/jwt.js";
 import { resolveCallerTier } from "../../tier.js";
 import { runVersion } from "../version/index.js";
 import { runCompanyList } from "../company/index.js";
@@ -19,6 +19,7 @@ export async function runDoctor(opts) {
     const tier = resolveCallerTier(token);
     const tokenExp = claims.exp ? new Date(claims.exp * 1000).toISOString() : null;
     const tokenExpired = claims.exp != null ? claims.exp * 1000 < now : null;
+    const impersonating = impersonationFromClaims(claims);
     // Connectivity (public, no auth) — reuse the version probe.
     const connectivity = await runVersion({
         endpoint,
@@ -55,6 +56,7 @@ export async function runDoctor(opts) {
             issuedFor: claims.issuedFor ?? null,
             tokenExp,
             tokenExpired,
+            ...(impersonating ? { impersonating } : {}),
         },
         connectivity,
         authProbe,

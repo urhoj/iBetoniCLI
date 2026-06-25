@@ -1,5 +1,5 @@
 import type { CallerTier } from "../tier.js";
-import type { DecodedClaims } from "./jwt.js";
+import { impersonationFromClaims, type DecodedClaims } from "./jwt.js";
 
 export interface WhoamiOutput {
   personId: number | null;
@@ -74,11 +74,7 @@ export function renderWhoami(input: {
     out.tokenExpiresAt = new Date(claims.exp * 1000).toISOString();
     out.tokenExpired = claims.exp * 1000 < now;
   }
-  const impersonating =
-    input.impersonation ??
-    (claims.imp != null
-      ? { actorPersonId: claims.imp, sessionId: claims.imp_sid ?? "" }
-      : undefined);
+  const impersonating = input.impersonation ?? impersonationFromClaims(claims);
   if (impersonating) out.impersonating = impersonating;
   return out;
 }

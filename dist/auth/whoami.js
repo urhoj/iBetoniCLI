@@ -1,3 +1,4 @@
+import { impersonationFromClaims } from "./jwt.js";
 /**
  * Project the active session into the stable `whoami` JSON shape — the one-shot
  * orientation an AI reads first: who/where it is, what it can do (`tier`), where
@@ -27,10 +28,7 @@ export function renderWhoami(input) {
         out.tokenExpiresAt = new Date(claims.exp * 1000).toISOString();
         out.tokenExpired = claims.exp * 1000 < now;
     }
-    const impersonating = input.impersonation ??
-        (claims.imp != null
-            ? { actorPersonId: claims.imp, sessionId: claims.imp_sid ?? "" }
-            : undefined);
+    const impersonating = input.impersonation ?? impersonationFromClaims(claims);
     if (impersonating)
         out.impersonating = impersonating;
     return out;
