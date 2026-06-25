@@ -52,6 +52,25 @@ function jwt(payload: Record<string, unknown>): string {
   return `${b64({ alg: "none" })}.${b64(payload)}.sig`;
 }
 
+function mkJwt(payload: Record<string, unknown>): string {
+  const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  return `${b64({ alg: "HS256", typ: "JWT" })}.${b64(payload)}.sig`;
+}
+
+describe("decodeJwtPayload impersonation claims", () => {
+  test("surfaces imp and imp_sid when present", () => {
+    const c = decodeJwtPayload(mkJwt({ personId: 42, ownerAsiakasId: 1349, imp: 10, imp_sid: "abc" }));
+    expect(c.imp).toBe(10);
+    expect(c.imp_sid).toBe("abc");
+  });
+
+  test("imp/imp_sid undefined on a normal login token", () => {
+    const c = decodeJwtPayload(mkJwt({ personId: 42, ownerAsiakasId: 1349 }));
+    expect(c.imp).toBeUndefined();
+    expect(c.imp_sid).toBeUndefined();
+  });
+});
+
 describe("decodeJwtPayload — isActiveCompanyAdmin", () => {
   test("asiakasAdmin on the active company → true", () => {
     const token = jwt({

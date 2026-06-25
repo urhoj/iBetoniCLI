@@ -21,6 +21,10 @@ export interface DecodedClaims {
    * False on short/absent tokens (fail-closed to non-admin).
    */
   isActiveCompanyAdmin: boolean;
+  /** Impersonation actor personId (`imp` claim) — present only on impersonation tokens. */
+  imp?: number;
+  /** Impersonation session id (`imp_sid` claim) — present only on impersonation tokens. */
+  imp_sid?: string;
 }
 
 /**
@@ -84,5 +88,7 @@ export function decodeJwtPayload(jwt: string): DecodedClaims {
     isSystemAdmin: globalRoles.isSystemAdmin === true,
     isDeveloper: globalRoles.isDeveloper === true,
     isActiveCompanyAdmin,
+    imp: finite(expanded.imp ?? expanded.i),
+    imp_sid: (expanded.imp_sid ?? expanded.s) as string | undefined,
   };
 }
