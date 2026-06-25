@@ -3735,15 +3735,20 @@ const BASE_COMMAND_SPECS = [
                 type: "boolean",
                 description: "Emit only { version, generatedAt, commonErrors, commands } — drop the overview/topics/feedbackGuidance primer and skip the glossary fetch (no token needed). Fewer bytes per dump.",
             },
+            {
+                name: "lean",
+                type: "boolean",
+                description: "Drop each command's `notes`/`seeAlso` prose (KEEPS `examples`) — ~7.6k fewer tokens on the full surface. For a whole-surface scan you get what exists + how to call it; fetch the dropped caveats/cross-refs per-command via `ib <command> --help`. Composes with --commands-only and domain filters.",
+            },
         ],
-        outputShape: "{ version, generatedAt, commonErrors: CommandError[], notice?, overview, glossary, feedbackGuidance, topics, commands: { '<command>': CommandSpec } } — with --commands-only: { version, generatedAt, commonErrors, commands }. `commonErrors` (401/500) applies to EVERY command and is omitted from each spec's `errors`. `notice` appears only on the full (no-domain) dump. `glossary` is the term+synonyms INDEX only and is EMPTY unless `--glossary` is passed; fetch a definition with `ib glossary lookup <term>` or all of them with `ib glossary list`.",
+        outputShape: "{ version, generatedAt, commonErrors: CommandError[], notice?, overview, glossary, feedbackGuidance, topics, commands: { '<command>': CommandSpec } } — with --commands-only: { version, generatedAt, commonErrors, commands }; with --lean each spec drops notes/seeAlso (examples kept). `commonErrors` (401/500) applies to EVERY command and is omitted from each spec's `errors`. `notice` appears only on the full (no-domain) dump. `glossary` is the term+synonyms INDEX only and is EMPTY unless `--glossary` is passed; fetch a definition with `ib glossary lookup <term>` or all of them with `ib glossary list`.",
         errors: [
             { exit: 4, meaning: "Unknown domain", remedy: "run `ib commands` (no arg) to see valid domains" },
             { exit: 1, meaning: "I/O error", remedy: "retry; check stdout pipe" },
         ],
         examples: [
             "ib reference dump keikka",
-            "ib reference dump ai attachment --commands-only",
+            "ib reference dump --lean --commands-only",
             "ib reference dump --glossary",
             "ib reference dump | jq .commonErrors",
         ],

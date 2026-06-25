@@ -214,8 +214,15 @@ export function buildProgram(): Command {
       "--commands-only",
       "Emit only { version, generatedAt, commonErrors, commands } — drop the overview/topics/feedbackGuidance primer (and skip the glossary fetch)"
     )
+    .option(
+      "--lean",
+      "Drop each command's notes/seeAlso prose (keeps examples) — ~7.6k fewer tokens on the full surface; fetch the dropped prose per-command via `ib <command> --help`"
+    )
     .action(
-      async (domains: string[], opts: { glossary?: boolean; commandsOnly?: boolean }) => {
+      async (
+        domains: string[],
+        opts: { glossary?: boolean; commandsOnly?: boolean; lean?: boolean }
+      ) => {
         try {
           let glossary: Array<{ term: string; synonyms: string[] }> = [];
           // The glossary is now OPT-IN: only fetch it when --glossary is asked
@@ -225,7 +232,13 @@ export function buildProgram(): Command {
           if (opts.glossary && !opts.commandsOnly) {
             try { glossary = await fetchPrimerGlossary(await getClient()); } catch { glossary = []; }
           }
-          runReferenceDump(domains, getCallerTier(), glossary, opts.commandsOnly ?? false);
+          runReferenceDump(
+            domains,
+            getCallerTier(),
+            glossary,
+            opts.commandsOnly ?? false,
+            opts.lean ?? false
+          );
         } catch (e) {
           exitWithError(e);
         }

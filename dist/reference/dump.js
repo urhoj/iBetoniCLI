@@ -74,6 +74,22 @@ function stripCommonErrors(spec) {
     return { ...spec, errors: filtered };
 }
 /**
+ * Lean mode (`--lean`): drop the per-spec `notes` and `seeAlso` prose. These
+ * are the largest low-essential fields across the full surface (~30 KB / ~7.6k
+ * tok); `examples` stay because they are invocation-critical (copy-paste
+ * correctness). For a whole-surface scan an AI wants what exists + how to call
+ * each command; the dropped caveats/cross-references are still one
+ * `ib <command> --help` (or a per-domain dump) away when it actually invokes.
+ */
+function stripProse(spec) {
+    if (spec.notes == null && spec.seeAlso == null)
+        return spec;
+    const out = { ...spec };
+    delete out.notes;
+    delete out.seeAlso;
+    return out;
+}
+/**
  * Build the reference object. Pure — no I/O — so tests can assert on it
  * directly. Commands are keyed by their full path (e.g. `ib keikka list`),
  * matching what an AI assistant sees from `--help`. When one or more `domain`s
@@ -86,7 +102,7 @@ function stripCommonErrors(spec) {
  * spec's prose is run through `scrubSpecForTier` so no cross-reference leaks a
  * hidden command path.
  */
-export function buildReference(domain, tier = "developer", glossary = []) {
+export function buildReference(domain, tier = "developer", glossary = [], lean = false) {
     let specs = visibleSpecs(COMMAND_SPECS, tier);
     const domains = domain == null ? [] : Array.isArray(domain) ? domain : [domain];
     if (domains.length) {
@@ -99,7 +115,7 @@ export function buildReference(domain, tier = "developer", glossary = []) {
     // The `notice` steer rides only on the FULL surface (no domain filter) — a
     // filtered dump is already the cheap path, so it needs no nudge.
     const notice = domains.length === 0
-        ? `Full command surface (${specs.length} commands) — large. For one area prefer \`ib reference dump <domain>\` (e.g. \`ib reference dump keikka\`), a fraction of the bytes; \`ib commands\` lists the domains. \`commonErrors\` applies to every command.`
+        ? `Full command surface (${specs.length} commands) — large. For one area prefer \`ib reference dump <domain>\`${lean ? "" : " (or add `--lean` to drop per-command notes/seeAlso)"}; \`ib commands\` lists the domains. \`commonErrors\` applies to every command.${lean ? " LEAN: notes/seeAlso dropped — see `ib <command> --help` for those." : ""}`
         : undefined;
     return {
         version: packageJson.version,
@@ -110,10 +126,12 @@ export function buildReference(domain, tier = "developer", glossary = []) {
         glossary,
         feedbackGuidance: FEEDBACK_GUIDANCE,
         topics: TOPICS,
-        commands: Object.fromEntries(specs.map((spec) => [
-            spec.command,
-            stripCommonErrors(scrubSpecForTier(spec, tier, hiddenCommands)),
-        ])),
+        commands: Object.fromEntries(specs.map((spec) => {
+            let s = stripCommonErrors(scrubSpecForTier(spec, tier, hiddenCommands));
+            if (lean)
+                s = stripProse(s);
+            return [spec.command, s];
+        })),
     };
 }
 /**
@@ -132,9 +150,12 @@ export function buildReference(domain, tier = "developer", glossary = []) {
  * contract must travel with the commands map or it would be lost. The caller
  * also skips the glossary DB fetch in that mode (no token needed), so this is
  * both fewer bytes and one fewer round-trip.
+ *
+ * `lean` drops each spec's `notes`/`seeAlso` (kept `examples`) — composes with
+ * `commandsOnly` and domain filters; see {@link stripProse}.
  */
-export function runReferenceDump(domain, tier = "developer", glossary = [], commandsOnly = false) {
-    const ref = buildReference(domain, tier, glossary);
+export function runReferenceDump(domain, tier = "developer", glossary = [], commandsOnly = false, lean = false) {
+    const ref = buildReference(domain, tier, glossary, lean);
     const out = commandsOnly
         ? {
             version: ref.version,

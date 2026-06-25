@@ -7866,12 +7866,13 @@ ARGUMENTS
 FLAGS
   --glossary BOOLEAN    Include the term+synonyms vocabulary INDEX (fetched from the DB) under \`glossary\`. Off by default to keep the dump small; fetch definitions on demand with \`ib glossary lookup <term>\` / \`ib glossary list\`.
   --commands-only BOOLEAN    Emit only { version, generatedAt, commonErrors, commands } — drop the overview/topics/feedbackGuidance primer and skip the glossary fetch (no token needed). Fewer bytes per dump.
+  --lean BOOLEAN    Drop each command's \`notes\`/\`seeAlso\` prose (KEEPS \`examples\`) — ~7.6k fewer tokens on the full surface. For a whole-surface scan you get what exists + how to call it; fetch the dropped caveats/cross-refs per-command via \`ib <command> --help\`. Composes with --commands-only and domain filters.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { version, generatedAt, commonErrors: CommandError[], notice?, overview, glossary, feedbackGuidance, topics, commands: { '<command>': CommandSpec } } — with --commands-only: { version, generatedAt, commonErrors, commands }. \`commonErrors\` (401/500) applies to EVERY command and is omitted from each spec's \`errors\`. \`notice\` appears only on the full (no-domain) dump. \`glossary\` is the term+synonyms INDEX only and is EMPTY unless \`--glossary\` is passed; fetch a definition with \`ib glossary lookup <term>\` or all of them with \`ib glossary list\`.
+  { version, generatedAt, commonErrors: CommandError[], notice?, overview, glossary, feedbackGuidance, topics, commands: { '<command>': CommandSpec } } — with --commands-only: { version, generatedAt, commonErrors, commands }; with --lean each spec drops notes/seeAlso (examples kept). \`commonErrors\` (401/500) applies to EVERY command and is omitted from each spec's \`errors\`. \`notice\` appears only on the full (no-domain) dump. \`glossary\` is the term+synonyms INDEX only and is EMPTY unless \`--glossary\` is passed; fetch a definition with \`ib glossary lookup <term>\` or all of them with \`ib glossary list\`.
 
 ERRORS (stderr, exit non-zero)
   exit 4  Unknown domain         → run \`ib commands\` (no arg) to see valid domains
@@ -7879,7 +7880,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib reference dump keikka
-  ib reference dump ai attachment --commands-only
+  ib reference dump --lean --commands-only
   ib reference dump --glossary
   ib reference dump | jq .commonErrors
 "

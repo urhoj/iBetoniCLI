@@ -76,6 +76,44 @@ describe("ib reference dump", () => {
     expect(buildReference("keikka").notice).toBeUndefined();
   });
 
+  test("--lean drops notes + seeAlso from every spec but KEEPS examples", () => {
+    const full = buildReference();
+    const lean = buildReference(undefined, "developer", [], true);
+    // Sanity: the default dump has specs that carry notes / seeAlso.
+    const hadNotes = Object.values(full.commands).some((s) => s.notes?.length);
+    const hadSeeAlso = Object.values(full.commands).some((s) => s.seeAlso?.length);
+    expect(hadNotes && hadSeeAlso).toBe(true);
+    // Lean: no spec retains notes or seeAlso; every spec still has examples.
+    for (const [name, spec] of Object.entries(lean.commands)) {
+      expect(spec.notes, `${name} notes dropped`).toBeUndefined();
+      expect(spec.seeAlso, `${name} seeAlso dropped`).toBeUndefined();
+      expect(spec.examples.length, `${name} examples kept`).toBeGreaterThan(0);
+    }
+    // Lean is strictly smaller than the default.
+    expect(JSON.stringify(lean).length).toBeLessThan(JSON.stringify(full).length);
+    // The notice advertises the lean mode it is in.
+    expect(lean.notice).toMatch(/LEAN/);
+    expect(full.notice).toMatch(/--lean/);
+  });
+
+  test("--lean composes with --commands-only (specs still stripped of prose)", () => {
+    const spy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    runReferenceDump("keikka", "developer", [], true, true); // commandsOnly + lean
+    const out = spy.mock.calls[0][0] as string;
+    spy.mockRestore();
+    const parsed = JSON.parse(out);
+    expect(Object.keys(parsed).sort()).toEqual([
+      "commands",
+      "commonErrors",
+      "generatedAt",
+      "version",
+    ]);
+    for (const spec of Object.values(parsed.commands) as Array<Record<string, unknown>>) {
+      expect(spec.notes).toBeUndefined();
+      expect(spec.seeAlso).toBeUndefined();
+    }
+  });
+
   test("runReferenceDump emits single-line JSON (stdout one-line contract)", () => {
     const spy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     runReferenceDump("keikka");

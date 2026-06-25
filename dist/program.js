@@ -186,6 +186,7 @@ export function buildProgram() {
         .argument("[domain...]", "Restrict the commands map to one or more domains — the token after `ib` (e.g. keikka). Multiple domains share a single primer.")
         .option("--glossary", "Include the term+synonyms vocabulary index (DB fetch). Off by default to keep the dump small; look up definitions on demand with `ib glossary lookup`/`list`")
         .option("--commands-only", "Emit only { version, generatedAt, commonErrors, commands } — drop the overview/topics/feedbackGuidance primer (and skip the glossary fetch)")
+        .option("--lean", "Drop each command's notes/seeAlso prose (keeps examples) — ~7.6k fewer tokens on the full surface; fetch the dropped prose per-command via `ib <command> --help`")
         .action(async (domains, opts) => {
         try {
             let glossary = [];
@@ -201,7 +202,7 @@ export function buildProgram() {
                     glossary = [];
                 }
             }
-            runReferenceDump(domains, getCallerTier(), glossary, opts.commandsOnly ?? false);
+            runReferenceDump(domains, getCallerTier(), glossary, opts.commandsOnly ?? false, opts.lean ?? false);
         }
         catch (e) {
             exitWithError(e);
