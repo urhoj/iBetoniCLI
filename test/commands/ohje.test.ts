@@ -6,6 +6,7 @@ import {
   buildOhjeBody,
   buildOhjeFields,
   isValidHelpId,
+  runOhjeEditField,
 } from "../../src/commands/ohje/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -294,5 +295,52 @@ describe("ib ohje aiConfidence", () => {
     const c = client({ get: vi.fn().mockResolvedValue(rows) });
     const out = await runOhjeList(c, { needsReview: true });
     expect(out.items.map((r: any) => r.helpId)).toEqual(["b", "c"]);
+  });
+});
+
+describe("ib ohje update — edit mode (in-field partial)", () => {
+  beforeEach(() => {
+    asGet().mockReset();
+    asPut().mockReset();
+  });
+
+  test("--append defaults to htmltext; --dry-run returns a field diff, no PUT", async () => {
+    asGet().mockResolvedValueOnce([
+      { helpId: "X", title: "T", shorttext: "s", htmltext: "<p>old</p>", img: null },
+    ]);
+    const res = await runOhjeEditField(
+      mockClient, "X", "htmltext",
+      { kind: "append", text: "<p>more</p>" },
+      { dryRun: true, reason: "r" }
+    ) as Record<string, unknown>;
+    expect(mockClient.put).not.toHaveBeenCalled();
+    expect(res).toMatchObject({ dryRun: true, helpId: "X", field: "htmltext", sameContent: false });
+    expect(String(res.unified)).toContain("+ <p>old</p><p>more</p>");
+  });
+
+  test("real --replace on a chosen field GET-merges then PUTs the full row", async () => {
+    // one GET for the edit base, one GET inside runOhjeUpdate's merge
+    asGet().mockResolvedValue([
+      { helpId: "X", title: "Vanha otsikko", shorttext: "s", htmltext: "<p>h</p>", img: null },
+    ]);
+    asPut().mockResolvedValueOnce({ success: true });
+    await runOhjeEditField(
+      mockClient, "X", "title",
+      { kind: "replace", find: "Vanha", replacement: "Uusi" },
+      { reason: "fix title" }
+    );
+    expect(mockClient.put).toHaveBeenCalledWith(
+      "/api/helps/update",
+      { helpId: "X", title: "Uusi otsikko", shorttext: "s", htmltext: "<p>h</p>", img: null },
+      { headers: { "X-Action-Reason": "fix title" } }
+    );
+  });
+
+  test("editing a helpId with no row → exit 5", async () => {
+    asGet().mockResolvedValueOnce([]); // no current row
+    await expect(
+      runOhjeEditField(mockClient, "Nope", "htmltext", { kind: "append", text: "x" }, { reason: "r" })
+    ).rejects.toThrow(/no .*row/i);
+    expect(mockClient.put).not.toHaveBeenCalled();
   });
 });

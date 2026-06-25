@@ -6681,6 +6681,12 @@ FLAGS
   --must-exist BOOLEAN    Fail (exit 4) instead of creating a new row when the helpId has no entry — guards against a typo'd helpId silently spawning a junk row
   --ai-confidence NUMBER    Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score and re-open the row.
   --needs-human-review BOOLEAN    Park the help row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked.
+  --field STRING    Edit-mode target field: title | shorttext | htmltext (default htmltext)
+  --replace STRING    Edit mode: replace this literal text in the target field (exactly once unless --all)
+  --with STRING    Replacement for --replace ("" deletes the matched text)
+  --append STRING    Edit mode: append text to the target field (verbatim)
+  --prepend STRING    Edit mode: prepend text to the target field (verbatim)
+  --all BOOLEAN    With --replace: substitute every occurrence
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -6691,10 +6697,11 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { success: true, helpId, created, written: {helpId,title,shorttext,htmltext,img, aiConfidence?, needsHumanReview?}, htmltextLength, response } — \`created\` is true when no prior row existed (a parallel groomer can spot an unexpected insert); aiConfidence/needsHumanReview present in \`written\` only when those flags were passed; or { dryRun: true, helpId, created, current, proposed }
+  { success: true, helpId, created, written: {helpId,title,shorttext,htmltext,img, aiConfidence?, needsHumanReview?}, htmltextLength, response } — \`created\` is true when no prior row existed (a parallel groomer can spot an unexpected insert); aiConfidence/needsHumanReview present in \`written\` only when those flags were passed; or { dryRun: true, helpId, created, current, proposed } | edit dry-run: {dryRun:true, helpId, field, matchCount?, addedLines, removedLines, sameContent, unified}
 
 ERRORS (stderr, exit non-zero)
   exit 4  Missing --reason / invalid helpId / --must-exist on a missing row → pass --reason; helpId 1–250 chars; drop --must-exist to create
+  exit 5  helpId has no existing row (edit mode only) → create the entry first with a full --htmltext/--title/--shorttext
   exit 4 (HTTP 400)  Validation failed      → title ≤500, htmltext ≤10000, helpId 1–250 chars
   exit 3 (HTTP 403)  Permission denied      → needs isHelperEditor or system-admin/developer
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -6704,6 +6711,7 @@ EXAMPLES
   ib ohje update LaskupohjaTilaus --title "Laskupohja" --htmltext "<p>Ohje…</p>" --reason "content fix"
   ib ohje update LaskupohjaTilaus --dry-run --title "New title"
   ib ohje update "käyttöikä" --shorttext "Betonin käyttöikä" --must-exist --reason groom
+  ib ohje update tila:2 --append "<p>Lisätieto…</p>" --reason "expand help" --dry-run
 "
 `;
 

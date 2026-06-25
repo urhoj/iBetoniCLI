@@ -2513,12 +2513,19 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "must-exist", type: "boolean", description: "Fail (exit 4) instead of creating a new row when the helpId has no entry — guards against a typo'd helpId silently spawning a junk row" },
       { name: "ai-confidence", type: "number", description: "Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score and re-open the row." },
       { name: "needs-human-review", type: "boolean", description: "Park the help row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked." },
+      { name: "field", type: "string", description: "Edit-mode target field: title | shorttext | htmltext (default htmltext)" },
+      { name: "replace", type: "string", description: "Edit mode: replace this literal text in the target field (exactly once unless --all)" },
+      { name: "with", type: "string", description: 'Replacement for --replace ("" deletes the matched text)' },
+      { name: "append", type: "string", description: "Edit mode: append text to the target field (verbatim)" },
+      { name: "prepend", type: "string", description: "Edit mode: prepend text to the target field (verbatim)" },
+      { name: "all", type: "boolean", description: "With --replace: substitute every occurrence" },
     ],
     writeFlags: true,
     outputShape:
-      "{ success: true, helpId, created, written: {helpId,title,shorttext,htmltext,img, aiConfidence?, needsHumanReview?}, htmltextLength, response } — `created` is true when no prior row existed (a parallel groomer can spot an unexpected insert); aiConfidence/needsHumanReview present in `written` only when those flags were passed; or { dryRun: true, helpId, created, current, proposed }",
+      "{ success: true, helpId, created, written: {helpId,title,shorttext,htmltext,img, aiConfidence?, needsHumanReview?}, htmltextLength, response } — `created` is true when no prior row existed (a parallel groomer can spot an unexpected insert); aiConfidence/needsHumanReview present in `written` only when those flags were passed; or { dryRun: true, helpId, created, current, proposed } | edit dry-run: {dryRun:true, helpId, field, matchCount?, addedLines, removedLines, sameContent, unified}",
     errors: [
       { exit: 4, meaning: "Missing --reason / invalid helpId / --must-exist on a missing row", remedy: "pass --reason; helpId 1–250 chars; drop --must-exist to create" },
+      { exit: 5, meaning: "helpId has no existing row (edit mode only)", remedy: "create the entry first with a full --htmltext/--title/--shorttext" },
       apiErr(400, "Validation failed", "title ≤500, htmltext ≤10000, helpId 1–250 chars"),
       apiErr(403, "Permission denied", "needs isHelperEditor or system-admin/developer"),
       ...COMMON_AUTH_ERRORS,
@@ -2527,6 +2534,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       'ib ohje update LaskupohjaTilaus --title "Laskupohja" --htmltext "<p>Ohje…</p>" --reason "content fix"',
       'ib ohje update LaskupohjaTilaus --dry-run --title "New title"',
       'ib ohje update "käyttöikä" --shorttext "Betonin käyttöikä" --must-exist --reason groom',
+      'ib ohje update tila:2 --append "<p>Lisätieto…</p>" --reason "expand help" --dry-run',
     ],
   },
 
