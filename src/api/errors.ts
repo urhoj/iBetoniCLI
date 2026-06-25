@@ -5,7 +5,14 @@ export class CliError extends Error {
     message: string,
     public statusCode: number,
     public body: unknown,
-    public exitCode: number
+    public exitCode: number,
+    /**
+     * Optional remedy hint carried by the error itself. When set (a string),
+     * it OVERRIDES the command's generic spec remedy in {@link hintForError};
+     * an empty string SUPPRESSES the spec remedy (the message is already the
+     * full remedy). Used by `failUsage` for self-explanatory usage errors.
+     */
+    public hint?: string
   ) {
     super(message);
     this.name = "CliError";
@@ -62,6 +69,13 @@ export function hintForError(
   if (err.statusCode === 404 && isRouteNotFound(err.body)) {
     return "route not found — this endpoint is not deployed on this backend (or the path is wrong). Check the deployed build with `ib version`; deploy-gated commands flag this in their --help NOTES.";
   }
+  // An error may carry its OWN remedy hint (set via `failUsage`). It wins over
+  // the command's generic spec remedy — an empty string suppresses the spec
+  // remedy entirely (the message is already the full remedy). This stops a
+  // self-explanatory client-side usage error (e.g. "--replace text not found")
+  // from inheriting the command's unrelated exit-4 remedy (e.g. legal save's
+  // "pass --file OR --content").
+  if (typeof err.hint === "string") return err.hint.length ? err.hint : null;
   const specRow = specErrors?.find(
     (r) =>
       (r.http !== undefined && r.http === err.statusCode) ||

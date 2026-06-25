@@ -6,7 +6,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, exitWithError, failWith, failUsage } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { type AssessFlags, assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "../../assess.js";
 import { lineDiff } from "../../textDiff.js";
@@ -414,7 +414,7 @@ export function registerOhjeCommands(
         append: opts.append, prepend: opts.prepend, all: opts.all,
       });
       if (opts.field !== undefined && !editOp) {
-        failWith("--field only applies in edit mode (--replace / --append / --prepend)", 4);
+        failUsage("--field only applies in edit mode (--replace / --append / --prepend)");
       }
       if (editOp) {
         if (
@@ -422,11 +422,11 @@ export function registerOhjeCommands(
           opts.shorttext !== undefined || opts.htmltext !== undefined ||
           opts.img !== undefined
         ) {
-          failWith("edit mode (--replace/--append/--prepend) cannot be combined with --body/--title/--shorttext/--htmltext/--img", 4);
+          failUsage("edit mode (--replace/--append/--prepend) cannot be combined with --body/--title/--shorttext/--htmltext/--img");
         }
         const rawField = opts.field ?? "htmltext";
         if (!(OHJE_EDITABLE_FIELDS as readonly string[]).includes(rawField)) {
-          failWith(`--field must be one of: ${OHJE_EDITABLE_FIELDS.join(", ")}`, 4);
+          failUsage(`--field must be one of: ${OHJE_EDITABLE_FIELDS.join(", ")}`);
         }
         const field = rawField as OhjeEditableField;
         if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);

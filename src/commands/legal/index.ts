@@ -20,7 +20,7 @@ import {
   writeFlagsToHeaders,
   type WriteFlags,
 } from "../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, exitWithError, failWith, failUsage } from "../../output/json.js";
 import { parseId } from "../../targets.js";
 import { decodeJwtPayload, type DecodedClaims } from "../../auth/jwt.js";
 import { lineDiff } from "../../textDiff.js";
@@ -683,7 +683,7 @@ export function registerLegalCommands(
       });
       if (editOp) {
         if (opts.file !== undefined || opts.content !== undefined) {
-          failWith("edit mode (--replace/--append/--prepend) is mutually exclusive with --file/--content", 4);
+          failUsage("edit mode (--replace/--append/--prepend) is mutually exclusive with --file/--content");
         }
         if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
         try {

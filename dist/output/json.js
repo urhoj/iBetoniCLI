@@ -124,8 +124,18 @@ export { emitStdout, emitStderr };
  * same envelope, same code, either way. Replaces every
  * `writeError(...); process.exit(N)` guard pair.
  */
-export function failWith(message, exitCode) {
-    throw new CliError(message, 0, null, exitCode);
+export function failWith(message, exitCode, hint) {
+    throw new CliError(message, 0, null, exitCode, hint);
+}
+/**
+ * `failWith` for a validation/USAGE error whose MESSAGE already states the full
+ * remedy. Suppresses the command's generic exit-4 spec hint (which would
+ * mislead — e.g. `ib legal save`'s "pass --file OR --content" appearing on an
+ * unrelated edit-mode error), or sets a positive `hint` to add guidance. Always
+ * exit 4 (validation). See {@link CliError.hint} / `hintForError`.
+ */
+export function failUsage(message, hint = "") {
+    return failWith(message, 4, hint);
 }
 /** Message extraction for failWith when re-raising a caught unknown. */
 export function errorMessage(err) {

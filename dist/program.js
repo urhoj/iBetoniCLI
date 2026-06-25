@@ -51,7 +51,7 @@ import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDom
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
-import { writeJson, exitWithError, failWith, emitStdout, emitStderr, setActiveCommandErrors } from "./output/json.js";
+import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, setActiveCommandErrors } from "./output/json.js";
 import { buildUnknownCommandEnvelope } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { createApiClient } from "./api/client.js";
@@ -260,15 +260,15 @@ export function buildProgram() {
             append: opts.append, prepend: opts.prepend, all: opts.all,
         });
         if (opts.field !== undefined && !editOp) {
-            failWith("--field only applies in edit mode (--replace / --append / --prepend)", 4);
+            failUsage("--field only applies in edit mode (--replace / --append / --prepend)");
         }
         if (editOp) {
             if (opts.summary !== undefined || opts.detail !== undefined) {
-                failWith("edit mode (--replace/--append/--prepend) cannot be combined with --summary/--detail", 4);
+                failUsage("edit mode (--replace/--append/--prepend) cannot be combined with --summary/--detail");
             }
             const field = (opts.field ?? "detail");
             if (field !== "summary" && field !== "detail") {
-                failWith("--field must be one of: summary, detail", 4);
+                failUsage("--field must be one of: summary, detail");
             }
             if (!opts.dryRun && !opts.reason)
                 failWith("Missing required flag: --reason", 4);

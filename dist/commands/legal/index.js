@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { CliError } from "../../api/errors.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, exitWithError, failWith, failUsage } from "../../output/json.js";
 import { parseId } from "../../targets.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { lineDiff } from "../../textDiff.js";
@@ -469,7 +469,7 @@ export function registerLegalCommands(parent, getClient) {
         });
         if (editOp) {
             if (opts.file !== undefined || opts.content !== undefined) {
-                failWith("edit mode (--replace/--append/--prepend) is mutually exclusive with --file/--content", 4);
+                failUsage("edit mode (--replace/--append/--prepend) is mutually exclusive with --file/--content");
             }
             if (!opts.dryRun && !opts.reason)
                 failWith("Missing required flag: --reason", 4);

@@ -5,7 +5,7 @@
  * Generalises the glossary append/replace idea to markdown/HTML bodies.
  * Spec: docs/superpowers/specs/2026-06-24-ib-in-field-partial-edits-design.md
  */
-import { failWith } from "./output/json.js";
+import { failUsage } from "./output/json.js";
 
 export type TextEditOp =
   | { kind: "replace"; find: string; replacement: string; all?: boolean }
@@ -54,9 +54,14 @@ export function applyTextEdit(current: string, op: TextEditOp): TextEditResult {
       return { next: op.text + base };
     case "replace": {
       const n = countOccurrences(base, op.find);
-      if (n === 0) failWith("--replace search text not found in the current field", 4);
+      if (n === 0) {
+        failUsage(
+          "--replace search text not found in the current field",
+          "read the current field first — the search text must match it verbatim; or use --append/--prepend"
+        );
+      }
       if (n > 1 && !op.all) {
-        failWith(`--replace matched ${n} times; pass --all or narrow the search`, 4);
+        failUsage(`--replace matched ${n} times; pass --all or narrow the search`);
       }
       return { next: base.split(op.find).join(op.replacement), matchCount: n };
     }
@@ -76,20 +81,20 @@ export function parseEditOp(flags: EditFlags): TextEditOp | undefined {
   if (flags.prepend !== undefined) kinds.push("prepend");
 
   if (kinds.length === 0) {
-    if (flags.with !== undefined) failWith("--with requires --replace", 4);
-    if (flags.all) failWith("--all only applies with --replace", 4);
+    if (flags.with !== undefined) failUsage("--with requires --replace");
+    if (flags.all) failUsage("--all only applies with --replace");
     return undefined;
   }
   if (kinds.length > 1) {
-    failWith(`pass only one of --replace / --append / --prepend (got ${kinds.join(", ")})`, 4);
+    failUsage(`pass only one of --replace / --append / --prepend (got ${kinds.join(", ")})`);
   }
   if (flags.replace !== undefined) {
     if (flags.with === undefined) {
-      failWith('--replace requires --with <text> (use --with "" to delete the match)', 4);
+      failUsage('--replace requires --with <text> (use --with "" to delete the match)');
     }
     return { kind: "replace", find: flags.replace, replacement: flags.with, all: !!flags.all };
   }
-  if (flags.all) failWith("--all only applies with --replace", 4);
+  if (flags.all) failUsage("--all only applies with --replace");
   if (flags.append !== undefined) return { kind: "append", text: flags.append };
   return { kind: "prepend", text: flags.prepend! };
 }
