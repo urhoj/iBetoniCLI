@@ -234,6 +234,7 @@ export function registerAuthCommands(
 
         // --- extend: renew the active session ---
         if (opts.extend) {
+          assertPersistedSwitchAllowed(isReadOnly()); // persists a rotated JWT
           const current = await store.load();
           if (!current?.impersonation) {
             failWith("No active impersonation session to extend.", 4);
