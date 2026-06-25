@@ -25,6 +25,14 @@ export interface DecodedClaims {
   imp?: number;
   /** Impersonation session id (`imp_sid` claim) — present only on impersonation tokens. */
   imp_sid?: string;
+  /**
+   * Every company this token may act as (the `company switch` targets), each
+   * with the role NAMES held there. From `asiakasesWithTypes`. The JWT carries
+   * NO company name for these entries (only the active company has
+   * `ownerAsiakasName`) — resolve names with `ib company list` when needed.
+   * Empty on short/absent tokens.
+   */
+  companies: Array<{ asiakasId: number; roles: string[] }>;
 }
 
 /**
@@ -78,6 +86,13 @@ export function decodeJwtPayload(jwt: string): DecodedClaims {
     owner !== undefined &&
     (activeRoles.includes("asiakasAdmin") || activeRoles.includes("hrAdmin"));
 
+  const companyList = companies
+    .map((c) => ({
+      asiakasId: finite(c?.asiakasId),
+      roles: Array.isArray(c?.roles) ? (c.roles as string[]) : [],
+    }))
+    .filter((c): c is { asiakasId: number; roles: string[] } => c.asiakasId !== undefined);
+
   return {
     personId: finite(expanded.personId ?? expanded.sub),
     ownerAsiakasId: finite(expanded.ownerAsiakasId ?? expanded.o),
@@ -90,5 +105,6 @@ export function decodeJwtPayload(jwt: string): DecodedClaims {
     isActiveCompanyAdmin,
     imp: finite(expanded.imp ?? expanded.i),
     imp_sid: (expanded.imp_sid ?? expanded.s) as string | undefined,
+    companies: companyList,
   };
 }

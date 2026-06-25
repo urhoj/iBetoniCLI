@@ -798,7 +798,7 @@ exports[`Help snapshots — contract stability > help for ib auth whoami matches
   ib auth whoami [flags]
 
 DESCRIPTION
-  Print the current authenticated user's personId, active company, and endpoint.
+  One-shot orientation for the active session: who/where you are, what you can do (tier), and where else you can act (companies). Decoded from the JWT, so it works for IB_TOKEN sessions too (not just the on-disk creds store). Run it first.
   Auth: requires login (any authenticated user).
 
 FLAGS
@@ -808,10 +808,10 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { personId, activeCompany: { asiakasId, name }, endpoint }
+  { personId, email?, activeCompany: { asiakasId, name, betoniJerryUmbrella? }, tier: 'developer'|'admin'|'standard', companies: { asiakasId, roles }[], endpoint, source: 'file'|'env', readOnly, tokenExpiresAt?, tokenExpired?, impersonating? } — \`tier\` is the discovery/capability gate; \`companies\` are the \`company switch\` targets (no name in the JWT — use \`ib company list\` for names); \`source:'env'\` = IB_TOKEN (non-refreshable).
 
 ERRORS (stderr, exit non-zero)
-  exit 2  Not logged in          → ib auth login first
+  exit 2  Not logged in          → ib auth login first (or set IB_TOKEN)
 
 EXAMPLES
   ib auth whoami
@@ -2324,7 +2324,7 @@ exports[`Help snapshots — contract stability > help for ib doctor matches snap
   ib doctor [flags]
 
 DESCRIPTION
-  Aggregated 'is my setup working' health check. Derives identity from the active JWT (so it works for both file- and IB_TOKEN-sessions, unlike \`auth whoami\`), reports token expiry, pings the public /api/version for connectivity + which build is live, and does ONE authenticated read to prove the token is accepted by this endpoint. Read-only. Exits 1 when the aggregate \`ok\` is false.
+  Aggregated 'is my setup working' health check, and the first-contact orientation for MCP / \`/api/cli/exec\` callers (where the \`auth\` group — incl. \`auth whoami\` — is denied). Derives identity + tier + switchable companies from the active JWT (works for both file- and IB_TOKEN-sessions), reports token expiry, pings the public /api/version for connectivity + which build is live, and does ONE authenticated read to prove the token is accepted by this endpoint. Read-only. Exits 1 when the aggregate \`ok\` is false.
   Auth: requires login (any authenticated user).
 
 FLAGS
@@ -2334,7 +2334,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { ok:boolean, cli, endpoint, readOnly, auth:{ personId, ownerAsiakasId, ownerAsiakasName, email, issuedFor, tokenExp, tokenExpired }, connectivity:VersionReport, authProbe:{ ok, status?, error? } }
+  { ok:boolean, cli, endpoint, readOnly, auth:{ personId, email, tier:'developer'|'admin'|'standard', ownerAsiakasId, ownerAsiakasName, companies:{ asiakasId, roles }[], issuedFor, tokenExp, tokenExpired }, connectivity:VersionReport, authProbe:{ ok, status?, error? } } — \`tier\` = capability/discovery gate; \`companies\` = \`company switch\` targets.
 
 ERRORS (stderr, exit non-zero)
   exit 1  Not healthy            → inspect connectivity / authProbe / tokenExpired in the report

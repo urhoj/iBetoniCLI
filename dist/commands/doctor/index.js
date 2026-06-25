@@ -1,5 +1,6 @@
 import { writeJson, exitWithError, setExitCode } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
+import { resolveCallerTier } from "../../tier.js";
 import { runVersion } from "../version/index.js";
 import { runCompanyList } from "../company/index.js";
 import { CliError } from "../../api/errors.js";
@@ -13,7 +14,9 @@ export async function runDoctor(opts) {
     const { client, endpoint, cliVersion, readOnly } = opts;
     const now = opts.nowMs ?? Date.now();
     // Identity + token health from the JWT (no network).
-    const claims = decodeJwtPayload(client.getCurrentToken());
+    const token = client.getCurrentToken();
+    const claims = decodeJwtPayload(token);
+    const tier = resolveCallerTier(token);
     const tokenExp = claims.exp ? new Date(claims.exp * 1000).toISOString() : null;
     const tokenExpired = claims.exp != null ? claims.exp * 1000 < now : null;
     // Connectivity (public, no auth) — reuse the version probe.
@@ -44,9 +47,11 @@ export async function runDoctor(opts) {
         readOnly,
         auth: {
             personId: claims.personId ?? null,
+            email: claims.email ?? null,
+            tier,
             ownerAsiakasId: claims.ownerAsiakasId ?? null,
             ownerAsiakasName: claims.ownerAsiakasName ?? null,
-            email: claims.email ?? null,
+            companies: claims.companies,
             issuedFor: claims.issuedFor ?? null,
             tokenExp,
             tokenExpired,

@@ -45,6 +45,12 @@ export function decodeJwtPayload(jwt) {
         .flatMap((c) => (Array.isArray(c?.roles) ? c.roles : []));
     const isActiveCompanyAdmin = owner !== undefined &&
         (activeRoles.includes("asiakasAdmin") || activeRoles.includes("hrAdmin"));
+    const companyList = companies
+        .map((c) => ({
+        asiakasId: finite(c?.asiakasId),
+        roles: Array.isArray(c?.roles) ? c.roles : [],
+    }))
+        .filter((c) => c.asiakasId !== undefined);
     return {
         personId: finite(expanded.personId ?? expanded.sub),
         ownerAsiakasId: finite(expanded.ownerAsiakasId ?? expanded.o),
@@ -57,6 +63,7 @@ export function decodeJwtPayload(jwt) {
         isActiveCompanyAdmin,
         imp: finite(expanded.imp ?? expanded.i),
         imp_sid: (expanded.imp_sid ?? expanded.s),
+        companies: companyList,
     };
 }
 //# sourceMappingURL=jwt.js.map

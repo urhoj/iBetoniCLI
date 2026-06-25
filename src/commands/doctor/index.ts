@@ -2,6 +2,8 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { writeJson, exitWithError, setExitCode } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
+import { resolveCallerTier } from "../../tier.js";
+import type { CallerTier } from "../../tier.js";
 import { runVersion, type VersionReport } from "../version/index.js";
 import { runCompanyList } from "../company/index.js";
 import { CliError } from "../../api/errors.js";
@@ -23,9 +25,13 @@ export interface DoctorReport {
   readOnly: boolean;
   auth: {
     personId: number | null;
+    email: string | null;
+    /** What this caller can do (developer > admin > standard) — the discovery gate. */
+    tier: CallerTier;
     ownerAsiakasId: number | null;
     ownerAsiakasName: string | null;
-    email: string | null;
+    /** Every company this token may act as (`company switch` targets) + roles held. */
+    companies: Array<{ asiakasId: number; roles: string[] }>;
     issuedFor: string | null;
     tokenExp: string | null;
     tokenExpired: boolean | null;
@@ -52,7 +58,9 @@ export async function runDoctor(opts: {
   const now = opts.nowMs ?? Date.now();
 
   // Identity + token health from the JWT (no network).
-  const claims = decodeJwtPayload(client.getCurrentToken());
+  const token = client.getCurrentToken();
+  const claims = decodeJwtPayload(token);
+  const tier = resolveCallerTier(token);
   const tokenExp = claims.exp ? new Date(claims.exp * 1000).toISOString() : null;
   const tokenExpired = claims.exp != null ? claims.exp * 1000 < now : null;
 
@@ -85,9 +93,11 @@ export async function runDoctor(opts: {
     readOnly,
     auth: {
       personId: claims.personId ?? null,
+      email: claims.email ?? null,
+      tier,
       ownerAsiakasId: claims.ownerAsiakasId ?? null,
       ownerAsiakasName: claims.ownerAsiakasName ?? null,
-      email: claims.email ?? null,
+      companies: claims.companies,
       issuedFor: claims.issuedFor ?? null,
       tokenExp,
       tokenExpired,

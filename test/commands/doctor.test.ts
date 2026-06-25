@@ -70,6 +70,31 @@ describe("runDoctor", () => {
     expect(report.authProbe).toEqual({ ok: true });
   });
 
+  test("surfaces tier (from globalRoles) and switchable companies (from asiakasesWithTypes)", async () => {
+    const payload = {
+      ...claims(FUTURE_EXP),
+      globalRoles: { isDeveloper: true },
+      asiakasesWithTypes: [
+        { asiakasId: 8, roles: ["asiakasAdmin"] },
+        { asiakasId: 26, roles: [] },
+      ],
+    };
+    const client = mockClient(makeJwt(payload), async () => ({ companies: [], currentCompanyId: 8 }));
+    const report = await runDoctor({
+      client,
+      endpoint: "https://api.example.com",
+      cliVersion: "1.2.3",
+      readOnly: false,
+      nowMs: NOW,
+      fetchImpl: reachableFetch(),
+    });
+    expect(report.auth.tier).toBe("developer");
+    expect(report.auth.companies).toEqual([
+      { asiakasId: 8, roles: ["asiakasAdmin"] },
+      { asiakasId: 26, roles: [] },
+    ]);
+  });
+
   test("unreachable endpoint → ok false", async () => {
     const client = mockClient(makeJwt(claims(FUTURE_EXP)), async () => ({
       companies: [],

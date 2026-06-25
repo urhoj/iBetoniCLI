@@ -314,13 +314,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib auth whoami",
     description:
-      "Print the current authenticated user's personId, active company, and endpoint.",
+      "One-shot orientation for the active session: who/where you are, what you can do (tier), and where else you can act (companies). Decoded from the JWT, so it works for IB_TOKEN sessions too (not just the on-disk creds store). Run it first.",
     auth: "any",
     flags: [],
     outputShape:
-      "{ personId, activeCompany: { asiakasId, name }, endpoint }",
+      "{ personId, email?, activeCompany: { asiakasId, name, betoniJerryUmbrella? }, tier: 'developer'|'admin'|'standard', companies: { asiakasId, roles }[], endpoint, source: 'file'|'env', readOnly, tokenExpiresAt?, tokenExpired?, impersonating? } — `tier` is the discovery/capability gate; `companies` are the `company switch` targets (no name in the JWT — use `ib company list` for names); `source:'env'` = IB_TOKEN (non-refreshable).",
     errors: [
-      { exit: 2, meaning: "Not logged in", remedy: "ib auth login first" },
+      { exit: 2, meaning: "Not logged in", remedy: "ib auth login first (or set IB_TOKEN)" },
     ],
     examples: ["ib auth whoami"],
   },
@@ -4225,11 +4225,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib doctor",
     description:
-      "Aggregated 'is my setup working' health check. Derives identity from the active JWT (so it works for both file- and IB_TOKEN-sessions, unlike `auth whoami`), reports token expiry, pings the public /api/version for connectivity + which build is live, and does ONE authenticated read to prove the token is accepted by this endpoint. Read-only. Exits 1 when the aggregate `ok` is false.",
+      "Aggregated 'is my setup working' health check, and the first-contact orientation for MCP / `/api/cli/exec` callers (where the `auth` group — incl. `auth whoami` — is denied). Derives identity + tier + switchable companies from the active JWT (works for both file- and IB_TOKEN-sessions), reports token expiry, pings the public /api/version for connectivity + which build is live, and does ONE authenticated read to prove the token is accepted by this endpoint. Read-only. Exits 1 when the aggregate `ok` is false.",
     auth: "any",
     flags: [],
     outputShape:
-      "{ ok:boolean, cli, endpoint, readOnly, auth:{ personId, ownerAsiakasId, ownerAsiakasName, email, issuedFor, tokenExp, tokenExpired }, connectivity:VersionReport, authProbe:{ ok, status?, error? } }",
+      "{ ok:boolean, cli, endpoint, readOnly, auth:{ personId, email, tier:'developer'|'admin'|'standard', ownerAsiakasId, ownerAsiakasName, companies:{ asiakasId, roles }[], issuedFor, tokenExp, tokenExpired }, connectivity:VersionReport, authProbe:{ ok, status?, error? } } — `tier` = capability/discovery gate; `companies` = `company switch` targets.",
     errors: [
       { exit: 1, meaning: "Not healthy", remedy: "inspect connectivity / authProbe / tokenExpired in the report" },
       { exit: 2, meaning: "Not logged in", remedy: "ib auth login (or set IB_TOKEN)" },

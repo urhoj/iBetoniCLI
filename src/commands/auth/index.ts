@@ -10,6 +10,8 @@ import {
 } from "../../auth/switch.js";
 import { refreshToken } from "../../auth/refresh.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
+import { resolveAuth } from "../../auth/resolve.js";
+import { resolveCallerTier } from "../../tier.js";
 import {
   performImpersonate,
   performImpersonateExtend,
@@ -95,11 +97,34 @@ export function registerAuthCommands(
     .description("Print the current authenticated user")
     .action(async () => {
       try {
-        const creds = await createStore(defaultCredentialsPath()).load();
-        if (!creds) {
-          failWith("Not logged in. Run `ib auth login` first.", 2);
+        // resolveAuth (IB_TOKEN-or-file) — so whoami works for headless/CI
+        // sessions too, not just the on-disk creds store.
+        const resolved = await resolveAuth({
+          credentialsPath: defaultCredentialsPath(),
+          defaultEndpoint: getGlobalOptions(parent).endpoint ?? undefined,
+        });
+        if (!resolved) {
+          failWith("Not logged in. Run `ib auth login` first (or set IB_TOKEN).", 2);
+          return;
         }
-        writeJson(renderWhoami(creds));
+        const claims = decodeJwtPayload(resolved.token);
+        const tier = resolveCallerTier(resolved.token);
+        // Impersonation marker lives on the creds profile (file sessions);
+        // renderWhoami falls back to the JWT imp claims for IB_TOKEN sessions.
+        const profile =
+          resolved.source === "file"
+            ? await createStore(defaultCredentialsPath()).load()
+            : null;
+        writeJson(
+          renderWhoami({
+            claims,
+            endpoint: resolved.endpoint,
+            source: resolved.source,
+            readOnly: isReadOnly(),
+            tier,
+            impersonation: profile?.impersonation,
+          })
+        );
       } catch (e) {
         exitWithError(e);
       }
