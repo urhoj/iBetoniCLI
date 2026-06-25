@@ -196,7 +196,16 @@ export async function runCustomerUpsert(
   if (flags.dryRun) return { action: "would-create", dryRun: res };
   const newId = extractAsiakasId(res);
   if (!newId) return { ...(res as Record<string, unknown>), action: "created" };
-  return { ...(await runCustomerGet(client, newId)), action: "created" };
+  // createY drops email (pre-059) and has no kommentti column — reconcile both so
+  // the create path matches `customer update`'s behaviour instead of silently
+  // discarding --email/--comment.
+  const created = await reconcileCreatedExtras(
+    client,
+    await runCustomerGet(client, newId),
+    { email: opts.email, comment: opts.comment },
+    flags
+  );
+  return { ...created, action: "created" };
 }
 
 /** The four roolit booleans carried on the asiakas row. */
@@ -822,8 +831,11 @@ export function buildAsiakasCreateBody(
   }
   if (flags.name !== undefined) body.asiakasNimi = flags.name;
   if (flags.ytunnus !== undefined) body.yTunnus = flags.ytunnus;
-  // createY's invoicing-email column is `email` (asiakasSql.createY → input("email", ...));
-  // setData/update uses `laskutusEmail` instead — the two endpoints differ by design.
+  // createY takes an `email` input. The proc historically IGNORED it (asiakas has
+  // no `email` column — only laskutusEmail), so --email did not persist on create;
+  // migration 059 makes createY write it into laskutusEmail. We keep sending
+  // body.email so it lands directly post-059, and reconcileCreatedExtras covers the
+  // pre-059 window via a follow-up update. setData/update writes laskutusEmail.
   if (flags.email !== undefined) body.email = flags.email;
   if (flags.shortName !== undefined) body.asiakasShortNimi = flags.shortName;
   applyBillingFlags(body, flags);
@@ -928,6 +940,39 @@ export function buildAsiakasUpdateBody(
   applyBillingFlags(body, flags);
   if (flags.body) Object.assign(body, parseJsonBodyFlag(flags.body));
   return body;
+}
+
+/**
+ * Persist any --email/--comment the createY proc could not store on the create
+ * itself. createY ignores `email` pre-migration-059 (asiakas has no `email`
+ * column) and has no kommentti column at all, so email/comment passed to
+ * `customer create` / `create-or-update` would silently vanish. After the create
+ * + read-back, compare the freshly-fetched record against what was requested and,
+ * ONLY when something did not land, issue one follow-up `customer update`
+ * (read-merge-write → setData, which writes laskutusEmail/kommentti). Self-healing
+ * across the 059 deploy: once createY writes laskutusEmail the read-back already
+ * matches and no follow-up fires. The idempotency key is intentionally NOT
+ * forwarded — reusing the create's key on the update would read as a duplicate of
+ * the create. Returns the final flat record (re-fetched only when it wrote).
+ */
+async function reconcileCreatedExtras(
+  client: ApiClient,
+  current: CustomerFlat,
+  desired: { email?: string; comment?: string },
+  flags: WriteFlags
+): Promise<CustomerFlat> {
+  if (flags.dryRun) return current;
+  const patch: CustomerUpdateFlags = {};
+  if (desired.email !== undefined && (current.email ?? "") !== desired.email) {
+    patch.email = desired.email;
+  }
+  if (desired.comment !== undefined && (current.comment ?? "") !== desired.comment) {
+    patch.comment = desired.comment;
+  }
+  if (patch.email === undefined && patch.comment === undefined) return current;
+  const body = buildAsiakasUpdateBody(current, patch);
+  await runCustomerUpdate(client, current.asiakasId, body, { reason: flags.reason });
+  return runCustomerGet(client, current.asiakasId);
 }
 
 /**
@@ -1231,7 +1276,11 @@ export function registerCustomerCommands(
           return;
         }
         const newId = extractAsiakasId(res);
-        const created = newId ? await runCustomerGet(client, newId) : res;
+        // createY ignores email pre-059 — reconcile it via a follow-up update so
+        // `customer create --email` actually persists (create has no --comment).
+        const created = newId
+          ? await reconcileCreatedExtras(client, await runCustomerGet(client, newId), { email: opts.email }, opts)
+          : res;
         writeJson(
           opts.getOrCreate ? { ...(created as Record<string, unknown>), reused: false } : created
         );

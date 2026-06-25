@@ -799,7 +799,7 @@ const BASE_COMMAND_SPECS = [
             { name: "name", type: "string", description: "Customer name (asiakasNimi)" },
             { name: "email", type: "string", description: "Invoicing email (laskutusEmail)" },
             { name: "short-name", type: "string", description: "Short display name (asiakasShortNimi)" },
-            { name: "comment", type: "string", description: "Comment (kommentti) — applied on update" },
+            { name: "comment", type: "string", description: "Comment (kommentti) — applied on create or update" },
             { name: "contact-person", type: "number", description: "Contact person id — applied on update" },
             { name: "type", type: "number", description: "Customer type id — applied on update" },
             { name: "address", type: "string", description: "Billing street address (laskutusOsoite)" },
@@ -2841,7 +2841,7 @@ const BASE_COMMAND_SPECS = [
     },
     {
         command: "ib person create",
-        description: "Create a person. REQUIRED: --first, --last. --email is OPTIONAL (personEmail is nullable; phone-only contacts are fine and the email can be added later via `ib person update`). --asiakas defaults to your active company. Returns the created person record (clean {personId, ...}), NOT the raw SQL recordset. With --get-or-create a duplicate email returns the existing person (reused:true) instead of failing — useful for idempotent bulk onboarding. Use typed flags or --body JSON (typed flags win). Requires --reason. Use --global to create a GLOBAL, self-managing person (ownerAsiakasId=null) discoverable across companies; --global and --asiakas are mutually exclusive.",
+        description: "Create a person. REQUIRED: --first, --last. --email is OPTIONAL (personEmail is nullable; phone-only contacts are fine and the email can be added later via `ib person update`). --asiakas defaults to your active company. Returns the created person record (clean {personId, ...}), NOT the raw SQL recordset. With --get-or-create a duplicate email returns the existing person (reused:true) when that person is visible to you (the email dedup is global, so an email owned by a company you can't access errors with guidance instead) — useful for idempotent bulk onboarding. NOTE: creating under a non-active owned company (--asiakas <other>) sets ownership but no membership, and the record is synthesized in the reply because the read-back is scoped to your active company. Use typed flags or --body JSON (typed flags win). Requires --reason. Use --global to create a GLOBAL, self-managing person (ownerAsiakasId=null) discoverable across companies; --global and --asiakas are mutually exclusive.",
         permissions: ["auth.page.person.edit"],
         flags: [
             { name: "first", type: "string", description: "personFirstName (REQUIRED)" },
@@ -2850,14 +2850,14 @@ const BASE_COMMAND_SPECS = [
             { name: "email", type: "string", description: "personEmail (optional)" },
             { name: "asiakas", type: "number", description: "Owner asiakasId (defaults to your active company)" },
             { name: "global", type: "boolean", description: "Create a global, owner-less person (ownerAsiakasId=null). Mutually exclusive with --asiakas." },
-            { name: "get-or-create", type: "boolean", description: "On a duplicate email, return the existing person (reused:true) instead of failing" },
+            { name: "get-or-create", type: "boolean", description: "On a duplicate email, return the existing person (reused:true) when visible to you; an email owned by a company you can't access errors with guidance" },
             { name: "body", type: "json", description: "Raw JSON body, merged under typed flags (optional)" },
             { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
         ],
         writeFlags: true,
         outputShape: "{ personId, name, email, ... } (re-fetched) · with --get-or-create adds reused:boolean · dry-run: { dryRun: true, wouldCreate: ... }",
         errors: [
-            apiErr(400, "Missing required field, or duplicate email without --get-or-create", "provide --first and --last (email is optional); add --get-or-create to reuse an existing email"),
+            apiErr(400, "Missing required field, or duplicate email without --get-or-create", "provide --first and --last (email is optional); add --get-or-create to reuse an existing visible person, or use a different email"),
             ...permErrors("auth.page.person.edit"),
         ],
         examples: [

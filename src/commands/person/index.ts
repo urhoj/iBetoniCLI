@@ -517,7 +517,9 @@ export function registerPersonCommands(
         "contacts are fine; add the email later). --asiakas defaults to your active " +
         "company. Returns the created person record (clean {personId, ...}). With " +
         "--get-or-create a duplicate email returns the existing person (reused:true) " +
-        "instead of failing. Use typed flags or --body JSON (typed flags win). Requires --reason."
+        "ONLY when that person is visible to you; an email owned by a company you can't " +
+        "access errors with guidance (the dedup is global). Use typed flags or --body " +
+        "JSON (typed flags win). Requires --reason."
     )
     .option("--first <s>", "personFirstName (required)")
     .option("--last <s>", "personLastName (required)")
@@ -530,7 +532,7 @@ export function registerPersonCommands(
     )
     .option(
       "--get-or-create",
-      "On a duplicate email, return the existing person (reused:true) instead of failing"
+      "On a duplicate email, return the existing person (reused:true) when visible to you; an email owned by a company you can't access errors with guidance"
     )
     .option("--body <json>", "Raw JSON body (merged under typed flags)");
   addWriteFlagsToCommand(createCmd).action(
@@ -580,11 +582,29 @@ export function registerPersonCommands(
           // --get-or-create: a duplicate email isn't a failure — return the
           // person that already owns it (so bulk onboarding is idempotent).
           if (opts.getOrCreate && body.personEmail && isDuplicateEmailError(e)) {
-            const existing = await runPersonByEmail(client, String(body.personEmail));
+            let existing: Awaited<ReturnType<typeof runPersonByEmail>> = null;
+            try {
+              existing = await runPersonByEmail(client, String(body.personEmail));
+            } catch (lookupErr) {
+              // The recovery lookup itself can 404 (the email's owner is in a
+              // company you can't see, or the route isn't deployed). Don't surface
+              // that as a misleading "person not found" — fall through to the clear
+              // guidance below.
+              if (!(lookupErr instanceof CliError && lookupErr.statusCode === 404)) throw lookupErr;
+            }
             if (existing) {
               writeJson({ ...existing, reused: true });
               return;
             }
+            // The email collides globally (the dedup is not tenant-scoped) but its
+            // owner is not visible to you — --get-or-create can only hand back a
+            // person you can access. Give an actionable error, not a bare 400/404.
+            failWith(
+              `email ${body.personEmail} is already in use by a person you cannot access ` +
+                `(likely owned by another company). --get-or-create only returns persons ` +
+                `visible to you — locate them with \`ib person search --my-companies\` or use a different email.`,
+              4
+            );
           }
           throw e;
         }
@@ -600,7 +620,28 @@ export function registerPersonCommands(
           writeJson(res);
           return;
         }
-        const created = await runPersonGet(client, newId);
+        let created: Record<string, unknown>;
+        try {
+          created = await runPersonGet(client, newId);
+        } catch (e) {
+          // GET /api/cli/person/get is scoped to your ACTIVE company, so a person
+          // created under a non-active owned company (--asiakas <other>) 404s on
+          // read-back even though the create COMMITTED. Synthesize the record from
+          // the inputs instead of surfacing a misleading "person not found" that
+          // implies the write failed.
+          if (e instanceof CliError && e.statusCode === 404) {
+            created = {
+              personId: newId,
+              name: `${body.personFirstName || ""} ${body.personLastName || ""}`.trim() || null,
+              email: (body.personEmail as string | null | undefined) ?? null,
+              phone: (body.personPhone as string | null | undefined) ?? null,
+              ownerAsiakasId: body.ownerAsiakasId ?? null,
+              note: "created under a non-active company; record synthesized from inputs (the read-back is scoped to your active company)",
+            };
+          } else {
+            throw e;
+          }
+        }
         writeJson(opts.getOrCreate ? { ...created, reused: false } : created);
       } catch (e) {
         exitWithError(e);

@@ -137,3 +137,58 @@ describe("runCustomerUpsert", () => {
     expect(mockClient.get).not.toHaveBeenCalled();
   });
 });
+
+describe("runCustomerUpsert reconciles createY-dropped email/comment", () => {
+  beforeEach(() => {
+    mGet().mockReset();
+    mPost().mockReset();
+  });
+
+  const flat = {
+    asiakasId: 5000, name: "Example Oy", yTunnus: "1234567-8", type: 1,
+    address: null, postalCode: null, city: null, email: null, phone: null,
+    contactPersonId: 0, shortName: null, comment: null,
+  };
+
+  test("create with --email/--comment → follow-up update when createY drops them (pre-059)", async () => {
+    mGet()
+      .mockResolvedValueOnce({ items: [], count: 0 }) // by-ytunnus
+      .mockResolvedValueOnce({ currentCompanyId: 8 }) // company-selection/available
+      .mockResolvedValueOnce(flat) // re-fetch after create — email/comment dropped by createY
+      .mockResolvedValueOnce({ ...flat, email: "a@b.fi", comment: "vip" }); // re-fetch after reconcile
+    mPost()
+      .mockResolvedValueOnce({ returnValue: 5000 }) // createY
+      .mockResolvedValueOnce({ success: true }); // follow-up set/:id
+
+    const res = await runCustomerUpsert(
+      mockClient,
+      { ytunnus: "1234567-8", name: "Example Oy", email: "a@b.fi", comment: "vip" },
+      { reason: "onboard", idempotencyKey: "k1" }
+    );
+
+    expect(res).toMatchObject({ asiakasId: 5000, action: "created", email: "a@b.fi", comment: "vip" });
+    // The follow-up update wrote laskutusEmail + kommentti to set/:id…
+    expect(mPost().mock.calls[1][0]).toBe("/api/asiakas/set/5000");
+    expect(mPost().mock.calls[1][1]).toMatchObject({ laskutusEmail: "a@b.fi", kommentti: "vip" });
+    // …and did NOT reuse the create's idempotency key (would look like a dup create).
+    expect(mPost().mock.calls[1][2].headers["Idempotency-Key"]).toBeUndefined();
+    expect(mPost().mock.calls[1][2].headers["X-Action-Reason"]).toBe("onboard");
+  });
+
+  test("create with --email → no follow-up update when createY already persisted it (post-059)", async () => {
+    mGet()
+      .mockResolvedValueOnce({ items: [], count: 0 }) // by-ytunnus
+      .mockResolvedValueOnce({ currentCompanyId: 8 }) // available
+      .mockResolvedValueOnce({ ...flat, email: "a@b.fi" }); // re-fetch already shows email
+    mPost().mockResolvedValueOnce({ returnValue: 5000 }); // createY only
+
+    const res = await runCustomerUpsert(
+      mockClient,
+      { ytunnus: "1234567-8", name: "Example Oy", email: "a@b.fi" },
+      { reason: "onboard" }
+    );
+
+    expect(res).toMatchObject({ asiakasId: 5000, action: "created", email: "a@b.fi" });
+    expect(mPost()).toHaveBeenCalledTimes(1); // createY only — read-back matched, no reconcile
+  });
+});

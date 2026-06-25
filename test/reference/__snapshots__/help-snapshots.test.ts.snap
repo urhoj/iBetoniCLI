@@ -1721,7 +1721,7 @@ FLAGS
   --name STRING    Customer name (asiakasNimi)
   --email STRING    Invoicing email (laskutusEmail)
   --short-name STRING    Short display name (asiakasShortNimi)
-  --comment STRING    Comment (kommentti) — applied on update
+  --comment STRING    Comment (kommentti) — applied on create or update
   --contact-person NUMBER    Contact person id — applied on update
   --type NUMBER    Customer type id — applied on update
   --address STRING    Billing street address (laskutusOsoite)
@@ -6890,7 +6890,7 @@ exports[`Help snapshots — contract stability > help for ib person create match
   ib person create [flags]
 
 DESCRIPTION
-  Create a person. REQUIRED: --first, --last. --email is OPTIONAL (personEmail is nullable; phone-only contacts are fine and the email can be added later via \`ib person update\`). --asiakas defaults to your active company. Returns the created person record (clean {personId, ...}), NOT the raw SQL recordset. With --get-or-create a duplicate email returns the existing person (reused:true) instead of failing — useful for idempotent bulk onboarding. Use typed flags or --body JSON (typed flags win). Requires --reason. Use --global to create a GLOBAL, self-managing person (ownerAsiakasId=null) discoverable across companies; --global and --asiakas are mutually exclusive.
+  Create a person. REQUIRED: --first, --last. --email is OPTIONAL (personEmail is nullable; phone-only contacts are fine and the email can be added later via \`ib person update\`). --asiakas defaults to your active company. Returns the created person record (clean {personId, ...}), NOT the raw SQL recordset. With --get-or-create a duplicate email returns the existing person (reused:true) when that person is visible to you (the email dedup is global, so an email owned by a company you can't access errors with guidance instead) — useful for idempotent bulk onboarding. NOTE: creating under a non-active owned company (--asiakas <other>) sets ownership but no membership, and the record is synthesized in the reply because the read-back is scoped to your active company. Use typed flags or --body JSON (typed flags win). Requires --reason. Use --global to create a GLOBAL, self-managing person (ownerAsiakasId=null) discoverable across companies; --global and --asiakas are mutually exclusive.
   Permissions: requires auth.page.person.edit.
 
 FLAGS
@@ -6900,7 +6900,7 @@ FLAGS
   --email STRING    personEmail (optional)
   --asiakas NUMBER    Owner asiakasId (defaults to your active company)
   --global BOOLEAN    Create a global, owner-less person (ownerAsiakasId=null). Mutually exclusive with --asiakas.
-  --get-or-create BOOLEAN    On a duplicate email, return the existing person (reused:true) instead of failing
+  --get-or-create BOOLEAN    On a duplicate email, return the existing person (reused:true) when visible to you; an email owned by a company you can't access errors with guidance
   --body JSON    Raw JSON body, merged under typed flags (optional)
   --reason STRING    Audit-log reason (REQUIRED)
 
@@ -6916,7 +6916,7 @@ OUTPUT (JSON, stdout)
   { personId, name, email, ... } (re-fetched) · with --get-or-create adds reused:boolean · dry-run: { dryRun: true, wouldCreate: ... }
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Missing required field, or duplicate email without --get-or-create → provide --first and --last (email is optional); add --get-or-create to reuse an existing email
+  exit 4 (HTTP 400)  Missing required field, or duplicate email without --get-or-create → provide --first and --last (email is optional); add --get-or-create to reuse an existing visible person, or use a different email
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.person.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose

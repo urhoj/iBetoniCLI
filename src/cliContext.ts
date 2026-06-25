@@ -4,6 +4,7 @@ import { createStore } from "./auth/store.js";
 import { refreshToken } from "./auth/refresh.js";
 import { performSwitch } from "./auth/switch.js";
 import { decodeJwtPayload } from "./auth/jwt.js";
+import { CliError } from "./api/errors.js";
 import type { GlobalOptions } from "./globals.js";
 
 /** Outcome of {@link resolveEphemeralSwitch}: the token to act with + identity. */
@@ -94,13 +95,33 @@ export async function createCliContext(opts: {
   // one command without persisting the switch. Mints an ephemeral JWT bound to
   // the target tenant (the switch endpoint enforces access; no access → exit 3)
   // and is never written back to the credentials store.
-  const eph = await resolveEphemeralSwitch({
-    baseToken: auth.token,
-    baseOwnerAsiakasId: auth.ownerAsiakasId,
-    targetAsiakasId: opts.global.asiakas ?? undefined,
-    switchFn: (toAsiakasId) =>
-      performSwitch({ endpoint, jwt: auth.token, toAsiakasId }),
-  });
+  let eph: EphemeralSwitchResult;
+  try {
+    eph = await resolveEphemeralSwitch({
+      baseToken: auth.token,
+      baseOwnerAsiakasId: auth.ownerAsiakasId,
+      targetAsiakasId: opts.global.asiakas ?? undefined,
+      switchFn: (toAsiakasId) =>
+        performSwitch({ endpoint, jwt: auth.token, toAsiakasId }),
+    });
+  } catch (e) {
+    // `--company <id>` switches your ACTING IDENTITY to a company you are a MEMBER
+    // of. A 403 here usually means you passed a customer your active company merely
+    // OWNS (e.g. one you just created) — that is a write TARGET, not an identity.
+    // Point the caller at the per-command `--asiakas` flag instead of the generic
+    // permission-denied hint.
+    if (e instanceof CliError && e.statusCode === 403) {
+      throw new CliError(
+        `${e.message} — note: --company switches to a company you are a MEMBER of; to act on a ` +
+          `customer your active company OWNS (e.g. just created), use that command's --asiakas <id> ` +
+          `flag instead of the global --company.`,
+        e.statusCode,
+        e.body,
+        e.exitCode
+      );
+    }
+    throw e;
+  }
 
   // Decode the active token (free, no network) so the client can announce the
   // write target on the first mutation. For an ephemeral switch the switch
