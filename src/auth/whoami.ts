@@ -4,22 +4,21 @@ export interface WhoamiOutput {
   personId: number;
   activeCompany: { asiakasId: number; name: string };
   endpoint: string;
+  /** Present only while an impersonation session is active. */
+  impersonating?: { actorPersonId: number; sessionId: string };
 }
 
 /**
  * Project a credentials profile into the stable `whoami` JSON shape.
  *
- * Pure function — no I/O, no JWT decode. The caller is responsible for
- * loading the profile from disk; this exists so the renderer can be
- * unit-tested without filesystem fixtures.
+ * Pure function — no I/O, no JWT decode. The caller loads the profile from disk.
  */
 export function renderWhoami(creds: CredentialsProfile): WhoamiOutput {
-  return {
+  const out: WhoamiOutput = {
     personId: creds.personId,
-    activeCompany: {
-      asiakasId: creds.ownerAsiakasId,
-      name: creds.ownerAsiakasName,
-    },
+    activeCompany: { asiakasId: creds.ownerAsiakasId, name: creds.ownerAsiakasName },
     endpoint: creds.endpoint,
   };
+  if (creds.impersonation) out.impersonating = creds.impersonation;
+  return out;
 }
