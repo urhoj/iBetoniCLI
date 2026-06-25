@@ -69,6 +69,12 @@ describe("decodeJwtPayload impersonation claims", () => {
     expect(c.imp).toBeUndefined();
     expect(c.imp_sid).toBeUndefined();
   });
+
+  test("short-shape { i, s } keys decode to imp and imp_sid", () => {
+    const c = decodeJwtPayload(mkJwt({ personId: 42, ownerAsiakasId: 1349, i: 10, s: "abc" }));
+    expect(c.imp).toBe(10);
+    expect(c.imp_sid).toBe("abc");
+  });
 });
 
 describe("decodeJwtPayload — isActiveCompanyAdmin", () => {

@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, existsSync, statSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createStore, type CredentialsProfile } from "../../src/auth/store.js";
@@ -73,7 +73,7 @@ describe("credentials store", () => {
   });
 });
 
-{
+describe("store impersonation + remove", () => {
   let dir: string;
   let path: string;
   const base: CredentialsProfile = {
@@ -84,21 +84,28 @@ describe("credentials store", () => {
   beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), "ibstore-")); path = join(dir, "credentials.json"); });
   afterEach(async () => { await rm(dir, { recursive: true, force: true }); });
 
-  describe("store impersonation + remove", () => {
-    test("persists and reads back the impersonation marker", async () => {
-      const s = createStore(path);
-      await s.save({ ...base, impersonation: { actorPersonId: 10, sessionId: "abc" } });
-      const loaded = await s.load();
-      expect(loaded?.impersonation).toEqual({ actorPersonId: 10, sessionId: "abc" });
-    });
-
-    test("remove deletes one profile, leaving others", async () => {
-      const s = createStore(path);
-      await s.save(base, "_impersonator");
-      await s.save(base, "default");
-      await s.remove("_impersonator");
-      expect(await s.load("_impersonator")).toBeNull();
-      expect(await s.load("default")).not.toBeNull();
-    });
+  test("persists and reads back the impersonation marker", async () => {
+    const s = createStore(path);
+    await s.save({ ...base, impersonation: { actorPersonId: 10, sessionId: "abc" } });
+    const loaded = await s.load();
+    expect(loaded?.impersonation).toEqual({ actorPersonId: 10, sessionId: "abc" });
   });
-}
+
+  test("remove deletes one profile, leaving others", async () => {
+    const s = createStore(path);
+    await s.save(base, "_impersonator");
+    await s.save(base, "default");
+    await s.remove("_impersonator");
+    expect(await s.load("_impersonator")).toBeNull();
+    expect(await s.load("default")).not.toBeNull();
+  });
+
+  test("remove resets activeProfile to 'default' when the removed profile was active", async () => {
+    const s = createStore(path);
+    await s.save(base, "_impersonator");
+    // activeProfile is now "_impersonator"; no "default" profile exists
+    await s.remove("_impersonator");
+    const raw = JSON.parse(await readFile(path, "utf8")) as { activeProfile: string };
+    expect(raw.activeProfile).toBe("default");
+  });
+});
