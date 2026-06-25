@@ -32,20 +32,48 @@ describe("ib reference dump", () => {
     expect(ref.glossary[0].term).toBe("keikka");
   });
 
-  test("every command has flags array, outputShape, errors, examples", () => {
+  test("every command has flags array, outputShape, errors array, examples", () => {
     const ref = buildReference();
     for (const [name, spec] of Object.entries(ref.commands)) {
       expect(Array.isArray(spec.flags), `${name} flags is array`).toBe(true);
       expect(spec.outputShape, `${name} outputShape`).toBeTruthy();
-      expect(
-        Array.isArray(spec.errors) && spec.errors.length > 0,
-        `${name} errors non-empty`
-      ).toBe(true);
+      // errors is always an array but MAY be empty now: the universal 401/500
+      // are hoisted to the top-level `commonErrors`, so a spec whose only
+      // errors were those globals legitimately ends up with [].
+      expect(Array.isArray(spec.errors), `${name} errors is array`).toBe(true);
       expect(
         Array.isArray(spec.examples) && spec.examples.length > 0,
         `${name} examples non-empty`
       ).toBe(true);
     }
+  });
+
+  test("hoists the universal 401/500 contract into top-level commonErrors and strips it from specs", () => {
+    const ref = buildReference();
+    // commonErrors carries exactly the 401 + 500 rows.
+    expect(ref.commonErrors.map((e) => e.http).sort()).toEqual([401, 500]);
+    // No surviving spec repeats a hoisted global row VERBATIM. (A command may
+    // still declare its OWN 401/500 with a different meaning/remedy — e.g.
+    // `auth login`'s 500 "retry later" — and those legitimately stay inline.)
+    const isHoisted = (e: { http?: number; exit: number; meaning: string; remedy: string }) =>
+      ref.commonErrors.some(
+        (c) =>
+          c.http === e.http &&
+          c.exit === e.exit &&
+          c.meaning === e.meaning &&
+          c.remedy === e.remedy
+      );
+    for (const [name, spec] of Object.entries(ref.commands)) {
+      expect(spec.errors.some(isHoisted), `${name} must not repeat a hoisted row`).toBe(false);
+    }
+    // A spec that keeps command-specific errors still has them (e.g. keikka list's 403).
+    expect(ref.commands["ib keikka list"].errors.length).toBeGreaterThan(0);
+  });
+
+  test("full (no-domain) dump carries a notice steering to per-domain; filtered dump does not", () => {
+    expect(typeof buildReference().notice).toBe("string");
+    expect(buildReference().notice).toMatch(/reference dump <domain>/);
+    expect(buildReference("keikka").notice).toBeUndefined();
   });
 
   test("runReferenceDump emits single-line JSON (stdout one-line contract)", () => {
@@ -113,17 +141,26 @@ describe("ib reference dump <domain...> (multiple domains)", () => {
 });
 
 describe("ib reference dump --commands-only", () => {
-  test("emits only { version, generatedAt, commands } — no primer", () => {
+  test("emits only { version, generatedAt, commonErrors, commands } — no primer", () => {
     const spy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     runReferenceDump("keikka", "developer", [], true);
     const out = spy.mock.calls[0][0] as string;
     spy.mockRestore();
     const parsed = JSON.parse(out);
-    expect(Object.keys(parsed).sort()).toEqual(["commands", "generatedAt", "version"]);
+    expect(Object.keys(parsed).sort()).toEqual([
+      "commands",
+      "commonErrors",
+      "generatedAt",
+      "version",
+    ]);
+    // commonErrors must survive --commands-only: specs no longer carry the
+    // 401/500 inline, so the contract has to travel with the commands map.
+    expect(parsed.commonErrors.map((e: { http: number }) => e.http).sort()).toEqual([401, 500]);
     expect(parsed.overview).toBeUndefined();
     expect(parsed.glossary).toBeUndefined();
     expect(parsed.topics).toBeUndefined();
     expect(parsed.feedbackGuidance).toBeUndefined();
+    expect(parsed.notice).toBeUndefined();
     expect(Object.keys(parsed.commands).every((c) => c.startsWith("ib keikka"))).toBe(true);
   });
 

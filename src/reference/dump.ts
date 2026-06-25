@@ -8,7 +8,7 @@
  * `src/output/help.ts`, so the JSON dump and the human help can never drift
  * out of sync — there is exactly one source of truth (`./specs.ts`).
  */
-import { COMMAND_SPECS } from "./specs.js";
+import { COMMAND_SPECS, COMMON_AUTH_ERRORS } from "./specs.js";
 import { assertKnownDomain } from "./commandsList.js";
 import {
   DOMAIN_OVERVIEW,
@@ -16,7 +16,7 @@ import {
   TOPICS,
 } from "./domain.js";
 import type { Topic } from "./domain.js";
-import type { CommandSpec } from "../output/help.js";
+import type { CommandError, CommandSpec } from "../output/help.js";
 import { type CallerTier, visibleSpecs, isHiddenAtTier } from "../tier.js";
 import { emitStdout } from "../output/json.js";
 import packageJson from "../../package.json" with { type: "json" };
@@ -27,6 +27,20 @@ export { projectGlossaryForPrimer };
 export interface ReferenceDump {
   version: string;
   generatedAt: string;
+  /**
+   * The error contract that applies to EVERY authenticated command (401 token
+   * expired, 500 backend error). Hoisted here ONCE and stripped from each
+   * spec's `errors` — those two rows otherwise repeat verbatim in ~240 specs
+   * and are the single largest field in the dump. Read this together with each
+   * spec's (now command-specific) `errors`.
+   */
+  commonErrors: CommandError[];
+  /**
+   * Present ONLY on the full (no-domain, non-commands-only) dump: a one-line
+   * steer to the per-domain form. The full surface is large; an AI almost
+   * always wants `ib reference dump <domain>`. Omitted on filtered dumps.
+   */
+  notice?: string;
   /** Plain-language description of the platform, tenancy model, BetoniJerry. */
   overview: string;
   /**
@@ -86,6 +100,28 @@ export async function fetchPrimerGlossary(
   }
 }
 
+/** True when an error row is one of the hoisted `commonErrors` (401/500). */
+function isCommonError(e: CommandError): boolean {
+  return COMMON_AUTH_ERRORS.some(
+    (c) =>
+      c.http === e.http &&
+      c.exit === e.exit &&
+      c.meaning === e.meaning &&
+      c.remedy === e.remedy
+  );
+}
+
+/**
+ * Drop the universal 401/500 rows from a spec's `errors` (they're emitted once
+ * as the dump's top-level `commonErrors`). Returns the spec unchanged when it
+ * carried none, so specs with only command-specific errors are untouched.
+ */
+function stripCommonErrors(spec: CommandSpec): CommandSpec {
+  const filtered = (spec.errors ?? []).filter((e) => !isCommonError(e));
+  if (filtered.length === (spec.errors?.length ?? 0)) return spec;
+  return { ...spec, errors: filtered };
+}
+
 /**
  * Build the reference object. Pure — no I/O — so tests can assert on it
  * directly. Commands are keyed by their full path (e.g. `ib keikka list`),
@@ -114,15 +150,26 @@ export function buildReference(
   const hiddenCommands = COMMAND_SPECS.filter((s) => isHiddenAtTier(s, tier)).map(
     (s) => s.command
   );
+  // The `notice` steer rides only on the FULL surface (no domain filter) — a
+  // filtered dump is already the cheap path, so it needs no nudge.
+  const notice =
+    domains.length === 0
+      ? `Full command surface (${specs.length} commands) — large. For one area prefer \`ib reference dump <domain>\` (e.g. \`ib reference dump keikka\`), a fraction of the bytes; \`ib commands\` lists the domains. \`commonErrors\` applies to every command.`
+      : undefined;
   return {
     version: packageJson.version,
     generatedAt: new Date().toISOString(),
+    commonErrors: COMMON_AUTH_ERRORS,
+    ...(notice ? { notice } : {}),
     overview: DOMAIN_OVERVIEW,
     glossary,
     feedbackGuidance: FEEDBACK_GUIDANCE,
     topics: TOPICS,
     commands: Object.fromEntries(
-      specs.map((spec) => [spec.command, scrubSpecForTier(spec, tier, hiddenCommands)])
+      specs.map((spec) => [
+        spec.command,
+        stripCommonErrors(scrubSpecForTier(spec, tier, hiddenCommands)),
+      ])
     ),
   };
 }
@@ -135,11 +182,14 @@ export function buildReference(
  * pushed the customer domain over the 10k-token audit threshold.
  *
  * `commandsOnly` strips the primer (overview/glossary/topics/feedbackGuidance)
- * and emits only `{ version, generatedAt, commands }` — the ~2-3 KB of static
- * discovery scaffolding is pure overhead for a caller (e.g. the
+ * and emits only `{ version, generatedAt, commonErrors, commands }` — the
+ * static discovery scaffolding is pure overhead for a caller (e.g. the
  * optimize-ib-summaries cron) that already knows the domain context and just
- * needs the command specs. The caller also skips the glossary DB fetch in that
- * mode (no token needed), so this is both fewer bytes and one fewer round-trip.
+ * needs the command specs. `commonErrors` is RETAINED (it is not part of the
+ * primer): each spec's `errors` has had the universal 401/500 stripped, so the
+ * contract must travel with the commands map or it would be lost. The caller
+ * also skips the glossary DB fetch in that mode (no token needed), so this is
+ * both fewer bytes and one fewer round-trip.
  */
 export function runReferenceDump(
   domain?: string | string[],
@@ -149,7 +199,12 @@ export function runReferenceDump(
 ): void {
   const ref = buildReference(domain, tier, glossary);
   const out = commandsOnly
-    ? { version: ref.version, generatedAt: ref.generatedAt, commands: ref.commands }
+    ? {
+        version: ref.version,
+        generatedAt: ref.generatedAt,
+        commonErrors: ref.commonErrors,
+        commands: ref.commands,
+      }
     : ref;
   emitStdout(JSON.stringify(out) + "\n");
 }

@@ -788,7 +788,7 @@ ARGUMENTS
 
 FLAGS
   --to NUMBER    Assignee personId (required)
-  --reason STRING    Audit reason (X-Action-Reason)
+  --reason STRING    Audit-log reason (X-Action-Reason)
   --dry-run BOOLEAN    Preview without sending (client-side)
 
 GLOBAL FLAGS
@@ -821,7 +821,7 @@ ARGUMENTS
   <bugReportId> NUMBER    bugReportId (required)
 
 FLAGS
-  --reason STRING    Why (required; X-Action-Reason) (required)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED (required)
   --dry-run BOOLEAN    Preview without sending (client-side)
 
 GLOBAL FLAGS
@@ -887,7 +887,7 @@ FLAGS
   --notes STRING    Admin notes (stored as adminNotes)
   --resolution STRING    Resolution text
   --assign NUMBER    Assign to a developer (personId → assignedTo)
-  --reason STRING    Audit reason (X-Action-Reason)
+  --reason STRING    Audit-log reason (X-Action-Reason)
   --dry-run BOOLEAN    Preview without sending (client-side)
 
 GLOBAL FLAGS
@@ -925,7 +925,7 @@ ARGUMENTS
 
 FLAGS
   --body STRING    Comment text (required)
-  --reason STRING    Audit reason (X-Action-Reason)
+  --reason STRING    Audit-log reason (X-Action-Reason)
   --dry-run BOOLEAN    Preview without sending (client-side)
 
 GLOBAL FLAGS
@@ -960,7 +960,7 @@ FLAGS
   --description STRING    What is wrong (required)
   --steps STRING    Steps to reproduce
   --priority STRING    low | medium | high | urgent (omitted → derived from severity)
-  --reason STRING    Audit reason (X-Action-Reason header)
+  --reason STRING    Audit-log reason (X-Action-Reason)
   --dry-run BOOLEAN    Preview the payload without sending (client-side)
 
 GLOBAL FLAGS
@@ -1067,7 +1067,7 @@ DESCRIPTION
 FLAGS
   --confirm BOOLEAN    Execute the operation (default is dry-run preview)
   --force-prod BOOLEAN    Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec.
-  --reason STRING    Audit reason (X-Action-Reason)
+  --reason STRING    Audit-log reason (X-Action-Reason)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -1130,7 +1130,7 @@ FLAGS
   --cascade BOOLEAN    Also invalidate related families (keikka only)
   --confirm BOOLEAN    Execute the operation (default is dry-run preview)
   --force-prod BOOLEAN    Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec.
-  --reason STRING    Audit reason (X-Action-Reason)
+  --reason STRING    Audit-log reason (X-Action-Reason)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -1202,7 +1202,7 @@ ARGUMENTS
 FLAGS
   --confirm BOOLEAN    Execute the operation (default is dry-run preview)
   --force-prod BOOLEAN    Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec.
-  --reason STRING    Audit reason (X-Action-Reason)
+  --reason STRING    Audit-log reason (X-Action-Reason)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -1764,7 +1764,7 @@ ARGUMENTS
   <asiakasId> NUMBER    asiakasId to delete (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -1995,7 +1995,7 @@ FLAGS
   --asiakas NUMBER    Target asiakasId (REQUIRED)
   --person NUMBER    Target personId (REQUIRED)
   --contact-type NUMBER    contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka) (default: 1)
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -2069,7 +2069,7 @@ FLAGS
   --asiakas NUMBER    Target asiakasId (REQUIRED)
   --person NUMBER    Target personId (REQUIRED)
   --contact-type NUMBER    contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka) (default: 1)
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -3085,7 +3085,7 @@ ARGUMENTS
 
 FLAGS
   --asiakas NUMBER    Target asiakasId (alias for the positional)
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -3124,7 +3124,7 @@ ARGUMENTS
 
 FLAGS
   --asiakas NUMBER    Target asiakasId (alias for the positional)
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -3190,7 +3190,7 @@ ARGUMENTS
   <requestId> NUMBER    pumppuRequestId (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -3226,7 +3226,7 @@ ARGUMENTS
   <requestId> NUMBER    pumppuRequestId (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -3262,7 +3262,7 @@ ARGUMENTS
   <requestId> NUMBER    pumppuRequestId (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -3361,7 +3361,7 @@ ARGUMENTS
   <requestId> NUMBER    pumppuRequestId (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -3525,7 +3525,7 @@ ARGUMENTS
   <offerId> NUMBER    pumppuOfferId to accept (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -3564,7 +3564,7 @@ ARGUMENTS
 FLAGS
   --scheduled-at STRING    Scheduled keikka start (REQUIRED; future ISO datetime)
   --pumppu NUMBER    vehicleId to pin to the keikka (must be yours)
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -3619,7 +3619,7 @@ FLAGS
   --extra-notes STRING    Free-text notes shown to the customer
   --cancellation-terms STRING    Cancellation terms shown to the customer
   --maintains-order-info STRING    Override provider default (true|false); omit to inherit
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -3660,7 +3660,7 @@ ARGUMENTS
   <offerId> NUMBER    pumppuOfferId you own (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -3698,7 +3698,7 @@ ARGUMENTS
   <offerId> NUMBER    your pumppuOfferId (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -3762,7 +3762,7 @@ DESCRIPTION
 FLAGS
   --body JSON    JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo? }
   --asiakas NUMBER    Target company asiakasId (default: your own)
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -3798,7 +3798,7 @@ ARGUMENTS
   <requestId> NUMBER    pumppuRequestId you own (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -3842,7 +3842,7 @@ FLAGS
   --line-length NUMBER    Hose line length m (linjanPituus)
   --notes STRING    Free-text description shown to providers (kuvaus)
   --asiakas NUMBER    Customer asiakasId (omit → your private BetoniJerry account)
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -6907,7 +6907,7 @@ FLAGS
   --global BOOLEAN    Create a global, owner-less person (ownerAsiakasId=null). Mutually exclusive with --asiakas.
   --get-or-create BOOLEAN    On a duplicate email, return the existing person (reused:true) when visible to you; an email owned by a company you can't access errors with guidance
   --body JSON    Raw JSON body, merged under typed flags (optional)
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -7110,7 +7110,7 @@ ARGUMENTS
   <personId> NUMBER    personId to delete (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -7147,7 +7147,7 @@ ARGUMENTS
   <email> STRING    alternative email to add (<=250 chars) (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -7219,7 +7219,7 @@ ARGUMENTS
   <email> STRING    alternative email to remove (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -7427,7 +7427,7 @@ ARGUMENTS
 FLAGS
   --global BOOLEAN    Make the person global (ownerAsiakasId=null)
   --asiakas NUMBER    Set owner to this asiakasId
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -7636,7 +7636,7 @@ ARGUMENTS
 
 FLAGS
   --body JSON    Patch body (JSON)
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -7772,30 +7772,31 @@ exports[`Help snapshots — contract stability > help for ib reference dump matc
   ib reference dump [<domain...>] [flags]
 
 DESCRIPTION
-  Emit the full command surface as JSON (version, generatedAt, overview, glossary, topics, feedbackGuidance, commands map). Read by AI assistants for one-shot CLI ingestion. Pass one or more domains (the token after \`ib\`, e.g. keikka) to narrow the commands map to those groups — the primer (overview/glossary/topics) is retained once, so a filtered dump stays self-contained. \`--commands-only\` drops the primer and emits just { version, generatedAt, commands } (and skips the glossary fetch) for callers that only need the specs.
+  Emit the full command surface as JSON for one-shot AI ingestion. The universal 401/500 error contract is hoisted to a single top-level \`commonErrors\` block and stripped from each spec (it applied to every command) — read \`commonErrors\` together with each spec's command-specific \`errors\`. Pass one or more domains (the token after \`ib\`, e.g. keikka) to narrow the commands map — STRONGLY preferred over the full surface (a one-domain dump is a fraction of the bytes). The full (no-domain) dump carries a \`notice\` field pointing this out. \`glossary\` (the term+synonyms vocabulary index) is OPT-IN via \`--glossary\`. \`--commands-only\` emits just { version, generatedAt, commonErrors, commands } for callers that already know the domain.
   Auth: none (public).
 
 ARGUMENTS
   <domain...> STRING    Restrict the commands map to one or more domains (the token after \`ib\`, e.g. keikka). Multiple domains share a single primer. Unknown domain exits 4 listing valid domains. (optional)
 
 FLAGS
-  --commands-only BOOLEAN    Emit only { version, generatedAt, commands } — drop the overview/glossary/topics/feedbackGuidance primer and skip the glossary DB fetch (no token needed). ~50% fewer bytes per dump.
+  --glossary BOOLEAN    Include the term+synonyms vocabulary INDEX (fetched from the DB) under \`glossary\`. Off by default to keep the dump small; fetch definitions on demand with \`ib glossary lookup <term>\` / \`ib glossary list\`.
+  --commands-only BOOLEAN    Emit only { version, generatedAt, commonErrors, commands } — drop the overview/topics/feedbackGuidance primer and skip the glossary fetch (no token needed). Fewer bytes per dump.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { version, generatedAt, overview, glossary, topics, feedbackGuidance, commands: { '<command>': CommandSpec } } — with --commands-only: { version, generatedAt, commands }. NOTE: \`glossary\` is the term+synonyms INDEX only ({ term, synonyms }[]) — definitions are NOT inlined (they would bloat the dump as the glossary grows); fetch a definition with \`ib glossary lookup <term>\` or all of them with \`ib glossary list\`.
+  { version, generatedAt, commonErrors: CommandError[], notice?, overview, glossary, feedbackGuidance, topics, commands: { '<command>': CommandSpec } } — with --commands-only: { version, generatedAt, commonErrors, commands }. \`commonErrors\` (401/500) applies to EVERY command and is omitted from each spec's \`errors\`. \`notice\` appears only on the full (no-domain) dump. \`glossary\` is the term+synonyms INDEX only and is EMPTY unless \`--glossary\` is passed; fetch a definition with \`ib glossary lookup <term>\` or all of them with \`ib glossary list\`.
 
 ERRORS (stderr, exit non-zero)
   exit 4  Unknown domain         → run \`ib commands\` (no arg) to see valid domains
   exit 1  I/O error              → retry; check stdout pipe
 
 EXAMPLES
-  ib reference dump
   ib reference dump keikka
   ib reference dump ai attachment --commands-only
-  ib reference dump | jq .version
+  ib reference dump --glossary
+  ib reference dump | jq .commonErrors
 "
 `;
 
@@ -8234,7 +8235,7 @@ ARGUMENTS
   <sijaintiId> NUMBER    sijaintiId to soft-delete (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -8525,7 +8526,7 @@ ARGUMENTS
   <sijaintiId> NUMBER    sijaintiId to restore (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -9594,7 +9595,7 @@ ARGUMENTS
   <tyomaaId> NUMBER    tyomaaId to delete (required)
 
 FLAGS
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -9795,7 +9796,7 @@ FLAGS
   --worksite NUMBER    Target tyomaaId (REQUIRED)
   --person NUMBER    Target personId (REQUIRED)
   --contact-type NUMBER    contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka) (default: 1)
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -9861,7 +9862,7 @@ FLAGS
   --worksite NUMBER    Target tyomaaId (REQUIRED)
   --person NUMBER    Target personId (REQUIRED)
   --contact-type NUMBER    contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka) (default: 1)
-  --reason STRING    Audit-log reason (REQUIRED)
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.

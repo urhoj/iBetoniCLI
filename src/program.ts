@@ -207,22 +207,30 @@ export function buildProgram(): Command {
       "Restrict the commands map to one or more domains — the token after `ib` (e.g. keikka). Multiple domains share a single primer."
     )
     .option(
-      "--commands-only",
-      "Emit only { version, generatedAt, commands } — drop the overview/glossary/topics/feedbackGuidance primer (and skip the glossary DB fetch)"
+      "--glossary",
+      "Include the term+synonyms vocabulary index (DB fetch). Off by default to keep the dump small; look up definitions on demand with `ib glossary lookup`/`list`"
     )
-    .action(async (domains: string[], opts: { commandsOnly?: boolean }) => {
-      try {
-        let glossary: Array<{ term: string; synonyms: string[] }> = [];
-        // --commands-only drops the primer entirely, so the glossary fetch (the
-        // only network call this command makes) is pure waste — skip it.
-        if (!opts.commandsOnly) {
-          try { glossary = await fetchPrimerGlossary(await getClient()); } catch { glossary = []; }
+    .option(
+      "--commands-only",
+      "Emit only { version, generatedAt, commonErrors, commands } — drop the overview/topics/feedbackGuidance primer (and skip the glossary fetch)"
+    )
+    .action(
+      async (domains: string[], opts: { glossary?: boolean; commandsOnly?: boolean }) => {
+        try {
+          let glossary: Array<{ term: string; synonyms: string[] }> = [];
+          // The glossary is now OPT-IN: only fetch it when --glossary is asked
+          // for (and never under --commands-only, which has no primer). The
+          // fetch is this command's only network call, so the default dump is
+          // also offline + token-free.
+          if (opts.glossary && !opts.commandsOnly) {
+            try { glossary = await fetchPrimerGlossary(await getClient()); } catch { glossary = []; }
+          }
+          runReferenceDump(domains, getCallerTier(), glossary, opts.commandsOnly ?? false);
+        } catch (e) {
+          exitWithError(e);
         }
-        runReferenceDump(domains, getCallerTier(), glossary, opts.commandsOnly ?? false);
-      } catch (e) {
-        exitWithError(e);
       }
-    });
+    );
   // `detail` is a PURE GROUP (no action of its own) with three explicit leaves.
   // A variadic action on the group AND `list`/`set` subcommands would make
   // commander mis-route `ib reference detail keikka list` to the `list` leaf —

@@ -12,8 +12,13 @@ const apiErr = (http, meaning, remedy) => ({
     meaning,
     remedy,
 });
-/** Errors that apply to every authenticated command. */
-const COMMON_AUTH_ERRORS = [
+/**
+ * Errors that apply to every authenticated command. Exported so
+ * `ib reference dump` can hoist them into a single top-level `commonErrors`
+ * block and strip the (identical) per-spec copies — they otherwise repeat
+ * verbatim in ~240 specs and are the single largest field in the dump.
+ */
+export const COMMON_AUTH_ERRORS = [
     apiErr(401, "Token expired", "ib auth refresh"),
     apiErr(500, "Backend error", "retry with --verbose"),
 ];
@@ -1980,7 +1985,7 @@ const BASE_COMMAND_SPECS = [
             { name: "person", type: "string", description: "personId or a name resolved within your active company" },
             { name: "email", type: "string", description: "alternative email to add (<=250 chars)" },
         ],
-        flags: [{ name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" }],
+        flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
         writeFlags: true,
         outputShape: "{ personId, personEmail, added: boolean } · dry-run: { dryRun:true, wouldAdd:{ personId, personEmail } }",
         errors: [
@@ -2002,7 +2007,7 @@ const BASE_COMMAND_SPECS = [
             { name: "person", type: "string", description: "personId or a name resolved within your active company" },
             { name: "email", type: "string", description: "alternative email to remove" },
         ],
-        flags: [{ name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" }],
+        flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
         writeFlags: true,
         outputShape: "backend delete result · dry-run: { dryRun:true, wouldDelete:{ personId, personEmail } }",
         errors: [
@@ -2186,7 +2191,7 @@ const BASE_COMMAND_SPECS = [
         permissions: ["auth.page.sijainnit.delete"],
         args: [{ name: "sijaintiId", type: "number", description: "sijaintiId to soft-delete" }],
         flags: [
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ success: true }",
@@ -2202,7 +2207,7 @@ const BASE_COMMAND_SPECS = [
         permissions: ["auth.page.sijainnit.edit"],
         args: [{ name: "sijaintiId", type: "number", description: "sijaintiId to restore" }],
         flags: [
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ success: true }",
@@ -2679,7 +2684,7 @@ const BASE_COMMAND_SPECS = [
         permissions: ["auth.page.asiakas.edit"],
         args: [{ name: "asiakasId", type: "number", description: "asiakasId to delete" }],
         flags: [
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: number }",
@@ -2697,7 +2702,7 @@ const BASE_COMMAND_SPECS = [
             { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
             { name: "person", type: "number", description: "Target personId (REQUIRED)" },
             { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)" },
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ added: { asiakasId, personId } } or { dryRun: true, wouldCreate: { asiakasId, personId, contactPersonTypeId } }",
@@ -2715,7 +2720,7 @@ const BASE_COMMAND_SPECS = [
             { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
             { name: "person", type: "number", description: "Target personId (REQUIRED)" },
             { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)" },
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ removed: { asiakasId, personId } } or { dryRun: true, wouldDelete: { asiakasId, personId } }",
@@ -2749,7 +2754,7 @@ const BASE_COMMAND_SPECS = [
         permissions: ["auth.page.tyomaa.edit"],
         args: [{ name: "tyomaaId", type: "number", description: "tyomaaId to delete" }],
         flags: [
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: { tyomaaId } }",
@@ -2811,7 +2816,7 @@ const BASE_COMMAND_SPECS = [
             { name: "worksite", type: "number", description: "Target tyomaaId (REQUIRED)" },
             { name: "person", type: "number", description: "Target personId (REQUIRED)" },
             { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)" },
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ added: { tyomaaId, personId } } or { dryRun: true, wouldCreate: { tyomaaId, personId, contactPersonTypeId } }",
@@ -2826,7 +2831,7 @@ const BASE_COMMAND_SPECS = [
             { name: "worksite", type: "number", description: "Target tyomaaId (REQUIRED)" },
             { name: "person", type: "number", description: "Target personId (REQUIRED)" },
             { name: "contact-type", type: "number", default: "1", description: "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)" },
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ removed: { tyomaaId, personId } } or { dryRun: true, wouldDelete: { tyomaaId, personId } }",
@@ -2861,7 +2866,7 @@ const BASE_COMMAND_SPECS = [
             { name: "global", type: "boolean", description: "Create a global, owner-less person (ownerAsiakasId=null). Mutually exclusive with --asiakas." },
             { name: "get-or-create", type: "boolean", description: "On a duplicate email, return the existing person (reused:true) when visible to you; an email owned by a company you can't access errors with guidance" },
             { name: "body", type: "json", description: "Raw JSON body, merged under typed flags (optional)" },
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ personId, name, email, ... } (re-fetched) · with --get-or-create adds reused:boolean · dry-run: { dryRun: true, wouldCreate: ... }",
@@ -2883,7 +2888,7 @@ const BASE_COMMAND_SPECS = [
         args: [{ name: "personId", type: "number", description: "personId to update" }],
         flags: [
             { name: "body", type: "json", description: "Patch body (JSON)" },
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ ok: true, updated: { personId } } or { dryRun: true, wouldUpdate: { personId, ... } }",
@@ -2905,7 +2910,7 @@ const BASE_COMMAND_SPECS = [
         flags: [
             { name: "global", type: "boolean", description: "Make the person global (ownerAsiakasId=null)" },
             { name: "asiakas", type: "number", description: "Set owner to this asiakasId" },
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ personId, ownerAsiakasId } or { dryRun: true, wouldSetOwner: { personId, from, to } }",
@@ -2926,7 +2931,7 @@ const BASE_COMMAND_SPECS = [
         permissions: ["auth.page.person.edit"],
         args: [{ name: "personId", type: "number", description: "personId to delete" }],
         flags: [
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: { personId } }",
@@ -3006,7 +3011,7 @@ const BASE_COMMAND_SPECS = [
             { name: "line-length", type: "number", description: "Hose line length m (linjanPituus)" },
             { name: "notes", type: "string", description: "Free-text description shown to providers (kuvaus)" },
             { name: "asiakas", type: "number", description: "Customer asiakasId (omit → your private BetoniJerry account)" },
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ pumppuRequestId, status:'open', asiakasId, personId, tyomaaId, geocoded } · { dryRun:true, wouldCreate:{ asiakasId, osoite, pumppuAika, totalM3, requiredPuomi, pumppuKesto, requiredLinja, notes }, validation:{ ok:true } } on --dry-run",
@@ -3031,7 +3036,7 @@ const BASE_COMMAND_SPECS = [
         command: "ib jerry request cancel",
         description: "Cancel your OWN pump request (customer-side) — allowed only while no live offer exists (POST /api/pumppuRequests/:id/cancel). Sets status='cancelled'. Requires --reason.",
         args: [{ name: "requestId", type: "number", description: "pumppuRequestId you own" }],
-        flags: [{ name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" }],
+        flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
         writeFlags: true,
         outputShape: "{ success: true, status: 'cancelled' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
         errors: [
@@ -3054,7 +3059,7 @@ const BASE_COMMAND_SPECS = [
             { name: "extra-notes", type: "string", description: "Free-text notes shown to the customer" },
             { name: "cancellation-terms", type: "string", description: "Cancellation terms shown to the customer" },
             { name: "maintains-order-info", type: "string", description: "Override provider default (true|false); omit to inherit" },
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ pumppuOfferId, status:'draft', created, messageThreadId } · { dryRun:true, wouldUpsert:{ pumppuRequestId, priceCents, vatPercent, validUntil, availableFrom, extraNotes, cancellationTerms, maintainsOrderInfo } } on --dry-run",
@@ -3080,7 +3085,7 @@ const BASE_COMMAND_SPECS = [
             { name: "offerId", type: "number", description: "pumppuOfferId you own" },
         ],
         flags: [
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ pumppuOfferId, status:'pending' } · { dryRun:true, wouldUpdate:{ pumppuRequestId, pumppuOfferId, status:'pending' } } on --dry-run",
@@ -3100,7 +3105,7 @@ const BASE_COMMAND_SPECS = [
             { name: "offerId", type: "number", description: "pumppuOfferId to accept" },
         ],
         flags: [
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ pumppuRequestId, pumppuOfferId, keikkaId:null, status:'accepted' } · { dryRun:true, wouldAccept:{ pumppuRequestId, pumppuOfferId, status:'accepted' } } on --dry-run",
@@ -3122,7 +3127,7 @@ const BASE_COMMAND_SPECS = [
         flags: [
             { name: "scheduled-at", type: "string", description: "Scheduled keikka start (REQUIRED; future ISO datetime)" },
             { name: "pumppu", type: "number", description: "vehicleId to pin to the keikka (must be yours)" },
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ pumppuRequestId, pumppuOfferId, status:'confirmed', keikkaId, scheduledAt } · { dryRun:true, wouldConfirm:{ pumppuRequestId, pumppuOfferId, status:'confirmed', scheduledAt, pumppuId } } on --dry-run",
@@ -3153,7 +3158,7 @@ const BASE_COMMAND_SPECS = [
             { name: "requestId", type: "number", description: "pumppuRequestId" },
             { name: "offerId", type: "number", description: "your pumppuOfferId" },
         ],
-        flags: [{ name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" }],
+        flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
         writeFlags: true,
         outputShape: "{ success: true, status: 'withdrawn' } or { dryRun: true, wouldUpdate: { pumppuOfferId, status } }",
         errors: [
@@ -3225,7 +3230,7 @@ const BASE_COMMAND_SPECS = [
         flags: [
             { name: "body", type: "json", description: "JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo? }" },
             { name: "asiakas", type: "number", description: "Target company asiakasId (default: your own)" },
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, openingHours, companyDescription, maintainsOrderInfo, changed } · { dryRun: true, wouldUpdate: {...} } on --dry-run",
@@ -3291,7 +3296,7 @@ const BASE_COMMAND_SPECS = [
         args: [{ name: "asiakasId", type: "number", required: false, description: "company asiakasId (or pass --asiakas)" }],
         flags: [
             { name: "asiakas", type: "number", description: "Target asiakasId (alias for the positional)" },
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: true } }",
@@ -3311,7 +3316,7 @@ const BASE_COMMAND_SPECS = [
         args: [{ name: "asiakasId", type: "number", required: false, description: "company asiakasId (or pass --asiakas)" }],
         flags: [
             { name: "asiakas", type: "number", description: "Target asiakasId (alias for the positional)" },
-            { name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
         outputShape: "{ success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: false } }",
@@ -3373,7 +3378,7 @@ const BASE_COMMAND_SPECS = [
         permissions: ["isSystemAdmin"],
         tier: "developer",
         args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
-        flags: [{ name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" }],
+        flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
         writeFlags: true,
         outputShape: "{ success: true, status: 'expired' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
         errors: [apiErr(403, "Not a system admin", "use a system-admin token"), apiErr(409, "Wrong state", "request not in an expirable state"), ...COMMON_AUTH_ERRORS],
@@ -3385,7 +3390,7 @@ const BASE_COMMAND_SPECS = [
         permissions: ["isSystemAdmin"],
         tier: "developer",
         args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
-        flags: [{ name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" }],
+        flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
         writeFlags: true,
         outputShape: "{ success: true, status: 'cancelled' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
         errors: [apiErr(403, "Not a system admin", "use a system-admin token"), apiErr(409, "Wrong state", "request not in a cancellable state"), ...COMMON_AUTH_ERRORS],
@@ -3397,7 +3402,7 @@ const BASE_COMMAND_SPECS = [
         permissions: ["isSystemAdmin"],
         tier: "developer",
         args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
-        flags: [{ name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" }],
+        flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
         writeFlags: true,
         outputShape: "{ success: true, status: 'open' | 'no_supply' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
         errors: [apiErr(403, "Not a system admin", "use a system-admin token"), apiErr(409, "Wrong state", "request not in a resendable state"), ...COMMON_AUTH_ERRORS],
@@ -3409,7 +3414,7 @@ const BASE_COMMAND_SPECS = [
         permissions: ["isSystemAdmin"],
         tier: "developer",
         args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
-        flags: [{ name: "reason", type: "string", description: "Audit-log reason (REQUIRED)" }],
+        flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
         writeFlags: true,
         outputShape: "{ success: true } or { dryRun: true, wouldDelete: { pumppuRequestId } }",
         errors: [
@@ -3650,7 +3655,7 @@ const BASE_COMMAND_SPECS = [
     // ─── reference (1) ───────────────────────────────────────────────────────
     {
         command: "ib reference dump",
-        description: "Emit the full command surface as JSON (version, generatedAt, overview, glossary, topics, feedbackGuidance, commands map). Read by AI assistants for one-shot CLI ingestion. Pass one or more domains (the token after `ib`, e.g. keikka) to narrow the commands map to those groups — the primer (overview/glossary/topics) is retained once, so a filtered dump stays self-contained. `--commands-only` drops the primer and emits just { version, generatedAt, commands } (and skips the glossary fetch) for callers that only need the specs.",
+        description: "Emit the full command surface as JSON for one-shot AI ingestion. The universal 401/500 error contract is hoisted to a single top-level `commonErrors` block and stripped from each spec (it applied to every command) — read `commonErrors` together with each spec's command-specific `errors`. Pass one or more domains (the token after `ib`, e.g. keikka) to narrow the commands map — STRONGLY preferred over the full surface (a one-domain dump is a fraction of the bytes). The full (no-domain) dump carries a `notice` field pointing this out. `glossary` (the term+synonyms vocabulary index) is OPT-IN via `--glossary`. `--commands-only` emits just { version, generatedAt, commonErrors, commands } for callers that already know the domain.",
         auth: "none",
         args: [
             {
@@ -3662,21 +3667,26 @@ const BASE_COMMAND_SPECS = [
         ],
         flags: [
             {
+                name: "glossary",
+                type: "boolean",
+                description: "Include the term+synonyms vocabulary INDEX (fetched from the DB) under `glossary`. Off by default to keep the dump small; fetch definitions on demand with `ib glossary lookup <term>` / `ib glossary list`.",
+            },
+            {
                 name: "commands-only",
                 type: "boolean",
-                description: "Emit only { version, generatedAt, commands } — drop the overview/glossary/topics/feedbackGuidance primer and skip the glossary DB fetch (no token needed). ~50% fewer bytes per dump.",
+                description: "Emit only { version, generatedAt, commonErrors, commands } — drop the overview/topics/feedbackGuidance primer and skip the glossary fetch (no token needed). Fewer bytes per dump.",
             },
         ],
-        outputShape: "{ version, generatedAt, overview, glossary, topics, feedbackGuidance, commands: { '<command>': CommandSpec } } — with --commands-only: { version, generatedAt, commands }. NOTE: `glossary` is the term+synonyms INDEX only ({ term, synonyms }[]) — definitions are NOT inlined (they would bloat the dump as the glossary grows); fetch a definition with `ib glossary lookup <term>` or all of them with `ib glossary list`.",
+        outputShape: "{ version, generatedAt, commonErrors: CommandError[], notice?, overview, glossary, feedbackGuidance, topics, commands: { '<command>': CommandSpec } } — with --commands-only: { version, generatedAt, commonErrors, commands }. `commonErrors` (401/500) applies to EVERY command and is omitted from each spec's `errors`. `notice` appears only on the full (no-domain) dump. `glossary` is the term+synonyms INDEX only and is EMPTY unless `--glossary` is passed; fetch a definition with `ib glossary lookup <term>` or all of them with `ib glossary list`.",
         errors: [
             { exit: 4, meaning: "Unknown domain", remedy: "run `ib commands` (no arg) to see valid domains" },
             { exit: 1, meaning: "I/O error", remedy: "retry; check stdout pipe" },
         ],
         examples: [
-            "ib reference dump",
             "ib reference dump keikka",
             "ib reference dump ai attachment --commands-only",
-            "ib reference dump | jq .version",
+            "ib reference dump --glossary",
+            "ib reference dump | jq .commonErrors",
         ],
     },
     {
@@ -4059,7 +4069,7 @@ const BASE_COMMAND_SPECS = [
             { name: "description", type: "string", required: true, description: "What is wrong" },
             { name: "steps", type: "string", description: "Steps to reproduce" },
             { name: "priority", type: "string", description: "low | medium | high | urgent (omitted → derived from severity)" },
-            { name: "reason", type: "string", description: "Audit reason (X-Action-Reason header)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason)" },
             { name: "dry-run", type: "boolean", description: "Preview the payload without sending (client-side)" },
         ],
         outputShape: "{ bugReportId, referenceNumber } (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
@@ -4120,7 +4130,7 @@ const BASE_COMMAND_SPECS = [
         args: [{ name: "bugReportId", type: "number", description: "bugReportId" }],
         flags: [
             { name: "body", type: "string", required: true, description: "Comment text" },
-            { name: "reason", type: "string", description: "Audit reason (X-Action-Reason)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason)" },
             { name: "dry-run", type: "boolean", description: "Preview without sending (client-side)" },
         ],
         outputShape: "{ commentId } (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
@@ -4145,7 +4155,7 @@ const BASE_COMMAND_SPECS = [
             { name: "notes", type: "string", description: "Admin notes (stored as adminNotes)" },
             { name: "resolution", type: "string", description: "Resolution text" },
             { name: "assign", type: "number", description: "Assign to a developer (personId → assignedTo)" },
-            { name: "reason", type: "string", description: "Audit reason (X-Action-Reason)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason)" },
             { name: "dry-run", type: "boolean", description: "Preview without sending (client-side)" },
         ],
         outputShape: "The updated report. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
@@ -4170,7 +4180,7 @@ const BASE_COMMAND_SPECS = [
         args: [{ name: "bugReportId", type: "number", description: "bugReportId" }],
         flags: [
             { name: "to", type: "number", required: true, description: "Assignee personId" },
-            { name: "reason", type: "string", description: "Audit reason (X-Action-Reason)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason)" },
             { name: "dry-run", type: "boolean", description: "Preview without sending (client-side)" },
         ],
         outputShape: "The updated report (status now in-progress). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
@@ -4203,7 +4213,7 @@ const BASE_COMMAND_SPECS = [
         mutates: true,
         args: [{ name: "bugReportId", type: "number", description: "bugReportId" }],
         flags: [
-            { name: "reason", type: "string", required: true, description: "Why (required; X-Action-Reason)" },
+            { name: "reason", type: "string", required: true, description: "Audit-log reason (X-Action-Reason); REQUIRED" },
             { name: "dry-run", type: "boolean", description: "Preview without sending (client-side)" },
         ],
         outputShape: "{ success: true, bugReportId } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, headers } }.",
@@ -4237,7 +4247,7 @@ const BASE_COMMAND_SPECS = [
         const writeFlags = [
             { name: "confirm", type: "boolean", description: "Execute the operation (default is dry-run preview)" },
             { name: "force-prod", type: "boolean", description: "Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec." },
-            { name: "reason", type: "string", description: "Audit reason (X-Action-Reason)" },
+            { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason)" },
         ];
         return [
             {

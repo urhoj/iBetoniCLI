@@ -44,7 +44,12 @@ describe("domain positional wiring", () => {
     const ref = JSON.parse(
       await runCapture(["reference", "dump", "keikka", "vehicle", "--commands-only"])
     );
-    expect(Object.keys(ref).sort()).toEqual(["commands", "generatedAt", "version"]);
+    expect(Object.keys(ref).sort()).toEqual([
+      "commands",
+      "commonErrors",
+      "generatedAt",
+      "version",
+    ]);
     const cmds = Object.keys(ref.commands);
     expect(cmds.some((c) => c.startsWith("ib keikka"))).toBe(true);
     expect(cmds.some((c) => c.startsWith("ib vehicle"))).toBe(true);
