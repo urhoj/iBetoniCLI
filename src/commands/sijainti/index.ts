@@ -261,6 +261,40 @@ export async function persistSijaintiCoords(
 }
 
 /**
+ * --geocode: resolve lat/lng from the body's address (sijaintiOsoite1) and set
+ * them on the body, unless coordinates are already present. Shared by create
+ * and update (the procs bind no lat/lng — persistSijaintiCoords then writes them
+ * via updateLatLng). Fails fast (exit 4) when no address is given or the address
+ * has no match (ZERO_RESULTS), so a bad address never silently persists without
+ * coordinates. Mutates `body`.
+ */
+export async function applyGeocodeToBody(
+  client: ApiClient,
+  body: Record<string, unknown>
+): Promise<void> {
+  if (
+    body.lat !== undefined &&
+    body.lat !== null &&
+    body.lng !== undefined &&
+    body.lng !== null
+  ) {
+    return;
+  }
+  const address = typeof body.sijaintiOsoite1 === "string" ? body.sijaintiOsoite1 : "";
+  if (!address) {
+    failWith("--geocode requires --address (or sijaintiOsoite1 in --body)", 4);
+  }
+  const geo = await runSijaintiGeocode(client, address);
+  const coords = extractGeocodeLatLng(geo);
+  if (!coords) {
+    const status = (geo as { status?: string } | null)?.status ?? "no match";
+    failWith(`could not geocode address "${address}" (status: ${status})`, 4);
+  }
+  body.lat = coords.lat;
+  body.lng = coords.lng;
+}
+
+/**
  * Default BetoniJerry delivery radius (km) applied when a varikko is enrolled
  * (`--on`) but has no usable `maxDeliveryDistance` — enrolling with 0 km would
  * cover nothing. Mid-range of the typical 30–80 km a varikko serves.
@@ -863,20 +897,7 @@ export function registerSijaintiCommands(
         // --geocode: resolve lat/lng from the address up front so the coords can
         // be persisted (the add proc itself binds no lat/lng — see
         // persistSijaintiCoords) and a ZERO_RESULTS address fails fast here.
-        if (opts.geocode && (body.lat === undefined || body.lat === null || body.lng === undefined || body.lng === null)) {
-          const address = typeof body.sijaintiOsoite1 === "string" ? body.sijaintiOsoite1 : "";
-          if (!address) {
-            failWith("--geocode requires --address (or sijaintiOsoite1 in --body)", 4);
-          }
-          const geo = await runSijaintiGeocode(client, address);
-          const coords = extractGeocodeLatLng(geo);
-          if (!coords) {
-            const status = (geo as { status?: string } | null)?.status ?? "no match";
-            failWith(`could not geocode address "${address}" (status: ${status})`, 4);
-          }
-          body.lat = coords.lat;
-          body.lng = coords.lng;
-        }
+        if (opts.geocode) await applyGeocodeToBody(client, body);
         const flags = {
           dryRun: opts.dryRun,
           idempotencyKey: opts.idempotencyKey,
@@ -901,7 +922,7 @@ export function registerSijaintiCommands(
     .command("update")
     .description(
       "Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Typed flags win over --body. " +
-        "--lat/--lng are persisted via a follow-up updateLatLng call (the save proc itself drops them) and echoed as { lat, lng, coordsPersisted }."
+        "--lat/--lng (or --geocode to re-resolve from the address) are persisted via a follow-up updateLatLng call (the save proc itself drops them) and echoed as { lat, lng, coordsPersisted }."
     )
     .option("--body <json>", "JSON object forwarded as the request body")
     .option("--id <sijaintiId>", "Target sijaintiId", Number)
@@ -911,7 +932,11 @@ export function registerSijaintiCommands(
     .option("--lat <n>", "Latitude", Number)
     .option("--lng <n>", "Longitude", Number)
     .option("--lyh <s>", "sijaintiLyh — short code/abbreviation (≤50 chars)")
-    .option("--max-distance <n>", "maxDeliveryDistance in km", Number);
+    .option("--max-distance <n>", "maxDeliveryDistance in km", Number)
+    .option(
+      "--geocode",
+      "Re-resolve lat/lng from the (changed) address via Google Maps when coordinates are not given (then persisted + echoed)"
+    );
   addWriteFlagsToCommand(updateCmd).action(
     async (opts: {
       body?: string;
@@ -923,6 +948,7 @@ export function registerSijaintiCommands(
       lng?: number;
       lyh?: string;
       maxDistance?: number;
+      geocode?: boolean;
       dryRun?: boolean;
       idempotencyKey?: string;
       reason?: string;
@@ -945,6 +971,9 @@ export function registerSijaintiCommands(
         if (body.sijaintiId === undefined) {
           failWith("update requires sijaintiId — pass --id or include it in --body", 4);
         }
+        // --geocode: re-resolve lat/lng from the (changed) address before the
+        // write, so a bad address fails fast and the coords are persisted below.
+        if (opts.geocode) await applyGeocodeToBody(client, body);
         const flags = {
           dryRun: opts.dryRun,
           idempotencyKey: opts.idempotencyKey,

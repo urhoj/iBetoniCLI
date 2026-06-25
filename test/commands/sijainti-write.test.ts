@@ -7,6 +7,7 @@ import {
   runSijaintiSetJerry,
   runSijaintiSaveLatLng,
   persistSijaintiCoords,
+  applyGeocodeToBody,
   buildSijaintiBody,
   applySijaintiCreateDefaults,
   extractGeocodeLatLng,
@@ -138,6 +139,45 @@ describe("sijainti coordinate persistence (updateLatLng)", () => {
     const out2 = await persistSijaintiCoords(mockClient, partial, 9, { lat: 60.17 }, {});
     expect(out2).toBe(partial);
     expect(mPost()).toHaveBeenCalledTimes(1); // only the first (full) call wrote
+  });
+});
+
+describe("applyGeocodeToBody (--geocode, shared by create/update)", () => {
+  const mPost = () => mockClient.post as ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    mPost().mockReset();
+  });
+
+  test("geocodes sijaintiOsoite1 and sets body.lat/lng", async () => {
+    mPost().mockResolvedValueOnce({
+      status: "OK",
+      results: [{ geometry: { location: { lat: 60.17, lng: 24.94 } } }],
+    });
+    const body: Record<string, unknown> = { sijaintiOsoite1: "Mannerheimintie 1, Helsinki" };
+    await applyGeocodeToBody(mockClient, body);
+    expect(mPost()).toHaveBeenCalledWith("/api/geocode/getLatLng", {
+      osoite: "Mannerheimintie 1, Helsinki",
+    });
+    expect(body).toMatchObject({ lat: 60.17, lng: 24.94 });
+  });
+
+  test("no-op (no geocode call) when coords already present", async () => {
+    const body: Record<string, unknown> = { sijaintiOsoite1: "X", lat: 1, lng: 2 };
+    await applyGeocodeToBody(mockClient, body);
+    expect(mPost()).not.toHaveBeenCalled();
+    expect(body).toEqual({ sijaintiOsoite1: "X", lat: 1, lng: 2 });
+  });
+
+  test("exit 4 when no address to geocode", async () => {
+    await expect(applyGeocodeToBody(mockClient, {})).rejects.toThrow(/requires --address/);
+    expect(mPost()).not.toHaveBeenCalled();
+  });
+
+  test("exit 4 when the address has no match (ZERO_RESULTS)", async () => {
+    mPost().mockResolvedValueOnce({ status: "ZERO_RESULTS" });
+    await expect(
+      applyGeocodeToBody(mockClient, { sijaintiOsoite1: "asdf" })
+    ).rejects.toThrow(/could not geocode/);
   });
 });
 

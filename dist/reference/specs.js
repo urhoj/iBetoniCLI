@@ -2123,7 +2123,7 @@ const BASE_COMMAND_SPECS = [
     },
     {
         command: "ib sijainti update",
-        description: "Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. --lat/--lng are persisted via a follow-up updateLatLng call (the save proc itself binds no lat/lng) and echoed as { lat, lng, coordsPersisted }. Provide typed flags or --body JSON; typed flags win over --body.",
+        description: "Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. --lat/--lng (or --geocode to re-resolve from the changed address) are persisted via a follow-up updateLatLng call (the save proc itself binds no lat/lng) and echoed as { lat, lng, coordsPersisted }. Provide typed flags or --body JSON; typed flags win over --body.",
         permissions: ["auth.page.sijainnit.edit"],
         flags: [
             { name: "body", type: "json", description: "JSON object with fields to update (optional if typed flags given)" },
@@ -2135,16 +2135,19 @@ const BASE_COMMAND_SPECS = [
             { name: "lng", type: "number", description: "Longitude (persisted via updateLatLng + echoed)" },
             { name: "lyh", type: "string", description: "sijaintiLyh — short code/abbreviation (≤50 chars)" },
             { name: "max-distance", type: "number", description: "maxDeliveryDistance in km" },
+            { name: "geocode", type: "boolean", description: "Re-resolve lat/lng from the (changed) --address via Google Maps when coordinates are not given (then persisted + echoed)" },
         ],
         writeFlags: true,
-        outputShape: "{ ok: true, ..., lat?, lng?, coordsPersisted? } — lat/lng/coordsPersisted present when --lat/--lng were given",
+        outputShape: "{ ok: true, ..., lat?, lng?, coordsPersisted? } — lat/lng/coordsPersisted present when --lat/--lng or --geocode supplied coordinates",
         errors: [
             apiErr(400, "Validation failed", "fix --body fields"),
+            apiErr(400, 'Address could not be geocoded (--geocode, status ZERO_RESULTS)', "supply a fuller --address or pass --lat/--lng directly"),
             apiErr(404, "Sijainti not found", "verify sijaintiId"),
             ...permErrors("auth.page.sijainnit.edit"),
         ],
         examples: [
             'ib sijainti update --id 42 --name "Renamed depot"',
+            'ib sijainti update --id 42 --address "Teollisuuskatu 9, Helsinki" --geocode',
             "ib sijainti update --body '{\"sijaintiId\":42,\"sijaintiNimi\":\"Renamed depot\"}'",
         ],
     },

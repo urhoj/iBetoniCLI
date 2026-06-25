@@ -8554,7 +8554,7 @@ exports[`Help snapshots — contract stability > help for ib sijainti update mat
   ib sijainti update [flags]
 
 DESCRIPTION
-  Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. --lat/--lng are persisted via a follow-up updateLatLng call (the save proc itself binds no lat/lng) and echoed as { lat, lng, coordsPersisted }. Provide typed flags or --body JSON; typed flags win over --body.
+  Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. --lat/--lng (or --geocode to re-resolve from the changed address) are persisted via a follow-up updateLatLng call (the save proc itself binds no lat/lng) and echoed as { lat, lng, coordsPersisted }. Provide typed flags or --body JSON; typed flags win over --body.
   Permissions: requires auth.page.sijainnit.edit.
 
 FLAGS
@@ -8567,6 +8567,7 @@ FLAGS
   --lng NUMBER    Longitude (persisted via updateLatLng + echoed)
   --lyh STRING    sijaintiLyh — short code/abbreviation (≤50 chars)
   --max-distance NUMBER    maxDeliveryDistance in km
+  --geocode BOOLEAN    Re-resolve lat/lng from the (changed) --address via Google Maps when coordinates are not given (then persisted + echoed)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -8577,10 +8578,11 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { ok: true, ..., lat?, lng?, coordsPersisted? } — lat/lng/coordsPersisted present when --lat/--lng were given
+  { ok: true, ..., lat?, lng?, coordsPersisted? } — lat/lng/coordsPersisted present when --lat/--lng or --geocode supplied coordinates
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed      → fix --body fields
+  exit 4 (HTTP 400)  Address could not be geocoded (--geocode, status ZERO_RESULTS) → supply a fuller --address or pass --lat/--lng directly
   exit 5 (HTTP 404)  Sijainti not found     → verify sijaintiId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.edit
@@ -8588,6 +8590,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib sijainti update --id 42 --name "Renamed depot"
+  ib sijainti update --id 42 --address "Teollisuuskatu 9, Helsinki" --geocode
   ib sijainti update --body '{"sijaintiId":42,"sijaintiNimi":"Renamed depot"}'
 "
 `;
