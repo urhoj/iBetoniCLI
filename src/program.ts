@@ -44,7 +44,8 @@ import { registerHelpCommands } from "./commands/help/index.js";
 import { registerVersionCommand } from "./commands/version/index.js";
 import { registerDoctorCommand } from "./commands/doctor/index.js";
 import { runReferenceDump, fetchPrimerGlossary } from "./reference/dump.js";
-import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList } from "./reference/detail.js";
+import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailEdit } from "./reference/detail.js";
+import { parseEditOp } from "./textEdit.js";
 import { addWriteFlagsToCommand } from "./api/writeFlags.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "./assess.js";
 import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDomain } from "./reference/commandsList.js";
@@ -275,7 +276,13 @@ export function buildProgram(): Command {
     )
     .argument("<command...>", "Command path after `ib` (e.g. keikka latest)")
     .option("--summary <text>", "Short one-line summary stored in the catalog")
-    .option("--detail <text>", "Full markdown business-context detail");
+    .option("--detail <text>", "Full markdown business-context detail")
+    .option("--field <name>", "Edit-mode target field: summary | detail (default detail)")
+    .option("--replace <text>", "Edit mode: replace this literal text in the target field (exactly once unless --all)")
+    .option("--with <text>", 'Replacement for --replace ("" deletes the matched text)')
+    .option("--append <text>", "Edit mode: append text to the target field (verbatim)")
+    .option("--prepend <text>", "Edit mode: prepend text to the target field (verbatim)")
+    .option("--all", "With --replace: substitute every occurrence");
   addWriteFlagsToCommand(addAssessWriteFlags(detailSet)).action(
     async (
       commandParts: string[],
@@ -287,8 +294,39 @@ export function buildProgram(): Command {
         dryRun?: boolean;
         idempotencyKey?: string;
         reason?: string;
+        field?: string;
+        replace?: string;
+        with?: string;
+        append?: string;
+        prepend?: string;
+        all?: boolean;
       }
     ) => {
+      const editOp = parseEditOp({
+        replace: opts.replace, with: opts.with,
+        append: opts.append, prepend: opts.prepend, all: opts.all,
+      });
+      if (editOp) {
+        if (opts.summary !== undefined || opts.detail !== undefined) {
+          failWith("edit mode (--replace/--append/--prepend) cannot be combined with --summary/--detail", 4);
+        }
+        const field = (opts.field ?? "detail") as "summary" | "detail";
+        if (field !== "summary" && field !== "detail") {
+          failWith("--field must be one of: summary, detail", 4);
+        }
+        if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
+        try {
+          const client = await getClient();
+          writeJson(
+            await runReferenceDetailEdit(client, commandParts, field, editOp, {
+              dryRun: opts.dryRun, reason: opts.reason, idempotencyKey: opts.idempotencyKey,
+            }, getCallerTier())
+          );
+        } catch (e) {
+          exitWithError(e);
+        }
+        return;
+      }
       assertAiConfidence(opts.aiConfidence);
       try {
         const client = await getClient();

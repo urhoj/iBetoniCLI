@@ -4062,8 +4062,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       },
       { name: "ai-confidence", type: "number", description: "Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score." },
       { name: "needs-human-review", type: "boolean", description: "Park the row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked." },
+      { name: "field", type: "string", description: "Edit-mode target field: summary | detail (default detail)" },
+      { name: "replace", type: "string", description: "Edit mode: replace this literal text in the target field (exactly once unless --all)" },
+      { name: "with", type: "string", description: 'Replacement for --replace ("" deletes the matched text)' },
+      { name: "append", type: "string", description: "Edit mode: append text to the target field (verbatim)" },
+      { name: "prepend", type: "string", description: "Edit mode: prepend text to the target field (verbatim)" },
+      { name: "all", type: "boolean", description: "With --replace: substitute every occurrence" },
     ],
-    outputShape: "{ command, runs, … } (backend response)",
+    outputShape: "{ command, runs, … } (backend response) | edit dry-run: {dryRun:true, command, field, matchCount?, addedLines, removedLines, sameContent, unified}",
     errors: [
       {
         exit: 5,
@@ -4074,6 +4080,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: [
       "ib reference detail set keikka list --summary 'Lists delivery orders' --reason 'initial fill'",
       "ib reference detail set keikka list --detail '## Keikka list\\nReturns ...' --reason 'update'",
+      "ib reference detail set keikka list --replace '14 latest' --with '20 latest' --reason 'fix count' --dry-run",
     ],
   },
   {

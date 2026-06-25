@@ -6,7 +6,8 @@
  * tests use a mock ApiClient so no network is needed.
  */
 import { describe, test, expect, vi } from "vitest";
-import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList } from "../../src/reference/detail.js";
+import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailEdit } from "../../src/reference/detail.js";
+import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
 
 function client(over: Record<string, unknown> = {}) {
@@ -130,5 +131,35 @@ describe("runReferenceDetail", () => {
     const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
     await runReferenceDetailList(c, 10, undefined, false);
     expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10");
+  });
+});
+
+describe("ib reference detail set — edit mode (in-field partial)", () => {
+  const CURRENT = { command: "ib keikka list", summary: "Lists orders", detail: "## Keikka list\nReturns the 14 latest.", hint: "" };
+
+  test("--replace on detail (default field) --dry-run returns a diff, no PUT", async () => {
+    const c = { get: vi.fn().mockResolvedValue(CURRENT), put: vi.fn(), post: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn().mockReturnValue("t") } as unknown as ApiClient;
+    const out = await runReferenceDetailEdit(
+      c, ["keikka", "list"], "detail",
+      { kind: "replace", find: "14 latest", replacement: "20 latest" },
+      { dryRun: true }, "developer"
+    ) as Record<string, unknown>;
+    expect(c.put).not.toHaveBeenCalled();
+    expect(out).toMatchObject({ dryRun: true, command: "ib keikka list", field: "detail", matchCount: 1 });
+    expect(String(out.unified)).toContain("20 latest");
+  });
+
+  test("real edit PUTs only the edited field", async () => {
+    const c = { get: vi.fn().mockResolvedValue(CURRENT), put: vi.fn().mockResolvedValue({ command: "ib keikka list" }), post: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn().mockReturnValue("t") } as unknown as ApiClient;
+    await runReferenceDetailEdit(
+      c, ["keikka", "list"], "summary",
+      { kind: "append", text: " (cached)" },
+      { reason: "tweak summary" }, "developer"
+    );
+    expect(c.put).toHaveBeenCalledWith(
+      "/api/cli/command-catalog/ib%20keikka%20list",
+      { summary: "Lists orders (cached)" },
+      { headers: { "X-Action-Reason": "tweak summary" } }
+    );
   });
 });

@@ -7734,6 +7734,12 @@ FLAGS
   --detail STRING    Full markdown business-context detail
   --ai-confidence NUMBER    Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score.
   --needs-human-review BOOLEAN    Park the row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked.
+  --field STRING    Edit-mode target field: summary | detail (default detail)
+  --replace STRING    Edit mode: replace this literal text in the target field (exactly once unless --all)
+  --with STRING    Replacement for --replace ("" deletes the matched text)
+  --append STRING    Edit mode: append text to the target field (verbatim)
+  --prepend STRING    Edit mode: prepend text to the target field (verbatim)
+  --all BOOLEAN    With --replace: substitute every occurrence
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -7744,7 +7750,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { command, runs, … } (backend response)
+  { command, runs, … } (backend response) | edit dry-run: {dryRun:true, command, field, matchCount?, addedLines, removedLines, sameContent, unified}
 
 ERRORS (stderr, exit non-zero)
   exit 5  Unknown command        → \`ib commands\` for valid paths
@@ -7752,6 +7758,7 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib reference detail set keikka list --summary 'Lists delivery orders' --reason 'initial fill'
   ib reference detail set keikka list --detail '## Keikka list\\nReturns ...' --reason 'update'
+  ib reference detail set keikka list --replace '14 latest' --with '20 latest' --reason 'fix count' --dry-run
 "
 `;
 

@@ -10,6 +10,8 @@ import { CliError } from "../api/errors.js";
 import { type CallerTier, visibleSpecs, getCallerTier } from "../tier.js";
 import { writeFlagsToHeaders, type WriteFlags } from "../api/writeFlags.js";
 import type { AssessFlags } from "../assess.js";
+import { lineDiff } from "../textDiff.js";
+import { applyTextEdit, type TextEditOp } from "../textEdit.js";
 
 function resolveCommand(commandParts: string[], tier: CallerTier): string {
   // Be liberal in what we accept. Every discovery surface — including this
@@ -86,4 +88,41 @@ export async function runReferenceDetailSet(
   return client.put(`/api/cli/command-catalog/${encodeURIComponent(command)}`, payload, {
     headers: writeFlagsToHeaders(flags),
   });
+}
+
+/** Catalog text fields editable in-field. */
+export const DETAIL_EDITABLE_FIELDS = ["summary", "detail"] as const;
+export type DetailEditableField = (typeof DETAIL_EDITABLE_FIELDS)[number];
+
+/**
+ * Edit mode for `reference detail set`: in-field partial edit of summary or
+ * detail. Reads the current catalog entry (resolves + validates the command),
+ * applies the edit, then `--dry-run` returns the field diff without writing, or
+ * a real run delegates to `runReferenceDetailSet` (PATCH — only the edited field).
+ */
+export async function runReferenceDetailEdit(
+  client: ApiClient,
+  commandParts: string[],
+  field: DetailEditableField,
+  op: TextEditOp,
+  flags: WriteFlags = {},
+  tier: CallerTier = getCallerTier()
+): Promise<unknown> {
+  const current = await runReferenceDetail(client, commandParts, tier);
+  const before = String((current as Record<string, unknown>)[field] ?? "");
+  const { next, matchCount } = applyTextEdit(before, op);
+  if (flags.dryRun) {
+    const diff = lineDiff(before, next);
+    return {
+      dryRun: true,
+      command: current.command,
+      field,
+      ...(matchCount !== undefined ? { matchCount } : {}),
+      addedLines: diff.addedLines,
+      removedLines: diff.removedLines,
+      sameContent: diff.sameContent,
+      unified: diff.unified,
+    };
+  }
+  return runReferenceDetailSet(client, commandParts, { [field]: next }, flags, tier);
 }
