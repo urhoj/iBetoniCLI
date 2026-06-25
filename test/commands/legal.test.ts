@@ -478,6 +478,6 @@ describe("ib legal save — edit mode (in-field partial)", () => {
     (c.get as ReturnType<typeof vi.fn>).mockRejectedValue(new CliError("not found", 404, null, 5));
     await expect(
       runLegalSaveWithEdit(c, "TOS", { kind: "append", text: "x" }, { version: "2.1" }, { reason: "r" })
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ exitCode: 5 });
   });
 });
