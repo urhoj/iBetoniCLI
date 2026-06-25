@@ -83,6 +83,8 @@ export const FEEDBACK_GUIDANCE = {
     "found a command, flag, or its output confusing or harder to use than expected",
     "could not find a command for something the user asked for that this CLI probably should do (a capability gap)",
     "noticed an inconsistency between commands (naming, behaviour, flags, or output shape)",
+    "have suggestions for improving the CLI's usability or user experience",
+    "too high token consumption or too many API calls for a given task (cost/efficiency)",
   ],
   how:
     "Use --kind bug for breakage, --kind improvement for gaps/ideas. Attach " +
