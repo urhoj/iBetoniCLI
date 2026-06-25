@@ -2215,6 +2215,32 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib person email set-main",
+    description:
+      "Promote one of a person's emails to be the PRIMARY (person.personEmail), demoting the previous primary into the alternatives (personEmails). The target must already be an address on this person (primary or alternative). Login is unaffected — every address resolves the person either way; this only changes which one is the displayed/primary address. Idempotent when already primary. Tenant-scoped like `ib person email add`. Requires --reason.",
+    permissions: ["auth.page.person.edit"],
+    args: [
+      { name: "person", type: "string", description: "personId or a name resolved within your active company" },
+      { name: "email", type: "string", description: "the person's email to promote to primary (primary or alternative)" },
+    ],
+    flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
+    writeFlags: true,
+    outputShape:
+      "{ personId, personEmail, main:true, changed:boolean } · dry-run: { dryRun:true, wouldSetMain:{ personId, personEmail } }",
+    errors: [
+      apiErr(404, "Person not found / out of your tenant, or the email is not on this person", "verify the address belongs to the person (`ib person email list`)"),
+      apiErr(409, "Email already belongs to another person (globally unique)", "use a different address"),
+      ...permErrors("auth.page.person.edit"),
+    ],
+    notes: [
+      "Deploy-gated: needs the puminet5api /api/person/setMainPersonEmail route AND the dbo.personEmail_setMain proc; until both ship, dry-run and the write both 404.",
+    ],
+    examples: [
+      "ib person email set-main 5351 matti.alt@example.com --reason 'primary contact changed'",
+      "ib person email set-main 5351 matti.alt@example.com --reason preview --dry-run",
+    ],
+  },
+  {
     command: "ib person email remove",
     description:
       "Remove an ALTERNATIVE email from a person (personEmails only — cannot remove the primary). Idempotent. Tenant-scoped like `ib person email add`. Requires --reason.",

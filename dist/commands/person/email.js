@@ -13,6 +13,11 @@ export async function runPersonEmailAdd(client, person, email, flags) {
     const personId = await resolvePersonRef(client, person);
     return client.post("/api/person/addPersonEmail", { personId, personEmail: email }, { headers: writeFlagsToHeaders(flags) });
 }
+/** POST /api/person/setMainPersonEmail { personId, personEmail }. */
+export async function runPersonEmailSetMain(client, person, email, flags) {
+    const personId = await resolvePersonRef(client, person);
+    return client.post("/api/person/setMainPersonEmail", { personId, personEmail: email }, { headers: writeFlagsToHeaders(flags) });
+}
 /** DELETE /api/person/deletePersonEmail/:personId/:email. */
 export async function runPersonEmailRemove(client, person, email, flags) {
     const personId = await resolvePersonRef(client, person);
@@ -41,6 +46,23 @@ export function registerPersonEmailCommands(person, getClient) {
             failWith("Missing required flag: --reason", 4);
         try {
             writeJson(await runPersonEmailAdd(await getClient(), personRef, emailAddr, {
+                dryRun: opts.dryRun,
+                idempotencyKey: opts.idempotencyKey,
+                reason: opts.reason,
+            }));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    const setMainCmd = email
+        .command("set-main <person> <email>")
+        .description("Promote one of a person's emails to primary (demotes the old primary to an alternative). Requires --reason.");
+    addWriteFlagsToCommand(setMainCmd).action(async (personRef, emailAddr, opts) => {
+        if (!opts.reason)
+            failWith("Missing required flag: --reason", 4);
+        try {
+            writeJson(await runPersonEmailSetMain(await getClient(), personRef, emailAddr, {
                 dryRun: opts.dryRun,
                 idempotencyKey: opts.idempotencyKey,
                 reason: opts.reason,

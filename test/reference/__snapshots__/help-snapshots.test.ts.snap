@@ -7287,6 +7287,48 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib person email set-main matches snapshot 1`] = `
+"USAGE
+  ib person email set-main <person> <email> [flags]
+
+DESCRIPTION
+  Promote one of a person's emails to be the PRIMARY (person.personEmail), demoting the previous primary into the alternatives (personEmails). The target must already be an address on this person (primary or alternative). Login is unaffected — every address resolves the person either way; this only changes which one is the displayed/primary address. Idempotent when already primary. Tenant-scoped like \`ib person email add\`. Requires --reason.
+  Permissions: requires auth.page.person.edit.
+
+ARGUMENTS
+  <person> STRING    personId or a name resolved within your active company (required)
+  <email> STRING    the person's email to promote to primary (primary or alternative) (required)
+
+FLAGS
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { personId, personEmail, main:true, changed:boolean } · dry-run: { dryRun:true, wouldSetMain:{ personId, personEmail } }
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  Person not found / out of your tenant, or the email is not on this person → verify the address belongs to the person (\`ib person email list\`)
+  exit 4 (HTTP 409)  Email already belongs to another person (globally unique) → use a different address
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.person.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Deploy-gated: needs the puminet5api /api/person/setMainPersonEmail route AND the dbo.personEmail_setMain proc; until both ship, dry-run and the write both 404.
+
+EXAMPLES
+  ib person email set-main 5351 matti.alt@example.com --reason 'primary contact changed'
+  ib person email set-main 5351 matti.alt@example.com --reason preview --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib person get matches snapshot 1`] = `
 "USAGE
   ib person get <personId> [flags]
