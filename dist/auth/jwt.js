@@ -55,6 +55,8 @@ export function decodeJwtPayload(jwt) {
         isSystemAdmin: globalRoles.isSystemAdmin === true,
         isDeveloper: globalRoles.isDeveloper === true,
         isActiveCompanyAdmin,
+        imp: finite(expanded.imp ?? expanded.i),
+        imp_sid: (expanded.imp_sid ?? expanded.s),
     };
 }
 //# sourceMappingURL=jwt.js.map

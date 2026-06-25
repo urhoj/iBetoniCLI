@@ -102,6 +102,19 @@ export async function createCliContext(opts) {
             // Undecodable token — skip the acting-as diagnostic.
         }
     }
+    // An impersonation session (JWT carries `imp`) must NOT use the standard
+    // refresh path: /api/auth/refresh-token re-derives DB claims and DROPS
+    // imp/imp_sid + the 10-min cap, silently escalating a 10-minute impersonation
+    // into a permanent login as the target. Disable auto-refresh for these
+    // sessions — a 401 surfaces cleanly and the user re-runs `ib auth impersonate`
+    // (or `ib auth impersonate --extend`).
+    let isImpersonating = false;
+    try {
+        isImpersonating = decodeJwtPayload(auth.token).imp !== undefined;
+    }
+    catch {
+        // Undecodable token — treat as a normal session.
+    }
     const client = createApiClient({
         endpoint,
         token: eph.token,
@@ -114,7 +127,7 @@ export async function createCliContext(opts) {
         // ephemeral `--company` token is single-command and bound to a different
         // company — persisting a refreshed copy would clobber the saved active
         // company, so it gets no refresh path (a 401 mid-command surfaces).
-        onRefresh: auth.refreshable && !eph.switched
+        onRefresh: auth.refreshable && !eph.switched && !isImpersonating
             ? async (currentJwt) => {
                 const fresh = await refreshToken({ endpoint, currentJwt });
                 const creds = await store.load();

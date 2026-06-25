@@ -36,6 +36,25 @@ export function createStore(path) {
             if (existsSync(path))
                 await unlink(path);
         },
+        async remove(profile) {
+            if (!existsSync(path))
+                return;
+            let file;
+            try {
+                file = JSON.parse(await readFile(path, "utf8"));
+            }
+            catch {
+                return; // corrupt — nothing to remove
+            }
+            if (file.profiles)
+                delete file.profiles[profile];
+            if (file.activeProfile === profile)
+                file.activeProfile = "default";
+            await writeFile(path, JSON.stringify(file, null, 2), { mode: 0o600 });
+            if (process.platform !== "win32") {
+                await chmod(path, 0o600);
+            }
+        },
     };
 }
 export function defaultCredentialsPath() {
