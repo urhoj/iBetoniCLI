@@ -337,10 +337,13 @@ describe("ib ohje update — edit mode (in-field partial)", () => {
   });
 
   test("editing a helpId with no row → exit 5", async () => {
-    asGet().mockResolvedValueOnce([]); // no current row
+    asGet().mockResolvedValue([]); // no current row (persistent for both calls)
     await expect(
       runOhjeEditField(mockClient, "Nope", "htmltext", { kind: "append", text: "x" }, { reason: "r" })
     ).rejects.toThrow(/no .*row/i);
+    await expect(
+      runOhjeEditField(mockClient, "NopeAgain", "htmltext", { kind: "append", text: "x" }, { reason: "r" })
+    ).rejects.toMatchObject({ exitCode: 5 });
     expect(mockClient.put).not.toHaveBeenCalled();
   });
 });

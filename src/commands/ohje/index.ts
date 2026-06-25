@@ -417,10 +417,11 @@ export function registerOhjeCommands(
         if (opts.body || opts.title || opts.shorttext || opts.htmltext || opts.img !== undefined) {
           failWith("edit mode (--replace/--append/--prepend) cannot be combined with --body/--title/--shorttext/--htmltext/--img", 4);
         }
-        const field = (opts.field ?? "htmltext") as OhjeEditableField;
-        if (!OHJE_EDITABLE_FIELDS.includes(field)) {
+        const rawField = opts.field ?? "htmltext";
+        if (!(OHJE_EDITABLE_FIELDS as readonly string[]).includes(rawField)) {
           failWith(`--field must be one of: ${OHJE_EDITABLE_FIELDS.join(", ")}`, 4);
         }
+        const field = rawField as OhjeEditableField;
         if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
         assertAiConfidence(opts.aiConfidence);
         try {
