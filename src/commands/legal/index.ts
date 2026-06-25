@@ -682,7 +682,7 @@ export function registerLegalCommands(
         append: opts.append, prepend: opts.prepend, all: opts.all,
       });
       if (editOp) {
-        if (opts.file || opts.content) {
+        if (opts.file !== undefined || opts.content !== undefined) {
           failWith("edit mode (--replace/--append/--prepend) is mutually exclusive with --file/--content", 4);
         }
         if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);

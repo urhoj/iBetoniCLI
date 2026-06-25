@@ -263,7 +263,9 @@ export function registerOhjeCommands(parent, getClient) {
             failWith("--field only applies in edit mode (--replace / --append / --prepend)", 4);
         }
         if (editOp) {
-            if (opts.body || opts.title || opts.shorttext || opts.htmltext || opts.img !== undefined) {
+            if (opts.body !== undefined || opts.title !== undefined ||
+                opts.shorttext !== undefined || opts.htmltext !== undefined ||
+                opts.img !== undefined) {
                 failWith("edit mode (--replace/--append/--prepend) cannot be combined with --body/--title/--shorttext/--htmltext/--img", 4);
             }
             const rawField = opts.field ?? "htmltext";
