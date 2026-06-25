@@ -2,6 +2,8 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFla
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "../../assess.js";
+import { lineDiff } from "../../textDiff.js";
+import { applyTextEdit, parseEditOp } from "../../textEdit.js";
 /**
  * helpId validity: any non-empty string up to the `dbo.helps.helpId` column
  * width (nvarchar 250). The backend binds it as a parameter (no string-built
@@ -150,6 +152,37 @@ export async function runOhjeUpdate(client, helpId, fields, flags, opts = {}, as
         response,
     };
 }
+/** Text fields editable in-field (img is not text; helpId is the key). */
+export const OHJE_EDITABLE_FIELDS = ["title", "shorttext", "htmltext"];
+/**
+ * Edit mode for `ohje update`: in-field partial edit of ONE text column. Fetches
+ * the current row (exit 5 if the helpId has no row — you cannot edit a body that
+ * does not exist), applies the edit, then `--dry-run` returns the field diff
+ * without writing, or a real run delegates to `runOhjeUpdate` (which GET-merges
+ * so the other columns survive).
+ */
+export async function runOhjeEditField(client, helpId, field, op, flags, assess = {}) {
+    const current = await runOhjeGet(client, helpId);
+    if (current === null) {
+        failWith(`helpId "${helpId}" has no existing row to edit — create it with a full --${field} first`, 5);
+    }
+    const before = String(current[field] ?? "");
+    const { next, matchCount } = applyTextEdit(before, op);
+    if (flags.dryRun) {
+        const diff = lineDiff(before, next);
+        return {
+            dryRun: true,
+            helpId,
+            field,
+            ...(matchCount !== undefined ? { matchCount } : {}),
+            addedLines: diff.addedLines,
+            removedLines: diff.removedLines,
+            sameContent: diff.sameContent,
+            unified: diff.unified,
+        };
+    }
+    return runOhjeUpdate(client, helpId, { [field]: next }, flags, {}, assess);
+}
 /**
  * Register `ib ohje` subcommands on the parent commander instance:
  *   - get <helpId>     single help entry (GET /api/helps/get/:helpId)
@@ -211,10 +244,44 @@ export function registerOhjeCommands(parent, getClient) {
         .option("--htmltext <s>", "HTML body shown in the modal (htmltext)")
         .option("--img <s>", "Image reference (img)")
         .option("--must-exist", "Fail (exit 4) if no row exists for this helpId instead of upserting a new one " +
-        "(guards against a typo'd helpId silently creating a junk row)");
+        "(guards against a typo'd helpId silently creating a junk row)")
+        .option("--field <name>", "Edit-mode target field: title | shorttext | htmltext (default htmltext)")
+        .option("--replace <text>", "Edit mode: replace this literal text in the target field (exactly once unless --all)")
+        .option("--with <text>", 'Replacement for --replace ("" deletes the matched text)')
+        .option("--append <text>", "Edit mode: append text to the target field (verbatim)")
+        .option("--prepend <text>", "Edit mode: prepend text to the target field (verbatim)")
+        .option("--all", "With --replace: substitute every occurrence");
     addWriteFlagsToCommand(addAssessWriteFlags(updateCmd)).action(async (helpId, opts) => {
         if (!isValidHelpId(helpId)) {
             failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
+        }
+        const editOp = parseEditOp({
+            replace: opts.replace, with: opts.with,
+            append: opts.append, prepend: opts.prepend, all: opts.all,
+        });
+        if (opts.field !== undefined && !editOp) {
+            failWith("--field only applies in edit mode (--replace / --append / --prepend)", 4);
+        }
+        if (editOp) {
+            if (opts.body || opts.title || opts.shorttext || opts.htmltext || opts.img !== undefined) {
+                failWith("edit mode (--replace/--append/--prepend) cannot be combined with --body/--title/--shorttext/--htmltext/--img", 4);
+            }
+            const rawField = opts.field ?? "htmltext";
+            if (!OHJE_EDITABLE_FIELDS.includes(rawField)) {
+                failWith(`--field must be one of: ${OHJE_EDITABLE_FIELDS.join(", ")}`, 4);
+            }
+            const field = rawField;
+            if (!opts.dryRun && !opts.reason)
+                failWith("Missing required flag: --reason", 4);
+            assertAiConfidence(opts.aiConfidence);
+            try {
+                const client = await getClient();
+                writeJson(await runOhjeEditField(client, helpId, field, editOp, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }, { aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }));
+            }
+            catch (e) {
+                exitWithError(e);
+            }
+            return;
         }
         assertAiConfidence(opts.aiConfidence);
         // --reason is required for an actual write; a --dry-run preview is

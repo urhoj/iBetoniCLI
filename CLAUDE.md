@@ -154,6 +154,10 @@ Append mode (developer-only, deploy-gated): `--add-synonyms` / `--remove-synonym
 
 **Primer glossary is the term+synonyms INDEX only (no definitions).** Both the root `ib --help` GLOSSARY section (rendered `term (syn1, syn2)`) and `ib reference dump`'s `glossary` key carry `{ term, synonyms }` — definitions are deliberately dropped (`projectGlossaryForPrimer`) so they don't bloat every dump / help / AI primer as the glossary grows. Fetch a definition on demand with `ib glossary lookup <term>` (one) or `ib glossary list` (all). The `/ai` loop is unaffected — it has its own top-30-by-`runs` glossary message (`puminet5api modules/gpt/ib/ibGlossary.js`). Both primer surfaces are absent offline / tokenless.
 
+### In-field partial edits (`ib legal save` / `ib ohje update` / `ib reference detail set`)
+
+`src/textEdit.ts` (`applyTextEdit` + `parseEditOp`) — a client-side read-merge-write alternative to resending the whole body. All three commands accept: `--replace <text> --with <text>` (strict: 0 matches → exit 4; >1 matches → exit 4 unless `--all`; `--with ""` deletes the match), `--append <text>`, `--prepend <text>` (verbatim, no auto-separator). `--field` selects the target field on `ohje update` (`title|shorttext|htmltext`, default `htmltext`) and `reference detail set` (`summary|detail`, default `detail`); `legal save` always edits `markdownContent`. `--dry-run` resolves **client-side**: returns a `lineDiff` of the changed field and never writes (works under `--read-only`). `legal save` still creates a NEW immutable version; when an edit flag is present, `--title` defaults to the current active doc's title. The helper is pure and side-effect-free — tests exercise it directly in `test/textEdit.test.ts`.
+
 ### `ib perf` — SQL slow-query monitoring
 
 `src/commands/perf/index.ts` — four `tier:"developer"` commands over the EXISTING `/api/admin/slow-queries*` routes (no backend deploy needed; the routes predate the group). All hidden from non-developer / tokenless callers in every discovery surface.
