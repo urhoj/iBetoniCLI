@@ -206,6 +206,36 @@ describe("changelog --source flag", () => {
   });
 });
 
+describe("changelog list search / status / presence filters", () => {
+  test("list maps --search to the search query param", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue([]);
+    await runChangelogList(c as never, { search: "weather" });
+    expect(c.get).toHaveBeenCalledWith("/api/changelog?search=weather");
+  });
+
+  test("list maps --status to the status query param (substring)", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue([]);
+    await runChangelogList(c as never, { status: "Deployed" });
+    expect(c.get).toHaveBeenCalledWith("/api/changelog?status=Deployed");
+  });
+
+  test("list maps --has-feedback / --has-sentry to presence flags", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue([]);
+    await runChangelogList(c as never, { hasFeedback: true, hasSentry: true });
+    expect(c.get).toHaveBeenCalledWith("/api/changelog?hasFeedback=1&hasSentry=1");
+  });
+
+  test("list omits presence flags when not set", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue([]);
+    await runChangelogList(c as never, { search: "x", hasFeedback: false });
+    expect(c.get).toHaveBeenCalledWith("/api/changelog?search=x");
+  });
+});
+
 describe("readJsonInput BOM handling", () => {
   test("parses a JSON array file that has a UTF-8 BOM (PowerShell Out-File -Encoding utf8)", () => {
     const p = join(tmpdir(), "ib-map-bom-test.json");

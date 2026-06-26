@@ -88,18 +88,21 @@ export async function runChangelogAdd(
   });
 }
 
-export async function runChangelogList(client: ApiClient, opts: Record<string, string | number | undefined>): Promise<ListEnvelope<Row>> {
+export async function runChangelogList(client: ApiClient, opts: Record<string, string | number | boolean | undefined>): Promise<ListEnvelope<Row>> {
   if (typeof opts.sentry === "string") opts.sentry = normalizeSentryRef(opts.sentry);
   const p = new URLSearchParams();
-  // CLI option key → API query key. The --feedback flag maps to the backend's
-  // `feedbackId` filter (controller passes req.query straight to listEntries).
+  // CLI option key → API query key. --feedback maps to the backend's `feedbackId`
+  // filter; --search/--status are substring LIKE filters (the controller passes
+  // req.query straight to listEntries). --has-feedback/--has-sentry are handled below.
   const keyMap: Record<string, string> = {
     month: "month", type: "type", area: "area", repo: "repo", feedback: "feedbackId",
-    sentry: "sentryIssue", source: "source", limit: "limit",
+    sentry: "sentryIssue", source: "source", search: "search", status: "status", limit: "limit",
   };
   for (const [optKey, apiKey] of Object.entries(keyMap)) {
     if (opts[optKey] !== undefined) p.set(apiKey, String(opts[optKey]));
   }
+  if (opts.hasFeedback) p.set("hasFeedback", "1");
+  if (opts.hasSentry) p.set("hasSentry", "1");
   const qs = p.toString();
   const rows = await client.get<Row[]>(`/api/changelog${qs ? `?${qs}` : ""}`);
   const items = Array.isArray(rows) ? rows : [];
@@ -259,7 +262,7 @@ export function registerChangelogCommands(
 
   c.command("list")
     .description(
-      "List change entries (filters: --month --type --area --repo --feedback --sentry --limit)"
+      "List change entries (filters: --month --type --area --repo --feedback --sentry --source --search --status --has-feedback --has-sentry --limit)"
     )
     .option("--month <YYYY-MM>", "Filter to a month")
     .option("--type <t>", "feature|improvement|bugfix")
@@ -268,8 +271,12 @@ export function registerChangelogCommands(
     .option("--feedback <id>", "Entries linked to a feedback id", Number)
     .option("--sentry <ref>", "Entries linked to a Sentry issue short id")
     .option("--source <s>", "human|routine")
+    .option("--search <text>", "Substring match over title/description/files/commitShas (deploy-gated)")
+    .option("--status <substr>", "Substring match on the free-text status field, e.g. 'Deployed' (deploy-gated)")
+    .option("--has-feedback", "Only entries linked to a feedback id (deploy-gated)")
+    .option("--has-sentry", "Only entries linked to a Sentry issue (deploy-gated)")
     .option("--limit <n>", "Max rows", Number)
-    .action(async (o: Record<string, string | number>) => {
+    .action(async (o: Record<string, string | number | boolean>) => {
       try {
         writeJson(await runChangelogList(await getClient(), o));
       } catch (e) {
@@ -536,6 +543,26 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         description: "linked Sentry issue short id",
       },
       { name: "source", type: "string", description: "human|routine" },
+      {
+        name: "search",
+        type: "string",
+        description: "Substring match over title/description/files/commitShas (deploy-gated)",
+      },
+      {
+        name: "status",
+        type: "string",
+        description: "Substring match on the free-text status field, e.g. 'Deployed' (deploy-gated)",
+      },
+      {
+        name: "has-feedback",
+        type: "boolean",
+        description: "Only entries linked to a feedback id (deploy-gated)",
+      },
+      {
+        name: "has-sentry",
+        type: "boolean",
+        description: "Only entries linked to a Sentry issue (deploy-gated)",
+      },
       { name: "limit", type: "number", description: "Max rows" },
     ],
     outputShape: "ListEnvelope<entry>",
@@ -547,7 +574,14 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         remedy: "dev token",
       },
     ],
-    examples: ["ib changelog list --month 2026-06 --type feature"],
+    notes: [
+      "--search / --status / --has-feedback / --has-sentry are server-side filters added in a later backend version; against an older backend they are silently ignored (the list returns unfiltered) — deploy-gated.",
+    ],
+    examples: [
+      "ib changelog list --month 2026-06 --type feature",
+      "ib changelog list --search weather",
+      "ib changelog list --has-feedback --status Deployed",
+    ],
   },
   {
     command: "ib changelog get",

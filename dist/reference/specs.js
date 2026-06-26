@@ -4019,6 +4019,7 @@ const BASE_COMMAND_SPECS = [
             { name: "unresolved", type: "boolean", description: "Shortcut for --status open,reviewed (un-closed items); mutually exclusive with --status" },
             { name: "kind", type: "string", description: "improvement | bug | idea | legal" },
             { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | other" },
+            { name: "search", type: "string", description: "Substring match over description/command/resolution/errorText (deploy-gated)" },
             { name: "limit", type: "number", default: "50", description: "Max rows (cap 200)" },
             { name: "offset", type: "number", default: "0", description: "Pagination offset" },
             { name: "full", type: "boolean", description: "Return untruncated description/resolution (default: each capped at 200 chars)" },
@@ -4029,10 +4030,14 @@ const BASE_COMMAND_SPECS = [
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
+        notes: [
+            "--search is a server-side substring filter added in a later backend version; against an older backend it is silently ignored (the list returns unfiltered) — deploy-gated.",
+        ],
         examples: [
             "ib feedback list --status open --scope cli",
             "ib feedback list --unresolved",
             "ib feedback list --kind bug --limit 20",
+            "ib feedback list --search IDOR --unresolved",
         ],
     },
     {

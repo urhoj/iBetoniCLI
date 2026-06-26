@@ -1396,6 +1396,10 @@ FLAGS
   --feedback NUMBER    linked feedback id
   --sentry STRING    linked Sentry issue short id
   --source STRING    human|routine
+  --search STRING    Substring match over title/description/files/commitShas (deploy-gated)
+  --status STRING    Substring match on the free-text status field, e.g. 'Deployed' (deploy-gated)
+  --has-feedback BOOLEAN    Only entries linked to a feedback id (deploy-gated)
+  --has-sentry BOOLEAN    Only entries linked to a Sentry issue (deploy-gated)
   --limit NUMBER    Max rows
 
 GLOBAL FLAGS
@@ -1407,8 +1411,13 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
 
+NOTES
+  - --search / --status / --has-feedback / --has-sentry are server-side filters added in a later backend version; against an older backend they are silently ignored (the list returns unfiltered) — deploy-gated.
+
 EXAMPLES
   ib changelog list --month 2026-06 --type feature
+  ib changelog list --search weather
+  ib changelog list --has-feedback --status Deployed
 "
 `;
 
@@ -2742,6 +2751,7 @@ FLAGS
   --unresolved BOOLEAN    Shortcut for --status open,reviewed (un-closed items); mutually exclusive with --status
   --kind STRING    improvement | bug | idea | legal
   --scope STRING    cli | app | jerry | bsg2 | workspace | other
+  --search STRING    Substring match over description/command/resolution/errorText (deploy-gated)
   --limit NUMBER    Max rows (cap 200) (default: 50)
   --offset NUMBER    Pagination offset (default: 0)
   --full BOOLEAN    Return untruncated description/resolution (default: each capped at 200 chars)
@@ -2757,10 +2767,14 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - --search is a server-side substring filter added in a later backend version; against an older backend it is silently ignored (the list returns unfiltered) — deploy-gated.
+
 EXAMPLES
   ib feedback list --status open --scope cli
   ib feedback list --unresolved
   ib feedback list --kind bug --limit 20
+  ib feedback list --search IDOR --unresolved
 "
 `;
 

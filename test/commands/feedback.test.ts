@@ -200,6 +200,20 @@ describe("ib feedback list", () => {
     expect(get).toHaveBeenCalledWith("/api/feedback?scope=workspace");
   });
 
+  test("forwards --search on the single-status path", async () => {
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { status: "open", search: "IDOR" });
+    expect(get).toHaveBeenCalledWith("/api/feedback?status=open&search=IDOR");
+  });
+
+  test("forwards --search to every page on the multi-status fan-out", async () => {
+    get.mockResolvedValueOnce([]);
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { unresolved: true, search: "weather" });
+    expect(get).toHaveBeenNthCalledWith(1, "/api/feedback?status=open&search=weather&limit=200");
+    expect(get).toHaveBeenNthCalledWith(2, "/api/feedback?status=reviewed&search=weather&limit=200");
+  });
+
   test("truncates description/resolution/errorText to 200 chars by default + sets hint", async () => {
     get.mockResolvedValueOnce([
       {

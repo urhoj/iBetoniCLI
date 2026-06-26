@@ -39,6 +39,8 @@ async function fetchRows(client, params) {
         qs.set("kind", params.kind);
     if (params.scope)
         qs.set("scope", params.scope);
+    if (params.search)
+        qs.set("search", params.search);
     if (params.limit !== undefined)
         qs.set("limit", String(params.limit));
     if (params.offset !== undefined)
@@ -121,12 +123,13 @@ export async function runFeedbackList(client, opts) {
             status: statuses?.[0],
             kind: opts.kind,
             scope: opts.scope,
+            search: opts.search,
             limit: opts.limit,
             offset: opts.offset,
         });
     }
     else {
-        const pages = await Promise.all(statuses.map((s) => fetchRows(client, { status: s, kind: opts.kind, scope: opts.scope, limit: CAP })));
+        const pages = await Promise.all(statuses.map((s) => fetchRows(client, { status: s, kind: opts.kind, scope: opts.scope, search: opts.search, limit: CAP })));
         if (pages.some((p) => p.length >= CAP))
             truncated = true;
         const merged = pages
@@ -257,6 +260,7 @@ export function registerFeedbackCommands(parent, getClient) {
         .option("--full", "Return untruncated description/resolution (default: capped at 200 chars)")
         .option("--kind <kind>", "improvement | bug | idea | legal")
         .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | other")
+        .option("--search <text>", "Substring match over description/command/resolution/errorText (deploy-gated)")
         .option("--limit <n>", "Max rows (default 50, cap 200)", Number)
         .option("--offset <n>", "Pagination offset", Number)
         .action(async (opts) => {

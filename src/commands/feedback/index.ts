@@ -60,12 +60,13 @@ function compactRow(
 /** Build the query string and GET a page of feedback rows (always an array). */
 async function fetchRows(
   client: ApiClient,
-  params: { status?: string; kind?: string; scope?: string; limit?: number; offset?: number }
+  params: { status?: string; kind?: string; scope?: string; search?: string; limit?: number; offset?: number }
 ): Promise<Record<string, unknown>[]> {
   const qs = new URLSearchParams();
   if (params.status) qs.set("status", params.status);
   if (params.kind) qs.set("kind", params.kind);
   if (params.scope) qs.set("scope", params.scope);
+  if (params.search) qs.set("search", params.search);
   if (params.limit !== undefined) qs.set("limit", String(params.limit));
   if (params.offset !== undefined) qs.set("offset", String(params.offset));
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
@@ -165,6 +166,7 @@ export async function runFeedbackList(
     status?: string;
     kind?: string;
     scope?: string;
+    search?: string;
     limit?: number;
     offset?: number;
     unresolved?: boolean;
@@ -180,13 +182,14 @@ export async function runFeedbackList(
       status: statuses?.[0],
       kind: opts.kind,
       scope: opts.scope,
+      search: opts.search,
       limit: opts.limit,
       offset: opts.offset,
     });
   } else {
     const pages = await Promise.all(
       statuses.map((s) =>
-        fetchRows(client, { status: s, kind: opts.kind, scope: opts.scope, limit: CAP })
+        fetchRows(client, { status: s, kind: opts.kind, scope: opts.scope, search: opts.search, limit: CAP })
       )
     );
     if (pages.some((p) => p.length >= CAP)) truncated = true;
@@ -347,6 +350,7 @@ export function registerFeedbackCommands(
     .option("--full", "Return untruncated description/resolution (default: capped at 200 chars)")
     .option("--kind <kind>", "improvement | bug | idea | legal")
     .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | other")
+    .option("--search <text>", "Substring match over description/command/resolution/errorText (deploy-gated)")
     .option("--limit <n>", "Max rows (default 50, cap 200)", Number)
     .option("--offset <n>", "Pagination offset", Number)
     .action(
@@ -354,6 +358,7 @@ export function registerFeedbackCommands(
         status?: string;
         kind?: string;
         scope?: string;
+        search?: string;
         limit?: number;
         offset?: number;
         unresolved?: boolean;
