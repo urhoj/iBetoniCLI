@@ -7000,6 +7000,7 @@ FLAGS
   --last STRING    personLastName (REQUIRED)
   --phone STRING    personPhone
   --email STRING    personEmail (optional)
+  --memo STRING    personMemo — free-text note/comment (optional)
   --asiakas NUMBER    Owner asiakasId (defaults to your active company)
   --global BOOLEAN    Create a global, owner-less person (ownerAsiakasId=null). Mutually exclusive with --asiakas.
   --get-or-create BOOLEAN    On a duplicate email, return the existing person (reused:true) when visible to you; an email owned by a company you can't access errors with guidance

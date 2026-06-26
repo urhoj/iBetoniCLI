@@ -43,6 +43,8 @@ export interface PersonCreateFlags {
   phone?: string;
   /** Optional — the DB and backend accept a person with no email (phone-only contacts). */
   email?: string;
+  /** Optional free-text note/comment (personMemo column). */
+  memo?: string;
   asiakas?: number;
   /** Create a global, self-managing person (ownerAsiakasId=null). Mutually exclusive with asiakas. */
   global?: boolean;
@@ -64,6 +66,7 @@ export function buildPersonCreateBody(
   if (typed.last !== undefined) body.personLastName = typed.last;
   if (typed.phone !== undefined) body.personPhone = typed.phone;
   if (typed.email !== undefined) body.personEmail = typed.email;
+  if (typed.memo !== undefined) body.personMemo = typed.memo;
   if (typed.asiakas !== undefined) body.ownerAsiakasId = typed.asiakas;
   if (typed.global) body.ownerAsiakasId = null;
   return body;
@@ -542,6 +545,7 @@ export function registerPersonCommands(
     .option("--last <s>", "personLastName (required)")
     .option("--phone <s>", "personPhone")
     .option("--email <s>", "personEmail (optional)")
+    .option("--memo <s>", "personMemo — free-text note/comment (optional)")
     .option("--asiakas <id>", "Owner asiakasId (defaults to your active company)", Number)
     .option(
       "--global",
@@ -574,6 +578,7 @@ export function registerPersonCommands(
         last: opts.last,
         phone: opts.phone,
         email: opts.email,
+        memo: opts.memo,
         asiakas: opts.asiakas,
         global: opts.global,
       });

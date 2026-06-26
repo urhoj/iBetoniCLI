@@ -3180,6 +3180,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "last", type: "string", description: "personLastName (REQUIRED)" },
       { name: "phone", type: "string", description: "personPhone" },
       { name: "email", type: "string", description: "personEmail (optional)" },
+      { name: "memo", type: "string", description: "personMemo — free-text note/comment (optional)" },
       { name: "asiakas", type: "number", description: "Owner asiakasId (defaults to your active company)" },
       { name: "global", type: "boolean", description: "Create a global, owner-less person (ownerAsiakasId=null). Mutually exclusive with --asiakas." },
       { name: "get-or-create", type: "boolean", description: "On a duplicate email, return the existing person (reused:true) when visible to you; an email owned by a company you can't access errors with guidance" },

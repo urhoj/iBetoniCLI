@@ -28,6 +28,8 @@ export function buildPersonCreateBody(parsedBody, typed) {
         body.personPhone = typed.phone;
     if (typed.email !== undefined)
         body.personEmail = typed.email;
+    if (typed.memo !== undefined)
+        body.personMemo = typed.memo;
     if (typed.asiakas !== undefined)
         body.ownerAsiakasId = typed.asiakas;
     if (typed.global)
@@ -350,6 +352,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .option("--last <s>", "personLastName (required)")
         .option("--phone <s>", "personPhone")
         .option("--email <s>", "personEmail (optional)")
+        .option("--memo <s>", "personMemo — free-text note/comment (optional)")
         .option("--asiakas <id>", "Owner asiakasId (defaults to your active company)", Number)
         .option("--global", "Create a GLOBAL, self-managing person with no owner (ownerAsiakasId=null), discoverable across companies. Mutually exclusive with --asiakas.")
         .option("--get-or-create", "On a duplicate email, return the existing person (reused:true) when visible to you; an email owned by a company you can't access errors with guidance")
@@ -376,6 +379,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
             last: opts.last,
             phone: opts.phone,
             email: opts.email,
+            memo: opts.memo,
             asiakas: opts.asiakas,
             global: opts.global,
         });
