@@ -184,11 +184,31 @@ export async function runOhjeEditField(client, helpId, field, op, flags, assess 
     return runOhjeUpdate(client, helpId, { [field]: next }, flags, {}, assess);
 }
 /**
+ * Delete one UI help entry (DELETE /api/helps/delete/:helpId). Used to remove
+ * orphan (stale-named) or empty data-driven helpIds — a missing help row makes
+ * its HelperIcon render nothing, the canonical graceful-absence behaviour.
+ * `--dry-run` resolves CLIENT-SIDE: it GETs the current row and returns
+ * `wouldDelete` (the row, or null when the helpId has no entry) WITHOUT issuing
+ * the DELETE — safe even before the backend route deploys. A real run DELETEs
+ * and reports whether a row existed (idempotent). Server-side requires
+ * isHelperEditor (or system-admin/developer).
+ */
+export async function runOhjeDelete(client, helpId, flags) {
+    const current = await runOhjeGet(client, helpId);
+    if (flags.dryRun) {
+        return { dryRun: true, helpId, wouldDelete: current };
+    }
+    const response = await client.delete(`/api/helps/delete/${encodeURIComponent(helpId)}`, { headers: writeFlagsToHeaders(flags) });
+    return { success: true, helpId, deleted: response?.deleted ?? null };
+}
+/**
  * Register `ib ohje` subcommands on the parent commander instance:
  *   - get <helpId>     single help entry (GET /api/helps/get/:helpId)
  *   - list             every help entry, as a list envelope (GET /api/helps/getAll)
  *   - update <helpId>  GET-merge-PUT one entry; --reason required; --dry-run
  *                      previews the merged row client-side without writing
+ *   - delete <helpId>  DELETE one entry; --reason required; --dry-run previews
+ *                      the row that WOULD be deleted client-side without writing
  *
  * Exit codes: 4 = missing --reason / bad input; otherwise the contract-mapped
  * codes via exitWithError (2 auth · 3 permission · 4 validation · 5 not-found).
@@ -300,6 +320,32 @@ export function registerOhjeCommands(parent, getClient) {
                 reason: opts.reason,
             }, { mustExist: opts.mustExist }, { aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview });
             writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    const deleteCmd = o
+        .command("delete <helpId>")
+        .description("Delete a UI help entry (DELETE /api/helps/delete/:helpId). Removes orphan " +
+        "(stale-named) or empty data-driven helpIds; a missing help row makes its " +
+        "HelperIcon render nothing (graceful absence). --reason is required for a write. " +
+        "--dry-run previews the row that WOULD be deleted CLIENT-SIDE without issuing the " +
+        "DELETE (works before the backend route deploys). Idempotent: a missing row " +
+        "returns deleted:false. Requires isHelperEditor or system-admin/developer.");
+    addWriteFlagsToCommand(deleteCmd).action(async (helpId, opts) => {
+        if (!isValidHelpId(helpId)) {
+            failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
+        }
+        if (!opts.dryRun && !opts.reason)
+            failWith("Missing required flag: --reason", 4);
+        try {
+            const client = await getClient();
+            writeJson(await runOhjeDelete(client, helpId, {
+                dryRun: opts.dryRun,
+                idempotencyKey: opts.idempotencyKey,
+                reason: opts.reason,
+            }));
         }
         catch (e) {
             exitWithError(e);

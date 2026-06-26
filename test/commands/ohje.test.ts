@@ -7,6 +7,7 @@ import {
   buildOhjeFields,
   isValidHelpId,
   runOhjeEditField,
+  runOhjeDelete,
 } from "../../src/commands/ohje/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -20,6 +21,7 @@ const mockClient = {
 
 const asGet = () => mockClient.get as ReturnType<typeof vi.fn>;
 const asPut = () => mockClient.put as ReturnType<typeof vi.fn>;
+const asDelete = () => mockClient.delete as ReturnType<typeof vi.fn>;
 
 describe("ib ohje get/list", () => {
   beforeEach(() => {
@@ -241,6 +243,51 @@ describe("ib ohje update", () => {
       runOhjeUpdate(mockClient, "Typo", { shorttext: "s" }, { reason: "r" }, { mustExist: true })
     ).rejects.toThrow(/must-exist/i);
     expect(mockClient.put).not.toHaveBeenCalled();
+  });
+});
+
+describe("ib ohje delete", () => {
+  beforeEach(() => {
+    asGet().mockReset();
+    asDelete().mockReset();
+  });
+
+  test("--dry-run GETs the row and returns wouldDelete WITHOUT issuing a DELETE", async () => {
+    asGet().mockResolvedValueOnce([
+      { helpId: "orphan", title: "T", shorttext: "", htmltext: "", img: null },
+    ]);
+    const res = await runOhjeDelete(mockClient, "orphan", { dryRun: true, reason: "r" });
+    expect(mockClient.get).toHaveBeenCalledWith("/api/helps/get/orphan");
+    expect(mockClient.delete).not.toHaveBeenCalled();
+    expect(res).toEqual({
+      dryRun: true,
+      helpId: "orphan",
+      wouldDelete: { helpId: "orphan", title: "T", shorttext: "", htmltext: "", img: null },
+    });
+  });
+
+  test("--dry-run on a missing helpId reports wouldDelete:null (no DELETE)", async () => {
+    asGet().mockResolvedValueOnce([]);
+    const res = await runOhjeDelete(mockClient, "nope", { dryRun: true });
+    expect(mockClient.delete).not.toHaveBeenCalled();
+    expect(res).toEqual({ dryRun: true, helpId: "nope", wouldDelete: null });
+  });
+
+  test("a real run DELETEs the url-encoded path with the reason header", async () => {
+    asGet().mockResolvedValueOnce([{ helpId: "old id", title: "T" }]);
+    asDelete().mockResolvedValueOnce({ success: true, helpId: "old id", deleted: true });
+    const res = await runOhjeDelete(mockClient, "old id", { reason: "cleanup" });
+    expect(mockClient.delete).toHaveBeenCalledWith("/api/helps/delete/old%20id", {
+      headers: { "X-Action-Reason": "cleanup" },
+    });
+    expect(res).toEqual({ success: true, helpId: "old id", deleted: true });
+  });
+
+  test("a real run on a missing row surfaces deleted:false (idempotent)", async () => {
+    asGet().mockResolvedValueOnce([]);
+    asDelete().mockResolvedValueOnce({ success: true, helpId: "gone", deleted: false });
+    const res = await runOhjeDelete(mockClient, "gone", { reason: "cleanup" });
+    expect(res).toEqual({ success: true, helpId: "gone", deleted: false });
   });
 });
 

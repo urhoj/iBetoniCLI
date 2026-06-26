@@ -6647,6 +6647,46 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib ohje delete matches snapshot 1`] = `
+"USAGE
+  ib ohje delete <helpId> [flags]
+
+DESCRIPTION
+  Delete a UI help-text entry (DELETE /api/helps/delete/:helpId). Removes orphan (stale-named) or empty data-driven helpIds — a missing help row just makes its HelperIcon render nothing (graceful absence), so deleting an empty/unused row is safe. --reason is required for a write. --dry-run previews the row that WOULD be deleted CLIENT-SIDE without issuing the DELETE (works before the backend route deploys). Idempotent: a missing row returns deleted:false. Requires isHelperEditor or system-admin/developer.
+  Permissions: requires isHelperEditor (or system-admin/developer).
+
+ARGUMENTS
+  <helpId> STRING    the helpId to delete (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success: true, helpId, deleted: boolean } — deleted is false when no row existed (idempotent); or { dryRun: true, helpId, wouldDelete: {helpId,title,shorttext,htmltext,img}|null } with --dry-run
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Missing --reason / invalid helpId → pass --reason; helpId 1–250 chars
+  exit 3 (HTTP 403)  Permission denied      → needs isHelperEditor or system-admin/developer
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Backend route is deploy-gated: DELETE /api/helps/delete/:helpId 404s until puminet5api ships it. --dry-run works immediately (resolved client-side via a GET).
+
+EXAMPLES
+  ib ohje delete sendIlmoitusButton --reason "orphan: button renamed to sendNotificationsButton"
+  ib ohje delete koekappale --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib ohje get matches snapshot 1`] = `
 "USAGE
   ib ohje get <helpId> [flags]

@@ -2336,7 +2336,7 @@ const BASE_COMMAND_SPECS = [
             'ib sijainti distance --from "60.17,24.94" --to 42',
         ],
     },
-    // ─── ohje (3) — UI help-text content (helps table behind HelperIcon) ──────
+    // ─── ohje (4) — UI help-text content (helps table behind HelperIcon) ──────
     {
         command: "ib ohje get",
         description: "Get one UI help-text entry by helpId — the title/shorttext/htmltext shown in a HelperIcon '(?)' modal in the web UI. This is end-user help CONTENT, distinct from `ib --help` (CLI usage). Returns null when the helpId has no entry yet. The HTTP route is unauthenticated, but ib calls it with your session token (login still required).",
@@ -2409,6 +2409,27 @@ const BASE_COMMAND_SPECS = [
             'ib ohje update LaskupohjaTilaus --dry-run --title "New title"',
             'ib ohje update "käyttöikä" --shorttext "Betonin käyttöikä" --must-exist --reason groom',
             'ib ohje update tila:2 --append "<p>Lisätieto…</p>" --reason "expand help" --dry-run',
+        ],
+    },
+    {
+        command: "ib ohje delete",
+        description: "Delete a UI help-text entry (DELETE /api/helps/delete/:helpId). Removes orphan (stale-named) or empty data-driven helpIds — a missing help row just makes its HelperIcon render nothing (graceful absence), so deleting an empty/unused row is safe. --reason is required for a write. --dry-run previews the row that WOULD be deleted CLIENT-SIDE without issuing the DELETE (works before the backend route deploys). Idempotent: a missing row returns deleted:false. Requires isHelperEditor or system-admin/developer.",
+        permissions: ["isHelperEditor (or system-admin/developer)"],
+        args: [{ name: "helpId", type: "string", description: "the helpId to delete" }],
+        flags: [],
+        writeFlags: true,
+        outputShape: "{ success: true, helpId, deleted: boolean } — deleted is false when no row existed (idempotent); or { dryRun: true, helpId, wouldDelete: {helpId,title,shorttext,htmltext,img}|null } with --dry-run",
+        errors: [
+            { exit: 4, meaning: "Missing --reason / invalid helpId", remedy: "pass --reason; helpId 1–250 chars" },
+            apiErr(403, "Permission denied", "needs isHelperEditor or system-admin/developer"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        notes: [
+            "Backend route is deploy-gated: DELETE /api/helps/delete/:helpId 404s until puminet5api ships it. --dry-run works immediately (resolved client-side via a GET).",
+        ],
+        examples: [
+            'ib ohje delete sendIlmoitusButton --reason "orphan: button renamed to sendNotificationsButton"',
+            "ib ohje delete koekappale --dry-run",
         ],
     },
     // ─── legal (15) — versioned legal documents + acceptance tracking ─────────
