@@ -47,6 +47,16 @@ describe("ib person list/get/search", () => {
     expect(result.count).toBe(1);
   });
 
+  test("runPersonList: --owned appends ?owned=1", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      count: 0,
+    });
+    await runPersonList(mockClient, { owned: true });
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/person/list?owned=1");
+  });
+
   test("runPersonGet: GET /api/cli/person/get/6233", async () => {
     (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       personId: 6233,

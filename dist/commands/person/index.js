@@ -61,6 +61,8 @@ export async function runPersonList(client, opts) {
         params.set("asiakas", String(opts.asiakas));
     if (opts.limit !== undefined)
         params.set("limit", String(opts.limit));
+    if (opts.owned)
+        params.set("owned", "1");
     const qs = params.toString();
     return client.get(`/api/cli/person/list${qs ? `?${qs}` : ""}`);
 }
@@ -269,6 +271,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .description("List persons")
         .option("--role <role>", "Filter by role name")
         .option("--asiakas <id>", "Filter by asiakasId", (v) => Number(v))
+        .option("--owned", "List persons the company OWNS instead of its members (the default)")
         .option("--limit <n>", "Max rows", (v) => Math.min(Number(v), 500))
         .action(async (opts) => {
         try {

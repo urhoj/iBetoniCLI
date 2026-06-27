@@ -33,6 +33,8 @@ import { registerPersonEmailCommands } from "./email.js";
 export interface PersonListFilter {
   role?: string;
   asiakas?: number;
+  /** List persons the company OWNS instead of its members (the default). */
+  owned?: boolean;
   limit?: number;
 }
 
@@ -96,6 +98,7 @@ export async function runPersonList(
   if (opts.role) params.set("role", opts.role);
   if (opts.asiakas !== undefined) params.set("asiakas", String(opts.asiakas));
   if (opts.limit !== undefined) params.set("limit", String(opts.limit));
+  if (opts.owned) params.set("owned", "1");
   const qs = params.toString();
   return client.get<ListEnvelope<Record<string, unknown>>>(
     `/api/cli/person/list${qs ? `?${qs}` : ""}`
@@ -426,6 +429,10 @@ export function registerPersonCommands(
     .description("List persons")
     .option("--role <role>", "Filter by role name")
     .option("--asiakas <id>", "Filter by asiakasId", (v: string) => Number(v))
+    .option(
+      "--owned",
+      "List persons the company OWNS instead of its members (the default)"
+    )
     .option("--limit <n>", "Max rows", (v: string) => Math.min(Number(v), 500))
     .action(async (opts: PersonListFilter) => {
       try {

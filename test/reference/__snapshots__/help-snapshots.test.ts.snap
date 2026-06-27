@@ -7420,12 +7420,13 @@ exports[`Help snapshots — contract stability > help for ib person list matches
   ib person list [flags]
 
 DESCRIPTION
-  List persons (drivers, admins, etc.) visible to the active company. Optional --role uses ROLE_NAME_BY_TYPEID from @ibetoni/constants.
+  List the active company's persons. By DEFAULT returns its MEMBERS (the asiakasPerson attachment — the same set as \`ib customer person list\`); --owned returns the persons it OWNS (person.ownerAsiakasId) instead. --asiakas <id> scopes to the MEMBERS of another company you belong to (member-gated). Optional --role uses ROLE_NAME_BY_TYPEID from @ibetoni/constants.
   Permissions: requires auth.page.person.read.
 
 FLAGS
   --role STRING    Filter by role name (e.g. driver, admin, laskuAdmin)
-  --asiakas NUMBER    Filter by asiakasId membership
+  --asiakas NUMBER    Scope to the MEMBERS of this asiakasId instead of the active company (you must belong to it). Combine with --owned for the persons it owns.
+  --owned BOOLEAN    List persons the company OWNS (person.ownerAsiakasId) instead of its asiakasPerson members (the default).
   --limit NUMBER    Max rows (capped at 500) (default: 100)
 
 GLOBAL FLAGS
@@ -7441,7 +7442,8 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
-  ib person list --role driver
+  ib person list
+  ib person list --owned
   ib person list --asiakas 1349 --limit 50
 "
 `;

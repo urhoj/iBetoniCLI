@@ -1291,7 +1291,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib person list",
     description:
-      "List persons (drivers, admins, etc.) visible to the active company. Optional --role uses ROLE_NAME_BY_TYPEID from @ibetoni/constants.",
+      "List the active company's persons. By DEFAULT returns its MEMBERS (the asiakasPerson attachment — the same set as `ib customer person list`); --owned returns the persons it OWNS (person.ownerAsiakasId) instead. --asiakas <id> scopes to the MEMBERS of another company you belong to (member-gated). Optional --role uses ROLE_NAME_BY_TYPEID from @ibetoni/constants.",
     permissions: ["auth.page.person.read"],
     flags: [
       {
@@ -1302,7 +1302,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       {
         name: "asiakas",
         type: "number",
-        description: "Filter by asiakasId membership",
+        description:
+          "Scope to the MEMBERS of this asiakasId instead of the active company (you must belong to it). Combine with --owned for the persons it owns.",
+      },
+      {
+        name: "owned",
+        type: "boolean",
+        description:
+          "List persons the company OWNS (person.ownerAsiakasId) instead of its asiakasPerson members (the default).",
       },
       {
         name: "limit",
@@ -1318,7 +1325,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.person.read"),
     ],
     examples: [
-      "ib person list --role driver",
+      "ib person list",
+      "ib person list --owned",
       "ib person list --asiakas 1349 --limit 50",
     ],
   },
