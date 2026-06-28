@@ -3141,15 +3141,16 @@ const BASE_COMMAND_SPECS = [
         flags: [
             { name: "price-cents", type: "number", description: "Offer price in cents (REQUIRED; integer 1..99999900)" },
             { name: "vat-percent", type: "number", default: "25.5", description: "VAT percent" },
+            { name: "price-terms", type: "string", description: "Price-estimate terms (Hinta-arvion ehdot) shown to the customer" },
             { name: "valid-until", type: "string", description: "Offer valid-until (ISO datetime; server default +7d)" },
-            { name: "available-from", type: "string", description: "Earliest availability (ISO datetime)" },
+            { name: "available-from", type: "string", description: "Earliest availability (ISO datetime; stored, not shown on the BetoniJerry customer card)" },
             { name: "extra-notes", type: "string", description: "Free-text notes shown to the customer" },
-            { name: "cancellation-terms", type: "string", description: "Cancellation terms shown to the customer" },
+            { name: "cancellation-terms", type: "string", description: "Per-offer cancellation terms (stored; BetoniJerry shows a platform-standard peruutusehdot, so this is NOT rendered on the customer card)" },
             { name: "maintains-order-info", type: "string", description: "Override provider default (true|false); omit to inherit" },
             { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
-        outputShape: "{ pumppuOfferId, status:'draft', created, messageThreadId } · { dryRun:true, wouldUpsert:{ pumppuRequestId, priceCents, vatPercent, validUntil, availableFrom, extraNotes, cancellationTerms, maintainsOrderInfo } } on --dry-run",
+        outputShape: "{ pumppuOfferId, status:'draft', created, messageThreadId } · { dryRun:true, wouldUpsert:{ pumppuRequestId, priceCents, vatPercent, priceTerms, validUntil, availableFrom, extraNotes, cancellationTerms, maintainsOrderInfo } } on --dry-run",
         errors: [
             apiErr(400, "priceCents missing / out of range", "pass --price-cents as an integer 1..99999900"),
             apiErr(403, "Not a provider", "switch to a provider company (company switch)"),
@@ -3160,6 +3161,7 @@ const BASE_COMMAND_SPECS = [
         examples: [
             'ib jerry offer create 4012 --price-cents 45000 --reason "tarjous"',
             'ib jerry offer create 4012 --price-cents 45000 --vat-percent 25.5 --maintains-order-info false --extra-notes "sis. siirtymat" --reason "tarjous"',
+            'ib jerry offer create 4012 --price-cents 45000 --price-terms "Arvioitu hinta; laskutus toteutuneen mukaan" --reason "tarjous"',
             'ib jerry offer create 4012 --price-cents 45000 --dry-run --reason "preview"',
         ],
     },

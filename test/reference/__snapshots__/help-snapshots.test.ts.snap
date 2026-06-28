@@ -3671,10 +3671,11 @@ ARGUMENTS
 FLAGS
   --price-cents NUMBER    Offer price in cents (REQUIRED; integer 1..99999900)
   --vat-percent NUMBER    VAT percent (default: 25.5)
+  --price-terms STRING    Price-estimate terms (Hinta-arvion ehdot) shown to the customer
   --valid-until STRING    Offer valid-until (ISO datetime; server default +7d)
-  --available-from STRING    Earliest availability (ISO datetime)
+  --available-from STRING    Earliest availability (ISO datetime; stored, not shown on the BetoniJerry customer card)
   --extra-notes STRING    Free-text notes shown to the customer
-  --cancellation-terms STRING    Cancellation terms shown to the customer
+  --cancellation-terms STRING    Per-offer cancellation terms (stored; BetoniJerry shows a platform-standard peruutusehdot, so this is NOT rendered on the customer card)
   --maintains-order-info STRING    Override provider default (true|false); omit to inherit
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
@@ -3687,7 +3688,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { pumppuOfferId, status:'draft', created, messageThreadId } · { dryRun:true, wouldUpsert:{ pumppuRequestId, priceCents, vatPercent, validUntil, availableFrom, extraNotes, cancellationTerms, maintainsOrderInfo } } on --dry-run
+  { pumppuOfferId, status:'draft', created, messageThreadId } · { dryRun:true, wouldUpsert:{ pumppuRequestId, priceCents, vatPercent, priceTerms, validUntil, availableFrom, extraNotes, cancellationTerms, maintainsOrderInfo } } on --dry-run
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  priceCents missing / out of range → pass --price-cents as an integer 1..99999900
@@ -3700,6 +3701,7 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib jerry offer create 4012 --price-cents 45000 --reason "tarjous"
   ib jerry offer create 4012 --price-cents 45000 --vat-percent 25.5 --maintains-order-info false --extra-notes "sis. siirtymat" --reason "tarjous"
+  ib jerry offer create 4012 --price-cents 45000 --price-terms "Arvioitu hinta; laskutus toteutuneen mukaan" --reason "tarjous"
   ib jerry offer create 4012 --price-cents 45000 --dry-run --reason "preview"
 "
 `;

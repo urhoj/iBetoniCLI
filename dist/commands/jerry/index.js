@@ -402,10 +402,11 @@ export function registerJerryCommands(parent, getClient) {
         .description("Create/update your draft offer on a request (provider). Requires --reason.")
         .requiredOption("--price-cents <n>", "Offer price in cents (integer 1..99999900)", Number)
         .option("--vat-percent <n>", "VAT percent (default 25.5)", Number)
+        .option("--price-terms <s>", "Price-estimate terms (Hinta-arvion ehdot) shown to the customer")
         .option("--valid-until <iso>", "Offer valid-until (ISO datetime)")
-        .option("--available-from <iso>", "Earliest availability (ISO datetime)")
+        .option("--available-from <iso>", "Earliest availability (ISO datetime; stored, not shown on the BetoniJerry customer card)")
         .option("--extra-notes <s>", "Free-text notes shown to the customer")
-        .option("--cancellation-terms <s>", "Cancellation terms shown to the customer")
+        .option("--cancellation-terms <s>", "Per-offer cancellation terms (stored; BetoniJerry shows a platform-standard peruutusehdot, so this is NOT rendered on the customer card)")
         .option("--maintains-order-info <bool>", "Override provider default (true|false)", parseBool)).action(async (idStr, opts) => {
         requireReason(opts);
         const priceCents = Number(opts.priceCents);
@@ -415,6 +416,8 @@ export function registerJerryCommands(parent, getClient) {
         const body = { priceCents };
         if (opts.vatPercent !== undefined)
             body.vatPercent = opts.vatPercent;
+        if (opts.priceTerms)
+            body.priceTerms = opts.priceTerms;
         if (opts.validUntil)
             body.validUntil = opts.validUntil;
         if (opts.availableFrom)

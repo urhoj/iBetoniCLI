@@ -327,6 +327,21 @@ describe("ib jerry offer", () => {
     );
   });
 
+  test("create forwards --price-terms in the body", async () => {
+    post.mockResolvedValueOnce({ pumppuOfferId: 56, status: "draft" });
+    await runJerryOfferCreate(
+      mockClient,
+      4012,
+      { priceCents: 45000, priceTerms: "Arvioitu hinta; laskutus toteutuneen mukaan" },
+      { reason: "tarjous" }
+    );
+    expect(post).toHaveBeenCalledWith(
+      "/api/pumppuRequests/4012/offers",
+      { priceCents: 45000, priceTerms: "Arvioitu hinta; laskutus toteutuneen mukaan" },
+      { headers: { "X-Action-Reason": "tarjous" } }
+    );
+  });
+
   test("create forwards --dry-run as X-Dry-Run", async () => {
     post.mockResolvedValueOnce({ dryRun: true });
     await runJerryOfferCreate(

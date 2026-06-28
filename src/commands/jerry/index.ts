@@ -119,6 +119,7 @@ export async function runJerryRequestOffers(
 export interface JerryOfferCreateBody {
   priceCents: number;
   vatPercent?: number;
+  priceTerms?: string;
   validUntil?: string;
   availableFrom?: string;
   extraNotes?: string;
@@ -631,10 +632,11 @@ export function registerJerryCommands(
       .description("Create/update your draft offer on a request (provider). Requires --reason.")
       .requiredOption("--price-cents <n>", "Offer price in cents (integer 1..99999900)", Number)
       .option("--vat-percent <n>", "VAT percent (default 25.5)", Number)
+      .option("--price-terms <s>", "Price-estimate terms (Hinta-arvion ehdot) shown to the customer")
       .option("--valid-until <iso>", "Offer valid-until (ISO datetime)")
-      .option("--available-from <iso>", "Earliest availability (ISO datetime)")
+      .option("--available-from <iso>", "Earliest availability (ISO datetime; stored, not shown on the BetoniJerry customer card)")
       .option("--extra-notes <s>", "Free-text notes shown to the customer")
-      .option("--cancellation-terms <s>", "Cancellation terms shown to the customer")
+      .option("--cancellation-terms <s>", "Per-offer cancellation terms (stored; BetoniJerry shows a platform-standard peruutusehdot, so this is NOT rendered on the customer card)")
       .option("--maintains-order-info <bool>", "Override provider default (true|false)", parseBool)
   ).action(
     async (
@@ -642,6 +644,7 @@ export function registerJerryCommands(
       opts: WriteOpts & {
         priceCents: number;
         vatPercent?: number;
+        priceTerms?: string;
         validUntil?: string;
         availableFrom?: string;
         extraNotes?: string;
@@ -656,6 +659,7 @@ export function registerJerryCommands(
       }
       const body: JerryOfferCreateBody = { priceCents };
       if (opts.vatPercent !== undefined) body.vatPercent = opts.vatPercent;
+      if (opts.priceTerms) body.priceTerms = opts.priceTerms;
       if (opts.validUntil) body.validUntil = opts.validUntil;
       if (opts.availableFrom) body.availableFrom = opts.availableFrom;
       if (opts.extraNotes) body.extraNotes = opts.extraNotes;
