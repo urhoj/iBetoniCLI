@@ -42,6 +42,7 @@ import { registerGlossaryCommands } from "./commands/glossary/index.js";
 import { registerHelpCommands } from "./commands/help/index.js";
 import { registerVersionCommand } from "./commands/version/index.js";
 import { registerDoctorCommand } from "./commands/doctor/index.js";
+import { registerInboxCommand } from "./commands/inbox/index.js";
 import { runReferenceDump, fetchPrimerGlossary } from "./reference/dump.js";
 import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailEdit } from "./reference/detail.js";
 import { parseEditOp } from "./textEdit.js";
@@ -177,6 +178,7 @@ export function buildProgram() {
     registerAttachmentCommands(program, getClient);
     registerVersionCommand(program, packageJson.version, getEndpoint);
     registerDoctorCommand(program, getClient, getEndpoint, packageJson.version, isReadOnly);
+    registerInboxCommand(program, getClient);
     const reference = program
         .command("reference")
         .description("Reference / meta commands (machine-readable CLI catalogue)");

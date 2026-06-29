@@ -4323,6 +4323,26 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     examples: ["ib doctor", "ib doctor --endpoint https://api-staging.ibetoni.fi"],
   },
+  // ─── inbox (1) ───────────────────────────────────────────────────────────
+  {
+    command: "ib inbox",
+    description:
+      "Aggregated operator inbox — the six open/incomplete signals in one rollup: deploy-pending changelog, unresolved feedback (open + reviewed, by kind), new bugs, open support escalations, staged legal drafts, and glossary misses, plus a `needsYou` headline (open feedback + new bugs + legal drafts + open support + deploy-pending entries with a real bump). The single source of truth behind the daily morning-report routine and the /admin operator dashboard. Read-only. Counts by default; --details adds slimmed top-items per signal (bugs without their huge sessionData).",
+    auth: "any",
+    tier: "developer",
+    flags: [
+      { name: "details", type: "boolean", description: "Include slimmed top-items per signal, not just counts" },
+    ],
+    outputShape:
+      "{ generatedAt, needsYou, changelog:{ pending, deployPending, maxBumpLevel }, feedback:{ open, reviewed, byKind:{ open, reviewed } }, bugs:{ new }, support:{ open, truncated }, legal:{ drafts }, glossary:{ misses } } — with --details each signal also carries an `items` array (feedback.items splits into { open, reviewed }).",
+    errors: [
+      apiErr(401, "Token expired", "ib auth refresh"),
+      apiErr(403, "Developer access required", "inbox is developer-gated; use a developer/sysadmin token"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    notes: ["Deploy-gated: 404 until the backend ships GET /api/cli/inbox."],
+    examples: ["ib inbox", "ib inbox --details"],
+  },
   // ─── feedback (5) ────────────────────────────────────────────────────────
   // NOTE on classification: feedback create/resolve carry custom write semantics
   // (meta-exempt create, client-side --dry-run, no idempotency/reason), so they
