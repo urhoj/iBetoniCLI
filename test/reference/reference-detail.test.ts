@@ -32,21 +32,21 @@ describe("runReferenceDetail", () => {
   });
 
   test("tolerates the leading `ib` prefix copied verbatim from `detail list` output", async () => {
-    // `reference detail list` emits `command: "ib driver available"`; feeding that
-    // value straight back into `get` must NOT double the prefix.
-    const mockResult = { command: "ib driver available", summary: null, detail: "d", hint: "" };
-    // as separate args: ["ib","driver","available"]
+    // `reference detail list` emits `command: "ib vehicle driver available"`; feeding
+    // that value straight back into `get` must NOT double the prefix.
+    const mockResult = { command: "ib vehicle driver available", summary: null, detail: "d", hint: "" };
+    // as separate args: ["ib","vehicle","driver","available"]
     const c1 = client({ get: vi.fn().mockResolvedValue(mockResult) });
-    await runReferenceDetail(c1, ["ib", "driver", "available"], "developer");
-    expect((c1 as any).get).toHaveBeenCalledWith("/api/cli/command-catalog/ib%20driver%20available");
-    // as one quoted string: ["ib driver available"]
+    await runReferenceDetail(c1, ["ib", "vehicle", "driver", "available"], "developer");
+    expect((c1 as any).get).toHaveBeenCalledWith("/api/cli/command-catalog/ib%20vehicle%20driver%20available");
+    // as one quoted string: ["ib vehicle driver available"]
     const c2 = client({ get: vi.fn().mockResolvedValue(mockResult) });
-    await runReferenceDetail(c2, ["ib driver available"], "developer");
-    expect((c2 as any).get).toHaveBeenCalledWith("/api/cli/command-catalog/ib%20driver%20available");
+    await runReferenceDetail(c2, ["ib vehicle driver available"], "developer");
+    expect((c2 as any).get).toHaveBeenCalledWith("/api/cli/command-catalog/ib%20vehicle%20driver%20available");
     // prefix-less form still resolves to the same key
     const c3 = client({ get: vi.fn().mockResolvedValue(mockResult) });
-    await runReferenceDetail(c3, ["driver", "available"], "developer");
-    expect((c3 as any).get).toHaveBeenCalledWith("/api/cli/command-catalog/ib%20driver%20available");
+    await runReferenceDetail(c3, ["vehicle", "driver", "available"], "developer");
+    expect((c3 as any).get).toHaveBeenCalledWith("/api/cli/command-catalog/ib%20vehicle%20driver%20available");
   });
 
   test("normalizes the `ib` prefix on the write path too (set)", async () => {

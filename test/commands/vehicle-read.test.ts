@@ -3,7 +3,6 @@ import {
   runVehicleList,
   runVehicleGet,
   runVehicleStatus,
-  runVehicleDrivers,
 } from "../../src/commands/vehicle/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -94,31 +93,5 @@ describe("ib vehicle list/get", () => {
     const result = await runVehicleStatus(mockClient, 7);
     expect(mockClient.get).toHaveBeenCalledWith("/api/cli/vehicle/status/7");
     expect((result as { plate: string }).plate).toBe("ABC-123");
-  });
-
-  test("runVehicleDrivers: hits bare path when no opts set", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      items: [],
-      nextCursor: null,
-      count: 0,
-    });
-    await runVehicleDrivers(mockClient, 7, {});
-    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/vehicle/drivers/7");
-  });
-
-  test("runVehicleDrivers: appends from/to when set", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      items: [{ pvm: "2026-05-29", driverId: 555 }],
-      nextCursor: null,
-      count: 1,
-    });
-    const result = await runVehicleDrivers(mockClient, 7, {
-      from: "2026-05-01",
-      to: "2026-05-31",
-    });
-    expect(mockClient.get).toHaveBeenCalledWith(
-      "/api/cli/vehicle/drivers/7?from=2026-05-01&to=2026-05-31"
-    );
-    expect(result.count).toBe(1);
   });
 });

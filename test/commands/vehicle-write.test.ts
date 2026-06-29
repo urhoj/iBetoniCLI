@@ -6,7 +6,6 @@ import {
   runVehicleUpdate,
   runVehicleDatesList,
   runVehicleDatesExpiring,
-  runVehicleDriversAssign,
 } from "../../src/commands/vehicle/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -295,25 +294,5 @@ describe("ib vehicle dates", () => {
     });
     await runVehicleDatesExpiring(c, 60);
     expect(c.get).toHaveBeenCalledWith("/api/cli/vehicle/dates/expiring?days=60");
-  });
-});
-
-describe("runVehicleDriversAssign", () => {
-  const c = {
-    get: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
-    getCurrentToken: vi.fn(),
-  } as unknown as ApiClient;
-  beforeEach(() => vi.clearAllMocks());
-  test("posts {vehicleId,personId,yyyymmdd} with write headers", async () => {
-    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({});
-    await runVehicleDriversAssign(c, 7, 555, "2026-06-02", { reason: "shift" });
-    expect(c.post).toHaveBeenCalledWith(
-      "/api/vehicle/driverDays/save",
-      { vehicleId: 7, personId: 555, yyyymmdd: 20260602 },
-      { headers: { "X-Action-Reason": "shift" } }
-    );
   });
 });

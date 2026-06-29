@@ -5,6 +5,7 @@ import { decodeJwtPayload } from "../../auth/jwt.js";
 import { parseId } from "../../targets.js";
 import { CliError } from "../../api/errors.js";
 import { diffFields } from "../../diff.js";
+import { registerVehicleDriverCommands } from "./driver.js";
 import { registerLogAlias } from "../log/index.js";
 /**
  * Parse a CLI boolean flag value. Accepts true/1/yes/on (case-insensitive) as
@@ -67,20 +68,6 @@ export async function runVehicleGet(client, vehicleId) {
  */
 export async function runVehicleStatus(client, vehicleId) {
     return client.get(`/api/cli/vehicle/status/${vehicleId}`);
-}
-/**
- * GET /api/cli/vehicle/drivers/:vehicleId — driver-assignment history over a
- * date range. Date aliases (today/yesterday/tomorrow) are resolved before the
- * call; query params are appended only when set.
- */
-export async function runVehicleDrivers(client, vehicleId, opts) {
-    const params = new URLSearchParams();
-    if (opts.from)
-        params.set("from", opts.from);
-    if (opts.to)
-        params.set("to", opts.to);
-    const qs = params.toString();
-    return client.get(`/api/cli/vehicle/drivers/${vehicleId}${qs ? `?${qs}` : ""}`);
 }
 /** GET /api/cli/vehicle/locations — fleet-wide live position snapshot. */
 export async function runVehicleLocations(client) {
@@ -276,22 +263,13 @@ export async function runVehicleUpdate(client, vehicleId, changes, flags) {
     });
 }
 /**
- * Assign a per-day driver to a vehicle (vehicleDriverDays). The date flag is
- * resolved through {@link resolveDate} (today/yesterday/tomorrow aliases) and
- * collapsed to the backend's integer `yyyymmdd` key. Write-safety flags
- * (--dry-run / --idempotency-key / --reason) map to headers as usual.
- */
-export async function runVehicleDriversAssign(client, vehicleId, personId, date, flags) {
-    const yyyymmdd = Number(resolveDate(date).replace(/-/g, ""));
-    return client.post("/api/vehicle/driverDays/save", { vehicleId, personId, yyyymmdd }, { headers: writeFlagsToHeaders(flags) });
-}
-/**
  * Register every `ib vehicle` subcommand on the parent commander instance.
  *
- * Reads: list, get, search, types, status, drivers, dates (list/expiring),
+ * Reads: list, get, search, types, status, dates (list/expiring),
  * and GPS/telemetry — locations, timeline, route, visits.
- * Writes: create, update, driver-assign (carry the --dry-run/--reason/-idempotency
- * write-safety flags).
+ * Writes: create, update (carry the --dry-run/--reason/-idempotency write-safety flags).
+ * The `driver` subgroup (day-driver dispatch + standing default driver) is
+ * registered separately via `registerVehicleDriverCommands`.
  *
  * `src/reference/specs.ts` is the single source of truth for the authoritative
  * subcommand list, flags, permissions, and output shapes (also via
@@ -347,23 +325,6 @@ export function registerVehicleCommands(parent, getClient) {
         try {
             const client = await getClient();
             const result = await runVehicleStatus(client, parseId(idStr, "vehicleId"));
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
-    v.command("drivers <vehicleId>")
-        .description("Driver-assignment history for a vehicle within a date range")
-        .option("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
-        .option("--to <date>", "End date YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
-        .action(async (idStr, opts) => {
-        try {
-            const client = await getClient();
-            const result = await runVehicleDrivers(client, parseId(idStr, "vehicleId"), {
-                from: resolveDate(opts.from),
-                to: resolveDate(opts.to),
-            });
             writeJson(result);
         }
         catch (e) {
@@ -455,7 +416,6 @@ export function registerVehicleCommands(parent, getClient) {
         .option("--no <n>", "Fleet number (vehicleNo)", (s) => Number(s))
         .option("--type <n>", "vehicleTypeId", (s) => Number(s))
         .option("--memo <s>", "Free-text memo")
-        .option("--default-driver <pid>", "Default driver personId", (s) => Number(s))
         .option("--capacity <m3>", "Concrete capacity in m3 (vehicleM3)", (s) => Number(s))
         .option("--asiakas <id>", "Owning asiakasId", (s) => Number(s))
         .option("--show-in-grid <bool>", "Whether the vehicle appears in the grid (true/false)", parseBoolFlag)
@@ -469,7 +429,6 @@ export function registerVehicleCommands(parent, getClient) {
                 vehicleNo: opts.no,
                 vehicleTypeId: opts.type,
                 memo: opts.memo,
-                defaultKuski_personId: opts.defaultDriver,
                 vehicleM3: opts.capacity,
                 asiakasId: opts.asiakas,
                 showInGrid: opts.showInGrid,
@@ -524,24 +483,6 @@ export function registerVehicleCommands(parent, getClient) {
             exitWithError(e);
         }
     });
-    const assignCmd = v
-        .command("driver-assign <vehicleId>")
-        .description("Assign a per-day driver to a vehicle (vehicleDriverDays)")
-        .requiredOption("--person <pid>", "Driver personId", (s) => Number(s))
-        .option("--date <d>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today");
-    addWriteFlagsToCommand(assignCmd).action(async (idStr, opts) => {
-        try {
-            const result = await runVehicleDriversAssign(await getClient(), parseId(idStr, "vehicleId"), opts.person, opts.date, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            });
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
     v.command("visits <filterType> <id>")
         .description("Vehicles that visited a worksite/location. filterType: tyomaa | sijainti")
         .option("--days <n>", "Look-back window in days (omit for all-time)", (val) => Number(val))
@@ -559,5 +500,7 @@ export function registerVehicleCommands(parent, getClient) {
         }
     });
     registerLogAlias(v, getClient, "vehicle", "vehicleId", "Change-tracker audit trail for one vehicle. Alias of `ib log entity vehicle`.");
+    // The vehicle-driver subgroup: day-driver dispatch + standing default driver.
+    registerVehicleDriverCommands(v, getClient);
 }
 //# sourceMappingURL=index.js.map

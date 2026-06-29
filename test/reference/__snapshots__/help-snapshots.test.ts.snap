@@ -2355,287 +2355,6 @@ EXAMPLES
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib driver absences matches snapshot 1`] = `
-"USAGE
-  ib driver absences [flags]
-
-DESCRIPTION
-  Driver absences (vacation/sick leave — personPvm 'pois' rows) in a date range. Optional --person filters to one driver.
-  Permissions: requires auth.page.grid.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
-
-FLAGS
-  --from DATE    Start date YYYY-MM-DD (or today/yesterday/tomorrow) (required)
-  --to DATE    End date YYYY-MM-DD (or today/yesterday/tomorrow) (required)
-  --person NUMBER    Filter to one driver personId
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  ListEnvelope<{ personId, name, date, status, statusName }>
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-NOTES
-  - Read-only — setting absence status is not exposed by the CLI in v1. Deploy-gated.
-
-SEE ALSO
-  ib driver available
-
-EXAMPLES
-  ib driver absences --from 2026-06-01 --to 2026-06-30
-  ib driver absences --from today --to today --person 123
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib driver assign matches snapshot 1`] = `
-"USAGE
-  ib driver assign [flags]
-
-DESCRIPTION
-  Assign a day driver to a vehicle for a date. ATOMIC: updates personPvm AND the keikkat/palkit on that vehicle that day, and relocates the driver off any vehicle they were previously on. Requires --reason.
-  Permissions: requires auth.page.grid.tilaus.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
-
-FLAGS
-  --vehicle NUMBER    Target vehicleId (required)
-  --person NUMBER    Driver personId (required)
-  --date DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (default: today)
-
-WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
-  --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { success, vehicleId, date, personId, oldPersonId } | { dryRun:true, vehicleId, date, personId, oldPersonId, keikkaIds, palkkiIds, wouldClearFromVehicleId } (with --dry-run)
-
-ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Missing/invalid field (no --reason, bad vehicle/person/date) → supply --reason and valid ids
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-NOTES
-  - Requires Admin, HR Admin, or Keikka Handler on the active company.
-  - --reason is hard-required (exits 4 without it).
-  - --dry-run previews the resolved oldPersonId + keikka/palkki ids without writing.
-  - Emits the dayDriver:updated socket so live grids update. Deploy-gated (404 until the backend ships /api/cli/driver/*).
-
-SEE ALSO
-  ib driver gaps, ib driver available, ib driver clear, ib vehicle driver-assign
-
-EXAMPLES
-  ib driver assign --vehicle 53 --person 555 --date tomorrow --reason 'auto-fill'
-  ib driver assign --vehicle 53 --person 555 --dry-run --reason preview
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib driver available matches snapshot 1`] = `
-"USAGE
-  ib driver available <date> [flags]
-
-DESCRIPTION
-  Assignable drivers (company pumpparit) who are free that day — not assigned to a vehicle and not on vacation/sick.
-  Permissions: requires auth.page.grid.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
-
-ARGUMENTS
-  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
-
-FLAGS
-  (none)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  ListEnvelope<{ personId, firstName, lastName, phone }>
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-NOTES
-  - Roster = asiakasPersonSettingTypeId 8 (pumppari) minus assigned-that-day minus absent-that-day.
-  - Deploy-gated.
-
-SEE ALSO
-  ib driver gaps, ib driver assign
-
-EXAMPLES
-  ib driver available today
-  ib driver available tomorrow
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib driver board matches snapshot 1`] = `
-"USAGE
-  ib driver board <date> [flags]
-
-DESCRIPTION
-  All grid-eligible vehicles for a day with their assigned driver, gap status (Ei kuljettajaa), and keikka load. Person/day-centric complement to \`ib vehicle drivers\`.
-  Permissions: requires auth.page.grid.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
-
-ARGUMENTS
-  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
-
-FLAGS
-  (none)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  ListEnvelope<{ vehicleId, plate, name, type, typeName, driverPersonId, driverName, hasDriver, needsDriver, keikkaCount, m3 }>
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-NOTES
-  - needsDriver = the vehicle uses the no-driver bar AND has no day driver (i.e. it's a gap).
-  - Deploy-gated: 404 until puminet5api ships /api/cli/driver/*.
-
-SEE ALSO
-  ib driver gaps, ib driver available, ib driver assign
-
-EXAMPLES
-  ib driver board today
-  ib driver board 2026-06-10
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib driver clear matches snapshot 1`] = `
-"USAGE
-  ib driver clear [flags]
-
-DESCRIPTION
-  Clear the day driver from a vehicle for a date (atomic — also clears the driver from that day's keikkat/palkit on the vehicle). Requires --reason.
-  Permissions: requires auth.page.grid.tilaus.edit.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
-
-FLAGS
-  --vehicle NUMBER    Target vehicleId (required)
-  --date DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (default: today)
-
-WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
-  --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { success, vehicleId, date, personId:null, oldPersonId } | { dryRun:true, ... } (with --dry-run)
-
-ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Missing/invalid field (no --reason, bad vehicle/date) → supply --reason and a valid vehicle
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-NOTES
-  - Requires Admin, HR Admin, or Keikka Handler on the active company.
-  - --reason is hard-required (exits 4 without it). Deploy-gated.
-
-SEE ALSO
-  ib driver assign, ib driver who
-
-EXAMPLES
-  ib driver clear --vehicle 53 --date today --reason 'sick leave'
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib driver gaps matches snapshot 1`] = `
-"USAGE
-  ib driver gaps <date> [flags]
-
-DESCRIPTION
-  Vehicles needing a driver that day — the 'Ei kuljettajaa' list. Board rows filtered to needsDriver.
-  Permissions: requires auth.page.grid.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
-
-ARGUMENTS
-  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
-
-FLAGS
-  (none)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  ListEnvelope<{ vehicleId, plate, name, type, typeName, driverPersonId, driverName, hasDriver, needsDriver, keikkaCount, m3 }>
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-NOTES
-  - Pair with \`ib driver available <date>\` to find drivers to fill these.
-  - Deploy-gated.
-
-SEE ALSO
-  ib driver available, ib driver assign, ib driver board
-
-EXAMPLES
-  ib driver gaps today
-  ib driver gaps tomorrow
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib driver who matches snapshot 1`] = `
-"USAGE
-  ib driver who <vehicleId> <date> [flags]
-
-DESCRIPTION
-  The day driver assigned to a single vehicle on a given date (or null when none).
-  Permissions: requires auth.page.grid.read.
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
-
-ARGUMENTS
-  <vehicleId> NUMBER    Target vehicleId (required)
-  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
-
-FLAGS
-  (none)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { vehicleId, date, driver: { personId, firstName, lastName, phone } | null }
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-NOTES
-  - Returns driver:null (not 404) when no driver is assigned. Deploy-gated.
-
-SEE ALSO
-  ib driver board, ib vehicle drivers
-
-EXAMPLES
-  ib driver who 53 today
-  ib driver who 53 2026-06-10
-"
-`;
-
 exports[`Help snapshots — contract stability > help for ib feedback count matches snapshot 1`] = `
 "USAGE
   ib feedback count [flags]
@@ -3023,7 +2742,7 @@ ARGUMENTS
 FLAGS
   --definition STRING    One-paragraph definition (≤2000). Omit to keep current.
   --synonyms STRING    Comma-separated aliases incl. inflections. Omit to keep; pass "" to clear.
-  --related STRING    Comma-separated command paths, e.g. "ib person,ib driver board". Omit to keep; pass "" to clear.
+  --related STRING    Comma-separated command paths, e.g. "ib person,ib vehicle driver board". Omit to keep; pass "" to clear.
   --entity STRING    Related DB entity, e.g. Person / personId. Omit to keep.
   --domain STRING    Domain grouping (e.g. vacation). Omit to keep.
   --update-only BOOLEAN    Only update an existing term; do not create a new one (404 if absent)
@@ -7065,6 +6784,44 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib person absences matches snapshot 1`] = `
+"USAGE
+  ib person absences [flags]
+
+DESCRIPTION
+  Staff absences (personPvm 'pois' rows — vacation / sick / etc.) in a date range. Staff-wide and person-keyed: the canonical 'who is away' query. An absent person cannot be set as a day driver, so this is also the driver-availability blocker list.
+  Permissions: requires auth.page.grid.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --from DATE    Start date YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+  --to DATE    End date YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+  --person NUMBER    Filter to one personId
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ personId, name, date, status, statusName }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Read-only — setting absence status is not exposed by the CLI in v1.
+  - Reuses /api/cli/driver/absences server-side; \`ib vehicle driver available\` already excludes these from the assignable pool. Deploy-gated.
+
+SEE ALSO
+  ib vehicle driver available, ib person day set
+
+EXAMPLES
+  ib person absences --from today --to today
+  ib person absences --from 2026-06-01 --to 2026-06-30 --person 123
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib person companies matches snapshot 1`] = `
 "USAGE
   ib person companies [<personId>] [flags]
@@ -7213,7 +6970,7 @@ NOTES
   - \`status\` is the personPvmStatus code; map statusId→friendly name via \`ib person day statuses\`.
 
 SEE ALSO
-  ib person day set, ib driver who
+  ib person day set, ib vehicle driver who
 
 EXAMPLES
   ib person day get --person 555 --from today
@@ -7258,10 +7015,10 @@ NOTES
   - --status accepts an id or a name (resolved via \`ib person day statuses\`).
   - --reason is hard-required (exits 4 without it).
   - --dry-run is CLIENT-side (the save endpoint has no server X-Dry-Run guard): it previews wouldChange and never writes.
-  - Read-merges the existing row so a re-set updates in place (no duplicate) and PRESERVES the existing vehicle assignment. It cannot CHANGE the vehicle — use \`ib driver assign\` for that (atomic).
+  - Read-merges the existing row so a re-set updates in place (no duplicate) and PRESERVES the existing vehicle assignment. It cannot CHANGE the vehicle — use \`ib vehicle driver assign\` for that (atomic).
 
 SEE ALSO
-  ib person day statuses, ib person day clear, ib driver assign
+  ib person day statuses, ib person day clear, ib vehicle driver assign
 
 EXAMPLES
   ib person day set --person 555 --date tomorrow --status loma --reason 'kesäloma'
@@ -7295,7 +7052,7 @@ NOTES
   - pois=true marks an absence (vacation/sick); statuses are company-configurable.
 
 SEE ALSO
-  ib person day set, ib driver absences
+  ib person day set, ib person absences
 
 EXAMPLES
   ib person day statuses
@@ -9032,21 +8789,21 @@ EXAMPLES
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib vehicle driver-assign matches snapshot 1`] = `
+exports[`Help snapshots — contract stability > help for ib vehicle driver assign matches snapshot 1`] = `
 "USAGE
-  ib vehicle driver-assign <vehicleId> [flags]
+  ib vehicle driver assign <vehicleId> <date> [flags]
 
 DESCRIPTION
-  Assign a per-day driver to a vehicle (vehicleDriverDays). POST /api/vehicle/driverDays/save.
-  Permissions: requires auth.page.vehicle.edit.
+  Set the DAY driver of a vehicle for a date. ATOMIC (the same transaction the web grid uses): writes personPvm.vehicleId AND the driver on every keikka (keikkaPerson) and palkki (palkkiPerson) on that vehicle that day, and relocates the driver off any other vehicle they held that day. Returns the full set of affected rows. Requires --reason.
+  Permissions: requires auth.page.grid.tilaus.edit.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
-  <vehicleId> NUMBER    vehicleId (required)
+  <vehicleId> NUMBER    Target vehicleId (required)
+  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
 
 FLAGS
   --person NUMBER    Driver personId (required)
-  --date DATE    Day YYYY-MM-DD or today/yesterday/tomorrow (default: today)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -9057,47 +8814,216 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  raw backend response | { dryRun, wouldUpdate }
+  { success, vehicleId, date, personId, oldPersonId, oldDriverName, newDriverName, clearedFromVehicleId, keikkaIds, palkkiIds } | { dryRun:true, vehicleId, date, personId, oldPersonId, keikkaIds, palkkiIds, wouldClearFromVehicleId } (with --dry-run)
 
 ERRORS (stderr, exit non-zero)
-  exit 5 (HTTP 404)  Vehicle not found      → verify vehicleId
+  exit 4 (HTTP 400)  Missing/invalid field (no --reason, bad vehicle/person/date, or person not an eligible pumppari) → supply --reason, valid ids, and a driver eligible for this company
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.edit
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - personPvm-only: this sets just the day-driver bar and does NOT update the keikkat/palkit on the vehicle that day. For the atomic equivalent the grid uses, prefer \`ib driver assign\`.
+  - Requires Admin, HR Admin, or Keikka Handler on the active company. --reason is hard-required (exits 4 without it).
+  - Cascade: personPvm.vehicleId set for the driver; keikkaPerson driver (contactPersonTypeId=1) replaced on each affected keikka; palkkiPerson driver replaced on each affected palkki; the prior occupant of this vehicle (oldPersonId) is freed, and the new driver is pulled off any other vehicle (clearedFromVehicleId).
+  - Return reports exactly what changed: keikkaIds + palkkiIds touched, oldPersonId/oldDriverName displaced, newDriverName, clearedFromVehicleId.
+  - keikkaPerson rows are written with keikkaPersonSourceId=30; the grid's per-keikka-bar driver label filters sourceId=50, so the vehicle ROW shows the driver (via personPvm) but a reloaded keikka BAR may not — known display quirk shared with the web grid.
+  - Emits the dayDriver:updated socket so live grids update. Deploy-gated (404 until /api/cli/driver/* ships).
 
 SEE ALSO
-  ib driver assign, ib driver gaps
+  ib vehicle driver gaps, ib vehicle driver available, ib vehicle driver clear, ib vehicle driver default set
 
 EXAMPLES
-  ib vehicle driver-assign 7 --person 555 --date 2026-06-02 --reason 'cover shift'
-  ib vehicle driver-assign 7 --person 555 --dry-run
+  ib vehicle driver assign 53 tomorrow --person 555 --reason 'auto-fill'
+  ib vehicle driver assign 53 today --person 555 --dry-run --reason preview
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib vehicle drivers matches snapshot 1`] = `
+exports[`Help snapshots — contract stability > help for ib vehicle driver available matches snapshot 1`] = `
 "USAGE
-  ib vehicle drivers <vehicleId> [flags]
+  ib vehicle driver available <date> [flags]
 
 DESCRIPTION
-  Driver assignment history for a vehicle within a date range.
-  Permissions: requires auth.page.vehicle.read.
+  Drivers free to assign that day — company pumpparit (asiakasPersonSettingTypeId 8) minus those already assigned to a vehicle that day minus those absent. The assignment candidate pool.
+  Permissions: requires auth.page.grid.read.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
-  <vehicleId> NUMBER    vehicleId to inspect (required)
+  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
 
 FLAGS
-  --from DATE    Start date (YYYY-MM-DD or today/yesterday/tomorrow) (default: today)
-  --to DATE    End date (YYYY-MM-DD or today/yesterday/tomorrow) (default: today)
+  (none)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ pvm, driverId, driverName, shiftStart, shiftEnd }>
+  ListEnvelope<{ personId, firstName, lastName, phone }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Returns PEOPLE, not vehicles — the drivers you can hand to \`assign\`.
+  - Absences are already excluded; for the raw away-list use \`ib person absences\`. Deploy-gated.
+
+SEE ALSO
+  ib vehicle driver gaps, ib vehicle driver assign, ib person absences
+
+EXAMPLES
+  ib vehicle driver available today
+  ib vehicle driver available tomorrow
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle driver board matches snapshot 1`] = `
+"USAGE
+  ib vehicle driver board <date> [flags]
+
+DESCRIPTION
+  All grid-eligible vehicles for a day with their day driver, gap status (Ei kuljettajaa), and keikka load. The dispatcher's day view.
+  Permissions: requires auth.page.grid.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+ARGUMENTS
+  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ vehicleId, plate, name, type, typeName, driverPersonId, driverName, hasDriver, needsDriver, keikkaCount, m3 }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - driverPersonId/driverName come from personPvm (the live day-driver source).
+  - needsDriver = the vehicle uses the no-driver bar AND has no day driver (i.e. it's a gap).
+  - Deploy-gated: 404 until puminet5api ships /api/cli/driver/*.
+
+SEE ALSO
+  ib vehicle driver gaps, ib vehicle driver available, ib vehicle driver assign
+
+EXAMPLES
+  ib vehicle driver board today
+  ib vehicle driver board 2026-06-10
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle driver clear matches snapshot 1`] = `
+"USAGE
+  ib vehicle driver clear <vehicleId> <date> [flags]
+
+DESCRIPTION
+  Remove the DAY driver from a vehicle for a date (same atomic cascade as assign, personId=null): clears the driver from that day's keikkat/palkit and frees the person (personPvm.vehicleId=null) so they're available for other tasks. Returns what was cleared. Requires --reason.
+  Permissions: requires auth.page.grid.tilaus.edit.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+ARGUMENTS
+  <vehicleId> NUMBER    Target vehicleId (required)
+  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success, vehicleId, date, personId:null, oldPersonId, oldDriverName, newDriverName:null, clearedFromVehicleId:null, keikkaIds, palkkiIds } | { dryRun:true, ... } (with --dry-run)
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Missing/invalid field (no --reason, bad vehicle/date) → supply --reason and a valid vehicle
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Requires Admin, HR Admin, or Keikka Handler on the active company. --reason is hard-required (exits 4 without it).
+  - Use this when a driver breaks down / is pulled off — they become available again for \`ib vehicle driver assign\` elsewhere. Deploy-gated.
+
+SEE ALSO
+  ib vehicle driver assign, ib vehicle driver who
+
+EXAMPLES
+  ib vehicle driver clear 53 today --reason 'breakdown — freed for other run'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle driver default clear matches snapshot 1`] = `
+"USAGE
+  ib vehicle driver default clear <vehicleId> [flags]
+
+DESCRIPTION
+  Clear the vehicle's STANDING default driver (setDefaultPumppari with personId=null): clears the column and removes the default driver from future keikat. Requires --reason.
+  Permissions: requires auth.page.vehicle.edit.
+
+ARGUMENTS
+  <vehicleId> NUMBER    Target vehicleId (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success, vehicleId, defaultDriverPersonId:null, cascade: { futureKeikkaIds, futureKeikkaCount, personPvmDaysUpdated } } | { dryRun:true, wouldUpdate } (with --dry-run)
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Missing --reason / bad id → supply --reason and a valid vehicleId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Clears vehicle.defaultKuski_personId and removes the driver (keikkaPerson contactPersonTypeId=1) from the vehicle's keikat from today 00:00 onward (today's later keikat included).
+  - Because the endpoint keys personPvm on the (now null) personId, clear does NOT re-point existing future personPvm rows — a prior default driver's already-set future day-driver rows remain until cleared per-day with \`ib vehicle driver clear\`. personPvmDaysUpdated is therefore 0 on a clear. Deploy-gated on the cascade-reporting proc.
+
+SEE ALSO
+  ib vehicle driver default set, ib vehicle driver clear
+
+EXAMPLES
+  ib vehicle driver default clear 53 --reason "driver left"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle driver default get matches snapshot 1`] = `
+"USAGE
+  ib vehicle driver default get <vehicleId> [flags]
+
+DESCRIPTION
+  Read the vehicle's STANDING default driver (vehicle.defaultKuski_personId) — the template driver, distinct from the per-day driver. Projects the field off the vehicle record.
+  Permissions: requires auth.page.vehicle.read.
+
+ARGUMENTS
+  <vehicleId> NUMBER    Target vehicleId (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { vehicleId, defaultDriverPersonId }
 
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Vehicle not found      → verify vehicleId
@@ -9105,11 +9031,175 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - defaultDriverPersonId is null when unset; resolve the name with \`ib person get <id>\`. For today's ACTUAL driver use \`ib vehicle driver who\`.
+
 SEE ALSO
-  ib driver who, ib driver board
+  ib vehicle driver default set, ib vehicle driver who
 
 EXAMPLES
-  ib vehicle drivers 7 --from 2026-05-01 --to 2026-05-31
+  ib vehicle driver default get 53
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle driver default set matches snapshot 1`] = `
+"USAGE
+  ib vehicle driver default set <vehicleId> [flags]
+
+DESCRIPTION
+  Set the vehicle's STANDING default driver via /api/vehicle/setDefaultPumppari — the exact endpoint the FE 'Oletus pumppari' control uses. Cascades to FUTURE dates and returns a cascade summary. Requires --reason.
+  Permissions: requires auth.page.vehicle.edit.
+
+ARGUMENTS
+  <vehicleId> NUMBER    Target vehicleId (required)
+
+FLAGS
+  --person NUMBER    Default driver personId (required)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success, vehicleId, defaultDriverPersonId, cascade: { futureKeikkaIds, futureKeikkaCount, personPvmDaysUpdated } } | { dryRun:true, wouldUpdate } (with --dry-run)
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Missing --reason / bad ids → supply --reason and a valid vehicleId/personId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.edit
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Cascade: sets vehicle.defaultKuski_personId; re-points the driver's EXISTING personPvm day-rows where pvm is AFTER today (active, pois=0; today EXCLUDED) to this vehicle; AND replaces the driver (keikkaPerson contactPersonTypeId=1, sourceId=30) on the vehicle's keikat from today 00:00 onward — so TODAY's later keikat ARE re-driven even though the personPvm half skips today. It does NOT create personPvm rows and does NOT touch palkit.
+  - cascade.personPvmDaysUpdated = future day-driver rows re-pointed; cascade.futureKeikkaIds/Count = future keikat updated.
+  - Same keikkaPersonSourceId=30 vs grid-bar-filter=50 display quirk as \`ib vehicle driver assign\`.
+  - This is the standing/template driver — for a single date use \`ib vehicle driver assign\`. Deploy-gated on the cascade-reporting proc (the write itself already works).
+
+SEE ALSO
+  ib vehicle driver default get, ib vehicle driver default clear, ib vehicle driver assign
+
+EXAMPLES
+  ib vehicle driver default set 53 --person 555 --reason "permanent driver"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle driver gaps matches snapshot 1`] = `
+"USAGE
+  ib vehicle driver gaps <date> [flags]
+
+DESCRIPTION
+  Vehicles needing a driver that day — the 'Ei kuljettajaa' list. Board rows filtered to needsDriver.
+  Permissions: requires auth.page.grid.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+ARGUMENTS
+  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ vehicleId, plate, name, type, typeName, driverPersonId, driverName, hasDriver, needsDriver, keikkaCount, m3 }>
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Pair with \`ib vehicle driver available <date>\` to find drivers to fill these. Deploy-gated.
+
+SEE ALSO
+  ib vehicle driver available, ib vehicle driver assign, ib vehicle driver board
+
+EXAMPLES
+  ib vehicle driver gaps today
+  ib vehicle driver gaps tomorrow
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle driver history matches snapshot 1`] = `
+"USAGE
+  ib vehicle driver history <vehicleId> [flags]
+
+DESCRIPTION
+  Who was the DAY driver of one vehicle on each day of a range, sourced from personPvm (the live day-driver table) — NOT the legacy vehicleDriverDays. One row per day that had a driver.
+  Permissions: requires auth.page.grid.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+ARGUMENTS
+  <vehicleId> NUMBER    Target vehicleId (required)
+
+FLAGS
+  --from DATE    Start date YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+  --to DATE    End date YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ date, personId, firstName, lastName, name }>
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Bad from/to date       → use YYYY-MM-DD (or today/yesterday/tomorrow)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Per-day \`ib vehicle driver who\`, batched over a range. Deploy-gated (new /api/cli/driver/history route).
+
+SEE ALSO
+  ib vehicle driver who, ib vehicle driver board
+
+EXAMPLES
+  ib vehicle driver history 53 --from 2026-06-01 --to 2026-06-30
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib vehicle driver who matches snapshot 1`] = `
+"USAGE
+  ib vehicle driver who <vehicleId> <date> [flags]
+
+DESCRIPTION
+  The day driver assigned to a single vehicle on a date (from personPvm), or null.
+  Permissions: requires auth.page.grid.read.
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+ARGUMENTS
+  <vehicleId> NUMBER    Target vehicleId (required)
+  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { vehicleId, date, driver: { personId, firstName, lastName, phone } | null }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Returns driver:null (not 404) when no driver is assigned. For a date range use \`ib vehicle driver history\`. For the STANDING default see \`ib vehicle driver default get\`. Deploy-gated.
+
+SEE ALSO
+  ib vehicle driver history, ib vehicle driver default get, ib vehicle driver board
+
+EXAMPLES
+  ib vehicle driver who 53 today
+  ib vehicle driver who 53 2026-06-10
 "
 `;
 
@@ -9217,7 +9307,7 @@ exports[`Help snapshots — contract stability > help for ib vehicle log matches
   ib vehicle log <vehicleId> [flags]
 
 DESCRIPTION
-  Change-tracker audit trail for one vehicle — who changed which field, when, old→new, with --reason. Alias of \`ib log entity vehicle\`. For DRIVER-assignment history use \`ib vehicle drivers\` (different data: personPvm assignments). GET /api/changes/vehicle/:vehicleId/:ownerAsiakasId.
+  Change-tracker audit trail for one vehicle — who changed which field, when, old→new, with --reason. Alias of \`ib log entity vehicle\`. For day-driver history use \`ib vehicle driver history\` (personPvm-based). GET /api/changes/vehicle/:vehicleId/:ownerAsiakasId.
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
@@ -9240,7 +9330,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 SEE ALSO
-  ib log entity, ib vehicle drivers
+  ib log entity, ib vehicle driver history
 
 EXAMPLES
   ib vehicle log 53
@@ -9423,7 +9513,6 @@ FLAGS
   --no NUMBER    Fleet number
   --type NUMBER    vehicleTypeId
   --memo STRING    Free-text memo
-  --default-driver NUMBER    Default driver personId
   --capacity NUMBER    Concrete capacity in m3
   --asiakas NUMBER    Owning asiakasId
   --show-in-grid BOOLEAN    Whether the vehicle appears in the grid (true/false)

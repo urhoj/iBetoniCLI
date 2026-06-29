@@ -281,7 +281,7 @@ export function registerGlossaryCommands(program, getClient) {
         .argument("<term>", "Canonical term")
         .option("--definition <d>", "One-paragraph definition (omit to keep current)")
         .option("--synonyms <list>", 'Comma-separated aliases incl. inflections (omit to keep; "" to clear)')
-        .option("--related <list>", 'Comma-separated command paths, e.g. "ib person,ib driver board" (omit to keep; "" to clear)')
+        .option("--related <list>", 'Comma-separated command paths, e.g. "ib person,ib vehicle driver board" (omit to keep; "" to clear)')
         .option("--entity <e>", "Related DB entity, e.g. Person / personId (omit to keep)")
         .option("--domain <d>", "Domain grouping (e.g. vacation) (omit to keep)")
         .option("--update-only", "Only update an existing term; do not create a new one (404 if absent)")
