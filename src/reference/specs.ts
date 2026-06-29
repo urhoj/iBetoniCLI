@@ -1034,25 +1034,6 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   },
 
   {
-    command: "ib customer prh",
-    description:
-      "Look up a company in the Finnish business registry (PRH). Pass <ytunnus> for an exact business-ID lookup, or --search <name>. Read-only; any authenticated user.",
-    auth: "any",
-    args: [{ name: "ytunnus", type: "string", required: false, description: "business ID (XXXXXXXX-X)" }],
-    flags: [
-      { name: "search", type: "string", description: "Search by company name instead" },
-      { name: "page", type: "number", default: "1", description: "Result page for --search" },
-    ],
-    outputShape:
-      "by-id: { businessId, name, tradeNames, address:{street,postCode,city,full}, companyForm, status } | search: ListEnvelope<{ businessId, name, city }>",
-    errors: [
-      apiErr(404, "Business ID not found", "verify the Y-tunnus"),
-      apiErr(400, "Invalid Y-tunnus format", "use XXXXXXXX-X"),
-      ...COMMON_AUTH_ERRORS,
-    ],
-    examples: ["ib customer prh 0145937-9", "ib customer prh --search Betoni"],
-  },
-  {
     command: "ib customer log",
     description:
       "Change-tracker audit trail for one customer — who changed which field, when, and the --reason. Reads the same log the CLI's writes populate.",
@@ -3973,9 +3954,43 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ];
   })(),
 
-  // ─── weather (7) ─────────────────────────────────────────────────────────
+  // ─── opendata (9): free/open external data — building + weather + prh ─────
   {
-    command: "ib weather forecast",
+    command: "ib opendata building",
+    description:
+      "Look up building-registry data for a point in the Helsinki metropolitan area (Helsinki/Vantaa/Espoo/HSY open WFS data). Resolve the point from EXACTLY ONE of: --sijainti, --worksite (alias --tyomaa), --lat+--lng, or --address. --city overrides the provider; when omitted it is derived from the source or auto-tried (Helsinki→Vantaa→Espoo). Read-only; any authenticated user. Worksite resolution is tenant-scoped; sijainti is cross-tenant readable; building data itself is public.",
+    auth: "any",
+    flags: [
+      { name: "sijainti", type: "number", description: "Resolve coordinates from a sijainti id (cross-tenant readable)" },
+      { name: "worksite", type: "number", description: "Resolve coordinates from a worksite (tyomaaId); tenant-scoped" },
+      { name: "tyomaa", type: "number", description: "Alias for --worksite" },
+      { name: "lat", type: "number", description: "Latitude (WGS84) — pair with --lng" },
+      { name: "lng", type: "number", description: "Longitude (WGS84) — pair with --lat" },
+      { name: "address", type: "string", description: "Street address to geocode (e.g. 'Mannerheimintie 1, Helsinki')" },
+      { name: "city", type: "string", description: "Helsinki | Vantaa | Espoo | HSY (override; otherwise derived/auto-tried)" },
+    ],
+    outputShape:
+      "{ source:'sijainti'|'worksite'|'address'|'coords', input, coords:{lat,lng}, city|null, requestedCity|null, derivedCity|null, found:boolean, outOfArea:boolean, building:{ buildingId, nationalBuildingId, buildingType, floors, totalArea, completionYear, facadeMaterial, … common schema }|null }",
+    errors: [
+      { exit: 4, meaning: "No source, multiple sources, or invalid city/coords", remedy: "pass exactly one of --sijainti / --worksite / --lat+--lng / --address; city must be Helsinki|Vantaa|Espoo|HSY" },
+      apiErr(404, "Sijainti/worksite not found (or no coordinates), or address not geocodable", "verify the id/address; a worksite must be geocoded and in your tenant"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "outOfArea:true → the point is outside the Helsinki metropolitan area (no city WFS covers it), found is false.",
+      "found:false with outOfArea:false → no building within ~50 m of the point.",
+      "For building data already stored on a worksite, `ib worksite get <id> --include-building` is cheaper.",
+    ],
+    seeAlso: ["ib worksite get", "ib opendata weather worksite", "ib sijainti list"],
+    examples: [
+      "ib opendata building --worksite 1234",
+      "ib opendata building --sijainti 56",
+      "ib opendata building --address 'Mannerheimintie 1, Helsinki'",
+      "ib opendata building --lat 60.1699 --lng 24.9384 --city Helsinki",
+    ],
+  },
+  {
+    command: "ib opendata weather forecast",
     description:
       "Single-point FMI weather forecast for a lat/lng at a given time. Coordinates must be within Finland (lat 59.5–70.1, lng 19.0–31.6). Time must be within now..+240h. Requires the company weather module (asiakasPersonSettingTypeId 18); 403 if disabled.",
     permissions: ["company weather module (asiakasPersonSettingTypeId 18)"],
@@ -3987,18 +4002,18 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }",
     errors: [
-      apiErr(403, "Weather module off or permission denied", "enable via 'ib weather toggle --on' (admin) or contact an admin"),
+      apiErr(403, "Weather module off or permission denied", "enable via 'ib opendata weather toggle --on' (admin) or contact an admin"),
       apiErr(400, "Bad coords/time", "use Finland coords and a time within now..+240h"),
       apiErr(401, "Not authenticated", "run 'ib auth login'"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: [
-      "ib weather forecast --lat 60.1699 --lng 24.9384 --time now",
-      "ib weather forecast --lat 60.1699 --lng 24.9384 --time 2026-06-09T14:00:00Z",
+      "ib opendata weather forecast --lat 60.1699 --lng 24.9384 --time now",
+      "ib opendata weather forecast --lat 60.1699 --lng 24.9384 --time 2026-06-09T14:00:00Z",
     ],
   },
   {
-    command: "ib weather day",
+    command: "ib opendata weather day",
     description:
       "Daily aggregate weather forecast (min/max/avg temperature, wind, precipitation) for a lat/lng on a calendar date. Accepts relative date aliases: today, tomorrow, yesterday. Coordinates must be within Finland. Requires the company weather module.",
     permissions: ["company weather module (asiakasPersonSettingTypeId 18)"],
@@ -4010,18 +4025,18 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ date, minTemp, maxTemp, avgTemp, windSpeed, precipitation, weatherSymbol, source, coordinates }",
     errors: [
-      apiErr(403, "Weather module off or permission denied", "enable via 'ib weather toggle --on'"),
+      apiErr(403, "Weather module off or permission denied", "enable via 'ib opendata weather toggle --on'"),
       apiErr(400, "Bad coords/date", "use Finland coords and a valid date"),
       apiErr(401, "Not authenticated", "run 'ib auth login'"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: [
-      "ib weather day --lat 60.17 --lng 24.94 --date today",
-      "ib weather day --lat 60.17 --lng 24.94 --date 2026-06-10",
+      "ib opendata weather day --lat 60.17 --lng 24.94 --date today",
+      "ib opendata weather day --lat 60.17 --lng 24.94 --date 2026-06-10",
     ],
   },
   {
-    command: "ib weather pumping",
+    command: "ib opendata weather pumping",
     description:
       "Weather analysis over a concrete-pumping window: hourly conditions for the entire duration starting at --start. The backend can correlate with a keikka via --keikka for error reporting. Requires the company weather module.",
     permissions: ["company weather module (asiakasPersonSettingTypeId 18)"],
@@ -4035,18 +4050,18 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ hourly: [{ time, temperature, windSpeed, precipitation, weatherSymbol }], summary, coordinates }",
     errors: [
-      apiErr(403, "Weather module off or permission denied", "enable via 'ib weather toggle --on'"),
+      apiErr(403, "Weather module off or permission denied", "enable via 'ib opendata weather toggle --on'"),
       apiErr(400, "Bad coords/time/duration", "use Finland coords, valid ISO time, positive duration"),
       apiErr(401, "Not authenticated", "run 'ib auth login'"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: [
-      "ib weather pumping --lat 60.17 --lng 24.94 --start now --duration 120",
-      "ib weather pumping --lat 60.17 --lng 24.94 --start 2026-06-10T08:00:00Z --duration 90 --keikka 1234",
+      "ib opendata weather pumping --lat 60.17 --lng 24.94 --start now --duration 120",
+      "ib opendata weather pumping --lat 60.17 --lng 24.94 --start 2026-06-10T08:00:00Z --duration 90 --keikka 1234",
     ],
   },
   {
-    command: "ib weather worksite",
+    command: "ib opendata weather worksite",
     description:
       "Forecast for a worksite identified by tyomaaId. The backend resolves the coordinates from the tyomaa record internally — no lat/lng needed. Use --force-refresh to bypass the cache. Requires the company weather module.",
     permissions: ["company weather module (asiakasPersonSettingTypeId 18)"],
@@ -4057,18 +4072,18 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }",
     errors: [
-      apiErr(403, "Weather module off or permission denied", "enable via 'ib weather toggle --on'"),
+      apiErr(403, "Weather module off or permission denied", "enable via 'ib opendata weather toggle --on'"),
       apiErr(404, "Tyomaa not found or has no coordinates", "check tyomaaId; ensure the worksite has been geocoded"),
       apiErr(401, "Not authenticated", "run 'ib auth login'"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: [
-      "ib weather worksite 1234",
-      "ib weather worksite 1234 --force-refresh",
+      "ib opendata weather worksite 1234",
+      "ib opendata weather worksite 1234 --force-refresh",
     ],
   },
   {
-    command: "ib weather address",
+    command: "ib opendata weather address",
     description:
       "Point forecast for a street address: geocodes the address via Google Maps (POST /api/geocode/getLatLng), then calls FMI for the forecast. Requires the company weather module. Fails with exit 5 (not-found) if the address returns ZERO_RESULTS from Google.",
     permissions: ["company weather module (asiakasPersonSettingTypeId 18)"],
@@ -4079,18 +4094,18 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }",
     errors: [
-      apiErr(403, "Weather module off or permission denied", "enable via 'ib weather toggle --on'"),
+      apiErr(403, "Weather module off or permission denied", "enable via 'ib opendata weather toggle --on'"),
       { exit: 5, meaning: "Address not found (ZERO_RESULTS)", remedy: "try a more specific Finnish address" },
       apiErr(401, "Not authenticated", "run 'ib auth login'"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: [
-      "ib weather address --address 'Mannerheimintie 1, Helsinki' --time now",
-      "ib weather address --address 'Tampereen valtatie 5, Tampere' --time 2026-06-10T10:00:00Z",
+      "ib opendata weather address --address 'Mannerheimintie 1, Helsinki' --time now",
+      "ib opendata weather address --address 'Tampereen valtatie 5, Tampere' --time 2026-06-10T10:00:00Z",
     ],
   },
   {
-    command: "ib weather status",
+    command: "ib opendata weather status",
     description:
       "Check whether the weather module is enabled for the active company. Does not require the weather module itself to be enabled (no circular dependency). Returns the enabled/disabled status and related settings.",
     auth: "any",
@@ -4100,10 +4115,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(401, "Not authenticated", "run 'ib auth login'"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
-    examples: ["ib weather status"],
+    examples: ["ib opendata weather status"],
   },
   {
-    command: "ib weather toggle",
+    command: "ib opendata weather toggle",
     description:
       "Enable or disable the weather module for the active company. Pass exactly one of --on or --off. Admin-scoped operation. Supports --dry-run, --idempotency-key, and --reason for audit trail.",
     auth: "any",
@@ -4120,9 +4135,29 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: [
-      "ib weather toggle --on --reason 'enabling for summer season'",
-      "ib weather toggle --off --dry-run",
+      "ib opendata weather toggle --on --reason 'enabling for summer season'",
+      "ib opendata weather toggle --off --dry-run",
     ],
+  },
+  {
+    command: "ib opendata prh",
+    description:
+      "Look up a company in the Finnish business registry (PRH open data). Pass <ytunnus> for an exact business-ID lookup, or --search <name>. Read-only; any authenticated user. Re-homed from `ib customer prh` (still works as a hidden alias); customer create/update prefill from the same data via --from-prh.",
+    auth: "any",
+    args: [{ name: "ytunnus", type: "string", required: false, description: "business ID (XXXXXXXX-X)" }],
+    flags: [
+      { name: "search", type: "string", description: "Search by company name instead" },
+      { name: "page", type: "number", default: "1", description: "Result page for --search" },
+    ],
+    outputShape:
+      "by-id: { businessId, name, tradeNames, address:{street,postCode,city,full}, companyForm, status } | search: ListEnvelope<{ businessId, name, city }>",
+    errors: [
+      apiErr(404, "Business ID not found", "verify the Y-tunnus"),
+      apiErr(400, "Invalid Y-tunnus format", "use XXXXXXXX-X"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    seeAlso: ["ib customer create", "ib opendata building"],
+    examples: ["ib opendata prh 0145937-9", "ib opendata prh --search Betoni"],
   },
 
   // ─── reference (1) ───────────────────────────────────────────────────────

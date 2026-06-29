@@ -6,6 +6,11 @@ import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveRoleTypeId } from "../../roles.js";
 import { resolveTarget, parseId } from "../../targets.js";
 import { runPersonRoleList } from "../person/index.js";
+// PRH lookups live in the shared module (also powers `ib opendata prh`). Aliased
+// to the historical names so internal `--from-prh` call sites and the hidden
+// `ib customer prh` alias are unchanged; re-exported for importers/tests.
+import { runPrhById as runCustomerPrhById, runPrhSearch as runCustomerPrhSearch, } from "../../prh.js";
+export { runCustomerPrhById, runCustomerPrhSearch };
 /**
  * Client-side fallback for `customer list --fields` / `--sijainti-types`:
  * filter the row's `sijainnit` array by sijaintiTypeId, then project the row to
@@ -472,34 +477,6 @@ export async function runCustomerPersonAdd(client, body, flags) {
     return { added: { asiakasId: body.asiakasId, personId: body.personId } };
 }
 /**
- * GET /api/prh/company/:businessId — single company from the Finnish business
- * registry. Backend wraps as { success, data, timestamp }; unwrap `.data`.
- * 404 (unknown Y-tunnus) → CliError exit 5; invalid format → exit 4.
- */
-export async function runCustomerPrhById(client, ytunnus) {
-    const res = await client.get(`/api/prh/company/${encodeURIComponent(ytunnus)}`);
-    return res.data;
-}
-/**
- * GET /api/prh/search/name?q=&page= — name search. Backend wraps as
- * { success, data: { companies, totalResults, … }, timestamp }. Project the
- * companies into the universal list envelope.
- */
-export async function runCustomerPrhSearch(client, name, page = 1) {
-    const qs = new URLSearchParams({ q: name, page: String(page) }).toString();
-    const res = await client.get(`/api/prh/search/name?${qs}`);
-    const companies = res.data?.companies ?? [];
-    return {
-        items: companies.map((c) => ({
-            businessId: c.businessId,
-            name: c.name,
-            city: c.address?.city ?? null,
-        })),
-        nextCursor: null,
-        count: companies.length,
-    };
-}
-/**
  * GET /api/changes/asiakas/:asiakasId/:ownerAsiakasId — the change-tracker
  * audit trail for one customer (the same log the CLI's --reason writes feed).
  * Returns a RAW array (sendSuccess(changes), no .data wrapper). Owner resolved
@@ -893,8 +870,9 @@ export function registerCustomerCommands(parent, getClient) {
             exitWithError(e);
         }
     });
-    c.command("prh [ytunnus]")
-        .description("Look up a company in the Finnish business registry (PRH). Positional <ytunnus> for an exact business-ID lookup, or --search <name>.")
+    // Hidden back-compat alias — canonical command is now `ib opendata prh`.
+    c.command("prh [ytunnus]", { hidden: true })
+        .description("Deprecated alias for `ib opendata prh` (still works). Look up a company in the Finnish business registry (PRH) by <ytunnus> or --search <name>.")
         .option("--search <name>", "Search by company name instead of business ID")
         .option("--page <n>", "Result page for --search (default 1)", (v) => Number(v), 1)
         .action(async (ytunnus, opts) => {

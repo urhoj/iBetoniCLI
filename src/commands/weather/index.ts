@@ -166,10 +166,14 @@ export async function runWeatherToggle(
  */
 export function registerWeatherCommands(
   parent: Command,
-  getClient: () => Promise<ApiClient>
+  getClient: () => Promise<ApiClient>,
+  opts: { hidden?: boolean } = {}
 ): void {
+  // Canonical home is `ib opendata weather`; the top-level `ib weather` is
+  // registered with { hidden: true } as a back-compat alias (runtime-only,
+  // absent from spec-driven discovery and root --help).
   const w = parent
-    .command("weather")
+    .command("weather", { hidden: !!opts.hidden })
     .description("FMI weather forecasts (requires the company weather module)");
 
   w.command("forecast")

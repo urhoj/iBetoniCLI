@@ -60,7 +60,13 @@ describe("Rich --help wiring — real command tree", () => {
       // Commander auto-adds a `help` subcommand to each GROUP (e.g. "ib keikka help");
       // those are framework-generated and legitimately specless. Our own top-level
       // `ib help` (depth 1) DOES have a spec and must NOT be excluded.
-      .filter((p) => !(p.endsWith(" help") && p !== "ib help"));
+      .filter((p) => !(p.endsWith(" help") && p !== "ib help"))
+      // Hidden back-compat aliases: weather + PRH were re-homed under
+      // `ib opendata` (canonical specs live at `ib opendata weather *` /
+      // `ib opendata prh`). These alias leaves are intentionally spec-less so
+      // they vanish from spec-driven discovery while still running.
+      .filter((p) => !p.startsWith("ib weather "))
+      .filter((p) => p !== "ib customer prh");
     const missing = leaves.filter((p) => !specPaths.has(p));
     // Guard against vacuous test: ensure we are actually checking a meaningful number of leaves.
     expect(leaves.length).toBeGreaterThan(80);

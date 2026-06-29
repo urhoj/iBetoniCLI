@@ -34,6 +34,7 @@ import { registerAttachmentCommands } from "./commands/attachment/index.js";
 import { registerSchemaCommands } from "./commands/schema/index.js";
 import { registerCacheCommands } from "./commands/cache/index.js";
 import { registerWeatherCommands } from "./commands/weather/index.js";
+import { registerOpendataCommands } from "./commands/opendata/index.js";
 import { registerChangelogCommands } from "./commands/changelog/index.js";
 import { registerFeedbackCommands } from "./commands/feedback/index.js";
 import { registerAiCommands } from "./commands/ai/index.js";
@@ -178,7 +179,11 @@ export function buildProgram(): Command {
   registerLogCommands(program, getClient);
   registerSchemaCommands(program, getClient);
   registerCacheCommands(program, getClient);
-  registerWeatherCommands(program, getClient);
+  // `ib opendata` (canonical) houses building + weather + prh. The top-level
+  // `ib weather` is kept as a HIDDEN back-compat alias (runtime-only; absent
+  // from spec-driven discovery and root --help).
+  registerOpendataCommands(program, getClient);
+  registerWeatherCommands(program, getClient, { hidden: true });
   registerChangelogCommands(program, getClient);
   registerFeedbackCommands(program, getClient);
   registerAiCommands(program, getClient);
