@@ -179,6 +179,24 @@ export async function runJerryOfferWithdraw(
 }
 
 /**
+ * Hard-delete your OWN DRAFT offer (DELETE /:id/offers/:offerId). Provider-only;
+ * own offer; DRAFT status only — a sent offer 409s (use `offer withdraw` for
+ * pending). Mirrors the request-draft delete; the offer's attachments are
+ * soft-deleted server-side. Returns { success, pumppuOfferId, deleted } (or the
+ * dry-run wouldDelete echo).
+ */
+export async function runJerryOfferDelete(
+  client: ApiClient,
+  id: number,
+  offerId: number,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.delete<unknown>(`/api/pumppuRequests/${id}/offers/${offerId}`, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/**
  * Accept an offer (customer-side; POST /:id/offers/:offerId/accept). Flips this
  * offer to 'accepted', sibling offers to 'rejected', and the request to
  * 'accepted'. Caller must own the request.
@@ -735,6 +753,20 @@ export function registerJerryCommands(
     try {
       const client = await getClient();
       writeJson(await runJerryOfferWithdraw(client, parseId(idStr, "requestId"), parseId(offerIdStr, "offerId"), opts));
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
+
+  addWriteFlagsToCommand(
+    offer
+      .command("delete <requestId> <offerId>")
+      .description("Hard-delete your OWN DRAFT offer (provider; draft only — sent offers 409, use withdraw). Requires --reason.")
+  ).action(async (idStr: string, offerIdStr: string, opts: WriteOpts) => {
+    requireReason(opts);
+    try {
+      const client = await getClient();
+      writeJson(await runJerryOfferDelete(client, parseId(idStr, "requestId"), parseId(offerIdStr, "offerId"), opts));
     } catch (e) {
       exitWithError(e);
     }

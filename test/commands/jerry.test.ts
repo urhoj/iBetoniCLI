@@ -18,6 +18,7 @@ import {
   runJerryOfferAccept,
   runJerryOfferConfirm,
   runJerryOfferWithdraw,
+  runJerryOfferDelete,
   runJerryAdminRequests,
   runJerryAdminRequestOffers,
   runJerryAdminRequestGet,
@@ -417,6 +418,17 @@ describe("ib jerry offer withdraw", () => {
       expect.objectContaining({ headers: expect.any(Object) })
     );
     expect(result).toEqual({ success: true, status: "withdrawn" });
+  });
+
+  test("offer delete hits DELETE /:id/offers/:offerId with headers", async () => {
+    const del = mockClient.delete as ReturnType<typeof vi.fn>;
+    del.mockResolvedValueOnce({ success: true, pumppuOfferId: 5, deleted: true });
+    const result = await runJerryOfferDelete(mockClient, 77, 5, { reason: "väärä luonnos" } as WriteFlags);
+    expect(del).toHaveBeenCalledWith(
+      "/api/pumppuRequests/77/offers/5",
+      expect.objectContaining({ headers: expect.any(Object) })
+    );
+    expect(result).toEqual({ success: true, pumppuOfferId: 5, deleted: true });
   });
 });
 

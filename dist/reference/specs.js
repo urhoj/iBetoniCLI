@@ -3259,6 +3259,25 @@ const BASE_COMMAND_SPECS = [
         examples: ['ib jerry offer withdraw 77 5 --reason "kalusto varattu"'],
     },
     {
+        command: "ib jerry offer delete",
+        description: "Hard-delete YOUR OWN DRAFT offer (DELETE /:id/offers/:offerId). Provider-only; you must own the offer; DRAFT status ONLY — a sent offer (pending/accepted/…) returns 409, use `ib jerry offer withdraw` for a pending one. The offer's attachments are soft-deleted server-side; the (request, provider) message thread is left in place for reuse. Requires --reason.",
+        permissions: ["isProvider"],
+        args: [
+            { name: "requestId", type: "number", description: "pumppuRequestId" },
+            { name: "offerId", type: "number", description: "your DRAFT pumppuOfferId" },
+        ],
+        flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
+        writeFlags: true,
+        outputShape: "{ success: true, pumppuOfferId, deleted: true } or { dryRun: true, wouldDelete: { pumppuOfferId, status } }",
+        errors: [
+            apiErr(403, "Not a provider", "use a pump-company token"),
+            apiErr(404, "Offer not found / not yours", "verify requestId + offerId"),
+            apiErr(409, "Not a draft", "only a draft offer can be deleted; use withdraw for a sent offer"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        examples: ['ib jerry offer delete 77 5 --reason "väärä luonnos"'],
+    },
+    {
         command: "ib jerry counts",
         description: "Lifecycle counts. Default --mine returns the customer view (GET /api/pumppuRequests/mine/counts: draft/open/pending_verification/accepted/cancelled/expired/no_supply). --provider returns the provider badge counts (GET /api/pumppuRequests/provider-counts: avoimet/tarjotut/voitetut/voitetutActionRequired/paattyneet) and requires a provider company.",
         permissions: ["--provider: provider company (isPumppuToimittaja)"],
