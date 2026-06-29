@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { createApiClient } from "../../src/api/client.js";
+import { createApiClient, sanitizeHeaderValue } from "../../src/api/client.js";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -341,5 +341,46 @@ describe("ApiClient", () => {
     expect(init.headers["X-Dry-Run"]).toBe("1");
     expect(init.headers["Idempotency-Key"]).toBe("k1");
     expect(init.headers["X-Action-Reason"]).toBe("test");
+  });
+
+  test("sanitizes non-Latin-1 header values so fetch can't throw a ByteString error", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })
+    );
+    const client = createApiClient({
+      endpoint: "https://api.example.com",
+      token: "x",
+      version: "1.0.0",
+    });
+    await client.post("/api/x", { a: 1 }, { headers: { "X-Action-Reason": "poisto — em dash, 5 €, “lainaus”" } });
+    const init = mockFetch.mock.calls[0][1];
+    expect(init.headers["X-Action-Reason"]).toBe('poisto - em dash, 5 EUR, "lainaus"');
+  });
+});
+
+describe("sanitizeHeaderValue", () => {
+  test("passes ASCII and Latin-1 (incl. Finnish ä/ö/å) through unchanged", () => {
+    expect(sanitizeHeaderValue("plain reason 14 vrk")).toBe("plain reason 14 vrk");
+    expect(sanitizeHeaderValue("ääkköset ÅÄÖ åäö")).toBe("ääkköset ÅÄÖ åäö");
+  });
+
+  test("transliterates common Unicode punctuation to ASCII", () => {
+    expect(sanitizeHeaderValue("a — b")).toBe("a - b"); // em dash
+    expect(sanitizeHeaderValue("a – b")).toBe("a - b"); // en dash
+    expect(sanitizeHeaderValue("it’s")).toBe("it's"); // curly apostrophe
+    expect(sanitizeHeaderValue("“q”")).toBe('"q"'); // curly quotes
+    expect(sanitizeHeaderValue("wait…")).toBe("wait..."); // ellipsis
+    expect(sanitizeHeaderValue("5 €")).toBe("5 EUR"); // euro
+  });
+
+  test("replaces any remaining >255 code point with '?'", () => {
+    expect(sanitizeHeaderValue("emoji 😀 x")).toBe("emoji ?? x"); // astral → 2 surrogate units
+  });
+
+  test("neutralizes control chars (CR/LF) to block header injection", () => {
+    expect(sanitizeHeaderValue("ok\r\nX-Evil: 1")).toBe("ok??X-Evil: 1");
   });
 });

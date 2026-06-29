@@ -35,6 +35,28 @@ function errorMessageFromBody(parsed, status) {
     }
     return fallback;
 }
+/**
+ * HTTP header values must be a ByteString (Latin-1, code points 0–255). Free-text
+ * header values — notably --reason (`X-Action-Reason`) and --idempotency-key — can
+ * carry Unicode punctuation (em/en dashes, curly quotes, …, €) that makes the
+ * runtime `fetch` throw "Cannot convert argument to a ByteString" BEFORE the
+ * request is sent, crashing the whole command client-side. Transliterate the
+ * common offenders to ASCII and replace any remaining >255 code point with '?',
+ * so a reason with fancy characters degrades gracefully instead of aborting the
+ * call. Latin-1 text (incl. Finnish ä/ö/å) passes through unchanged.
+ */
+export function sanitizeHeaderValue(value) {
+    // Fast path: only printable Latin-1 code points (U+0020-U+00FF) present.
+    if (!/[^\u0020-\u00ff]/.test(value))
+        return value;
+    return value
+        .replace(/[\u2010-\u2015]/g, "-") // hyphens & dashes
+        .replace(/[\u2018\u2019\u201a\u201b]/g, "'") // single curly quotes
+        .replace(/[\u201c\u201d\u201e\u201f]/g, '"') // double curly quotes
+        .replace(/\u2026/g, "...") // ellipsis
+        .replace(/\u20ac/g, "EUR") // euro sign
+        .replace(/[^\u0020-\u00ff]/g, "?"); // remaining >255 + control chars
+}
 export function createApiClient({ endpoint, token, version, requestId, onRefresh, readOnly = false, actingAs, quiet = false, }) {
     const platform = `${process.platform} node-${process.versions.node}`;
     const userAgent = `ib-cli/${version} (${platform})`;
@@ -55,13 +77,21 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
         process.stderr.write(`[ib] write → asiakasId ${actingAs.ownerAsiakasId}${name}${umbrella}\n`);
     }
     function buildHeaders(extra = {}, withBody = false) {
-        return {
+        const merged = {
             Authorization: `Bearer ${currentToken}`,
             "User-Agent": userAgent,
             "X-Request-ID": requestId || randomUUID(),
             ...(withBody ? { "Content-Type": "application/json" } : {}),
             ...extra,
         };
+        // Header values must be a Latin-1 ByteString or `fetch` throws before the
+        // request is sent. Sanitize every value (no-op for already-clean ASCII /
+        // Latin-1) so a --reason with an em dash, curly quote, € etc. can't crash
+        // the command. Central choke point: all requests flow through here.
+        for (const key of Object.keys(merged)) {
+            merged[key] = sanitizeHeaderValue(merged[key]);
+        }
+        return merged;
     }
     async function doFetch(method, path, body, opts) {
         const url = `${endpoint}${path}`;
