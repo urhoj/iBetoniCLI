@@ -89,33 +89,11 @@ describe("ib jerry request", () => {
     expect(result).toEqual({ items: [], nextCursor: null, count: 0 });
   });
 
-  test("list --open --all forwards ?scope=all and uses the backend truncated flag", async () => {
-    const rows = Array.from({ length: 200 }, (_, i) => ({ pumppuRequestId: i + 1, distanceKm: i, isOutOfArea: true }));
-    get.mockResolvedValueOnce({ requests: rows, truncated: true });
-    const result = await runJerryRequestList(mockClient, { open: true, all: true });
-    expect(get).toHaveBeenCalledWith("/api/pumppuRequests/open?scope=all");
-    expect(result.count).toBe(200);
-    expect(result.truncated).toBe(true);
-  });
-
-  test("list --open --all reports truncated=false at exactly the cap (no false positive)", async () => {
-    const rows = Array.from({ length: 200 }, (_, i) => ({ pumppuRequestId: i + 1 }));
-    get.mockResolvedValueOnce({ requests: rows, truncated: false });
-    const result = await runJerryRequestList(mockClient, { open: true, all: true });
-    expect(result.count).toBe(200);
-    expect(result.truncated).toBe(false);
-  });
-
-  test("list --open without --all does not set truncated", async () => {
+  test("list --open returns a plain envelope (no marketplace/truncated field)", async () => {
     get.mockResolvedValueOnce([{ pumppuRequestId: 1 }]);
     const result = await runJerryRequestList(mockClient, { open: true });
     expect(get).toHaveBeenCalledWith("/api/pumppuRequests/open");
     expect(result.truncated).toBeUndefined();
-  });
-
-  test("list --all without --open exits 4 (no silent no-op)", async () => {
-    await expect(runJerryRequestList(mockClient, { all: true })).rejects.toThrow();
-    expect(get).not.toHaveBeenCalled();
   });
 
   test("get (default) hits the customer recap path", async () => {

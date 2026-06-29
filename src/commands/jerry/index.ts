@@ -32,7 +32,6 @@ export interface JerryRequestListOpts {
   mine?: boolean;
   status?: string;
   limit?: number;
-  all?: boolean;
   provider?: boolean;
   tab?: string;
 }
@@ -57,22 +56,7 @@ export async function runJerryRequestList(
     return { items, nextCursor: null, count: items.length };
   }
   if (opts.open) {
-    if (opts.all) {
-      // Whole-marketplace browse (?scope=all): open + no_supply beyond the
-      // caller's varikko delivery area, with distanceKm/isOutOfArea/isNoSupply.
-      // The backend returns { requests, truncated } so the 200-row cap is exact,
-      // not inferred from length.
-      const data = await client.get<{ requests?: unknown; truncated?: boolean }>(
-        "/api/pumppuRequests/open?scope=all"
-      );
-      const items = Array.isArray(data?.requests) ? (data.requests as Row[]) : [];
-      return { items, nextCursor: null, count: items.length, truncated: !!data?.truncated };
-    }
     return toEnvelope(await client.get<unknown>("/api/pumppuRequests/open"));
-  }
-  // --all only narrows the provider inbox; --mine has no whole-marketplace scope.
-  if (opts.all) {
-    failWith("--all only applies with --open (whole-marketplace browse)", 4);
   }
   const params = new URLSearchParams();
   if (opts.status) params.set("status", opts.status);
@@ -556,12 +540,11 @@ export function registerJerryCommands(
     .command("list")
     .description("List pump requests (--mine default, or --open provider inbox)")
     .option("--open", "Provider inbox: open requests (requires provider role)")
-    .option("--all", "With --open: browse the whole marketplace — open/no_supply requests beyond your varikko delivery area (adds distanceKm/isOutOfArea/isNoSupply)")
     .option("--mine", "Your own requests (default)")
     .option("--status <csv>", "Filter --mine by status (CSV)")
     .option("--limit <n>", "Max rows for --mine", (v: string) => Math.min(Number(v), 200))
     .option("--provider", "Provider lifecycle view via /provider-list (incl. your sent offers)")
-    .option("--tab <tab>", "With --provider: avoimet|tarjotut|voitetut|paattyneet|kokomarkkina (default avoimet)")
+    .option("--tab <tab>", "With --provider: avoimet|tarjotut|voitetut|paattyneet (default avoimet)")
     .action(async (opts: JerryRequestListOpts) => {
       try {
         const client = await getClient();
