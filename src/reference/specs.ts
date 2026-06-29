@@ -3804,6 +3804,28 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: ['ib jerry admin request-resend 41 --reason "retry fanout"'],
   },
   {
+    command: "ib jerry admin request-extend",
+    description:
+      "Extend a request's validity (POST /api/admin/jerry-requests/:id/extend). Sets expiresAt to now + --days (default 14, i.e. 2 weeks) or an absolute --until date; the new expiry must be in the future. An 'expired' request is reactivated to 'open'; open/no_supply/pending_verification keep their status (a no_supply request stays in Koko markkina, never Päättyneet). draft/cancelled/accepted → 409. System-admin only. Requires --reason.",
+    permissions: ["isSystemAdmin"],
+    tier: "developer",
+    args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
+    flags: [
+      { name: "days", type: "number", description: "Valid for N more days from now (default 14); mutually exclusive with --until" },
+      { name: "until", type: "string", description: "Absolute new expiry (ISO date/datetime); mutually exclusive with --days" },
+      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
+    ],
+    writeFlags: true,
+    outputShape: "{ success: true, status, expiresAt } or { dryRun: true, wouldUpdate: { pumppuRequestId, expiresAt } }",
+    errors: [
+      apiErr(400, "Bad date/days", "use a positive --days or a future --until"),
+      apiErr(403, "Not a system admin", "use a system-admin token"),
+      apiErr(409, "Wrong state", "request not in an extendable state (draft/cancelled/accepted)"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    examples: ['ib jerry admin request-extend 32 --days 14 --reason "reactivate"'],
+  },
+  {
     command: "ib jerry admin request-delete",
     description:
       "Delete a DRAFT request permanently (DELETE /api/admin/jerry-requests/:id). Only status='draft' rows are deletable; a non-draft or missing id returns 404. System-admin only. Requires --reason.",

@@ -263,6 +263,21 @@ export const runJerryAdminRequestExpire = adminReqWrite("expire");
 export const runJerryAdminRequestCancel = adminReqWrite("cancel");
 /** Re-run provider fan-out for a request (POST /api/admin/jerry-requests/:id/resend). System-admin only. */
 export const runJerryAdminRequestResend = adminReqWrite("resend");
+/**
+ * Extend a request's validity (POST /api/admin/jerry-requests/:id/extend). Sends
+ * `until` (absolute ISO) when given, else `days` (omitted → backend default 14).
+ * System-admin only.
+ */
+export async function runJerryAdminRequestExtend(client, id, opts) {
+    const body = {};
+    if (opts.until)
+        body.until = opts.until;
+    else if (opts.days != null)
+        body.days = opts.days;
+    return client.post(`/api/admin/jerry-requests/${id}/extend`, body, {
+        headers: writeFlagsToHeaders(opts),
+    });
+}
 /** Delete a draft request (admin; DELETE /api/admin/jerry-requests/:id). System-admin only. */
 export async function runJerryAdminRequestDelete(client, id, flags) {
     return client.delete(`/api/admin/jerry-requests/${id}`, { headers: writeFlagsToHeaders(flags) });
@@ -699,5 +714,22 @@ export function registerJerryCommands(parent, getClient) {
     adminReqAction("request-cancel", "Cancel any request (admin). Requires --reason.", runJerryAdminRequestCancel);
     adminReqAction("request-resend", "Re-run provider fan-out for a request (admin). Requires --reason.", runJerryAdminRequestResend);
     adminReqAction("request-delete", "Delete a draft request (admin). Requires --reason.", runJerryAdminRequestDelete);
+    // request-extend needs --days/--until, so it is registered outside adminReqAction.
+    addWriteFlagsToCommand(admin
+        .command("request-extend <requestId>")
+        .description("Extend a request's validity / reactivate it (admin). Requires --reason.")
+        .option("--days <n>", "Make it valid for N more days from now (default 14)", Number)
+        .option("--until <date>", "Absolute new expiry (ISO date/datetime)")).action(async (idStr, opts) => {
+        requireReason(opts);
+        if (opts.days != null && opts.until)
+            failWith("Pass either --days or --until, not both", 4);
+        try {
+            const client = await getClient();
+            writeJson(await runJerryAdminRequestExtend(client, parseId(idStr, "requestId"), opts));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
 }
 //# sourceMappingURL=index.js.map

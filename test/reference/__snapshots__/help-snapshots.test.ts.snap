@@ -3374,6 +3374,45 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib jerry admin request-extend matches snapshot 1`] = `
+"USAGE
+  ib jerry admin request-extend <requestId> [flags]
+
+DESCRIPTION
+  Extend a request's validity (POST /api/admin/jerry-requests/:id/extend). Sets expiresAt to now + --days (default 14, i.e. 2 weeks) or an absolute --until date; the new expiry must be in the future. An 'expired' request is reactivated to 'open'; open/no_supply/pending_verification keep their status (a no_supply request stays in Koko markkina, never Päättyneet). draft/cancelled/accepted → 409. System-admin only. Requires --reason.
+  Permissions: requires isSystemAdmin.
+
+ARGUMENTS
+  <requestId> NUMBER    pumppuRequestId (required)
+
+FLAGS
+  --days NUMBER    Valid for N more days from now (default 14); mutually exclusive with --until
+  --until STRING    Absolute new expiry (ISO date/datetime); mutually exclusive with --days
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success: true, status, expiresAt } or { dryRun: true, wouldUpdate: { pumppuRequestId, expiresAt } }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Bad date/days          → use a positive --days or a future --until
+  exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
+  exit 4 (HTTP 409)  Wrong state            → request not in an extendable state (draft/cancelled/accepted)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry admin request-extend 32 --days 14 --reason "reactivate"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib jerry admin request-get matches snapshot 1`] = `
 "USAGE
   ib jerry admin request-get <requestId> [flags]

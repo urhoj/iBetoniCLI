@@ -25,6 +25,7 @@ import {
   runJerryAdminRequestExpire,
   runJerryAdminRequestCancel,
   runJerryAdminRequestResend,
+  runJerryAdminRequestExtend,
   runJerryAdminRequestDelete,
 } from "../../src/commands/jerry/index.js";
 import type { ApiClient } from "../../src/api/client.js";
@@ -464,6 +465,36 @@ describe("ib jerry admin request write commands", () => {
     post.mockResolvedValueOnce({ success: true, sentCount: 3 });
     await runJerryAdminRequestResend(mockClient, 41, { reason: "retry fanout" } as WriteFlags);
     expect(post).toHaveBeenCalledWith("/api/admin/jerry-requests/41/resend", {}, expect.objectContaining({ headers: expect.any(Object) }));
+  });
+
+  test("admin request-extend posts /:id/extend with { days } body + headers", async () => {
+    post.mockResolvedValueOnce({ success: true, status: "open", expiresAt: "2026-07-13T00:00:00.000Z" });
+    await runJerryAdminRequestExtend(mockClient, 32, { days: 14, reason: "reactivate" } as { days?: number; until?: string } & WriteFlags);
+    expect(post).toHaveBeenCalledWith(
+      "/api/admin/jerry-requests/32/extend",
+      { days: 14 },
+      expect.objectContaining({ headers: expect.any(Object) }),
+    );
+  });
+
+  test("admin request-extend prefers --until and omits days", async () => {
+    post.mockResolvedValueOnce({ success: true, status: "open", expiresAt: "2026-08-01T00:00:00.000Z" });
+    await runJerryAdminRequestExtend(mockClient, 32, { days: 14, until: "2026-08-01", reason: "r" } as { days?: number; until?: string } & WriteFlags);
+    expect(post).toHaveBeenCalledWith(
+      "/api/admin/jerry-requests/32/extend",
+      { until: "2026-08-01" },
+      expect.objectContaining({ headers: expect.any(Object) }),
+    );
+  });
+
+  test("admin request-extend sends empty body when neither days nor until given", async () => {
+    post.mockResolvedValueOnce({ success: true, status: "open", expiresAt: "x" });
+    await runJerryAdminRequestExtend(mockClient, 32, { reason: "r" } as { days?: number; until?: string } & WriteFlags);
+    expect(post).toHaveBeenCalledWith(
+      "/api/admin/jerry-requests/32/extend",
+      {},
+      expect.objectContaining({ headers: expect.any(Object) }),
+    );
   });
 
   test("admin request-delete calls DELETE with headers", async () => {
