@@ -31,30 +31,6 @@ try {
 catch {
     setCallerTier("standard");
 }
-// Best-effort prefetch the DB glossary for root `ib --help` / bare `ib` so
-// `renderDomainHelp` can include the GLOSSARY section. Scoped to root help
-// only — subcommand/group help renders from bundled specs and gains nothing.
-// All failures are swallowed: offline, tokenless, or backend-down still
-// renders `--help` correctly (GLOSSARY section simply omitted).
-const wantsRootHelp = process.argv.length <= 2 ||
-    (process.argv.length === 3 && ["--help", "-h"].includes(process.argv[2]));
-if (wantsRootHelp && resolvedAuth?.token) {
-    try {
-        const { createApiClient } = await import("../api/client.js");
-        const { fetchPrimerGlossary } = await import("../reference/dump.js");
-        const { setHelpGlossary } = await import("../reference/domain.js");
-        const client = createApiClient({
-            endpoint: resolvedAuth.endpoint,
-            token: resolvedAuth.token,
-            version: program.version() ?? "0.0.0",
-            readOnly: true,
-        });
-        setHelpGlossary(await fetchPrimerGlossary(client));
-    }
-    catch {
-        // Glossary unavailable — root help renders without the GLOSSARY section.
-    }
-}
 await program
     .parseAsync(process.argv)
     .catch((err) => handleParseRejection(err, parserText, erroringCommand));

@@ -5,9 +5,10 @@
  * it is operating on (the business, the multi-tenant model, the Finnish entity
  * vocabulary). Both ride along in the single artifact an AI ingests at session
  * start: `ib reference dump` embeds {@link DOMAIN_OVERVIEW} and a DB-fetched
- * glossary as top-level keys, and `ib --help` renders the same via
- * {@link renderDomainHelp}. One source of truth → the primer can never drift
- * from the CLI it describes.
+ * glossary as top-level keys; `ib --help` renders the overview plus a pointer
+ * to `ib glossary` via {@link renderDomainHelp} (the full term index is fetched
+ * on demand, not dumped into every help render). One source of truth → the
+ * primer can never drift from the CLI it describes.
  */
 import type { CallerTier } from "../tier.js";
 
@@ -143,50 +144,27 @@ export const TOPICS: Topic[] = [
 ];
 
 /**
- * Module-level holder for a DB-fetched glossary, stashed by `bin/ib.ts` before
- * help renders so `renderDomainHelp` can include it without requiring network
- * access at render time. When empty, the GLOSSARY section is omitted.
- */
-let helpGlossary: Array<{ term: string; synonyms: string[] }> = [];
-
-/** Stash the DB-fetched glossary for renderDomainHelp; called by bin/ib.ts before
- * parseAsync on root --help so the synchronous Commander render can include the
- * GLOSSARY section. Empty → section omitted. */
-export function setHelpGlossary(
-  g: Array<{ term: string; synonyms: string[] }>
-): void {
-  helpGlossary = g;
-}
-
-/**
  * Render the primer as a fixed-section text block for `ib --help`. Mirrors the
  * parse-friendly style of `formatHelp` (uppercase section headers, two-space
  * indent) so an AI sees a consistent layout across root and per-command help.
- * The GLOSSARY section is rendered from the `helpGlossary` holder (DB-fetched
- * at startup by `bin/ib.ts`) — omitted entirely when the holder is empty
- * (offline / tokenless).
+ * The GLOSSARY section is a fixed pointer to `ib glossary` — the full
+ * term/synonym index is fetched on demand (`ib glossary list --terms-only`),
+ * NOT dumped into every help render, so help stays small (and needs no network
+ * round-trip) as the self-improving glossary grows.
  *
  * The `tier` parameter is accepted for API compatibility (callers pass
- * `getCallerTier()`) but is not used for glossary filtering now that the
- * glossary is DB-backed and tier-scoped at the server level.
+ * `getCallerTier()`) but is unused — the glossary is DB-backed and tier-scoped
+ * server-side.
  */
 export function renderDomainHelp(_tier: CallerTier = "developer"): string {
-  const glossary = helpGlossary;
   const lines: string[] = [];
   lines.push("");
   lines.push("ABOUT");
   lines.push(`  ${DOMAIN_OVERVIEW}`);
-  if (glossary.length > 0) {
-    lines.push("");
-    lines.push("GLOSSARY (term + synonyms; run `ib glossary lookup <term>` for the definition)");
-    for (const g of glossary) {
-      lines.push(
-        g.synonyms && g.synonyms.length > 0
-          ? `  ${g.term} (${g.synonyms.join(", ")})`
-          : `  ${g.term}`
-      );
-    }
-  }
+  lines.push("");
+  lines.push("GLOSSARY (Finnish & domain vocabulary — looked up on demand, not listed here)");
+  lines.push("  Term + synonym index:  `ib glossary list --terms-only`");
+  lines.push("  Define a single term:  `ib glossary lookup <term>`");
   lines.push("");
   lines.push("FILING FEEDBACK (AI users — be proactive)");
   lines.push(`  ${FEEDBACK_GUIDANCE.summary}`);
