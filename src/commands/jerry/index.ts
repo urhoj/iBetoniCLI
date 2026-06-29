@@ -940,8 +940,13 @@ export function registerJerryCommands(
     }
   });
 
-  admin
-    .command("requests")
+  // admin request — lifecycle subgroup (reads + write transitions) ─────────────
+  const adminRequest = admin
+    .command("request")
+    .description("Admin tarjouspyyntö lifecycle (list/get/offers/expire/cancel/resend/extend/delete)");
+
+  adminRequest
+    .command("list")
     .description("System-wide tarjouspyyntö list with offer summary (filters)")
     .option("--status <csv>", "Status filter CSV (open,accepted,...)")
     .option("--from <date>", "createdAt from (YYYY-MM-DD / today / yesterday)", resolveDate)
@@ -958,8 +963,8 @@ export function registerJerryCommands(
       }
     });
 
-  admin
-    .command("request-get <requestId>")
+  adminRequest
+    .command("get <requestId>")
     .description("One request's full detail (admin view)")
     .action(async (idStr: string) => {
       try {
@@ -970,8 +975,8 @@ export function registerJerryCommands(
       }
     });
 
-  admin
-    .command("request-offers <requestId>")
+  adminRequest
+    .command("offers <requestId>")
     .description("All offers on one request (admin view, no masking)")
     .action(async (idStr: string) => {
       try {
@@ -983,7 +988,7 @@ export function registerJerryCommands(
     });
 
   const adminReqAction = (name: string, desc: string, run: (c: ApiClient, id: number, f: WriteOpts) => Promise<unknown>) =>
-    addWriteFlagsToCommand(admin.command(`${name} <requestId>`).description(desc))
+    addWriteFlagsToCommand(adminRequest.command(`${name} <requestId>`).description(desc))
       .action(async (idStr: string, opts: WriteOpts) => {
         requireReason(opts);
         try {
@@ -992,15 +997,15 @@ export function registerJerryCommands(
         } catch (e) { exitWithError(e); }
       });
 
-  adminReqAction("request-expire", "Force-expire a request (admin). Requires --reason.", runJerryAdminRequestExpire);
-  adminReqAction("request-cancel", "Cancel any request (admin). Requires --reason.", runJerryAdminRequestCancel);
-  adminReqAction("request-resend", "Re-run provider fan-out for a request (admin). Requires --reason.", runJerryAdminRequestResend);
-  adminReqAction("request-delete", "Delete a draft request (admin). Requires --reason.", runJerryAdminRequestDelete);
+  adminReqAction("expire", "Force-expire a request (admin). Requires --reason.", runJerryAdminRequestExpire);
+  adminReqAction("cancel", "Cancel any request (admin). Requires --reason.", runJerryAdminRequestCancel);
+  adminReqAction("resend", "Re-run provider fan-out for a request (admin). Requires --reason.", runJerryAdminRequestResend);
+  adminReqAction("delete", "Delete a draft request (admin). Requires --reason.", runJerryAdminRequestDelete);
 
-  // request-extend needs --days/--until, so it is registered outside adminReqAction.
+  // extend needs --days/--until, so it is registered outside adminReqAction.
   addWriteFlagsToCommand(
-    admin
-      .command("request-extend <requestId>")
+    adminRequest
+      .command("extend <requestId>")
       .description("Extend a request's validity / reactivate it (admin). Requires --reason.")
       .option("--days <n>", "Make it valid for N more days from now (default 14)", Number)
       .option("--until <date>", "Absolute new expiry (ISO date/datetime)")

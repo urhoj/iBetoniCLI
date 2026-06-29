@@ -296,7 +296,7 @@ describe("ib jerry admin", () => {
     );
   });
 
-  test("admin requests forwards filters and wraps requests in an envelope", async () => {
+  test("admin request list forwards filters and wraps requests in an envelope", async () => {
     get.mockResolvedValueOnce({ requests: [{ pumppuRequestId: 1 }], truncated: false });
     const result = await runJerryAdminRequests(mockClient, { status: "open,accepted", customer: 5 });
     expect(get).toHaveBeenCalledWith(
@@ -305,7 +305,7 @@ describe("ib jerry admin", () => {
     expect(result).toEqual({ items: [{ pumppuRequestId: 1 }], nextCursor: null, count: 1, truncated: false });
   });
 
-  test("admin request-offers wraps the offers array", async () => {
+  test("admin request offers wraps the offers array", async () => {
     get.mockResolvedValueOnce([{ pumppuOfferId: 9 }]);
     const result = await runJerryAdminRequestOffers(mockClient, 1);
     expect(get).toHaveBeenCalledWith("/api/admin/jerry-requests/1/offers");
@@ -449,25 +449,25 @@ describe("ib jerry request list --provider", () => {
 });
 
 describe("ib jerry admin request write commands", () => {
-  test("admin request-expire posts to /:id/expire with headers", async () => {
+  test("admin request expire posts to /:id/expire with headers", async () => {
     post.mockResolvedValueOnce({ success: true, status: "expired" });
     await runJerryAdminRequestExpire(mockClient, 41, { reason: "stuck" } as WriteFlags);
     expect(post).toHaveBeenCalledWith("/api/admin/jerry-requests/41/expire", {}, expect.objectContaining({ headers: expect.any(Object) }));
   });
 
-  test("admin request-cancel posts to /:id/cancel with headers", async () => {
+  test("admin request cancel posts to /:id/cancel with headers", async () => {
     post.mockResolvedValueOnce({ success: true, status: "cancelled" });
     await runJerryAdminRequestCancel(mockClient, 41, { reason: "admin override" } as WriteFlags);
     expect(post).toHaveBeenCalledWith("/api/admin/jerry-requests/41/cancel", {}, expect.objectContaining({ headers: expect.any(Object) }));
   });
 
-  test("admin request-resend posts to /:id/resend with headers", async () => {
+  test("admin request resend posts to /:id/resend with headers", async () => {
     post.mockResolvedValueOnce({ success: true, sentCount: 3 });
     await runJerryAdminRequestResend(mockClient, 41, { reason: "retry fanout" } as WriteFlags);
     expect(post).toHaveBeenCalledWith("/api/admin/jerry-requests/41/resend", {}, expect.objectContaining({ headers: expect.any(Object) }));
   });
 
-  test("admin request-extend posts /:id/extend with { days } body + headers", async () => {
+  test("admin request extend posts /:id/extend with { days } body + headers", async () => {
     post.mockResolvedValueOnce({ success: true, status: "open", expiresAt: "2026-07-13T00:00:00.000Z" });
     await runJerryAdminRequestExtend(mockClient, 32, { days: 14, reason: "reactivate" } as { days?: number; until?: string } & WriteFlags);
     expect(post).toHaveBeenCalledWith(
@@ -477,7 +477,7 @@ describe("ib jerry admin request write commands", () => {
     );
   });
 
-  test("admin request-extend prefers --until and omits days", async () => {
+  test("admin request extend prefers --until and omits days", async () => {
     post.mockResolvedValueOnce({ success: true, status: "open", expiresAt: "2026-08-01T00:00:00.000Z" });
     await runJerryAdminRequestExtend(mockClient, 32, { days: 14, until: "2026-08-01", reason: "r" } as { days?: number; until?: string } & WriteFlags);
     expect(post).toHaveBeenCalledWith(
@@ -487,7 +487,7 @@ describe("ib jerry admin request write commands", () => {
     );
   });
 
-  test("admin request-extend sends empty body when neither days nor until given", async () => {
+  test("admin request extend sends empty body when neither days nor until given", async () => {
     post.mockResolvedValueOnce({ success: true, status: "open", expiresAt: "x" });
     await runJerryAdminRequestExtend(mockClient, 32, { reason: "r" } as { days?: number; until?: string } & WriteFlags);
     expect(post).toHaveBeenCalledWith(
@@ -497,14 +497,14 @@ describe("ib jerry admin request write commands", () => {
     );
   });
 
-  test("admin request-delete calls DELETE with headers", async () => {
+  test("admin request delete calls DELETE with headers", async () => {
     const del = mockClient.delete as ReturnType<typeof vi.fn>;
     del.mockResolvedValueOnce({ success: true });
     await runJerryAdminRequestDelete(mockClient, 41, { reason: "cleanup" } as WriteFlags);
     expect(del).toHaveBeenCalledWith("/api/admin/jerry-requests/41", expect.objectContaining({ headers: expect.any(Object) }));
   });
 
-  test("admin request-get GETs the single-request path", async () => {
+  test("admin request get GETs the single-request path", async () => {
     get.mockResolvedValueOnce({ pumppuRequestId: 41, status: "open" });
     const result = await runJerryAdminRequestGet(mockClient, 41);
     expect(get).toHaveBeenCalledWith("/api/admin/jerry-requests/41");

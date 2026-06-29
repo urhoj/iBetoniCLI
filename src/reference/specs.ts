@@ -3715,7 +3715,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: ['ib jerry admin disable 1402 --reason "offboard provider"', "ib jerry admin disable --asiakas 1402 --dry-run"],
   },
   {
-    command: "ib jerry admin requests",
+    command: "ib jerry admin request list",
     description:
       "System-wide tarjouspyyntö list with offer summary — date, customer, placing operator, worksite, m³, status, offer count, accepted/best price (GET /api/admin/jerry-requests). Filters: --status (CSV), --from/--to (createdAt), --customer, --provider, --limit. System-admin only.",
     permissions: ["isSystemAdmin"],
@@ -3731,12 +3731,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ pumppuRequestId, status, createdAt, customerNimi, operatorName, osoite, totalM3, offerCount, acceptedPriceCents, bestPriceCents }>",
     errors: [apiErr(403, "Not a system admin", "use a system-admin token"), ...COMMON_AUTH_ERRORS],
-    examples: ["ib jerry admin requests --status open,accepted", "ib jerry admin requests --provider 1402 --from 2026-06-01"],
+    examples: ["ib jerry admin request list --status open,accepted", "ib jerry admin request list --provider 1402 --from 2026-06-01"],
   },
   {
-    command: "ib jerry admin request-get",
+    command: "ib jerry admin request get",
     description:
-      "One request's full detail — date, customer, placing operator, worksite, m³, status, offer count, accepted/best price (GET /api/admin/jerry-requests/:id). For the offers use `ib jerry admin request-offers`. System-admin only.",
+      "One request's full detail — date, customer, placing operator, worksite, m³, status, offer count, accepted/best price (GET /api/admin/jerry-requests/:id). For the offers use `ib jerry admin request offers`. System-admin only.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
@@ -3749,10 +3749,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(404, "Request not found", "verify pumppuRequestId"),
       ...COMMON_AUTH_ERRORS,
     ],
-    examples: ["ib jerry admin request-get 41"],
+    examples: ["ib jerry admin request get 41"],
   },
   {
-    command: "ib jerry admin request-offers",
+    command: "ib jerry admin request offers",
     description:
       "All offers on one request (admin view, no PII masking): offering company, contact, price, status, scheduledAt/keikka (GET /api/admin/jerry-requests/:id/offers). System-admin only.",
     permissions: ["isSystemAdmin"],
@@ -3762,10 +3762,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ pumppuOfferId, providerAsiakasId, providerNimi, providerContactName, priceCents, vatPercent, status, scheduledAt, keikkaId }>",
     errors: [apiErr(400, "Invalid id", "pass a numeric requestId"), apiErr(403, "Not a system admin", "use a system-admin token"), ...COMMON_AUTH_ERRORS],
-    examples: ["ib jerry admin request-offers 41"],
+    examples: ["ib jerry admin request offers 41"],
   },
   {
-    command: "ib jerry admin request-expire",
+    command: "ib jerry admin request expire",
     description:
       "Force-expire an open/no_supply/pending_verification request (POST /api/admin/jerry-requests/:id/expire). status → expired. System-admin only. Requires --reason.",
     permissions: ["isSystemAdmin"],
@@ -3775,10 +3775,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ success: true, status: 'expired' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
     errors: [apiErr(403, "Not a system admin", "use a system-admin token"), apiErr(409, "Wrong state", "request not in an expirable state"), ...COMMON_AUTH_ERRORS],
-    examples: ['ib jerry admin request-expire 41 --reason "abandoned"'],
+    examples: ['ib jerry admin request expire 41 --reason "abandoned"'],
   },
   {
-    command: "ib jerry admin request-cancel",
+    command: "ib jerry admin request cancel",
     description:
       "Cancel a non-terminal, non-accepted request (POST /api/admin/jerry-requests/:id/cancel). status → cancelled. Already cancelled/expired/accepted → 409 (an accepted request has a confirmed offer/keikka and is not cancellable here). System-admin only. Requires --reason.",
     permissions: ["isSystemAdmin"],
@@ -3788,10 +3788,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ success: true, status: 'cancelled' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
     errors: [apiErr(403, "Not a system admin", "use a system-admin token"), apiErr(409, "Wrong state", "request not in a cancellable state"), ...COMMON_AUTH_ERRORS],
-    examples: ['ib jerry admin request-cancel 41 --reason "customer request"'],
+    examples: ['ib jerry admin request cancel 41 --reason "customer request"'],
   },
   {
-    command: "ib jerry admin request-resend",
+    command: "ib jerry admin request resend",
     description:
       "Re-run provider fan-out for a request (POST /api/admin/jerry-requests/:id/resend). Re-notifies eligible providers. System-admin only. Requires --reason.",
     permissions: ["isSystemAdmin"],
@@ -3801,10 +3801,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ success: true, status: 'open' | 'no_supply' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
     errors: [apiErr(403, "Not a system admin", "use a system-admin token"), apiErr(409, "Wrong state", "request not in a resendable state"), ...COMMON_AUTH_ERRORS],
-    examples: ['ib jerry admin request-resend 41 --reason "retry fanout"'],
+    examples: ['ib jerry admin request resend 41 --reason "retry fanout"'],
   },
   {
-    command: "ib jerry admin request-extend",
+    command: "ib jerry admin request extend",
     description:
       "Extend a request's validity (POST /api/admin/jerry-requests/:id/extend). Sets expiresAt to now + --days (default 14, i.e. 2 weeks) or an absolute --until date; the new expiry must be in the future. An 'expired' request is reactivated to 'open'; open/no_supply/pending_verification keep their status (a no_supply request stays in Koko markkina, never Päättyneet). draft/cancelled/accepted → 409. System-admin only. Requires --reason.",
     permissions: ["isSystemAdmin"],
@@ -3823,10 +3823,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(409, "Wrong state", "request not in an extendable state (draft/cancelled/accepted)"),
       ...COMMON_AUTH_ERRORS,
     ],
-    examples: ['ib jerry admin request-extend 32 --days 14 --reason "reactivate"'],
+    examples: ['ib jerry admin request extend 32 --days 14 --reason "reactivate"'],
   },
   {
-    command: "ib jerry admin request-delete",
+    command: "ib jerry admin request delete",
     description:
       "Delete a DRAFT request permanently (DELETE /api/admin/jerry-requests/:id). Only status='draft' rows are deletable; a non-draft or missing id returns 404. System-admin only. Requires --reason.",
     permissions: ["isSystemAdmin"],
@@ -3840,7 +3840,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(404, "Not a draft / not found", "only status='draft' rows are deletable; non-draft or missing id → 404"),
       ...COMMON_AUTH_ERRORS,
     ],
-    examples: ['ib jerry admin request-delete 41 --reason "cleanup draft"'],
+    examples: ['ib jerry admin request delete 41 --reason "cleanup draft"'],
   },
 
   // ─── schema (7) — developer-only SQL introspection ─────────────────────────
