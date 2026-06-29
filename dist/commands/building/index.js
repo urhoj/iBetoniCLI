@@ -39,14 +39,14 @@ export async function runBuildingLookup(client, opts) {
 export function registerBuildingCommands(parent, getClient) {
     parent
         .command("building")
-        .description("Building-registry lookup (Helsinki/Vantaa/Espoo/HSY open data) for a sijainti, worksite, address, or lat/lng")
+        .description("Building-registry lookup for a sijainti, worksite, address, or lat/lng — metro WFS (Helsinki/Vantaa/Espoo/HSY) with a national Ryhti fallback so points anywhere in Finland resolve")
         .option("--sijainti <id>", "Resolve coordinates from a sijainti id", Number)
         .option("--worksite <tyomaaId>", "Resolve coordinates from a worksite (tenant-scoped)", Number)
         .option("--tyomaa <tyomaaId>", "Alias for --worksite", Number)
         .option("--lat <n>", "Latitude (WGS84) — pair with --lng", Number)
         .option("--lng <n>", "Longitude (WGS84) — pair with --lat", Number)
         .option("--address <s>", "Street address to geocode")
-        .option("--city <name>", "Helsinki | Vantaa | Espoo | HSY (override; otherwise derived/auto-tried)")
+        .option("--city <name>", "Helsinki | Vantaa | Espoo | HSY | Ryhti (override; otherwise derived/auto-tried then national Ryhti fallback)")
         .action(async (opts) => {
         const sources = selectedSources(opts);
         if (sources.length === 0) {

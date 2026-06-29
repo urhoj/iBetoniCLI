@@ -4,6 +4,8 @@ import {
   runWeatherDay,
   runWeatherPumping,
   runWeatherWorksite,
+  runWeatherSijainti,
+  runWeatherKeikka,
   runWeatherAddress,
   runWeatherStatus,
   runWeatherToggle,
@@ -133,6 +135,46 @@ describe("ib weather worksite", () => {
       "/api/weather/tyomaa/456",
       { forceRefresh: false }
     );
+  });
+});
+
+// ─── sijainti ──────────────────────────────────────────────────────────────────
+
+describe("ib weather sijainti", () => {
+  test("resolves sijainti coords then forecasts", async () => {
+    const get = mockClient.get as ReturnType<typeof vi.fn>;
+    get.mockResolvedValueOnce({ sijaintiId: 56, lat: 60.17, lng: 24.94 }); // sijainti get
+    get.mockResolvedValueOnce({ temperature: 5 }); // forecast
+    const out = await runWeatherSijainti(mockClient, 56, "now");
+    expect(get.mock.calls[0][0]).toBe("/api/geocode/sijainti/get/56");
+    expect(get.mock.calls[1][0] as string).toMatch(/^\/api\/weather\/forecast\/60\.17\/24\.94\//);
+    expect(out).toMatchObject({ temperature: 5 });
+  });
+
+  test("throws exit 5 when the sijainti has no coordinates", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ sijaintiId: 56, lat: null, lng: null });
+    await expect(runWeatherSijainti(mockClient, 56, "now")).rejects.toMatchObject({ exitCode: 5 });
+  });
+});
+
+// ─── keikka ───────────────────────────────────────────────────────────────────
+
+describe("ib weather keikka", () => {
+  test("resolves the keikka's worksite then POSTs the tyomaa forecast", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      keikkaId: 9001,
+      worksite: { tyomaaId: 123, address: "Katu 1" },
+    });
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ temperature: 7 });
+    const out = await runWeatherKeikka(mockClient, 9001, true);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/keikka/get/9001");
+    expect(mockClient.post).toHaveBeenCalledWith("/api/weather/tyomaa/123", { forceRefresh: true });
+    expect(out).toMatchObject({ temperature: 7 });
+  });
+
+  test("throws exit 5 when the keikka has no worksite", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ keikkaId: 9001, worksite: null });
+    await expect(runWeatherKeikka(mockClient, 9001, false)).rejects.toMatchObject({ exitCode: 5 });
   });
 });
 

@@ -3,6 +3,7 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFla
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { parseId } from "../../targets.js";
+import { runKeikkaGet } from "../keikka/index.js";
 /** Expand `now` to the current ISO timestamp; pass any other value through. */
 function resolveTime(input) {
     return input === "now" ? new Date().toISOString() : input;
@@ -39,6 +40,33 @@ export async function runWeatherPumping(client, opts) {
  */
 export async function runWeatherWorksite(client, tyomaaId, forceRefresh) {
     return client.post(`/api/weather/tyomaa/${tyomaaId}`, { forceRefresh });
+}
+/**
+ * GET /api/geocode/sijainti/get/:sijaintiId → coords → forecast. Sijainti rows
+ * (depots/plants) are cross-tenant readable. Throws exit 5 when the sijainti is
+ * missing or has no GPS pin.
+ */
+export async function runWeatherSijainti(client, sijaintiId, time) {
+    const s = await client.get(`/api/geocode/sijainti/get/${sijaintiId}`);
+    const lat = Number(s?.lat);
+    const lng = Number(s?.lng);
+    if (!s || !Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
+        throw new CliError(`sijainti ${sijaintiId} has no coordinates`, 404, s, 5);
+    }
+    return runWeatherForecast(client, { lat, lng, time });
+}
+/**
+ * GET /api/cli/keikka/get/:keikkaId → worksite.tyomaaId → POST
+ * /api/weather/tyomaa/:tyomaaId (the same path `worksite` uses). A keikka's
+ * location is its worksite. Throws exit 5 when the keikka has no worksite.
+ */
+export async function runWeatherKeikka(client, keikkaId, forceRefresh) {
+    const k = await runKeikkaGet(client, keikkaId);
+    const tyomaaId = k?.worksite?.tyomaaId;
+    if (!tyomaaId) {
+        throw new CliError(`keikka ${keikkaId} has no worksite to resolve coordinates from`, 404, k, 5);
+    }
+    return runWeatherWorksite(client, tyomaaId, forceRefresh);
 }
 /**
  * Pull lat/lng out of whatever shape getLatLng returns; throw exit 5 if absent.
@@ -160,6 +188,30 @@ export function registerWeatherCommands(parent, getClient, opts = {}) {
         try {
             const client = await getClient();
             writeJson(await runWeatherWorksite(client, parseId(idStr, "tyomaaId"), !!opts.forceRefresh));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    w.command("sijainti <sijaintiId>")
+        .description("Point forecast for a sijainti (resolves coordinates from the location)")
+        .option("--time <iso>", "Forecast time (ISO 8601, or 'now')", "now")
+        .action(async (idStr, opts) => {
+        try {
+            const client = await getClient();
+            writeJson(await runWeatherSijainti(client, parseId(idStr, "sijaintiId"), opts.time));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    w.command("keikka <keikkaId>")
+        .description("Forecast for a keikka (resolves coordinates from its worksite)")
+        .option("--force-refresh", "Bypass the cache and refetch from FMI")
+        .action(async (idStr, opts) => {
+        try {
+            const client = await getClient();
+            writeJson(await runWeatherKeikka(client, parseId(idStr, "keikkaId"), !!opts.forceRefresh));
         }
         catch (e) {
             exitWithError(e);

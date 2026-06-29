@@ -3954,11 +3954,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ];
   })(),
 
-  // ─── opendata (9): free/open external data — building + weather + prh ─────
+  // ─── opendata (11): free/open external data — building + weather + prh ────
   {
     command: "ib opendata building",
     description:
-      "Look up building-registry data for a point in the Helsinki metropolitan area (Helsinki/Vantaa/Espoo/HSY open WFS data). Resolve the point from EXACTLY ONE of: --sijainti, --worksite (alias --tyomaa), --lat+--lng, or --address. --city overrides the provider; when omitted it is derived from the source or auto-tried (Helsinki→Vantaa→Espoo). Read-only; any authenticated user. Worksite resolution is tenant-scoped; sijainti is cross-tenant readable; building data itself is public.",
+      "Look up building-registry data for a point anywhere in Finland. The metro-area WFS providers (Helsinki/Vantaa/Espoo/HSY) are tried first for their richer per-building detail; the NATIONAL Ryhti open dataset (SYKE) is a fallback so points outside the metro area still resolve (found:true with national:true). Resolve the point from EXACTLY ONE of: --sijainti, --worksite (alias --tyomaa), --lat+--lng, or --address. --city overrides the provider (pass Ryhti to force the national source); when omitted it is derived from the source or auto-tried (Helsinki→Vantaa→Espoo) then Ryhti. Read-only; any authenticated user. Worksite resolution is tenant-scoped; sijainti is cross-tenant readable; building data itself is public.",
     auth: "any",
     flags: [
       { name: "sijainti", type: "number", description: "Resolve coordinates from a sijainti id (cross-tenant readable)" },
@@ -3967,17 +3967,18 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "lat", type: "number", description: "Latitude (WGS84) — pair with --lng" },
       { name: "lng", type: "number", description: "Longitude (WGS84) — pair with --lat" },
       { name: "address", type: "string", description: "Street address to geocode (e.g. 'Mannerheimintie 1, Helsinki')" },
-      { name: "city", type: "string", description: "Helsinki | Vantaa | Espoo | HSY (override; otherwise derived/auto-tried)" },
+      { name: "city", type: "string", description: "Helsinki | Vantaa | Espoo | HSY | Ryhti (override; otherwise derived/auto-tried then national Ryhti fallback)" },
     ],
     outputShape:
-      "{ source:'sijainti'|'worksite'|'address'|'coords', input, coords:{lat,lng}, city|null, requestedCity|null, derivedCity|null, found:boolean, outOfArea:boolean, building:{ buildingId, nationalBuildingId, buildingType, floors, totalArea, completionYear, facadeMaterial, … common schema }|null }",
+      "{ source:'sijainti'|'worksite'|'address'|'coords', input, coords:{lat,lng}, city|null, requestedCity|null, derivedCity|null, found:boolean, outOfArea:boolean, national:boolean, building:{ buildingId, nationalBuildingId, buildingType, floors, totalArea, completionYear, facadeMaterial, … common schema }|null }",
     errors: [
-      { exit: 4, meaning: "No source, multiple sources, or invalid city/coords", remedy: "pass exactly one of --sijainti / --worksite / --lat+--lng / --address; city must be Helsinki|Vantaa|Espoo|HSY" },
+      { exit: 4, meaning: "No source, multiple sources, or invalid city/coords", remedy: "pass exactly one of --sijainti / --worksite / --lat+--lng / --address; city must be Helsinki|Vantaa|Espoo|HSY|Ryhti" },
       apiErr(404, "Sijainti/worksite not found (or no coordinates), or address not geocodable", "verify the id/address; a worksite must be geocoded and in your tenant"),
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "outOfArea:true → the point is outside the Helsinki metropolitan area (no city WFS covers it), found is false.",
+      "national:true → the building came from the national Ryhti dataset (used when the metro WFS providers miss or the point is outside the metro area). Its street/postal address is joined by proximity from the Ryhti open_address dataset (so streetNameFi/streetNumber/postalCode/postalArea are populated), but it has no utility fields, and SYKE warns its data quality varies — treat it as enrichment, not authoritative.",
+      "outOfArea:true → the point is outside the Helsinki metropolitan area; with the Ryhti fallback a building may still be found (found:true, national:true). found:false with outOfArea:true means even Ryhti had no match.",
       "found:false with outOfArea:false → no building within ~50 m of the point.",
       "For building data already stored on a worksite, `ib worksite get <id> --include-building` is cheaper.",
     ],
@@ -3986,7 +3987,9 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ib opendata building --worksite 1234",
       "ib opendata building --sijainti 56",
       "ib opendata building --address 'Mannerheimintie 1, Helsinki'",
+      "ib opendata building --address 'Hämeenkatu 1, Tampere'",
       "ib opendata building --lat 60.1699 --lng 24.9384 --city Helsinki",
+      "ib opendata building --lat 61.4978 --lng 23.7610 --city Ryhti",
     ],
   },
   {
@@ -4080,6 +4083,51 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: [
       "ib opendata weather worksite 1234",
       "ib opendata weather worksite 1234 --force-refresh",
+    ],
+  },
+  {
+    command: "ib opendata weather sijainti",
+    description:
+      "Point forecast for a sijainti (depot/plant/location): resolves the location's coordinates (GET /api/geocode/sijainti/get/:id), then calls FMI. Sijainnit are cross-tenant readable. Requires the company weather module.",
+    permissions: ["company weather module (asiakasPersonSettingTypeId 18)"],
+    args: [{ name: "sijaintiId", type: "number", description: "sijaintiId (coordinates resolved from the location)" }],
+    flags: [
+      { name: "time", type: "string", description: "Forecast time (ISO 8601 or 'now'; default now)" },
+    ],
+    outputShape:
+      "{ temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }",
+    errors: [
+      apiErr(403, "Weather module off or permission denied", "enable via 'ib opendata weather toggle --on'"),
+      { exit: 5, meaning: "Sijainti not found or has no coordinates", remedy: "check sijaintiId; ensure the location has a GPS pin (`ib sijainti list`)" },
+      apiErr(401, "Not authenticated", "run 'ib auth login'"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    examples: [
+      "ib opendata weather sijainti 56",
+      "ib opendata weather sijainti 56 --time 2026-06-30T08:00:00Z",
+    ],
+  },
+  {
+    command: "ib opendata weather keikka",
+    description:
+      "Forecast for a keikka: resolves the keikka's worksite (GET /api/cli/keikka/get/:id → worksite.tyomaaId) and returns the worksite forecast (POST /api/weather/tyomaa/:id). Tenant-scoped via the keikka. Requires the company weather module.",
+    permissions: ["company weather module (asiakasPersonSettingTypeId 18)"],
+    args: [{ name: "keikkaId", type: "number", description: "keikkaId (coordinates resolved from its worksite)" }],
+    flags: [
+      { name: "force-refresh", type: "boolean", description: "Bypass the cache and refetch from FMI" },
+    ],
+    outputShape:
+      "{ temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }",
+    errors: [
+      apiErr(403, "Weather module off or permission denied", "enable via 'ib opendata weather toggle --on'"),
+      { exit: 5, meaning: "Keikka not found or has no worksite", remedy: "check keikkaId; the keikka must have a worksite with coordinates" },
+      apiErr(401, "Not authenticated", "run 'ib auth login'"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    seeAlso: ["ib opendata weather worksite", "ib keikka get"],
+    examples: [
+      "ib opendata weather keikka 9001",
+      "ib opendata weather keikka 9001 --force-refresh",
     ],
   },
   {

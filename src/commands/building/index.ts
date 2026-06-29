@@ -53,7 +53,7 @@ export function registerBuildingCommands(
   parent
     .command("building")
     .description(
-      "Building-registry lookup (Helsinki/Vantaa/Espoo/HSY open data) for a sijainti, worksite, address, or lat/lng"
+      "Building-registry lookup for a sijainti, worksite, address, or lat/lng — metro WFS (Helsinki/Vantaa/Espoo/HSY) with a national Ryhti fallback so points anywhere in Finland resolve"
     )
     .option("--sijainti <id>", "Resolve coordinates from a sijainti id", Number)
     .option("--worksite <tyomaaId>", "Resolve coordinates from a worksite (tenant-scoped)", Number)
@@ -63,7 +63,7 @@ export function registerBuildingCommands(
     .option("--address <s>", "Street address to geocode")
     .option(
       "--city <name>",
-      "Helsinki | Vantaa | Espoo | HSY (override; otherwise derived/auto-tried)"
+      "Helsinki | Vantaa | Espoo | HSY | Ryhti (override; otherwise derived/auto-tried then national Ryhti fallback)"
     )
     .action(async (opts: BuildingLookupOptions) => {
       const sources = selectedSources(opts);
