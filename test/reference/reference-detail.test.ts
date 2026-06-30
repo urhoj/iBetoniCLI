@@ -81,9 +81,9 @@ describe("runReferenceDetail", () => {
       expect((e as CliError).exitCode).toBe(5);
       expect((e as CliError).message).toMatch(/unknown command/);
     }
-    // developer tier: command is visible, request goes to the network
-    const devClient = client({ get: vi.fn().mockResolvedValue({ command: "ib schema table", summary: null, detail: "d", hint: "" }) });
-    const result = await runReferenceDetail(devClient, ["schema", "table"], "developer");
+    // developer tier: command is visible under ib dev schema table, request goes to the network
+    const devClient = client({ get: vi.fn().mockResolvedValue({ command: "ib dev schema table", summary: null, detail: "d", hint: "" }) });
+    const result = await runReferenceDetail(devClient, ["dev", "schema", "table"], "developer");
     expect(result.detail).toBe("d");
   });
 

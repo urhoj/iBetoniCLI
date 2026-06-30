@@ -63,14 +63,22 @@ describe("visibleSubcommands (#1)", () => {
 });
 
 describe("visibleSubcommands root tier-hiding (#1)", () => {
-  test("standard tier hides fully-developer domains at root (schema/ai/changelog)", () => {
-    const names = visibleSubcommands(buildProgram(), "standard");
+  test("back-compat aliases (schema/ai/changelog) hidden via Commander at root at both tiers", () => {
+    // Hidden Commander commands are filtered regardless of tier — they are
+    // runtime-only aliases absent from spec-driven discovery and root --help.
+    const std = visibleSubcommands(buildProgram(), "standard");
+    expect(std).not.toContain("schema");
+    expect(std).not.toContain("ai");
+    expect(std).not.toContain("changelog");
+    expect(std).toContain("keikka");
+    // dev umbrella is the canonical path at standard (has standard-visible leaves)
+    expect(std).toContain("dev");
+  });
+  test("developer tier keeps the dev umbrella at root (not the old hidden aliases)", () => {
+    const names = visibleSubcommands(buildProgram(), "developer");
+    expect(names).toContain("dev");
+    // back-compat aliases are still Commander-hidden even at developer tier
     expect(names).not.toContain("schema");
     expect(names).not.toContain("ai");
-    expect(names).not.toContain("changelog");
-    expect(names).toContain("keikka");
-  });
-  test("developer tier keeps the developer-only domains at root", () => {
-    expect(visibleSubcommands(buildProgram(), "developer")).toContain("schema");
   });
 });

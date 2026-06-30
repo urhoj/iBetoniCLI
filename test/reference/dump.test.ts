@@ -216,19 +216,19 @@ describe("ib reference dump --commands-only", () => {
 describe("reference dump tier filtering", () => {
   test("standard omits developer commands", () => {
     const std = buildReference(undefined, "standard");
-    expect(Object.keys(std.commands)).not.toContain("ib ai conversation");
-    expect(Object.keys(std.commands)).toContain("ib feedback create");
+    expect(Object.keys(std.commands)).not.toContain("ib dev ai conversation");
+    expect(Object.keys(std.commands)).toContain("ib dev feedback create");
     // glossary is injected (not bundled) — always [] when nothing passed
     expect(std.glossary).toEqual([]);
   });
   test("developer dump retains developer commands", () => {
     const dev = buildReference(undefined, "developer");
-    expect(Object.keys(dev.commands)).toContain("ib ai conversation");
+    expect(Object.keys(dev.commands)).toContain("ib dev ai conversation");
     // glossary defaults to [] without injection
     expect(dev.glossary).toEqual([]);
   });
   test("default tier is developer (back-compat)", () => {
-    expect(Object.keys(buildReference().commands)).toContain("ib ai conversation");
+    expect(Object.keys(buildReference().commands)).toContain("ib dev ai conversation");
   });
   test("domain-filtered dump carries the injected glossary unchanged", () => {
     const injected = [{ term: "keikka", synonyms: [] }];
@@ -248,7 +248,7 @@ describe("reference dump leaks no hidden command path (notes/seeAlso/examples)",
   });
   test("developer dump still contains the cross-references (parity, not over-scrubbed)", () => {
     const dev = JSON.stringify(buildReference(undefined, "developer"));
-    expect(dev).toContain("ib ai conversation"); // present for developers
+    expect(dev).toContain("ib dev ai conversation"); // present for developers
   });
 });
 
@@ -260,7 +260,7 @@ describe("projectGlossaryForPrimer — glossary projection security", () => {
         term: "ai",
         synonyms: [],
         definition: "AI assistant interface",
-        relatedCommands: ["ib ai conversation"],
+        relatedCommands: ["ib dev ai conversation"],
         relatedEntity: "ai",
         runs: 42,
         lastReviewed: "2026-06-01T00:00:00.000Z",
@@ -297,13 +297,13 @@ describe("projectGlossaryForPrimer — glossary projection security", () => {
         term: "ai",
         synonyms: [],
         definition: "AI assistant interface",
-        relatedCommands: ["ib ai conversation"],
+        relatedCommands: ["ib dev ai conversation"],
       },
     ];
     const projected = projectGlossaryForPrimer(rawItems);
     const std = JSON.stringify(buildReference(undefined, "standard", projected));
     // The hidden command path must NOT appear anywhere in the dump output.
-    expect(std).not.toContain("ib ai conversation");
+    expect(std).not.toContain("ib dev ai conversation");
     // The term should be present; the definition is intentionally dropped.
     expect(std).toContain('"term":"ai"');
     expect(std).not.toContain("AI assistant interface");

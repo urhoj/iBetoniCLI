@@ -3879,77 +3879,77 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     const invalidNameErr = apiErr(400, "Invalid name (letters/digits/underscore only)", "use the bare object name, no schema prefix");
     return [
       {
-        command: "ib schema tables",
+        command: "ib dev schema tables",
         description: "List dbo base tables with column counts. Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
         flags: listFlags,
         outputShape: "{ items: [{ name, type:'table', columnCount }], nextCursor: null, count }",
         errors: devErrors,
-        examples: ["ib schema tables", "ib schema tables --search keikka"],
+        examples: ["ib dev schema tables", "ib dev schema tables --search keikka"],
       },
       {
-        command: "ib schema table",
+        command: "ib dev schema table",
         description: "Columns (type, nullability, default, key), primary key, foreign keys, and indexes for one dbo table. Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
         args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix)" }],
         flags: [],
         outputShape: "{ name, columns:[{name,dataType,maxLength,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], indexes:[{name,columns,unique}] }",
-        errors: [...devErrors, invalidNameErr, apiErr(404, "Table not found", "check the name via `ib schema tables`")],
-        examples: ["ib schema table keikka"],
+        errors: [...devErrors, invalidNameErr, apiErr(404, "Table not found", "check the name via `ib dev schema tables`")],
+        examples: ["ib dev schema table keikka"],
       },
       {
-        command: "ib schema views",
+        command: "ib dev schema views",
         description: "List dbo views with column counts. Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
         flags: listFlags,
         outputShape: "{ items: [{ name, type:'view', columnCount }], nextCursor: null, count }",
         errors: devErrors,
-        examples: ["ib schema views"],
+        examples: ["ib dev schema views"],
       },
       {
-        command: "ib schema view",
+        command: "ib dev schema view",
         description: "Columns and full definition (T-SQL) for one dbo view. Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
         args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix)" }],
         flags: [],
         outputShape: "{ name, columns:[{name,dataType,maxLength,nullable,default,key}], definition:'<T-SQL>' }",
-        errors: [...devErrors, invalidNameErr, apiErr(404, "View not found", "check the name via `ib schema views`")],
-        examples: ["ib schema view keikkaBetoniView"],
+        errors: [...devErrors, invalidNameErr, apiErr(404, "View not found", "check the name via `ib dev schema views`")],
+        examples: ["ib dev schema view keikkaBetoniView"],
       },
       {
-        command: "ib schema procs",
+        command: "ib dev schema procs",
         description: "List dbo stored procedures and functions (P/FN/TF/IF). Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
         flags: listFlags,
         outputShape: "{ items: [{ name, type:'P'|'FN'|'TF'|'IF' }], nextCursor: null, count }",
         errors: devErrors,
-        examples: ["ib schema procs", "ib schema procs --search asiakas"],
+        examples: ["ib dev schema procs", "ib dev schema procs --search asiakas"],
       },
       {
-        command: "ib schema proc",
+        command: "ib dev schema proc",
         description: "Signature (parameters) and full definition (T-SQL) for one dbo proc/function. Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
         args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix)" }],
         flags: [],
         outputShape: "{ name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }",
-        errors: [...devErrors, invalidNameErr, apiErr(404, "Proc/function not found", "check the name via `ib schema procs`")],
-        examples: ["ib schema proc asiakas_find"],
+        errors: [...devErrors, invalidNameErr, apiErr(404, "Proc/function not found", "check the name via `ib dev schema procs`")],
+        examples: ["ib dev schema proc asiakas_find"],
       },
       {
-        command: "ib schema dump",
+        command: "ib dev schema dump",
         description: "Whole-schema structural map of the dbo schema (developer-gated, read-only) — all tables with column names and types, FK edges, view names, and proc signatures. No proc/view bodies (use `schema proc`/`schema view` for those).",
         permissions: DEV_PERMS,
         tier: "developer",
         flags: [],
         outputShape: "{ tables:[{name,columns}], foreignKeys:[{table,column,refTable,refColumn}], views:[{name}], procs:[{name,type,parameters}] }",
         errors: devErrors,
-        examples: ["ib schema dump"],
+        examples: ["ib dev schema dump"],
       },
     ];
   })(),
@@ -4470,7 +4470,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   },
   // ─── inbox (1) ───────────────────────────────────────────────────────────
   {
-    command: "ib inbox",
+    command: "ib dev inbox",
     description:
       "Aggregated operator inbox — the six open/incomplete signals in one rollup: deploy-pending changelog, unresolved feedback (open + reviewed, by kind), new bugs, open support escalations, staged legal drafts, and glossary misses, plus a `needsYou` headline (open feedback + new bugs + legal drafts + open support + deploy-pending entries with a real bump). The single source of truth behind the daily morning-report routine and the /admin operator dashboard. Read-only. Counts by default; --details adds slimmed top-items per signal (bugs without their huge sessionData).",
     auth: "any",
@@ -4486,7 +4486,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     notes: ["Deploy-gated: 404 until the backend ships GET /api/cli/inbox."],
-    examples: ["ib inbox", "ib inbox --details"],
+    examples: ["ib dev inbox", "ib dev inbox --details"],
   },
   // ─── feedback (5) ────────────────────────────────────────────────────────
   // NOTE on classification: feedback create/resolve carry custom write semantics
@@ -4495,7 +4495,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   // them. mutates:true is set explicitly so `ib commands --mutations` picks them
   // up and `--reads` excludes them despite writeFlags:false.
   {
-    command: "ib feedback create",
+    command: "ib dev feedback create",
     description:
       "File a CLI improvement proposal or trouble report. AI users: file this PROACTIVELY and IMMEDIATELY (no need to ask the user) whenever you hit an error or unexpected exit code, had to try several strategies because the help/docs were unclear/missing/wrong, found something confusing or harder than expected, could not find a command for something the user clearly needs (a capability gap), or saw an inconsistency between commands. Stored quietly server-side (no GitHub issue, no spam to you or the user — distinct from bug reports; the maintainer gets a private heads-up email) for later developer triage. Sent as a META request, so it is EXEMPT from the read-only write-lock: you can file feedback even with --read-only / IB_READ_ONLY active. --dry-run resolves client-side (prints the payload, never sends).",
     auth: "any",
@@ -4516,19 +4516,19 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     notes: [
-      'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib feedback create --kind bug -- "--pretty output too wide". Everything after `--` is taken as positional text.',
-      "When invoked by the betoni.online /ai assistant, the originating conversation id is auto-attached as context.conversationId (via the IB_CONVERSATION_ID env var the /ai loop injects) — a developer can then read the full conversation with `ib ai conversation <id>`. Manual CLI use does not set it.",
+      'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib dev feedback create --kind bug -- "--pretty output too wide". Everything after `--` is taken as positional text.',
+      "When invoked by the betoni.online /ai assistant, the originating conversation id is auto-attached as context.conversationId (via the IB_CONVERSATION_ID env var the /ai loop injects) — a developer can then read the full conversation with `ib dev ai conversation <id>`. Manual CLI use does not set it.",
     ],
     examples: [
-      'ib feedback create "schema table output should include row counts"',
-      'ib feedback create "keikka list --pvm rejected my date" --kind bug --command "keikka list --pvm 1.6." --error "invalid date format"',
-      'ib feedback create "ib customer search --email" --kind idea --dry-run',
-      'ib feedback create "TOS 2.0 lacks a clause covering the AI assistant features; draft update suggested" --kind legal',
-      'ib feedback create "Jerry inbox should show boom length on request cards" --scope jerry --kind idea',
+      'ib dev feedback create "schema table output should include row counts"',
+      'ib dev feedback create "keikka list --pvm rejected my date" --kind bug --command "keikka list --pvm 1.6." --error "invalid date format"',
+      'ib dev feedback create "ib customer search --email" --kind idea --dry-run',
+      'ib dev feedback create "TOS 2.0 lacks a clause covering the AI assistant features; draft update suggested" --kind legal',
+      'ib dev feedback create "Jerry inbox should show boom length on request cards" --scope jerry --kind idea',
     ],
   },
   {
-    command: "ib feedback list",
+    command: "ib dev feedback list",
     description:
       "List filed feedback for triage. Developer-only (isSystemAdmin / isDeveloper). Newest first, paginated (default 50, cap 200).",
     permissions: ["isSystemAdmin or isDeveloper"],
@@ -4554,14 +4554,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "--search is a server-side substring filter added in a later backend version; against an older backend it is silently ignored (the list returns unfiltered) — deploy-gated.",
     ],
     examples: [
-      "ib feedback list --status open --scope cli",
-      "ib feedback list --unresolved",
-      "ib feedback list --kind bug --limit 20",
-      "ib feedback list --search IDOR --unresolved",
+      "ib dev feedback list --status open --scope cli",
+      "ib dev feedback list --unresolved",
+      "ib dev feedback list --kind bug --limit 20",
+      "ib dev feedback list --search IDOR --unresolved",
     ],
   },
   {
-    command: "ib feedback get",
+    command: "ib dev feedback get",
     description:
       "Fetch one feedback row by id (developer-only).",
     permissions: ["isSystemAdmin or isDeveloper"],
@@ -4571,13 +4571,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape: "The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, ... }",
     errors: [
       apiErr(403, "Permission denied", "requires a developer token"),
-      apiErr(404, "Not found", "check the id via `ib feedback list`"),
+      apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
-    examples: ["ib feedback get 42"],
+    examples: ["ib dev feedback get 42"],
   },
   {
-    command: "ib feedback resolve",
+    command: "ib dev feedback resolve",
     description:
       "Triage a feedback row: set its status and/or attach a resolution note (developer-only). This IS a real write — blocked under --read-only (exit 3). --dry-run previews the update body client-side without sending.",
     permissions: ["isSystemAdmin or isDeveloper"],
@@ -4595,16 +4595,16 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     errors: [
       { exit: 4, meaning: "Validation", remedy: "provide --status and/or --note; status must be a known value" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
-      apiErr(404, "Not found", "check the id via `ib feedback list`"),
+      apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     examples: [
-      'ib feedback resolve 42 --status applied --note "added row counts in CLI v1.3"',
-      'ib feedback resolve 42 --status dismissed --note "by design"',
+      'ib dev feedback resolve 42 --status applied --note "added row counts in CLI v1.3"',
+      'ib dev feedback resolve 42 --status dismissed --note "by design"',
     ],
   },
   {
-    command: "ib feedback count",
+    command: "ib dev feedback count",
     description:
       "Aggregate counts of filed feedback by status, kind, and scope (developer-only). The cheapest way to answer \"is there any open feedback?\" — a tiny fixed-size response instead of a row dump. Counts are computed client-side over up to 200 rows.",
     permissions: ["isSystemAdmin or isDeveloper"],
@@ -4620,13 +4620,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(401, "Token expired", "ib auth refresh"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
-    examples: ["ib feedback count", "ib feedback count --scope cli", "ib feedback count --kind legal"],
+    examples: ["ib dev feedback count", "ib dev feedback count --scope cli", "ib dev feedback count --kind legal"],
   },
   // ─── ai (2) — read AI assistant conversations ────────────────────────────
   {
-    command: "ib ai conversations",
+    command: "ib dev ai conversations",
     description:
-      "List recent /ai assistant conversations CROSS-TENANT for audit/browse (compact rows, newest-first, no message bodies). Developer/sysadmin tooling — the way to discover conversationIds to audit without an `ib feedback` row pointing at one. Drill into a transcript with `ib ai conversation <id>`.",
+      "List recent /ai assistant conversations CROSS-TENANT for audit/browse (compact rows, newest-first, no message bodies). Developer/sysadmin tooling — the way to discover conversationIds to audit without an `ib feedback` row pointing at one. Drill into a transcript with `ib dev ai conversation <id>`.",
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     flags: [
@@ -4643,15 +4643,15 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       "Deploy-gated: 404 until puminet5api ships the /api/cli/ai/conversations route.",
     ],
-    seeAlso: ["ib ai conversation", "ib feedback list"],
+    seeAlso: ["ib dev ai conversation", "ib dev feedback list"],
     examples: [
-      "ib ai conversations",
-      "ib ai conversations --limit 50",
-      "ib ai conversations --person 6233",
+      "ib dev ai conversations",
+      "ib dev ai conversations --limit 50",
+      "ib dev ai conversations --person 6233",
     ],
   },
   {
-    command: "ib ai conversation",
+    command: "ib dev ai conversation",
     description:
       "Fetch the full transcript of an /ai assistant conversation by id (gptConversations/gptMessages). Developer/sysadmin tooling. The id originates from an `ib feedback` row's context.conversationId, stamped automatically when the AI files feedback from the /ai page.",
     permissions: ["isSystemAdmin or isDeveloper"],
@@ -4669,8 +4669,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       "Deploy-gated: 404 until puminet5api ships the /api/cli/ai/conversation/:id route.",
     ],
-    seeAlso: ["ib feedback get", "ib feedback list"],
-    examples: ["ib ai conversation 4321"],
+    seeAlso: ["ib dev feedback get", "ib dev feedback list"],
+    examples: ["ib dev ai conversation 4321"],
   },
   // ─── bug (8) — bugReport system (/api/bugs/*) ────────────────────────────
   // Sibling of feedback. Writes are REAL (read-only-blocked, NOT meta-exempt);
@@ -4678,9 +4678,9 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   // /api/bugs/*). writeFlags:false + mutates:true so `ib commands --mutations`
   // classifies create/comment/admin* as writes despite the custom flag block.
   {
-    command: "ib bug create",
+    command: "ib dev bug create",
     description:
-      "File a bug report into the betoni.online bugReport system. This is a LOUD write (distinct from the quiet `ib feedback`): it opens a GitHub issue AND emails admins. A real mutation — blocked under --read-only/IB_READ_ONLY (exit 3). CLI-filed reports are auto-tagged via browserInfo=ib-cli/<version>. --dry-run resolves client-side (prints the payload, never sends).",
+      "File a bug report into the betoni.online bugReport system. This is a LOUD write (distinct from the quiet `ib dev feedback`): it opens a GitHub issue AND emails admins. A real mutation — blocked under --read-only/IB_READ_ONLY (exit 3). CLI-filed reports are auto-tagged via browserInfo=ib-cli/<version>. --dry-run resolves client-side (prints the payload, never sends).",
     auth: "any",
     mutates: true,
     flags: [
@@ -4700,14 +4700,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(403, "Blocked under --read-only", "this is a real write; drop --read-only / unset IB_READ_ONLY"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
-    seeAlso: ["ib bug list", "ib feedback create", "ib attachment upload --bug-report <id>"],
+    seeAlso: ["ib dev bug list", "ib dev feedback create", "ib attachment upload --bug-report <id>"],
     examples: [
-      'ib bug create --type functionality-error --severity major --description "Grid crashes on save" --steps "open grid, click save"',
-      'ib bug create --type other --severity minor --description "preview" --dry-run',
+      'ib dev bug create --type functionality-error --severity major --description "Grid crashes on save" --steps "open grid, click save"',
+      'ib dev bug create --type other --severity minor --description "preview" --dry-run',
     ],
   },
   {
-    command: "ib bug list",
+    command: "ib dev bug list",
     description:
       "List bug reports. Permission-filtered server-side: a regular user sees their own + their company's reports; an admin/developer sees all and may narrow by --owner (ownerAsiakasId; ignored for non-admins). Newest first by default.",
     auth: "any",
@@ -4728,11 +4728,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { exit: 4, meaning: "Validation", remedy: "--status/--severity/--type/--order-by/--order must be valid enum values" },
       ...COMMON_AUTH_ERRORS,
     ],
-    seeAlso: ["ib bug get", "ib bug admin stats"],
-    examples: ["ib bug list --status new --severity major", "ib bug list --owner 1349 --limit 20"],
+    seeAlso: ["ib dev bug get", "ib dev bug admin stats"],
+    examples: ["ib dev bug list --status new --severity major", "ib dev bug list --owner 1349 --limit 20"],
   },
   {
-    command: "ib bug get",
+    command: "ib dev bug get",
     description:
       "Fetch one bug report with its comments and attachments inline. Access: report owner OR same ownerAsiakasId OR admin/developer.",
     auth: "any",
@@ -4741,14 +4741,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape: "The full report { bugReportId, bugType, severity, status, priority, description, reporterName, ageDays, staleDays, comments: [...], attachments: [...], ... }. ageDays/staleDays are derived client-side: whole days since createdAt and since last activity (updatedAt↔createdAt) — surfaces a stale report without ISO-date math.",
     errors: [
       apiErr(403, "Permission denied", "you must own the report, share its company, or be a developer"),
-      apiErr(404, "Not found", "check the id via `ib bug list`"),
+      apiErr(404, "Not found", "check the id via `ib dev bug list`"),
       ...COMMON_AUTH_ERRORS,
     ],
-    seeAlso: ["ib bug list", "ib attachment list --bug-report <id>"],
-    examples: ["ib bug get 51"],
+    seeAlso: ["ib dev bug list", "ib attachment list --bug-report <id>"],
+    examples: ["ib dev bug get 51"],
   },
   {
-    command: "ib bug comment",
+    command: "ib dev bug comment",
     description:
       "Add a comment to a bug report (owner / same-company / admin). Notifies the other party by email. A real write — blocked under --read-only. --dry-run previews client-side.",
     auth: "any",
@@ -4763,13 +4763,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     errors: [
       { exit: 4, meaning: "Validation", remedy: "--body must not be empty" },
       apiErr(403, "Permission denied / read-only", "you must own the report, share its company, or be a developer; not under --read-only"),
-      apiErr(404, "Not found", "check the id via `ib bug list`"),
+      apiErr(404, "Not found", "check the id via `ib dev bug list`"),
       ...COMMON_AUTH_ERRORS,
     ],
-    examples: ['ib bug comment 51 --body "still reproduces on staging"'],
+    examples: ['ib dev bug comment 51 --body "still reproduces on staging"'],
   },
   {
-    command: "ib bug admin update",
+    command: "ib dev bug admin update",
     description:
       "Triage a bug report: set status / priority / admin notes / resolution / assignee. Developer-only (isSystemAdmin / isDeveloper). A real write — blocked under --read-only. --dry-run previews client-side.",
     permissions: ["isSystemAdmin or isDeveloper"],
@@ -4789,17 +4789,17 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     errors: [
       { exit: 4, meaning: "Validation", remedy: "provide at least one of --status/--priority/--notes/--resolution/--assign; status/priority must be valid enums" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
-      apiErr(404, "Not found", "check the id via `ib bug list`"),
+      apiErr(404, "Not found", "check the id via `ib dev bug list`"),
       ...COMMON_AUTH_ERRORS,
     ],
-    seeAlso: ["ib bug admin assign", "ib bug admin delete"],
+    seeAlso: ["ib dev bug admin assign", "ib dev bug admin delete"],
     examples: [
-      'ib bug admin update 51 --status resolved --resolution "fixed in v2.1"',
-      "ib bug admin update 51 --priority urgent --assign 6233",
+      'ib dev bug admin update 51 --status resolved --resolution "fixed in v2.1"',
+      "ib dev bug admin update 51 --priority urgent --assign 6233",
     ],
   },
   {
-    command: "ib bug admin assign",
+    command: "ib dev bug admin assign",
     description:
       "Assign a bug report to a developer; the backend also flips its status to in-progress. Developer-only. A real write — blocked under --read-only. --dry-run previews client-side.",
     permissions: ["isSystemAdmin or isDeveloper"],
@@ -4815,13 +4815,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     errors: [
       { exit: 4, meaning: "Validation", remedy: "--to <personId> must be a positive integer" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
-      apiErr(404, "Not found", "check the id via `ib bug list`"),
+      apiErr(404, "Not found", "check the id via `ib dev bug list`"),
       ...COMMON_AUTH_ERRORS,
     ],
-    examples: ["ib bug admin assign 51 --to 6233"],
+    examples: ["ib dev bug admin assign 51 --to 6233"],
   },
   {
-    command: "ib bug admin stats",
+    command: "ib dev bug admin stats",
     description: "Aggregate bug report statistics (counts by status/severity/etc.). Developer-only. Optionally scoped to one tenant with --owner.",
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
@@ -4831,10 +4831,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(403, "Permission denied", "requires a developer token"),
       ...COMMON_AUTH_ERRORS,
     ],
-    examples: ["ib bug admin stats", "ib bug admin stats --owner 1349"],
+    examples: ["ib dev bug admin stats", "ib dev bug admin stats --owner 1349"],
   },
   {
-    command: "ib bug admin delete",
+    command: "ib dev bug admin delete",
     description:
       "Permanently delete a bug report. Developer-only and IRREVERSIBLE. A real write — blocked under --read-only. --reason is REQUIRED. --dry-run previews client-side.",
     permissions: ["isSystemAdmin or isDeveloper"],
@@ -4849,10 +4849,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     errors: [
       { exit: 4, meaning: "Validation", remedy: "--reason is required for delete" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
-      apiErr(404, "Not found", "check the id via `ib bug list`"),
+      apiErr(404, "Not found", "check the id via `ib dev bug list`"),
       ...COMMON_AUTH_ERRORS,
     ],
-    examples: ['ib bug admin delete 51 --reason "duplicate of BR-40"'],
+    examples: ['ib dev bug admin delete 51 --reason "duplicate of BR-40"'],
   },
   // ─── cache (6) — Redis inspection and invalidation ───────────────────────
   ...((): CommandSpec[] => {
@@ -4880,31 +4880,31 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ];
     return [
       {
-        command: "ib cache stats",
+        command: "ib dev cache stats",
         description: "Redis connection status, total key count, and hit rate. Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
         flags: [],
         outputShape: "{ connected, totalKeys, hitRate?, usedMemory? }",
         errors: devErrors,
-        examples: ["ib cache stats"],
+        examples: ["ib dev cache stats"],
       },
       {
-        command: "ib cache keys",
+        command: "ib dev cache keys",
         description: "Key counts grouped by prefix pattern (SCAN). Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
         flags: [{ name: "pattern", type: "string", default: "*", description: "SCAN match glob (default: *)" }],
         outputShape: "{ totalKeys, groups: [{ prefix, count }] }",
         errors: devErrors,
-        examples: ["ib cache keys", "ib cache keys --pattern 'keikka:*'"],
+        examples: ["ib dev cache keys", "ib dev cache keys --pattern 'keikka:*'"],
       },
       {
-        command: "ib cache invalidate",
+        command: "ib dev cache invalidate",
         description: "Invalidate cache for one entity family by domain identifier (no Redis key knowledge needed). Previews (X-Dry-Run) unless --confirm. --cascade fans out to related families (keikka only). Any admin; non-developers are scoped to their own company. Guard: refuses deployed endpoints unless --force-prod (all slots share Redis DB 3).",
         permissions: ADMIN_PERMS,
         mutates: true,
-        args: [{ name: "entityType", type: "string", description: "Entity family, e.g. keikka/asiakas/vehicle (see `ib cache entities`)" }],
+        args: [{ name: "entityType", type: "string", description: "Entity family, e.g. keikka/asiakas/vehicle (see `ib dev cache entities`)" }],
         flags: [
           { name: "id", type: "number", description: "Entity id (e.g. keikkaId)" },
           { name: "asiakas-id", type: "number", description: "Tenant scope (developers may target others; non-devs use their own)" },
@@ -4913,7 +4913,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         ],
         outputShape: "preview: { dryRun:true, wouldDelete, patterns[] } | execute: { dryRun:false, deleted }",
         errors: [
-          apiErr(400, "Unknown entityType or cascade unsupported", "run `ib cache entities` to list valid types"),
+          apiErr(400, "Unknown entityType or cascade unsupported", "run `ib dev cache entities` to list valid types"),
           apiErr(403, "Not an admin, or cross-tenant entity needs developer", "cross-tenant entities (keikka, grid, stat, attachment) require isSystemAdmin/isDeveloper; others need an admin role"),
           refusedRemote,
           readOnlyErr,
@@ -4923,15 +4923,15 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
           "Without --confirm the command only PREVIEWS (counts keys) and never deletes.",
           "Single-entity invalidate may leave related caches (grid/stepLog/attachments) stale — use --cascade (keikka) or invalidate each family.",
         ],
-        seeAlso: ["ib cache entities", "ib cache keys"],
+        seeAlso: ["ib dev cache entities", "ib dev cache keys"],
         examples: [
-          "ib cache invalidate keikka --id 123",
-          "ib cache invalidate keikka --id 123 --cascade --confirm",
-          "ib cache invalidate asiakas --asiakas-id 8 --confirm",
+          "ib dev cache invalidate keikka --id 123",
+          "ib dev cache invalidate keikka --id 123 --cascade --confirm",
+          "ib dev cache invalidate asiakas --asiakas-id 8 --confirm",
         ],
       },
       {
-        command: "ib cache clear",
+        command: "ib dev cache clear",
         description: "Flush the entire Redis cache (curated sweep; preserves sessions/locks/metrics). Previews (X-Dry-Run) unless --confirm. Cross-tenant: clears every company's cached data. Guard: refuses deployed endpoints unless --force-prod. Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
@@ -4939,11 +4939,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         flags: writeFlags,
         outputShape: "preview: { dryRun:true, wouldDelete } | execute: { deleted }",
         errors: [...devErrors, refusedRemote, readOnlyErr],
-        examples: ["ib cache clear", "ib cache clear --confirm --force-prod"],
+        examples: ["ib dev cache clear", "ib dev cache clear --confirm --force-prod"],
       },
       {
-        command: "ib cache pattern",
-        description: "Invalidate keys matching a raw Redis glob. Previews unless --confirm. Guard: refuses deployed endpoints unless --force-prod. Developer-only. Prefer `ib cache invalidate` (domain entity); use `ib cache keys` to find the right glob.",
+        command: "ib dev cache pattern",
+        description: "Invalidate keys matching a raw Redis glob. Previews unless --confirm. Guard: refuses deployed endpoints unless --force-prod. Developer-only. Prefer `ib dev cache invalidate` (domain entity); use `ib dev cache keys` to find the right glob.",
         permissions: DEV_PERMS,
         tier: "developer",
         mutates: true,
@@ -4951,16 +4951,16 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         flags: writeFlags,
         outputShape: "preview: { dryRun:true, wouldDelete, pattern } | execute: { deleted, pattern }",
         errors: [...devErrors, refusedRemote, readOnlyErr],
-        examples: ["ib cache pattern 'keikka:*'", "ib cache pattern 'person:*' --confirm --force-prod"],
+        examples: ["ib dev cache pattern 'keikka:*'", "ib dev cache pattern 'person:*' --confirm --force-prod"],
       },
       {
-        command: "ib cache entities",
+        command: "ib dev cache entities",
         description: "List the valid cache entity types, their scope params (id/asiakasId), cascade support, and example invalidation commands. Offline — no auth required.",
         auth: "none",
         flags: [],
         outputShape: "{ items: [{ entityType, params[], cascade?, developerOnly?, example }], count }",
         errors: [{ exit: 0, meaning: "Always succeeds (offline static list)", remedy: "n/a" }],
-        examples: ["ib cache entities"],
+        examples: ["ib dev cache entities"],
       },
     ];
   })(),
@@ -4977,22 +4977,22 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "SQL durations cover the executeQuery (cache-runner) path only — raw getConnection() queries are not timed.";
     return [
       {
-        command: "ib perf slow",
+        command: "ib dev perf slow",
         description: "Recent slow queries from the collector's Redis ring buffer (procedure, durationMs, entity, params, timestamp). Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
         flags: [
           { name: "limit", type: "number", default: "50", description: "Max rows" },
-          { name: "env", type: "string", description: "Environment buffer to read (default: backend's current env; discover via `ib perf config`)" },
+          { name: "env", type: "string", description: "Environment buffer to read (default: backend's current env; discover via `ib dev perf config`)" },
         ],
         outputShape: "ListEnvelope<{ procedure, durationMs, entity, params, timestamp }> & { totalCount?, environment? } (+truncated:true when the page filled the limit)",
         errors: devErrors,
-        notes: [COVERAGE_NOTE, "Threshold to be 'slow' is the collector's SLOW_QUERY_THRESHOLD_MS (default 1000ms) — see `ib perf config`."],
-        seeAlso: ["ib perf stats", "ib perf config"],
-        examples: ["ib perf slow", "ib perf slow --limit 20 --env production"],
+        notes: [COVERAGE_NOTE, "Threshold to be 'slow' is the collector's SLOW_QUERY_THRESHOLD_MS (default 1000ms) — see `ib dev perf config`."],
+        seeAlso: ["ib dev perf stats", "ib dev perf config"],
+        examples: ["ib dev perf slow", "ib dev perf slow --limit 20 --env production"],
       },
       {
-        command: "ib perf stats",
+        command: "ib dev perf stats",
         description: "Aggregate slow-query stats: top procedures (count/avgMs), avg/max/min duration, by-entity breakdown, lifetime totalCount. Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
@@ -5000,22 +5000,22 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         outputShape: "{ totalSlowQueries, bufferedQueries, avgDuration, maxDuration, minDuration, topProcedures:[{ name, count, avgMs }], byEntity, since, threshold, sentryThreshold, environment }",
         errors: devErrors,
         notes: [COVERAGE_NOTE],
-        seeAlso: ["ib perf slow", "ib perf config"],
-        examples: ["ib perf stats", "ib perf stats --env staging"],
+        seeAlso: ["ib dev perf slow", "ib dev perf config"],
+        examples: ["ib dev perf stats", "ib dev perf stats --env staging"],
       },
       {
-        command: "ib perf config",
+        command: "ib dev perf config",
         description: "Slow-query collector configuration (enabled, threshold, sentryThreshold, maxEntries, current environment) plus availableEnvironments that have data. Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
         flags: [],
         outputShape: "{ enabled, threshold, sentryThreshold, maxEntries, environment, availableEnvironments:[string] }",
         errors: devErrors,
-        seeAlso: ["ib perf slow", "ib perf stats"],
-        examples: ["ib perf config"],
+        seeAlso: ["ib dev perf slow", "ib dev perf stats"],
+        examples: ["ib dev perf config"],
       },
       {
-        command: "ib perf clear",
+        command: "ib dev perf clear",
         description: "Clear the slow-query buffer for one environment. Previews with --dry-run (client-side); --reason recommended for the audit log. Developer-only; refused under --read-only.",
         permissions: DEV_PERMS,
         tier: "developer",
@@ -5028,8 +5028,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
           { exit: 3, meaning: "Blocked by read-only mode", remedy: "clearing needs a session without --read-only/IB_READ_ONLY" },
         ],
         notes: ["The DELETE route honours no server-side X-Dry-Run — --dry-run is resolved CLIENT-SIDE (never sends)."],
-        seeAlso: ["ib perf stats"],
-        examples: ['ib perf clear --env staging --reason "reset after load test"', "ib perf clear --dry-run"],
+        seeAlso: ["ib dev perf stats"],
+        examples: ['ib dev perf clear --env staging --reason "reset after load test"', "ib dev perf clear --dry-run"],
       },
     ];
   })(),

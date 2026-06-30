@@ -167,11 +167,11 @@ describe("ib commands classification", () => {
 
   test("feedback create/resolve are mutations despite writeFlags:false", () => {
     const muts = filterCommandSpecs(COMMAND_SPECS, { mutations: true }).map((c) => c.command);
-    expect(muts).toContain("ib feedback create");
-    expect(muts).toContain("ib feedback resolve");
+    expect(muts).toContain("ib dev feedback create");
+    expect(muts).toContain("ib dev feedback resolve");
     const reads = filterCommandSpecs(COMMAND_SPECS, { reads: true }).map((c) => c.command);
-    expect(reads).not.toContain("ib feedback create");
-    expect(reads).not.toContain("ib feedback resolve");
+    expect(reads).not.toContain("ib dev feedback create");
+    expect(reads).not.toContain("ib dev feedback resolve");
   });
 });
 
@@ -208,44 +208,48 @@ describe("buildDomainIndex", () => {
     expect(jerry?.description).toMatch(/BetoniJerry|request-for-quote/i);
     // regression: "ai" must NOT inherit sijainti's blurb via the "ai" ⊂ "sijainti"
     // substring collision. Blurbs now come directly from DOMAIN_BLURBS (no
-    // substring matching) so there is no collision risk — this assertion guards
-    // that the mapping remains an exact lookup, not a substring search.
-    const ai = env.items.find((i) => i.domain === "ai");
-    expect(ai?.description).toMatch(/conversation/i);
-    expect(ai?.description).not.toMatch(/geocoded location/i);
+    // substring matching). All former standalone ai/schema/changelog/etc. groups
+    // are now consolidated under the "dev" domain.
+    const dev_domain = env.items.find((i) => i.domain === "dev");
+    expect(dev_domain?.description).toMatch(/developer|maintainer/i);
+    expect(dev_domain?.description).not.toMatch(/geocoded location/i);
   });
 });
 
 describe("tier filtering — flat list", () => {
   test("standard hides developer leaves; developer keeps them", () => {
-    const dev = buildCommandsList({ domain: "ai" }, "developer");
-    expect(dev.items.map((i) => i.command)).toContain("ib ai conversation");
-    const std = buildCommandsList({ domain: "ai" }, "standard");
-    // All ib ai commands are tier:developer — the whole domain collapses to empty at standard.
-    expect(std.items).toHaveLength(0);
+    // All former standalone ai/schema/etc. groups consolidated under "dev".
+    const dev = buildCommandsList({ domain: "dev" }, "developer");
+    expect(dev.items.map((i) => i.command)).toContain("ib dev ai conversation");
+    const std = buildCommandsList({ domain: "dev" }, "standard");
+    // developer-only commands (ai, schema, etc.) are hidden at standard,
+    // but standard-visible dev commands (feedback create, cache invalidate) remain.
+    expect(std.items.map((i) => i.command)).not.toContain("ib dev ai conversation");
+    expect(std.items.map((i) => i.command)).toContain("ib dev feedback create");
   });
   test("feedback create stays visible at standard; triage drops", () => {
-    const std = buildCommandsList({ domain: "feedback" }, "standard");
+    const std = buildCommandsList({ domain: "dev" }, "standard");
     const cmds = std.items.map((i) => i.command);
-    expect(cmds).toContain("ib feedback create");
-    expect(cmds).not.toContain("ib feedback list");
+    expect(cmds).toContain("ib dev feedback create");
+    expect(cmds).not.toContain("ib dev feedback list");
   });
   test("default tier is developer (back-compat)", () => {
-    const def = buildCommandsList({ domain: "schema" });
+    const def = buildCommandsList({ domain: "dev" });
     expect(def.count).toBeGreaterThan(0);
   });
 });
 
 describe("fullyHiddenDomains", () => {
-  test("standard fully hides ai/schema/changelog only", () => {
+  test("standard has no fully-hidden domains (all dev-only groups consolidated under 'dev' which has standard-visible leaves)", () => {
     const hidden = fullyHiddenDomains("standard");
-    expect(hidden.has("ai")).toBe(true);
-    expect(hidden.has("schema")).toBe(true);
-    expect(hidden.has("changelog")).toBe(true);
-    // partial / visible domains must NOT be fully hidden
-    expect(hidden.has("feedback")).toBe(false);
+    // dev domain has standard-visible specs (feedback create, cache invalidate, bug create/list/get/comment)
+    expect(hidden.has("dev")).toBe(false);
+    // old standalone domains no longer exist in COMMAND_SPECS — not present, so not hidden
+    expect(hidden.has("ai")).toBe(false);
+    expect(hidden.has("schema")).toBe(false);
+    expect(hidden.has("changelog")).toBe(false);
+    // other visible domains must NOT be fully hidden
     expect(hidden.has("jerry")).toBe(false);
-    expect(hidden.has("cache")).toBe(false);
     expect(hidden.has("keikka")).toBe(false);
   });
   test("developer hides nothing", () => {
@@ -258,43 +262,50 @@ describe("assertKnownDomain tier-filtered error list", () => {
     let msg = "";
     try { assertKnownDomain(COMMAND_SPECS, "bogusxyz", "standard"); } catch (e) { msg = (e as Error).message; }
     expect(msg).toContain("unknown domain: bogusxyz");
+    // old standalone domains no longer exist in COMMAND_SPECS → not in error list
     expect(msg).not.toContain("schema");
     expect(msg).not.toContain("changelog");
     expect(msg).toContain("keikka"); // a visible domain is still suggested
   });
-  test("a hidden-but-valid domain still validates as KNOWN at standard (no throw)", () => {
-    expect(() => assertKnownDomain(COMMAND_SPECS, "schema", "standard")).not.toThrow();
+  test("a known domain validates without throwing", () => {
+    // dev is the new umbrella — it is a known domain and does not throw
+    expect(() => assertKnownDomain(COMMAND_SPECS, "dev", "standard")).not.toThrow();
   });
-  test("developer error lists all domains incl. schema", () => {
+  test("developer error lists all domains incl. dev", () => {
     let msg = "";
     try { assertKnownDomain(COMMAND_SPECS, "bogusxyz", "developer"); } catch (e) { msg = (e as Error).message; }
-    expect(msg).toContain("schema");
+    expect(msg).toContain("dev");
   });
 });
 
 describe("tier filtering — domain index", () => {
-  test("standard drops fully-developer domains (ai, schema, changelog)", () => {
+  test("standard drops old top-level developer domains; dev umbrella still shows (has standard-visible leaves)", () => {
     const domains = buildDomainIndex(undefined, "standard").items.map(
       (i) => i.domain
     );
+    // old standalone domains no longer exist in COMMAND_SPECS
     expect(domains).not.toContain("ai");
     expect(domains).not.toContain("schema");
     expect(domains).not.toContain("changelog");
-    expect(domains).toContain("feedback"); // create still visible
+    // dev appears because it has standard-visible specs (feedback create, cache invalidate, bug create/list/get/comment)
+    expect(domains).toContain("dev");
   });
-  test("developer index keeps ai + schema", () => {
+  test("developer index keeps dev umbrella (containing ai, schema, changelog, etc.)", () => {
     const domains = buildDomainIndex(undefined, "developer").items.map(
       (i) => i.domain
     );
-    expect(domains).toContain("ai");
-    expect(domains).toContain("schema");
+    // consolidated under dev
+    expect(domains).toContain("dev");
+    expect(domains).not.toContain("ai");
+    expect(domains).not.toContain("schema");
   });
-  test("standard feedback row lists only create", () => {
-    const fb = buildDomainIndex(undefined, "standard").items.find(
-      (i) => i.domain === "feedback"
+  test("standard dev row lists only standard-visible leaves (incl. feedback create, not feedback list)", () => {
+    const dev = buildDomainIndex(undefined, "standard").items.find(
+      (i) => i.domain === "dev"
     )!;
-    expect(fb.commands).toContain("feedback create");
-    expect(fb.commands).not.toContain("feedback list");
-    expect(fb.count).toBe(fb.commands.length);
+    expect(dev).toBeDefined();
+    expect(dev.commands).toContain("dev feedback create");
+    expect(dev.commands).not.toContain("dev feedback list");
+    expect(dev.count).toBe(dev.commands.length);
   });
 });

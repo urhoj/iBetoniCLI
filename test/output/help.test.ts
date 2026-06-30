@@ -96,8 +96,9 @@ describe("formatGroupHelp tier filtering", () => {
     expect(dev).toContain("admin");
   });
   test("fully-hidden group renders the not-available fallback at standard", () => {
+    // schema is now under ib dev schema — use that path for tier-gating tests
     const std = formatGroupHelp(
-      "ib schema",
+      "ib dev schema",
       "Schema",
       COMMAND_SPECS,
       "standard"
@@ -105,7 +106,7 @@ describe("formatGroupHelp tier filtering", () => {
     expect(std).toContain("not available at your access level");
     expect(std).not.toContain("SUBCOMMANDS");
     const dev = formatGroupHelp(
-      "ib schema",
+      "ib dev schema",
       "Schema",
       COMMAND_SPECS,
       "developer"
@@ -113,8 +114,9 @@ describe("formatGroupHelp tier filtering", () => {
     expect(dev).toContain("SUBCOMMANDS");
   });
   test("feedback group keeps create, drops list at standard", () => {
+    // feedback is now under ib dev feedback
     const std = formatGroupHelp(
-      "ib feedback",
+      "ib dev feedback",
       "Feedback",
       COMMAND_SPECS,
       "standard"

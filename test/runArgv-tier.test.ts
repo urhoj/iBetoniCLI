@@ -20,13 +20,13 @@ describe("runArgv applies caller tier to discovery", () => {
     const out = JSON.parse(res.stdout);
     expect(out.items.map((i: { domain: string }) => i.domain)).not.toContain("ai");
   });
-  test("developer token shows ai domain", async () => {
+  test("developer token shows dev domain (consolidates ai/schema/changelog/etc.)", async () => {
     const res = await runArgv(["commands"], {
       token: jwt({ globalRoles: { isDeveloper: true } }),
       endpoint: "http://127.0.0.1:1",
     });
     const out = JSON.parse(res.stdout);
-    expect(out.items.map((i: { domain: string }) => i.domain)).toContain("ai");
+    expect(out.items.map((i: { domain: string }) => i.domain)).toContain("dev");
   });
   test("runArgv restores the ambient tier afterwards (no leak)", async () => {
     expect(getCallerTier()).toBe("developer"); // module default

@@ -163,25 +163,41 @@ export function buildProgram() {
     registerMessageCommands(program, getClient);
     registerScheduleCommands(program, getClient);
     registerStatsCommands(program, getClient);
-    registerPerfCommands(program, getClient);
     registerLogCommands(program, getClient);
-    registerSchemaCommands(program, getClient);
-    registerCacheCommands(program, getClient);
     // `ib opendata` (canonical) houses building + weather + prh. The top-level
     // `ib weather` is kept as a HIDDEN back-compat alias (runtime-only; absent
     // from spec-driven discovery and root --help).
     registerOpendataCommands(program, getClient);
     registerWeatherCommands(program, getClient, { hidden: true });
-    registerChangelogCommands(program, getClient);
-    registerFeedbackCommands(program, getClient);
-    registerAiCommands(program, getClient);
-    registerBugCommands(program, getClient);
     registerGlossaryCommands(program, getClient);
     registerSearchCommands(program, getClient);
     registerAttachmentCommands(program, getClient);
     registerVersionCommand(program, packageJson.version, getEndpoint);
     registerDoctorCommand(program, getClient, getEndpoint, packageJson.version, isReadOnly);
-    registerInboxCommand(program, getClient);
+    // `ib dev` — developer/maintainer meta umbrella. The 8 groups below are
+    // canonical under `ib dev …`; their previous top-level paths stay registered
+    // with { hidden: true } as runtime-only back-compat aliases (absent from
+    // spec-driven discovery and root --help), mirroring `ib opendata`/`ib weather`.
+    const dev = program
+        .command("dev")
+        .description("Developer & maintainer tools — bug reports, CLI feedback, changelog, perf, cache, schema, AI logs, operator inbox. Filing a bug or feedback is open to everyone.");
+    registerBugCommands(dev, getClient);
+    registerFeedbackCommands(dev, getClient);
+    registerChangelogCommands(dev, getClient);
+    registerPerfCommands(dev, getClient);
+    registerCacheCommands(dev, getClient);
+    registerSchemaCommands(dev, getClient);
+    registerAiCommands(dev, getClient);
+    registerInboxCommand(dev, getClient);
+    // Hidden back-compat aliases at the old top-level paths (still executable).
+    registerBugCommands(program, getClient, { hidden: true });
+    registerFeedbackCommands(program, getClient, { hidden: true });
+    registerChangelogCommands(program, getClient, { hidden: true });
+    registerPerfCommands(program, getClient, { hidden: true });
+    registerCacheCommands(program, getClient, { hidden: true });
+    registerSchemaCommands(program, getClient, { hidden: true });
+    registerAiCommands(program, getClient, { hidden: true });
+    registerInboxCommand(program, getClient, { hidden: true });
     const reference = program
         .command("reference")
         .description("Reference / meta commands (machine-readable CLI catalogue)");

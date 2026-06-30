@@ -65,6 +65,11 @@ export function visibleSubcommands(cmd, tier) {
     const fullyHidden = base === "ib" ? fullyHiddenDomains(tier) : new Set();
     return cmd.commands
         .filter((sub) => {
+        // Skip Commander-hidden commands (back-compat aliases registered with
+        // { hidden: true }) — they must be invisible everywhere, not just in
+        // Commander's own --help renderer.
+        if (sub._hidden)
+            return false;
         if (fullyHidden.has(sub.name()))
             return false;
         const spec = COMMAND_SPECS.find((s) => s.command === `${base} ${sub.name()}`);

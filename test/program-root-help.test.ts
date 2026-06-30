@@ -19,11 +19,14 @@ describe("root --help command listing is tier-filtered", () => {
     expect(h).not.toMatch(/^\s+ai\b/m);
     expect(h).toMatch(/^\s+keikka\b/m); // visible domain still listed
   });
-  test("developer lists schema/ai/changelog", () => {
+  test("developer sees dev umbrella; old hidden aliases not shown at root", () => {
     const h = rootHelp("developer");
-    expect(h).toMatch(/^\s+schema\b/m);
-    expect(h).toMatch(/^\s+ai\b/m);
-    expect(h).toMatch(/^\s+changelog\b/m);
+    // dev is the new umbrella for schema/ai/changelog/bug/feedback/perf/cache/inbox
+    expect(h).toMatch(/^\s+dev\b/m);
+    // back-compat aliases are registered as Commander-hidden — absent from root help
+    expect(h).not.toMatch(/^\s+schema\b/m);
+    expect(h).not.toMatch(/^\s+ai\b/m);
+    expect(h).not.toMatch(/^\s+changelog\b/m);
   });
 });
 

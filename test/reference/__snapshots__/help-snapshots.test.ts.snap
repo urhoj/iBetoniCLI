@@ -1,80 +1,5 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`Help snapshots — contract stability > help for ib ai conversation matches snapshot 1`] = `
-"USAGE
-  ib ai conversation <conversationId> [flags]
-
-DESCRIPTION
-  Fetch the full transcript of an /ai assistant conversation by id (gptConversations/gptMessages). Developer/sysadmin tooling. The id originates from an \`ib feedback\` row's context.conversationId, stamped automatically when the AI files feedback from the /ai page.
-  Permissions: requires isSystemAdmin or isDeveloper.
-
-ARGUMENTS
-  <conversationId> NUMBER    gptConversations id (from a feedback row's context.conversationId) (required)
-
-FLAGS
-  (none)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { conversationId, personId, ownerAsiakasId, messageCount, messages: [{ gptMessageId, role?, content?, raw?, ... }] }
-
-ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → conversationId must be a positive integer
-  exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
-  exit 5 (HTTP 404)  Not found              → no conversation with that id
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-NOTES
-  - Deploy-gated: 404 until puminet5api ships the /api/cli/ai/conversation/:id route.
-
-SEE ALSO
-  ib feedback get, ib feedback list
-
-EXAMPLES
-  ib ai conversation 4321
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib ai conversations matches snapshot 1`] = `
-"USAGE
-  ib ai conversations [flags]
-
-DESCRIPTION
-  List recent /ai assistant conversations CROSS-TENANT for audit/browse (compact rows, newest-first, no message bodies). Developer/sysadmin tooling — the way to discover conversationIds to audit without an \`ib feedback\` row pointing at one. Drill into a transcript with \`ib ai conversation <id>\`.
-  Permissions: requires isSystemAdmin or isDeveloper.
-
-FLAGS
-  --limit NUMBER    Max rows to return (1-100) (default: 20)
-  --person NUMBER    Filter to one person's conversations (personId)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  ListEnvelope<{ conversationId, personId, ownerAsiakasId, entryTime, messageCount }> (truncated:true when the page hit --limit)
-
-ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → --limit must be 1-100; --person must be a positive integer
-  exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-NOTES
-  - Deploy-gated: 404 until puminet5api ships the /api/cli/ai/conversations route.
-
-SEE ALSO
-  ib ai conversation, ib feedback list
-
-EXAMPLES
-  ib ai conversations
-  ib ai conversations --limit 50
-  ib ai conversations --person 6233
-"
-`;
-
 exports[`Help snapshots — contract stability > help for ib attachment attach matches snapshot 1`] = `
 "USAGE
   ib attachment attach <attachmentId> [flags]
@@ -818,748 +743,6 @@ EXAMPLES
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib bug admin assign matches snapshot 1`] = `
-"USAGE
-  ib bug admin assign <bugReportId> [flags]
-
-DESCRIPTION
-  Assign a bug report to a developer; the backend also flips its status to in-progress. Developer-only. A real write — blocked under --read-only. --dry-run previews client-side.
-  Permissions: requires isSystemAdmin or isDeveloper.
-
-ARGUMENTS
-  <bugReportId> NUMBER    bugReportId (required)
-
-FLAGS
-  --to NUMBER    Assignee personId (required)
-  --reason STRING    Audit-log reason (X-Action-Reason)
-  --dry-run BOOLEAN    Preview without sending (client-side)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  The updated report (status now in-progress). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
-
-ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → --to <personId> must be a positive integer
-  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
-  exit 5 (HTTP 404)  Not found              → check the id via \`ib bug list\`
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-EXAMPLES
-  ib bug admin assign 51 --to 6233
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib bug admin delete matches snapshot 1`] = `
-"USAGE
-  ib bug admin delete <bugReportId> [flags]
-
-DESCRIPTION
-  Permanently delete a bug report. Developer-only and IRREVERSIBLE. A real write — blocked under --read-only. --reason is REQUIRED. --dry-run previews client-side.
-  Permissions: requires isSystemAdmin or isDeveloper.
-
-ARGUMENTS
-  <bugReportId> NUMBER    bugReportId (required)
-
-FLAGS
-  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED (required)
-  --dry-run BOOLEAN    Preview without sending (client-side)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { success: true, bugReportId } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, headers } }.
-
-ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → --reason is required for delete
-  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
-  exit 5 (HTTP 404)  Not found              → check the id via \`ib bug list\`
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-EXAMPLES
-  ib bug admin delete 51 --reason "duplicate of BR-40"
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib bug admin stats matches snapshot 1`] = `
-"USAGE
-  ib bug admin stats [flags]
-
-DESCRIPTION
-  Aggregate bug report statistics (counts by status/severity/etc.). Developer-only. Optionally scoped to one tenant with --owner.
-  Permissions: requires isSystemAdmin or isDeveloper.
-
-FLAGS
-  --owner NUMBER    Scope to one tenant (ownerAsiakasId)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { ...aggregate counts }
-
-ERRORS (stderr, exit non-zero)
-  exit 3 (HTTP 403)  Permission denied      → requires a developer token
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-EXAMPLES
-  ib bug admin stats
-  ib bug admin stats --owner 1349
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib bug admin update matches snapshot 1`] = `
-"USAGE
-  ib bug admin update <bugReportId> [flags]
-
-DESCRIPTION
-  Triage a bug report: set status / priority / admin notes / resolution / assignee. Developer-only (isSystemAdmin / isDeveloper). A real write — blocked under --read-only. --dry-run previews client-side.
-  Permissions: requires isSystemAdmin or isDeveloper.
-
-ARGUMENTS
-  <bugReportId> NUMBER    bugReportId (required)
-
-FLAGS
-  --status STRING    new | in-progress | resolved | closed
-  --priority STRING    low | medium | high | urgent
-  --notes STRING    Admin notes (stored as adminNotes)
-  --resolution STRING    Resolution text
-  --assign NUMBER    Assign to a developer (personId → assignedTo)
-  --reason STRING    Audit-log reason (X-Action-Reason)
-  --dry-run BOOLEAN    Preview without sending (client-side)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  The updated report. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
-
-ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → provide at least one of --status/--priority/--notes/--resolution/--assign; status/priority must be valid enums
-  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
-  exit 5 (HTTP 404)  Not found              → check the id via \`ib bug list\`
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-SEE ALSO
-  ib bug admin assign, ib bug admin delete
-
-EXAMPLES
-  ib bug admin update 51 --status resolved --resolution "fixed in v2.1"
-  ib bug admin update 51 --priority urgent --assign 6233
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib bug comment matches snapshot 1`] = `
-"USAGE
-  ib bug comment <bugReportId> [flags]
-
-DESCRIPTION
-  Add a comment to a bug report (owner / same-company / admin). Notifies the other party by email. A real write — blocked under --read-only. --dry-run previews client-side.
-  Auth: requires login (any authenticated user).
-
-ARGUMENTS
-  <bugReportId> NUMBER    bugReportId (required)
-
-FLAGS
-  --body STRING    Comment text (required)
-  --reason STRING    Audit-log reason (X-Action-Reason)
-  --dry-run BOOLEAN    Preview without sending (client-side)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { commentId } (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
-
-ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → --body must not be empty
-  exit 3 (HTTP 403)  Permission denied / read-only → you must own the report, share its company, or be a developer; not under --read-only
-  exit 5 (HTTP 404)  Not found              → check the id via \`ib bug list\`
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-EXAMPLES
-  ib bug comment 51 --body "still reproduces on staging"
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib bug create matches snapshot 1`] = `
-"USAGE
-  ib bug create [flags]
-
-DESCRIPTION
-  File a bug report into the betoni.online bugReport system. This is a LOUD write (distinct from the quiet \`ib feedback\`): it opens a GitHub issue AND emails admins. A real mutation — blocked under --read-only/IB_READ_ONLY (exit 3). CLI-filed reports are auto-tagged via browserInfo=ib-cli/<version>. --dry-run resolves client-side (prints the payload, never sends).
-  Auth: requires login (any authenticated user).
-
-FLAGS
-  --type STRING    ui-display-issue | functionality-error | performance-problem | data-incorrect | other (required)
-  --severity STRING    critical | major | minor | cosmetic (required)
-  --description STRING    What is wrong (required)
-  --steps STRING    Steps to reproduce
-  --priority STRING    low | medium | high | urgent (omitted → derived from severity)
-  --reason STRING    Audit-log reason (X-Action-Reason)
-  --dry-run BOOLEAN    Preview the payload without sending (client-side)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { bugReportId, referenceNumber } (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
-
-ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → --type/--severity/--description required; --type, --severity, --priority must be valid enum values
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Blocked under --read-only → this is a real write; drop --read-only / unset IB_READ_ONLY
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-SEE ALSO
-  ib bug list, ib feedback create, ib attachment upload --bug-report <id>
-
-EXAMPLES
-  ib bug create --type functionality-error --severity major --description "Grid crashes on save" --steps "open grid, click save"
-  ib bug create --type other --severity minor --description "preview" --dry-run
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib bug get matches snapshot 1`] = `
-"USAGE
-  ib bug get <bugReportId> [flags]
-
-DESCRIPTION
-  Fetch one bug report with its comments and attachments inline. Access: report owner OR same ownerAsiakasId OR admin/developer.
-  Auth: requires login (any authenticated user).
-
-ARGUMENTS
-  <bugReportId> NUMBER    bugReportId (required)
-
-FLAGS
-  (none)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  The full report { bugReportId, bugType, severity, status, priority, description, reporterName, ageDays, staleDays, comments: [...], attachments: [...], ... }. ageDays/staleDays are derived client-side: whole days since createdAt and since last activity (updatedAt↔createdAt) — surfaces a stale report without ISO-date math.
-
-ERRORS (stderr, exit non-zero)
-  exit 3 (HTTP 403)  Permission denied      → you must own the report, share its company, or be a developer
-  exit 5 (HTTP 404)  Not found              → check the id via \`ib bug list\`
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-SEE ALSO
-  ib bug list, ib attachment list --bug-report <id>
-
-EXAMPLES
-  ib bug get 51
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib bug list matches snapshot 1`] = `
-"USAGE
-  ib bug list [flags]
-
-DESCRIPTION
-  List bug reports. Permission-filtered server-side: a regular user sees their own + their company's reports; an admin/developer sees all and may narrow by --owner (ownerAsiakasId; ignored for non-admins). Newest first by default.
-  Auth: requires login (any authenticated user).
-
-FLAGS
-  --status STRING    new | in-progress | resolved | closed
-  --severity STRING    critical | major | minor | cosmetic
-  --type STRING    ui-display-issue | functionality-error | performance-problem | data-incorrect | other
-  --owner NUMBER    Filter by owning tenant asiakasId (admins only)
-  --limit NUMBER    Max rows (sets truncated when hit)
-  --offset NUMBER    Pagination offset
-  --order-by STRING    createdAt | updatedAt | severity | status | bugType | bugReportId (default: createdAt)
-  --order STRING    asc | desc (default: desc)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { items: BugReportRow[], nextCursor: null, count, truncated } — each row is enriched client-side with ageDays (whole days since createdAt) and staleDays (since last activity = updatedAt↔createdAt); a high staleDays on an open report flags a months-old untouched bug. (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
-
-ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → --status/--severity/--type/--order-by/--order must be valid enum values
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-SEE ALSO
-  ib bug get, ib bug admin stats
-
-EXAMPLES
-  ib bug list --status new --severity major
-  ib bug list --owner 1349 --limit 20
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib cache clear matches snapshot 1`] = `
-"USAGE
-  ib cache clear [flags]
-
-DESCRIPTION
-  Flush the entire Redis cache (curated sweep; preserves sessions/locks/metrics). Previews (X-Dry-Run) unless --confirm. Cross-tenant: clears every company's cached data. Guard: refuses deployed endpoints unless --force-prod. Developer-only.
-  Permissions: requires isSystemAdmin or isDeveloper.
-
-FLAGS
-  --confirm BOOLEAN    Execute the operation (default is dry-run preview)
-  --force-prod BOOLEAN    Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec.
-  --reason STRING    Audit-log reason (X-Action-Reason)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  preview: { dryRun:true, wouldDelete } | execute: { deleted }
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-  exit 3  Refused: deployed endpoint without --force-prod → prod and staging share Redis DB 3; add --force-prod or use a local endpoint
-  exit 3  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
-
-EXAMPLES
-  ib cache clear
-  ib cache clear --confirm --force-prod
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib cache entities matches snapshot 1`] = `
-"USAGE
-  ib cache entities [flags]
-
-DESCRIPTION
-  List the valid cache entity types, their scope params (id/asiakasId), cascade support, and example invalidation commands. Offline — no auth required.
-  Auth: none (public).
-
-FLAGS
-  (none)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { items: [{ entityType, params[], cascade?, developerOnly?, example }], count }
-
-ERRORS (stderr, exit non-zero)
-  exit 0  Always succeeds (offline static list) → n/a
-
-EXAMPLES
-  ib cache entities
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib cache invalidate matches snapshot 1`] = `
-"USAGE
-  ib cache invalidate <entityType> [flags]
-
-DESCRIPTION
-  Invalidate cache for one entity family by domain identifier (no Redis key knowledge needed). Previews (X-Dry-Run) unless --confirm. --cascade fans out to related families (keikka only). Any admin; non-developers are scoped to their own company. Guard: refuses deployed endpoints unless --force-prod (all slots share Redis DB 3).
-  Permissions: requires admin role (SystemAdmin, AsiakasAdmin, or LaskuAdmin) or developer.
-
-ARGUMENTS
-  <entityType> STRING    Entity family, e.g. keikka/asiakas/vehicle (see \`ib cache entities\`) (required)
-
-FLAGS
-  --id NUMBER    Entity id (e.g. keikkaId)
-  --asiakas-id NUMBER    Tenant scope (developers may target others; non-devs use their own)
-  --cascade BOOLEAN    Also invalidate related families (keikka only)
-  --confirm BOOLEAN    Execute the operation (default is dry-run preview)
-  --force-prod BOOLEAN    Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec.
-  --reason STRING    Audit-log reason (X-Action-Reason)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  preview: { dryRun:true, wouldDelete, patterns[] } | execute: { dryRun:false, deleted }
-
-ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Unknown entityType or cascade unsupported → run \`ib cache entities\` to list valid types
-  exit 3 (HTTP 403)  Not an admin, or cross-tenant entity needs developer → cross-tenant entities (keikka, grid, stat, attachment) require isSystemAdmin/isDeveloper; others need an admin role
-  exit 3  Refused: deployed endpoint without --force-prod → prod and staging share Redis DB 3; add --force-prod or use a local endpoint
-  exit 3  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-NOTES
-  - Without --confirm the command only PREVIEWS (counts keys) and never deletes.
-  - Single-entity invalidate may leave related caches (grid/stepLog/attachments) stale — use --cascade (keikka) or invalidate each family.
-
-SEE ALSO
-  ib cache entities, ib cache keys
-
-EXAMPLES
-  ib cache invalidate keikka --id 123
-  ib cache invalidate keikka --id 123 --cascade --confirm
-  ib cache invalidate asiakas --asiakas-id 8 --confirm
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib cache keys matches snapshot 1`] = `
-"USAGE
-  ib cache keys [flags]
-
-DESCRIPTION
-  Key counts grouped by prefix pattern (SCAN). Developer-only.
-  Permissions: requires isSystemAdmin or isDeveloper.
-
-FLAGS
-  --pattern STRING    SCAN match glob (default: *) (default: *)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { totalKeys, groups: [{ prefix, count }] }
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-EXAMPLES
-  ib cache keys
-  ib cache keys --pattern 'keikka:*'
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib cache pattern matches snapshot 1`] = `
-"USAGE
-  ib cache pattern <glob> [flags]
-
-DESCRIPTION
-  Invalidate keys matching a raw Redis glob. Previews unless --confirm. Guard: refuses deployed endpoints unless --force-prod. Developer-only. Prefer \`ib cache invalidate\` (domain entity); use \`ib cache keys\` to find the right glob.
-  Permissions: requires isSystemAdmin or isDeveloper.
-
-ARGUMENTS
-  <glob> STRING    Raw Redis key glob (e.g. 'keikka:*') (required)
-
-FLAGS
-  --confirm BOOLEAN    Execute the operation (default is dry-run preview)
-  --force-prod BOOLEAN    Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec.
-  --reason STRING    Audit-log reason (X-Action-Reason)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  preview: { dryRun:true, wouldDelete, pattern } | execute: { deleted, pattern }
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-  exit 3  Refused: deployed endpoint without --force-prod → prod and staging share Redis DB 3; add --force-prod or use a local endpoint
-  exit 3  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
-
-EXAMPLES
-  ib cache pattern 'keikka:*'
-  ib cache pattern 'person:*' --confirm --force-prod
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib cache stats matches snapshot 1`] = `
-"USAGE
-  ib cache stats [flags]
-
-DESCRIPTION
-  Redis connection status, total key count, and hit rate. Developer-only.
-  Permissions: requires isSystemAdmin or isDeveloper.
-
-FLAGS
-  (none)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { connected, totalKeys, hitRate?, usedMemory? }
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-EXAMPLES
-  ib cache stats
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib changelog add matches snapshot 1`] = `
-"USAGE
-  ib changelog add [flags]
-
-DESCRIPTION
-  Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row.
-  Auth: requires login (any authenticated user).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
-
-FLAGS
-  --type STRING    feature|improvement|bugfix (required)
-  --area STRING    frontend|backend|cli|database|cicd (required)
-  --title STRING    Entry title (required)
-  --description STRING    Kuvaus (free length — the column is nvarchar(max), no practical cap) (required)
-  --benefits STRING    Hyödyt
-  --impact STRING    Vaikutus
-  --status STRING    Tila (Julkaistu/Korjattu/...)
-  --severity STRING    Bug severity (Kriittinen/Korkea/Normaali/Matala)
-  --files STRING    CSV of file paths
-  --repo STRING    Repo/submodule
-  --sha STRING    Commit SHAs (CSV)
-  --vtag STRING    Version tag
-  --bump-level STRING    App version bump this implies: none|patch|minor|major (default: patch)
-  --feedback NUMBER    cliFeedback id this entry resolves
-  --sentry STRING    Sentry issue short id or URL this entry fixes (stored, not sent to Sentry)
-  --source STRING    Source: human (default) | routine (automated AI-routine entry)
-  --date DATE    Entry date (YYYY-MM-DD|today)
-  --language STRING    Entry language (fi|en), default fi
-
-WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
-  --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { changelogId } | { dryRun, wouldCreate, validation }
-
-ERRORS (stderr, exit non-zero)
-  exit 3 (HTTP 403)  Developer access required → use a developer token
-  exit 4 (HTTP 400)  Validation (bad enum/date) → check --type/--area/--date
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-
-NOTES
-  - --dry-run is SERVER-side (X-Dry-Run): the backend validates the payload then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s under --dry-run.
-  - Developer-gated.
-
-SEE ALSO
-  ib changelog report, ib feedback resolve
-
-EXAMPLES
-  ib changelog add --type bugfix --area cli --title "x" --description "y" --feedback 12 --sha 59d9cc5
-  ib changelog add --type bugfix --area backend --title "fix npe" --description "y" --sentry PUMINET5API-1A2
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib changelog get matches snapshot 1`] = `
-"USAGE
-  ib changelog get <changelogId> [flags]
-
-DESCRIPTION
-  Get one change entry.
-  Auth: requires login (any authenticated user).
-
-ARGUMENTS
-  <changelogId> NUMBER    Entry id (required)
-
-FLAGS
-  (none)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  entry
-
-ERRORS (stderr, exit non-zero)
-  exit 3 (HTTP 403)  Developer only         → dev token
-  exit 5 (HTTP 404)  Not found              → ib changelog list
-
-EXAMPLES
-  ib changelog get 7
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib changelog list matches snapshot 1`] = `
-"USAGE
-  ib changelog list [flags]
-
-DESCRIPTION
-  List change entries with filters.
-  Auth: requires login (any authenticated user).
-
-FLAGS
-  --month STRING    YYYY-MM
-  --type STRING    feature|improvement|bugfix
-  --area STRING    frontend|backend|cli|database|cicd
-  --repo STRING    Repo/submodule
-  --feedback NUMBER    linked feedback id
-  --sentry STRING    linked Sentry issue short id
-  --source STRING    human|routine
-  --search STRING    Substring match over title/description/files/commitShas (deploy-gated)
-  --status STRING    Substring match on the free-text status field, e.g. 'Deployed' (deploy-gated)
-  --has-feedback BOOLEAN    Only entries linked to a feedback id (deploy-gated)
-  --has-sentry BOOLEAN    Only entries linked to a Sentry issue (deploy-gated)
-  --limit NUMBER    Max rows
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  ListEnvelope<entry>
-
-ERRORS (stderr, exit non-zero)
-  exit 3 (HTTP 403)  Developer only         → dev token
-
-NOTES
-  - --search / --status / --has-feedback / --has-sentry are server-side filters added in a later backend version; against an older backend they are silently ignored (the list returns unfiltered) — deploy-gated.
-
-EXAMPLES
-  ib changelog list --month 2026-06 --type feature
-  ib changelog list --search weather
-  ib changelog list --has-feedback --status Deployed
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib changelog pending matches snapshot 1`] = `
-"USAGE
-  ib changelog pending [flags]
-
-DESCRIPTION
-  Unreleased entries (versionTag IS NULL) + the max bump level they imply. Drives the deploy-time app version bump.
-  Auth: requires login (any authenticated user).
-
-FLAGS
-  (none)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { entries, maxBumpLevel, count }
-
-ERRORS (stderr, exit non-zero)
-  exit 3 (HTTP 403)  Developer only         → dev token
-
-EXAMPLES
-  ib changelog pending
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib changelog release matches snapshot 1`] = `
-"USAGE
-  ib changelog release [flags]
-
-DESCRIPTION
-  Stamp unreleased entries with a version tag (marks them released). Called by scripts/apply-release-version.ps1. Use --vtag to stamp them all with one tag, or --map for precise per-entry repo@version tags.
-  Auth: requires login (any authenticated user).
-
-FLAGS
-  --vtag STRING    Single version tag to stamp on all pending entries (e.g. 1.0.8)
-  --map STRING    JSON file (or -): [{changelogId, versionTag}] for precise per-entry stamping
-
-WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
-  --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { released, versionTag } | { released, mode:'map' } | { dryRun, wouldRelease }
-
-ERRORS (stderr, exit non-zero)
-  exit 3 (HTTP 403)  Developer only         → dev token
-  exit 4 (HTTP 400)  Validation (need --vtag or --map) → pass exactly one of --vtag/--map
-
-NOTES
-  - Developer-gated.
-  - Provide exactly one of --vtag (one tag for all) or --map (precise per-entry repo@version).
-  - Typically invoked by scripts/apply-release-version.ps1, not by hand.
-
-EXAMPLES
-  ib changelog release --vtag 1.0.8 --reason 'release 1.0.8'
-  ib changelog release --map ./stampMap.json --reason 'release'
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib changelog report matches snapshot 1`] = `
-"USAGE
-  ib changelog report [flags]
-
-DESCRIPTION
-  Generate the monthly report (markdown or json) from entries.
-  Auth: requires login (any authenticated user).
-
-FLAGS
-  --month STRING    YYYY-MM (required)
-  --format STRING    md|json (default: md)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { month, markdown } | { month, rows }
-
-ERRORS (stderr, exit non-zero)
-  exit 3 (HTTP 403)  Developer only         → dev token
-
-EXAMPLES
-  ib changelog report --month 2026-06
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib changelog update matches snapshot 1`] = `
-"USAGE
-  ib changelog update <changelogId> [flags]
-
-DESCRIPTION
-  Edit a change entry.
-  Auth: requires login (any authenticated user).
-  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
-
-ARGUMENTS
-  <changelogId> NUMBER    Entry id (required)
-
-FLAGS
-  --type STRING    feature|improvement|bugfix
-  --area STRING    frontend|backend|cli|database|cicd
-  --title STRING    New title
-  --description STRING    New description
-  --benefits STRING    Hyödyt
-  --impact STRING    Vaikutus
-  --status STRING    Status update (e.g. mark deployed)
-  --severity STRING    Bug severity
-  --files STRING    CSV of file paths
-  --repo STRING    Repo/submodule
-  --sha STRING    Commit SHAs (CSV)
-  --vtag STRING    Version tag
-  --source STRING    Source: human|routine
-  --date DATE    Entry date (YYYY-MM-DD|today)
-  --language STRING    Entry language (fi|en)
-
-WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
-  --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  entry
-
-ERRORS (stderr, exit non-zero)
-  exit 3 (HTTP 403)  Developer only         → dev token
-  exit 4 (HTTP 400)  Validation (bad enum/language) → language must be fi|en
-
-EXAMPLES
-  ib changelog update 7 --status "Deployed prod"
-  ib changelog update 386 --language en
-"
-`;
-
 exports[`Help snapshots — contract stability > help for ib commands matches snapshot 1`] = `
 "USAGE
   ib commands [<domain>] [flags]
@@ -2295,12 +1478,690 @@ EXAMPLES
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib doctor matches snapshot 1`] = `
+exports[`Help snapshots — contract stability > help for ib dev ai conversation matches snapshot 1`] = `
 "USAGE
-  ib doctor [flags]
+  ib dev ai conversation <conversationId> [flags]
 
 DESCRIPTION
-  Aggregated 'is my setup working' health check, and the first-contact orientation for MCP / \`/api/cli/exec\` callers (where the \`auth\` group — incl. \`auth whoami\` — is denied). Derives identity + tier + switchable companies from the active JWT (works for both file- and IB_TOKEN-sessions), reports token expiry, pings the public /api/version for connectivity + which build is live, and does ONE authenticated read to prove the token is accepted by this endpoint. Read-only. Exits 1 when the aggregate \`ok\` is false.
+  Fetch the full transcript of an /ai assistant conversation by id (gptConversations/gptMessages). Developer/sysadmin tooling. The id originates from an \`ib feedback\` row's context.conversationId, stamped automatically when the AI files feedback from the /ai page.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <conversationId> NUMBER    gptConversations id (from a feedback row's context.conversationId) (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { conversationId, personId, ownerAsiakasId, messageCount, messages: [{ gptMessageId, role?, content?, raw?, ... }] }
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → conversationId must be a positive integer
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
+  exit 5 (HTTP 404)  Not found              → no conversation with that id
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Deploy-gated: 404 until puminet5api ships the /api/cli/ai/conversation/:id route.
+
+SEE ALSO
+  ib dev feedback get, ib dev feedback list
+
+EXAMPLES
+  ib dev ai conversation 4321
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev ai conversations matches snapshot 1`] = `
+"USAGE
+  ib dev ai conversations [flags]
+
+DESCRIPTION
+  List recent /ai assistant conversations CROSS-TENANT for audit/browse (compact rows, newest-first, no message bodies). Developer/sysadmin tooling — the way to discover conversationIds to audit without an \`ib feedback\` row pointing at one. Drill into a transcript with \`ib dev ai conversation <id>\`.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --limit NUMBER    Max rows to return (1-100) (default: 20)
+  --person NUMBER    Filter to one person's conversations (personId)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ conversationId, personId, ownerAsiakasId, entryTime, messageCount }> (truncated:true when the page hit --limit)
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → --limit must be 1-100; --person must be a positive integer
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Deploy-gated: 404 until puminet5api ships the /api/cli/ai/conversations route.
+
+SEE ALSO
+  ib dev ai conversation, ib dev feedback list
+
+EXAMPLES
+  ib dev ai conversations
+  ib dev ai conversations --limit 50
+  ib dev ai conversations --person 6233
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev bug admin assign matches snapshot 1`] = `
+"USAGE
+  ib dev bug admin assign <bugReportId> [flags]
+
+DESCRIPTION
+  Assign a bug report to a developer; the backend also flips its status to in-progress. Developer-only. A real write — blocked under --read-only. --dry-run previews client-side.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <bugReportId> NUMBER    bugReportId (required)
+
+FLAGS
+  --to NUMBER    Assignee personId (required)
+  --reason STRING    Audit-log reason (X-Action-Reason)
+  --dry-run BOOLEAN    Preview without sending (client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  The updated report (status now in-progress). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → --to <personId> must be a positive integer
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev bug list\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib dev bug admin assign 51 --to 6233
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev bug admin delete matches snapshot 1`] = `
+"USAGE
+  ib dev bug admin delete <bugReportId> [flags]
+
+DESCRIPTION
+  Permanently delete a bug report. Developer-only and IRREVERSIBLE. A real write — blocked under --read-only. --reason is REQUIRED. --dry-run previews client-side.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <bugReportId> NUMBER    bugReportId (required)
+
+FLAGS
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED (required)
+  --dry-run BOOLEAN    Preview without sending (client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success: true, bugReportId } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, headers } }.
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → --reason is required for delete
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev bug list\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib dev bug admin delete 51 --reason "duplicate of BR-40"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev bug admin stats matches snapshot 1`] = `
+"USAGE
+  ib dev bug admin stats [flags]
+
+DESCRIPTION
+  Aggregate bug report statistics (counts by status/severity/etc.). Developer-only. Optionally scoped to one tenant with --owner.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --owner NUMBER    Scope to one tenant (ownerAsiakasId)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { ...aggregate counts }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib dev bug admin stats
+  ib dev bug admin stats --owner 1349
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev bug admin update matches snapshot 1`] = `
+"USAGE
+  ib dev bug admin update <bugReportId> [flags]
+
+DESCRIPTION
+  Triage a bug report: set status / priority / admin notes / resolution / assignee. Developer-only (isSystemAdmin / isDeveloper). A real write — blocked under --read-only. --dry-run previews client-side.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <bugReportId> NUMBER    bugReportId (required)
+
+FLAGS
+  --status STRING    new | in-progress | resolved | closed
+  --priority STRING    low | medium | high | urgent
+  --notes STRING    Admin notes (stored as adminNotes)
+  --resolution STRING    Resolution text
+  --assign NUMBER    Assign to a developer (personId → assignedTo)
+  --reason STRING    Audit-log reason (X-Action-Reason)
+  --dry-run BOOLEAN    Preview without sending (client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  The updated report. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → provide at least one of --status/--priority/--notes/--resolution/--assign; status/priority must be valid enums
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev bug list\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib dev bug admin assign, ib dev bug admin delete
+
+EXAMPLES
+  ib dev bug admin update 51 --status resolved --resolution "fixed in v2.1"
+  ib dev bug admin update 51 --priority urgent --assign 6233
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev bug comment matches snapshot 1`] = `
+"USAGE
+  ib dev bug comment <bugReportId> [flags]
+
+DESCRIPTION
+  Add a comment to a bug report (owner / same-company / admin). Notifies the other party by email. A real write — blocked under --read-only. --dry-run previews client-side.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <bugReportId> NUMBER    bugReportId (required)
+
+FLAGS
+  --body STRING    Comment text (required)
+  --reason STRING    Audit-log reason (X-Action-Reason)
+  --dry-run BOOLEAN    Preview without sending (client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { commentId } (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → --body must not be empty
+  exit 3 (HTTP 403)  Permission denied / read-only → you must own the report, share its company, or be a developer; not under --read-only
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev bug list\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib dev bug comment 51 --body "still reproduces on staging"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev bug create matches snapshot 1`] = `
+"USAGE
+  ib dev bug create [flags]
+
+DESCRIPTION
+  File a bug report into the betoni.online bugReport system. This is a LOUD write (distinct from the quiet \`ib dev feedback\`): it opens a GitHub issue AND emails admins. A real mutation — blocked under --read-only/IB_READ_ONLY (exit 3). CLI-filed reports are auto-tagged via browserInfo=ib-cli/<version>. --dry-run resolves client-side (prints the payload, never sends).
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --type STRING    ui-display-issue | functionality-error | performance-problem | data-incorrect | other (required)
+  --severity STRING    critical | major | minor | cosmetic (required)
+  --description STRING    What is wrong (required)
+  --steps STRING    Steps to reproduce
+  --priority STRING    low | medium | high | urgent (omitted → derived from severity)
+  --reason STRING    Audit-log reason (X-Action-Reason)
+  --dry-run BOOLEAN    Preview the payload without sending (client-side)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { bugReportId, referenceNumber } (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → --type/--severity/--description required; --type, --severity, --priority must be valid enum values
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Blocked under --read-only → this is a real write; drop --read-only / unset IB_READ_ONLY
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib dev bug list, ib dev feedback create, ib attachment upload --bug-report <id>
+
+EXAMPLES
+  ib dev bug create --type functionality-error --severity major --description "Grid crashes on save" --steps "open grid, click save"
+  ib dev bug create --type other --severity minor --description "preview" --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev bug get matches snapshot 1`] = `
+"USAGE
+  ib dev bug get <bugReportId> [flags]
+
+DESCRIPTION
+  Fetch one bug report with its comments and attachments inline. Access: report owner OR same ownerAsiakasId OR admin/developer.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <bugReportId> NUMBER    bugReportId (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  The full report { bugReportId, bugType, severity, status, priority, description, reporterName, ageDays, staleDays, comments: [...], attachments: [...], ... }. ageDays/staleDays are derived client-side: whole days since createdAt and since last activity (updatedAt↔createdAt) — surfaces a stale report without ISO-date math.
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Permission denied      → you must own the report, share its company, or be a developer
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev bug list\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib dev bug list, ib attachment list --bug-report <id>
+
+EXAMPLES
+  ib dev bug get 51
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev bug list matches snapshot 1`] = `
+"USAGE
+  ib dev bug list [flags]
+
+DESCRIPTION
+  List bug reports. Permission-filtered server-side: a regular user sees their own + their company's reports; an admin/developer sees all and may narrow by --owner (ownerAsiakasId; ignored for non-admins). Newest first by default.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --status STRING    new | in-progress | resolved | closed
+  --severity STRING    critical | major | minor | cosmetic
+  --type STRING    ui-display-issue | functionality-error | performance-problem | data-incorrect | other
+  --owner NUMBER    Filter by owning tenant asiakasId (admins only)
+  --limit NUMBER    Max rows (sets truncated when hit)
+  --offset NUMBER    Pagination offset
+  --order-by STRING    createdAt | updatedAt | severity | status | bugType | bugReportId (default: createdAt)
+  --order STRING    asc | desc (default: desc)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { items: BugReportRow[], nextCursor: null, count, truncated } — each row is enriched client-side with ageDays (whole days since createdAt) and staleDays (since last activity = updatedAt↔createdAt); a high staleDays on an open report flags a months-old untouched bug. (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → --status/--severity/--type/--order-by/--order must be valid enum values
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib dev bug get, ib dev bug admin stats
+
+EXAMPLES
+  ib dev bug list --status new --severity major
+  ib dev bug list --owner 1349 --limit 20
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev cache clear matches snapshot 1`] = `
+"USAGE
+  ib dev cache clear [flags]
+
+DESCRIPTION
+  Flush the entire Redis cache (curated sweep; preserves sessions/locks/metrics). Previews (X-Dry-Run) unless --confirm. Cross-tenant: clears every company's cached data. Guard: refuses deployed endpoints unless --force-prod. Developer-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --confirm BOOLEAN    Execute the operation (default is dry-run preview)
+  --force-prod BOOLEAN    Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec.
+  --reason STRING    Audit-log reason (X-Action-Reason)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  preview: { dryRun:true, wouldDelete } | execute: { deleted }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 3  Refused: deployed endpoint without --force-prod → prod and staging share Redis DB 3; add --force-prod or use a local endpoint
+  exit 3  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
+
+EXAMPLES
+  ib dev cache clear
+  ib dev cache clear --confirm --force-prod
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev cache entities matches snapshot 1`] = `
+"USAGE
+  ib dev cache entities [flags]
+
+DESCRIPTION
+  List the valid cache entity types, their scope params (id/asiakasId), cascade support, and example invalidation commands. Offline — no auth required.
+  Auth: none (public).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { items: [{ entityType, params[], cascade?, developerOnly?, example }], count }
+
+ERRORS (stderr, exit non-zero)
+  exit 0  Always succeeds (offline static list) → n/a
+
+EXAMPLES
+  ib dev cache entities
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev cache invalidate matches snapshot 1`] = `
+"USAGE
+  ib dev cache invalidate <entityType> [flags]
+
+DESCRIPTION
+  Invalidate cache for one entity family by domain identifier (no Redis key knowledge needed). Previews (X-Dry-Run) unless --confirm. --cascade fans out to related families (keikka only). Any admin; non-developers are scoped to their own company. Guard: refuses deployed endpoints unless --force-prod (all slots share Redis DB 3).
+  Permissions: requires admin role (SystemAdmin, AsiakasAdmin, or LaskuAdmin) or developer.
+
+ARGUMENTS
+  <entityType> STRING    Entity family, e.g. keikka/asiakas/vehicle (see \`ib dev cache entities\`) (required)
+
+FLAGS
+  --id NUMBER    Entity id (e.g. keikkaId)
+  --asiakas-id NUMBER    Tenant scope (developers may target others; non-devs use their own)
+  --cascade BOOLEAN    Also invalidate related families (keikka only)
+  --confirm BOOLEAN    Execute the operation (default is dry-run preview)
+  --force-prod BOOLEAN    Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec.
+  --reason STRING    Audit-log reason (X-Action-Reason)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  preview: { dryRun:true, wouldDelete, patterns[] } | execute: { dryRun:false, deleted }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Unknown entityType or cascade unsupported → run \`ib dev cache entities\` to list valid types
+  exit 3 (HTTP 403)  Not an admin, or cross-tenant entity needs developer → cross-tenant entities (keikka, grid, stat, attachment) require isSystemAdmin/isDeveloper; others need an admin role
+  exit 3  Refused: deployed endpoint without --force-prod → prod and staging share Redis DB 3; add --force-prod or use a local endpoint
+  exit 3  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Without --confirm the command only PREVIEWS (counts keys) and never deletes.
+  - Single-entity invalidate may leave related caches (grid/stepLog/attachments) stale — use --cascade (keikka) or invalidate each family.
+
+SEE ALSO
+  ib dev cache entities, ib dev cache keys
+
+EXAMPLES
+  ib dev cache invalidate keikka --id 123
+  ib dev cache invalidate keikka --id 123 --cascade --confirm
+  ib dev cache invalidate asiakas --asiakas-id 8 --confirm
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev cache keys matches snapshot 1`] = `
+"USAGE
+  ib dev cache keys [flags]
+
+DESCRIPTION
+  Key counts grouped by prefix pattern (SCAN). Developer-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --pattern STRING    SCAN match glob (default: *) (default: *)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { totalKeys, groups: [{ prefix, count }] }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib dev cache keys
+  ib dev cache keys --pattern 'keikka:*'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev cache pattern matches snapshot 1`] = `
+"USAGE
+  ib dev cache pattern <glob> [flags]
+
+DESCRIPTION
+  Invalidate keys matching a raw Redis glob. Previews unless --confirm. Guard: refuses deployed endpoints unless --force-prod. Developer-only. Prefer \`ib dev cache invalidate\` (domain entity); use \`ib dev cache keys\` to find the right glob.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <glob> STRING    Raw Redis key glob (e.g. 'keikka:*') (required)
+
+FLAGS
+  --confirm BOOLEAN    Execute the operation (default is dry-run preview)
+  --force-prod BOOLEAN    Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec.
+  --reason STRING    Audit-log reason (X-Action-Reason)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  preview: { dryRun:true, wouldDelete, pattern } | execute: { deleted, pattern }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 3  Refused: deployed endpoint without --force-prod → prod and staging share Redis DB 3; add --force-prod or use a local endpoint
+  exit 3  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
+
+EXAMPLES
+  ib dev cache pattern 'keikka:*'
+  ib dev cache pattern 'person:*' --confirm --force-prod
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev cache stats matches snapshot 1`] = `
+"USAGE
+  ib dev cache stats [flags]
+
+DESCRIPTION
+  Redis connection status, total key count, and hit rate. Developer-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { connected, totalKeys, hitRate?, usedMemory? }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib dev cache stats
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev changelog add matches snapshot 1`] = `
+"USAGE
+  ib dev changelog add [flags]
+
+DESCRIPTION
+  Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row.
+  Auth: requires login (any authenticated user).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+FLAGS
+  --type STRING    feature|improvement|bugfix (required)
+  --area STRING    frontend|backend|cli|database|cicd (required)
+  --title STRING    Entry title (required)
+  --description STRING    Kuvaus (free length — the column is nvarchar(max), no practical cap) (required)
+  --benefits STRING    Hyödyt
+  --impact STRING    Vaikutus
+  --status STRING    Tila (Julkaistu/Korjattu/...)
+  --severity STRING    Bug severity (Kriittinen/Korkea/Normaali/Matala)
+  --files STRING    CSV of file paths
+  --repo STRING    Repo/submodule
+  --sha STRING    Commit SHAs (CSV)
+  --vtag STRING    Version tag
+  --bump-level STRING    App version bump this implies: none|patch|minor|major (default: patch)
+  --feedback NUMBER    cliFeedback id this entry resolves
+  --sentry STRING    Sentry issue short id or URL this entry fixes (stored, not sent to Sentry)
+  --source STRING    Source: human (default) | routine (automated AI-routine entry)
+  --date DATE    Entry date (YYYY-MM-DD|today)
+  --language STRING    Entry language (fi|en), default fi
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { changelogId } | { dryRun, wouldCreate, validation }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Developer access required → use a developer token
+  exit 4 (HTTP 400)  Validation (bad enum/date) → check --type/--area/--date
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+
+NOTES
+  - --dry-run is SERVER-side (X-Dry-Run): the backend validates the payload then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s under --dry-run.
+  - Developer-gated.
+
+SEE ALSO
+  ib dev changelog report, ib dev feedback resolve
+
+EXAMPLES
+  ib dev changelog add --type bugfix --area cli --title "x" --description "y" --feedback 12 --sha 59d9cc5
+  ib dev changelog add --type bugfix --area backend --title "fix npe" --description "y" --sentry PUMINET5API-1A2
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev changelog get matches snapshot 1`] = `
+"USAGE
+  ib dev changelog get <changelogId> [flags]
+
+DESCRIPTION
+  Get one change entry.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <changelogId> NUMBER    Entry id (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  entry
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Developer only         → dev token
+  exit 5 (HTTP 404)  Not found              → ib dev changelog list
+
+EXAMPLES
+  ib dev changelog get 7
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev changelog list matches snapshot 1`] = `
+"USAGE
+  ib dev changelog list [flags]
+
+DESCRIPTION
+  List change entries with filters.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --month STRING    YYYY-MM
+  --type STRING    feature|improvement|bugfix
+  --area STRING    frontend|backend|cli|database|cicd
+  --repo STRING    Repo/submodule
+  --feedback NUMBER    linked feedback id
+  --sentry STRING    linked Sentry issue short id
+  --source STRING    human|routine
+  --search STRING    Substring match over title/description/files/commitShas (deploy-gated)
+  --status STRING    Substring match on the free-text status field, e.g. 'Deployed' (deploy-gated)
+  --has-feedback BOOLEAN    Only entries linked to a feedback id (deploy-gated)
+  --has-sentry BOOLEAN    Only entries linked to a Sentry issue (deploy-gated)
+  --limit NUMBER    Max rows
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<entry>
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Developer only         → dev token
+
+NOTES
+  - --search / --status / --has-feedback / --has-sentry are server-side filters added in a later backend version; against an older backend they are silently ignored (the list returns unfiltered) — deploy-gated.
+
+EXAMPLES
+  ib dev changelog list --month 2026-06 --type feature
+  ib dev changelog list --search weather
+  ib dev changelog list --has-feedback --status Deployed
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev changelog pending matches snapshot 1`] = `
+"USAGE
+  ib dev changelog pending [flags]
+
+DESCRIPTION
+  Unreleased entries (versionTag IS NULL) + the max bump level they imply. Drives the deploy-time app version bump.
   Auth: requires login (any authenticated user).
 
 FLAGS
@@ -2310,21 +2171,133 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { ok:boolean, cli, endpoint, readOnly, auth:{ personId, email, tier:'developer'|'admin'|'standard', ownerAsiakasId, ownerAsiakasName, companies:{ asiakasId, roles }[], issuedFor, tokenExp, tokenExpired, impersonating?:{actorPersonId,sessionId} }, connectivity:VersionReport, authProbe:{ ok, status?, error? } } — \`tier\` = capability/discovery gate; \`companies\` = \`company switch\` targets; \`impersonating\` present only when the token acts as another person.
+  { entries, maxBumpLevel, count }
 
 ERRORS (stderr, exit non-zero)
-  exit 1  Not healthy            → inspect connectivity / authProbe / tokenExpired in the report
-  exit 2  Not logged in          → ib auth login (or set IB_TOKEN)
+  exit 3 (HTTP 403)  Developer only         → dev token
 
 EXAMPLES
-  ib doctor
-  ib doctor --endpoint https://api-staging.ibetoni.fi
+  ib dev changelog pending
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib feedback count matches snapshot 1`] = `
+exports[`Help snapshots — contract stability > help for ib dev changelog release matches snapshot 1`] = `
 "USAGE
-  ib feedback count [flags]
+  ib dev changelog release [flags]
+
+DESCRIPTION
+  Stamp unreleased entries with a version tag (marks them released). Called by scripts/apply-release-version.ps1. Use --vtag to stamp them all with one tag, or --map for precise per-entry repo@version tags.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --vtag STRING    Single version tag to stamp on all pending entries (e.g. 1.0.8)
+  --map STRING    JSON file (or -): [{changelogId, versionTag}] for precise per-entry stamping
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { released, versionTag } | { released, mode:'map' } | { dryRun, wouldRelease }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Developer only         → dev token
+  exit 4 (HTTP 400)  Validation (need --vtag or --map) → pass exactly one of --vtag/--map
+
+NOTES
+  - Developer-gated.
+  - Provide exactly one of --vtag (one tag for all) or --map (precise per-entry repo@version).
+  - Typically invoked by scripts/apply-release-version.ps1, not by hand.
+
+EXAMPLES
+  ib dev changelog release --vtag 1.0.8 --reason 'release 1.0.8'
+  ib dev changelog release --map ./stampMap.json --reason 'release'
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev changelog report matches snapshot 1`] = `
+"USAGE
+  ib dev changelog report [flags]
+
+DESCRIPTION
+  Generate the monthly report (markdown or json) from entries.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --month STRING    YYYY-MM (required)
+  --format STRING    md|json (default: md)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { month, markdown } | { month, rows }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Developer only         → dev token
+
+EXAMPLES
+  ib dev changelog report --month 2026-06
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev changelog update matches snapshot 1`] = `
+"USAGE
+  ib dev changelog update <changelogId> [flags]
+
+DESCRIPTION
+  Edit a change entry.
+  Auth: requires login (any authenticated user).
+  Timezone: dates interpreted in active company timezone (Europe/Helsinki).
+
+ARGUMENTS
+  <changelogId> NUMBER    Entry id (required)
+
+FLAGS
+  --type STRING    feature|improvement|bugfix
+  --area STRING    frontend|backend|cli|database|cicd
+  --title STRING    New title
+  --description STRING    New description
+  --benefits STRING    Hyödyt
+  --impact STRING    Vaikutus
+  --status STRING    Status update (e.g. mark deployed)
+  --severity STRING    Bug severity
+  --files STRING    CSV of file paths
+  --repo STRING    Repo/submodule
+  --sha STRING    Commit SHAs (CSV)
+  --vtag STRING    Version tag
+  --source STRING    Source: human|routine
+  --date DATE    Entry date (YYYY-MM-DD|today)
+  --language STRING    Entry language (fi|en)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  entry
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Developer only         → dev token
+  exit 4 (HTTP 400)  Validation (bad enum/language) → language must be fi|en
+
+EXAMPLES
+  ib dev changelog update 7 --status "Deployed prod"
+  ib dev changelog update 386 --language en
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev feedback count matches snapshot 1`] = `
+"USAGE
+  ib dev feedback count [flags]
 
 DESCRIPTION
   Aggregate counts of filed feedback by status, kind, and scope (developer-only). The cheapest way to answer "is there any open feedback?" — a tiny fixed-size response instead of a row dump. Counts are computed client-side over up to 200 rows.
@@ -2346,15 +2319,15 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
-  ib feedback count
-  ib feedback count --scope cli
-  ib feedback count --kind legal
+  ib dev feedback count
+  ib dev feedback count --scope cli
+  ib dev feedback count --kind legal
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib feedback create matches snapshot 1`] = `
+exports[`Help snapshots — contract stability > help for ib dev feedback create matches snapshot 1`] = `
 "USAGE
-  ib feedback create <description> [flags]
+  ib dev feedback create <description> [flags]
 
 DESCRIPTION
   File a CLI improvement proposal or trouble report. AI users: file this PROACTIVELY and IMMEDIATELY (no need to ask the user) whenever you hit an error or unexpected exit code, had to try several strategies because the help/docs were unclear/missing/wrong, found something confusing or harder than expected, could not find a command for something the user clearly needs (a capability gap), or saw an inconsistency between commands. Stored quietly server-side (no GitHub issue, no spam to you or the user — distinct from bug reports; the maintainer gets a private heads-up email) for later developer triage. Sent as a META request, so it is EXEMPT from the read-only write-lock: you can file feedback even with --read-only / IB_READ_ONLY active. --dry-run resolves client-side (prints the payload, never sends).
@@ -2382,21 +2355,21 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - A description starting with "-" is parsed as an option (exit 4) — put a bare \`--\` terminator before it: ib feedback create --kind bug -- "--pretty output too wide". Everything after \`--\` is taken as positional text.
-  - When invoked by the betoni.online /ai assistant, the originating conversation id is auto-attached as context.conversationId (via the IB_CONVERSATION_ID env var the /ai loop injects) — a developer can then read the full conversation with \`ib ai conversation <id>\`. Manual CLI use does not set it.
+  - A description starting with "-" is parsed as an option (exit 4) — put a bare \`--\` terminator before it: ib dev feedback create --kind bug -- "--pretty output too wide". Everything after \`--\` is taken as positional text.
+  - When invoked by the betoni.online /ai assistant, the originating conversation id is auto-attached as context.conversationId (via the IB_CONVERSATION_ID env var the /ai loop injects) — a developer can then read the full conversation with \`ib dev ai conversation <id>\`. Manual CLI use does not set it.
 
 EXAMPLES
-  ib feedback create "schema table output should include row counts"
-  ib feedback create "keikka list --pvm rejected my date" --kind bug --command "keikka list --pvm 1.6." --error "invalid date format"
-  ib feedback create "ib customer search --email" --kind idea --dry-run
-  ib feedback create "TOS 2.0 lacks a clause covering the AI assistant features; draft update suggested" --kind legal
-  ib feedback create "Jerry inbox should show boom length on request cards" --scope jerry --kind idea
+  ib dev feedback create "schema table output should include row counts"
+  ib dev feedback create "keikka list --pvm rejected my date" --kind bug --command "keikka list --pvm 1.6." --error "invalid date format"
+  ib dev feedback create "ib customer search --email" --kind idea --dry-run
+  ib dev feedback create "TOS 2.0 lacks a clause covering the AI assistant features; draft update suggested" --kind legal
+  ib dev feedback create "Jerry inbox should show boom length on request cards" --scope jerry --kind idea
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib feedback get matches snapshot 1`] = `
+exports[`Help snapshots — contract stability > help for ib dev feedback get matches snapshot 1`] = `
 "USAGE
-  ib feedback get <id> [flags]
+  ib dev feedback get <id> [flags]
 
 DESCRIPTION
   Fetch one feedback row by id (developer-only).
@@ -2416,17 +2389,17 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → requires a developer token
-  exit 5 (HTTP 404)  Not found              → check the id via \`ib feedback list\`
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\`
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
-  ib feedback get 42
+  ib dev feedback get 42
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib feedback list matches snapshot 1`] = `
+exports[`Help snapshots — contract stability > help for ib dev feedback list matches snapshot 1`] = `
 "USAGE
-  ib feedback list [flags]
+  ib dev feedback list [flags]
 
 DESCRIPTION
   List filed feedback for triage. Developer-only (isSystemAdmin / isDeveloper). Newest first, paginated (default 50, cap 200).
@@ -2457,16 +2430,16 @@ NOTES
   - --search is a server-side substring filter added in a later backend version; against an older backend it is silently ignored (the list returns unfiltered) — deploy-gated.
 
 EXAMPLES
-  ib feedback list --status open --scope cli
-  ib feedback list --unresolved
-  ib feedback list --kind bug --limit 20
-  ib feedback list --search IDOR --unresolved
+  ib dev feedback list --status open --scope cli
+  ib dev feedback list --unresolved
+  ib dev feedback list --kind bug --limit 20
+  ib dev feedback list --search IDOR --unresolved
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib feedback resolve matches snapshot 1`] = `
+exports[`Help snapshots — contract stability > help for ib dev feedback resolve matches snapshot 1`] = `
 "USAGE
-  ib feedback resolve <id> [flags]
+  ib dev feedback resolve <id> [flags]
 
 DESCRIPTION
   Triage a feedback row: set its status and/or attach a resolution note (developer-only). This IS a real write — blocked under --read-only (exit 3). --dry-run previews the update body client-side without sending.
@@ -2490,12 +2463,419 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4  Validation             → provide --status and/or --note; status must be a known value
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
-  exit 5 (HTTP 404)  Not found              → check the id via \`ib feedback list\`
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\`
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
-  ib feedback resolve 42 --status applied --note "added row counts in CLI v1.3"
-  ib feedback resolve 42 --status dismissed --note "by design"
+  ib dev feedback resolve 42 --status applied --note "added row counts in CLI v1.3"
+  ib dev feedback resolve 42 --status dismissed --note "by design"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev inbox matches snapshot 1`] = `
+"USAGE
+  ib dev inbox [flags]
+
+DESCRIPTION
+  Aggregated operator inbox — the six open/incomplete signals in one rollup: deploy-pending changelog, unresolved feedback (open + reviewed, by kind), new bugs, open support escalations, staged legal drafts, and glossary misses, plus a \`needsYou\` headline (open feedback + new bugs + legal drafts + open support + deploy-pending entries with a real bump). The single source of truth behind the daily morning-report routine and the /admin operator dashboard. Read-only. Counts by default; --details adds slimmed top-items per signal (bugs without their huge sessionData).
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --details BOOLEAN    Include slimmed top-items per signal, not just counts
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { generatedAt, needsYou, changelog:{ pending, deployPending, maxBumpLevel }, feedback:{ open, reviewed, byKind:{ open, reviewed } }, bugs:{ new }, support:{ open, truncated }, legal:{ drafts }, glossary:{ misses } } — with --details each signal also carries an \`items\` array (feedback.items splits into { open, reviewed }).
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Developer access required → inbox is developer-gated; use a developer/sysadmin token
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Deploy-gated: 404 until the backend ships GET /api/cli/inbox.
+
+EXAMPLES
+  ib dev inbox
+  ib dev inbox --details
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev perf clear matches snapshot 1`] = `
+"USAGE
+  ib dev perf clear [flags]
+
+DESCRIPTION
+  Clear the slow-query buffer for one environment. Previews with --dry-run (client-side); --reason recommended for the audit log. Developer-only; refused under --read-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --env STRING    Environment buffer to clear (default: backend's current env)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  execute: { cleared:true, environment, message } | --dry-run: { dryRun:true, wouldClear:{ method, path } }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 3  Blocked by read-only mode → clearing needs a session without --read-only/IB_READ_ONLY
+
+NOTES
+  - The DELETE route honours no server-side X-Dry-Run — --dry-run is resolved CLIENT-SIDE (never sends).
+
+SEE ALSO
+  ib dev perf stats
+
+EXAMPLES
+  ib dev perf clear --env staging --reason "reset after load test"
+  ib dev perf clear --dry-run
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev perf config matches snapshot 1`] = `
+"USAGE
+  ib dev perf config [flags]
+
+DESCRIPTION
+  Slow-query collector configuration (enabled, threshold, sentryThreshold, maxEntries, current environment) plus availableEnvironments that have data. Developer-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { enabled, threshold, sentryThreshold, maxEntries, environment, availableEnvironments:[string] }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib dev perf slow, ib dev perf stats
+
+EXAMPLES
+  ib dev perf config
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev perf slow matches snapshot 1`] = `
+"USAGE
+  ib dev perf slow [flags]
+
+DESCRIPTION
+  Recent slow queries from the collector's Redis ring buffer (procedure, durationMs, entity, params, timestamp). Developer-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --limit NUMBER    Max rows (default: 50)
+  --env STRING    Environment buffer to read (default: backend's current env; discover via \`ib dev perf config\`)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ procedure, durationMs, entity, params, timestamp }> & { totalCount?, environment? } (+truncated:true when the page filled the limit)
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - SQL durations cover the executeQuery (cache-runner) path only — raw getConnection() queries are not timed.
+  - Threshold to be 'slow' is the collector's SLOW_QUERY_THRESHOLD_MS (default 1000ms) — see \`ib dev perf config\`.
+
+SEE ALSO
+  ib dev perf stats, ib dev perf config
+
+EXAMPLES
+  ib dev perf slow
+  ib dev perf slow --limit 20 --env production
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev perf stats matches snapshot 1`] = `
+"USAGE
+  ib dev perf stats [flags]
+
+DESCRIPTION
+  Aggregate slow-query stats: top procedures (count/avgMs), avg/max/min duration, by-entity breakdown, lifetime totalCount. Developer-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --env STRING    Environment buffer to read (default: backend's current env)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { totalSlowQueries, bufferedQueries, avgDuration, maxDuration, minDuration, topProcedures:[{ name, count, avgMs }], byEntity, since, threshold, sentryThreshold, environment }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - SQL durations cover the executeQuery (cache-runner) path only — raw getConnection() queries are not timed.
+
+SEE ALSO
+  ib dev perf slow, ib dev perf config
+
+EXAMPLES
+  ib dev perf stats
+  ib dev perf stats --env staging
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev schema dump matches snapshot 1`] = `
+"USAGE
+  ib dev schema dump [flags]
+
+DESCRIPTION
+  Whole-schema structural map of the dbo schema (developer-gated, read-only) — all tables with column names and types, FK edges, view names, and proc signatures. No proc/view bodies (use \`schema proc\`/\`schema view\` for those).
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { tables:[{name,columns}], foreignKeys:[{table,column,refTable,refColumn}], views:[{name}], procs:[{name,type,parameters}] }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib dev schema dump
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev schema proc matches snapshot 1`] = `
+"USAGE
+  ib dev schema proc <name> [flags]
+
+DESCRIPTION
+  Signature (parameters) and full definition (T-SQL) for one dbo proc/function. Developer-only.
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+
+ARGUMENTS
+  <name> STRING    bare dbo object name (no schema prefix) (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
+  exit 5 (HTTP 404)  Proc/function not found → check the name via \`ib dev schema procs\`
+
+EXAMPLES
+  ib dev schema proc asiakas_find
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev schema procs matches snapshot 1`] = `
+"USAGE
+  ib dev schema procs [flags]
+
+DESCRIPTION
+  List dbo stored procedures and functions (P/FN/TF/IF). Developer-only.
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+
+FLAGS
+  --search STRING    Filter object names by substring
+  --limit NUMBER    Max rows (max 1000) (default: 200)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { items: [{ name, type:'P'|'FN'|'TF'|'IF' }], nextCursor: null, count }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib dev schema procs
+  ib dev schema procs --search asiakas
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev schema table matches snapshot 1`] = `
+"USAGE
+  ib dev schema table <name> [flags]
+
+DESCRIPTION
+  Columns (type, nullability, default, key), primary key, foreign keys, and indexes for one dbo table. Developer-only.
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+
+ARGUMENTS
+  <name> STRING    bare dbo object name (no schema prefix) (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { name, columns:[{name,dataType,maxLength,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], indexes:[{name,columns,unique}] }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
+  exit 5 (HTTP 404)  Table not found        → check the name via \`ib dev schema tables\`
+
+EXAMPLES
+  ib dev schema table keikka
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev schema tables matches snapshot 1`] = `
+"USAGE
+  ib dev schema tables [flags]
+
+DESCRIPTION
+  List dbo base tables with column counts. Developer-only.
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+
+FLAGS
+  --search STRING    Filter object names by substring
+  --limit NUMBER    Max rows (max 1000) (default: 200)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { items: [{ name, type:'table', columnCount }], nextCursor: null, count }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib dev schema tables
+  ib dev schema tables --search keikka
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev schema view matches snapshot 1`] = `
+"USAGE
+  ib dev schema view <name> [flags]
+
+DESCRIPTION
+  Columns and full definition (T-SQL) for one dbo view. Developer-only.
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+
+ARGUMENTS
+  <name> STRING    bare dbo object name (no schema prefix) (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { name, columns:[{name,dataType,maxLength,nullable,default,key}], definition:'<T-SQL>' }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
+  exit 5 (HTTP 404)  View not found         → check the name via \`ib dev schema views\`
+
+EXAMPLES
+  ib dev schema view keikkaBetoniView
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev schema views matches snapshot 1`] = `
+"USAGE
+  ib dev schema views [flags]
+
+DESCRIPTION
+  List dbo views with column counts. Developer-only.
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+
+FLAGS
+  --search STRING    Filter object names by substring
+  --limit NUMBER    Max rows (max 1000) (default: 200)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { items: [{ name, type:'view', columnCount }], nextCursor: null, count }
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib dev schema views
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib doctor matches snapshot 1`] = `
+"USAGE
+  ib doctor [flags]
+
+DESCRIPTION
+  Aggregated 'is my setup working' health check, and the first-contact orientation for MCP / \`/api/cli/exec\` callers (where the \`auth\` group — incl. \`auth whoami\` — is denied). Derives identity + tier + switchable companies from the active JWT (works for both file- and IB_TOKEN-sessions), reports token expiry, pings the public /api/version for connectivity + which build is live, and does ONE authenticated read to prove the token is accepted by this endpoint. Read-only. Exits 1 when the aggregate \`ok\` is false.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { ok:boolean, cli, endpoint, readOnly, auth:{ personId, email, tier:'developer'|'admin'|'standard', ownerAsiakasId, ownerAsiakasName, companies:{ asiakasId, roles }[], issuedFor, tokenExp, tokenExpired, impersonating?:{actorPersonId,sessionId} }, connectivity:VersionReport, authProbe:{ ok, status?, error? } } — \`tier\` = capability/discovery gate; \`companies\` = \`company switch\` targets; \`impersonating\` present only when the token acts as another person.
+
+ERRORS (stderr, exit non-zero)
+  exit 1  Not healthy            → inspect connectivity / authProbe / tokenExpired in the report
+  exit 2  Not logged in          → ib auth login (or set IB_TOKEN)
+
+EXAMPLES
+  ib doctor
+  ib doctor --endpoint https://api-staging.ibetoni.fi
 "
 `;
 
@@ -2780,37 +3160,6 @@ EXAMPLES
   ib help
   ib help write-safety
   ib help tila
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib inbox matches snapshot 1`] = `
-"USAGE
-  ib inbox [flags]
-
-DESCRIPTION
-  Aggregated operator inbox — the six open/incomplete signals in one rollup: deploy-pending changelog, unresolved feedback (open + reviewed, by kind), new bugs, open support escalations, staged legal drafts, and glossary misses, plus a \`needsYou\` headline (open feedback + new bugs + legal drafts + open support + deploy-pending entries with a real bump). The single source of truth behind the daily morning-report routine and the /admin operator dashboard. Read-only. Counts by default; --details adds slimmed top-items per signal (bugs without their huge sessionData).
-  Auth: requires login (any authenticated user).
-
-FLAGS
-  --details BOOLEAN    Include slimmed top-items per signal, not just counts
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { generatedAt, needsYou, changelog:{ pending, deployPending, maxBumpLevel }, feedback:{ open, reviewed, byKind:{ open, reviewed } }, bugs:{ new }, support:{ open, truncated }, legal:{ drafts }, glossary:{ misses } } — with --details each signal also carries an \`items\` array (feedback.items splits into { open, reviewed }).
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Developer access required → inbox is developer-gated; use a developer/sysadmin token
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-NOTES
-  - Deploy-gated: 404 until the backend ships GET /api/cli/inbox.
-
-EXAMPLES
-  ib inbox
-  ib inbox --details
 "
 `;
 
@@ -6980,146 +7329,6 @@ EXAMPLES
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib perf clear matches snapshot 1`] = `
-"USAGE
-  ib perf clear [flags]
-
-DESCRIPTION
-  Clear the slow-query buffer for one environment. Previews with --dry-run (client-side); --reason recommended for the audit log. Developer-only; refused under --read-only.
-  Permissions: requires isSystemAdmin or isDeveloper.
-
-FLAGS
-  --env STRING    Environment buffer to clear (default: backend's current env)
-
-WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
-  --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  execute: { cleared:true, environment, message } | --dry-run: { dryRun:true, wouldClear:{ method, path } }
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-  exit 3  Blocked by read-only mode → clearing needs a session without --read-only/IB_READ_ONLY
-
-NOTES
-  - The DELETE route honours no server-side X-Dry-Run — --dry-run is resolved CLIENT-SIDE (never sends).
-
-SEE ALSO
-  ib perf stats
-
-EXAMPLES
-  ib perf clear --env staging --reason "reset after load test"
-  ib perf clear --dry-run
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib perf config matches snapshot 1`] = `
-"USAGE
-  ib perf config [flags]
-
-DESCRIPTION
-  Slow-query collector configuration (enabled, threshold, sentryThreshold, maxEntries, current environment) plus availableEnvironments that have data. Developer-only.
-  Permissions: requires isSystemAdmin or isDeveloper.
-
-FLAGS
-  (none)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { enabled, threshold, sentryThreshold, maxEntries, environment, availableEnvironments:[string] }
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-SEE ALSO
-  ib perf slow, ib perf stats
-
-EXAMPLES
-  ib perf config
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib perf slow matches snapshot 1`] = `
-"USAGE
-  ib perf slow [flags]
-
-DESCRIPTION
-  Recent slow queries from the collector's Redis ring buffer (procedure, durationMs, entity, params, timestamp). Developer-only.
-  Permissions: requires isSystemAdmin or isDeveloper.
-
-FLAGS
-  --limit NUMBER    Max rows (default: 50)
-  --env STRING    Environment buffer to read (default: backend's current env; discover via \`ib perf config\`)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  ListEnvelope<{ procedure, durationMs, entity, params, timestamp }> & { totalCount?, environment? } (+truncated:true when the page filled the limit)
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-NOTES
-  - SQL durations cover the executeQuery (cache-runner) path only — raw getConnection() queries are not timed.
-  - Threshold to be 'slow' is the collector's SLOW_QUERY_THRESHOLD_MS (default 1000ms) — see \`ib perf config\`.
-
-SEE ALSO
-  ib perf stats, ib perf config
-
-EXAMPLES
-  ib perf slow
-  ib perf slow --limit 20 --env production
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib perf stats matches snapshot 1`] = `
-"USAGE
-  ib perf stats [flags]
-
-DESCRIPTION
-  Aggregate slow-query stats: top procedures (count/avgMs), avg/max/min duration, by-entity breakdown, lifetime totalCount. Developer-only.
-  Permissions: requires isSystemAdmin or isDeveloper.
-
-FLAGS
-  --env STRING    Environment buffer to read (default: backend's current env)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { totalSlowQueries, bufferedQueries, avgDuration, maxDuration, minDuration, topProcedures:[{ name, count, avgMs }], byEntity, since, threshold, sentryThreshold, environment }
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-NOTES
-  - SQL durations cover the executeQuery (cache-runner) path only — raw getConnection() queries are not timed.
-
-SEE ALSO
-  ib perf slow, ib perf config
-
-EXAMPLES
-  ib perf stats
-  ib perf stats --env staging
-"
-`;
-
 exports[`Help snapshots — contract stability > help for ib person absences matches snapshot 1`] = `
 "USAGE
   ib person absences [flags]
@@ -8233,215 +8442,6 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib schedule week 2026-06-01
   ib schedule week today
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib schema dump matches snapshot 1`] = `
-"USAGE
-  ib schema dump [flags]
-
-DESCRIPTION
-  Whole-schema structural map of the dbo schema (developer-gated, read-only) — all tables with column names and types, FK edges, view names, and proc signatures. No proc/view bodies (use \`schema proc\`/\`schema view\` for those).
-  Permissions: requires developer access (isSystemAdmin or isDeveloper).
-
-FLAGS
-  (none)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { tables:[{name,columns}], foreignKeys:[{table,column,refTable,refColumn}], views:[{name}], procs:[{name,type,parameters}] }
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-EXAMPLES
-  ib schema dump
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib schema proc matches snapshot 1`] = `
-"USAGE
-  ib schema proc <name> [flags]
-
-DESCRIPTION
-  Signature (parameters) and full definition (T-SQL) for one dbo proc/function. Developer-only.
-  Permissions: requires developer access (isSystemAdmin or isDeveloper).
-
-ARGUMENTS
-  <name> STRING    bare dbo object name (no schema prefix) (required)
-
-FLAGS
-  (none)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-  exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
-  exit 5 (HTTP 404)  Proc/function not found → check the name via \`ib schema procs\`
-
-EXAMPLES
-  ib schema proc asiakas_find
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib schema procs matches snapshot 1`] = `
-"USAGE
-  ib schema procs [flags]
-
-DESCRIPTION
-  List dbo stored procedures and functions (P/FN/TF/IF). Developer-only.
-  Permissions: requires developer access (isSystemAdmin or isDeveloper).
-
-FLAGS
-  --search STRING    Filter object names by substring
-  --limit NUMBER    Max rows (max 1000) (default: 200)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { items: [{ name, type:'P'|'FN'|'TF'|'IF' }], nextCursor: null, count }
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-EXAMPLES
-  ib schema procs
-  ib schema procs --search asiakas
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib schema table matches snapshot 1`] = `
-"USAGE
-  ib schema table <name> [flags]
-
-DESCRIPTION
-  Columns (type, nullability, default, key), primary key, foreign keys, and indexes for one dbo table. Developer-only.
-  Permissions: requires developer access (isSystemAdmin or isDeveloper).
-
-ARGUMENTS
-  <name> STRING    bare dbo object name (no schema prefix) (required)
-
-FLAGS
-  (none)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { name, columns:[{name,dataType,maxLength,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], indexes:[{name,columns,unique}] }
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-  exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
-  exit 5 (HTTP 404)  Table not found        → check the name via \`ib schema tables\`
-
-EXAMPLES
-  ib schema table keikka
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib schema tables matches snapshot 1`] = `
-"USAGE
-  ib schema tables [flags]
-
-DESCRIPTION
-  List dbo base tables with column counts. Developer-only.
-  Permissions: requires developer access (isSystemAdmin or isDeveloper).
-
-FLAGS
-  --search STRING    Filter object names by substring
-  --limit NUMBER    Max rows (max 1000) (default: 200)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { items: [{ name, type:'table', columnCount }], nextCursor: null, count }
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-EXAMPLES
-  ib schema tables
-  ib schema tables --search keikka
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib schema view matches snapshot 1`] = `
-"USAGE
-  ib schema view <name> [flags]
-
-DESCRIPTION
-  Columns and full definition (T-SQL) for one dbo view. Developer-only.
-  Permissions: requires developer access (isSystemAdmin or isDeveloper).
-
-ARGUMENTS
-  <name> STRING    bare dbo object name (no schema prefix) (required)
-
-FLAGS
-  (none)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { name, columns:[{name,dataType,maxLength,nullable,default,key}], definition:'<T-SQL>' }
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-  exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
-  exit 5 (HTTP 404)  View not found         → check the name via \`ib schema views\`
-
-EXAMPLES
-  ib schema view keikkaBetoniView
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib schema views matches snapshot 1`] = `
-"USAGE
-  ib schema views [flags]
-
-DESCRIPTION
-  List dbo views with column counts. Developer-only.
-  Permissions: requires developer access (isSystemAdmin or isDeveloper).
-
-FLAGS
-  --search STRING    Filter object names by substring
-  --limit NUMBER    Max rows (max 1000) (default: 200)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
-
-OUTPUT (JSON, stdout)
-  { items: [{ name, type:'view', columnCount }], nextCursor: null, count }
-
-ERRORS (stderr, exit non-zero)
-  exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-EXAMPLES
-  ib schema views
 "
 `;
 

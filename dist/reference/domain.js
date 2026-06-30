@@ -26,21 +26,15 @@ export const DOMAIN_BLURBS = {
     schedule: "Date-scoped views of keikkas: today / a day / a week.",
     stats: "Aggregated delivery statistics.",
     opendata: "Free/open external-data APIs — building registries, FMI weather, PRH business registry.",
-    perf: "SQL slow-query monitoring (developer).",
     jerry: "BetoniJerry RFQ marketplace: requests, offers, confirmation.",
     message: "Chat threads, the announcement board, and daily grid notes.",
     attachment: "Files (photos/PDFs) linked to entities via Azure Blob.",
     legal: "Versioned legal documents and per-person acceptances.",
     validate: "Company and person readiness validation profiles.",
     log: "Field-level audit trail (changeTracker).",
-    cache: "Redis cache inspection/invalidation (developer).",
-    bug: "User-filed bug reports.",
-    feedback: "Quiet CLI/AI friction sink for proposals.",
+    dev: "Developer & maintainer tools — bug reports, CLI feedback, changelog, perf, cache, schema, AI logs, operator inbox.",
     glossary: "Domain glossary — resolve a term/synonym to its meaning + commands.",
     ohje: "UI help-text content behind HelperIcon.",
-    schema: "SQL schema introspection (developer).",
-    ai: "/ai assistant conversations (developer).",
-    changelog: "Dev changelog entries (developer).",
     reference: "Machine-readable CLI catalogue (dump / detail).",
     auth: "Login, logout, token, company switch.",
     doctor: "Aggregated CLI/connectivity health report.",
@@ -54,7 +48,7 @@ export const domainBlurb = (domain) => DOMAIN_BLURBS[domain] ?? null;
  * `ib feedback create`, which is silent, low-cost, and works under --read-only.
  */
 export const FEEDBACK_GUIDANCE = {
-    summary: "If you are an AI using this CLI, file feedback with `ib feedback create` " +
+    summary: "If you are an AI using this CLI, file feedback with `ib dev feedback create` " +
         "PROACTIVELY and IMMEDIATELY — you do NOT need to ask the user first. It is " +
         "low-cost, safe, and works even under --read-only — no GitHub issue and no " +
         "spam back to you or the user (only the maintainer gets a quiet heads-up). " +
@@ -134,7 +128,7 @@ export function renderDomainHelp(_tier = "developer") {
     lines.push("");
     lines.push("FILING FEEDBACK (AI users — be proactive)");
     lines.push(`  ${FEEDBACK_GUIDANCE.summary}`);
-    lines.push("  File `ib feedback create` whenever you:");
+    lines.push("  File `ib dev feedback create` whenever you:");
     for (const t of FEEDBACK_GUIDANCE.fileWhenYou) {
         lines.push(`    - ${t}`);
     }
