@@ -4366,7 +4366,8 @@ const BASE_COMMAND_SPECS = [
             { name: "order-by", type: "string", default: "createdAt", description: "createdAt | updatedAt | severity | status | bugType | bugReportId" },
             { name: "order", type: "string", default: "desc", description: "asc | desc" },
         ],
-        outputShape: "{ items: BugReportRow[], nextCursor: null, count, truncated }" + TRUNCATED_NOTE,
+        outputShape: "{ items: BugReportRow[], nextCursor: null, count, truncated } — each row is enriched client-side with ageDays (whole days since createdAt) and staleDays (since last activity = updatedAt↔createdAt); a high staleDays on an open report flags a months-old untouched bug." +
+            TRUNCATED_NOTE,
         errors: [
             { exit: 4, meaning: "Validation", remedy: "--status/--severity/--type/--order-by/--order must be valid enum values" },
             ...COMMON_AUTH_ERRORS,
@@ -4380,7 +4381,7 @@ const BASE_COMMAND_SPECS = [
         auth: "any",
         args: [{ name: "bugReportId", type: "number", description: "bugReportId" }],
         flags: [],
-        outputShape: "The full report { bugReportId, bugType, severity, status, priority, description, reporterName, comments: [...], attachments: [...], ... }",
+        outputShape: "The full report { bugReportId, bugType, severity, status, priority, description, reporterName, ageDays, staleDays, comments: [...], attachments: [...], ... }. ageDays/staleDays are derived client-side: whole days since createdAt and since last activity (updatedAt↔createdAt) — surfaces a stale report without ISO-date math.",
         errors: [
             apiErr(403, "Permission denied", "you must own the report, share its company, or be a developer"),
             apiErr(404, "Not found", "check the id via `ib bug list`"),

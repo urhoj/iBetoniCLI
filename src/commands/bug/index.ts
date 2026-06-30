@@ -50,6 +50,33 @@ function unwrapData(res: unknown): unknown {
   return res;
 }
 
+/**
+ * Whole days elapsed between an ISO timestamp and `now` (floored, never
+ * negative). Returns null when the value is missing or unparseable, so callers
+ * surface "unknown" rather than a misleading 0.
+ */
+function daysSince(iso: unknown, now: number): number | null {
+  if (typeof iso !== "string" || iso === "") return null;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  return Math.max(0, Math.floor((now - t) / 86_400_000));
+}
+
+/**
+ * Enrich a bug-report row with two derived triage signals, computed client-side
+ * (no backend change): `ageDays` (since createdAt) and `staleDays` (since the
+ * last activity — updatedAt, falling back to createdAt). A high staleDays on an
+ * open report is the "nobody has touched this in months" flag — the signal that
+ * a months-old report can otherwise hide behind a raw ISO `createdAt`.
+ */
+function withAge(row: Record<string, unknown>, now: number): Record<string, unknown> {
+  return {
+    ...row,
+    ageDays: daysSince(row.createdAt, now),
+    staleDays: daysSince(row.updatedAt ?? row.createdAt, now),
+  };
+}
+
 export interface BugCreateInput {
   type?: string;
   severity?: string;
@@ -135,7 +162,9 @@ export async function runBugList(
 
   const res = await client.get<unknown>(`/api/bugs/list${suffix}`);
   const data = unwrapData(res);
-  const items = Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
+  const rows = Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
+  const now = Date.now();
+  const items = rows.map((r) => withAge(r, now));
   const truncated = opts.limit !== undefined && items.length >= opts.limit;
   return { items, nextCursor: null, count: items.length, truncated };
 }
@@ -143,7 +172,11 @@ export async function runBugList(
 /** GET /api/bugs/:id — one report with its comments + attachments inline. */
 export async function runBugGet(client: ApiClient, id: number): Promise<unknown> {
   const res = await client.get<unknown>(`/api/bugs/${id}`);
-  return unwrapData(res);
+  const data = unwrapData(res);
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    return withAge(data as Record<string, unknown>, Date.now());
+  }
+  return data;
 }
 
 export interface BugCommentInput {

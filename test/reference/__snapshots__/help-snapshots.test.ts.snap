@@ -1045,7 +1045,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  The full report { bugReportId, bugType, severity, status, priority, description, reporterName, comments: [...], attachments: [...], ... }
+  The full report { bugReportId, bugType, severity, status, priority, description, reporterName, ageDays, staleDays, comments: [...], attachments: [...], ... }. ageDays/staleDays are derived client-side: whole days since createdAt and since last activity (updatedAt↔createdAt) — surfaces a stale report without ISO-date math.
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → you must own the report, share its company, or be a developer
@@ -1083,7 +1083,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { items: BugReportRow[], nextCursor: null, count, truncated } (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
+  { items: BugReportRow[], nextCursor: null, count, truncated } — each row is enriched client-side with ageDays (whole days since createdAt) and staleDays (since last activity = updatedAt↔createdAt); a high staleDays on an open report flags a months-old untouched bug. (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
 
 ERRORS (stderr, exit non-zero)
   exit 4  Validation             → --status/--severity/--type/--order-by/--order must be valid enum values

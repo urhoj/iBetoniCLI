@@ -29,6 +29,33 @@ function unwrapData(res) {
     return res;
 }
 /**
+ * Whole days elapsed between an ISO timestamp and `now` (floored, never
+ * negative). Returns null when the value is missing or unparseable, so callers
+ * surface "unknown" rather than a misleading 0.
+ */
+function daysSince(iso, now) {
+    if (typeof iso !== "string" || iso === "")
+        return null;
+    const t = Date.parse(iso);
+    if (Number.isNaN(t))
+        return null;
+    return Math.max(0, Math.floor((now - t) / 86_400_000));
+}
+/**
+ * Enrich a bug-report row with two derived triage signals, computed client-side
+ * (no backend change): `ageDays` (since createdAt) and `staleDays` (since the
+ * last activity — updatedAt, falling back to createdAt). A high staleDays on an
+ * open report is the "nobody has touched this in months" flag — the signal that
+ * a months-old report can otherwise hide behind a raw ISO `createdAt`.
+ */
+function withAge(row, now) {
+    return {
+        ...row,
+        ageDays: daysSince(row.createdAt, now),
+        staleDays: daysSince(row.updatedAt ?? row.createdAt, now),
+    };
+}
+/**
  * POST /api/bugs/report — file a bug report. A REAL write (blocked under
  * --read-only) that ALSO opens a GitHub issue + emails admins. --dry-run
  * resolves client-side (no server dry-run guard on /report).
@@ -90,14 +117,20 @@ export async function runBugList(client, opts) {
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     const res = await client.get(`/api/bugs/list${suffix}`);
     const data = unwrapData(res);
-    const items = Array.isArray(data) ? data : [];
+    const rows = Array.isArray(data) ? data : [];
+    const now = Date.now();
+    const items = rows.map((r) => withAge(r, now));
     const truncated = opts.limit !== undefined && items.length >= opts.limit;
     return { items, nextCursor: null, count: items.length, truncated };
 }
 /** GET /api/bugs/:id — one report with its comments + attachments inline. */
 export async function runBugGet(client, id) {
     const res = await client.get(`/api/bugs/${id}`);
-    return unwrapData(res);
+    const data = unwrapData(res);
+    if (data && typeof data === "object" && !Array.isArray(data)) {
+        return withAge(data, Date.now());
+    }
+    return data;
 }
 /** POST /api/bugs/:id/comment — add a comment (owner / same-company / admin). */
 export async function runBugComment(client, id, input) {

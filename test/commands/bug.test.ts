@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   runBugCreate,
   runBugList,
@@ -132,7 +132,10 @@ describe("ib bug list", () => {
       "/api/bugs/list?status=new&severity=major&bugType=functionality-error&ownerAsiakasId=1349&limit=20&offset=0&orderBy=severity&orderDirection=asc"
     );
     expect(out).toEqual({
-      items: [{ bugReportId: 1 }, { bugReportId: 2 }],
+      items: [
+        { bugReportId: 1, ageDays: null, staleDays: null },
+        { bugReportId: 2, ageDays: null, staleDays: null },
+      ],
       nextCursor: null,
       count: 2,
       truncated: false,
@@ -170,7 +173,74 @@ describe("ib bug get", () => {
     });
     const out = await runBugGet(mockClient, 51);
     expect(get).toHaveBeenCalledWith("/api/bugs/51");
-    expect(out).toEqual({ bugReportId: 51, comments: [], attachments: [] });
+    expect(out).toEqual({
+      bugReportId: 51,
+      comments: [],
+      attachments: [],
+      ageDays: null,
+      staleDays: null,
+    });
+  });
+});
+
+describe("ib bug age enrichment", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-30T00:00:00.000Z"));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  test("get adds ageDays (since createdAt) and staleDays (since last activity)", async () => {
+    get.mockResolvedValueOnce({
+      success: true,
+      data: {
+        bugReportId: 4,
+        createdAt: "2026-06-20T00:00:00.000Z",
+        updatedAt: "2026-06-28T00:00:00.000Z",
+        comments: [],
+        attachments: [],
+      },
+    });
+    const out = await runBugGet(mockClient, 4);
+    expect(out).toMatchObject({ bugReportId: 4, ageDays: 10, staleDays: 2 });
+  });
+
+  test("staleDays falls back to createdAt when updatedAt is null (never-touched report)", async () => {
+    get.mockResolvedValueOnce({
+      data: { bugReportId: 4, createdAt: "2026-06-20T00:00:00.000Z", updatedAt: null },
+    });
+    const out = await runBugGet(mockClient, 4);
+    expect(out).toMatchObject({ ageDays: 10, staleDays: 10 });
+  });
+
+  test("unparseable / missing createdAt → null (not a misleading 0)", async () => {
+    get.mockResolvedValueOnce({ data: { bugReportId: 4, createdAt: "not-a-date" } });
+    const out = await runBugGet(mockClient, 4);
+    expect(out).toMatchObject({ ageDays: null, staleDays: null });
+  });
+
+  test("list enriches every row from createdAt / updatedAt", async () => {
+    get.mockResolvedValueOnce({
+      data: [
+        { bugReportId: 1, createdAt: "2026-06-29T00:00:00.000Z" },
+        {
+          bugReportId: 2,
+          createdAt: "2026-06-20T00:00:00.000Z",
+          updatedAt: "2026-06-25T00:00:00.000Z",
+        },
+      ],
+    });
+    const out = await runBugList(mockClient, {});
+    expect(out.items).toEqual([
+      { bugReportId: 1, createdAt: "2026-06-29T00:00:00.000Z", ageDays: 1, staleDays: 1 },
+      {
+        bugReportId: 2,
+        createdAt: "2026-06-20T00:00:00.000Z",
+        updatedAt: "2026-06-25T00:00:00.000Z",
+        ageDays: 10,
+        staleDays: 5,
+      },
+    ]);
   });
 });
 
