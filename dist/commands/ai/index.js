@@ -30,9 +30,9 @@ export async function runAiConversationList(client, opts = {}) {
     return { items, nextCursor: null, count: items.length, truncated: items.length >= limit };
 }
 /** Register `ib ai conversations` and `ib ai conversation <id>`. */
-export function registerAiCommands(parent, getClient) {
+export function registerAiCommands(parent, getClient, opts = {}) {
     const ai = parent
-        .command("ai")
+        .command("ai", { hidden: !!opts.hidden })
         .description("Read AI assistant conversations (developer-only)");
     ai
         .command("conversations")

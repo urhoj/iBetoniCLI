@@ -310,10 +310,11 @@ export async function runFeedbackResolve(
  */
 export function registerFeedbackCommands(
   parent: Command,
-  getClient: () => Promise<ApiClient>
+  getClient: () => Promise<ApiClient>,
+  opts: { hidden?: boolean } = {}
 ): void {
   const f = parent
-    .command("feedback")
+    .command("feedback", { hidden: !!opts.hidden })
     .description("File & triage CLI improvement proposals / trouble reports");
 
   f.command("create <description>")

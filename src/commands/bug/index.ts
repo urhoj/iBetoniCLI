@@ -314,10 +314,11 @@ export async function runBugAdminDelete(
  */
 export function registerBugCommands(
   parent: Command,
-  getClient: () => Promise<ApiClient>
+  getClient: () => Promise<ApiClient>,
+  opts: { hidden?: boolean } = {}
 ): void {
   const bug = parent
-    .command("bug")
+    .command("bug", { hidden: !!opts.hidden })
     .description("File, read, and triage bug reports (bugReport system)");
 
   bug

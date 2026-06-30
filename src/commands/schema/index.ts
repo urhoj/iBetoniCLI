@@ -48,9 +48,10 @@ export async function runSchemaDump(client: ApiClient): Promise<Record_> {
  */
 export function registerSchemaCommands(
   parent: Command,
-  getClient: () => Promise<ApiClient>
+  getClient: () => Promise<ApiClient>,
+  opts: { hidden?: boolean } = {}
 ): void {
-  const s = parent.command("schema").description("SQL schema introspection (developer-only)");
+  const s = parent.command("schema", { hidden: !!opts.hidden }).description("SQL schema introspection (developer-only)");
 
   const listOpt = (cmd: Command) =>
     cmd

@@ -57,8 +57,8 @@ export async function runPerfClear(client, opts) {
     const res = await client.delete(path, { headers });
     return { cleared: true, environment: opts.env ?? null, message: res.message ?? "cleared" };
 }
-export function registerPerfCommands(parent, getClient) {
-    const perf = parent.command("perf").description("SQL slow-query monitoring (developer)");
+export function registerPerfCommands(parent, getClient, opts = {}) {
+    const perf = parent.command("perf", { hidden: !!opts.hidden }).description("SQL slow-query monitoring (developer)");
     perf
         .command("slow")
         .description("Recent slow queries from the collector's ring buffer")

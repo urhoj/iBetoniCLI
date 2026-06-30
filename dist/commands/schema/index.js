@@ -34,8 +34,8 @@ export async function runSchemaDump(client) {
  * Requires developer access server-side (isSystemAdmin or isDeveloper) — a
  * non-developer gets 403 → exit code 3.
  */
-export function registerSchemaCommands(parent, getClient) {
-    const s = parent.command("schema").description("SQL schema introspection (developer-only)");
+export function registerSchemaCommands(parent, getClient, opts = {}) {
+    const s = parent.command("schema", { hidden: !!opts.hidden }).description("SQL schema introspection (developer-only)");
     const listOpt = (cmd) => cmd
         .option("--search <substr>", "Filter object names by substring")
         .option("--limit <n>", "Max rows (default 200, max 1000)", (v) => Math.min(Number(v), 1000));

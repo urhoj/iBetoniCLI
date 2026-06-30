@@ -187,10 +187,11 @@ export function normalizeLanguage(lang?: string): string | undefined {
 
 export function registerChangelogCommands(
   parent: Command,
-  getClient: () => Promise<ApiClient>
+  getClient: () => Promise<ApiClient>,
+  opts: { hidden?: boolean } = {}
 ): void {
   const c = parent
-    .command("changelog")
+    .command("changelog", { hidden: !!opts.hidden })
     .description(
       "Development changelog entries (source of the monthly report)"
     );

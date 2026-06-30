@@ -96,9 +96,9 @@ export function normalizeLanguage(lang) {
         failWith(`--language must be ${LANGUAGES.join("|")}`, 4);
     return v;
 }
-export function registerChangelogCommands(parent, getClient) {
+export function registerChangelogCommands(parent, getClient, opts = {}) {
     const c = parent
-        .command("changelog")
+        .command("changelog", { hidden: !!opts.hidden })
         .description("Development changelog entries (source of the monthly report)");
     addWriteFlagsToCommand(c
         .command("add")

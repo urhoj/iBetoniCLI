@@ -233,9 +233,9 @@ export async function runFeedbackResolve(client, id, input) {
  *   get      GET  /api/feedback/:id (developer-only)
  *   resolve  PUT  /api/feedback/:id (developer-only; a real write)
  */
-export function registerFeedbackCommands(parent, getClient) {
+export function registerFeedbackCommands(parent, getClient, opts = {}) {
     const f = parent
-        .command("feedback")
+        .command("feedback", { hidden: !!opts.hidden })
         .description("File & triage CLI improvement proposals / trouble reports");
     f.command("create <description>")
         .description("File a proposal/trouble report. Silent server-side; works under --read-only.")

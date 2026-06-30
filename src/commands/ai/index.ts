@@ -64,10 +64,11 @@ export async function runAiConversationList(
 /** Register `ib ai conversations` and `ib ai conversation <id>`. */
 export function registerAiCommands(
   parent: Command,
-  getClient: () => Promise<ApiClient>
+  getClient: () => Promise<ApiClient>,
+  opts: { hidden?: boolean } = {}
 ): void {
   const ai = parent
-    .command("ai")
+    .command("ai", { hidden: !!opts.hidden })
     .description("Read AI assistant conversations (developer-only)");
 
   ai

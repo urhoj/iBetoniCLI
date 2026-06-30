@@ -98,8 +98,8 @@ export async function runPerfClear(
   return { cleared: true, environment: opts.env ?? null, message: res.message ?? "cleared" };
 }
 
-export function registerPerfCommands(parent: Command, getClient: () => Promise<ApiClient>): void {
-  const perf = parent.command("perf").description("SQL slow-query monitoring (developer)");
+export function registerPerfCommands(parent: Command, getClient: () => Promise<ApiClient>, opts: { hidden?: boolean } = {}): void {
+  const perf = parent.command("perf", { hidden: !!opts.hidden }).description("SQL slow-query monitoring (developer)");
 
   perf
     .command("slow")

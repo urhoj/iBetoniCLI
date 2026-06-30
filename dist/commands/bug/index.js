@@ -216,9 +216,9 @@ export async function runBugAdminDelete(client, id, input) {
  * replaced by its CommandSpec via attachRichHelp; the two group commands render
  * computed group help.
  */
-export function registerBugCommands(parent, getClient) {
+export function registerBugCommands(parent, getClient, opts = {}) {
     const bug = parent
-        .command("bug")
+        .command("bug", { hidden: !!opts.hidden })
         .description("File, read, and triage bug reports (bugReport system)");
     bug
         .command("create")

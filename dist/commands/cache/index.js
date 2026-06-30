@@ -51,8 +51,8 @@ export async function runCachePattern(client, pattern, opts) {
  * preview by default and require --confirm to execute; --force-prod overrides
  * the shared-cache endpoint guard. `entities` is fully offline.
  */
-export function registerCacheCommands(parent, getClient) {
-    const c = parent.command("cache").description("Redis cache inspection and invalidation (admin/developer)");
+export function registerCacheCommands(parent, getClient, opts = {}) {
+    const c = parent.command("cache", { hidden: !!opts.hidden }).description("Redis cache inspection and invalidation (admin/developer)");
     c.command("stats")
         .description("Cache connection, key count, and hit rate (developer-only)")
         .action(async () => {

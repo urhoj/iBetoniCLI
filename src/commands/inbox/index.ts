@@ -45,10 +45,11 @@ export async function runInbox(
 
 export function registerInboxCommand(
   parent: Command,
-  getClient: () => Promise<ApiClient>
+  getClient: () => Promise<ApiClient>,
+  opts: { hidden?: boolean } = {}
 ): void {
   parent
-    .command("inbox")
+    .command("inbox", { hidden: !!opts.hidden })
     .description(
       "Aggregated operator inbox: counts of every open/incomplete signal (deploy-pending changelog, unresolved feedback, new bugs, open support, staged legal drafts, glossary misses) plus a `needsYou` headline"
     )
