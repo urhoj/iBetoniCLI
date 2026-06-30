@@ -1,10 +1,10 @@
 /**
  * `ib ai` — read AI-assistant conversations (developer-only).
  *
- * `ib ai conversations` lists recent conversations (compact rows, for audit/browse);
- * `ib ai conversation <id>` fetches the FULL transcript of one. Both go over
+ * `ib dev ai conversations` lists recent conversations (compact rows, for audit/browse);
+ * `ib dev ai conversation <id>` fetches the FULL transcript of one. Both go over
  * /api/cli/ai/* (dev-gated, cross-tenant). The id for the transcript read can come
- * from a feedback row's context.conversationId (`ib feedback create` stamps it when
+ * from a feedback row's context.conversationId (`ib dev feedback create` stamps it when
  * the AI files feedback from the /ai page) OR from the `conversations` list.
  */
 import type { Command } from "commander";
@@ -14,7 +14,7 @@ import type { ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 import { parseId } from "../../targets.js";
 
-/** One row of the `ib ai conversations` browse list (no message bodies). */
+/** One row of the `ib dev ai conversations` browse list (no message bodies). */
 export interface AiConversationRow {
   conversationId: number;
   personId: number;
@@ -61,7 +61,7 @@ export async function runAiConversationList(
   return { items, nextCursor: null, count: items.length, truncated: items.length >= limit };
 }
 
-/** Register `ib ai conversations` and `ib ai conversation <id>`. */
+/** Register `ib dev ai conversations` and `ib dev ai conversation <id>`. */
 export function registerAiCommands(
   parent: Command,
   getClient: () => Promise<ApiClient>,
@@ -74,7 +74,7 @@ export function registerAiCommands(
   ai
     .command("conversations")
     .description(
-      "List recent /ai conversations (developer-only, cross-tenant) for audit; drill into one with `ib ai conversation <id>`"
+      "List recent /ai conversations (developer-only, cross-tenant) for audit; drill into one with `ib dev ai conversation <id>`"
     )
     .option("--limit <n>", "Max rows to return (1-100, default 20)", (v) => Number(v))
     .option("--person <personId>", "Filter to one person's conversations", (v) => Number(v))

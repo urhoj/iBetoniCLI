@@ -29,14 +29,14 @@ export async function runAiConversationList(client, opts = {}) {
     const items = res.items ?? [];
     return { items, nextCursor: null, count: items.length, truncated: items.length >= limit };
 }
-/** Register `ib ai conversations` and `ib ai conversation <id>`. */
+/** Register `ib dev ai conversations` and `ib dev ai conversation <id>`. */
 export function registerAiCommands(parent, getClient, opts = {}) {
     const ai = parent
         .command("ai", { hidden: !!opts.hidden })
         .description("Read AI assistant conversations (developer-only)");
     ai
         .command("conversations")
-        .description("List recent /ai conversations (developer-only, cross-tenant) for audit; drill into one with `ib ai conversation <id>`")
+        .description("List recent /ai conversations (developer-only, cross-tenant) for audit; drill into one with `ib dev ai conversation <id>`")
         .option("--limit <n>", "Max rows to return (1-100, default 20)", (v) => Number(v))
         .option("--person <personId>", "Filter to one person's conversations", (v) => Number(v))
         .action(async (opts) => {

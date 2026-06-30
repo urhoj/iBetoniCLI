@@ -7,7 +7,7 @@ const STATUSES = ["open", "reviewed", "applied", "dismissed"];
 const MAX_FREETEXT = 200;
 const CAP = 200;
 const TRUNCATED_FIELDS = ["description", "resolution", "errorText"];
-const TRUNCATE_HINT = "description/resolution truncated to 200 chars; ib feedback get <id> for full text";
+const TRUNCATE_HINT = "description/resolution truncated to 200 chars; ib dev feedback get <id> for full text";
 /** Cap a string at MAX_FREETEXT chars, appending "..." when cut. Non-strings
  * pass through untouched. */
 function truncateField(v) {

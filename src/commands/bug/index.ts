@@ -307,8 +307,8 @@ export async function runBugAdminDelete(
 }
 
 /**
- * Register `ib bug` (create/list/get/comment) + the developer-only
- * `ib bug admin` subgroup (update/assign/stats/delete). Each leaf's --help is
+ * Register `ib dev bug` (create/list/get/comment) + the developer-only
+ * `ib dev bug admin` subgroup (update/assign/stats/delete). Each leaf's --help is
  * replaced by its CommandSpec via attachRichHelp; the two group commands render
  * computed group help.
  */

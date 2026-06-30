@@ -34,6 +34,8 @@ Run from the `betonicli/` directory:
 
 ## Architecture
 
+> Re-homed under `ib dev` (2026-06-30): `bug`, `feedback`, `changelog`, `perf`, `cache`, `schema`, `ai`, `inbox`. Old top-level paths remain as hidden runtime aliases; `ib commands`/`reference dump` use `dev`.
+
 ### Single source of truth: `src/reference/specs.ts`
 
 `COMMAND_SPECS` is the canonical catalogue of every subcommand (`command`, `description`, optional `tier` (visibility gate — `"developer"` hides the command from non-developer/tokenless callers in every discovery surface; absent = visible to all), optional `auth` / `permissions`, positional `args`, `flags`, `writeFlags` / `mutates`, `outputShape`, dual-encoded `errors` (`{ http?, exit }`), optional `notes` / `seeAlso`, `examples`). It drives **three** consumers that must never drift:
@@ -118,7 +120,7 @@ Rows are self-describing — each carries `showInGrid`/`firstDate`/`lastDate`/`d
 
 **`meta` read-only exemption:** `create` is sent with `client.post(..., { meta: true })`. In `src/api/client.ts` the read-only write-lock and the acting-as diagnostic both skip `meta` requests — so an agent running `--read-only` / `IB_READ_ONLY` can *still* file feedback (it's not a domain mutation). `meta` is the ONLY write-lock bypass; use it only for non-mutating diagnostics. `resolve` is a real write (PUT, blocked under read-only). `--dry-run` on `create`/`resolve` resolves **client-side** (prints the payload, never sends) — not the server `X-Dry-Run`. Specs keep `writeFlags:false` (custom client-side dry-run; the standard write-safety block would mis-document them) but set `mutates:true`, so `ib commands` classifies them as writes via `mutates ?? !!writeFlags` — `--mutations` lists them and `--reads` excludes them. **Deploy-gated**: `/api/feedback` + the `cliFeedback` table must deploy first.
 
-`list` caps each row's `description`/`resolution`/`errorText` at 200 chars by default (full text via `ib feedback get <id>` or `--full`); when anything was cut the envelope carries a `hint`. `--unresolved` (= `--status open,reviewed`) and a comma-separated `--status` fan out to one GET per status, merged newest-first client-side. `resolve` returns a compact ack `{ feedbackId, status, updatedAt, resolution }` by default (`--full` for the whole row). `ib feedback count` returns `{ total, byStatus, byKind, byScope }` aggregated client-side — the cheap "is there anything open?" call. All four are client-side only (no backend change).
+`list` caps each row's `description`/`resolution`/`errorText` at 200 chars by default (full text via `ib dev feedback get <id>` or `--full`); when anything was cut the envelope carries a `hint`. `--unresolved` (= `--status open,reviewed`) and a comma-separated `--status` fan out to one GET per status, merged newest-first client-side. `resolve` returns a compact ack `{ feedbackId, status, updatedAt, resolution }` by default (`--full` for the whole row). `ib dev feedback count` returns `{ total, byStatus, byKind, byScope }` aggregated client-side — the cheap "is there anything open?" call. All four are client-side only (no backend change).
 
 ### `ib message chat` — conversational thread CLI
 
@@ -162,10 +164,10 @@ Append mode (developer-only, deploy-gated): `--add-synonyms` / `--remove-synonym
 
 `src/commands/perf/index.ts` — four `tier:"developer"` commands over the EXISTING `/api/admin/slow-queries*` routes (no backend deploy needed; the routes predate the group). All hidden from non-developer / tokenless callers in every discovery surface.
 
-- `ib perf slow [--limit N] [--env name]` — recent slow queries from the Redis ring buffer as a `ListEnvelope` (`truncated:true` when the page filled the limit). `durationMs` is the row field (the backend sends `duration`, renamed in `runPerfSlow`); rows also carry `procedure`/`entity`/`params`/`timestamp`, plus envelope-level `totalCount`/`environment`.
-- `ib perf stats [--env name]` — aggregate stats (top procedures by count/avgMs, avg/max/min, by-entity, lifetime `totalSlowQueries`).
-- `ib perf config` — collector config (`enabled`/`threshold`/`sentryThreshold`/`maxEntries`); folds in `availableEnvironments` via a second GET to `/environments` (`Promise.all` with the config GET).
-- `ib perf clear [--env name] --reason <r>` — DELETE the buffer. `--dry-run` is **client-side only** (the route honours no `X-Dry-Run`): it resolves before any fetch and returns `{ dryRun:true, wouldClear:{ method, path } }`. Blocked under `--read-only` / `IB_READ_ONLY`.
+- `ib dev perf slow [--limit N] [--env name]` — recent slow queries from the Redis ring buffer as a `ListEnvelope` (`truncated:true` when the page filled the limit). `durationMs` is the row field (the backend sends `duration`, renamed in `runPerfSlow`); rows also carry `procedure`/`entity`/`params`/`timestamp`, plus envelope-level `totalCount`/`environment`.
+- `ib dev perf stats [--env name]` — aggregate stats (top procedures by count/avgMs, avg/max/min, by-entity, lifetime `totalSlowQueries`).
+- `ib dev perf config` — collector config (`enabled`/`threshold`/`sentryThreshold`/`maxEntries`); folds in `availableEnvironments` via a second GET to `/environments` (`Promise.all` with the config GET).
+- `ib dev perf clear [--env name] --reason <r>` — DELETE the buffer. `--dry-run` is **client-side only** (the route honours no `X-Dry-Run`): it resolves before any fetch and returns `{ dryRun:true, wouldClear:{ method, path } }`. Blocked under `--read-only` / `IB_READ_ONLY`.
 
 All three reads build their query suffix through one `qs()` helper. Coverage caveat (shared with `--stats`): only `executeQuery`-path stored procs are timed/collected — raw `getConnection()` queries are not.
 

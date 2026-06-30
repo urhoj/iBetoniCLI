@@ -5,7 +5,7 @@
  * the CLI can be improved. Submission is QUIET (no GitHub issue, no spam to you
  * or the user — distinct from `bugReport`); the maintainer gets a private
  * heads-up email. A developer-gated analyzer skill reads them back via
- * `ib feedback list` and closes the loop.
+ * `ib dev feedback list` and closes the loop.
  *
  * `create` is sent as a META request → exempt from the read-only write-lock, so
  * an agent running `--read-only` can still report friction. `list`/`get`/`resolve`
@@ -30,7 +30,7 @@ const MAX_FREETEXT = 200;
 const CAP = 200;
 const TRUNCATED_FIELDS = ["description", "resolution", "errorText"] as const;
 const TRUNCATE_HINT =
-  "description/resolution truncated to 200 chars; ib feedback get <id> for full text";
+  "description/resolution truncated to 200 chars; ib dev feedback get <id> for full text";
 
 /** Cap a string at MAX_FREETEXT chars, appending "..." when cut. Non-strings
  * pass through untouched. */

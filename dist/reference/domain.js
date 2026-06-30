@@ -45,7 +45,7 @@ export const domainBlurb = (domain) => DOMAIN_BLURBS[domain] ?? null;
  * `ib --help` and embedded in `ib reference dump` so it rides along with the
  * primer the AI ingests at session start. Intent: proactive, immediate feedback
  * (no need to ask the user) that makes the CLI better over time — the channel is
- * `ib feedback create`, which is silent, low-cost, and works under --read-only.
+ * `ib dev feedback create`, which is silent, low-cost, and works under --read-only.
  */
 export const FEEDBACK_GUIDANCE = {
     summary: "If you are an AI using this CLI, file feedback with `ib dev feedback create` " +

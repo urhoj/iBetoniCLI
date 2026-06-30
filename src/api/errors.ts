@@ -97,7 +97,7 @@ export function hintForError(
       // ROUTE_NOT_FOUND catch-all (their unmatched routes still 404 without a code).
       return "not found — the id likely does not exist in the ACTIVE company. (On a current backend an undeployed endpoint instead returns code \"ROUTE_NOT_FOUND\"; older backends omit it, so a 404 there can still mean not-deployed — check `ib version`.)";
     default:
-      if (err.statusCode >= 500) return "backend error — retry with --verbose; if it persists, file `ib feedback create --kind bug`";
+      if (err.statusCode >= 500) return "backend error — retry with --verbose; if it persists, file `ib dev feedback create --kind bug`";
       return null;
   }
 }
