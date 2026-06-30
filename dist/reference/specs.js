@@ -4327,7 +4327,7 @@ const BASE_COMMAND_SPECS = [
     // classifies create/comment/admin* as writes despite the custom flag block.
     {
         command: "ib dev bug create",
-        description: "File a bug report into the betoni.online bugReport system. This is a LOUD write (distinct from the quiet `ib dev feedback`): it opens a GitHub issue AND emails admins. A real mutation — blocked under --read-only/IB_READ_ONLY (exit 3). CLI-filed reports are auto-tagged via browserInfo=ib-cli/<version>. --dry-run resolves client-side (prints the payload, never sends).",
+        description: "File a bug report into the betoni.online bugReport system. This is a LOUD write (distinct from the quiet `ib feedback`): it opens a GitHub issue AND emails admins. A real mutation — blocked under --read-only/IB_READ_ONLY (exit 3). CLI-filed reports are auto-tagged via browserInfo=ib-cli/<version>. --dry-run resolves client-side (prints the payload, never sends).",
         auth: "any",
         mutates: true,
         flags: [
