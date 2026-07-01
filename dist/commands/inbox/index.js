@@ -13,7 +13,7 @@ export async function runInbox(client, opts = {}) {
 export function registerInboxCommand(parent, getClient, opts = {}) {
     parent
         .command("inbox", { hidden: !!opts.hidden })
-        .description("Aggregated operator inbox: counts of every open/incomplete signal (deploy-pending changelog, unresolved feedback, new bugs, open support, staged legal drafts, glossary misses) plus a `needsYou` headline")
+        .description("Aggregated operator inbox: counts of every open/incomplete signal (deploy-pending changelog, unresolved feedback, new bugs, open support, staged legal drafts, glossary misses, live no_supply tarjouspyynnot) plus a memory-groom signal and a `needsYou` headline")
         .option("--details", "Include slimmed top-items per signal (bugs stripped of sessionData), not just counts")
         .action(async (opts) => {
         try {

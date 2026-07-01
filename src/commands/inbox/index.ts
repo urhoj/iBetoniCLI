@@ -26,6 +26,20 @@ export interface InboxRollup {
   support: { open: number; truncated: boolean; items?: unknown[] };
   legal: { drafts: number; items?: unknown[] };
   glossary: { misses: number; items?: unknown[] };
+  jerry: {
+    noSupplyLive: number;
+    noSupplyExpired: number;
+    items?: unknown[];
+  };
+  memory:
+    | {
+        feedbackId: number;
+        entryCount: number | null;
+        flaggedForRetire: number | null;
+        groomDate: string | null;
+        daysSince: number | null;
+      }
+    | null;
 }
 
 /**
@@ -51,7 +65,7 @@ export function registerInboxCommand(
   parent
     .command("inbox", { hidden: !!opts.hidden })
     .description(
-      "Aggregated operator inbox: counts of every open/incomplete signal (deploy-pending changelog, unresolved feedback, new bugs, open support, staged legal drafts, glossary misses) plus a `needsYou` headline"
+      "Aggregated operator inbox: counts of every open/incomplete signal (deploy-pending changelog, unresolved feedback, new bugs, open support, staged legal drafts, glossary misses, live no_supply tarjouspyynnot) plus a memory-groom signal and a `needsYou` headline"
     )
     .option(
       "--details",

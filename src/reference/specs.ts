@@ -4472,7 +4472,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib dev inbox",
     description:
-      "Aggregated operator inbox — the six open/incomplete signals in one rollup: deploy-pending changelog, unresolved feedback (open + reviewed, by kind), new bugs, open support escalations, staged legal drafts, and glossary misses, plus a `needsYou` headline (open feedback + new bugs + legal drafts + open support + deploy-pending entries with a real bump). The single source of truth behind the daily morning-report routine and the /admin operator dashboard. Read-only. Counts by default; --details adds slimmed top-items per signal (bugs without their huge sessionData).",
+      "Aggregated operator inbox: counts of every open/incomplete signal (deploy-pending changelog, unresolved feedback, new bugs, open support, staged legal drafts, glossary misses, live no_supply tarjouspyynnot) plus a memory-groom signal and a `needsYou` headline",
     auth: "any",
     tier: "developer",
     flags: [
