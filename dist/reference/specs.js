@@ -1944,7 +1944,7 @@ const BASE_COMMAND_SPECS = [
     },
     {
         command: "ib notification email send",
-        description: "Send an email to one person (resolved within your company) or a raw address. Admin/HR/developer-gated server-side. Pick the sender domain with --from-brand (betoni=noreply@ibetoni.fi default, betonijerry=noreply@betonijerry.fi bypassing the demo reroute). One of --body/--html required; --dry-run previews the resolved recipient + sender without sending.",
+        description: "Send an email to one person (resolved within your company) or a raw address. Admin/HR/developer-gated server-side. Pick the sender domain with --from-brand (betoni=noreply@ibetoni.fi default, betonijerry=noreply@betonijerry.fi bypassing the demo reroute). One of --body/--html/--html-body required; --dry-run previews the resolved recipient + sender without sending.",
         tier: "admin",
         permissions: [
             "company admin (isAsiakasAdmin), HR admin (isHRAdmin), or global developer/sysadmin (server-enforced)",
@@ -1965,6 +1965,11 @@ const BASE_COMMAND_SPECS = [
                 description: "Path to an HTML file sent as the HTML body (avoids argv mangling of ä/ö)",
             },
             {
+                name: "html-body",
+                type: "string",
+                description: "Inline raw HTML body — use instead of --html for MCP/remote callers (argv-safe, no local file read)",
+            },
+            {
                 name: "from-brand",
                 type: "string",
                 description: "Sender identity: betoni (default, noreply@ibetoni.fi) or betonijerry (noreply@betonijerry.fi)",
@@ -1973,7 +1978,7 @@ const BASE_COMMAND_SPECS = [
         writeFlags: true,
         outputShape: "{ sent:true, to, from, subject } | { dryRun:true, wouldSend:{ to, from, subject, hasHtml } } (with --dry-run)",
         errors: [
-            apiErr(400, "Missing --subject, neither --body nor --html, bad --from-brand, recipient has no email on file, or both/neither of personId+email", "supply --subject, one of --body/--html, and a valid --from-brand"),
+            apiErr(400, "Missing --subject, none of --body/--html/--html-body, --html and --html-body both set, bad --from-brand, recipient has no email on file, or both/neither of personId+email", "supply --subject, one of --body/--html/--html-body, and a valid --from-brand"),
             apiErr(403, "Not Admin/HR/developer", "switch to a company where you are admin/HR (ib company switch), or use a developer/sysadmin token"),
             apiErr(404, "Recipient personId not found in your company", "check the personId / name belongs to your company"),
             apiErr(422, "Email provider (SendGrid) rejected the send — e.g. the From address/domain is not a verified Sender Identity (notably --from-brand betonijerry until betonijerry.fi is authenticated in SendGrid)", "a provider/config issue, not your request — authenticate the sending domain in SendGrid (Sender Authentication); the exact SendGrid reason is in the error message"),
@@ -1990,6 +1995,7 @@ const BASE_COMMAND_SPECS = [
         examples: [
             "ib notification email send web-xxxxx@srv1.mail-tester.com --subject 'deliverability test' --body 'testing' --from-brand betonijerry --reason 'spam check'",
             "ib notification email send 'Juha Urho' --subject Tiedote --html ./notice.html",
+            "ib notification email send 5351 --subject Raportti --html-body '<h1>Aamuraportti</h1><p>…</p>' --reason 'morning report over MCP'",
             "ib notification email send 5351 --subject Test --body Hi --dry-run",
         ],
     },

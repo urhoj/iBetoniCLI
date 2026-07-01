@@ -2109,7 +2109,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib notification email send",
     description:
-      "Send an email to one person (resolved within your company) or a raw address. Admin/HR/developer-gated server-side. Pick the sender domain with --from-brand (betoni=noreply@ibetoni.fi default, betonijerry=noreply@betonijerry.fi bypassing the demo reroute). One of --body/--html required; --dry-run previews the resolved recipient + sender without sending.",
+      "Send an email to one person (resolved within your company) or a raw address. Admin/HR/developer-gated server-side. Pick the sender domain with --from-brand (betoni=noreply@ibetoni.fi default, betonijerry=noreply@betonijerry.fi bypassing the demo reroute). One of --body/--html/--html-body required; --dry-run previews the resolved recipient + sender without sending.",
     tier: "admin",
     permissions: [
       "company admin (isAsiakasAdmin), HR admin (isHRAdmin), or global developer/sysadmin (server-enforced)",
@@ -2131,6 +2131,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         description: "Path to an HTML file sent as the HTML body (avoids argv mangling of ä/ö)",
       },
       {
+        name: "html-body",
+        type: "string",
+        description:
+          "Inline raw HTML body — use instead of --html for MCP/remote callers (argv-safe, no local file read)",
+      },
+      {
         name: "from-brand",
         type: "string",
         description:
@@ -2143,8 +2149,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     errors: [
       apiErr(
         400,
-        "Missing --subject, neither --body nor --html, bad --from-brand, recipient has no email on file, or both/neither of personId+email",
-        "supply --subject, one of --body/--html, and a valid --from-brand"
+        "Missing --subject, none of --body/--html/--html-body, --html and --html-body both set, bad --from-brand, recipient has no email on file, or both/neither of personId+email",
+        "supply --subject, one of --body/--html/--html-body, and a valid --from-brand"
       ),
       apiErr(
         403,
@@ -2174,6 +2180,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: [
       "ib notification email send web-xxxxx@srv1.mail-tester.com --subject 'deliverability test' --body 'testing' --from-brand betonijerry --reason 'spam check'",
       "ib notification email send 'Juha Urho' --subject Tiedote --html ./notice.html",
+      "ib notification email send 5351 --subject Raportti --html-body '<h1>Aamuraportti</h1><p>…</p>' --reason 'morning report over MCP'",
       "ib notification email send 5351 --subject Test --body Hi --dry-run",
     ],
   },
