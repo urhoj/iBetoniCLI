@@ -143,6 +143,37 @@ export async function runNotificationEmailSend(
 }
 
 /**
+ * Resolve the email HTML body from EITHER `--html <file>` (read from disk) OR
+ * `--html-body <string>` (inline, for MCP/remote callers that can't reach the
+ * caller's filesystem over the `ib_exec` bridge). Mutually exclusive; both →
+ * exit 4. Returns undefined when neither is given.
+ */
+export function resolveEmailHtml(opts: { html?: string; htmlBody?: string }): string | undefined {
+  if (opts.html && opts.htmlBody) {
+    throw new CliError(
+      "--html and --html-body are mutually exclusive",
+      400,
+      null,
+      exitCodeFromStatus(400)
+    );
+  }
+  if (opts.htmlBody !== undefined) return opts.htmlBody;
+  if (opts.html) {
+    try {
+      return readFileSync(opts.html, "utf8");
+    } catch {
+      throw new CliError(
+        `cannot read --html file: ${opts.html}`,
+        400,
+        null,
+        exitCodeFromStatus(400)
+      );
+    }
+  }
+  return undefined;
+}
+
+/**
  * Register `ib notification` — outbound notifications to people.
  * Subgroups: `notification fcm send` (FCM push), `notification email send` (email channel).
  * Admin/HR-gated server-side; `src/reference/specs.ts` is the source of truth for flags/permissions/output.
@@ -213,11 +244,15 @@ export function registerNotificationCommands(
   const emailSend = email
     .command("send <recipient>")
     .description(
-      "Send an email to a personId/name (resolved in your company) or a raw address (Admin/HR/developer only). One of --body/--html required. --dry-run previews the resolved recipient + sender."
+      "Send an email to a personId/name (resolved in your company) or a raw address (Admin/HR/developer only). One of --body/--html/--html-body required. --dry-run previews the resolved recipient + sender."
     )
     .requiredOption("--subject <text>", "Email subject")
     .option("--body <text>", "Plain-text body (auto-wrapped to HTML)")
     .option("--html <file>", "Path to an HTML file to send as the HTML body")
+    .option(
+      "--html-body <html>",
+      "Inline raw HTML body — use instead of --html for MCP/remote callers (argv-safe, no local file read)"
+    )
     .option(
       "--from-brand <brand>",
       "Sender identity: betoni (default, noreply@ibetoni.fi) or betonijerry (noreply@betonijerry.fi)",
@@ -230,13 +265,14 @@ export function registerNotificationCommands(
         subject: string;
         body?: string;
         html?: string;
+        htmlBody?: string;
         fromBrand?: string;
       }
     ) => {
       try {
-        if (!opts.body && !opts.html) {
+        if (!opts.body && !opts.html && !opts.htmlBody) {
           throw new CliError(
-            "one of --body or --html is required",
+            "one of --body, --html, or --html-body is required",
             400,
             null,
             exitCodeFromStatus(400)
@@ -251,19 +287,7 @@ export function registerNotificationCommands(
             exitCodeFromStatus(400)
           );
         }
-        let html: string | undefined;
-        if (opts.html) {
-          try {
-            html = readFileSync(opts.html, "utf8");
-          } catch {
-            throw new CliError(
-              `cannot read --html file: ${opts.html}`,
-              400,
-              null,
-              exitCodeFromStatus(400)
-            );
-          }
-        }
+        const html = resolveEmailHtml({ html: opts.html, htmlBody: opts.htmlBody });
         const result = await runNotificationEmailSend(
           await getClient(),
           { recipient, subject: opts.subject, text: opts.body, html, fromBrand: brand },

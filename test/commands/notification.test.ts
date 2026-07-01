@@ -4,6 +4,7 @@ import {
   resolvePersonRef,
   runNotificationFcmSend,
   runNotificationEmailSend,
+  resolveEmailHtml,
 } from "../../src/commands/notification/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -150,5 +151,35 @@ describe("runNotificationEmailSend", () => {
       { subject: "S", fromBrand: "betoni", text: "B", personId: 6233 },
       { headers: {} }
     );
+  });
+});
+
+describe("resolveEmailHtml", () => {
+  test("returns inline --html-body verbatim (no file read)", () => {
+    expect(resolveEmailHtml({ htmlBody: "<h1>Hi ä ö</h1>" })).toBe("<h1>Hi ä ö</h1>");
+  });
+
+  test("returns undefined when neither is given", () => {
+    expect(resolveEmailHtml({})).toBeUndefined();
+  });
+
+  test("both --html and --html-body → exit 4 (mutually exclusive)", () => {
+    try {
+      resolveEmailHtml({ html: "./x.html", htmlBody: "<p>y</p>" });
+      throw new Error("should have thrown");
+    } catch (e) {
+      expect((e as { exitCode: number }).exitCode).toBe(4);
+      expect((e as Error).message).toMatch(/mutually exclusive/i);
+    }
+  });
+
+  test("unreadable --html file → exit 4", () => {
+    try {
+      resolveEmailHtml({ html: "C:/nope/does-not-exist-xyz.html" });
+      throw new Error("should have thrown");
+    } catch (e) {
+      expect((e as { exitCode: number }).exitCode).toBe(4);
+      expect((e as Error).message).toMatch(/cannot read/i);
+    }
   });
 });
