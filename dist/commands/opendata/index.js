@@ -1,5 +1,6 @@
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { registerBuildingCommands } from "../building/index.js";
+import { registerParcelCommands } from "../parcel/index.js";
 import { registerWeatherCommands } from "../weather/index.js";
 import { runPrhById, runPrhSearch } from "../../prh.js";
 /**
@@ -17,6 +18,7 @@ export function registerOpendataCommands(parent, getClient) {
         .command("opendata")
         .description("Free/open external-data APIs — city building registries, FMI weather, PRH business registry");
     registerBuildingCommands(od, getClient);
+    registerParcelCommands(od, getClient);
     registerWeatherCommands(od, getClient);
     od.command("prh [ytunnus]")
         .description("Look up a company in the Finnish business registry (PRH) by <ytunnus>, or --search <name>")

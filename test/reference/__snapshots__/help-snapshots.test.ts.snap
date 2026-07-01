@@ -7010,6 +7010,53 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib opendata parcel matches snapshot 1`] = `
+"USAGE
+  ib opendata parcel [flags]
+
+DESCRIPTION
+  Look up cadastral parcel (kiinteistö / palsta) data for a property or point ANYWHERE in Finland, from MML's national open Kiinteistötietojen kyselypalvelu (OGC API Features). Complements \`ib opendata building\`: building answers 'what is built here', parcel answers 'which registered parcel is here / what does this kiinteistötunnus cover'. Resolve from EXACTLY ONE of: --kiinteistotunnus (dashed or 14-digit), --sijainti, --worksite (alias --tyomaa), --lat+--lng, or --address. Returns the parcel polygon(s), MML presentation-form id and a computed area (m²; the open product carries no registered-area attribute). NOTE: this is the registered cadastral unit, NOT the town-plan plot with building rights (rakennusoikeus). The propertyId returned by \`ib opendata building\` feeds straight into --kiinteistotunnus. Read-only; any authenticated user. Worksite resolution is tenant-scoped; sijainti is cross-tenant readable; cadastral data itself is public.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --kiinteistotunnus STRING    Property identifier, dashed (092-014-0202-0001) or 14-digit (09201402020001) — direct lookup, no geocode
+  --sijainti NUMBER    Resolve coordinates from a sijainti id (cross-tenant readable)
+  --worksite NUMBER    Resolve coordinates from a worksite (tyomaaId); tenant-scoped
+  --tyomaa NUMBER    Alias for --worksite
+  --lat NUMBER    Latitude (WGS84) — pair with --lng
+  --lng NUMBER    Longitude (WGS84) — pair with --lat
+  --address STRING    Street address to geocode (e.g. 'Sarkatie 7, Vantaa')
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { source:'kiinteistotunnus'|'sijainti'|'worksite'|'address'|'coords', input, coords:{lat,lng}|null, found:boolean, parcel:{ source:'MML', kiinteistotunnus, kiinteistotunnusFormatted, municipalityNumber, parcelCount, totalAreaM2, palstat:[{ palstaId, kiinteistotunnus, kiinteistotunnusFormatted, areaM2, representativePoint:{lat,lng}|null, geometry }] } }
+
+ERRORS (stderr, exit non-zero)
+  exit 4  No source, multiple sources, both kiinteistotunnus and a point, invalid kiinteistotunnus, or invalid coords → pass exactly one of --kiinteistotunnus / --sijainti / --worksite / --lat+--lng / --address
+  exit 5 (HTTP 404)  Sijainti/worksite not found (or no coordinates), or address not geocodable → verify the id/address; a worksite must be geocoded and in your tenant
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - parcelCount / number of polygons = number of PALSTAT (separate land pieces that make up one property), NOT the number of buildings on it. Buildings are a separate registry — use \`ib opendata building\`.
+  - areaM2 is COMPUTED from the parcel polygon (projected to EPSG:3067 + shoelace); MML's open 'simple' product carries no authoritative registered-area attribute, so treat it as a close approximation.
+  - kiinteistotunnusFormatted is MML's presentation form with leading zeros dropped (e.g. '92-14-202-1'); kiinteistotunnus is the 14-digit database form used by the API.
+  - found:false → MML returned no parcel for the tunnus/point (e.g. outside Finland, or an unregistered point).
+
+SEE ALSO
+  ib opendata building, ib worksite get, ib sijainti list
+
+EXAMPLES
+  ib opendata parcel --kiinteistotunnus 092-014-0202-0001
+  ib opendata parcel --kiinteistotunnus 92742200030051
+  ib opendata parcel --address 'Sarkatie 7, Vantaa'
+  ib opendata parcel --worksite 1234
+  ib opendata parcel --lat 60.272 --lng 24.8062
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib opendata prh matches snapshot 1`] = `
 "USAGE
   ib opendata prh [<ytunnus>] [flags]

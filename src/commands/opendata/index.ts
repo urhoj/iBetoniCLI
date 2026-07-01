@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { registerBuildingCommands } from "../building/index.js";
+import { registerParcelCommands } from "../parcel/index.js";
 import { registerWeatherCommands } from "../weather/index.js";
 import { runPrhById, runPrhSearch } from "../../prh.js";
 
@@ -26,6 +27,7 @@ export function registerOpendataCommands(
     );
 
   registerBuildingCommands(od, getClient);
+  registerParcelCommands(od, getClient);
   registerWeatherCommands(od, getClient);
 
   od.command("prh [ytunnus]")

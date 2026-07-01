@@ -3664,7 +3664,7 @@ const BASE_COMMAND_SPECS = [
             },
         ];
     })(),
-    // ─── opendata (11): free/open external data — building + weather + prh ────
+    // ─── opendata (12): free/open external data — building + parcel + weather + prh ────
     {
         command: "ib opendata building",
         description: "Look up building-registry data for a point anywhere in Finland. The metro-area WFS providers (Helsinki/Vantaa/Espoo/HSY) are tried first for their richer per-building detail; the NATIONAL Ryhti open dataset (SYKE) is a fallback so points outside the metro area still resolve (found:true with national:true). Resolve the point from EXACTLY ONE of: --sijainti, --worksite (alias --tyomaa), --lat+--lng, or --address. --city overrides the provider (pass Ryhti to force the national source); when omitted it is derived from the source or auto-tried (Helsinki→Vantaa→Espoo) then Ryhti. Read-only; any authenticated user. Worksite resolution is tenant-scoped; sijainti is cross-tenant readable; building data itself is public.",
@@ -3698,6 +3698,40 @@ const BASE_COMMAND_SPECS = [
             "ib opendata building --address 'Hämeenkatu 1, Tampere'",
             "ib opendata building --lat 60.1699 --lng 24.9384 --city Helsinki",
             "ib opendata building --lat 61.4978 --lng 23.7610 --city Ryhti",
+        ],
+    },
+    {
+        command: "ib opendata parcel",
+        description: "Look up cadastral parcel (kiinteistö / palsta) data for a property or point ANYWHERE in Finland, from MML's national open Kiinteistötietojen kyselypalvelu (OGC API Features). Complements `ib opendata building`: building answers 'what is built here', parcel answers 'which registered parcel is here / what does this kiinteistötunnus cover'. Resolve from EXACTLY ONE of: --kiinteistotunnus (dashed or 14-digit), --sijainti, --worksite (alias --tyomaa), --lat+--lng, or --address. Returns the parcel polygon(s), MML presentation-form id and a computed area (m²; the open product carries no registered-area attribute). NOTE: this is the registered cadastral unit, NOT the town-plan plot with building rights (rakennusoikeus). The propertyId returned by `ib opendata building` feeds straight into --kiinteistotunnus. Read-only; any authenticated user. Worksite resolution is tenant-scoped; sijainti is cross-tenant readable; cadastral data itself is public.",
+        auth: "any",
+        flags: [
+            { name: "kiinteistotunnus", type: "string", description: "Property identifier, dashed (092-014-0202-0001) or 14-digit (09201402020001) — direct lookup, no geocode" },
+            { name: "sijainti", type: "number", description: "Resolve coordinates from a sijainti id (cross-tenant readable)" },
+            { name: "worksite", type: "number", description: "Resolve coordinates from a worksite (tyomaaId); tenant-scoped" },
+            { name: "tyomaa", type: "number", description: "Alias for --worksite" },
+            { name: "lat", type: "number", description: "Latitude (WGS84) — pair with --lng" },
+            { name: "lng", type: "number", description: "Longitude (WGS84) — pair with --lat" },
+            { name: "address", type: "string", description: "Street address to geocode (e.g. 'Sarkatie 7, Vantaa')" },
+        ],
+        outputShape: "{ source:'kiinteistotunnus'|'sijainti'|'worksite'|'address'|'coords', input, coords:{lat,lng}|null, found:boolean, parcel:{ source:'MML', kiinteistotunnus, kiinteistotunnusFormatted, municipalityNumber, parcelCount, totalAreaM2, palstat:[{ palstaId, kiinteistotunnus, kiinteistotunnusFormatted, areaM2, representativePoint:{lat,lng}|null, geometry }] } }",
+        errors: [
+            { exit: 4, meaning: "No source, multiple sources, both kiinteistotunnus and a point, invalid kiinteistotunnus, or invalid coords", remedy: "pass exactly one of --kiinteistotunnus / --sijainti / --worksite / --lat+--lng / --address" },
+            apiErr(404, "Sijainti/worksite not found (or no coordinates), or address not geocodable", "verify the id/address; a worksite must be geocoded and in your tenant"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        notes: [
+            "parcelCount / number of polygons = number of PALSTAT (separate land pieces that make up one property), NOT the number of buildings on it. Buildings are a separate registry — use `ib opendata building`.",
+            "areaM2 is COMPUTED from the parcel polygon (projected to EPSG:3067 + shoelace); MML's open 'simple' product carries no authoritative registered-area attribute, so treat it as a close approximation.",
+            "kiinteistotunnusFormatted is MML's presentation form with leading zeros dropped (e.g. '92-14-202-1'); kiinteistotunnus is the 14-digit database form used by the API.",
+            "found:false → MML returned no parcel for the tunnus/point (e.g. outside Finland, or an unregistered point).",
+        ],
+        seeAlso: ["ib opendata building", "ib worksite get", "ib sijainti list"],
+        examples: [
+            "ib opendata parcel --kiinteistotunnus 092-014-0202-0001",
+            "ib opendata parcel --kiinteistotunnus 92742200030051",
+            "ib opendata parcel --address 'Sarkatie 7, Vantaa'",
+            "ib opendata parcel --worksite 1234",
+            "ib opendata parcel --lat 60.272 --lng 24.8062",
         ],
     },
     {
