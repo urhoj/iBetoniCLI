@@ -1274,7 +1274,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     notes: [
       "Per-section gating mirrors the FE dashboard: weather/cameras/vehicles degrade to forbidden when the company module is off; building/parcel are open to any authenticated user; a bad address or unresolvable point degrades EVERY section to error instead of failing the command.",
-      "`deliveries` reports THIS worksite's delivery volume (tyomaaId-scoped, not just nearby); `vehicles` reports nearby BetoniJerry ecofleet vehicles; `sijainti` reports sijainnit found NEARBY the resolved point (~2 km).",
+      "`deliveries` reports worksite delivery volume — tyomaaId-scoped when invoked by <tyomaaId>, or the nearest owned worksite at the geocoded point when invoked via --address; `vehicles` reports nearby BetoniJerry ecofleet vehicles; `sijainti` reports sijainnit found NEARBY the resolved point (~2 km).",
     ],
     seeAlso: ["ib sijainti dashboard", "ib opendata building", "ib opendata parcel", "ib worksite get"],
     examples: [
