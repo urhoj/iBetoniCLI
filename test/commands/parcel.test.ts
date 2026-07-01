@@ -64,4 +64,15 @@ describe("runParcelLookup", () => {
       "/api/cli/opendata/parcel/lookup?address=Sarkatie+7%2C+Vantaa"
     );
   });
+
+  test("--with-buildings adds withBuildings=1", async () => {
+    get().mockResolvedValueOnce({});
+    await runParcelLookup(mockClient, {
+      kiinteistotunnus: "09201402020001",
+      withBuildings: true,
+    });
+    expect(get()).toHaveBeenCalledWith(
+      "/api/cli/opendata/parcel/lookup?kiinteistotunnus=09201402020001&withBuildings=1"
+    );
+  });
 });

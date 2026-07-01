@@ -10,6 +10,7 @@ export interface ParcelLookupOptions {
   lat?: number;
   lng?: number;
   address?: string;
+  withBuildings?: boolean;
 }
 
 /** Distinct primary sources the caller supplied (exactly one allowed). */
@@ -41,6 +42,7 @@ export async function runParcelLookup(
   if (opts.lat !== undefined) params.set("lat", String(opts.lat));
   if (opts.lng !== undefined) params.set("lng", String(opts.lng));
   if (opts.address !== undefined) params.set("address", opts.address);
+  if (opts.withBuildings) params.set("withBuildings", "1");
   return client.get<Record<string, unknown>>(
     `/api/cli/opendata/parcel/lookup?${params.toString()}`
   );
@@ -66,6 +68,10 @@ export function registerParcelCommands(
     .option("--lat <n>", "Latitude (WGS84) — pair with --lng", Number)
     .option("--lng <n>", "Longitude (WGS84) — pair with --lat", Number)
     .option("--address <s>", "Street address to geocode")
+    .option(
+      "--with-buildings",
+      "Also count buildings on the parcel (national Ryhti; permit-based, best-effort)"
+    )
     .action(async (opts: ParcelLookupOptions) => {
       const sources = selectedSources(opts);
       if (sources.length === 0) {

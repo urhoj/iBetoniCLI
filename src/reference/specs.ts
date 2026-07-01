@@ -4012,16 +4012,18 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "lat", type: "number", description: "Latitude (WGS84) — pair with --lng" },
       { name: "lng", type: "number", description: "Longitude (WGS84) — pair with --lat" },
       { name: "address", type: "string", description: "Street address to geocode (e.g. 'Sarkatie 7, Vantaa')" },
+      { name: "with-buildings", type: "boolean", description: "Also count buildings on the parcel via national Ryhti (permit-based, best-effort); adds buildingCount + buildings to the parcel" },
     ],
     outputShape:
-      "{ source:'kiinteistotunnus'|'sijainti'|'worksite'|'address'|'coords', input, coords:{lat,lng}|null, found:boolean, parcel:{ source:'MML', kiinteistotunnus, kiinteistotunnusFormatted, municipalityNumber, parcelCount, totalAreaM2, palstat:[{ palstaId, kiinteistotunnus, kiinteistotunnusFormatted, areaM2, representativePoint:{lat,lng}|null, geometry }] } }",
+      "{ source:'kiinteistotunnus'|'sijainti'|'worksite'|'address'|'coords', input, coords:{lat,lng}|null, found:boolean, parcel:{ source:'MML', kiinteistotunnus, kiinteistotunnusFormatted, municipalityNumber, parcelCount, totalAreaM2, palstat:[{ palstaId, kiinteistotunnus, kiinteistotunnusFormatted, areaM2, representativePoint:{lat,lng}|null, geometry }], buildingCount?, buildings?:[{ nationalBuildingId, usagePurpose, completionYear, status }] (only with --with-buildings) } }",
     errors: [
       { exit: 4, meaning: "No source, multiple sources, both kiinteistotunnus and a point, invalid kiinteistotunnus, or invalid coords", remedy: "pass exactly one of --kiinteistotunnus / --sijainti / --worksite / --lat+--lng / --address" },
       apiErr(404, "Sijainti/worksite not found (or no coordinates), or address not geocodable", "verify the id/address; a worksite must be geocoded and in your tenant"),
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "parcelCount / number of polygons = number of PALSTAT (separate land pieces that make up one property), NOT the number of buildings on it. Buildings are a separate registry — use `ib opendata building`.",
+      "parcelCount / number of polygons = number of PALSTAT (separate land pieces that make up one property), NOT the number of buildings on it. Pass --with-buildings to count buildings on the parcel (national Ryhti, deduped by pysyva_rakennustunnus); use `ib opendata building` for one building's full detail.",
+      "--with-buildings adds parcel.buildingCount + parcel.buildings from the national Ryhti dataset (permit-based; SYKE warns coverage/quality varies, so treat the count as best-effort). It is a best-effort enrichment: a Ryhti failure leaves buildingCount:null + buildingsError and does not fail the parcel lookup.",
       "areaM2 is COMPUTED from the parcel polygon (projected to EPSG:3067 + shoelace); MML's open 'simple' product carries no authoritative registered-area attribute, so treat it as a close approximation.",
       "kiinteistotunnusFormatted is MML's presentation form with leading zeros dropped (e.g. '92-14-202-1'); kiinteistotunnus is the 14-digit database form used by the API.",
       "found:false → MML returned no parcel for the tunnus/point (e.g. outside Finland, or an unregistered point).",
@@ -4029,7 +4031,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     seeAlso: ["ib opendata building", "ib worksite get", "ib sijainti list"],
     examples: [
       "ib opendata parcel --kiinteistotunnus 092-014-0202-0001",
-      "ib opendata parcel --kiinteistotunnus 92742200030051",
+      "ib opendata parcel --kiinteistotunnus 92742200030051 --with-buildings",
       "ib opendata parcel --address 'Sarkatie 7, Vantaa'",
       "ib opendata parcel --worksite 1234",
       "ib opendata parcel --lat 60.272 --lng 24.8062",

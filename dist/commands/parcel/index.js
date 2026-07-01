@@ -35,6 +35,8 @@ export async function runParcelLookup(client, opts) {
         params.set("lng", String(opts.lng));
     if (opts.address !== undefined)
         params.set("address", opts.address);
+    if (opts.withBuildings)
+        params.set("withBuildings", "1");
     return client.get(`/api/cli/opendata/parcel/lookup?${params.toString()}`);
 }
 /** Register `ib opendata parcel`. */
@@ -49,6 +51,7 @@ export function registerParcelCommands(parent, getClient) {
         .option("--lat <n>", "Latitude (WGS84) — pair with --lng", Number)
         .option("--lng <n>", "Longitude (WGS84) — pair with --lat", Number)
         .option("--address <s>", "Street address to geocode")
+        .option("--with-buildings", "Also count buildings on the parcel (national Ryhti; permit-based, best-effort)")
         .action(async (opts) => {
         const sources = selectedSources(opts);
         if (sources.length === 0) {
