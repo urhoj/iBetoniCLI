@@ -1,0 +1,301 @@
+import type { ApiClient } from "../../api/client.js";
+import { CliError } from "../../api/errors.js";
+
+/**
+ * Shared orchestrator behind `ib worksite dashboard` / `ib sijainti dashboard`
+ * (Address Information Dashboard, spec 2026-07-01). Fans out to the seven
+ * granular Address Information Dashboard endpoints CLI-side (no BFF — mirrors
+ * the FE's own `Promise.allSettled` panel model) and merges them into one
+ * report, gated per-panel by whatever the caller's token allows (a 403 on any
+ * one panel — e.g. no `hasWeather` module — degrades that panel to
+ * `forbidden` instead of failing the whole command).
+ */
+
+const SECTION_NAMES = [
+  "weather",
+  "building",
+  "parcel",
+  "cameras",
+  "sijainti",
+  "deliveries",
+  "vehicles",
+] as const;
+
+export type SectionName = (typeof SECTION_NAMES)[number];
+
+export type SectionStatus = "ok" | "empty" | "forbidden" | "error";
+
+export interface SectionResult {
+  status: SectionStatus;
+  data?: unknown;
+  error?: string;
+}
+
+export interface AddressDashboardInput {
+  tyomaaId?: number;
+  sijaintiId?: number;
+  address?: string;
+}
+
+export type AddressDashboardReport = {
+  point: { lat: number; lng: number } | null;
+  address: string | null;
+} & Record<SectionName, SectionResult>;
+
+/** Keys whose value is stripped anywhere in a section's `data` before it is returned. */
+const STRIP_KEYS = new Set(["geometry", "rawData", "rawProperties", "rawGeometry"]);
+
+/**
+ * Recursively drop {@link STRIP_KEYS} from an arbitrary JSON-like value
+ * (arrays and nested objects included) so heavy polygon/raw-provider blobs
+ * never bloat the printed report. Returns a new structure; the input is not
+ * mutated.
+ */
+export function deepStripHeavyFields<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((v) => deepStripHeavyFields(v)) as unknown as T;
+  }
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+      if (STRIP_KEYS.has(key)) continue;
+      out[key] = deepStripHeavyFields(v);
+    }
+    return out as T;
+  }
+  return value;
+}
+
+/**
+ * A fulfilled section's value counts as `empty` (rather than `ok`) when it
+ * matches one of the well-known "nothing found" shapes emitted by the seven
+ * panels: an empty `items`/`days` array, `found:false` (building/parcel),
+ * `tyomaa:null` (deliveries — no worksite resolved), or `enabled:false`
+ * (a module-gated panel that resolved but is off, e.g. ecofleet).
+ */
+function isEmptySectionValue(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
+  if (Array.isArray(v.items) && v.items.length === 0) return true;
+  if (Array.isArray(v.days) && v.days.length === 0) return true;
+  if (v.found === false) return true;
+  if (v.tyomaa === null) return true;
+  if (v.enabled === false) return true;
+  return false;
+}
+
+/** True for a rejection that carries an HTTP 403 / mapped exit code 3 (permission-denied). */
+function isForbiddenReason(reason: unknown): boolean {
+  if (!reason || typeof reason !== "object") return false;
+  const r = reason as { statusCode?: unknown; exitCode?: unknown };
+  return r.statusCode === 403 || r.exitCode === 3;
+}
+
+/**
+ * Extract a short message from a settled-promise rejection reason. Handles a
+ * real `Error`/`CliError` (the normal production shape) as well as a bare
+ * `{ message }` object (a plausible test/mock shape) without collapsing to
+ * `"[object Object]"`.
+ */
+function reasonMessage(reason: unknown): string {
+  if (reason instanceof Error) return reason.message;
+  if (
+    reason &&
+    typeof reason === "object" &&
+    typeof (reason as { message?: unknown }).message === "string"
+  ) {
+    return (reason as { message: string }).message;
+  }
+  return String(reason);
+}
+
+/**
+ * Map a settled-results bag (one entry per dashboard section) to the report
+ * shape: `fulfilled` → `ok` (or `empty`, see {@link isEmptySectionValue}),
+ * `rejected` → `error` (or `forbidden` for a 403-shaped reason). Every
+ * fulfilled section's `data` is deep-stripped of heavy geometry/raw-provider
+ * blobs (see {@link deepStripHeavyFields}) so the report stays light.
+ *
+ * Generic over the caller's section keys — `runAddressDashboard` calls it
+ * with all seven; tests may call it with any subset.
+ */
+export function assembleReport<Sections extends Record<string, PromiseSettledResult<unknown>>>(
+  sections: Sections
+): { [K in keyof Sections]: SectionResult } {
+  const report = {} as { [K in keyof Sections]: SectionResult };
+  for (const key of Object.keys(sections) as (keyof Sections)[]) {
+    const settled = sections[key];
+    if (settled.status === "fulfilled") {
+      const data = deepStripHeavyFields(settled.value);
+      report[key] = { status: isEmptySectionValue(data) ? "empty" : "ok", data };
+    } else {
+      report[key] = {
+        status: isForbiddenReason(settled.reason) ? "forbidden" : "error",
+        error: reasonMessage(settled.reason),
+      };
+    }
+  }
+  return report;
+}
+
+interface ResolvedPoint {
+  lat: number;
+  lng: number;
+  /** The opendata `<key>=<value>` query fragment shared by the building/parcel calls. */
+  source: string;
+  /**
+   * Present only for the worksite/sijainti input forms — the parcel envelope
+   * fetched to resolve coordinates, reused as the `parcel` section so it is
+   * fetched exactly once.
+   */
+  parcel?: unknown;
+}
+
+/**
+ * Pull `{lat,lng}` out of `/api/geocode/getLatLng`'s raw Google payload
+ * (`results[0].geometry.location`), with a normalized top-level `{lat,lng}`
+ * fallback (mirrors `runWeatherAddress`'s `extractLatLng`). Returns null for
+ * ZERO_RESULTS / error / 0,0 shapes.
+ */
+function extractGeocodedLatLng(geo: unknown): { lat: number; lng: number } | null {
+  const g = geo as Record<string, unknown> | null;
+  if (!g || typeof g !== "object") return null;
+  const results = g.results as
+    | Array<{ geometry?: { location?: { lat?: unknown; lng?: unknown } } }>
+    | undefined;
+  const location = results?.[0]?.geometry?.location;
+  const lat = Number(location?.lat ?? g.lat);
+  const lng = Number(location?.lng ?? g.lng);
+  if (Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0)) {
+    return { lat, lng };
+  }
+  return null;
+}
+
+/**
+ * Phase 1: resolve the caller's point (`address` | `tyomaaId` | `sijaintiId`)
+ * to `{lat,lng}` plus the opendata `source` query fragment reused by the
+ * building/parcel calls.
+ *
+ * - `address` — geocode via `POST /api/geocode/getLatLng`.
+ * - `tyomaaId` / `sijaintiId` — coordinates aren't carried by the caller, so
+ *   they are resolved from the parcel lookup's `coords` field — fetched
+ *   once here and reused as the `parcel` section in phase 2 (no double fetch).
+ *
+ * Throws a `CliError` (exit 4 for a missing/ambiguous input, exit 5 for an
+ * unresolvable point) — the caller turns that into a report-shaped result
+ * instead of letting the whole command fail.
+ */
+async function resolvePoint(client: ApiClient, input: AddressDashboardInput): Promise<ResolvedPoint> {
+  if (input.address !== undefined) {
+    const source = `address=${encodeURIComponent(input.address)}`;
+    const geo = await client.post<unknown>("/api/geocode/getLatLng", { osoite: input.address });
+    const coords = extractGeocodedLatLng(geo);
+    if (!coords) {
+      const status = (geo as { status?: string } | null)?.status ?? "unknown";
+      throw new CliError(`could not geocode address (status: ${status})`, 404, geo, 5);
+    }
+    return { lat: coords.lat, lng: coords.lng, source };
+  }
+
+  const source =
+    input.tyomaaId !== undefined
+      ? `worksite=${input.tyomaaId}`
+      : input.sijaintiId !== undefined
+        ? `sijainti=${input.sijaintiId}`
+        : null;
+  if (source === null) {
+    throw new CliError("provide exactly one of tyomaaId, sijaintiId, or address", 0, null, 4);
+  }
+
+  const parcel = await client.get<Record<string, unknown>>(
+    `/api/cli/opendata/parcel/lookup?${source}&withBuildings=1`
+  );
+  const coords = parcel?.coords as { lat?: unknown; lng?: unknown } | null | undefined;
+  const lat = Number(coords?.lat);
+  const lng = Number(coords?.lng);
+  if (!coords || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new CliError("could not resolve coordinates for the given point", 404, parcel, 5);
+  }
+  return { lat, lng, source, parcel };
+}
+
+/**
+ * Build a `Record<SectionName, PromiseSettledResult<unknown>>` where every
+ * section is rejected with the same `reason` — used when phase 1 (point
+ * resolution) fails, so the command still prints a full report instead of
+ * throwing.
+ */
+function allSectionsRejected(reason: unknown): Record<SectionName, PromiseSettledResult<unknown>> {
+  const sections = {} as Record<SectionName, PromiseSettledResult<unknown>>;
+  for (const name of SECTION_NAMES) {
+    sections[name] = { status: "rejected", reason };
+  }
+  return sections;
+}
+
+/**
+ * Orchestrate the Address Information Dashboard (spec 2026-07-01 §8):
+ * resolve `input` to a point, then fan out to the seven panel endpoints with
+ * `Promise.allSettled` and merge them via {@link assembleReport}.
+ *
+ * `input` carries exactly one of `tyomaaId` / `sijaintiId` / `address` — the
+ * caller (`ib worksite dashboard` / `ib sijainti dashboard`) resolves that
+ * exclusivity from its own positional/flag; this function itself just prefers
+ * `address`, then `tyomaaId`, then `sijaintiId` if more than one is somehow
+ * present.
+ *
+ * If the point cannot be resolved (bad address, worksite/sijainti with no
+ * coordinates), every section reports `status:"error"` with the same message
+ * instead of the whole command throwing — a partial dashboard for an
+ * unresolvable point is still useful (e.g. distinguishing "no coordinates"
+ * from "weather module disabled").
+ */
+export async function runAddressDashboard(
+  client: ApiClient,
+  input: AddressDashboardInput
+): Promise<AddressDashboardReport> {
+  let resolved: ResolvedPoint;
+  try {
+    resolved = await resolvePoint(client, input);
+  } catch (err) {
+    return {
+      point: null,
+      address: input.address ?? null,
+      ...assembleReport(allSectionsRejected(err)),
+    };
+  }
+
+  const { lat, lng, source, parcel } = resolved;
+  const deliveriesPath =
+    input.tyomaaId !== undefined
+      ? `/api/tyomaa/delivery-summary?tyomaaId=${input.tyomaaId}`
+      : `/api/tyomaa/delivery-summary?lat=${lat}&lng=${lng}`;
+
+  const [weather, building, parcelSettled, cameras, sijainti, deliveries, vehicles] =
+    await Promise.allSettled([
+      client.get(`/api/weather/forecast-days/${lat}/${lng}?days=10`),
+      client.get(`/api/cli/opendata/building/lookup?${source}`),
+      parcel !== undefined
+        ? parcel
+        : client.get(`/api/cli/opendata/parcel/lookup?${source}&withBuildings=1`),
+      client.get(`/api/cameras/point/${lat}/${lng}?radiusKm=2`),
+      client.get(`/api/sijainti/near?lat=${lat}&lng=${lng}&radius=2000`),
+      client.get(deliveriesPath),
+      client.get(`/api/ecofleet/near?lat=${lat}&lng=${lng}&radius=2000`),
+    ]);
+
+  return {
+    point: { lat, lng },
+    address: input.address ?? null,
+    ...assembleReport({
+      weather,
+      building,
+      parcel: parcelSettled,
+      cameras,
+      sijainti,
+      deliveries,
+      vehicles,
+    }),
+  };
+}
