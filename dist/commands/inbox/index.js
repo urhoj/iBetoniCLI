@@ -1,8 +1,9 @@
 import { writeJson, exitWithError } from "../../output/json.js";
 /**
- * `ib inbox` — one aggregated rollup of the six open/incomplete operator signals
+ * `ib inbox` — one aggregated rollup of the eight open/incomplete operator signals
  * (deploy-pending changelog, unresolved feedback, new bugs, open support
- * escalations, staged legal drafts, glossary misses). The single source of truth
+ * escalations, staged legal drafts, glossary misses, live no_supply
+ * tarjouspyynnot, and a memory-groom signal). The single source of truth
  * behind the daily morning-report routine and the /admin operator dashboard.
  * Read-only; developer-gated server-side.
  */
