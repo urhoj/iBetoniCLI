@@ -23,6 +23,13 @@ const SECTION_NAMES = [
 
 export type SectionName = (typeof SECTION_NAMES)[number];
 
+/**
+ * Spec §2 "AT / CLOSE" — CLOSE is a tunable constant, expected to be tuned;
+ * shared search radius for the sijainti/ecofleet/cameras panels. Mirrors the
+ * FE sibling's `DASHBOARD_CLOSE_RADIUS_M` (`useAddressDashboard.js`).
+ */
+const DASHBOARD_CLOSE_RADIUS_M = 2000;
+
 export type SectionStatus = "ok" | "empty" | "forbidden" | "error";
 
 export interface SectionResult {
@@ -141,7 +148,13 @@ export function assembleReport<Sections extends Record<string, PromiseSettledRes
 interface ResolvedPoint {
   lat: number;
   lng: number;
-  /** The opendata `<key>=<value>` query fragment shared by the building/parcel calls. */
+  /**
+   * The opendata `<key>=<value>` query fragment used ONLY for phase 1's own
+   * `tyomaaId`/`sijaintiId` parcel resolve (below) — not reused by the phase
+   * 2 building/parcel fan-out, which uses the now-known `{lat,lng}` instead
+   * so the backend doesn't have to re-resolve the source (re-geocode /
+   * re-query) a second time.
+   */
   source: string;
   /**
    * Present only for the worksite/sijainti input forms — the parcel envelope
@@ -174,8 +187,11 @@ function extractGeocodedLatLng(geo: unknown): { lat: number; lng: number } | nul
 
 /**
  * Phase 1: resolve the caller's point (`address` | `tyomaaId` | `sijaintiId`)
- * to `{lat,lng}` plus the opendata `source` query fragment reused by the
- * building/parcel calls.
+ * to `{lat,lng}`. The `source` query fragment returned alongside it is used
+ * ONLY by this function's own `tyomaaId`/`sijaintiId` parcel resolve below —
+ * phase 2's building/parcel fan-out uses the resolved `{lat,lng}` instead
+ * (see {@link runAddressDashboard}), avoiding a redundant server-side
+ * re-geocode/re-resolve of the same source.
  *
  * - `address` — geocode via `POST /api/geocode/getLatLng`.
  * - `tyomaaId` / `sijaintiId` — coordinates aren't carried by the caller, so
@@ -266,23 +282,29 @@ export async function runAddressDashboard(
     };
   }
 
-  const { lat, lng, source, parcel } = resolved;
+  const { lat, lng, parcel } = resolved;
   const deliveriesPath =
     input.tyomaaId !== undefined
       ? `/api/tyomaa/delivery-summary?tyomaaId=${input.tyomaaId}`
       : `/api/tyomaa/delivery-summary?lat=${lat}&lng=${lng}`;
 
+  // building/parcel reuse the already-resolved {lat,lng} rather than the raw
+  // `source` token — both `/building/lookup` and `/parcel/lookup` would
+  // otherwise re-resolve it server-side (re-geocode for `address=`, a second
+  // DB lookup for `worksite=`/`sijainti=`). The tyomaaId/sijaintiId forms
+  // still reuse the single `parcel` result fetched in resolvePoint instead of
+  // issuing a second parcel/lookup call.
   const [weather, building, parcelSettled, cameras, sijainti, deliveries, vehicles] =
     await Promise.allSettled([
       client.get(`/api/weather/forecast-days/${lat}/${lng}?days=10`),
-      client.get(`/api/cli/opendata/building/lookup?${source}`),
+      client.get(`/api/cli/opendata/building/lookup?lat=${lat}&lng=${lng}`),
       parcel !== undefined
         ? parcel
-        : client.get(`/api/cli/opendata/parcel/lookup?${source}&withBuildings=1`),
-      client.get(`/api/cameras/point/${lat}/${lng}?radiusKm=2`),
-      client.get(`/api/sijainti/near?lat=${lat}&lng=${lng}&radius=2000`),
+        : client.get(`/api/cli/opendata/parcel/lookup?lat=${lat}&lng=${lng}&withBuildings=1`),
+      client.get(`/api/cameras/point/${lat}/${lng}?radiusKm=${DASHBOARD_CLOSE_RADIUS_M / 1000}`),
+      client.get(`/api/sijainti/near?lat=${lat}&lng=${lng}&radius=${DASHBOARD_CLOSE_RADIUS_M}`),
       client.get(deliveriesPath),
-      client.get(`/api/ecofleet/near?lat=${lat}&lng=${lng}&radius=2000`),
+      client.get(`/api/ecofleet/near?lat=${lat}&lng=${lng}&radius=${DASHBOARD_CLOSE_RADIUS_M}`),
     ]);
 
   return {

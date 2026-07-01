@@ -153,13 +153,18 @@ describe("runAddressDashboard — address input", () => {
     expect(post()).toHaveBeenCalledWith("/api/geocode/getLatLng", {
       osoite: "Mannerheimintie 1, Helsinki",
     });
+    // exactly one geocode for the whole dashboard — building/parcel reuse the
+    // resolved coords instead of re-geocoding the address server-side.
+    expect(post()).toHaveBeenCalledTimes(1);
     expect(report.point).toEqual(coords);
     expect(report.address).toBe("Mannerheimintie 1, Helsinki");
 
     const paths = get().mock.calls.map((c: unknown[]) => c[0] as string);
     expect(paths).toContain(`/api/weather/forecast-days/${coords.lat}/${coords.lng}?days=10`);
-    expect(paths.some((p) => p.startsWith("/api/cli/opendata/building/lookup?address="))).toBe(true);
-    expect(paths.some((p) => p.startsWith("/api/cli/opendata/parcel/lookup?address="))).toBe(true);
+    expect(paths).toContain(`/api/cli/opendata/building/lookup?lat=${coords.lat}&lng=${coords.lng}`);
+    expect(paths).toContain(
+      `/api/cli/opendata/parcel/lookup?lat=${coords.lat}&lng=${coords.lng}&withBuildings=1`
+    );
     expect(paths).toContain(`/api/cameras/point/${coords.lat}/${coords.lng}?radiusKm=2`);
     expect(paths).toContain(`/api/sijainti/near?lat=${coords.lat}&lng=${coords.lng}&radius=2000`);
     // address form has no tyomaaId — deliveries falls back to lat/lng
@@ -185,7 +190,9 @@ describe("runAddressDashboard — tyomaaId input", () => {
     const parcelCalls = paths.filter((p) => p.startsWith("/api/cli/opendata/parcel/lookup"));
     expect(parcelCalls).toHaveLength(1); // fetched once, reused as the parcel section
     expect(parcelCalls[0]).toBe("/api/cli/opendata/parcel/lookup?worksite=123&withBuildings=1");
-    expect(paths).toContain("/api/cli/opendata/building/lookup?worksite=123");
+    // building/lookup uses the resolved coords, not the worksite= source token
+    // (no redundant DB re-resolve server-side).
+    expect(paths).toContain(`/api/cli/opendata/building/lookup?lat=${coords.lat}&lng=${coords.lng}`);
     expect(paths).toContain("/api/tyomaa/delivery-summary?tyomaaId=123");
     expect(paths).toContain(`/api/weather/forecast-days/${coords.lat}/${coords.lng}?days=10`);
     expect(report.point).toEqual(coords);
@@ -203,7 +210,9 @@ describe("runAddressDashboard — sijaintiId input", () => {
     const paths = get().mock.calls.map((c: unknown[]) => c[0] as string);
     expect(paths.filter((p) => p.startsWith("/api/cli/opendata/parcel/lookup"))).toHaveLength(1);
     expect(paths).toContain("/api/cli/opendata/parcel/lookup?sijainti=56&withBuildings=1");
-    expect(paths).toContain("/api/cli/opendata/building/lookup?sijainti=56");
+    // building/lookup uses the resolved coords, not the sijainti= source token
+    // (no redundant DB re-resolve server-side).
+    expect(paths).toContain(`/api/cli/opendata/building/lookup?lat=${coords.lat}&lng=${coords.lng}`);
     // no tyomaaId on this input form — deliveries falls back to lat/lng
     expect(paths).toContain(`/api/tyomaa/delivery-summary?lat=${coords.lat}&lng=${coords.lng}`);
     expect(report.point).toEqual(coords);
