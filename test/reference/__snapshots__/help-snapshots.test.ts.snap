@@ -8212,6 +8212,41 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib reference detail delete matches snapshot 1`] = `
+"USAGE
+  ib reference detail delete <command...> [flags]
+
+DESCRIPTION
+  Delete one command-catalog row by its exact key — prunes orphans of re-homed/removed commands (developer only)
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <command...> STRING    The exact stored command key after \`ib\` (e.g. ai conversation). Unlike get/set this is NOT validated against the live catalogue — that is precisely what lets you remove an orphan whose command no longer exists. (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { deleted } (rows removed, 0 or 1 — idempotent) | --dry-run: { dryRun:true, wouldDelete:{ command, exists }, validation }
+
+ERRORS (stderr, exit non-zero)
+  exit 3  Not a developer        → Requires isDeveloper / isSystemAdmin
+  exit 4  Missing --reason on a real delete, or empty command path → Pass --reason (or --dry-run to preview) and a command path
+
+EXAMPLES
+  ib reference detail delete ai conversation --dry-run
+  ib reference detail delete ai conversation --reason 'orphan: ai domain re-homed under dev'
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib reference detail get matches snapshot 1`] = `
 "USAGE
   ib reference detail get <command...> [flags]

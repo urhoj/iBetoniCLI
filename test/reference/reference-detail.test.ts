@@ -6,7 +6,7 @@
  * tests use a mock ApiClient so no network is needed.
  */
 import { describe, test, expect, vi } from "vitest";
-import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailEdit } from "../../src/reference/detail.js";
+import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailEdit, runReferenceDetailDelete } from "../../src/reference/detail.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
 
@@ -131,6 +131,44 @@ describe("runReferenceDetail", () => {
     const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
     await runReferenceDetailList(c, 10, undefined, false);
     expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10");
+  });
+});
+
+describe("runReferenceDetailDelete", () => {
+  test("DELETEs the exact key with the write-safety reason header", async () => {
+    const c = client({ delete: vi.fn().mockResolvedValue({ deleted: 1 }) });
+    const out = await runReferenceDetailDelete(c, ["ai", "conversation"], { reason: "orphan cleanup" });
+    expect((c as any).delete).toHaveBeenCalledWith(
+      "/api/cli/command-catalog/ib%20ai%20conversation",
+      { headers: { "X-Action-Reason": "orphan cleanup" } }
+    );
+    expect(out).toEqual({ deleted: 1 });
+  });
+
+  test("targets ORPHAN keys that are NOT in the live catalogue (no exit 5 gate)", async () => {
+    // `ai conversation` no longer resolves as a command — get/set would exit 5,
+    // but delete must reach it so the orphan row can be pruned.
+    const c = client({ delete: vi.fn().mockResolvedValue({ deleted: 1 }) });
+    await runReferenceDetailDelete(c, ["ib", "ai", "conversation"], { reason: "r" });
+    expect((c as any).delete).toHaveBeenCalledWith(
+      "/api/cli/command-catalog/ib%20ai%20conversation",
+      { headers: { "X-Action-Reason": "r" } }
+    );
+  });
+
+  test("maps --dry-run to the X-Dry-Run header", async () => {
+    const c = client({ delete: vi.fn().mockResolvedValue({ dryRun: true, wouldDelete: { command: "ib ai conversation", exists: true } }) });
+    await runReferenceDetailDelete(c, ["ai conversation"], { dryRun: true });
+    expect((c as any).delete).toHaveBeenCalledWith(
+      "/api/cli/command-catalog/ib%20ai%20conversation",
+      { headers: { "X-Dry-Run": "1" } }
+    );
+  });
+
+  test("exit 4 on an empty command path", async () => {
+    const c = client({ delete: vi.fn() });
+    await expect(runReferenceDetailDelete(c, ["ib"], { reason: "r" })).rejects.toMatchObject({ exitCode: 4 });
+    expect((c as any).delete).not.toHaveBeenCalled();
   });
 });
 

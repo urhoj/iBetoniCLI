@@ -39,6 +39,31 @@ export async function runReferenceDetailList(client, stalest, domain, withDetail
     const q = p.toString();
     return client.get(`/api/cli/command-catalog${q ? `?${q}` : ""}`);
 }
+/**
+ * Normalize a command path to the exact catalog key format (`ib <path>`) WITHOUT
+ * the registry-visibility check `resolveCommand` enforces. `delete` targets
+ * ORPHANED rows whose command no longer exists in the catalogue (a command
+ * re-homed under a new domain leaves its old key behind), so it must accept an
+ * arbitrary key. Strips any leading `ib` token(s) and collapses whitespace, so
+ * `delete ib ai conversation`, `delete ai conversation`, and a single quoted
+ * string all resolve to the same stored key. Empty path → exit 4.
+ */
+function normalizeCommandKey(commandParts) {
+    const tokens = commandParts.join(" ").trim().split(/\s+/).filter(Boolean);
+    while (tokens[0]?.toLowerCase() === "ib")
+        tokens.shift();
+    if (tokens.length === 0) {
+        throw new CliError("a command path is required (e.g. `ib reference detail delete ai conversation`)", 0, null, 4);
+    }
+    return `ib ${tokens.join(" ")}`;
+}
+export async function runReferenceDetailDelete(client, commandParts, flags = {}) {
+    // No resolveCommand() gate — the target is an orphan key, not a live command.
+    const command = normalizeCommandKey(commandParts);
+    return client.delete(`/api/cli/command-catalog/${encodeURIComponent(command)}`, {
+        headers: writeFlagsToHeaders(flags),
+    });
+}
 export async function runReferenceDetailSet(client, commandParts, body, flags = {}, tier = getCallerTier()) {
     // Same client-side visibility gate as the read: an unknown (or tier-hidden)
     // command exits 5 before any write leaves the process.

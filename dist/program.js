@@ -44,7 +44,7 @@ import { registerVersionCommand } from "./commands/version/index.js";
 import { registerDoctorCommand } from "./commands/doctor/index.js";
 import { registerInboxCommand } from "./commands/inbox/index.js";
 import { runReferenceDump, fetchPrimerGlossary } from "./reference/dump.js";
-import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailEdit } from "./reference/detail.js";
+import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailEdit, runReferenceDetailDelete } from "./reference/detail.js";
 import { parseEditOp } from "./textEdit.js";
 import { addWriteFlagsToCommand } from "./api/writeFlags.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "./assess.js";
@@ -317,6 +317,26 @@ export function buildProgram() {
                 reason: opts.reason,
             }, getCallerTier());
             writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    // `delete` — prune one catalog row by its EXACT key. Deliberately NOT gated by
+    // the command registry (unlike get/set): its purpose is removing orphans whose
+    // command path no longer resolves. --reason required for a real delete.
+    const detailDelete = detail
+        .command("delete")
+        .description("Delete one command-catalog row by its exact key — prunes orphans of re-homed/removed commands (developer only)")
+        .argument("<command...>", "The exact stored command key after `ib` (e.g. ai conversation)");
+    addWriteFlagsToCommand(detailDelete).action(async (commandParts, opts) => {
+        if (!opts.dryRun && !opts.reason)
+            failWith("Missing required flag: --reason", 4);
+        try {
+            const client = await getClient();
+            writeJson(await runReferenceDetailDelete(client, commandParts, {
+                dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
+            }));
         }
         catch (e) {
             exitWithError(e);

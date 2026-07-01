@@ -4373,6 +4373,35 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib reference detail delete",
+    description:
+      "Delete one command-catalog row by its exact key — prunes orphans of re-homed/removed commands (developer only)",
+    tier: "developer",
+    auth: "any",
+    mutates: true,
+    writeFlags: true,
+    args: [
+      {
+        name: "command...",
+        type: "string",
+        required: true,
+        description:
+          "The exact stored command key after `ib` (e.g. ai conversation). Unlike get/set this is NOT validated against the live catalogue — that is precisely what lets you remove an orphan whose command no longer exists.",
+      },
+    ],
+    flags: [],
+    outputShape:
+      "{ deleted } (rows removed, 0 or 1 — idempotent) | --dry-run: { dryRun:true, wouldDelete:{ command, exists }, validation }",
+    errors: [
+      { exit: 3, meaning: "Not a developer", remedy: "Requires isDeveloper / isSystemAdmin" },
+      { exit: 4, meaning: "Missing --reason on a real delete, or empty command path", remedy: "Pass --reason (or --dry-run to preview) and a command path" },
+    ],
+    examples: [
+      "ib reference detail delete ai conversation --dry-run",
+      "ib reference detail delete ai conversation --reason 'orphan: ai domain re-homed under dev'",
+    ],
+  },
+  {
     command: "ib commands",
     description:
       "Offline command discovery from the spec catalogue. No args = compact DOMAIN INDEX (~5 KB: every domain with leaf count, glossary blurb, runnable command paths). A domain arg, a filter flag, or --all returns the flat per-command list { command, description, permissions, isWrite }. Lighter than `ib reference dump` (the full surface). No auth, no network.",
