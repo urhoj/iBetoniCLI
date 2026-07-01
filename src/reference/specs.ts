@@ -1247,6 +1247,42 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib worksite dashboard",
+    description:
+      "One-shot Address Information Dashboard report for a worksite (tyomaa) — merges weather, building, cadastral parcel, nearby traffic cameras, nearby sijainnit, worksite deliveries, and nearby vehicles into a single JSON, with each section independently degrading to forbidden/error instead of failing the whole report. Resolve the point from EXACTLY ONE of the positional tyomaaId or --address.",
+    auth: "any",
+    args: [
+      {
+        name: "tyomaaId",
+        type: "number",
+        required: false,
+        description: "tyomaaId to report on (mutually exclusive with --address)",
+      },
+    ],
+    flags: [
+      {
+        name: "address",
+        type: "string",
+        description: "Street address to resolve the point from, instead of tyomaaId (mutually exclusive)",
+      },
+    ],
+    outputShape:
+      "{ point:{lat,lng}|null, address:string|null, weather, building, parcel, cameras, sijainti, deliveries, vehicles } — each section is { status:'ok'|'empty'|'forbidden'|'error', data?, error? }; a forbidden/error section never fails the whole command",
+    errors: [
+      { exit: 4, meaning: "Missing or ambiguous point input", remedy: "pass exactly one of <tyomaaId> or --address" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Per-section gating mirrors the FE dashboard: weather/cameras/vehicles degrade to forbidden when the company module is off; building/parcel are open to any authenticated user; a bad address or unresolvable point degrades EVERY section to error instead of failing the command.",
+      "`deliveries` reports THIS worksite's delivery volume (tyomaaId-scoped, not just nearby); `vehicles` reports nearby BetoniJerry ecofleet vehicles; `sijainti` reports sijainnit found NEARBY the resolved point (~2 km).",
+    ],
+    seeAlso: ["ib sijainti dashboard", "ib opendata building", "ib opendata parcel", "ib worksite get"],
+    examples: [
+      "ib worksite dashboard 1234",
+      'ib worksite dashboard --address "Oraspolku 2, Helsinki"',
+    ],
+  },
+  {
     command: "ib worksite log",
     description:
       "Change-tracker audit trail for one worksite (tyomaa) — who changed which field, when, old→new, with --reason. Alias of `ib log entity tyomaa`. GET /api/changes/tyomaa/:tyomaaId/:ownerAsiakasId.",
@@ -2381,6 +2417,43 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       ...permErrors("auth.page.sijainnit.read"),
     ],
     examples: ["ib sijainti get 42"],
+  },
+  {
+    command: "ib sijainti dashboard",
+    description:
+      "One-shot Address Information Dashboard report for a sijainti (location) — merges weather, building, cadastral parcel, nearby traffic cameras, nearby sijainnit, worksite deliveries, and nearby vehicles into a single JSON, with each section independently degrading to forbidden/error instead of failing the whole report. Resolve the point from EXACTLY ONE of the positional sijaintiId or --address.",
+    auth: "any",
+    args: [
+      {
+        name: "sijaintiId",
+        type: "number",
+        required: false,
+        description: "sijaintiId to report on (mutually exclusive with --address)",
+      },
+    ],
+    flags: [
+      {
+        name: "address",
+        type: "string",
+        description: "Street address to resolve the point from, instead of sijaintiId (mutually exclusive)",
+      },
+    ],
+    outputShape:
+      "{ point:{lat,lng}|null, address:string|null, weather, building, parcel, cameras, sijainti, deliveries, vehicles } — each section is { status:'ok'|'empty'|'forbidden'|'error', data?, error? }; a forbidden/error section never fails the whole command",
+    errors: [
+      { exit: 4, meaning: "Missing or ambiguous point input", remedy: "pass exactly one of <sijaintiId> or --address" },
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Per-section gating mirrors the FE dashboard: weather/cameras/vehicles degrade to forbidden when the company module is off; building/parcel are open to any authenticated user; a bad address or unresolvable point degrades EVERY section to error instead of failing the command.",
+      "The `sijainti` section reports sijainnit found NEARBY the resolved point (~2 km) — unrelated to the sijaintiId positional used to resolve the point itself.",
+      "`deliveries` reports worksite (tyomaa) delivery volume near the point; `vehicles` reports nearby BetoniJerry ecofleet vehicles.",
+    ],
+    seeAlso: ["ib worksite dashboard", "ib opendata building", "ib opendata parcel", "ib sijainti list"],
+    examples: [
+      "ib sijainti dashboard 42",
+      'ib sijainti dashboard --address "Oraspolku 2, Helsinki"',
+    ],
   },
   {
     command: "ib sijainti create",

@@ -4,6 +4,7 @@ import { decodeJwtPayload } from "../../auth/jwt.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { registerLogAlias } from "../log/index.js";
 import { resolveTarget, parseId } from "../../targets.js";
+import { runAddressDashboard, } from "../_shared/addressDashboard.js";
 /**
  * GET /api/cli/worksite/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
@@ -218,6 +219,19 @@ export async function runWorksitePersonList(client, tyomaaId) {
     return { items, nextCursor: null, count: items.length };
 }
 /**
+ * `ib worksite dashboard` — resolve the caller's point from exactly one of
+ * `tyomaaId` / `address` and delegate to the shared
+ * {@link runAddressDashboard} orchestrator (Address Information Dashboard,
+ * spec 2026-07-01): weather, building, cadastral parcel, nearby traffic
+ * cameras, nearby sijainnit, worksite deliveries, and nearby vehicles merged
+ * into one report. The exactly-one validation is the caller's job (the
+ * command action, mirroring `ib opendata building`'s `selectedSources`
+ * pattern) — this function just forwards whichever one is set.
+ */
+export async function runWorksiteDashboard(client, opts) {
+    return runAddressDashboard(client, opts.address !== undefined ? { address: opts.address } : { tyomaaId: opts.tyomaaId });
+}
+/**
  * Register `ib worksite` subcommands on the parent commander instance:
  *   - list            filterable by --limit/--cursor
  *   - get             single tyomaa by id
@@ -225,6 +239,7 @@ export async function runWorksitePersonList(client, tyomaaId) {
  *   - dates list      GET /api/cli/worksite/dates/:id (compliance dates, read-only)
  *   - dates expiring  GET /api/cli/worksite/dates/expiring?days=N (read-only)
  *   - search          free-text search (existing POST /api/tyomaa/search route)
+ *   - dashboard       one-shot Address Information Dashboard report (read-only)
  *   - create          POST /api/tyomaa/new with --body JSON (write flags)
  *   - update          POST /api/tyomaa/set/<ownerAsiakasId>/<tyomaaId>/<yyyymmdd>
  *   - delete          DELETE /api/tyomaa/delete/:id (write flags, --reason)
@@ -319,6 +334,26 @@ export function registerWorksiteCommands(parent, getClient) {
         try {
             const client = await getClient();
             const result = await runWorksiteSearch(client, query, opts.limit, !!opts.myCompanies);
+            writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    w.command("dashboard [tyomaaId]")
+        .description("One-shot Address Information Dashboard report for a worksite (tyomaa) — merges weather, building, cadastral parcel, nearby traffic cameras, nearby sijainnit, worksite deliveries, and nearby vehicles into a single JSON, with each section independently degrading to forbidden/error instead of failing the whole report. Resolve the point from EXACTLY ONE of the positional tyomaaId or --address.")
+        .option("--address <address>", "Resolve the point from a street address instead of tyomaaId")
+        .action(async (idStr, opts) => {
+        if (idStr !== undefined && opts.address !== undefined) {
+            failWith("pass exactly one of <tyomaaId> or --address, not both", 4);
+        }
+        if (idStr === undefined && opts.address === undefined) {
+            failWith("pass exactly one of <tyomaaId> or --address", 4);
+        }
+        const tyomaaId = idStr !== undefined ? parseId(idStr, "tyomaaId") : undefined;
+        try {
+            const client = await getClient();
+            const result = await runWorksiteDashboard(client, { tyomaaId, address: opts.address });
             writeJson(result);
         }
         catch (e) {

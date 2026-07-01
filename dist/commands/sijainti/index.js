@@ -5,6 +5,7 @@ import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { CliError } from "../../api/errors.js";
 import { parseId } from "../../targets.js";
+import { runAddressDashboard, } from "../_shared/addressDashboard.js";
 /**
  * Sentinel `jerryActiveUntil` value meaning "enrolled in BetoniJerry, no end
  * date" — matches the EditSijainti toggle (a future/sentinel datetime = active,
@@ -521,12 +522,26 @@ function assertValidAsiakasFlag(asiakas) {
     }
 }
 /**
+ * `ib sijainti dashboard` — resolve the caller's point from exactly one of
+ * `sijaintiId` / `address` and delegate to the shared
+ * {@link runAddressDashboard} orchestrator (Address Information Dashboard,
+ * spec 2026-07-01): weather, building, cadastral parcel, nearby traffic
+ * cameras, nearby sijainnit, worksite deliveries, and nearby vehicles merged
+ * into one report. The exactly-one validation is the caller's job (the
+ * command action, mirroring `ib opendata building`'s `selectedSources`
+ * pattern) — this function just forwards whichever one is set.
+ */
+export async function runSijaintiDashboard(client, opts) {
+    return runAddressDashboard(client, opts.address !== undefined ? { address: opts.address } : { sijaintiId: opts.sijaintiId });
+}
+/**
  * Register `ib sijainti` subcommands on the parent commander instance:
  *   - list      typeName-joined rows; filterable by --type (id or name)/--search/
  *               --limit/--valid-at/--include-deleted/--asiakas (owner)
  *   - plants    (alias: tehtaat) concrete plants (betoniasemat) across ALL
  *               companies; --asiakas narrows to one company's plants
  *   - get       single sijainti by id (existing /api/geocode/sijainti route)
+ *   - dashboard one-shot Address Information Dashboard report (read-only)
  *   - types     sijainti type lookup (sijaintiTypeId → selite)
  *   - geocode   address → coords via Google Maps
  *   - closest   nearest sijainti of a type to a worksite
@@ -599,6 +614,26 @@ export function registerSijaintiCommands(parent, getClient) {
         try {
             const client = await getClient();
             const result = await runSijaintiGet(client, parseId(idStr, "sijaintiId"));
+            writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    s.command("dashboard [sijaintiId]")
+        .description("One-shot Address Information Dashboard report for a sijainti (location) — merges weather, building, cadastral parcel, nearby traffic cameras, nearby sijainnit, worksite deliveries, and nearby vehicles into a single JSON, with each section independently degrading to forbidden/error instead of failing the whole report. Resolve the point from EXACTLY ONE of the positional sijaintiId or --address.")
+        .option("--address <address>", "Resolve the point from a street address instead of sijaintiId")
+        .action(async (idStr, opts) => {
+        if (idStr !== undefined && opts.address !== undefined) {
+            failWith("pass exactly one of <sijaintiId> or --address, not both", 4);
+        }
+        if (idStr === undefined && opts.address === undefined) {
+            failWith("pass exactly one of <sijaintiId> or --address", 4);
+        }
+        const sijaintiId = idStr !== undefined ? parseId(idStr, "sijaintiId") : undefined;
+        try {
+            const client = await getClient();
+            const result = await runSijaintiDashboard(client, { sijaintiId, address: opts.address });
             writeJson(result);
         }
         catch (e) {
