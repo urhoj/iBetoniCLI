@@ -2402,12 +2402,13 @@ exports[`Help snapshots — contract stability > help for ib dev feedback list m
   ib dev feedback list [flags]
 
 DESCRIPTION
-  List filed feedback for triage. Developer-only (isSystemAdmin / isDeveloper). Newest first, paginated (default 50, cap 200).
+  List filed feedback for triage. Developer-only (isSystemAdmin / isDeveloper). Newest first, paginated (default 50, cap 200). By DEFAULT returns only active items (status open + reviewed) — closed items (applied/dismissed) are hidden; pass --all for every status, or --status to name specific ones.
   Permissions: requires isSystemAdmin or isDeveloper.
 
 FLAGS
   --status STRING    open | reviewed | applied | dismissed, or a comma-separated list (e.g. open,reviewed)
-  --unresolved BOOLEAN    Shortcut for --status open,reviewed (un-closed items); mutually exclusive with --status
+  --unresolved BOOLEAN    Shortcut for --status open,reviewed (un-closed items) — same as the default; mutually exclusive with --status/--all
+  --all BOOLEAN    Include every status (open,reviewed,applied,dismissed); overrides the open+reviewed default; mutually exclusive with --status/--unresolved
   --kind STRING    improvement | bug | idea | legal
   --scope STRING    cli | app | jerry | bsg2 | workspace | other
   --search STRING    Substring match over description/command/resolution/errorText (deploy-gated)
@@ -2422,18 +2423,21 @@ OUTPUT (JSON, stdout)
   { items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }
 
 ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → use only one of --all / --unresolved / --status; --status values must be open|reviewed|applied|dismissed
   exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
+  - Default scope is the active bucket (open + reviewed). Pass --all to include closed (applied/dismissed) items, or --status applied to target them.
   - --search is a server-side substring filter added in a later backend version; against an older backend it is silently ignored (the list returns unfiltered) — deploy-gated.
 
 EXAMPLES
-  ib dev feedback list --status open --scope cli
-  ib dev feedback list --unresolved
+  ib dev feedback list
+  ib dev feedback list --all
+  ib dev feedback list --status applied --scope cli
   ib dev feedback list --kind bug --limit 20
-  ib dev feedback list --search IDOR --unresolved
+  ib dev feedback list --search IDOR
 "
 `;
 

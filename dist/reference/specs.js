@@ -4325,12 +4325,13 @@ const BASE_COMMAND_SPECS = [
     },
     {
         command: "ib dev feedback list",
-        description: "List filed feedback for triage. Developer-only (isSystemAdmin / isDeveloper). Newest first, paginated (default 50, cap 200).",
+        description: "List filed feedback for triage. Developer-only (isSystemAdmin / isDeveloper). Newest first, paginated (default 50, cap 200). By DEFAULT returns only active items (status open + reviewed) — closed items (applied/dismissed) are hidden; pass --all for every status, or --status to name specific ones.",
         permissions: ["isSystemAdmin or isDeveloper"],
         tier: "developer",
         flags: [
             { name: "status", type: "string", description: "open | reviewed | applied | dismissed, or a comma-separated list (e.g. open,reviewed)" },
-            { name: "unresolved", type: "boolean", description: "Shortcut for --status open,reviewed (un-closed items); mutually exclusive with --status" },
+            { name: "unresolved", type: "boolean", description: "Shortcut for --status open,reviewed (un-closed items) — same as the default; mutually exclusive with --status/--all" },
+            { name: "all", type: "boolean", description: "Include every status (open,reviewed,applied,dismissed); overrides the open+reviewed default; mutually exclusive with --status/--unresolved" },
             { name: "kind", type: "string", description: "improvement | bug | idea | legal" },
             { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | other" },
             { name: "search", type: "string", description: "Substring match over description/command/resolution/errorText (deploy-gated)" },
@@ -4340,18 +4341,21 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }",
         errors: [
+            { exit: 4, meaning: "Validation", remedy: "use only one of --all / --unresolved / --status; --status values must be open|reviewed|applied|dismissed" },
             apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
         notes: [
+            "Default scope is the active bucket (open + reviewed). Pass --all to include closed (applied/dismissed) items, or --status applied to target them.",
             "--search is a server-side substring filter added in a later backend version; against an older backend it is silently ignored (the list returns unfiltered) — deploy-gated.",
         ],
         examples: [
-            "ib dev feedback list --status open --scope cli",
-            "ib dev feedback list --unresolved",
+            "ib dev feedback list",
+            "ib dev feedback list --all",
+            "ib dev feedback list --status applied --scope cli",
             "ib dev feedback list --kind bug --limit 20",
-            "ib dev feedback list --search IDOR --unresolved",
+            "ib dev feedback list --search IDOR",
         ],
     },
     {

@@ -131,14 +131,26 @@ export async function runFeedbackCreate(
 
 /**
  * Resolve the requested status filter into a list of statuses, or null for no
- * filter. `--unresolved` = open + reviewed. `--status` may be a single value or
- * a comma-separated list. Conflicting/unknown values exit 4.
+ * filter (every status). With NO selector the DEFAULT is the active bucket
+ * (`open` + `reviewed`) — closed items (`applied`/`dismissed`) are hidden unless
+ * you ask for them. `--all` = null (every status); `--unresolved` = open +
+ * reviewed; `--status` = a single value or comma-separated list. The three
+ * selectors are mutually exclusive; conflicting/unknown values exit 4.
  */
-function resolveStatuses(opts: { status?: string; unresolved?: boolean }): string[] | null {
-  if (opts.unresolved && opts.status) {
-    throw new CliError("Use either --unresolved or --status, not both", 400, null, 4);
+function resolveStatuses(opts: {
+  status?: string;
+  unresolved?: boolean;
+  all?: boolean;
+}): string[] | null {
+  const selectors = [
+    opts.all && "--all",
+    opts.unresolved && "--unresolved",
+    opts.status && "--status",
+  ].filter(Boolean);
+  if (selectors.length > 1) {
+    throw new CliError(`Use only one of ${selectors.join(", ")}`, 400, null, 4);
   }
-  if (opts.unresolved) return ["open", "reviewed"];
+  if (opts.all) return null;
   if (opts.status) {
     const list = opts.status
       .split(",")
@@ -149,16 +161,19 @@ function resolveStatuses(opts: { status?: string; unresolved?: boolean }): strin
         throw new CliError(`--status must be one of: ${STATUSES.join(", ")}`, 400, null, 4);
       }
     }
-    return list.length ? list : null;
+    if (list.length) return list;
   }
-  return null;
+  // Default (and --unresolved): the active bucket. Closed items need --all/--status.
+  return ["open", "reviewed"];
 }
 
 /**
- * GET /api/feedback — developer-only. One status (or none) is a single
- * server-filtered GET. `--unresolved` / a CSV `--status` fan out to one GET per
- * status, merged newest-first and sliced [offset, offset+limit) client-side.
- * Long free-text is capped at 200 chars unless `--full`.
+ * GET /api/feedback — developer-only. Defaults to the active bucket
+ * (`open` + `reviewed`); pass `--all` for every status or `--status`/`--unresolved`
+ * to filter. One status is a single server-filtered GET; the default,
+ * `--unresolved`, and a CSV `--status` fan out to one GET per status, merged
+ * newest-first and sliced [offset, offset+limit) client-side. Long free-text is
+ * capped at 200 chars unless `--full`.
  */
 export async function runFeedbackList(
   client: ApiClient,
@@ -170,6 +185,7 @@ export async function runFeedbackList(
     limit?: number;
     offset?: number;
     unresolved?: boolean;
+    all?: boolean;
     full?: boolean;
   }
 ): Promise<ListEnvelope<Record<string, unknown>>> {
@@ -345,9 +361,10 @@ export function registerFeedbackCommands(
     );
 
   f.command("list")
-    .description("List feedback for triage (developer-only)")
+    .description("List feedback for triage (developer-only). Defaults to active items (open+reviewed); --all for every status")
     .option("--status <status>", "open | reviewed | applied | dismissed (or a comma-separated list, e.g. open,reviewed)")
-    .option("--unresolved", "Shortcut for --status open,reviewed (un-closed items)")
+    .option("--unresolved", "Shortcut for --status open,reviewed (un-closed items) — same as the default")
+    .option("--all", "Include every status (open,reviewed,applied,dismissed); overrides the open+reviewed default")
     .option("--full", "Return untruncated description/resolution (default: capped at 200 chars)")
     .option("--kind <kind>", "improvement | bug | idea | legal")
     .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | other")
@@ -363,6 +380,7 @@ export function registerFeedbackCommands(
         limit?: number;
         offset?: number;
         unresolved?: boolean;
+        all?: boolean;
         full?: boolean;
       }) => {
         try {

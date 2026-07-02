@@ -187,17 +187,28 @@ describe("ib feedback list", () => {
     });
   });
 
-  test("no filters → bare path, empty array tolerated", async () => {
-    get.mockResolvedValueOnce(null);
+  test("no filters → defaults to the active bucket (open+reviewed), newest-first", async () => {
+    get.mockResolvedValueOnce([{ feedbackId: 3, status: "open" }]); // open page
+    get.mockResolvedValueOnce([{ feedbackId: 5, status: "reviewed" }]); // reviewed page
     const out = await runFeedbackList(mockClient, {});
+    expect(get).toHaveBeenNthCalledWith(1, "/api/feedback?status=open&limit=200");
+    expect(get).toHaveBeenNthCalledWith(2, "/api/feedback?status=reviewed&limit=200");
+    expect(out.items.map((r) => r.feedbackId)).toEqual([5, 3]);
+  });
+
+  test("--all → bare path (every status), empty array tolerated", async () => {
+    get.mockResolvedValueOnce(null);
+    const out = await runFeedbackList(mockClient, { all: true });
     expect(get).toHaveBeenCalledWith("/api/feedback");
     expect(out).toEqual({ items: [], nextCursor: null, count: 0 });
   });
 
-  test("forwards --scope filter", async () => {
+  test("forwards --scope filter to each default-bucket page", async () => {
+    get.mockResolvedValueOnce([]);
     get.mockResolvedValueOnce([]);
     await runFeedbackList(mockClient, { scope: "workspace" });
-    expect(get).toHaveBeenCalledWith("/api/feedback?scope=workspace");
+    expect(get).toHaveBeenNthCalledWith(1, "/api/feedback?status=open&scope=workspace&limit=200");
+    expect(get).toHaveBeenNthCalledWith(2, "/api/feedback?status=reviewed&scope=workspace&limit=200");
   });
 
   test("forwards --search on the single-status path", async () => {
@@ -223,7 +234,7 @@ describe("ib feedback list", () => {
         errorText: "z".repeat(201),
       },
     ]);
-    const out = await runFeedbackList(mockClient, {});
+    const out = await runFeedbackList(mockClient, { all: true });
     expect(out.items[0].description).toBe("x".repeat(200) + "...");
     expect(out.items[0].resolution).toBe("y".repeat(200) + "...");
     expect(out.items[0].errorText).toBe("z".repeat(200) + "...");
@@ -240,7 +251,7 @@ describe("ib feedback list", () => {
 
   test("short rows are unchanged and add no hint", async () => {
     get.mockResolvedValueOnce([{ feedbackId: 1, description: "short" }]);
-    const out = await runFeedbackList(mockClient, {});
+    const out = await runFeedbackList(mockClient, { all: true });
     expect(out.items[0].description).toBe("short");
     expect(out.hint).toBeUndefined();
   });
@@ -274,6 +285,13 @@ describe("ib feedback list", () => {
   test("--unresolved together with --status exits 4 (no fetch)", async () => {
     await expect(
       runFeedbackList(mockClient, { unresolved: true, status: "open" })
+    ).rejects.toMatchObject({ exitCode: 4 });
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  test("--all together with --status exits 4 (no fetch)", async () => {
+    await expect(
+      runFeedbackList(mockClient, { all: true, status: "open" })
     ).rejects.toMatchObject({ exitCode: 4 });
     expect(get).not.toHaveBeenCalled();
   });
