@@ -205,7 +205,14 @@ function extractGeocodedLatLng(geo: unknown): { lat: number; lng: number } | nul
 async function resolvePoint(client: ApiClient, input: AddressDashboardInput): Promise<ResolvedPoint> {
   if (input.address !== undefined) {
     const source = `address=${encodeURIComponent(input.address)}`;
-    const geo = await client.post<unknown>("/api/geocode/getLatLng", { osoite: input.address });
+    // Read-over-POST: geocoding an address mutates nothing. `{ read: true }`
+    // exempts it from the `--read-only` write-lock AND suppresses the
+    // "[ib] write → asiakasId …" acting-as banner (a dashboard is read-only).
+    const geo = await client.post<unknown>(
+      "/api/geocode/getLatLng",
+      { osoite: input.address },
+      { read: true }
+    );
     const coords = extractGeocodedLatLng(geo);
     if (!coords) {
       const status = (geo as { status?: string } | null)?.status ?? "unknown";

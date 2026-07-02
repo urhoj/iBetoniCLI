@@ -150,9 +150,13 @@ describe("runAddressDashboard — address input", () => {
       address: "Mannerheimintie 1, Helsinki",
     });
 
-    expect(post()).toHaveBeenCalledWith("/api/geocode/getLatLng", {
-      osoite: "Mannerheimintie 1, Helsinki",
-    });
+    // read-over-POST: flagged { read: true } so it skips the --read-only
+    // write-lock and the "[ib] write → …" acting-as banner.
+    expect(post()).toHaveBeenCalledWith(
+      "/api/geocode/getLatLng",
+      { osoite: "Mannerheimintie 1, Helsinki" },
+      { read: true }
+    );
     // exactly one geocode for the whole dashboard — building/parcel reuse the
     // resolved coords instead of re-geocoding the address server-side.
     expect(post()).toHaveBeenCalledTimes(1);
