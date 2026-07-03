@@ -11,6 +11,7 @@ import {
 } from "../../src/commands/bug/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
+import { setCallerTier } from "../../src/tier.js";
 
 const mockClient = {
   get: vi.fn(),
@@ -393,5 +394,41 @@ describe("ib bug admin delete", () => {
     await expect(runBugAdminDelete(mockClient, 51, {})).rejects.toMatchObject({ exitCode: 4 });
     await expect(runBugAdminDelete(mockClient, 51, { reason: "  " })).rejects.toThrowError(CliError);
     expect(del).not.toHaveBeenCalled();
+  });
+});
+
+// A bugReport 404 is where an AI conflates the two "bug" stores: a bug-KIND
+// report lives in the developer-only feedback sink, NOT bugReport. runBugGet
+// enriches a developer's 404 with a pointer to `ib dev feedback`; the pointer is
+// tier-gated so the hidden feedback subtree is never advertised to a standard
+// caller (see the reference-dump tier-secrecy guarantee).
+describe("ib bug get — 404 cross-reference to the feedback sink", () => {
+  afterEach(() => setCallerTier("developer"));
+
+  test("a developer's 404 is enriched to point at `ib dev feedback` (keyed by the same id)", async () => {
+    setCallerTier("developer");
+    get.mockRejectedValueOnce(new CliError("Vikaraporttia ei löytynyt", 404, null, 5));
+    const err = await runBugGet(mockClient, 72).catch((e: unknown) => e as CliError);
+    expect(err).toBeInstanceOf(CliError);
+    expect(err.statusCode).toBe(404); // not-found contract preserved
+    expect(err.exitCode).toBe(5);
+    expect(err.hint).toContain("ib dev feedback get 72");
+    expect(err.hint).toContain("ib dev feedback list --kind bug");
+  });
+
+  test("a standard caller's 404 is NOT enriched (hidden feedback subtree stays secret)", async () => {
+    setCallerTier("standard");
+    get.mockRejectedValueOnce(new CliError("Vikaraporttia ei löytynyt", 404, null, 5));
+    const err = await runBugGet(mockClient, 72).catch((e: unknown) => e as CliError);
+    expect(err).toBeInstanceOf(CliError);
+    expect(err.hint).toBeUndefined(); // falls back to the generic spec remedy
+  });
+
+  test("a non-404 error passes through unchanged even for a developer", async () => {
+    setCallerTier("developer");
+    get.mockRejectedValueOnce(new CliError("Permission denied", 403, null, 3));
+    const err = await runBugGet(mockClient, 72).catch((e: unknown) => e as CliError);
+    expect(err.statusCode).toBe(403);
+    expect(err.hint).toBeUndefined();
   });
 });

@@ -1,4 +1,5 @@
 import { CliError } from "../../api/errors.js";
+import { getCallerTier } from "../../tier.js";
 import { writeFlagsToHeaders } from "../../api/writeFlags.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 import { parseId } from "../../targets.js";
@@ -125,7 +126,22 @@ export async function runBugList(client, opts) {
 }
 /** GET /api/bugs/:id — one report with its comments + attachments inline. */
 export async function runBugGet(client, id) {
-    const res = await client.get(`/api/bugs/${id}`);
+    let res;
+    try {
+        res = await client.get(`/api/bugs/${id}`);
+    }
+    catch (e) {
+        // A bugReport 404 is the exact spot an AI conflates the two "bug" stores:
+        // a bug-KIND report may instead live in the (developer-only) feedback sink,
+        // not the bugReport system. Point developers there at the moment of
+        // confusion by overriding the generic spec remedy. Tier-gated so the hidden
+        // feedback subtree is never advertised to a standard caller; hintForError
+        // still prefers the deploy hint for a route-not-found 404 over this one.
+        if (e instanceof CliError && e.statusCode === 404 && getCallerTier() === "developer") {
+            throw new CliError(e.message, e.statusCode, e.body, e.exitCode, `check the id via \`ib dev bug list\`. Not there? A bug-kind AI/CLI report lives in the SEPARATE feedback sink — try \`ib dev feedback get ${id}\` or \`ib dev feedback list --kind bug\`.`);
+        }
+        throw e;
+    }
     const data = unwrapData(res);
     if (data && typeof data === "object" && !Array.isArray(data)) {
         return withAge(data, Date.now());

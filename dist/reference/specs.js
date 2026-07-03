@@ -4368,9 +4368,10 @@ const BASE_COMMAND_SPECS = [
         outputShape: "The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, ... }",
         errors: [
             apiErr(403, "Permission denied", "requires a developer token"),
-            apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
+            apiErr(404, "Not found", "check the id via `ib dev feedback list`. Not there? A user-filed tracked bug lives in the SEPARATE bugReport system — try `ib dev bug get <id>` or `ib dev bug list`."),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
+        seeAlso: ["ib dev feedback list", "ib dev bug get"],
         examples: ["ib dev feedback get 42"],
     },
     {
@@ -4528,7 +4529,7 @@ const BASE_COMMAND_SPECS = [
             apiErr(404, "Not found", "check the id via `ib dev bug list`"),
             ...COMMON_AUTH_ERRORS,
         ],
-        seeAlso: ["ib dev bug list", "ib attachment list --bug-report <id>"],
+        seeAlso: ["ib dev bug list", "ib dev feedback list", "ib attachment list --bug-report <id>"],
         examples: ["ib dev bug get 51"],
     },
     {

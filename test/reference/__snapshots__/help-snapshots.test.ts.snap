@@ -1789,7 +1789,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 SEE ALSO
-  ib dev bug list, ib attachment list --bug-report <id>
+  ib dev bug list, ib dev feedback list, ib attachment list --bug-report <id>
 
 EXAMPLES
   ib dev bug get 51
@@ -2389,8 +2389,11 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → requires a developer token
-  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\`
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\`. Not there? A user-filed tracked bug lives in the SEPARATE bugReport system — try \`ib dev bug get <id>\` or \`ib dev bug list\`.
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib dev feedback list, ib dev bug get
 
 EXAMPLES
   ib dev feedback get 42
