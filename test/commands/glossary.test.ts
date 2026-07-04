@@ -1,7 +1,7 @@
 import { describe, test, expect, vi } from "vitest";
 import {
   runGlossaryLookup, runGlossaryList, runGlossarySet, runGlossaryMisses, runGlossaryLookupBatch,
-  mergeSetInput, runGlossaryImport,
+  mergeSetInput, runGlossaryImport, runGlossaryDelete,
 } from "../../src/commands/glossary/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -269,5 +269,51 @@ describe("glossary append flags", () => {
     const get = vi.fn().mockResolvedValue({ items: [], count: 0 });
     await runGlossaryList(mkClient({ get }), { needsReview: true, maxConfidence: 90 });
     expect(get).toHaveBeenCalledWith("/api/cli/glossary?needsReview=1&maxConfidence=90");
+  });
+});
+
+// ── delete: --dry-run must NEVER issue the DELETE (fb#76 data-loss fix) ────────
+describe("glossary delete", () => {
+  test("real delete issues DELETE with write-safety headers", async () => {
+    const del = vi.fn().mockResolvedValue({ deleted: 1 });
+    const get = vi.fn();
+    await runGlossaryDelete(mkClient({ delete: del, get }), "obsolete term", { reason: "cleanup" });
+    expect(del).toHaveBeenCalledWith(
+      "/api/cli/glossary/obsolete%20term",
+      { headers: { "X-Action-Reason": "cleanup" } }
+    );
+    // a real delete never reaches for the client-side preview
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  test("--dry-run resolves CLIENT-SIDE: previews via ?search=, never issues DELETE", async () => {
+    const entry = { term: "pumi.fi", synonyms: ["kutil"], definition: "legacy", relatedCommands: [], relatedEntity: null };
+    const get = vi.fn().mockResolvedValue({ items: [{ term: "other" }, entry], count: 2 });
+    const del = vi.fn();
+    const res = await runGlossaryDelete(mkClient({ delete: del, get }), "pumi.fi", { dryRun: true, reason: "preview" });
+    expect(del).not.toHaveBeenCalled();
+    expect(get).toHaveBeenCalledWith("/api/cli/glossary?search=pumi.fi");
+    expect(res).toEqual({ dryRun: true, term: "pumi.fi", wouldDelete: entry });
+  });
+
+  test("--dry-run exact-matches the normalized term (case/space-insensitive)", async () => {
+    const entry = { term: "pumi.fi", synonyms: [], definition: "d", relatedCommands: [], relatedEntity: null };
+    const get = vi.fn().mockResolvedValue({ items: [entry], count: 1 });
+    const res = await runGlossaryDelete(mkClient({ delete: vi.fn(), get }), "  PUMI.FI  ", { dryRun: true });
+    expect(res).toMatchObject({ dryRun: true, wouldDelete: entry });
+  });
+
+  test("--dry-run returns wouldDelete:null when no exact match (no substring false-positive)", async () => {
+    const get = vi.fn().mockResolvedValue({ items: [{ term: "pumi.fi.legacy" }], count: 1 });
+    const res = await runGlossaryDelete(mkClient({ delete: vi.fn(), get }), "pumi.fi", { dryRun: true });
+    expect(res).toEqual({ dryRun: true, term: "pumi.fi", wouldDelete: null });
+  });
+
+  test("--dry-run swallows a preview fetch error and still returns a safe envelope", async () => {
+    const get = vi.fn().mockRejectedValue(new CliError("boom", 500, null, 6));
+    const del = vi.fn();
+    const res = await runGlossaryDelete(mkClient({ delete: del, get }), "pumi.fi", { dryRun: true });
+    expect(del).not.toHaveBeenCalled();
+    expect(res).toEqual({ dryRun: true, term: "pumi.fi", wouldDelete: null });
   });
 });

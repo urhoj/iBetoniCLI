@@ -203,7 +203,29 @@ export async function runGlossaryMisses(client, top) {
     const res = await client.get(`/api/cli/glossary/misses${top ? `?top=${top}` : ""}`);
     return { items: res.items, nextCursor: null, count: res.count, truncated: top != null };
 }
+/**
+ * Delete a glossary entry. `--dry-run` resolves CLIENT-SIDE: it previews the
+ * entry that WOULD be deleted and NEVER issues the DELETE. The backend DELETE
+ * route historically ignored `X-Dry-Run` and destroyed the row regardless
+ * (fb#76), so relying on a server-side dry-run here was a data-loss footgun.
+ * The preview is fetched via the `?search=` list endpoint — which, unlike
+ * `/lookup/:term`, does NOT record a glossary miss for an absent term — and
+ * exact-matched on the normalized term (backend `normalizeTerm` = trim+lower).
+ * A real run issues the DELETE with the write-safety headers.
+ */
 export async function runGlossaryDelete(client, term, flags = {}) {
+    if (flags.dryRun) {
+        let wouldDelete = null;
+        try {
+            const res = await client.get(`/api/cli/glossary?search=${encodeURIComponent(term)}`);
+            const norm = term.trim().toLowerCase();
+            wouldDelete = (res.items ?? []).find((e) => String(e.term).toLowerCase() === norm) ?? null;
+        }
+        catch {
+            // Best-effort preview: a search failure must not turn a dry-run into an error.
+        }
+        return { dryRun: true, term, wouldDelete };
+    }
     return client.delete(`/api/cli/glossary/${encodeURIComponent(term)}`, { headers: writeFlagsToHeaders(flags) });
 }
 export function registerGlossaryCommands(program, getClient) {

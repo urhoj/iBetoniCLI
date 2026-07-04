@@ -5573,9 +5573,15 @@ const BASE_COMMAND_SPECS = [
         writeFlags: true,
         args: [{ name: "term", type: "string", required: true, description: "Canonical term" }],
         flags: [],
-        outputShape: "{ deleted: 0|1 }",
+        outputShape: "{ deleted: 0|1 } — rows removed; or { dryRun: true, term, wouldDelete: <entry>|null } with --dry-run",
         errors: [{ http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" }],
-        examples: ["ib glossary delete obsolete-term --reason cleanup"],
+        notes: [
+            "--dry-run resolves CLIENT-SIDE: it previews the entry that WOULD be deleted (via the miss-free ?search= endpoint) and never issues the DELETE — safe even before the backend guard deploys (the backend DELETE route ignored X-Dry-Run before this fix, so a --dry-run silently destroyed the entry).",
+        ],
+        examples: [
+            "ib glossary delete obsolete-term --reason cleanup",
+            "ib glossary delete obsolete-term --dry-run",
+        ],
     },
     {
         command: "ib glossary lint",
