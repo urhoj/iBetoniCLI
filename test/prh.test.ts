@@ -8,4 +8,10 @@ describe("runPrhById", () => {
     const res = await runPrhById(client, "0145937-9");
     expect(res.companySituations).toEqual([{ type: "KONKURSSI" }]);
   });
+
+  test("defaults companySituations to [] when absent", async () => {
+    const client = { get: vi.fn().mockResolvedValueOnce({ data: { businessId: "0145937-9", name: "X" } }) } as unknown as ApiClient;
+    const res = await runPrhById(client, "0145937-9");
+    expect(res.companySituations).toEqual([]);
+  });
 });
