@@ -987,6 +987,40 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib customer dead-list matches snapshot 1`] = `
+"USAGE
+  ib customer dead-list [flags]
+
+DESCRIPTION
+  List customers flagged dead/caution by the PRH nightly business-registry sweep.
+  Permissions: requires auth.page.asiakas.read.
+
+FLAGS
+  --limit NUMBER    Max rows (capped at 500). (default: 200)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ asiakasId, name, yTunnus, prhStatus:'dead'|'caution', prhSituation, prhCheckedAt }> — dead rows first, then most-recently-checked.
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check auth.page.asiakas.read
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Reads the prhStatus columns written by the nightly PRH sweep (puminet7) — not a live PRH lookup.
+  - Scope: own tenant; system admins see all tenants.
+  - \`dead\` = konkurssi/selvitystila/purettu (won't pay); \`caution\` = yrityssaneeraus (sell with care / prepay).
+
+EXAMPLES
+  ib customer dead-list
+  ib customer dead-list --pretty
+  ib customer dead-list --limit 50
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib customer delete matches snapshot 1`] = `
 "USAGE
   ib customer delete <asiakasId> [flags]

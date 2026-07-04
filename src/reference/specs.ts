@@ -786,7 +786,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   },
 
 
-  // ─── customer (7) ────────────────────────────────────────────────────────
+  // ─── customer (12) ───────────────────────────────────────────────────────
   {
     command: "ib customer list",
     description: "List customers (asiakkaat).",
@@ -824,6 +824,23 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ib customer list --ids 26 --full --fields name,address,postalCode,city,contactPersonId,companyDescription",
       "ib customer list --ids 26 --include sijainnit --sijainti-types 1,2",
     ],
+  },
+  {
+    command: "ib customer dead-list",
+    description: "List customers flagged dead/caution by the PRH nightly business-registry sweep.",
+    permissions: ["auth.page.asiakas.read"],
+    flags: [
+      { name: "limit", type: "number", default: "200", description: "Max rows (capped at 500)." },
+    ],
+    outputShape:
+      "ListEnvelope<{ asiakasId, name, yTunnus, prhStatus:'dead'|'caution', prhSituation, prhCheckedAt }> — dead rows first, then most-recently-checked.",
+    errors: permErrors("auth.page.asiakas.read"),
+    notes: [
+      "Reads the prhStatus columns written by the nightly PRH sweep (puminet7) — not a live PRH lookup.",
+      "Scope: own tenant; system admins see all tenants.",
+      "`dead` = konkurssi/selvitystila/purettu (won't pay); `caution` = yrityssaneeraus (sell with care / prepay).",
+    ],
+    examples: ["ib customer dead-list", "ib customer dead-list --pretty", "ib customer dead-list --limit 50"],
   },
   {
     command: "ib customer get",

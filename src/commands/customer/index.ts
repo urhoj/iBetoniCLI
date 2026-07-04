@@ -117,6 +117,26 @@ export async function runCustomerList(
   return env;
 }
 
+export interface DeadCustomer {
+  asiakasId: number; name: string | null; yTunnus: string | null;
+  prhStatus: string; prhSituation: string | null; prhCheckedAt: string | null;
+}
+
+/**
+ * GET /api/cli/customer/dead-list — customers the PRH nightly sweep flagged
+ * `dead` (konkurssi/selvitystila/purettu) or `caution` (yrityssaneeraus).
+ * Tenant-scoped; reads the pre-swept columns (no live PRH call).
+ */
+export async function runCustomerDeadList(
+  client: ApiClient,
+  opts: { limit?: number } = {}
+): Promise<ListEnvelope<DeadCustomer>> {
+  const params = new URLSearchParams();
+  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
+  const qs = params.toString();
+  return client.get<ListEnvelope<DeadCustomer>>(`/api/cli/customer/dead-list${qs ? `?${qs}` : ""}`);
+}
+
 /** The flat customer record returned by GET /api/cli/customer/get/:id (extended). */
 export interface CustomerFlat {
   asiakasId: number;
@@ -993,6 +1013,7 @@ async function reconcileCreatedExtras(
 /**
  * Register `ib customer` subcommands on the parent commander instance:
  *   - list      filterable by --limit/--cursor
+ *   - dead-list customers the PRH nightly sweep flagged dead/caution (reads pre-checked columns)
  *   - get       single asiakas by id (flat shape incl. contactPersonId/shortName/comment)
  *   - worksites the customer's worksites (GET /api/tyomaa/asiakasTyomaaList/:asiakasId)
  *   - search    free-text search (existing /api/asiakas/search route)
@@ -1059,6 +1080,21 @@ export function registerCustomerCommands(
           sijaintiTypes,
         });
         writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  c.command("dead-list")
+    .description(
+      "List customers the PRH nightly sweep flagged dead (konkurssi/selvitystila/purettu) " +
+        "or caution (yrityssaneeraus). Reads pre-checked prhStatus columns; tenant-scoped."
+    )
+    .option("--limit <n>", "Max rows", (v: string) => Math.min(Number(v), 500))
+    .action(async (opts: { limit?: number }) => {
+      try {
+        const client = await getClient();
+        writeJson(await runCustomerDeadList(client, { limit: opts.limit }));
       } catch (e) {
         exitWithError(e);
       }

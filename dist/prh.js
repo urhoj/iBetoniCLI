@@ -5,7 +5,7 @@
  */
 export async function runPrhById(client, ytunnus) {
     const res = await client.get(`/api/prh/company/${encodeURIComponent(ytunnus)}`);
-    return res.data;
+    return { ...res.data, companySituations: res.data.companySituations ?? [] };
 }
 /**
  * GET /api/prh/search/name?q=&page= — name search. Backend wraps as

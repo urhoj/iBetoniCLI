@@ -20,6 +20,7 @@ export interface PrhCompany {
   address: { street: string | null; postCode: string | null; city: string | null; full: string | null } | null;
   companyForm: { type?: string; name?: string } | null;
   status: string | null;
+  companySituations: Array<{ type?: string; [k: string]: unknown }>;
 }
 
 /**
@@ -34,7 +35,7 @@ export async function runPrhById(
   const res = await client.get<{ data: PrhCompany }>(
     `/api/prh/company/${encodeURIComponent(ytunnus)}`
   );
-  return res.data;
+  return { ...res.data, companySituations: res.data.companySituations ?? [] };
 }
 
 /**
