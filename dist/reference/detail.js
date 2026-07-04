@@ -81,6 +81,31 @@ export async function runReferenceDetailSet(client, commandParts, body, flags = 
         headers: writeFlagsToHeaders(flags),
     });
 }
+/**
+ * Audit the DB command-catalog for ORPHAN rows — keys whose command no longer
+ * exists in the live `COMMAND_SPECS`. The catalog is keyed by command string and
+ * nothing prunes it, so every rename/re-home leaves its old row behind (the class
+ * behind fb#73: `ib customer prh` → `ib opendata prh`). Those orphans surface in
+ * `reference detail list` but `get`/`set` then reject them (exit 5), a confusing
+ * round-trip; the remedy is `reference detail delete`. Read-only: one GET of the
+ * whole catalog plus a local set-diff. Compares against the FULL spec set (NOT
+ * tier-filtered) — a developer-tier command still has a spec, so its row is not an
+ * orphan. Each finding carries the ready-to-run prune command.
+ */
+export async function runReferenceDetailLint(client) {
+    const { items } = await runReferenceDetailList(client);
+    const live = new Set(COMMAND_SPECS.map((s) => s.command));
+    const orphans = items
+        .filter((row) => !live.has(row.command))
+        .map((row) => ({
+        command: row.command,
+        severity: "warn",
+        kind: "orphan",
+        summary: row.summary ?? null,
+        hint: `orphan: no live command — prune with \`ib reference detail delete ${row.command.replace(/^ib /, "")} --reason <r>\` (or seed the re-homed command)`,
+    }));
+    return { items: orphans, count: orphans.length };
+}
 /** Catalog text fields editable in-field. */
 export const DETAIL_EDITABLE_FIELDS = ["summary", "detail"];
 /**

@@ -8339,6 +8339,39 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib reference detail lint matches snapshot 1`] = `
+"USAGE
+  ib reference detail lint [flags]
+
+DESCRIPTION
+  Audit the command-catalog for orphan rows — keys with no live command (re-homed/renamed leftovers); --strict for CI (developer only)
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --strict BOOLEAN    Exit 1 if any orphan row exists (for CI)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { items: [{ command, severity:'warn', kind:'orphan', summary, hint }], count } — one finding per catalog key with no live command
+
+ERRORS (stderr, exit non-zero)
+  exit 1  --strict and orphan rows found → Prune each with \`ib reference detail delete <key> --reason <r>\`, or seed the re-homed command
+  exit 3  Not a developer        → Requires isDeveloper / isSystemAdmin
+
+NOTES
+  - Read-only: one GET of the whole catalog plus a local diff against the live command specs. The class behind fb#73 (\`ib customer prh\` re-homed to \`ib opendata prh\`).
+
+SEE ALSO
+  ib reference detail delete, ib reference detail list
+
+EXAMPLES
+  ib reference detail lint
+  ib reference detail lint --strict
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib reference detail list matches snapshot 1`] = `
 "USAGE
   ib reference detail list [flags]

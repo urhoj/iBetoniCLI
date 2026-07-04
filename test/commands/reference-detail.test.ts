@@ -1,5 +1,6 @@
 import { describe, test, expect, vi } from "vitest";
-import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList } from "../../src/reference/detail.js";
+import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailLint } from "../../src/reference/detail.js";
+import { COMMAND_SPECS } from "../../src/reference/specs.js";
 
 function client(over: Record<string, unknown> = {}) {
   return { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn(), ...over } as never;
@@ -45,5 +46,38 @@ describe("ib reference detail (DB-backed)", () => {
     const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
     await runReferenceDetailList(c, 10, undefined, false, true, 90);
     expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10&needsReview=1&maxConfidence=90");
+  });
+
+  describe("lint (orphan catalog rows)", () => {
+    const live = COMMAND_SPECS[0].command; // a guaranteed-live command key
+
+    test("flags only rows whose command is not a live spec", async () => {
+      const c = client({
+        get: vi.fn().mockResolvedValue({
+          items: [
+            { command: live, summary: "s1" },
+            { command: "ib customer prh", summary: "stale alias" },
+            { command: "ib weather forecast", summary: null },
+          ],
+          count: 3,
+        }),
+      });
+      const res = await runReferenceDetailLint(c);
+      expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog");
+      expect(res.count).toBe(2);
+      expect(res.items.map((f) => f.command).sort()).toEqual(["ib customer prh", "ib weather forecast"]);
+      const prh = res.items.find((f) => f.command === "ib customer prh")!;
+      expect(prh.severity).toBe("warn");
+      expect(prh.kind).toBe("orphan");
+      expect(prh.summary).toBe("stale alias");
+      // hint carries the ready-to-run prune command with the `ib ` prefix stripped
+      expect(prh.hint).toContain("reference detail delete customer prh");
+    });
+
+    test("clean catalog yields zero findings", async () => {
+      const c = client({ get: vi.fn().mockResolvedValue({ items: [{ command: live }], count: 1 }) });
+      const res = await runReferenceDetailLint(c);
+      expect(res).toEqual({ items: [], count: 0 });
+    });
   });
 });

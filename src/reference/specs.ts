@@ -4520,6 +4520,27 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib reference detail lint",
+    description:
+      "Audit the command-catalog for orphan rows — keys with no live command (re-homed/renamed leftovers); --strict for CI (developer only)",
+    tier: "developer",
+    auth: "any",
+    flags: [
+      { name: "strict", type: "boolean", description: "Exit 1 if any orphan row exists (for CI)" },
+    ],
+    outputShape:
+      "{ items: [{ command, severity:'warn', kind:'orphan', summary, hint }], count } — one finding per catalog key with no live command",
+    errors: [
+      { exit: 1, meaning: "--strict and orphan rows found", remedy: "Prune each with `ib reference detail delete <key> --reason <r>`, or seed the re-homed command" },
+      { exit: 3, meaning: "Not a developer", remedy: "Requires isDeveloper / isSystemAdmin" },
+    ],
+    notes: [
+      "Read-only: one GET of the whole catalog plus a local diff against the live command specs. The class behind fb#73 (`ib customer prh` re-homed to `ib opendata prh`).",
+    ],
+    seeAlso: ["ib reference detail delete", "ib reference detail list"],
+    examples: ["ib reference detail lint", "ib reference detail lint --strict"],
+  },
+  {
     command: "ib commands",
     description:
       "Offline command discovery from the spec catalogue. No args = compact DOMAIN INDEX (~5 KB: every domain with leaf count, glossary blurb, runnable command paths). A domain arg, a filter flag, or --all returns the flat per-command list { command, description, permissions, isWrite }. Lighter than `ib reference dump` (the full surface). No auth, no network.",

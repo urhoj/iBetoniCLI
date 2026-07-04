@@ -45,7 +45,7 @@ import { registerVersionCommand } from "./commands/version/index.js";
 import { registerDoctorCommand } from "./commands/doctor/index.js";
 import { registerInboxCommand } from "./commands/inbox/index.js";
 import { runReferenceDump, fetchPrimerGlossary } from "./reference/dump.js";
-import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailEdit, runReferenceDetailDelete } from "./reference/detail.js";
+import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailEdit, runReferenceDetailDelete, runReferenceDetailLint } from "./reference/detail.js";
 import { parseEditOp } from "./textEdit.js";
 import { addWriteFlagsToCommand } from "./api/writeFlags.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "./assess.js";
@@ -422,6 +422,24 @@ export function buildProgram(): Command {
       }
     }
   );
+
+  // `lint` — audit the catalog for orphan rows (keys with no live command left
+  // by a rename/re-home). Read-only (one GET + local diff); --strict is a CI gate.
+  detail
+    .command("lint")
+    .description(
+      "Audit the command-catalog for orphan rows — keys with no live command (re-homed/renamed leftovers); --strict for CI (developer only)"
+    )
+    .option("--strict", "Exit 1 if any orphan row exists (for CI)")
+    .action(async (opts: { strict?: boolean }) => {
+      try {
+        const res = await runReferenceDetailLint(await getClient());
+        writeJson(res);
+        if (opts.strict && res.items.length > 0) process.exitCode = 1;
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
 
   // `ib commands` — filtered, offline discovery over the same spec catalogue.
   // Note: the filter is `--reads` (not `--read-only`) because `--read-only` is
