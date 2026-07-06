@@ -1,7 +1,7 @@
 import { describe, test, expect, vi } from "vitest";
 import {
   runGlossaryLookup, runGlossaryList, runGlossarySet, runGlossaryMisses, runGlossaryLookupBatch,
-  mergeSetInput, runGlossaryImport, runGlossaryDelete,
+  mergeSetInput, runGlossaryImport, runGlossaryDelete, runGlossaryDismiss,
 } from "../../src/commands/glossary/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -315,5 +315,32 @@ describe("glossary delete", () => {
     const res = await runGlossaryDelete(mkClient({ delete: del, get }), "pumi.fi", { dryRun: true });
     expect(del).not.toHaveBeenCalled();
     expect(res).toEqual({ dryRun: true, term: "pumi.fi", wouldDelete: null });
+  });
+});
+
+// ── dismiss: junk misses leave the queue without being defined ────────────────
+describe("glossary dismiss", () => {
+  test("issues DELETE to the misses endpoint with write-safety headers", async () => {
+    const del = vi.fn().mockResolvedValue({ term: "xa4", dismissed: 1 });
+    await runGlossaryDismiss(mkClient({ delete: del }), "xa4", { reason: "junk" });
+    expect(del).toHaveBeenCalledWith(
+      "/api/cli/glossary/misses/xa4",
+      { headers: { "X-Action-Reason": "junk" } }
+    );
+  });
+
+  test("--dry-run maps to the X-Dry-Run header (server guard ships with the route; an older backend 404s the path, so no silent-persist window)", async () => {
+    const del = vi.fn().mockResolvedValue({ dryRun: true, term: "xa4", wouldDismiss: true });
+    await runGlossaryDismiss(mkClient({ delete: del }), "xa4", { dryRun: true });
+    expect(del).toHaveBeenCalledWith(
+      "/api/cli/glossary/misses/xa4",
+      { headers: { "X-Dry-Run": "1" } }
+    );
+  });
+
+  test("URL-encodes multi-word terms", async () => {
+    const del = vi.fn().mockResolvedValue({ term: "kualle urho tilaukset", dismissed: 1 });
+    await runGlossaryDismiss(mkClient({ delete: del }), "kualle urho tilaukset", {});
+    expect(del.mock.calls[0]![0]).toBe("/api/cli/glossary/misses/kualle%20urho%20tilaukset");
   });
 });

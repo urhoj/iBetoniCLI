@@ -2957,6 +2957,41 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib glossary dismiss matches snapshot 1`] = `
+"USAGE
+  ib glossary dismiss <term> [flags]
+
+DESCRIPTION
+  Dismiss an open lookup miss WITHOUT defining the term — for junk/test lookups (developer only). The term re-enters the queue if it is ever looked up again.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <term> STRING    Missed term (as listed by \`ib glossary misses\`) (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { term, dismissed: 1 }; or { dryRun: true, term, wouldDismiss: boolean } with --dry-run
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a developer        → Developer access required
+  exit 5 (HTTP 404)  No OPEN miss for that term → Check \`ib glossary misses\` for the exact term
+
+EXAMPLES
+  ib glossary dismiss xa4 --reason junk
+  ib glossary dismiss xa4 --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib glossary import matches snapshot 1`] = `
 "USAGE
   ib glossary import <file> [flags]

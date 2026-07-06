@@ -1,6 +1,6 @@
 /**
  * `ib glossary` — the DB-backed domain glossary (synonym-aware vocabulary).
- * lookup/list are open; set/import/lint/delete/misses are developer-only. Backend:
+ * lookup/list are open; set/import/lint/delete/misses/dismiss are developer-only. Backend:
  * /api/cli/glossary/*. The vocabulary is the single source of truth in the DB.
  * Key behaviors: lookup <term> → exit 5 + miss recorded on 404, did-you-mean
  * hints via /glossary?search=, comma-separated terms → batch lookup; set is a
@@ -235,6 +235,16 @@ export async function runGlossaryMisses(client: ApiClient, top?: number): Promis
 }
 
 /**
+ * Dismiss an open glossary miss (junk/test lookup terms) WITHOUT defining it.
+ * `--dry-run` is SERVER-SIDE (X-Dry-Run): safe here because the guard ships in
+ * the same deploy as the route — an older backend 404s the two-segment path
+ * instead of persisting. A dismissed term re-enters the queue if looked up again.
+ */
+export async function runGlossaryDismiss(client: ApiClient, term: string, flags: WriteFlags = {}): Promise<unknown> {
+  return client.delete(`/api/cli/glossary/misses/${encodeURIComponent(term)}`, { headers: writeFlagsToHeaders(flags) });
+}
+
+/**
  * Delete a glossary entry. `--dry-run` resolves CLIENT-SIDE: it previews the
  * entry that WOULD be deleted and NEVER issues the DELETE. The backend DELETE
  * route historically ignored `X-Dry-Run` and destroyed the row regardless
@@ -305,6 +315,18 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
     .option("--top <n>", "Return up to N", (v: string) => Number(v))
     .action(async (opts: { top?: number }) => {
       try { writeJson(await runGlossaryMisses(await getClient(), opts.top)); } catch (e) { exitWithError(e); }
+    });
+
+  const dismiss = glossary
+    .command("dismiss")
+    .description("Dismiss an open lookup miss without defining it — junk/test terms (developer only)")
+    .argument("<term>", "Missed term to dismiss (as listed by `ib glossary misses`)");
+  addWriteFlagsToCommand(dismiss).action(
+    async (term: string, opts: { dryRun?: boolean; idempotencyKey?: string; reason?: string }) => {
+      try {
+        writeJson(await runGlossaryDismiss(await getClient(), term,
+          { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
+      } catch (e) { exitWithError(e); }
     });
 
   glossary

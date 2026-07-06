@@ -5632,6 +5632,25 @@ const BASE_COMMAND_SPECS = [
         examples: ["ib glossary misses --top 20"],
     },
     {
+        command: "ib glossary dismiss",
+        description: "Dismiss an open lookup miss WITHOUT defining the term — for junk/test lookups (developer only). The term re-enters the queue if it is ever looked up again.",
+        tier: "developer",
+        auth: "any",
+        mutates: true,
+        writeFlags: true,
+        args: [{ name: "term", type: "string", required: true, description: "Missed term (as listed by `ib glossary misses`)" }],
+        flags: [],
+        outputShape: "{ term, dismissed: 1 }; or { dryRun: true, term, wouldDismiss: boolean } with --dry-run",
+        errors: [
+            { http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" },
+            { http: 404, exit: 5, meaning: "No OPEN miss for that term", remedy: "Check `ib glossary misses` for the exact term" },
+        ],
+        examples: [
+            "ib glossary dismiss xa4 --reason junk",
+            "ib glossary dismiss xa4 --dry-run",
+        ],
+    },
+    {
         command: "ib glossary set",
         description: "Create/update a glossary entry (developer only). PARTIAL update: only the fields you pass change — omit a flag to KEEP its current value, pass an empty value to CLEAR it. Auto-resolves a matching miss.",
         tier: "developer",
