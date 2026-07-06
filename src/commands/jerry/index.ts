@@ -387,6 +387,73 @@ export async function runJerryAdminToggle(
   );
 }
 
+// ─── admin onboarding (provider-acquisition pipeline) ───────────────────────
+
+export interface JerryOnboardingListOpts {
+  status?: string;
+  tier?: number;
+  due?: boolean;
+}
+
+/** List onboarding prospects (GET /api/admin/jerry-onboarding). System-admin only. */
+export async function runJerryOnboardingList(
+  client: ApiClient,
+  opts: JerryOnboardingListOpts = {}
+): Promise<ListEnvelope<Row>> {
+  const params = new URLSearchParams();
+  if (opts.status) params.set("status", opts.status);
+  if (opts.tier !== undefined) params.set("tier", String(opts.tier));
+  const qs = params.toString();
+  const env = toEnvelope(
+    await client.get<unknown>(`/api/admin/jerry-onboarding${qs ? `?${qs}` : ""}`)
+  );
+  if (!opts.due) return env;
+  const items = (env.items as Row[]).filter((r) => r.muistutusDue === true);
+  return { ...env, items, count: items.length };
+}
+
+/** Add a prospect (POST /api/admin/jerry-onboarding). System-admin only. */
+export async function runJerryOnboardingAdd(
+  client: ApiClient,
+  asiakasId: number,
+  fields: Row,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>(
+    "/api/admin/jerry-onboarding",
+    { asiakasId, ...fields },
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/** Partial-update a prospect (PUT /api/admin/jerry-onboarding/:id). System-admin only. */
+export async function runJerryOnboardingSet(
+  client: ApiClient,
+  asiakasId: number,
+  fields: Row,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.put<unknown>(
+    `/api/admin/jerry-onboarding/${asiakasId}`,
+    fields,
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/** Log a call/response/note event (POST /api/admin/jerry-onboarding/:id/events). */
+export async function runJerryOnboardingLog(
+  client: ApiClient,
+  asiakasId: number,
+  body: Row,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>(
+    `/api/admin/jerry-onboarding/${asiakasId}/events`,
+    body,
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
 export interface JerryAdminRequestsOpts {
   status?: string;
   from?: string;
@@ -918,6 +985,109 @@ export function registerJerryCommands(
     try {
       const client = await getClient();
       writeJson(await runJerryAdminToggle(client, resolveAsiakasTarget(idStr, opts.asiakas), false, opts));
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
+
+  // admin onboarding — provider-acquisition pipeline ──────────────────────────
+  const onboarding = admin
+    .command("onboarding")
+    .description("Provider onboarding pipeline (prospects + contact history)");
+
+  onboarding
+    .command("list")
+    .description("List onboarding prospects with live Jerry status and reminder-due flag")
+    .option("--status <key>", "Filter by pipeline status key (e.g. email1_lahetetty)")
+    .option("--tier <n>", "Filter by tier (1/2)", Number)
+    .option("--due", "Only rows where the email1b reminder is due")
+    .action(async (opts: JerryOnboardingListOpts) => {
+      try {
+        const client = await getClient();
+        writeJson(await runJerryOnboardingList(client, opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  const pickProspectFields = (o: Record<string, unknown>): Row => {
+    const out: Row = {};
+    if (o.tier !== undefined) out.tier = o.tier;
+    if (o.malli !== undefined) out.malli = o.malli;
+    if (o.kanava !== undefined) out.kanava = o.kanava;
+    if (o.alue !== undefined) out.alue = o.alue;
+    if (o.status !== undefined) out.status = o.status;
+    if (o.notes !== undefined) out.muistiinpanot = o.notes;
+    if (o.outreachName !== undefined) out.outreachName = o.outreachName;
+    if (o.outreachEmail !== undefined) out.outreachEmail = o.outreachEmail;
+    if (o.outreachPhone !== undefined) out.outreachPhone = o.outreachPhone;
+    return out;
+  };
+
+  addWriteFlagsToCommand(
+    onboarding
+      .command("add <asiakasId>")
+      .description("Add a company to the onboarding pipeline")
+      .option("--tier <n>", "1 = priority, 2 = secondary", Number)
+      .option("--malli <v>", "Email variant (A/B)")
+      .option("--kanava <text>", "Preferred channel")
+      .option("--alue <text>", "Operating area ({alue} merge field)")
+      .option("--source <s>", "manual|import|scheduled (default manual)")
+  ).action(async (idStr: string, opts: WriteOpts & Record<string, unknown>) => {
+    try {
+      const client = await getClient();
+      writeJson(
+        await runJerryOnboardingAdd(
+          client,
+          resolveAsiakasTarget(idStr, undefined),
+          { ...pickProspectFields(opts), ...(opts.source !== undefined ? { source: opts.source } : {}) },
+          opts
+        )
+      );
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
+
+  addWriteFlagsToCommand(
+    onboarding
+      .command("set <asiakasId>")
+      .description("Partial-update a prospect (status, tier, notes, outreach contact)")
+      .option("--status <key>", "Pipeline status key")
+      .option("--tier <n>", "1/2", Number)
+      .option("--malli <v>", "Email variant (A/B)")
+      .option("--kanava <text>", "Preferred channel")
+      .option("--alue <text>", "Operating area")
+      .option("--notes <text>", "muistiinpanot")
+      .option("--outreach-name <text>", "Contact override name")
+      .option("--outreach-email <email>", "Contact override email")
+      .option("--outreach-phone <phone>", "Contact override phone")
+  ).action(async (idStr: string, opts: WriteOpts & Record<string, unknown>) => {
+    try {
+      const client = await getClient();
+      writeJson(
+        await runJerryOnboardingSet(client, resolveAsiakasTarget(idStr, undefined), pickProspectFields(opts), opts)
+      );
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
+
+  addWriteFlagsToCommand(
+    onboarding
+      .command("log <asiakasId>")
+      .description("Log a call/response/note event (optionally set status atomically)")
+      .requiredOption("--type <t>", "call | response | note")
+      .requiredOption("--text <text>", "Event text")
+      .option("--time <iso>", "Backdated event time (ISO 8601)")
+      .option("--set-status <key>", "Also set the pipeline status")
+  ).action(async (idStr: string, opts: WriteOpts & Record<string, unknown>) => {
+    try {
+      const client = await getClient();
+      const body: Row = { eventType: opts.type, eventText: opts.text };
+      if (opts.time !== undefined) body.eventTime = opts.time;
+      if (opts.setStatus !== undefined) body.setStatus = opts.setStatus;
+      writeJson(await runJerryOnboardingLog(client, resolveAsiakasTarget(idStr, undefined), body, opts));
     } catch (e) {
       exitWithError(e);
     }

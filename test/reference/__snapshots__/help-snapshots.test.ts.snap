@@ -3347,6 +3347,161 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib jerry admin onboarding add matches snapshot 1`] = `
+"USAGE
+  ib jerry admin onboarding add <asiakasId> [flags]
+
+DESCRIPTION
+  Add a company to the provider-onboarding pipeline (POST /api/admin/jerry-onboarding). One row per asiakasId; duplicate exits 4. Emails are NOT sent via CLI — sending stays a human action in /admin. System-admin only.
+  Permissions: requires isSystemAdmin.
+
+ARGUMENTS
+  <asiakasId> NUMBER    company asiakasId (required)
+
+FLAGS
+  --tier NUMBER    1 priority / 2 secondary
+  --malli STRING    Email variant (A/B)
+  --kanava STRING    Preferred channel, free text
+  --alue STRING    Operating area ({alue} merge field)
+  --source STRING    manual | import | scheduled (default manual)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { jerryOnboardingId } · { dryRun: true, wouldCreate: { asiakasId } } on --dry-run
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Prospect already exists / company not found → check asiakasId
+  exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry admin onboarding add 1389 --tier 2 --alue "Oulu" --source scheduled --reason "uusi yritys rekisterista"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry admin onboarding list matches snapshot 1`] = `
+"USAGE
+  ib jerry admin onboarding list [flags]
+
+DESCRIPTION
+  List provider-onboarding prospects — pipeline status, tier, outreach contact, live Jerry-active flag, and muistutusDue (email1b reminder due) per company (GET /api/admin/jerry-onboarding). Filters: --status, --tier, --due (client-side on muistutusDue). System-admin only.
+  Permissions: requires isSystemAdmin.
+
+FLAGS
+  --status STRING    Pipeline status key (e.g. email1_lahetetty, vastasi_kylla)
+  --tier NUMBER    Tier filter (1 priority / 2 secondary)
+  --due BOOLEAN    Only rows where the email1b reminder is due
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ asiakasId, asiakasNimi, tier, status, alue, outreachEmail, jerryActive, lastEventTime, muistutusDue }>
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry admin onboarding list --due
+  ib jerry admin onboarding list --status vastasi_kylla
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry admin onboarding log matches snapshot 1`] = `
+"USAGE
+  ib jerry admin onboarding log <asiakasId> [flags]
+
+DESCRIPTION
+  Append a call/response/note event to a prospect's contact history (POST /api/admin/jerry-onboarding/:asiakasId/events). --time backdates; --set-status also moves the pipeline status atomically. System-admin only.
+  Permissions: requires isSystemAdmin.
+
+ARGUMENTS
+  <asiakasId> NUMBER    company asiakasId (required)
+
+FLAGS
+  --type STRING    call | response | note; REQUIRED
+  --text STRING    Event text; REQUIRED
+  --time STRING    Backdated event time (ISO 8601)
+  --set-status STRING    Also set the pipeline status
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { jerryOnboardingEventId } · { dryRun: true, wouldLog: {...} } on --dry-run
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Invalid eventType / missing text → type must be call, response or note
+  exit 5 (HTTP 404)  Prospect not found     → add it first: ib jerry admin onboarding add
+  exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry admin onboarding log 1389 --type call --text "puhuttiin Jussin kanssa, kiinnostunut" --set-status vastasi_kylla
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry admin onboarding set matches snapshot 1`] = `
+"USAGE
+  ib jerry admin onboarding set <asiakasId> [flags]
+
+DESCRIPTION
+  Partial-update an onboarding prospect (PUT /api/admin/jerry-onboarding/:asiakasId) — status, tier, notes, outreach contact override. Only the flags you pass are written; a status change also writes a status_change history event. System-admin only.
+  Permissions: requires isSystemAdmin.
+
+ARGUMENTS
+  <asiakasId> NUMBER    company asiakasId (required)
+
+FLAGS
+  --status STRING    Pipeline status key
+  --tier NUMBER    1/2
+  --malli STRING    Email variant (A/B)
+  --kanava STRING    Preferred channel
+  --alue STRING    Operating area
+  --notes STRING    muistiinpanot
+  --outreach-name STRING    Contact override name
+  --outreach-email STRING    Contact override email
+  --outreach-phone STRING    Contact override phone
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success: true } · { dryRun: true, wouldUpdate: { asiakasId, fields } } on --dry-run
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Unknown status         → use a pipeline status key
+  exit 5 (HTTP 404)  Prospect not found     → add it first: ib jerry admin onboarding add
+  exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry admin onboarding set 1389 --status vastasi_kylla --reason "vastasi puhelimessa"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib jerry admin request cancel matches snapshot 1`] = `
 "USAGE
   ib jerry admin request cancel <requestId> [flags]
