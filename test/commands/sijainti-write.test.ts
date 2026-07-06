@@ -25,6 +25,7 @@ const mockClient = {
 describe("ib sijainti create/update", () => {
   beforeEach(() => {
     (mockClient.post as ReturnType<typeof vi.fn>).mockReset();
+    (mockClient.get as ReturnType<typeof vi.fn>).mockReset();
   });
 
   test("runSijaintiCreate forwards body + all three write-flag headers", async () => {
@@ -56,19 +57,137 @@ describe("ib sijainti create/update", () => {
     expect((result as { sijaintiId: number }).sijaintiId).toBe(4242);
   });
 
-  test("runSijaintiUpdate posts to /api/geocode/updateSijainti with sijaintiId IN body (not URL) + flag headers", async () => {
+  test("runSijaintiUpdate read-merges (fb#93): GET current row, sparse fields overlaid, jerryActiveUntil/dates preserved, coords stripped", async () => {
+    const current = {
+      sijaintiId: 4242,
+      sijaintiNimi: "Helsinki HQ",
+      sijaintiOsoite1: "Mannerheimintie 1",
+      sijaintiOsoite2: "00100 Helsinki",
+      sijaintiPhone: "+358401234567",
+      jerryActiveUntil: "9999-12-31T23:59:59.000Z",
+      startDate: "2024-01-01",
+      endDate: null,
+      maxDeliveryDistance: 60,
+      lat: 60.17,
+      lng: 24.94,
+      placeId: "ChIJxyz",
+    };
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce(current);
     (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       success: true,
     });
-    const body = { sijaintiId: 4242, sijaintiNimi: "Helsinki HQ — Tower B" };
-    await runSijaintiUpdate(mockClient, body, {
+    const sparse = { sijaintiId: 4242, sijaintiNimi: "Helsinki HQ — Tower B" };
+    const { result, merged } = await runSijaintiUpdate(mockClient, sparse, {
       reason: "tower split",
     });
+    expect(mockClient.get).toHaveBeenCalledWith("/api/geocode/sijainti/get/4242");
+    // one POST only (no geocode — address unchanged), sijaintiId IN body (not URL)
+    expect(mockClient.post).toHaveBeenCalledTimes(1);
     expect(mockClient.post).toHaveBeenCalledWith(
       "/api/geocode/updateSijainti",
-      body,
+      {
+        sijaintiId: 4242,
+        sijaintiNimi: "Helsinki HQ — Tower B",
+        sijaintiOsoite1: "Mannerheimintie 1",
+        sijaintiOsoite2: "00100 Helsinki",
+        sijaintiPhone: "+358401234567",
+        jerryActiveUntil: "9999-12-31T23:59:59.000Z",
+        startDate: "2024-01-01",
+        endDate: null,
+        maxDeliveryDistance: 60,
+      },
       { headers: { "X-Action-Reason": "tower split" } }
     );
+    // lat/lng/placeId never ride the save body (persisted separately via updateLatLng)
+    expect(merged.lat).toBeUndefined();
+    expect(merged.lng).toBeUndefined();
+    expect((result as { success: boolean }).success).toBe(true);
+  });
+
+  test("runSijaintiUpdate: explicit null in the sparse body still clears the field", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      sijaintiId: 7,
+      sijaintiNimi: "Depot",
+      sijaintiOsoite1: "Street 1",
+      endDate: "2026-12-31",
+    });
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
+    const { merged } = await runSijaintiUpdate(
+      mockClient,
+      { sijaintiId: 7, endDate: null },
+      {}
+    );
+    expect(merged.endDate).toBeNull();
+    expect(merged.sijaintiNimi).toBe("Depot");
+  });
+
+  test("runSijaintiUpdate: address change without coords auto-geocodes the NEW address", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      sijaintiId: 7,
+      sijaintiNimi: "Depot",
+      sijaintiOsoite1: "Old Street 1",
+      lat: 60.1,
+      lng: 24.9,
+    });
+    const post = mockClient.post as ReturnType<typeof vi.fn>;
+    post.mockImplementation(async (path: string) => {
+      if (path === "/api/geocode/getLatLng") {
+        return { results: [{ geometry: { location: { lat: 61.5, lng: 23.75 } } }] };
+      }
+      return { success: true };
+    });
+    const { merged, geocodeFailed } = await runSijaintiUpdate(
+      mockClient,
+      { sijaintiId: 7, sijaintiOsoite1: "New Street 2, Tampere" },
+      {}
+    );
+    expect(post).toHaveBeenCalledWith("/api/geocode/getLatLng", {
+      osoite: "New Street 2, Tampere",
+    });
+    expect(merged.lat).toBe(61.5);
+    expect(merged.lng).toBe(23.75);
+    expect(geocodeFailed).toBeUndefined();
+  });
+
+  test("runSijaintiUpdate: auto-geocode failure is soft — update still POSTs, geocodeFailed reported", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      sijaintiId: 7,
+      sijaintiNimi: "Depot",
+      sijaintiOsoite1: "Old Street 1",
+    });
+    const post = mockClient.post as ReturnType<typeof vi.fn>;
+    post.mockImplementation(async (path: string) => {
+      if (path === "/api/geocode/getLatLng") return { status: "ZERO_RESULTS" };
+      return { success: true };
+    });
+    const { merged, geocodeFailed } = await runSijaintiUpdate(
+      mockClient,
+      { sijaintiId: 7, sijaintiOsoite1: "Nonexistent Road 999" },
+      {}
+    );
+    expect(geocodeFailed).toContain("could not geocode");
+    expect(merged.lat).toBeUndefined();
+    expect(post).toHaveBeenCalledWith(
+      "/api/geocode/updateSijainti",
+      expect.objectContaining({ sijaintiOsoite1: "Nonexistent Road 999" }),
+      { headers: {} }
+    );
+  });
+
+  test("runSijaintiUpdate: explicit --lat/--lng suppress the auto-geocode on address change", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      sijaintiId: 7,
+      sijaintiOsoite1: "Old Street 1",
+    });
+    const post = mockClient.post as ReturnType<typeof vi.fn>;
+    post.mockResolvedValue({ success: true });
+    const { merged } = await runSijaintiUpdate(
+      mockClient,
+      { sijaintiId: 7, sijaintiOsoite1: "New Street 2", lat: 61.5, lng: 23.75 },
+      {}
+    );
+    expect(post).toHaveBeenCalledTimes(1); // updateSijainti only — no getLatLng
+    expect(merged.lat).toBe(61.5);
   });
 });
 

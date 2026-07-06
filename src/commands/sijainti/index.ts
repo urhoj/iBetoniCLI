@@ -196,18 +196,81 @@ export async function runSijaintiCreate(
 }
 
 /**
- * POST /api/geocode/updateSijainti with a free-form body. The target
- * `sijaintiId` is carried IN the body (not the URL) — this matches the
- * existing geocodeRoutes.js shape.
+ * Build the full save body for an update: the current row with the sparse
+ * user-supplied fields overlaid (fb#93). lat/lng/placeId are stripped from the
+ * base — the save proc binds none of them (they are persisted separately via
+ * updateLatLng) and re-sending the old coords under a changed address would
+ * resurrect stale coordinates. An explicit null in `sparse` still clears its
+ * field; the server-side extractSijaintiBody whitelist drops any extra keys.
+ */
+export function mergeSijaintiUpdateBody(
+  current: Record<string, unknown>,
+  sparse: Record<string, unknown>
+): Record<string, unknown> {
+  const base = { ...current };
+  delete base.lat;
+  delete base.lng;
+  delete base.placeId;
+  return { ...base, ...sparse };
+}
+
+/** Did the sparse update change an address line? (null/undefined normalised) */
+export function sijaintiAddressChanged(
+  current: Record<string, unknown>,
+  sparse: Record<string, unknown>
+): boolean {
+  return (["sijaintiOsoite1", "sijaintiOsoite2"] as const).some(
+    (k) => sparse[k] !== undefined && (sparse[k] ?? null) !== (current[k] ?? null)
+  );
+}
+
+export interface SijaintiUpdateOutcome {
+  /** Backend echo of POST /api/geocode/updateSijainti (or the dry-run preview). */
+  result: unknown;
+  /** The full merged body that was posted — source for the coords follow-up. */
+  merged: Record<string, unknown>;
+  /** Set when the automatic address-change geocode failed (update still ran). */
+  geocodeFailed?: string;
+}
+
+/**
+ * Update a sijainti via read-merge-write (fb#93). The `sijainti_save` proc
+ * assigns most columns directly (no COALESCE) — a sparse body would NULL
+ * jerryActiveUntil (silently unenrolling a Jerry varikko), start/end dates,
+ * phone and comment — so the current row is fetched first and the sparse
+ * `body` overlaid on it (same GET+merge as set-jerry). The proc also NULLs
+ * lat/lng/placeId whenever an address line changes, so an address change
+ * without explicit coords geocodes the new address automatically (soft-fail:
+ * `geocodeFailed` is reported on the outcome instead of aborting the update);
+ * `geocode=true` (--geocode) forces re-resolution and fails fast. The target
+ * `sijaintiId` is carried IN the body (geocodeRoutes.js shape).
  */
 export async function runSijaintiUpdate(
   client: ApiClient,
   body: Record<string, unknown>,
-  flags: WriteFlags
-): Promise<unknown> {
-  return client.post<unknown>("/api/geocode/updateSijainti", body, {
+  flags: WriteFlags,
+  geocode = false
+): Promise<SijaintiUpdateOutcome> {
+  const current = await runSijaintiGet(client, Number(body.sijaintiId));
+  const merged = mergeSijaintiUpdateBody(current, body);
+  let geocodeFailed: string | undefined;
+  if (geocode) {
+    await applyGeocodeToBody(client, merged); // explicit: fail fast on a bad address
+  } else if (
+    sijaintiAddressChanged(current, body) &&
+    merged.lat == null &&
+    merged.lng == null
+  ) {
+    try {
+      await applyGeocodeToBody(client, merged);
+    } catch (e) {
+      geocodeFailed = errorMessage(e);
+    }
+  }
+  const result = await client.post<unknown>("/api/geocode/updateSijainti", merged, {
     headers: writeFlagsToHeaders(flags),
   });
+  return { result, merged, geocodeFailed };
 }
 
 /**
@@ -968,8 +1031,10 @@ export function registerSijaintiCommands(
   const updateCmd = s
     .command("update")
     .description(
-      "Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Typed flags win over --body. " +
-        "--lat/--lng (or --geocode to re-resolve from the address) are persisted via a follow-up updateLatLng call (the save proc itself drops them) and echoed as { lat, lng, coordsPersisted }."
+      "Update a sijainti (read-merge-write over POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Typed flags win over --body. " +
+        "Omitted fields KEEP their current values (the save proc would otherwise NULL e.g. jerryActiveUntil and dates); pass an explicit null in --body to clear a field. " +
+        "An address change re-geocodes the new address automatically when no --lat/--lng are given (--geocode forces re-resolution). " +
+        "Coords are persisted via a follow-up updateLatLng call (the save proc itself drops them) and echoed as { lat, lng, coordsPersisted }."
     )
     .option("--body <json>", "JSON object forwarded as the request body")
     .option("--id <sijaintiId>", "Target sijaintiId", Number)
@@ -1018,21 +1083,36 @@ export function registerSijaintiCommands(
         if (body.sijaintiId === undefined) {
           failWith("update requires sijaintiId — pass --id or include it in --body", 4);
         }
-        // --geocode: re-resolve lat/lng from the (changed) address before the
-        // write, so a bad address fails fast and the coords are persisted below.
-        if (opts.geocode) await applyGeocodeToBody(client, body);
         const flags = {
           dryRun: opts.dryRun,
           idempotencyKey: opts.idempotencyKey,
           reason: opts.reason,
         };
-        const result = await runSijaintiUpdate(client, body, flags);
+        const { result, merged, geocodeFailed } = await runSijaintiUpdate(
+          client,
+          body,
+          flags,
+          !!opts.geocode
+        );
         // The save proc drops lat/lng; persist them via the dedicated updateLatLng
         // route (the FE's update→saveLatLng flow) and echo { lat, lng, coordsPersisted }.
         const sijaintiId = !opts.dryRun ? Number(body.sijaintiId) : undefined;
-        writeJson(
-          await persistSijaintiCoords(client, result, sijaintiId, { lat: body.lat, lng: body.lng }, flags)
+        const echo = await persistSijaintiCoords(
+          client,
+          result,
+          sijaintiId,
+          { lat: merged.lat, lng: merged.lng },
+          flags
         );
+        if (geocodeFailed) {
+          const base =
+            echo && typeof echo === "object"
+              ? (echo as Record<string, unknown>)
+              : { result: echo };
+          writeJson({ ...base, coordsPersisted: false, geocodeFailed });
+        } else {
+          writeJson(echo);
+        }
       } catch (e) {
         exitWithError(e);
       }

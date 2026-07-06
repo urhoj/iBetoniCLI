@@ -100,6 +100,41 @@ describe("runVehicleCreate", () => {
       headers: { "X-Dry-Run": "1" },
     });
   });
+
+  test("--asiakas rides the /new path param so the stub is owned by the target tenant (fb#94)", async () => {
+    (c.post as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ vehicleId: 91 })
+      .mockResolvedValueOnce({ vehicleId: 91 });
+    await runVehicleCreate(
+      c,
+      { vehicleRegNo: "PUM-24", asiakasId: 1380, vehiclePuomi: 24 },
+      { reason: "jerry onboarding" }
+    );
+    expect(c.post).toHaveBeenNthCalledWith(1, "/api/vehicle/new/1380", {}, {
+      headers: { "X-Action-Reason": "jerry onboarding" },
+    });
+    expect(c.post).toHaveBeenNthCalledWith(
+      2,
+      "/api/vehicle/save",
+      expect.objectContaining({
+        vehicleId: 91,
+        asiakasId: 1380,
+        vehiclePuomi: 24,
+      }),
+      { headers: { "X-Action-Reason": "jerry onboarding" } }
+    );
+  });
+
+  test("--asiakas dry-run also targets the tenant's /new path", async () => {
+    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      dryRun: true,
+      wouldCreate: { vehicleId: null },
+    });
+    await runVehicleCreate(c, { asiakasId: 1380 }, { dryRun: true });
+    expect(c.post).toHaveBeenCalledWith("/api/vehicle/new/1380", {}, {
+      headers: { "X-Dry-Run": "1" },
+    });
+  });
 });
 
 describe("runVehicleUpdate", () => {
@@ -255,6 +290,29 @@ describe("runVehicleUpdate", () => {
         lastDate: "2026-12-31",
       }),
       { headers: { "X-Action-Reason": "retiring" } }
+    );
+  });
+
+  test("--puomi updates vehiclePuomi (merge + dry-run diff)", async () => {
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([CURRENT_53]);
+    const out = await runVehicleUpdate(
+      c,
+      53,
+      { vehiclePuomi: 32 },
+      { dryRun: true }
+    );
+    expect(out).toEqual({
+      dryRun: true,
+      vehicleId: 53,
+      wouldChange: { vehiclePuomi: { from: 0, to: 32 } },
+    });
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([CURRENT_53]);
+    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ vehicleId: 53 });
+    await runVehicleUpdate(c, 53, { vehiclePuomi: 32 }, { reason: "boom fix" });
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/vehicle/save",
+      expect.objectContaining({ vehicleId: 53, vehiclePuomi: 32 }),
+      { headers: { "X-Action-Reason": "boom fix" } }
     );
   });
 });

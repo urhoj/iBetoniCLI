@@ -168,13 +168,19 @@ const VEHICLE_DIFF_FIELDS = [
     "showInGrid",
     "defaultKuski_personId",
     "vehicleM3",
+    "vehiclePuomi",
 ];
 /**
  * Create a vehicle. The backend `vehicle_save` proc is UPDATE-only, so creation
- * is two-step: `POST /api/vehicle/new/:ownerAsiakasId` inserts a blank stub and
+ * is two-step: `POST /api/vehicle/new/:asiakasId` inserts a blank stub and
  * returns its `vehicleId`, then `POST /api/vehicle/save` populates it.
  *
- * `ownerAsiakasId` is taken from the active JWT. For a dry-run we only hit the
+ * The `/new` path param stamps BOTH `ownerAsiakasId` and `asiakasId` on the
+ * stub, so `--asiakas` must ride the path — not just the save body — or a
+ * cross-tenant create ends up owned by the caller's company (fb#94). Target =
+ * `fields.asiakasId`, defaulting to the active JWT's company. The route guard
+ * (`hasVehicleAccessOnAsiakas`) requires admin/owner/vehicleHandler on the
+ * target tenant (sysadmin/developer pass). For a dry-run we only hit the
  * `/new` endpoint (with `X-Dry-Run`) and return the backend's preview — no save
  * is attempted. The `--reason` audit string is sent on both calls; the
  * `--idempotency-key` only applies to the populating save.
@@ -182,13 +188,14 @@ const VEHICLE_DIFF_FIELDS = [
 export async function runVehicleCreate(client, fields, flags) {
     const ownerAsiakasId = decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId ??
         failWith("could not resolve ownerAsiakasId from the active token", 4);
+    const targetAsiakasId = fields.asiakasId ?? ownerAsiakasId;
     if (flags.dryRun) {
-        return client.post(`/api/vehicle/new/${ownerAsiakasId}`, {}, { headers: writeFlagsToHeaders(flags) });
+        return client.post(`/api/vehicle/new/${targetAsiakasId}`, {}, { headers: writeFlagsToHeaders(flags) });
     }
-    const created = await client.post(`/api/vehicle/new/${ownerAsiakasId}`, {}, { headers: writeFlagsToHeaders({ reason: flags.reason }) });
+    const created = await client.post(`/api/vehicle/new/${targetAsiakasId}`, {}, { headers: writeFlagsToHeaders({ reason: flags.reason }) });
     const body = {
         vehicleId: created.vehicleId,
-        asiakasId: fields.asiakasId ?? ownerAsiakasId,
+        asiakasId: targetAsiakasId,
         vehicleNo: fields.vehicleNo ?? null,
         vehicleNimi: fields.vehicleNimi ?? null,
         vehicleRegNo: fields.vehicleRegNo ?? null,
@@ -196,6 +203,7 @@ export async function runVehicleCreate(client, fields, flags) {
         memo: fields.memo ?? null,
         defaultKuski_personId: fields.defaultKuski_personId ?? null,
         vehicleM3: fields.vehicleM3 ?? null,
+        vehiclePuomi: fields.vehiclePuomi ?? null,
     };
     return client.post("/api/vehicle/save", body, {
         headers: writeFlagsToHeaders({
@@ -231,7 +239,7 @@ export async function runVehicleUpdate(client, vehicleId, changes, flags) {
         vehicleNo: changes.vehicleNo ?? current.vehicleNo,
         vehicleNimi: changes.vehicleNimi ?? current.vehicleNimi,
         vehicleRegNo: changes.vehicleRegNo ?? current.vehicleRegNo,
-        vehiclePuomi: current.vehiclePuomi,
+        vehiclePuomi: changes.vehiclePuomi ?? current.vehiclePuomi,
         firstDate: changes.firstDate ?? current.firstDate,
         lastDate: changes.lastDate ?? current.lastDate,
         vehicleTypeId: changes.vehicleTypeId ?? current.vehicleTypeId,
@@ -377,7 +385,9 @@ export function registerVehicleCommands(parent, getClient) {
     });
     const createCmd = v
         .command("create")
-        .description("Create a vehicle (new stub then save). ownerAsiakasId from JWT.")
+        .description("Create a vehicle (new stub then save). --asiakas creates it under that tenant " +
+        "(rides the /new path param — requires admin/owner/vehicleHandler role there); " +
+        "default = active company from JWT.")
         .option("--reg <s>", "Registration number (vehicleRegNo)")
         .option("--name <s>", "Display name (vehicleNimi)")
         .option("--no <n>", "Fleet number (vehicleNo)", (s) => Number(s))
@@ -385,7 +395,8 @@ export function registerVehicleCommands(parent, getClient) {
         .option("--memo <s>", "Free-text memo")
         .option("--default-driver <pid>", "Default driver personId", (s) => Number(s))
         .option("--capacity <m3>", "Concrete capacity in m3 (vehicleM3)", (s) => Number(s))
-        .option("--asiakas <id>", "Owning asiakasId (defaults to active company)", (s) => Number(s));
+        .option("--puomi <m>", "Boom length in metres (vehiclePuomi — BetoniJerry matching field)", (s) => Number(s))
+        .option("--asiakas <id>", "Owning asiakasId (defaults to active company; needs a vehicle-manage role on that tenant)", (s) => Number(s));
     addWriteFlagsToCommand(createCmd).action(async (opts) => {
         try {
             const result = await runVehicleCreate(await getClient(), {
@@ -396,6 +407,7 @@ export function registerVehicleCommands(parent, getClient) {
                 memo: opts.memo,
                 defaultKuski_personId: opts.defaultDriver,
                 vehicleM3: opts.capacity,
+                vehiclePuomi: opts.puomi,
                 asiakasId: opts.asiakas,
             }, {
                 dryRun: opts.dryRun,
@@ -417,6 +429,7 @@ export function registerVehicleCommands(parent, getClient) {
         .option("--type <n>", "vehicleTypeId", (s) => Number(s))
         .option("--memo <s>", "Free-text memo")
         .option("--capacity <m3>", "Concrete capacity in m3 (vehicleM3)", (s) => Number(s))
+        .option("--puomi <m>", "Boom length in metres (vehiclePuomi — BetoniJerry matching field)", (s) => Number(s))
         .option("--asiakas <id>", "Owning asiakasId", (s) => Number(s))
         .option("--show-in-grid <bool>", "Whether the vehicle appears in the grid (true/false)", parseBoolFlag)
         .option("--first-date <date>", "Start of validity window YYYY-MM-DD (firstDate; or today/yesterday/tomorrow)")
@@ -430,6 +443,7 @@ export function registerVehicleCommands(parent, getClient) {
                 vehicleTypeId: opts.type,
                 memo: opts.memo,
                 vehicleM3: opts.capacity,
+                vehiclePuomi: opts.puomi,
                 asiakasId: opts.asiakas,
                 showInGrid: opts.showInGrid,
                 firstDate: resolveDate(opts.firstDate),

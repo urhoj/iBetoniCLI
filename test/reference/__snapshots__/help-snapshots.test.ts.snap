@@ -9103,7 +9103,7 @@ exports[`Help snapshots — contract stability > help for ib sijainti update mat
   ib sijainti update [flags]
 
 DESCRIPTION
-  Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. --lat/--lng (or --geocode to re-resolve from the changed address) are persisted via a follow-up updateLatLng call (the save proc itself binds no lat/lng) and echoed as { lat, lng, coordsPersisted }. Provide typed flags or --body JSON; typed flags win over --body.
+  Update a sijainti via read-merge-write (GET current row + POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Omitted fields KEEP their current values (the save proc assigns directly — a sparse body would NULL e.g. jerryActiveUntil, dates, phone); pass an explicit null in --body to clear a field. An address change re-geocodes the new address automatically when no --lat/--lng are given (soft-fail: geocodeFailed echoed; --geocode forces re-resolution and fails fast). --lat/--lng are persisted via a follow-up updateLatLng call (the save proc itself binds no lat/lng) and echoed as { lat, lng, coordsPersisted }. Provide typed flags or --body JSON; typed flags win over --body.
   Permissions: requires auth.page.sijainnit.edit.
 
 FLAGS
@@ -9116,7 +9116,7 @@ FLAGS
   --lng NUMBER    Longitude (persisted via updateLatLng + echoed)
   --lyh STRING    sijaintiLyh — short code/abbreviation (≤50 chars)
   --max-distance NUMBER    maxDeliveryDistance in km
-  --geocode BOOLEAN    Re-resolve lat/lng from the (changed) --address via Google Maps when coordinates are not given (then persisted + echoed)
+  --geocode BOOLEAN    Force re-resolving lat/lng from the address via Google Maps (fails fast on no match). Address changes auto-geocode even without this flag when no coordinates are given
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -9127,7 +9127,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { ok: true, ..., lat?, lng?, coordsPersisted? } — lat/lng/coordsPersisted present when --lat/--lng or --geocode supplied coordinates
+  { ok: true, ..., lat?, lng?, coordsPersisted?, geocodeFailed? } — lat/lng/coordsPersisted present when coordinates were supplied or geocoded; geocodeFailed when the automatic address-change geocode found no match (update still ran, coords now NULL)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed      → fix --body fields
@@ -9235,7 +9235,7 @@ exports[`Help snapshots — contract stability > help for ib vehicle create matc
   ib vehicle create [flags]
 
 DESCRIPTION
-  Create a vehicle. Two-step backend flow (POST /api/vehicle/new then /save); ownerAsiakasId from JWT. Dry-run previews via /new without inserting.
+  Create a vehicle. Two-step backend flow (POST /api/vehicle/new/:asiakasId then /save). --asiakas creates the vehicle UNDER that tenant (it rides the /new path param, which stamps ownerAsiakasId+asiakasId on the stub — fb#94); default = active company from JWT. Requires an admin/owner/vehicleHandler role on the target tenant. Dry-run previews via /new without inserting.
   Permissions: requires auth.page.vehicle.edit.
 
 FLAGS
@@ -9246,7 +9246,8 @@ FLAGS
   --memo STRING    Free-text memo
   --default-driver NUMBER    Default driver personId
   --capacity NUMBER    Concrete capacity in m3 (vehicleM3)
-  --asiakas NUMBER    Owning asiakasId (defaults to active company)
+  --puomi NUMBER    Boom length in metres (vehiclePuomi — BetoniJerry matching field)
+  --asiakas NUMBER    Target asiakasId to create the vehicle under (defaults to active company; needs a vehicle-manage role on that tenant)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -9261,12 +9262,14 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed      → fix the field flags
+  exit 3 (HTTP 403)  No access to this tenant's vehicles (--asiakas) → you need an admin/owner/vehicleHandler role on the target tenant
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib vehicle create --reg ABC-123 --type 1 --capacity 7.5 --reason 'new truck'
+  ib vehicle create --reg ABC-123 --type 2 --puomi 24 --asiakas 1380 --reason 'jerry onboarding'
   ib vehicle create --reg ABC-123 --dry-run
 "
 `;
@@ -10054,6 +10057,7 @@ FLAGS
   --type NUMBER    vehicleTypeId
   --memo STRING    Free-text memo
   --capacity NUMBER    Concrete capacity in m3
+  --puomi NUMBER    Boom length in metres (vehiclePuomi — BetoniJerry matching field)
   --asiakas NUMBER    Owning asiakasId
   --show-in-grid BOOLEAN    Whether the vehicle appears in the grid (true/false)
   --first-date DATE    Start of validity window (firstDate); YYYY-MM-DD or today/yesterday/tomorrow

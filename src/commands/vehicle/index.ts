@@ -262,6 +262,8 @@ export interface VehicleWriteFields {
   memo?: string;
   defaultKuski_personId?: number;
   vehicleM3?: number;
+  /** Boom length in metres (a core BetoniJerry matching field). */
+  vehiclePuomi?: number;
   asiakasId?: number;
   showInGrid?: boolean;
   firstDate?: string;
@@ -286,14 +288,20 @@ const VEHICLE_DIFF_FIELDS = [
   "showInGrid",
   "defaultKuski_personId",
   "vehicleM3",
+  "vehiclePuomi",
 ] as const;
 
 /**
  * Create a vehicle. The backend `vehicle_save` proc is UPDATE-only, so creation
- * is two-step: `POST /api/vehicle/new/:ownerAsiakasId` inserts a blank stub and
+ * is two-step: `POST /api/vehicle/new/:asiakasId` inserts a blank stub and
  * returns its `vehicleId`, then `POST /api/vehicle/save` populates it.
  *
- * `ownerAsiakasId` is taken from the active JWT. For a dry-run we only hit the
+ * The `/new` path param stamps BOTH `ownerAsiakasId` and `asiakasId` on the
+ * stub, so `--asiakas` must ride the path — not just the save body — or a
+ * cross-tenant create ends up owned by the caller's company (fb#94). Target =
+ * `fields.asiakasId`, defaulting to the active JWT's company. The route guard
+ * (`hasVehicleAccessOnAsiakas`) requires admin/owner/vehicleHandler on the
+ * target tenant (sysadmin/developer pass). For a dry-run we only hit the
  * `/new` endpoint (with `X-Dry-Run`) and return the backend's preview — no save
  * is attempted. The `--reason` audit string is sent on both calls; the
  * `--idempotency-key` only applies to the populating save.
@@ -306,21 +314,22 @@ export async function runVehicleCreate(
   const ownerAsiakasId =
     decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId ??
     failWith("could not resolve ownerAsiakasId from the active token", 4);
+  const targetAsiakasId = fields.asiakasId ?? ownerAsiakasId;
   if (flags.dryRun) {
     return client.post(
-      `/api/vehicle/new/${ownerAsiakasId}`,
+      `/api/vehicle/new/${targetAsiakasId}`,
       {},
       { headers: writeFlagsToHeaders(flags) }
     );
   }
   const created = await client.post<{ vehicleId: number }>(
-    `/api/vehicle/new/${ownerAsiakasId}`,
+    `/api/vehicle/new/${targetAsiakasId}`,
     {},
     { headers: writeFlagsToHeaders({ reason: flags.reason }) }
   );
   const body = {
     vehicleId: created.vehicleId,
-    asiakasId: fields.asiakasId ?? ownerAsiakasId,
+    asiakasId: targetAsiakasId,
     vehicleNo: fields.vehicleNo ?? null,
     vehicleNimi: fields.vehicleNimi ?? null,
     vehicleRegNo: fields.vehicleRegNo ?? null,
@@ -328,6 +337,7 @@ export async function runVehicleCreate(
     memo: fields.memo ?? null,
     defaultKuski_personId: fields.defaultKuski_personId ?? null,
     vehicleM3: fields.vehicleM3 ?? null,
+    vehiclePuomi: fields.vehiclePuomi ?? null,
   };
   return client.post("/api/vehicle/save", body, {
     headers: writeFlagsToHeaders({
@@ -371,7 +381,7 @@ export async function runVehicleUpdate(
     vehicleNo: changes.vehicleNo ?? current.vehicleNo,
     vehicleNimi: changes.vehicleNimi ?? current.vehicleNimi,
     vehicleRegNo: changes.vehicleRegNo ?? current.vehicleRegNo,
-    vehiclePuomi: current.vehiclePuomi,
+    vehiclePuomi: changes.vehiclePuomi ?? current.vehiclePuomi,
     firstDate: changes.firstDate ?? current.firstDate,
     lastDate: changes.lastDate ?? current.lastDate,
     vehicleTypeId: changes.vehicleTypeId ?? current.vehicleTypeId,
@@ -541,7 +551,11 @@ export function registerVehicleCommands(
 
   const createCmd = v
     .command("create")
-    .description("Create a vehicle (new stub then save). ownerAsiakasId from JWT.")
+    .description(
+      "Create a vehicle (new stub then save). --asiakas creates it under that tenant " +
+        "(rides the /new path param — requires admin/owner/vehicleHandler role there); " +
+        "default = active company from JWT."
+    )
     .option("--reg <s>", "Registration number (vehicleRegNo)")
     .option("--name <s>", "Display name (vehicleNimi)")
     .option("--no <n>", "Fleet number (vehicleNo)", (s: string) => Number(s))
@@ -558,8 +572,13 @@ export function registerVehicleCommands(
       (s: string) => Number(s)
     )
     .option(
+      "--puomi <m>",
+      "Boom length in metres (vehiclePuomi — BetoniJerry matching field)",
+      (s: string) => Number(s)
+    )
+    .option(
       "--asiakas <id>",
-      "Owning asiakasId (defaults to active company)",
+      "Owning asiakasId (defaults to active company; needs a vehicle-manage role on that tenant)",
       (s: string) => Number(s)
     );
   addWriteFlagsToCommand(createCmd).action(
@@ -572,6 +591,7 @@ export function registerVehicleCommands(
         memo?: string;
         defaultDriver?: number;
         capacity?: number;
+        puomi?: number;
         asiakas?: number;
       }
     ) => {
@@ -586,6 +606,7 @@ export function registerVehicleCommands(
             memo: opts.memo,
             defaultKuski_personId: opts.defaultDriver,
             vehicleM3: opts.capacity,
+            vehiclePuomi: opts.puomi,
             asiakasId: opts.asiakas,
           },
           {
@@ -614,6 +635,11 @@ export function registerVehicleCommands(
       "Concrete capacity in m3 (vehicleM3)",
       (s: string) => Number(s)
     )
+    .option(
+      "--puomi <m>",
+      "Boom length in metres (vehiclePuomi — BetoniJerry matching field)",
+      (s: string) => Number(s)
+    )
     .option("--asiakas <id>", "Owning asiakasId", (s: string) => Number(s))
     .option(
       "--show-in-grid <bool>",
@@ -638,6 +664,7 @@ export function registerVehicleCommands(
         type?: number;
         memo?: string;
         capacity?: number;
+        puomi?: number;
         asiakas?: number;
         showInGrid?: boolean;
         firstDate?: string;
@@ -655,6 +682,7 @@ export function registerVehicleCommands(
             vehicleTypeId: opts.type,
             memo: opts.memo,
             vehicleM3: opts.capacity,
+            vehiclePuomi: opts.puomi,
             asiakasId: opts.asiakas,
             showInGrid: opts.showInGrid,
             firstDate: resolveDate(opts.firstDate),

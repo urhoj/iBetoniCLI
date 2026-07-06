@@ -1744,7 +1744,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib vehicle create",
     description:
-      "Create a vehicle. Two-step backend flow (POST /api/vehicle/new then /save); ownerAsiakasId from JWT. Dry-run previews via /new without inserting.",
+      "Create a vehicle. Two-step backend flow (POST /api/vehicle/new/:asiakasId then /save). --asiakas creates the vehicle UNDER that tenant (it rides the /new path param, which stamps ownerAsiakasId+asiakasId on the stub — fb#94); default = active company from JWT. Requires an admin/owner/vehicleHandler role on the target tenant. Dry-run previews via /new without inserting.",
     permissions: ["auth.page.vehicle.edit"],
     flags: [
       { name: "reg", type: "string", description: "Registration number (vehicleRegNo)" },
@@ -1754,16 +1754,19 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "memo", type: "string", description: "Free-text memo" },
       { name: "default-driver", type: "number", description: "Default driver personId" },
       { name: "capacity", type: "number", description: "Concrete capacity in m3 (vehicleM3)" },
-      { name: "asiakas", type: "number", description: "Owning asiakasId (defaults to active company)" },
+      { name: "puomi", type: "number", description: "Boom length in metres (vehiclePuomi — BetoniJerry matching field)" },
+      { name: "asiakas", type: "number", description: "Target asiakasId to create the vehicle under (defaults to active company; needs a vehicle-manage role on that tenant)" },
     ],
     writeFlags: true,
     outputShape: "{ vehicleId, ... } (raw backend save response) | { dryRun, wouldCreate }",
     errors: [
       apiErr(400, "Validation failed", "fix the field flags"),
+      apiErr(403, "No access to this tenant's vehicles (--asiakas)", "you need an admin/owner/vehicleHandler role on the target tenant"),
       ...permErrors("auth.page.vehicle.edit"),
     ],
     examples: [
       "ib vehicle create --reg ABC-123 --type 1 --capacity 7.5 --reason 'new truck'",
+      "ib vehicle create --reg ABC-123 --type 2 --puomi 24 --asiakas 1380 --reason 'jerry onboarding'",
       "ib vehicle create --reg ABC-123 --dry-run",
     ],
   },
@@ -1780,6 +1783,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "type", type: "number", description: "vehicleTypeId" },
       { name: "memo", type: "string", description: "Free-text memo" },
       { name: "capacity", type: "number", description: "Concrete capacity in m3" },
+      { name: "puomi", type: "number", description: "Boom length in metres (vehiclePuomi — BetoniJerry matching field)" },
       { name: "asiakas", type: "number", description: "Owning asiakasId" },
       { name: "show-in-grid", type: "boolean", description: "Whether the vehicle appears in the grid (true/false)" },
       { name: "first-date", type: "date", description: "Start of validity window (firstDate); YYYY-MM-DD or today/yesterday/tomorrow" },
@@ -2506,7 +2510,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib sijainti update",
     description:
-      "Update a sijainti (POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. --lat/--lng (or --geocode to re-resolve from the changed address) are persisted via a follow-up updateLatLng call (the save proc itself binds no lat/lng) and echoed as { lat, lng, coordsPersisted }. Provide typed flags or --body JSON; typed flags win over --body.",
+      "Update a sijainti via read-merge-write (GET current row + POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Omitted fields KEEP their current values (the save proc assigns directly — a sparse body would NULL e.g. jerryActiveUntil, dates, phone); pass an explicit null in --body to clear a field. An address change re-geocodes the new address automatically when no --lat/--lng are given (soft-fail: geocodeFailed echoed; --geocode forces re-resolution and fails fast). --lat/--lng are persisted via a follow-up updateLatLng call (the save proc itself binds no lat/lng) and echoed as { lat, lng, coordsPersisted }. Provide typed flags or --body JSON; typed flags win over --body.",
     permissions: ["auth.page.sijainnit.edit"],
     flags: [
       { name: "body", type: "json", description: "JSON object with fields to update (optional if typed flags given)" },
@@ -2518,10 +2522,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "lng", type: "number", description: "Longitude (persisted via updateLatLng + echoed)" },
       { name: "lyh", type: "string", description: "sijaintiLyh — short code/abbreviation (≤50 chars)" },
       { name: "max-distance", type: "number", description: "maxDeliveryDistance in km" },
-      { name: "geocode", type: "boolean", description: "Re-resolve lat/lng from the (changed) --address via Google Maps when coordinates are not given (then persisted + echoed)" },
+      { name: "geocode", type: "boolean", description: "Force re-resolving lat/lng from the address via Google Maps (fails fast on no match). Address changes auto-geocode even without this flag when no coordinates are given" },
     ],
     writeFlags: true,
-    outputShape: "{ ok: true, ..., lat?, lng?, coordsPersisted? } — lat/lng/coordsPersisted present when --lat/--lng or --geocode supplied coordinates",
+    outputShape: "{ ok: true, ..., lat?, lng?, coordsPersisted?, geocodeFailed? } — lat/lng/coordsPersisted present when coordinates were supplied or geocoded; geocodeFailed when the automatic address-change geocode found no match (update still ran, coords now NULL)",
     errors: [
       apiErr(400, "Validation failed", "fix --body fields"),
       apiErr(400, 'Address could not be geocoded (--geocode, status ZERO_RESULTS)', "supply a fuller --address or pass --lat/--lng directly"),
