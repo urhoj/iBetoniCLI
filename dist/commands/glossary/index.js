@@ -210,6 +210,8 @@ export async function runGlossaryMisses(client, top) {
  * instead of persisting. A dismissed term re-enters the queue if looked up again.
  */
 export async function runGlossaryDismiss(client, term, flags = {}) {
+    if (!term.trim())
+        failWith("dismiss: term must be non-empty", 4);
     return client.delete(`/api/cli/glossary/misses/${encodeURIComponent(term)}`, { headers: writeFlagsToHeaders(flags) });
 }
 /**

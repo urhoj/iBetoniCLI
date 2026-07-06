@@ -343,4 +343,12 @@ describe("glossary dismiss", () => {
     await runGlossaryDismiss(mkClient({ delete: del }), "kualle urho tilaukset", {});
     expect(del.mock.calls[0]![0]).toBe("/api/cli/glossary/misses/kualle%20urho%20tilaukset");
   });
+
+  test("rejects an empty/whitespace term (exit 4, no DELETE)", async () => {
+    const del = vi.fn();
+    const err = await runGlossaryDismiss(mkClient({ delete: del }), "  ", {}).catch((e) => e);
+    expect(err).toBeInstanceOf(CliError);
+    expect((err as CliError).exitCode).toBe(4);
+    expect(del).not.toHaveBeenCalled();
+  });
 });
