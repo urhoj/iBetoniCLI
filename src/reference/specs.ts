@@ -85,6 +85,19 @@ const LEGAL_DEV_ERRORS: CommandError[] = [
   apiErr(500, "Backend error", "retry with --verbose"),
 ];
 
+// ─── vehicle cross-tenant (--asiakas) shared fragments ───────────────────────
+// The --asiakas override on vehicle list/get/search reads another company's
+// fleet; the extra permission line and 403 row are identical across all three
+// specs, so single-source them here (see cliListKeyGen scopeParam + the
+// hasVehicleAccessOnAsiakas gate in puminet5api).
+const VEHICLE_ASIAKAS_PERMISSION =
+  "--asiakas: sysadmin/developer or a vehicle-manage role (admin/owner/vehicleHandler) on the target tenant";
+const VEHICLE_ASIAKAS_403: CommandError = apiErr(
+  403,
+  "No vehicle access on the requested --asiakas company",
+  "use a tenant you have a vehicle-manage role on, or a developer token"
+);
+
 const BASE_COMMAND_SPECS: CommandSpec[] = [
   // ─── attachment (12) ─────────────────────────────────────────────────────
   {
@@ -1698,7 +1711,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     command: "ib vehicle list",
     description:
       "List vehicles visible to the active company. ownerAsiakasId derived from JWT. Rows are self-describing (showInGrid/firstDate/lastDate/deletedTime). Default scope = non-deleted with no narrowing, so grid-hidden AND expired vehicles ARE included; only soft-deleted are excluded. Use the flags to narrow or to reveal deleted rows. --asiakas lists ANOTHER company's fleet (cross-tenant; developer/admin lever) instead of the active company.",
-    permissions: ["auth.page.vehicle.read", "--asiakas: sysadmin/developer or a vehicle-manage role (admin/owner/vehicleHandler) on the target tenant"],
+    permissions: ["auth.page.vehicle.read", VEHICLE_ASIAKAS_PERMISSION],
     seeAlso: ["ib vehicle types"],
     flags: [
       {
@@ -1743,7 +1756,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>" + TRUNCATED_NOTE,
     errors: [
-      apiErr(403, "No vehicle access on the requested --asiakas company", "use a tenant you have a vehicle-manage role on, or a developer token"),
+      VEHICLE_ASIAKAS_403,
       ...permErrors("auth.page.vehicle.read"),
     ],
     examples: [
@@ -1759,7 +1772,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     command: "ib vehicle get",
     description:
       "Get a single vehicle by id. --asiakas reads a vehicle owned by ANOTHER company (cross-tenant; developer/admin lever) — without it the lookup is scoped to the active company and a foreign vehicleId returns 404.",
-    permissions: ["auth.page.vehicle.read", "--asiakas: sysadmin/developer or a vehicle-manage role (admin/owner/vehicleHandler) on the target tenant"],
+    permissions: ["auth.page.vehicle.read", VEHICLE_ASIAKAS_PERMISSION],
     args: [{ name: "vehicleId", type: "number", description: "vehicleId to fetch" }],
     flags: [
       {
@@ -1773,7 +1786,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "{ vehicleId, vehicleNo, name, plate, type, typeName, boomLength, capacity, sortNo, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, memo, billingProductId, asiakasId, defaultDriverId, showInGrid:boolean, showInReports:boolean, useNoDriverBar:boolean, isRestricted:boolean, hasGpsTracking:boolean }",
     errors: [
       apiErr(404, "Vehicle not found", "verify vehicleId (and --asiakas if it belongs to another company)"),
-      apiErr(403, "No vehicle access on the requested --asiakas company", "use a tenant you have a vehicle-manage role on, or a developer token"),
+      VEHICLE_ASIAKAS_403,
       ...permErrors("auth.page.vehicle.read"),
     ],
     examples: ["ib vehicle get 7", "ib vehicle get 159 --asiakas 1380"],
@@ -1806,7 +1819,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     command: "ib vehicle search",
     description:
       "Search vehicles by reg-no / name / fleet-number substring (LIKE on vehicleRegNo / vehicleNimi / vehicleNo). --asiakas searches ANOTHER company's fleet (cross-tenant; same gate as `ib vehicle list --asiakas`).",
-    permissions: ["auth.page.vehicle.read", "--asiakas: sysadmin/developer or a vehicle-manage role (admin/owner/vehicleHandler) on the target tenant"],
+    permissions: ["auth.page.vehicle.read", VEHICLE_ASIAKAS_PERMISSION],
     args: [{ name: "query", type: "string", description: "substring to match (reg-no, name, or fleet number)" }],
     flags: [
       { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
@@ -1820,7 +1833,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>" + TRUNCATED_NOTE,
     errors: [
-      apiErr(403, "No vehicle access on the requested --asiakas company", "use a tenant you have a vehicle-manage role on, or a developer token"),
+      VEHICLE_ASIAKAS_403,
       ...permErrors("auth.page.vehicle.read"),
     ],
     examples: ["ib vehicle search ABC", "ib vehicle search kuorma --limit 20", "ib vehicle search 82", "ib vehicle search ABC --asiakas 1380"],
