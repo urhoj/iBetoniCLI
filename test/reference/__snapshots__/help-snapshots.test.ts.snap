@@ -7738,6 +7738,46 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib person activity matches snapshot 1`] = `
+"USAGE
+  ib person activity <personId> [flags]
+
+DESCRIPTION
+  Login / security-event / impersonation history for one person: lastLoginTime, personLog type-1 logins, SecurityEventLog rows for the person's email — all event types (SUCCESSFUL_LOGIN plus lockout/brute-force/rate-limit), each with eventType/method/ip (source once persisted) — and impersonation rows as-target and as-actor. Developer-only — the data includes IPs/emails.
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+
+ARGUMENTS
+  <personId> NUMBER    person.personId (required)
+
+FLAGS
+  --limit NUMBER    Max rows per list (capped at 1000) (default: 100)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { personId, email, lastLoginTime, logins:[{entryTime}], securityEvents:[{eventType,method,source,ip,timestamp}], impersonations:{ asTarget:[{actorPersonId,entryTime,type,sessionId,endReason?}], asActor:[{targetPersonId,entryTime,type,sessionId,endReason?}] } }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  personId is not a positive integer → pass a numeric personId
+  exit 5 (HTTP 404)  no person with that id → check the id with \`ib person get <id>\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check developer access (isSystemAdmin or isDeveloper)
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Developer-gated server-side and hidden from non-developer discovery.
+  - personLog type-1 counts credential logins AND token-refresh/impersonation bootstraps; cross-check securityEvents (credential-only) to tell them apart. Deploy-gated (no-op until the puminet5api backend deploys).
+
+SEE ALSO
+  ib person log, ib person get
+
+EXAMPLES
+  ib person activity 63
+  ib person activity 63 --limit 20
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib person companies matches snapshot 1`] = `
 "USAGE
   ib person companies [<personId>] [flags]

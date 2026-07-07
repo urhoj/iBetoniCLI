@@ -1567,6 +1567,28 @@ const BASE_COMMAND_SPECS = [
             "ib person absences --from 2026-06-01 --to 2026-06-30 --person 123",
         ],
     },
+    {
+        command: "ib person activity",
+        description: "Login / security-event / impersonation history for one person: lastLoginTime, personLog type-1 logins, SecurityEventLog rows for the person's email — all event types (SUCCESSFUL_LOGIN plus lockout/brute-force/rate-limit), each with eventType/method/ip (source once persisted) — and impersonation rows as-target and as-actor. Developer-only — the data includes IPs/emails.",
+        permissions: ["developer access (isSystemAdmin or isDeveloper)"],
+        tier: "developer",
+        args: [{ name: "personId", type: "number", description: "person.personId" }],
+        flags: [
+            { name: "limit", type: "number", default: "100", description: "Max rows per list (capped at 1000)" },
+        ],
+        outputShape: "{ personId, email, lastLoginTime, logins:[{entryTime}], securityEvents:[{eventType,method,source,ip,timestamp}], impersonations:{ asTarget:[{actorPersonId,entryTime,type,sessionId,endReason?}], asActor:[{targetPersonId,entryTime,type,sessionId,endReason?}] } }",
+        errors: [
+            apiErr(400, "personId is not a positive integer", "pass a numeric personId"),
+            apiErr(404, "no person with that id", "check the id with `ib person get <id>`"),
+            ...permErrors("developer access (isSystemAdmin or isDeveloper)"),
+        ],
+        notes: [
+            "Developer-gated server-side and hidden from non-developer discovery.",
+            "personLog type-1 counts credential logins AND token-refresh/impersonation bootstraps; cross-check securityEvents (credential-only) to tell them apart. Deploy-gated (no-op until the puminet5api backend deploys).",
+        ],
+        seeAlso: ["ib person log", "ib person get"],
+        examples: ["ib person activity 63", "ib person activity 63 --limit 20"],
+    },
     // ─── vehicle (16) ─────────────────────────────────────────────────────────
     {
         command: "ib vehicle list",

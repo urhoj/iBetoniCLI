@@ -30,6 +30,7 @@ import { CliError } from "../../api/errors.js";
 import { registerPersonDayCommands } from "./day.js";
 import { registerPersonEmailCommands } from "./email.js";
 import { registerPersonAbsencesCommand } from "./absences.js";
+import { registerPersonActivityCommand } from "./activity.js";
 
 export interface PersonListFilter {
   role?: string;
@@ -426,6 +427,7 @@ export function registerPersonCommands(
   registerPersonDayCommands(p, getClient);
   registerPersonEmailCommands(p, getClient);
   registerPersonAbsencesCommand(p, getClient);
+  registerPersonActivityCommand(p, getClient);
 
   p.command("list")
     .description("List persons")

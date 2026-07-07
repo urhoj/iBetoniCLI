@@ -12,6 +12,7 @@ import { CliError } from "../../api/errors.js";
 import { registerPersonDayCommands } from "./day.js";
 import { registerPersonEmailCommands } from "./email.js";
 import { registerPersonAbsencesCommand } from "./absences.js";
+import { registerPersonActivityCommand } from "./activity.js";
 /**
  * Merge typed create flags over a parsed --body object (typed flags win) into the
  * /api/person/newPerson body. Email is intentionally optional: person.personEmail
@@ -269,6 +270,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     registerPersonDayCommands(p, getClient);
     registerPersonEmailCommands(p, getClient);
     registerPersonAbsencesCommand(p, getClient);
+    registerPersonActivityCommand(p, getClient);
     p.command("list")
         .description("List persons")
         .option("--role <role>", "Filter by role name")
