@@ -571,7 +571,7 @@ export function registerJerryCommands(parent, getClient) {
         .option("--lng <n>", "Longitude (trusted only with --lat + --place-id)", Number)
         .option("--place-id <s>", "Google placeId (lets the server trust client coords)")
         .option("--formatted-address <s>", "Google formatted address")
-        .option("--boom <m>", "Required boom (m) — filters varikot by their puomiMin/puomiMax range (0/absent = no boom filter)", Number)
+        .option("--boom <m>", "Required boom (m) — filters varikot by their puomiMin/puomiMax range (absent/0 = no boom filter)", Number)
         .action(async (opts) => {
         try {
             const client = await getClient();

@@ -436,11 +436,12 @@ describe("runSijaintiSetJerry (delivery radius)", () => {
   });
 
   test("boom bounds omitted → body keeps the current row's values untouched", async () => {
-    mGet().mockResolvedValueOnce({ sijaintiId: 42 });
+    mGet().mockResolvedValueOnce({ sijaintiId: 42, puomiMin: 11, puomiMax: 33 });
     mPost().mockResolvedValueOnce({ ok: true });
     await runSijaintiSetJerry(mockClient, 42, true, {});
     const [, body] = mPost().mock.calls[0];
-    expect((body as Record<string, unknown>).puomiMin).toBeUndefined();
+    expect((body as Record<string, unknown>).puomiMin).toBe(11);
+    expect((body as Record<string, unknown>).puomiMax).toBe(33);
   });
 });
 
