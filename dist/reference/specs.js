@@ -2285,7 +2285,7 @@ const BASE_COMMAND_SPECS = [
             { name: "all", type: "boolean", description: "Include ALL companies' sijainnit, not just own + shared (ownerAsiakasId 0)" },
             { name: "asiakas", type: "number", description: "Only rows owned by this asiakasId (client-side filter on ownerAsiakasId; combine with --all for another company's rows)" },
         ],
-        outputShape: "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil }> (+truncated:true when the result hit the limit; +hint pointing at --all when 0 rows came back without --all)",
+        outputShape: "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil, maxDeliveryDistance }> (+truncated:true when the result hit the limit; +hint pointing at --all when 0 rows came back without --all)",
         errors: [
             { exit: 4, meaning: "Unknown or ambiguous --type name", remedy: "the error lists the valid types; or run `ib sijainti types`" },
             ...permErrors("auth.page.sijainnit.read"),
@@ -2293,6 +2293,7 @@ const BASE_COMMAND_SPECS = [
         notes: [
             "The list is capped (default 100 / max 500) with NO cursor — `truncated:true` flags a result that filled the limit (raise --limit or narrow with --search/--type). Backend signal needs a backend deployed ≥ 2026-06-11; the client-side --search slice sets it on every backend.",
             "typeName is joined client-side from the sijaintiTypes lookup (one extra GET, automatic); newer backends also emit it directly, plus ownerAsiakasId/ownerName.",
+            "jerryActiveUntil (enrolment) + coords + maxDeliveryDistance (km delivery radius) are the set required for a Jerry-enabled varikko to be matchable — a row that is Jerry-active but has null coords or maxDeliveryDistance covers nothing. maxDeliveryDistance is deploy-gated (null on backends older than 2026-07-07). The optional boom range (puomiMin/puomiMax) is NOT in the list — get it via `ib sijainti get <id>`.",
             "Supplier locations (betoniasemat, depots) usually belong to ANOTHER company — without --all they are invisible here even though `ib vehicle visits sijainti <id>` and the GPS timeline reference them. To resolve such a location by name use --search <name> --all. An empty result without --all carries a `hint` saying exactly this.",
             "--all needs a backend deployed ≥ 2026-06-10; an older backend silently ignores it (returns the own+shared scope). --search works on every backend (client-side fallback).",
             "An unknown numeric --type id is passed through and simply returns zero rows; an unknown type NAME exits 4.",
