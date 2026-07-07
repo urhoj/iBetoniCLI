@@ -5,6 +5,7 @@ import { exitCodeFromStatus } from "../api/errors.js";
 import { MESSAGE_DAILY_SPECS } from "../commands/message/daily/index.js";
 import { MESSAGE_BOARD_SPECS } from "../commands/message/board/index.js";
 import { CHANGELOG_SPECS } from "../commands/changelog/index.js";
+import { ONBOARDING_STATUS_KEYS } from "../commands/jerry/index.js";
 /** API error row: derive the exit code from the HTTP status. */
 const apiErr = (http, meaning, remedy) => ({
     http,
@@ -3553,7 +3554,7 @@ const BASE_COMMAND_SPECS = [
         permissions: ["isSystemAdmin"],
         tier: "developer",
         flags: [
-            { name: "status", type: "string", description: "Pipeline status key (e.g. email1_lahetetty, vastasi_kylla)" },
+            { name: "status", type: "string", description: `Filter by pipeline status key: ${ONBOARDING_STATUS_KEYS}` },
             { name: "tier", type: "number", description: "Tier filter (1 priority / 2 secondary)" },
             { name: "due", type: "boolean", description: "Only rows where the email1b reminder is due" },
         ],
@@ -3590,7 +3591,7 @@ const BASE_COMMAND_SPECS = [
         tier: "developer",
         args: [{ name: "asiakasId", type: "number", description: "company asiakasId" }],
         flags: [
-            { name: "status", type: "string", description: "Pipeline status key" },
+            { name: "status", type: "string", description: `Pipeline status key: ${ONBOARDING_STATUS_KEYS}` },
             { name: "tier", type: "number", description: "1/2" },
             { name: "malli", type: "string", description: "Email variant (A/B)" },
             { name: "kanava", type: "string", description: "Preferred channel" },
@@ -3603,7 +3604,7 @@ const BASE_COMMAND_SPECS = [
         writeFlags: true,
         outputShape: "{ success: true } · { dryRun: true, wouldUpdate: { asiakasId, fields } } on --dry-run",
         errors: [
-            apiErr(400, "Unknown status", "use a pipeline status key"),
+            apiErr(400, "Unknown status", "use one of the status keys listed on --status"),
             apiErr(404, "Prospect not found", "add it first: ib jerry admin onboarding add"),
             apiErr(403, "Not a system admin", "use a system-admin token"),
             ...COMMON_AUTH_ERRORS,
@@ -3620,7 +3621,7 @@ const BASE_COMMAND_SPECS = [
             { name: "type", type: "string", description: "call | response | note; REQUIRED" },
             { name: "text", type: "string", description: "Event text; REQUIRED" },
             { name: "time", type: "string", description: "Backdated event time (ISO 8601)" },
-            { name: "set-status", type: "string", description: "Also set the pipeline status" },
+            { name: "set-status", type: "string", description: `Also set the pipeline status. Keys: ${ONBOARDING_STATUS_KEYS}` },
         ],
         writeFlags: true,
         outputShape: "{ jerryOnboardingEventId } · { dryRun: true, wouldLog: {...} } on --dry-run",

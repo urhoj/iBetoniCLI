@@ -210,6 +210,13 @@ export async function runJerryAdminToggle(client, asiakasId, on, flags) {
     const action = on ? "enable" : "disable";
     return client.post(`/api/admin/jerry-companies/${asiakasId}/${action}`, {}, { headers: writeFlagsToHeaders(flags) });
 }
+// ─── admin onboarding (provider-acquisition pipeline) ───────────────────────
+/**
+ * Valid onboarding pipeline status keys — mirrors backend ALL_STATUSES
+ * (puminet5api modules/jerryAdmin/onboardingStatus.js); the server 400s on
+ * anything else. Shared by the option help here and the CommandSpecs.
+ */
+export const ONBOARDING_STATUS_KEYS = "ei_aloitettu → email1_lahetetty → muistutus_lahetetty → vastasi_kylla → tiedot_pyydetty → tervetuloa_lahetetty (pipeline order); terminal: vastasi_ei / ei_vastausta / ei_sovellu";
 /** List onboarding prospects (GET /api/admin/jerry-onboarding). System-admin only. */
 export async function runJerryOnboardingList(client, opts = {}) {
     const params = new URLSearchParams();
@@ -676,7 +683,7 @@ export function registerJerryCommands(parent, getClient) {
     onboarding
         .command("list")
         .description("List onboarding prospects with live Jerry status and reminder-due flag")
-        .option("--status <key>", "Filter by pipeline status key (e.g. email1_lahetetty)")
+        .option("--status <key>", `Filter by pipeline status key: ${ONBOARDING_STATUS_KEYS}`)
         .option("--tier <n>", "Filter by tier (1/2)", Number)
         .option("--due", "Only rows where the email1b reminder is due")
         .action(async (opts) => {
@@ -729,7 +736,7 @@ export function registerJerryCommands(parent, getClient) {
     addWriteFlagsToCommand(onboarding
         .command("set <asiakasId>")
         .description("Partial-update a prospect (status, tier, notes, outreach contact)")
-        .option("--status <key>", "Pipeline status key")
+        .option("--status <key>", `Pipeline status key: ${ONBOARDING_STATUS_KEYS}`)
         .option("--tier <n>", "1/2", Number)
         .option("--malli <v>", "Email variant (A/B)")
         .option("--kanava <text>", "Preferred channel")
@@ -752,7 +759,7 @@ export function registerJerryCommands(parent, getClient) {
         .requiredOption("--type <t>", "call | response | note")
         .requiredOption("--text <text>", "Event text")
         .option("--time <iso>", "Backdated event time (ISO 8601)")
-        .option("--set-status <key>", "Also set the pipeline status")).action(async (idStr, opts) => {
+        .option("--set-status <key>", `Also set the pipeline status. Keys: ${ONBOARDING_STATUS_KEYS}`)).action(async (idStr, opts) => {
         try {
             const client = await getClient();
             const body = { eventType: opts.type, eventText: opts.text };

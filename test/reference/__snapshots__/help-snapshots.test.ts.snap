@@ -3431,7 +3431,7 @@ DESCRIPTION
   Permissions: requires isSystemAdmin.
 
 FLAGS
-  --status STRING    Pipeline status key (e.g. email1_lahetetty, vastasi_kylla)
+  --status STRING    Filter by pipeline status key: ei_aloitettu → email1_lahetetty → muistutus_lahetetty → vastasi_kylla → tiedot_pyydetty → tervetuloa_lahetetty (pipeline order); terminal: vastasi_ei / ei_vastausta / ei_sovellu
   --tier NUMBER    Tier filter (1 priority / 2 secondary)
   --due BOOLEAN    Only rows where the email1b reminder is due
 
@@ -3467,7 +3467,7 @@ FLAGS
   --type STRING    call | response | note; REQUIRED
   --text STRING    Event text; REQUIRED
   --time STRING    Backdated event time (ISO 8601)
-  --set-status STRING    Also set the pipeline status
+  --set-status STRING    Also set the pipeline status. Keys: ei_aloitettu → email1_lahetetty → muistutus_lahetetty → vastasi_kylla → tiedot_pyydetty → tervetuloa_lahetetty (pipeline order); terminal: vastasi_ei / ei_vastausta / ei_sovellu
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -3504,7 +3504,7 @@ ARGUMENTS
   <asiakasId> NUMBER    company asiakasId (required)
 
 FLAGS
-  --status STRING    Pipeline status key
+  --status STRING    Pipeline status key: ei_aloitettu → email1_lahetetty → muistutus_lahetetty → vastasi_kylla → tiedot_pyydetty → tervetuloa_lahetetty (pipeline order); terminal: vastasi_ei / ei_vastausta / ei_sovellu
   --tier NUMBER    1/2
   --malli STRING    Email variant (A/B)
   --kanava STRING    Preferred channel
@@ -3526,7 +3526,7 @@ OUTPUT (JSON, stdout)
   { success: true } · { dryRun: true, wouldUpdate: { asiakasId, fields } } on --dry-run
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Unknown status         → use a pipeline status key
+  exit 4 (HTTP 400)  Unknown status         → use one of the status keys listed on --status
   exit 5 (HTTP 404)  Prospect not found     → add it first: ib jerry admin onboarding add
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
