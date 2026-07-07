@@ -2529,6 +2529,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     errors: [
       apiErr(400, "Validation failed", "fix --body fields"),
       apiErr(400, 'Address could not be geocoded (--geocode, status ZERO_RESULTS)', "supply a fuller --address or pass --lat/--lng directly"),
+      { exit: 4, meaning: "--puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max", remedy: "pass metres 0–999.99 with min ≤ max" },
       ...permErrors("auth.page.sijainnit.edit"),
     ],
     examples: [
@@ -2563,6 +2564,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(400, "Validation failed", "fix --body fields"),
       apiErr(400, 'Address could not be geocoded (--geocode, status ZERO_RESULTS)', "supply a fuller --address or pass --lat/--lng directly"),
       apiErr(404, "Sijainti not found", "verify sijaintiId"),
+      { exit: 4, meaning: "--puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max — would otherwise clear the stored bound", remedy: "pass metres 0–999.99 with min ≤ max" },
       ...permErrors("auth.page.sijainnit.edit"),
     ],
     examples: [
@@ -2588,6 +2590,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "{ ok: true, ... } (raw backend response) or { dryRun: true, wouldUpdate: {...} }",
     errors: [
       apiErr(400, "Neither/both of --on/--off given, or --radius not a positive number", "pass exactly one of --on / --off; --radius is km > 0"),
+      { exit: 4, meaning: "--puomi-min/--puomi-max not a non-negative number or min > max", remedy: "pass metres 0–999.99 with min ≤ max" },
       apiErr(404, "Sijainti not found", "verify sijaintiId"),
       ...permErrors("auth.page.sijainnit.edit"),
     ],
@@ -2753,7 +2756,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       },
       { name: "title", type: "string", description: "Help title (otsikko)" },
       { name: "shorttext", type: "string", description: "Short text" },
-      { name: "htmltext", type: "string", description: "HTML body shown in the modal" },
+      { name: "htmltext", type: "string", description: "Modal body — rendered as MARKDOWN (react-markdown + GFM), NOT HTML despite the column name. Use markdown (**bold**, - bullets, blank line = paragraph); raw <p>/<ul> tags show literally." },
       { name: "img", type: "string", description: "Image reference (pass \"\" to clear it to null)" },
       { name: "must-exist", type: "boolean", description: "Fail (exit 4) instead of creating a new row when the helpId has no entry — guards against a typo'd helpId silently spawning a junk row" },
       { name: "ai-confidence", type: "number", description: "Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score and re-open the row." },
@@ -3719,7 +3722,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib jerry check-address",
     description:
-      "Geofence feasibility probe (POST /api/pumppuRequests/checkAddress; the route is unauthenticated, but ib calls it with your session): which provider varikot cover an address. The single best tool for diagnosing 'no offers'. --address is required (the `osoite` body field); if --lat/--lng/--place-id are all supplied the server trusts them instead of re-geocoding. Not a mutation, so no write-safety flags. Rate-limited 10/min per IP. The `providers` array is only included when the token is a developer/admin.",
+      "Geofence feasibility probe (POST /api/pumppuRequests/checkAddress; the route is unauthenticated, but ib calls it with your session): which provider varikot cover an address. The single best tool for diagnosing 'no offers'. --address is required (the `osoite` body field); if --lat/--lng/--place-id are all supplied the server trusts them instead of re-geocoding. Not a mutation, so no write-safety flags. Rate-limited 20/min per IP. The `providers` array is only included when the token is a developer/admin.",
     auth: "any",
     flags: [
       { name: "address", type: "string", description: "Street address to check (REQUIRED; sent as `osoite`)" },
@@ -3733,7 +3736,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "{ geocoded: boolean, deliverable?: boolean, lat?, lng?, placeId?, formattedAddress?, providerCount?, nearestVarikkoKm?, providers?: [{ asiakasId, asiakasNimi, distanceKm }] }",
     errors: [
       apiErr(400, "osoite missing", "pass --address"),
-      apiErr(429, "Rate limit (10/min/IP)", "wait and retry"),
+      { exit: 4, meaning: "--boom not a non-negative number", remedy: "pass metres ≥ 0, or omit for no boom filter" },
+      apiErr(429, "Rate limit (20/min/IP)", "wait and retry"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     notes: [

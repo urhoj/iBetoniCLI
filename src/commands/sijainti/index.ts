@@ -74,6 +74,29 @@ export function buildSijaintiBody(
   return body;
 }
 
+/**
+ * Guard the `--puomi-min`/`--puomi-max` flag pair (metres). Each must be a
+ * non-negative finite number when supplied, and min must not exceed max;
+ * otherwise exit 4. Without this, a typo like `--puomi-min 3O` makes Commander
+ * coerce `Number("3O")` → `NaN`, which serializes to JSON `null` and silently
+ * CLEARS a stored bound on the server (the save proc assigns puomiMin directly,
+ * no COALESCE). Shared by `sijainti create`, `sijainti update`, and `set-jerry`
+ * so all three reject bad input identically.
+ */
+export function assertPuomiFlags(puomiMin?: number, puomiMax?: number): void {
+  for (const [flag, v] of [
+    ["--puomi-min", puomiMin],
+    ["--puomi-max", puomiMax],
+  ] as const) {
+    if (v !== undefined && (!Number.isFinite(v) || v < 0)) {
+      failWith(`${flag} must be a non-negative number of metres`, 4);
+    }
+  }
+  if (puomiMin !== undefined && puomiMax !== undefined && puomiMin > puomiMax) {
+    failWith("--puomi-min cannot exceed --puomi-max", 4);
+  }
+}
+
 /** Max length of sijaintiLyh in the DB (nvarchar(50)). */
 const SIJAINTI_LYH_MAX = 50;
 /** maxDeliveryDistance DB default — the value the create proc fails to apply itself. */
@@ -993,6 +1016,7 @@ export function registerSijaintiCommands(
       idempotencyKey?: string;
       reason?: string;
     }) => {
+      assertPuomiFlags(opts.puomiMin, opts.puomiMax);
       try {
         const client = await getClient();
         const parsed = opts.body
@@ -1087,6 +1111,7 @@ export function registerSijaintiCommands(
       idempotencyKey?: string;
       reason?: string;
     }) => {
+      assertPuomiFlags(opts.puomiMin, opts.puomiMax);
       try {
         const client = await getClient();
         const parsed = opts.body
@@ -1179,21 +1204,7 @@ export function registerSijaintiCommands(
       if (opts.radius !== undefined && (!Number.isFinite(opts.radius) || opts.radius <= 0)) {
         failWith("--radius must be a positive number of km", 4);
       }
-      for (const [flag, v] of [
-        ["--puomi-min", opts.puomiMin],
-        ["--puomi-max", opts.puomiMax],
-      ] as const) {
-        if (v !== undefined && (!Number.isFinite(v) || v < 0)) {
-          failWith(`${flag} must be a non-negative number of metres`, 4);
-        }
-      }
-      if (
-        opts.puomiMin !== undefined &&
-        opts.puomiMax !== undefined &&
-        opts.puomiMin > opts.puomiMax
-      ) {
-        failWith("--puomi-min cannot exceed --puomi-max", 4);
-      }
+      assertPuomiFlags(opts.puomiMin, opts.puomiMax);
       try {
         const client = await getClient();
         const result = await runSijaintiSetJerry(

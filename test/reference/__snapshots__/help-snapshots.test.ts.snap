@@ -3851,7 +3851,7 @@ exports[`Help snapshots — contract stability > help for ib jerry check-address
   ib jerry check-address [flags]
 
 DESCRIPTION
-  Geofence feasibility probe (POST /api/pumppuRequests/checkAddress; the route is unauthenticated, but ib calls it with your session): which provider varikot cover an address. The single best tool for diagnosing 'no offers'. --address is required (the \`osoite\` body field); if --lat/--lng/--place-id are all supplied the server trusts them instead of re-geocoding. Not a mutation, so no write-safety flags. Rate-limited 10/min per IP. The \`providers\` array is only included when the token is a developer/admin.
+  Geofence feasibility probe (POST /api/pumppuRequests/checkAddress; the route is unauthenticated, but ib calls it with your session): which provider varikot cover an address. The single best tool for diagnosing 'no offers'. --address is required (the \`osoite\` body field); if --lat/--lng/--place-id are all supplied the server trusts them instead of re-geocoding. Not a mutation, so no write-safety flags. Rate-limited 20/min per IP. The \`providers\` array is only included when the token is a developer/admin.
   Auth: requires login (any authenticated user).
 
 FLAGS
@@ -3870,7 +3870,8 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  osoite missing         → pass --address
-  exit 4 (HTTP 429)  Rate limit (10/min/IP) → wait and retry
+  exit 4  --boom not a non-negative number → pass metres ≥ 0, or omit for no boom filter
+  exit 4 (HTTP 429)  Rate limit (20/min/IP) → wait and retry
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
@@ -7160,7 +7161,7 @@ FLAGS
   --body JSON    JSON with any of title/shorttext/htmltext/img (typed flags win)
   --title STRING    Help title (otsikko)
   --shorttext STRING    Short text
-  --htmltext STRING    HTML body shown in the modal
+  --htmltext STRING    Modal body — rendered as MARKDOWN (react-markdown + GFM), NOT HTML despite the column name. Use markdown (**bold**, - bullets, blank line = paragraph); raw <p>/<ul> tags show literally.
   --img STRING    Image reference (pass "" to clear it to null)
   --must-exist BOOLEAN    Fail (exit 4) instead of creating a new row when the helpId has no entry — guards against a typo'd helpId silently spawning a junk row
   --ai-confidence NUMBER    Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score and re-open the row.
@@ -8913,6 +8914,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed      → fix --body fields
   exit 4 (HTTP 400)  Address could not be geocoded (--geocode, status ZERO_RESULTS) → supply a fuller --address or pass --lat/--lng directly
+  exit 4  --puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max → pass metres 0–999.99 with min ≤ max
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -9211,6 +9213,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Neither/both of --on/--off given, or --radius not a positive number → pass exactly one of --on / --off; --radius is km > 0
+  exit 4  --puomi-min/--puomi-max not a non-negative number or min > max → pass metres 0–999.99 with min ≤ max
   exit 5 (HTTP 404)  Sijainti not found     → verify sijaintiId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.edit
@@ -9331,6 +9334,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed      → fix --body fields
   exit 4 (HTTP 400)  Address could not be geocoded (--geocode, status ZERO_RESULTS) → supply a fuller --address or pass --lat/--lng directly
   exit 5 (HTTP 404)  Sijainti not found     → verify sijaintiId
+  exit 4  --puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max — would otherwise clear the stored bound → pass metres 0–999.99 with min ≤ max
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose

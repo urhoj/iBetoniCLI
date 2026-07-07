@@ -11,6 +11,7 @@ import {
   buildSijaintiBody,
   applySijaintiCreateDefaults,
   extractGeocodeLatLng,
+  assertPuomiFlags,
 } from "../../src/commands/sijainti/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -348,6 +349,30 @@ describe("buildSijaintiBody (typed-flag merge)", () => {
       puomiMin: 20,
       puomiMax: 42,
     });
+  });
+});
+
+describe("assertPuomiFlags", () => {
+  test("accepts valid, absent, and zero bounds", () => {
+    expect(() => assertPuomiFlags(20, 42)).not.toThrow();
+    expect(() => assertPuomiFlags(undefined, undefined)).not.toThrow();
+    expect(() => assertPuomiFlags(0, 0)).not.toThrow();
+    expect(() => assertPuomiFlags(20, undefined)).not.toThrow(); // one-sided ok
+  });
+
+  test("rejects NaN (a typo'd flag Commander coerced) with exit 4", () => {
+    // Number("3O") === NaN — without this guard it would JSON-serialize to null
+    // and silently clear the stored bound.
+    expect(() => assertPuomiFlags(Number("3O"), 42)).toThrow(/--puomi-min must be a non-negative number of metres/);
+    expect(() => assertPuomiFlags(20, Number("x"))).toThrow(/--puomi-max must be a non-negative number of metres/);
+  });
+
+  test("rejects negative bounds", () => {
+    expect(() => assertPuomiFlags(-5, 42)).toThrow(/--puomi-min must be a non-negative/);
+  });
+
+  test("rejects min > max", () => {
+    expect(() => assertPuomiFlags(50, 40)).toThrow(/--puomi-min cannot exceed --puomi-max/);
   });
 });
 

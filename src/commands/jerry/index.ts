@@ -882,6 +882,12 @@ export function registerJerryCommands(
         formattedAddress?: string;
         boom?: number;
       }) => {
+        // Reject a NaN --boom (e.g. Commander coercing "abc" → NaN) so the probe
+        // fails loudly instead of silently dropping the boom filter the operator
+        // asked for — misleading during onboarding verification.
+        if (opts.boom !== undefined && (!Number.isFinite(opts.boom) || opts.boom < 0)) {
+          failWith("--boom must be a non-negative number of metres", 4);
+        }
         try {
           const client = await getClient();
           writeJson(await runJerryCheckAddress(client, opts));
