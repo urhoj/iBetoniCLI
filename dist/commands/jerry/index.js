@@ -163,6 +163,8 @@ export async function runJerryCheckAddress(client, opts) {
         body.placeId = opts.placeId;
     if (opts.formattedAddress)
         body.formattedAddress = opts.formattedAddress;
+    if (opts.boom !== undefined)
+        body.requiredPuomi = opts.boom;
     return client.post("/api/pumppuRequests/checkAddress", body, { read: true });
 }
 // ─── provider settings ──────────────────────────────────────────────────────
@@ -569,6 +571,7 @@ export function registerJerryCommands(parent, getClient) {
         .option("--lng <n>", "Longitude (trusted only with --lat + --place-id)", Number)
         .option("--place-id <s>", "Google placeId (lets the server trust client coords)")
         .option("--formatted-address <s>", "Google formatted address")
+        .option("--boom <m>", "Required boom (m) — filters varikot by their puomiMin/puomiMax range (0/absent = no boom filter)", Number)
         .action(async (opts) => {
         try {
             const client = await getClient();

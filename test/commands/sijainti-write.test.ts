@@ -342,6 +342,13 @@ describe("buildSijaintiBody (typed-flag merge)", () => {
       asiakasId: 8,
     });
   });
+
+  test("maps puomiMin/puomiMax to backend names", () => {
+    expect(buildSijaintiBody({}, { puomiMin: 20, puomiMax: 42 })).toEqual({
+      puomiMin: 20,
+      puomiMax: 42,
+    });
+  });
 });
 
 describe("applySijaintiCreateDefaults", () => {
@@ -417,6 +424,23 @@ describe("runSijaintiSetJerry (delivery radius)", () => {
     const body = mPost().mock.calls[0][1];
     expect(body.jerryActiveUntil).toBeNull();
     expect(body.maxDeliveryDistance).toBe(35);
+  });
+
+  test("--on with boom range writes puomiMin/puomiMax onto the merged body", async () => {
+    mGet().mockResolvedValueOnce({ sijaintiId: 42 });
+    mPost().mockResolvedValueOnce({ ok: true });
+    await runSijaintiSetJerry(mockClient, 42, true, {}, undefined, { min: 20, max: 42 });
+    const [, body] = mPost().mock.calls[0];
+    expect((body as Record<string, unknown>).puomiMin).toBe(20);
+    expect((body as Record<string, unknown>).puomiMax).toBe(42);
+  });
+
+  test("boom bounds omitted → body keeps the current row's values untouched", async () => {
+    mGet().mockResolvedValueOnce({ sijaintiId: 42 });
+    mPost().mockResolvedValueOnce({ ok: true });
+    await runSijaintiSetJerry(mockClient, 42, true, {});
+    const [, body] = mPost().mock.calls[0];
+    expect((body as Record<string, unknown>).puomiMin).toBeUndefined();
   });
 });
 

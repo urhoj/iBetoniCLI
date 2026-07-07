@@ -186,6 +186,13 @@ describe("ib jerry check-address", () => {
       osoite: "Hämeenkatu 1, Tampere",
     }, { read: true });
   });
+
+  test("check-address forwards --boom as requiredPuomi", async () => {
+    post.mockResolvedValueOnce({ geocoded: true, deliverable: true });
+    await runJerryCheckAddress(mockClient, { address: "Sarkatie 7, Vantaa", boom: 36 });
+    const [, body] = post.mock.calls[0];
+    expect((body as Record<string, unknown>).requiredPuomi).toBe(36);
+  });
 });
 
 describe("ib jerry provider-settings", () => {

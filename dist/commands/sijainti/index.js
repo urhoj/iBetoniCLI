@@ -37,6 +37,10 @@ export function buildSijaintiBody(parsedBody, typed) {
         body.maxDeliveryDistance = typed.maxDeliveryDistance;
     if (typed.asiakasId !== undefined)
         body.asiakasId = typed.asiakasId;
+    if (typed.puomiMin !== undefined)
+        body.puomiMin = typed.puomiMin;
+    if (typed.puomiMax !== undefined)
+        body.puomiMax = typed.puomiMax;
     return body;
 }
 /** Max length of sijaintiLyh in the DB (nvarchar(50)). */
@@ -266,7 +270,7 @@ const DEFAULT_JERRY_RADIUS_KM = 50;
  * DEFAULT_JERRY_RADIUS_KM when the varikko currently has none — otherwise the
  * varikko would be "enrolled but covering nothing".
  */
-export async function runSijaintiSetJerry(client, sijaintiId, on, flags, radius) {
+export async function runSijaintiSetJerry(client, sijaintiId, on, flags, radius, boom) {
     const current = await client.get(`/api/geocode/sijainti/get/${sijaintiId}`);
     const body = {
         ...current,
@@ -281,6 +285,13 @@ export async function runSijaintiSetJerry(client, sijaintiId, on, flags, radius)
             body.maxDeliveryDistance = DEFAULT_JERRY_RADIUS_KM;
         }
     }
+    // Per-sijainti boom range (m) — the betonijerry matching filter since
+    // 2026-07 (vehicle fleet booms are no longer consulted). Only set when
+    // given; the GET+merge otherwise preserves the stored bounds.
+    if (boom?.min !== undefined)
+        body.puomiMin = boom.min;
+    if (boom?.max !== undefined)
+        body.puomiMax = boom.max;
     return client.post("/api/geocode/updateSijainti", body, {
         headers: writeFlagsToHeaders(flags),
     });
@@ -700,6 +711,8 @@ export function registerSijaintiCommands(parent, getClient) {
         .option("--lyh <s>", "sijaintiLyh — short code/abbreviation (≤50 chars; defaults to --name)")
         .option("--max-distance <n>", "maxDeliveryDistance in km (default 50)", Number)
         .option("--asiakas <id>", "Owner asiakasId (defaults to your active company)", Number)
+        .option("--puomi-min <m>", "puomiMin — smallest boom (m) served from this sijainti (BetoniJerry matching)", Number)
+        .option("--puomi-max <m>", "puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching)", Number)
         .option("--geocode", "Resolve lat/lng from the address via Google Maps when coordinates are not given (then persisted + echoed)");
     addWriteFlagsToCommand(createCmd).action(async (opts) => {
         try {
@@ -716,6 +729,8 @@ export function registerSijaintiCommands(parent, getClient) {
                 lyh: opts.lyh,
                 maxDeliveryDistance: opts.maxDistance,
                 asiakasId: opts.asiakas,
+                puomiMin: opts.puomiMin,
+                puomiMax: opts.puomiMax,
             });
             // asiakasId is a NOT NULL FK the add proc inserts directly — default it
             // to the caller's active company when neither --asiakas nor --body gave one.
@@ -766,6 +781,8 @@ export function registerSijaintiCommands(parent, getClient) {
         .option("--lng <n>", "Longitude", Number)
         .option("--lyh <s>", "sijaintiLyh — short code/abbreviation (≤50 chars)")
         .option("--max-distance <n>", "maxDeliveryDistance in km", Number)
+        .option("--puomi-min <m>", "puomiMin — smallest boom (m) served from this sijainti (BetoniJerry matching)", Number)
+        .option("--puomi-max <m>", "puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching)", Number)
         .option("--geocode", "Re-resolve lat/lng from the (changed) address via Google Maps when coordinates are not given (then persisted + echoed)");
     addWriteFlagsToCommand(updateCmd).action(async (opts) => {
         try {
@@ -782,6 +799,8 @@ export function registerSijaintiCommands(parent, getClient) {
                 lng: opts.lng,
                 lyh: opts.lyh,
                 maxDeliveryDistance: opts.maxDistance,
+                puomiMin: opts.puomiMin,
+                puomiMax: opts.puomiMax,
             });
             if (body.sijaintiId === undefined) {
                 failWith("update requires sijaintiId — pass --id or include it in --body", 4);
@@ -820,7 +839,9 @@ export function registerSijaintiCommands(parent, getClient) {
         "flag AND HAS_JERRY setting (ib jerry admin enable).")
         .option("--on", "Enrol: jerryActiveUntil = sentinel + ensure a delivery radius")
         .option("--off", "Unenrol: jerryActiveUntil = null")
-        .option("--radius <km>", "Delivery radius in km (maxDeliveryDistance) to set when enrolling", Number);
+        .option("--radius <km>", "Delivery radius in km (maxDeliveryDistance) to set when enrolling", Number)
+        .option("--puomi-min <m>", "puomiMin (m) to set while enrolling (BetoniJerry boom-range matching)", Number)
+        .option("--puomi-max <m>", "puomiMax (m) to set while enrolling (BetoniJerry boom-range matching)", Number);
     addWriteFlagsToCommand(setJerryCmd).action(async (idStr, opts) => {
         if (opts.on === opts.off) {
             // neither or both given — ambiguous
@@ -829,13 +850,28 @@ export function registerSijaintiCommands(parent, getClient) {
         if (opts.radius !== undefined && (!Number.isFinite(opts.radius) || opts.radius <= 0)) {
             failWith("--radius must be a positive number of km", 4);
         }
+        for (const [flag, v] of [
+            ["--puomi-min", opts.puomiMin],
+            ["--puomi-max", opts.puomiMax],
+        ]) {
+            if (v !== undefined && (!Number.isFinite(v) || v < 0)) {
+                failWith(`${flag} must be a non-negative number of metres`, 4);
+            }
+        }
+        if (opts.puomiMin !== undefined &&
+            opts.puomiMax !== undefined &&
+            opts.puomiMin > opts.puomiMax) {
+            failWith("--puomi-min cannot exceed --puomi-max", 4);
+        }
         try {
             const client = await getClient();
             const result = await runSijaintiSetJerry(client, parseId(idStr, "sijaintiId"), !!opts.on, {
                 dryRun: opts.dryRun,
                 idempotencyKey: opts.idempotencyKey,
                 reason: opts.reason,
-            }, opts.radius);
+            }, opts.radius, opts.puomiMin !== undefined || opts.puomiMax !== undefined
+                ? { min: opts.puomiMin, max: opts.puomiMax }
+                : undefined);
             writeJson(result);
         }
         catch (e) {

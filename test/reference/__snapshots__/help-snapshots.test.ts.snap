@@ -3860,6 +3860,7 @@ FLAGS
   --lng NUMBER    Longitude (trusted only with --lat + --place-id)
   --place-id STRING    Google placeId (lets the server trust client coords)
   --formatted-address STRING    Google formatted address
+  --boom NUMBER    Required boom (m) — filters varikot by their puomiMin/puomiMax range (absent/0 = no boom filter)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -3873,7 +3874,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - A varikko counts toward providerCount only when ALL THREE hold: the company has isPumppuToimittaja = 1, the company has the HAS_JERRY setting on (ib jerry admin enable), and the sijainti is enrolled (jerryActiveUntil in the future, ib sijainti set-jerry --on) with maxDeliveryDistance covering the point.
+  - A varikko counts toward providerCount only when ALL of these hold: the company has isPumppuToimittaja = 1, the company has the HAS_JERRY setting on (ib jerry admin enable), the sijainti is enrolled (jerryActiveUntil in the future, ib sijainti set-jerry --on) with maxDeliveryDistance covering the point, and — when a boom is stated — the sijainti boom range covers it (puomiMin <= boom <= puomiMax, NULL bound = unbounded).
 
 EXAMPLES
   ib jerry check-address --address 'Mannerheimintie 1, Helsinki'
@@ -8894,6 +8895,8 @@ FLAGS
   --lyh STRING    sijaintiLyh — short code/abbreviation, ≤50 chars (defaults to --name)
   --max-distance NUMBER    maxDeliveryDistance in km (default 50)
   --asiakas NUMBER    Owner asiakasId (defaults to your active company)
+  --puomi-min NUMBER    puomiMin — smallest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)
+  --puomi-max NUMBER    puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)
   --geocode BOOLEAN    Resolve lat/lng from the address via Google Maps when coordinates are not given (then persisted + echoed)
 
 WRITE-SAFETY FLAGS
@@ -9192,6 +9195,8 @@ FLAGS
   --on BOOLEAN    Enrol (jerryActiveUntil = sentinel) + ensure a delivery radius
   --off BOOLEAN    Unenrol (jerryActiveUntil = null)
   --radius NUMBER    Delivery radius in km (maxDeliveryDistance) to set when enrolling; defaults to 50 when the varikko has none
+  --puomi-min NUMBER    puomiMin (m) to set while enrolling — betonijerry matches requests with puomiMin <= boom <= puomiMax (NULL bound = unbounded)
+  --puomi-max NUMBER    puomiMax (m) to set while enrolling
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -9216,6 +9221,7 @@ NOTES
   - IMPORTANT: BetoniJerry coverage keys on the delivery radius maxDeliveryDistance (KM) — NOT geofenceRadius (metres, a GPS depot detector) — so --on ALSO sets that radius: --radius <km>, or a 50 km default when the varikko has none (otherwise it would be enrolled but cover nothing).
   - Replicates the EditSijainti toggle: reads the row, overrides the fields, and writes back (lat/lng etc. preserved).
   - Matching also requires the company-level gates: isPumppuToimittaja AND the HAS_JERRY setting (asiakasSettingTypeId 35) — toggle both with \`ib jerry admin enable\`. Varikko enrolment alone does not make the company matchable.
+  - Boom-range matching (since 2026-07): requests stating a boom only match varikot whose puomiMin/puomiMax range covers it (NULL bound = unbounded; both NULL = matches everything). Vehicle fleet booms are NOT consulted. Deploy-gated: needs the backend with sijainti puomi columns.
 
 EXAMPLES
   ib sijainti set-jerry 42 --on --radius 60 --reason 'pilot varikko, 60 km radius'
@@ -9306,6 +9312,8 @@ FLAGS
   --lng NUMBER    Longitude (persisted via updateLatLng + echoed)
   --lyh STRING    sijaintiLyh — short code/abbreviation (≤50 chars)
   --max-distance NUMBER    maxDeliveryDistance in km
+  --puomi-min NUMBER    puomiMin — smallest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)
+  --puomi-max NUMBER    puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)
   --geocode BOOLEAN    Force re-resolving lat/lng from the address via Google Maps (fails fast on no match). Address changes auto-geocode even without this flag when no coordinates are given
 
 WRITE-SAFETY FLAGS
@@ -9436,7 +9444,7 @@ FLAGS
   --memo STRING    Free-text memo
   --default-driver NUMBER    Default driver personId
   --capacity NUMBER    Concrete capacity in m3 (vehicleM3)
-  --puomi NUMBER    Boom length in metres (vehiclePuomi — BetoniJerry matching field)
+  --puomi NUMBER    Boom length in metres (vehiclePuomi — informational; BetoniJerry matching uses sijainti puomiMin/puomiMax since 2026-07)
   --asiakas NUMBER    Target asiakasId to create the vehicle under (defaults to active company; needs a vehicle-manage role on that tenant)
 
 WRITE-SAFETY FLAGS
@@ -10247,7 +10255,7 @@ FLAGS
   --type NUMBER    vehicleTypeId
   --memo STRING    Free-text memo
   --capacity NUMBER    Concrete capacity in m3
-  --puomi NUMBER    Boom length in metres (vehiclePuomi — BetoniJerry matching field)
+  --puomi NUMBER    Boom length in metres (vehiclePuomi — informational; BetoniJerry matching uses sijainti puomiMin/puomiMax since 2026-07)
   --asiakas NUMBER    Owning asiakasId
   --show-in-grid BOOLEAN    Whether the vehicle appears in the grid (true/false)
   --first-date DATE    Start of validity window (firstDate); YYYY-MM-DD or today/yesterday/tomorrow
