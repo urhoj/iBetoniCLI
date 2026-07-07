@@ -32,6 +32,18 @@ describe("ib vehicle types/search", () => {
     expect(mockClient.get).toHaveBeenCalledWith("/api/cli/vehicle/types");
   });
 
+  test("runVehicleTypes appends asiakas for a cross-tenant type list", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      count: 0,
+    });
+    await runVehicleTypes(mockClient, 1380);
+    expect(mockClient.get).toHaveBeenCalledWith(
+      "/api/cli/vehicle/types?asiakas=1380"
+    );
+  });
+
   test("runVehicleSearch encodes search + limit", async () => {
     (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       items: [],

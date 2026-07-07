@@ -1660,12 +1660,18 @@ const BASE_COMMAND_SPECS = [
     },
     {
         command: "ib vehicle types",
-        description: "List vehicle types (vehicleTypeId + name) for the active company.",
-        permissions: ["auth.page.vehicle.read"],
-        flags: [],
+        description: "List vehicle types (vehicleTypeId + name) for the active company. --asiakas lists ANOTHER company's types (cross-tenant) — needed for `ib vehicle create --asiakas` since types are tenant-defined.",
+        permissions: ["auth.page.vehicle.read", VEHICLE_ASIAKAS_PERMISSION],
+        flags: [
+            {
+                name: "asiakas",
+                type: "number",
+                description: "List another company's vehicle types (cross-tenant). Requires sysadmin/developer or a vehicle-manage role on that tenant; default = active company.",
+            },
+        ],
         outputShape: "ListEnvelope<{ vehicleTypeId, name }>",
-        errors: permErrors("auth.page.vehicle.read"),
-        examples: ["ib vehicle types", "ib vehicle types --pretty"],
+        errors: [VEHICLE_ASIAKAS_403, ...permErrors("auth.page.vehicle.read")],
+        examples: ["ib vehicle types", "ib vehicle types --pretty", "ib vehicle types --asiakas 1380"],
     },
     {
         command: "ib vehicle search",

@@ -208,12 +208,19 @@ export async function runVehicleVisits(
 /**
  * GET /api/cli/vehicle/types — list selectable vehicle types
  * (vehicleTypeId + name) for the active company, in the list envelope shape.
+ *
+ * `asiakas` reads another company's type list (cross-tenant) — needed when
+ * creating a vehicle under that tenant (`vehicle create --asiakas`), since types
+ * are tenant-defined. Same gate as `vehicle list --asiakas`; default = active
+ * company from the JWT.
  */
 export async function runVehicleTypes(
-  client: ApiClient
+  client: ApiClient,
+  asiakas?: number
 ): Promise<ListEnvelope<Record<string, unknown>>> {
+  const qs = asiakas !== undefined ? `?asiakas=${asiakas}` : "";
   return client.get<ListEnvelope<Record<string, unknown>>>(
-    "/api/cli/vehicle/types"
+    `/api/cli/vehicle/types${qs}`
   );
 }
 
@@ -532,9 +539,14 @@ export function registerVehicleCommands(
 
   v.command("types")
     .description("List vehicle types (vehicleTypeId + name)")
-    .action(async () => {
+    .option(
+      "--asiakas <id>",
+      "List another company's vehicle types (cross-tenant; needed for `vehicle create --asiakas` since types are tenant-defined)",
+      (val: string) => Number(val)
+    )
+    .action(async (opts: { asiakas?: number }) => {
       try {
-        writeJson(await runVehicleTypes(await getClient()));
+        writeJson(await runVehicleTypes(await getClient(), opts.asiakas));
       } catch (e) {
         exitWithError(e);
       }

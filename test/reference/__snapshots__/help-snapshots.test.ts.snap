@@ -10307,11 +10307,11 @@ exports[`Help snapshots — contract stability > help for ib vehicle types match
   ib vehicle types [flags]
 
 DESCRIPTION
-  List vehicle types (vehicleTypeId + name) for the active company.
-  Permissions: requires auth.page.vehicle.read.
+  List vehicle types (vehicleTypeId + name) for the active company. --asiakas lists ANOTHER company's types (cross-tenant) — needed for \`ib vehicle create --asiakas\` since types are tenant-defined.
+  Permissions: requires auth.page.vehicle.read, --asiakas: sysadmin/developer or a vehicle-manage role (admin/owner/vehicleHandler) on the target tenant.
 
 FLAGS
-  (none)
+  --asiakas NUMBER    List another company's vehicle types (cross-tenant). Requires sysadmin/developer or a vehicle-manage role on that tenant; default = active company.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -10320,6 +10320,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleTypeId, name }>
 
 ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  No vehicle access on the requested --asiakas company → use a tenant you have a vehicle-manage role on, or a developer token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -10327,6 +10328,7 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib vehicle types
   ib vehicle types --pretty
+  ib vehicle types --asiakas 1380
 "
 `;
 
