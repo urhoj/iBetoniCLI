@@ -1057,7 +1057,9 @@ export interface CustomerMergeOptions {
  * `--dry-run` calls POST /validate (the read-only safety check reporting what
  * WOULD move + any blocking conflicts) and NEVER merges — the /merge route has
  * no `X-Dry-Run` guard, so a server-side dry-run there would still merge. The
- * real path POSTs /merge with the universal write-flag headers.
+ * validate call is tagged `read`, so `merge --dry-run` runs even under
+ * `--read-only` / `IB_READ_ONLY`. The real path POSTs /merge with the universal
+ * write-flag headers.
  */
 export async function runCustomerMerge(
   client: ApiClient,
@@ -1071,9 +1073,13 @@ export async function runCustomerMerge(
   };
   if (opts.allowBigMerge) body.allowBigMerge = true;
   if (flags.dryRun) {
+    // /validate is a tenant-scoped READ that happens to use POST — mark it `read`
+    // so the --read-only / IB_READ_ONLY write-lock and the acting-as "write"
+    // diagnostic both skip it (it never mutates).
     const validation = await client.post<unknown>(
       "/api/admin/asiakas-combinator/validate",
-      body
+      body,
+      { read: true }
     );
     return { dryRun: true, validation };
   }

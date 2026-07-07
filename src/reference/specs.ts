@@ -1109,7 +1109,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     notes: [
       "ALWAYS --dry-run first: the /merge route has no X-Dry-Run guard, so a real invocation merges immediately.",
-      "--dry-run issues a POST to /validate (server-side read-only), so it is BLOCKED under --read-only / IB_READ_ONLY — drop the write-lock to preview.",
+      "--dry-run issues a read-only POST to /validate (tagged `read`), so it runs even under --read-only / IB_READ_ONLY; only a real merge is blocked by the write-lock.",
       "Affects keikka / tyomaa / person / sijainti / stat / lasku rows and the change history; caches are invalidated server-side.",
     ],
     seeAlso: ["ib customer duplicates", "ib customer delete"],

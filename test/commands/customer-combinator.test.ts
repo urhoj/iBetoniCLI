@@ -88,8 +88,8 @@ describe("runCustomerMerge", () => {
     );
     expect(mockClient.post).toHaveBeenCalledTimes(1);
     expect(asPost().mock.calls[0][0]).toBe("/api/admin/asiakas-combinator/validate");
-    // No write-flag headers are sent to the read-only validate call.
-    expect(asPost().mock.calls[0][2]).toBeUndefined();
+    // Tagged `read` so it runs under --read-only and skips the acting-as write diagnostic.
+    expect(asPost().mock.calls[0][2]).toEqual({ read: true });
     expect(result).toEqual({ dryRun: true, validation: { success: true, referencesToMove: 3 } });
   });
 
