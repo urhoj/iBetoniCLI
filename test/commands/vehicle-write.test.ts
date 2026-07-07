@@ -43,6 +43,18 @@ describe("ib vehicle types/search", () => {
       "/api/cli/vehicle/list?search=ABC&limit=25"
     );
   });
+
+  test("runVehicleSearch appends asiakas for a cross-tenant search", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      count: 0,
+    });
+    await runVehicleSearch(mockClient, "ABC", undefined, 1380);
+    expect(mockClient.get).toHaveBeenCalledWith(
+      "/api/cli/vehicle/list?search=ABC&asiakas=1380"
+    );
+  });
 });
 
 describe("runVehicleCreate", () => {

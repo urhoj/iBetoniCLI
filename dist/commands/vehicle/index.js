@@ -49,6 +49,8 @@ export async function runVehicleList(client, opts) {
         params.set("validOn", opts.validOn);
     if (opts.type !== undefined)
         params.set("type", String(opts.type));
+    if (opts.asiakas !== undefined)
+        params.set("asiakas", String(opts.asiakas));
     const qs = params.toString();
     return client.get(`/api/cli/vehicle/list${qs ? `?${qs}` : ""}`);
 }
@@ -58,9 +60,14 @@ export async function runVehicleList(client, opts) {
  * vehiclePuomi, capacity ← vehicleM3, sortNo), validity (firstDate/lastDate),
  * memo, billingProductId, asiakasId, defaultDriverId, and the behaviour toggles
  * (showInGrid/showInReports/useNoDriverBar/isRestricted/hasGpsTracking).
+ *
+ * `asiakas` reads a vehicle owned by another company (cross-tenant); it needs
+ * sysadmin/developer or a vehicle-manage role on that tenant, else the backend
+ * returns 403. Default = the active company from the JWT.
  */
-export async function runVehicleGet(client, vehicleId) {
-    return client.get(`/api/cli/vehicle/get/${vehicleId}`);
+export async function runVehicleGet(client, vehicleId, asiakas) {
+    const qs = asiakas !== undefined ? `?asiakas=${asiakas}` : "";
+    return client.get(`/api/cli/vehicle/get/${vehicleId}${qs}`);
 }
 /**
  * GET /api/cli/vehicle/status/:vehicleId. Returns the flat status record:
@@ -128,10 +135,12 @@ export async function runVehicleTypes(client) {
  * vehicle list (reg-no / name / fleet number). Reuses the list endpoint with a
  * `search` query param; `limit` is appended only when supplied.
  */
-export async function runVehicleSearch(client, query, limit) {
+export async function runVehicleSearch(client, query, limit, asiakas) {
     const params = new URLSearchParams({ search: query });
     if (limit !== undefined)
         params.set("limit", String(limit));
+    if (asiakas !== undefined)
+        params.set("asiakas", String(asiakas));
     return client.get(`/api/cli/vehicle/list?${params.toString()}`);
 }
 /**
@@ -298,6 +307,7 @@ export function registerVehicleCommands(parent, getClient) {
         .option("--grid-only", "Only vehicles shown in the grid (showInGrid=1)")
         .option("--valid-on <date>", "Only vehicles valid on this day YYYY-MM-DD (or today/yesterday/tomorrow)")
         .option("--type <id>", "Only this vehicleTypeId", (val) => Number(val))
+        .option("--asiakas <id>", "Read another company's fleet (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant). Default: active company.", (val) => Number(val))
         .action(async (opts) => {
         try {
             const client = await getClient();
@@ -308,6 +318,7 @@ export function registerVehicleCommands(parent, getClient) {
                 gridOnly: opts.gridOnly,
                 validOn: resolveDate(opts.validOn),
                 type: opts.type,
+                asiakas: opts.asiakas,
             });
             writeJson(result);
         }
@@ -317,10 +328,11 @@ export function registerVehicleCommands(parent, getClient) {
     });
     v.command("get <vehicleId>")
         .description("Get a single vehicle by vehicleId")
-        .action(async (idStr) => {
+        .option("--asiakas <id>", "Read a vehicle owned by another company (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant)", (val) => Number(val))
+        .action(async (idStr, opts) => {
         try {
             const client = await getClient();
-            const result = await runVehicleGet(client, parseId(idStr, "vehicleId"));
+            const result = await runVehicleGet(client, parseId(idStr, "vehicleId"), opts.asiakas);
             writeJson(result);
         }
         catch (e) {
@@ -363,9 +375,10 @@ export function registerVehicleCommands(parent, getClient) {
     v.command("search <query>")
         .description("Search vehicles by reg-no / name substring")
         .option("--limit <n>", "Max rows", (val) => Math.min(Number(val), 500))
+        .option("--asiakas <id>", "Search another company's fleet (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant)", (val) => Number(val))
         .action(async (query, opts) => {
         try {
-            writeJson(await runVehicleSearch(await getClient(), query, opts.limit));
+            writeJson(await runVehicleSearch(await getClient(), query, opts.limit, opts.asiakas));
         }
         catch (e) {
             exitWithError(e);

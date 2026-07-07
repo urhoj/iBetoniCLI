@@ -72,6 +72,18 @@ describe("ib vehicle list/get", () => {
     expect(mockClient.get).toHaveBeenCalledWith("/api/cli/vehicle/list");
   });
 
+  test("runVehicleList: appends asiakas for a cross-tenant read", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      count: 0,
+    });
+    await runVehicleList(mockClient, { asiakas: 1380 });
+    expect(mockClient.get).toHaveBeenCalledWith(
+      "/api/cli/vehicle/list?asiakas=1380"
+    );
+  });
+
   test("runVehicleGet: GET /api/cli/vehicle/get/7", async () => {
     (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       vehicleId: 7,
@@ -80,6 +92,17 @@ describe("ib vehicle list/get", () => {
     const result = await runVehicleGet(mockClient, 7);
     expect(mockClient.get).toHaveBeenCalledWith("/api/cli/vehicle/get/7");
     expect((result as { vehicleId: number }).vehicleId).toBe(7);
+  });
+
+  test("runVehicleGet: appends ?asiakas= for a cross-tenant read", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      vehicleId: 159,
+      name: "Pumi 24 m",
+    });
+    await runVehicleGet(mockClient, 159, 1380);
+    expect(mockClient.get).toHaveBeenCalledWith(
+      "/api/cli/vehicle/get/159?asiakas=1380"
+    );
   });
 
   test("runVehicleStatus: GET /api/cli/vehicle/status/7", async () => {

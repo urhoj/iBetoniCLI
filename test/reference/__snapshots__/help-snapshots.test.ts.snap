@@ -9949,14 +9949,14 @@ exports[`Help snapshots — contract stability > help for ib vehicle get matches
   ib vehicle get <vehicleId> [flags]
 
 DESCRIPTION
-  Get a single vehicle by id.
-  Permissions: requires auth.page.vehicle.read.
+  Get a single vehicle by id. --asiakas reads a vehicle owned by ANOTHER company (cross-tenant; developer/admin lever) — without it the lookup is scoped to the active company and a foreign vehicleId returns 404.
+  Permissions: requires auth.page.vehicle.read, --asiakas: sysadmin/developer or a vehicle-manage role (admin/owner/vehicleHandler) on the target tenant.
 
 ARGUMENTS
   <vehicleId> NUMBER    vehicleId to fetch (required)
 
 FLAGS
-  (none)
+  --asiakas NUMBER    Read a vehicle owned by this company (cross-tenant). Requires sysadmin/developer or a vehicle-manage role on that tenant; default = active company.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -9965,13 +9965,15 @@ OUTPUT (JSON, stdout)
   { vehicleId, vehicleNo, name, plate, type, typeName, boomLength, capacity, sortNo, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, memo, billingProductId, asiakasId, defaultDriverId, showInGrid:boolean, showInReports:boolean, useNoDriverBar:boolean, isRestricted:boolean, hasGpsTracking:boolean }
 
 ERRORS (stderr, exit non-zero)
-  exit 5 (HTTP 404)  Vehicle not found      → verify vehicleId
+  exit 5 (HTTP 404)  Vehicle not found      → verify vehicleId (and --asiakas if it belongs to another company)
+  exit 3 (HTTP 403)  No vehicle access on the requested --asiakas company → use a tenant you have a vehicle-manage role on, or a developer token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
   ib vehicle get 7
+  ib vehicle get 159 --asiakas 1380
 "
 `;
 
@@ -9980,8 +9982,8 @@ exports[`Help snapshots — contract stability > help for ib vehicle list matche
   ib vehicle list [flags]
 
 DESCRIPTION
-  List vehicles visible to the active company. ownerAsiakasId derived from JWT. Rows are self-describing (showInGrid/firstDate/lastDate/deletedTime). Default scope = non-deleted with no narrowing, so grid-hidden AND expired vehicles ARE included; only soft-deleted are excluded. Use the flags to narrow or to reveal deleted rows.
-  Permissions: requires auth.page.vehicle.read.
+  List vehicles visible to the active company. ownerAsiakasId derived from JWT. Rows are self-describing (showInGrid/firstDate/lastDate/deletedTime). Default scope = non-deleted with no narrowing, so grid-hidden AND expired vehicles ARE included; only soft-deleted are excluded. Use the flags to narrow or to reveal deleted rows. --asiakas lists ANOTHER company's fleet (cross-tenant; developer/admin lever) instead of the active company.
+  Permissions: requires auth.page.vehicle.read, --asiakas: sysadmin/developer or a vehicle-manage role (admin/owner/vehicleHandler) on the target tenant.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 FLAGS
@@ -9990,6 +9992,7 @@ FLAGS
   --grid-only BOOLEAN    Only vehicles shown in the grid (showInGrid=1)
   --valid-on DATE    Only vehicles whose validity window covers this day (YYYY-MM-DD or today/yesterday/tomorrow)
   --type NUMBER    Only this vehicleTypeId (see \`ib vehicle types\`)
+  --asiakas NUMBER    List another company's fleet (cross-tenant). Requires sysadmin/developer or a vehicle-manage role on that tenant; default = active company.
   --cursor STRING    Pagination cursor (from a previous page's nextCursor)
 
 GLOBAL FLAGS
@@ -9999,6 +10002,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
 
 ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  No vehicle access on the requested --asiakas company → use a tenant you have a vehicle-manage role on, or a developer token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -10012,6 +10016,7 @@ EXAMPLES
   ib vehicle list --grid-only --valid-on today
   ib vehicle list --deleted
   ib vehicle list --type 1
+  ib vehicle list --asiakas 1380
 "
 `;
 
@@ -10116,14 +10121,15 @@ exports[`Help snapshots — contract stability > help for ib vehicle search matc
   ib vehicle search <query> [flags]
 
 DESCRIPTION
-  Search vehicles by reg-no / name / fleet-number substring (LIKE on vehicleRegNo / vehicleNimi / vehicleNo).
-  Permissions: requires auth.page.vehicle.read.
+  Search vehicles by reg-no / name / fleet-number substring (LIKE on vehicleRegNo / vehicleNimi / vehicleNo). --asiakas searches ANOTHER company's fleet (cross-tenant; same gate as \`ib vehicle list --asiakas\`).
+  Permissions: requires auth.page.vehicle.read, --asiakas: sysadmin/developer or a vehicle-manage role (admin/owner/vehicleHandler) on the target tenant.
 
 ARGUMENTS
   <query> STRING    substring to match (reg-no, name, or fleet number) (required)
 
 FLAGS
   --limit NUMBER    Max rows (capped at 500) (default: 100)
+  --asiakas NUMBER    Search another company's fleet (cross-tenant). Requires sysadmin/developer or a vehicle-manage role on that tenant; default = active company.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -10132,6 +10138,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
 
 ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  No vehicle access on the requested --asiakas company → use a tenant you have a vehicle-manage role on, or a developer token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -10140,6 +10147,7 @@ EXAMPLES
   ib vehicle search ABC
   ib vehicle search kuorma --limit 20
   ib vehicle search 82
+  ib vehicle search ABC --asiakas 1380
 "
 `;
 

@@ -1514,8 +1514,8 @@ const BASE_COMMAND_SPECS = [
     // ─── vehicle (16) ─────────────────────────────────────────────────────────
     {
         command: "ib vehicle list",
-        description: "List vehicles visible to the active company. ownerAsiakasId derived from JWT. Rows are self-describing (showInGrid/firstDate/lastDate/deletedTime). Default scope = non-deleted with no narrowing, so grid-hidden AND expired vehicles ARE included; only soft-deleted are excluded. Use the flags to narrow or to reveal deleted rows.",
-        permissions: ["auth.page.vehicle.read"],
+        description: "List vehicles visible to the active company. ownerAsiakasId derived from JWT. Rows are self-describing (showInGrid/firstDate/lastDate/deletedTime). Default scope = non-deleted with no narrowing, so grid-hidden AND expired vehicles ARE included; only soft-deleted are excluded. Use the flags to narrow or to reveal deleted rows. --asiakas lists ANOTHER company's fleet (cross-tenant; developer/admin lever) instead of the active company.",
+        permissions: ["auth.page.vehicle.read", "--asiakas: sysadmin/developer or a vehicle-manage role (admin/owner/vehicleHandler) on the target tenant"],
         seeAlso: ["ib vehicle types"],
         flags: [
             {
@@ -1545,33 +1545,49 @@ const BASE_COMMAND_SPECS = [
                 description: "Only this vehicleTypeId (see `ib vehicle types`)",
             },
             {
+                name: "asiakas",
+                type: "number",
+                description: "List another company's fleet (cross-tenant). Requires sysadmin/developer or a vehicle-manage role on that tenant; default = active company.",
+            },
+            {
                 name: "cursor",
                 type: "string",
                 description: "Pagination cursor (from a previous page's nextCursor)",
             },
         ],
         outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>" + TRUNCATED_NOTE,
-        errors: permErrors("auth.page.vehicle.read"),
+        errors: [
+            apiErr(403, "No vehicle access on the requested --asiakas company", "use a tenant you have a vehicle-manage role on, or a developer token"),
+            ...permErrors("auth.page.vehicle.read"),
+        ],
         examples: [
             "ib vehicle list",
             "ib vehicle list --pretty",
             "ib vehicle list --grid-only --valid-on today",
             "ib vehicle list --deleted",
             "ib vehicle list --type 1",
+            "ib vehicle list --asiakas 1380",
         ],
     },
     {
         command: "ib vehicle get",
-        description: "Get a single vehicle by id.",
-        permissions: ["auth.page.vehicle.read"],
+        description: "Get a single vehicle by id. --asiakas reads a vehicle owned by ANOTHER company (cross-tenant; developer/admin lever) — without it the lookup is scoped to the active company and a foreign vehicleId returns 404.",
+        permissions: ["auth.page.vehicle.read", "--asiakas: sysadmin/developer or a vehicle-manage role (admin/owner/vehicleHandler) on the target tenant"],
         args: [{ name: "vehicleId", type: "number", description: "vehicleId to fetch" }],
-        flags: [],
+        flags: [
+            {
+                name: "asiakas",
+                type: "number",
+                description: "Read a vehicle owned by this company (cross-tenant). Requires sysadmin/developer or a vehicle-manage role on that tenant; default = active company.",
+            },
+        ],
         outputShape: "{ vehicleId, vehicleNo, name, plate, type, typeName, boomLength, capacity, sortNo, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, memo, billingProductId, asiakasId, defaultDriverId, showInGrid:boolean, showInReports:boolean, useNoDriverBar:boolean, isRestricted:boolean, hasGpsTracking:boolean }",
         errors: [
-            apiErr(404, "Vehicle not found", "verify vehicleId"),
+            apiErr(404, "Vehicle not found", "verify vehicleId (and --asiakas if it belongs to another company)"),
+            apiErr(403, "No vehicle access on the requested --asiakas company", "use a tenant you have a vehicle-manage role on, or a developer token"),
             ...permErrors("auth.page.vehicle.read"),
         ],
-        examples: ["ib vehicle get 7"],
+        examples: ["ib vehicle get 7", "ib vehicle get 159 --asiakas 1380"],
     },
     {
         command: "ib vehicle status",
@@ -1597,15 +1613,23 @@ const BASE_COMMAND_SPECS = [
     },
     {
         command: "ib vehicle search",
-        description: "Search vehicles by reg-no / name / fleet-number substring (LIKE on vehicleRegNo / vehicleNimi / vehicleNo).",
-        permissions: ["auth.page.vehicle.read"],
+        description: "Search vehicles by reg-no / name / fleet-number substring (LIKE on vehicleRegNo / vehicleNimi / vehicleNo). --asiakas searches ANOTHER company's fleet (cross-tenant; same gate as `ib vehicle list --asiakas`).",
+        permissions: ["auth.page.vehicle.read", "--asiakas: sysadmin/developer or a vehicle-manage role (admin/owner/vehicleHandler) on the target tenant"],
         args: [{ name: "query", type: "string", description: "substring to match (reg-no, name, or fleet number)" }],
         flags: [
             { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
+            {
+                name: "asiakas",
+                type: "number",
+                description: "Search another company's fleet (cross-tenant). Requires sysadmin/developer or a vehicle-manage role on that tenant; default = active company.",
+            },
         ],
         outputShape: "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>" + TRUNCATED_NOTE,
-        errors: permErrors("auth.page.vehicle.read"),
-        examples: ["ib vehicle search ABC", "ib vehicle search kuorma --limit 20", "ib vehicle search 82"],
+        errors: [
+            apiErr(403, "No vehicle access on the requested --asiakas company", "use a tenant you have a vehicle-manage role on, or a developer token"),
+            ...permErrors("auth.page.vehicle.read"),
+        ],
+        examples: ["ib vehicle search ABC", "ib vehicle search kuorma --limit 20", "ib vehicle search 82", "ib vehicle search ABC --asiakas 1380"],
     },
     {
         command: "ib vehicle create",

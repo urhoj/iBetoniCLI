@@ -34,6 +34,12 @@ export interface VehicleListFilter {
   validOn?: string;
   /** Only vehicles of this vehicleTypeId. */
   type?: number;
+  /**
+   * Read another company's fleet (cross-tenant). Requires sysadmin/developer, or
+   * an admin/owner/vehicleHandler role on the target tenant (same gate as
+   * `vehicle create`/`update`); default = the active company from the JWT.
+   */
+  asiakas?: number;
 }
 
 export interface VehicleDayFilter {
@@ -84,6 +90,7 @@ export async function runVehicleList(
   if (opts.gridOnly) params.set("gridOnly", "1");
   if (opts.validOn) params.set("validOn", opts.validOn);
   if (opts.type !== undefined) params.set("type", String(opts.type));
+  if (opts.asiakas !== undefined) params.set("asiakas", String(opts.asiakas));
   const qs = params.toString();
   return client.get<ListEnvelope<Record<string, unknown>>>(
     `/api/cli/vehicle/list${qs ? `?${qs}` : ""}`
@@ -96,13 +103,19 @@ export async function runVehicleList(
  * vehiclePuomi, capacity ← vehicleM3, sortNo), validity (firstDate/lastDate),
  * memo, billingProductId, asiakasId, defaultDriverId, and the behaviour toggles
  * (showInGrid/showInReports/useNoDriverBar/isRestricted/hasGpsTracking).
+ *
+ * `asiakas` reads a vehicle owned by another company (cross-tenant); it needs
+ * sysadmin/developer or a vehicle-manage role on that tenant, else the backend
+ * returns 403. Default = the active company from the JWT.
  */
 export async function runVehicleGet(
   client: ApiClient,
-  vehicleId: number
+  vehicleId: number,
+  asiakas?: number
 ): Promise<Record<string, unknown>> {
+  const qs = asiakas !== undefined ? `?asiakas=${asiakas}` : "";
   return client.get<Record<string, unknown>>(
-    `/api/cli/vehicle/get/${vehicleId}`
+    `/api/cli/vehicle/get/${vehicleId}${qs}`
   );
 }
 
@@ -212,10 +225,12 @@ export async function runVehicleTypes(
 export async function runVehicleSearch(
   client: ApiClient,
   query: string,
-  limit?: number
+  limit?: number,
+  asiakas?: number
 ): Promise<ListEnvelope<Record<string, unknown>>> {
   const params = new URLSearchParams({ search: query });
   if (limit !== undefined) params.set("limit", String(limit));
+  if (asiakas !== undefined) params.set("asiakas", String(asiakas));
   return client.get<ListEnvelope<Record<string, unknown>>>(
     `/api/cli/vehicle/list?${params.toString()}`
   );
@@ -450,6 +465,11 @@ export function registerVehicleCommands(
       "Only vehicles valid on this day YYYY-MM-DD (or today/yesterday/tomorrow)"
     )
     .option("--type <id>", "Only this vehicleTypeId", (val: string) => Number(val))
+    .option(
+      "--asiakas <id>",
+      "Read another company's fleet (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant). Default: active company.",
+      (val: string) => Number(val)
+    )
     .action(
       async (
         opts: {
@@ -459,6 +479,7 @@ export function registerVehicleCommands(
           gridOnly?: boolean;
           validOn?: string;
           type?: number;
+          asiakas?: number;
         }
       ) => {
         try {
@@ -470,6 +491,7 @@ export function registerVehicleCommands(
             gridOnly: opts.gridOnly,
             validOn: resolveDate(opts.validOn),
             type: opts.type,
+            asiakas: opts.asiakas,
           });
           writeJson(result);
         } catch (e) {
@@ -480,10 +502,15 @@ export function registerVehicleCommands(
 
   v.command("get <vehicleId>")
     .description("Get a single vehicle by vehicleId")
-    .action(async (idStr: string) => {
+    .option(
+      "--asiakas <id>",
+      "Read a vehicle owned by another company (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant)",
+      (val: string) => Number(val)
+    )
+    .action(async (idStr: string, opts: { asiakas?: number }) => {
       try {
         const client = await getClient();
-        const result = await runVehicleGet(client, parseId(idStr, "vehicleId"));
+        const result = await runVehicleGet(client, parseId(idStr, "vehicleId"), opts.asiakas);
         writeJson(result);
       } catch (e) {
         exitWithError(e);
@@ -529,9 +556,14 @@ export function registerVehicleCommands(
     .option("--limit <n>", "Max rows", (val: string) =>
       Math.min(Number(val), 500)
     )
-    .action(async (query: string, opts: { limit?: number }) => {
+    .option(
+      "--asiakas <id>",
+      "Search another company's fleet (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant)",
+      (val: string) => Number(val)
+    )
+    .action(async (query: string, opts: { limit?: number; asiakas?: number }) => {
       try {
-        writeJson(await runVehicleSearch(await getClient(), query, opts.limit));
+        writeJson(await runVehicleSearch(await getClient(), query, opts.limit, opts.asiakas));
       } catch (e) {
         exitWithError(e);
       }
