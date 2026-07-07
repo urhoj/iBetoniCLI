@@ -685,6 +685,43 @@ async function reconcileCreatedExtras(client, current, desired, flags) {
     return runCustomerGet(client, current.asiakasId);
 }
 /**
+ * GET /api/admin/asiakas-combinator/duplicates?ownerAsiakasId=<id> — likely-
+ * duplicate customer pairs for one tenant (y-tunnus / exact-name / email /
+ * name-prefix matches). System-admin gated server-side. The backend returns
+ * `{ pairs }` (top 100, each pair once with id1 < id2); projected into the list
+ * envelope. `truncated` is set when the 100-pair cap was hit (there is no cursor).
+ */
+export async function runCustomerDuplicates(client, ownerAsiakasId) {
+    const res = await client.get(`/api/admin/asiakas-combinator/duplicates?ownerAsiakasId=${ownerAsiakasId}`);
+    const items = Array.isArray(res?.pairs) ? res.pairs : [];
+    return { items, nextCursor: null, count: items.length, truncated: items.length >= 100 };
+}
+/**
+ * Merge two duplicate customers — the secondary's references move onto the main,
+ * then the secondary is deleted. IRREVERSIBLE, system-admin gated server-side.
+ *
+ * `--dry-run` calls POST /validate (the read-only safety check reporting what
+ * WOULD move + any blocking conflicts) and NEVER merges — the /merge route has
+ * no `X-Dry-Run` guard, so a server-side dry-run there would still merge. The
+ * real path POSTs /merge with the universal write-flag headers.
+ */
+export async function runCustomerMerge(client, opts, flags) {
+    const body = {
+        mainAsiakasId: opts.mainAsiakasId,
+        secondaryAsiakasId: opts.secondaryAsiakasId,
+        ownerAsiakasId: opts.ownerAsiakasId,
+    };
+    if (opts.allowBigMerge)
+        body.allowBigMerge = true;
+    if (flags.dryRun) {
+        const validation = await client.post("/api/admin/asiakas-combinator/validate", body);
+        return { dryRun: true, validation };
+    }
+    return client.post("/api/admin/asiakas-combinator/merge", body, {
+        headers: writeFlagsToHeaders(flags),
+    });
+}
+/**
  * Register `ib customer` subcommands on the parent commander instance:
  *   - list      filterable by --limit/--cursor
  *   - dead-list customers the PRH nightly sweep flagged dead/caution (reads pre-checked columns)
@@ -696,6 +733,8 @@ async function reconcileCreatedExtras(client, current, desired, flags) {
  *   - update    read-merge-write via typed flags; --body overrides (write flags)
  *   - create-or-update  upsert keyed by ytunnus (lookup → update or create; alias `upsert`)
  *   - delete    DELETE /api/asiakas/delete/<id>/<owner> (requires --reason)
+ *   - duplicates likely-duplicate customer pairs for a tenant (read; system-admin; feeds merge)
+ *   - merge     merge two duplicate customers (--dry-run = /validate; IRREVERSIBLE; requires --reason)
  *   - log       change-tracker audit trail for one customer
  *   - modules   report/toggle roolit + the 8 module flags (admin-gated; write flags)
  *   - operator  verify/provision all 9 operator flags at once (admin-gated; write flags)
@@ -1127,6 +1166,55 @@ export function registerCustomerCommands(parent, getClient) {
             const client = await getClient();
             const result = await runCustomerPersonList(client, resolveAsiakasTarget(asiakasIdStr, opts.asiakas), opts.role, opts.includeRoles);
             writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    c.command("duplicates")
+        .description("List likely-duplicate customer pairs for a tenant (y-tunnus / exact-name / " +
+        "email / name-prefix). Read-only; system-admin gated. Owner defaults to your " +
+        "active company; --owner scans another tenant. Feeds `ib customer merge`.")
+        .option("--owner <id>", "ownerAsiakasId to scan (default: active company)", Number)
+        .action(async (opts) => {
+        try {
+            const client = await getClient();
+            const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
+            writeJson(await runCustomerDuplicates(client, owner));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    const mergeCmd = c
+        .command("merge")
+        .description("Merge two duplicate customers: the secondary's references move onto the main, " +
+        "then the secondary is DELETED. IRREVERSIBLE, system-admin gated. --dry-run runs " +
+        "the read-only /validate safety check (never merges). A real merge requires --reason.")
+        .requiredOption("--main <id>", "asiakasId to KEEP (references merge into this)", Number)
+        .requiredOption("--secondary <id>", "asiakasId to REMOVE (merged away, then deleted)", Number)
+        .option("--owner <id>", "ownerAsiakasId (default: active company)", Number)
+        .option("--allow-big-merge", "System-admin: permit a merge above the safety row cap");
+    addWriteFlagsToCommand(mergeCmd).action(async (opts) => {
+        if (!Number.isInteger(opts.main) || opts.main <= 0 ||
+            !Number.isInteger(opts.secondary) || opts.secondary <= 0) {
+            failWith("--main and --secondary must be positive integer asiakasIds", 4);
+        }
+        if (opts.main === opts.secondary) {
+            failWith("--main and --secondary must differ", 4);
+        }
+        if (!opts.dryRun && !opts.reason) {
+            failWith("customer merge is irreversible — pass --reason (or --dry-run to preview via /validate)", 4);
+        }
+        try {
+            const client = await getClient();
+            const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
+            writeJson(await runCustomerMerge(client, {
+                mainAsiakasId: opts.main,
+                secondaryAsiakasId: opts.secondary,
+                ownerAsiakasId: owner,
+                allowBigMerge: opts.allowBigMerge,
+            }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
         }
         catch (e) {
             exitWithError(e);

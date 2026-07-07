@@ -1057,6 +1057,42 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib customer duplicates matches snapshot 1`] = `
+"USAGE
+  ib customer duplicates [flags]
+
+DESCRIPTION
+  List likely-duplicate customer pairs for one tenant (y-tunnus / exact-name / email / name-prefix matches). Read-only; system-admin gated server-side. Owner defaults to your active company; --owner scans another tenant. Feeds \`ib customer merge\`.
+  Permissions: requires system admin (or company admin on the target tenant).
+
+FLAGS
+  --owner NUMBER    ownerAsiakasId to scan (default: active company)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { items: [{ id1, name1, id2, name2, matchCode: 'ytunnus'|'exact_name'|'email'|'name_prefix', matchValue, confidence: 'high'|'low' }], count, truncated? } — truncated=true when capped at 100 pairs
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  ownerAsiakasId missing/invalid → pass --owner <id>, or set an active company
+  exit 3 (HTTP 403)  Not permitted on this tenant → use a system-admin token
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - name_prefix is a low-confidence heuristic (same distinctive name-start after stripping generic lead-words like Rakennusliike / Kiinteistö Oy) — a human confirms before merging.
+  - Each pair is returned once (id1 < id2), top 100 by match confidence.
+
+SEE ALSO
+  ib customer merge, ib customer get
+
+EXAMPLES
+  ib customer duplicates
+  ib customer duplicates --owner 1349
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib customer get matches snapshot 1`] = `
 "USAGE
   ib customer get <asiakasId> [flags]
@@ -1162,6 +1198,52 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib customer log 26
   ib customer log 26 --limit 20
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib customer merge matches snapshot 1`] = `
+"USAGE
+  ib customer merge [flags]
+
+DESCRIPTION
+  Merge two duplicate customers: the secondary's references move onto the main, then the secondary is DELETED. IRREVERSIBLE and system-admin gated. --dry-run runs the read-only /validate safety check (what would move + conflicts) and NEVER merges. A real merge requires --reason.
+  Permissions: requires system admin (or company admin on the target tenant).
+
+FLAGS
+  --main NUMBER    asiakasId to KEEP — references merge into this one (required)
+  --secondary NUMBER    asiakasId to REMOVE — merged away then deleted (required)
+  --owner NUMBER    ownerAsiakasId (default: active company)
+  --allow-big-merge BOOLEAN    System-admin: permit a merge above the safety row cap
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  real: { success, safetyValidation, timestamp, ... } | dry-run: { dryRun: true, validation: { success, ... } }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Validation failed (missing/equal ids, or safety row cap) → check --main/--secondary; run --dry-run first; a system-admin may add --allow-big-merge
+  exit 3 (HTTP 403)  Not permitted on this tenant → use a system-admin token
+  exit 5 (HTTP 404)  One or both customers not found or access denied → verify --main/--secondary and --owner
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - ALWAYS --dry-run first: the /merge route has no X-Dry-Run guard, so a real invocation merges immediately.
+  - --dry-run issues a POST to /validate (server-side read-only), so it is BLOCKED under --read-only / IB_READ_ONLY — drop the write-lock to preview.
+  - Affects keikka / tyomaa / person / sijainti / stat / lasku rows and the change history; caches are invalidated server-side.
+
+SEE ALSO
+  ib customer duplicates, ib customer delete
+
+EXAMPLES
+  ib customer merge --main 8001 --secondary 8002 --dry-run
+  ib customer merge --main 8001 --secondary 8002 --reason 'dedupe: same y-tunnus'
 "
 `;
 

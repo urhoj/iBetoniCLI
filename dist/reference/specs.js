@@ -968,6 +968,55 @@ const BASE_COMMAND_SPECS = [
         ],
     },
     {
+        command: "ib customer duplicates",
+        description: "List likely-duplicate customer pairs for one tenant (y-tunnus / exact-name / email / name-prefix matches). Read-only; system-admin gated server-side. Owner defaults to your active company; --owner scans another tenant. Feeds `ib customer merge`.",
+        permissions: ["system admin (or company admin on the target tenant)"],
+        flags: [
+            { name: "owner", type: "number", description: "ownerAsiakasId to scan (default: active company)" },
+        ],
+        outputShape: "{ items: [{ id1, name1, id2, name2, matchCode: 'ytunnus'|'exact_name'|'email'|'name_prefix', matchValue, confidence: 'high'|'low' }], count, truncated? } — truncated=true when capped at 100 pairs",
+        errors: [
+            apiErr(400, "ownerAsiakasId missing/invalid", "pass --owner <id>, or set an active company"),
+            apiErr(403, "Not permitted on this tenant", "use a system-admin token"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        notes: [
+            "name_prefix is a low-confidence heuristic (same distinctive name-start after stripping generic lead-words like Rakennusliike / Kiinteistö Oy) — a human confirms before merging.",
+            "Each pair is returned once (id1 < id2), top 100 by match confidence.",
+        ],
+        seeAlso: ["ib customer merge", "ib customer get"],
+        examples: ["ib customer duplicates", "ib customer duplicates --owner 1349"],
+    },
+    {
+        command: "ib customer merge",
+        description: "Merge two duplicate customers: the secondary's references move onto the main, then the secondary is DELETED. IRREVERSIBLE and system-admin gated. --dry-run runs the read-only /validate safety check (what would move + conflicts) and NEVER merges. A real merge requires --reason.",
+        permissions: ["system admin (or company admin on the target tenant)"],
+        flags: [
+            { name: "main", type: "number", description: "asiakasId to KEEP — references merge into this one (required)" },
+            { name: "secondary", type: "number", description: "asiakasId to REMOVE — merged away then deleted (required)" },
+            { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+            { name: "allow-big-merge", type: "boolean", description: "System-admin: permit a merge above the safety row cap" },
+        ],
+        writeFlags: true,
+        outputShape: "real: { success, safetyValidation, timestamp, ... } | dry-run: { dryRun: true, validation: { success, ... } }",
+        errors: [
+            apiErr(400, "Validation failed (missing/equal ids, or safety row cap)", "check --main/--secondary; run --dry-run first; a system-admin may add --allow-big-merge"),
+            apiErr(403, "Not permitted on this tenant", "use a system-admin token"),
+            apiErr(404, "One or both customers not found or access denied", "verify --main/--secondary and --owner"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        notes: [
+            "ALWAYS --dry-run first: the /merge route has no X-Dry-Run guard, so a real invocation merges immediately.",
+            "--dry-run issues a POST to /validate (server-side read-only), so it is BLOCKED under --read-only / IB_READ_ONLY — drop the write-lock to preview.",
+            "Affects keikka / tyomaa / person / sijainti / stat / lasku rows and the change history; caches are invalidated server-side.",
+        ],
+        seeAlso: ["ib customer duplicates", "ib customer delete"],
+        examples: [
+            "ib customer merge --main 8001 --secondary 8002 --dry-run",
+            "ib customer merge --main 8001 --secondary 8002 --reason 'dedupe: same y-tunnus'",
+        ],
+    },
+    {
         command: "ib customer log",
         description: "Change-tracker audit trail for one customer — who changed which field, when, and the --reason. Reads the same log the CLI's writes populate.",
         permissions: ["auth.page.asiakas.read (company member or admin)"],
