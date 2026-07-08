@@ -9575,6 +9575,7 @@ FLAGS
   --month STRING    Whole calendar month YYYY-MM (expands to first→last day)
   --week DATE    7-day window starting <start>
   --by STRING    Single breakdown: customer|vehicle|driver|worksite|status|day (omit for full bundle)
+  --all BOOLEAN    All tenants (requires developer/system-admin access; 403 otherwise)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -9590,11 +9591,13 @@ NOTES
   - Default range is today. Exactly one of --today/--month/--week/(--from & --to).
   - Deploy-gated: returns 404 until GET /api/cli/stats is deployed.
   - Revenue and driver hours are out of scope (v1).
+  - --all requires developer/system-admin access (403 for everyone else); omit to stay scoped to your own visibility.
 
 EXAMPLES
   ib stats --month 2026-06
   ib stats --from 2026-06-01 --to 2026-06-07 --by driver
   ib stats --today --pretty
+  ib stats --today --all
 "
 `;
 

@@ -783,6 +783,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "month", type: "string", description: "Whole calendar month YYYY-MM (expands to first→last day)" },
       { name: "week", type: "date", description: "7-day window starting <start>" },
       { name: "by", type: "string", description: "Single breakdown: customer|vehicle|driver|worksite|status|day (omit for full bundle)" },
+      { name: "all", type: "boolean", description: "All tenants (requires developer/system-admin access; 403 otherwise)" },
     ],
     outputShape:
       "No --by: { period, totals:{orders,m3,activeVehicles,activeDrivers}, byStatus, byCustomer, byVehicle, byDriver, byWorksite, byDay }. With --by: ListEnvelope of that one breakdown.",
@@ -791,11 +792,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "Default range is today. Exactly one of --today/--month/--week/(--from & --to).",
       "Deploy-gated: returns 404 until GET /api/cli/stats is deployed.",
       "Revenue and driver hours are out of scope (v1).",
+      "--all requires developer/system-admin access (403 for everyone else); omit to stay scoped to your own visibility.",
     ],
     examples: [
       "ib stats --month 2026-06",
       "ib stats --from 2026-06-01 --to 2026-06-07 --by driver",
       "ib stats --today --pretty",
+      "ib stats --today --all",
     ],
   },
 

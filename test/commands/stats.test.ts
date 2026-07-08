@@ -43,4 +43,13 @@ describe("runStats", () => {
     await expect(runStats(mockClient, { month: "2026-06", by: "bogus" })).rejects.toThrow();
     expect(mockClient.get).not.toHaveBeenCalled();
   });
+  test("appends &all=1 when --all given", async () => {
+    await runStats(mockClient, { from: "2026-06-01", to: "2026-06-30", all: true });
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/stats?from=2026-06-01&to=2026-06-30&all=1");
+  });
+  test("omits &all when --all not given", async () => {
+    await runStats(mockClient, { from: "2026-06-01", to: "2026-06-30" });
+    const url = (mockClient.get as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(url).not.toContain("all=");
+  });
 });

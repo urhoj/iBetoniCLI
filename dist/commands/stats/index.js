@@ -42,6 +42,9 @@ export async function runStats(client, opts) {
         }
         params.set("by", opts.by);
     }
+    if (opts.all) {
+        params.set("all", "1");
+    }
     return client.get(`/api/cli/stats?${params.toString()}`);
 }
 /**
@@ -58,6 +61,7 @@ export function registerStatsCommands(parent, getClient) {
         .option("--month <YYYY-MM>", "Whole calendar month (expands to first→last day)")
         .option("--week <start>", "7-day window starting <start> (YYYY-MM-DD)")
         .option("--by <dim>", `Single breakdown: ${STATS_DIMS.join("|")} (omit for full bundle)`)
+        .option("--all", "All tenants (requires developer/system-admin access; 403 otherwise)")
         .action(async (opts) => {
         try {
             const client = await getClient();

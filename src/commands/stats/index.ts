@@ -14,6 +14,7 @@ export interface StatsOptions {
   month?: string;
   week?: string;
   by?: string;
+  all?: boolean;
 }
 
 /**
@@ -56,6 +57,9 @@ export async function runStats(client: ApiClient, opts: StatsOptions): Promise<u
     }
     params.set("by", opts.by);
   }
+  if (opts.all) {
+    params.set("all", "1");
+  }
   return client.get<unknown>(`/api/cli/stats?${params.toString()}`);
 }
 
@@ -73,6 +77,7 @@ export function registerStatsCommands(parent: Command, getClient: () => Promise<
     .option("--month <YYYY-MM>", "Whole calendar month (expands to first→last day)")
     .option("--week <start>", "7-day window starting <start> (YYYY-MM-DD)")
     .option("--by <dim>", `Single breakdown: ${STATS_DIMS.join("|")} (omit for full bundle)`)
+    .option("--all", "All tenants (requires developer/system-admin access; 403 otherwise)")
     .action(async (opts: StatsOptions) => {
       try {
         const client = await getClient();
