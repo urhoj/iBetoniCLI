@@ -12,6 +12,22 @@ const BUMP_LEVELS = ["none", "patch", "minor", "major"];
 const LANGUAGES = ["fi", "en"]; // devChangelog.language is CHAR(2) NOT NULL DEFAULT 'fi'
 const SOURCES = ["human", "routine"];
 /**
+ * The repos whose versions `npm run deploy` Step 0 bumps independently, each
+ * from the max --bump-level across the unreleased entries that name it. A
+ * --repo value NOT in this set is unknown to Step 0 and triggers a fail-safe
+ * bump of EVERY coordinated repo (unless --bump-level none). The standalone
+ * lane (betonicli, @ibetoni/*) versions separately via `npm run final`, so
+ * target those with `--repo <name> --bump-level none`.
+ */
+const COORDINATED_REPOS = [
+    "puminet4",
+    "puminet5api",
+    "puminet7-functions-app",
+    "betonijerry",
+    "workspace",
+];
+const REPO_FLAG_DESC = "Repo this entry ships in — coordinated: puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace. ⚠ An unrecognized value fail-safe-bumps ALL coordinated repos on next deploy; for the standalone lane (betonicli, @ibetoni/*) also pass --bump-level none.";
+/**
  * Normalize a Sentry issue reference: accept a bare short id (e.g. PUMINET5API-1A2)
  * or extract one from a pasted URL/string; otherwise trim and cap at 64 chars to fit
  * the devChangelog.sentryIssue column. Store-only — never sent to Sentry.
@@ -112,7 +128,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--status <s>", "Tila (Julkaistu/Korjattu/...)")
         .option("--severity <s>", "Bug severity")
         .option("--files <csv>", "Comma-separated file paths")
-        .option("--repo <r>", "Repo/submodule")
+        .option("--repo <r>", REPO_FLAG_DESC)
         .option("--sha <csv>", "Commit SHAs (CSV)")
         .option("--vtag <s>", "Version tag")
         .option("--bump-level <l>", "App version bump this implies: none|patch|minor|major", "patch")
@@ -145,6 +161,10 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
                 .filter(Boolean));
         if (o.repo)
             body.repo = o.repo;
+        if (o.repo &&
+            !COORDINATED_REPOS.includes(o.repo) &&
+            (o.bumpLevel || "patch") !== "none")
+            console.error(`[ib] ⚠ --repo "${o.repo}" is not a coordinated repo (${COORDINATED_REPOS.join(", ")}) — on next deploy this fail-safe-bumps ALL of them. For the standalone lane (betonicli, @ibetoni/*) add --bump-level none.`);
         if (o.sha)
             body.commitShas = o.sha;
         if (o.vtag)
@@ -349,7 +369,7 @@ export const CHANGELOG_SPECS = [
                 description: "Bug severity (Kriittinen/Korkea/Normaali/Matala)",
             },
             { name: "files", type: "string", description: "CSV of file paths" },
-            { name: "repo", type: "string", description: "Repo/submodule" },
+            { name: "repo", type: "string", description: REPO_FLAG_DESC },
             { name: "sha", type: "string", description: "Commit SHAs (CSV)" },
             { name: "vtag", type: "string", description: "Version tag" },
             { name: "bump-level", type: "string", default: "patch", description: "App version bump this implies: none|patch|minor|major" },

@@ -2163,7 +2163,7 @@ FLAGS
   --status STRING    Tila (Julkaistu/Korjattu/...)
   --severity STRING    Bug severity (Kriittinen/Korkea/Normaali/Matala)
   --files STRING    CSV of file paths
-  --repo STRING    Repo/submodule
+  --repo STRING    Repo this entry ships in — coordinated: puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace. ⚠ An unrecognized value fail-safe-bumps ALL coordinated repos on next deploy; for the standalone lane (betonicli, @ibetoni/*) also pass --bump-level none.
   --sha STRING    Commit SHAs (CSV)
   --vtag STRING    Version tag
   --bump-level STRING    App version bump this implies: none|patch|minor|major (default: patch)
