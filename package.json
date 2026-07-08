@@ -1,6 +1,6 @@
 {
   "name": "@ibetoni/cli",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "description": "iBetoni CLI — AI-driven command-line interface for betoni.online and betoniJerry",
   "type": "module",
   "bin": {
