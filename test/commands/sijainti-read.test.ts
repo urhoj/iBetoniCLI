@@ -11,6 +11,8 @@ import {
   runSijaintiDistance,
   resolveSijaintiTypeId,
   sijaintiRowMatches,
+  sijaintiJerryActive,
+  sijaintiMatchable,
 } from "../../src/commands/sijainti/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -460,6 +462,97 @@ describe("runSijaintiListJoined", () => {
     const result = await runSijaintiListJoined(mockClient, {});
     expect(result.items.length).toBeGreaterThan(0);
     expect(result.hint).toBeUndefined();
+  });
+});
+
+describe("sijaintiJerryActive / sijaintiMatchable (fb#108)", () => {
+  const now = new Date("2026-07-08T00:00:00Z");
+  const SENTINEL = "9999-12-31 23:59:59"; // future = enrolment active
+  const PAST = "2020-01-01 00:00:00"; // expired enrolment
+
+  test("sijaintiJerryActive: non-null future/sentinel = active", () => {
+    expect(sijaintiJerryActive({ jerryActiveUntil: SENTINEL }, now)).toBe(true);
+    expect(sijaintiJerryActive({ jerryActiveUntil: "2027-01-01 00:00:00" }, now)).toBe(true);
+  });
+
+  test("sijaintiJerryActive: null (not enrolled), past (expired) and unparseable = inactive", () => {
+    expect(sijaintiJerryActive({ jerryActiveUntil: null }, now)).toBe(false);
+    expect(sijaintiJerryActive({}, now)).toBe(false);
+    expect(sijaintiJerryActive({ jerryActiveUntil: PAST }, now)).toBe(false);
+    expect(sijaintiJerryActive({ jerryActiveUntil: "not-a-date" }, now)).toBe(false);
+  });
+
+  test("sijaintiMatchable: active + coords + positive radius = true", () => {
+    expect(
+      sijaintiMatchable(
+        { jerryActiveUntil: SENTINEL, coords: { lat: 60.1, lng: 24.9 }, maxDeliveryDistance: 50 },
+        now
+      )
+    ).toBe(true);
+  });
+
+  test("sijaintiMatchable: false when expired, missing coords, or radius 0/null", () => {
+    const coords = { lat: 60.1, lng: 24.9 };
+    // expired enrolment
+    expect(sijaintiMatchable({ jerryActiveUntil: PAST, coords, maxDeliveryDistance: 50 }, now)).toBe(false);
+    // no GPS pin
+    expect(sijaintiMatchable({ jerryActiveUntil: SENTINEL, coords: null, maxDeliveryDistance: 50 }, now)).toBe(false);
+    // 0 km radius (covers nothing)
+    expect(sijaintiMatchable({ jerryActiveUntil: SENTINEL, coords, maxDeliveryDistance: 0 }, now)).toBe(false);
+    // null radius (deploy-gated / unset)
+    expect(sijaintiMatchable({ jerryActiveUntil: SENTINEL, coords, maxDeliveryDistance: null }, now)).toBe(false);
+    // not enrolled at all
+    expect(sijaintiMatchable({ jerryActiveUntil: null, coords, maxDeliveryDistance: 50 }, now)).toBe(false);
+  });
+});
+
+describe("runSijaintiListJoined --jerry (fb#108)", () => {
+  const get = mockClient.get as ReturnType<typeof vi.fn>;
+  const SENTINEL = "9999-12-31 23:59:59";
+  const PAST = "2020-01-01 00:00:00";
+  const coords = { lat: 60.1, lng: 24.9 };
+  beforeEach(() => {
+    get.mockReset();
+    get.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/geocode/sijaintiTypes")) return TYPE_ROWS;
+      if (path.startsWith("/api/cli/sijainti/list")) {
+        return {
+          items: [
+            { sijaintiId: 1, name: "Matchable", coords, type: 1, jerryActiveUntil: SENTINEL, maxDeliveryDistance: 50 },
+            { sijaintiId: 2, name: "No coords", coords: null, type: 1, jerryActiveUntil: SENTINEL, maxDeliveryDistance: 50 },
+            { sijaintiId: 3, name: "Expired", coords, type: 1, jerryActiveUntil: PAST, maxDeliveryDistance: 50 },
+            { sijaintiId: 4, name: "Not enrolled", coords, type: 1, jerryActiveUntil: null, maxDeliveryDistance: 50 },
+            { sijaintiId: 5, name: "Zero radius", coords, type: 1, jerryActiveUntil: SENTINEL, maxDeliveryDistance: 0 },
+          ],
+          nextCursor: null,
+          count: 5,
+        };
+      }
+      throw new Error(`unexpected GET ${path}`);
+    });
+  });
+
+  test("keeps only enrolled rows (expired included, non-enrolled dropped) and fetches at the 500 scan cap", async () => {
+    const result = await runSijaintiListJoined(mockClient, { jerry: true });
+    expect(get).toHaveBeenCalledWith("/api/cli/sijainti/list?limit=500");
+    // id 4 (jerryActiveUntil null) is dropped; the expired id 3 stays (lapsed varikko surfaces)
+    expect(result.items.map((r) => r.sijaintiId)).toEqual([1, 2, 3, 5]);
+  });
+
+  test("stamps each surviving row with a derived matchable boolean", async () => {
+    const result = await runSijaintiListJoined(mockClient, { jerry: true });
+    expect(result.items.map((r) => ({ id: r.sijaintiId, matchable: r.matchable }))).toEqual([
+      { id: 1, matchable: true }, // active + coords + radius
+      { id: 2, matchable: false }, // no coords
+      { id: 3, matchable: false }, // expired
+      { id: 5, matchable: false }, // 0 km radius
+    ]);
+  });
+
+  test("without --jerry the rows carry NO matchable field (default output unchanged)", async () => {
+    const result = await runSijaintiListJoined(mockClient, {});
+    expect(result.items).toHaveLength(5);
+    expect(result.items.every((r) => !("matchable" in r))).toBe(true);
   });
 });
 

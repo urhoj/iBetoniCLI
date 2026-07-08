@@ -113,6 +113,35 @@ export function extractGeocodeLatLng(geo) {
     return null;
 }
 /**
+ * Is a list row's BetoniJerry enrolment ACTIVE right now? True when
+ * `jerryActiveUntil` is non-null AND parses to a moment >= `now` (future/sentinel
+ * = active; a PAST date = expired = inactive). The stored value is Helsinki-local
+ * without a timezone (e.g. "9999-12-31 23:59:59" sentinel, or a real date) — a
+ * near-expiry boundary can be off by the TZ offset, acceptable for an audit
+ * heuristic. Pure (takes `now`) so it is directly unit-testable.
+ */
+export function sijaintiJerryActive(row, now) {
+    const raw = row.jerryActiveUntil;
+    if (raw == null)
+        return false;
+    const until = new Date(String(raw));
+    return Number.isFinite(until.getTime()) && until.getTime() >= now.getTime();
+}
+/**
+ * Derived `matchable` for a list row (fb#108): the full set BetoniJerry needs
+ * to match a varikko to a delivery — enrolment ACTIVE ({@link sijaintiJerryActive})
+ * AND GPS coords present AND a positive delivery radius (maxDeliveryDistance km).
+ * A row that is Jerry-active but has null coords or a 0/null radius covers
+ * nothing, so `matchable:false` flags the misconfiguration. Boom range
+ * (puomiMin/puomiMax) is deliberately NOT part of this — it is optional
+ * (NULL = unbounded) and stays off the list. Pure (takes `now`).
+ */
+export function sijaintiMatchable(row, now) {
+    return (sijaintiJerryActive(row, now) &&
+        row.coords != null &&
+        Number(row.maxDeliveryDistance) > 0);
+}
+/**
  * GET /api/cli/sijainti/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
  *
@@ -410,7 +439,7 @@ export async function runSijaintiListJoined(client, opts) {
     const typeId = opts.type !== undefined && opts.type !== ""
         ? resolveSijaintiTypeId(types.items, opts.type)
         : undefined;
-    const clientFiltered = !!opts.search || opts.owner !== undefined;
+    const clientFiltered = !!opts.search || opts.owner !== undefined || !!opts.jerry;
     const env = await runSijaintiList(client, {
         type: typeId !== undefined ? String(typeId) : undefined,
         limit: clientFiltered ? SIJAINTI_SEARCH_SCAN_LIMIT : opts.limit,
@@ -426,8 +455,8 @@ export async function runSijaintiListJoined(client, opts) {
     }));
     // Propagate the backend's honest truncation signal (deploy-gated; undefined
     // on older backends) — without it a default-limit scope=all list silently
-    // capped at 100 reads as complete. A client-side --search/--asiakas slice
-    // that cuts matched rows is truncation too.
+    // capped at 100 reads as complete. A client-side --search/--asiakas/--jerry
+    // slice that cuts matched rows is truncation too.
     let truncated = env.truncated === true;
     if (clientFiltered) {
         let matched = items;
@@ -436,6 +465,14 @@ export async function runSijaintiListJoined(client, opts) {
         }
         if (opts.search) {
             matched = matched.filter((r) => sijaintiRowMatches(r, opts.search));
+        }
+        if (opts.jerry) {
+            // --jerry (fb#108): keep only Jerry-ENROLLED rows (jerryActiveUntil set;
+            // expired kept so lapsed varikot surface) and stamp each with `matchable`.
+            const now = new Date();
+            matched = matched
+                .filter((r) => r.jerryActiveUntil != null)
+                .map((r) => ({ ...r, matchable: sijaintiMatchable(r, now) }));
         }
         const cap = opts.limit ?? DEFAULT_LIST_LIMIT;
         truncated = truncated || matched.length > cap;
@@ -644,6 +681,7 @@ export function registerSijaintiCommands(parent, getClient) {
         .option("--include-deleted", "Include soft-deleted sijainnit")
         .option("--all", "Include all companies' sijainnit (supplier plants etc.), not just own + shared")
         .option("--asiakas <id>", "Only rows owned by this asiakasId (combine with --all for another company's rows)", Number)
+        .option("--jerry", "Only BetoniJerry-enrolled varikot; adds a derived `matchable` boolean (enrolment active + coords + delivery radius > 0)")
         .action(async (opts) => {
         assertValidAsiakasFlag(opts.asiakas);
         try {
@@ -656,6 +694,7 @@ export function registerSijaintiCommands(parent, getClient) {
                 includeDeleted: opts.includeDeleted,
                 all: opts.all,
                 owner: opts.asiakas,
+                jerry: opts.jerry,
             });
             writeJson(result);
         }

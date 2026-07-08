@@ -2383,8 +2383,9 @@ const BASE_COMMAND_SPECS = [
             { name: "include-deleted", type: "boolean", description: "Include soft-deleted sijainnit" },
             { name: "all", type: "boolean", description: "Include ALL companies' sijainnit, not just own + shared (ownerAsiakasId 0)" },
             { name: "asiakas", type: "number", description: "Only rows owned by this asiakasId (client-side filter on ownerAsiakasId; combine with --all for another company's rows)" },
+            { name: "jerry", type: "boolean", description: "BetoniJerry audit lens: only Jerry-enrolled varikot (jerryActiveUntil set; expired included), each stamped with a derived `matchable` boolean" },
         ],
-        outputShape: "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil, maxDeliveryDistance }> (+truncated:true when the result hit the limit; +hint pointing at --all when 0 rows came back without --all)",
+        outputShape: "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil, maxDeliveryDistance }> (+matchable:boolean on each row when --jerry is set; +truncated:true when the result hit the limit; +hint pointing at --all when 0 rows came back without --all)",
         errors: [
             { exit: 4, meaning: "Unknown or ambiguous --type name", remedy: "the error lists the valid types; or run `ib sijainti types`" },
             ...permErrors("auth.page.sijainnit.read"),
@@ -2397,14 +2398,16 @@ const BASE_COMMAND_SPECS = [
             "--all needs a backend deployed ≥ 2026-06-10; an older backend silently ignores it (returns the own+shared scope). --search works on every backend (client-side fallback).",
             "An unknown numeric --type id is passed through and simply returns zero rows; an unknown type NAME exits 4.",
             "--asiakas filters client-side on the server-emitted ownerAsiakasId field — needs a backend deployed ≥ 2026-06-11 (older backends omit the field, so it matches nothing).",
+            "--jerry (fb#108) is a client-side BetoniJerry audit lens: keeps only Jerry-ENROLLED rows (jerryActiveUntil non-null; expired enrolments INCLUDED so lapsed varikot surface) and stamps each with `matchable` = enrolment active (jerryActiveUntil >= now) AND coords present AND maxDeliveryDistance > 0. So `matchable:false` spots an enrolled-but-not-matchable varikko (expired, no GPS pin, or 0 km radius) in ONE command. Boom range (puomiMin/puomiMax) is NOT part of matchable — use `ib sijainti get <id>`.",
         ],
-        seeAlso: ["ib sijainti plants", "ib sijainti types", "ib search", "ib vehicle visits", "ib vehicle timeline"],
+        seeAlso: ["ib sijainti plants", "ib sijainti types", "ib sijainti set-jerry", "ib search", "ib vehicle visits", "ib vehicle timeline"],
         examples: [
             "ib sijainti list",
             "ib sijainti list --type jäteasema",
             "ib sijainti list --search kivikko --all",
             "ib sijainti list --all --asiakas 30",
             "ib sijainti list --valid-at today",
+            "ib sijainti list --jerry",
         ],
     },
     {
