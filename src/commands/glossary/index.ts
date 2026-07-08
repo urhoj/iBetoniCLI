@@ -344,7 +344,7 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
 
   const set = glossary
     .command("set")
-    .description("Create/update a glossary entry — PARTIAL: only fields you pass change; omit to keep, \"\" to clear (developer only)")
+    .description("Create/update a glossary entry — creates the term if absent (upsert), pass --update-only to require it exists. PARTIAL: only fields you pass change; omit to keep, \"\" to clear (developer only)")
     .argument("<term>", "Canonical term")
     .option("--definition <d>", "One-paragraph definition (omit to keep current)")
     .option("--synonyms <list>", 'Comma-separated aliases incl. inflections (omit to keep; "" to clear)')

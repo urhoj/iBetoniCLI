@@ -5774,7 +5774,7 @@ const BASE_COMMAND_SPECS = [
     },
     {
         command: "ib glossary set",
-        description: "Create/update a glossary entry (developer only). PARTIAL update: only the fields you pass change — omit a flag to KEEP its current value, pass an empty value to CLEAR it. Auto-resolves a matching miss.",
+        description: "Create/update a glossary entry (developer only). UPSERT: creates the term if absent, pass --update-only to require it already exists (404 otherwise). PARTIAL update: only the fields you pass change — omit a flag to KEEP its current value, pass an empty value to CLEAR it. Auto-resolves a matching miss.",
         tier: "developer",
         auth: "any",
         mutates: true,
