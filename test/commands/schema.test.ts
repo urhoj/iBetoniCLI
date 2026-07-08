@@ -7,8 +7,10 @@ import {
   runSchemaProcs,
   runSchemaProc,
   runSchemaDump,
+  runSchemaBatch,
 } from "../../src/commands/schema/index.js";
 import type { ApiClient } from "../../src/api/client.js";
+import { CliError } from "../../src/api/errors.js";
 
 const mockClient = {
   get: vi.fn(),
@@ -80,5 +82,43 @@ describe("ib schema", () => {
     get().mockResolvedValueOnce({ tables: [], foreignKeys: [], views: [], procs: [] });
     await runSchemaDump(mockClient);
     expect(mockClient.get).toHaveBeenCalledWith("/api/cli/schema/dump");
+  });
+
+  test("runSchemaBatch: fans out the single fn per name into an envelope", async () => {
+    get()
+      .mockResolvedValueOnce({ name: "sijainti_save" })
+      .mockResolvedValueOnce({ name: "sijainti_add" });
+    const res = await runSchemaBatch(mockClient, runSchemaProc, ["sijainti_save", "sijainti_add"]);
+    expect(mockClient.get).toHaveBeenNthCalledWith(1, "/api/cli/schema/proc/sijainti_save");
+    expect(mockClient.get).toHaveBeenNthCalledWith(2, "/api/cli/schema/proc/sijainti_add");
+    expect(res).toEqual({
+      items: [
+        { name: "sijainti_save", found: true, object: { name: "sijainti_save" } },
+        { name: "sijainti_add", found: true, object: { name: "sijainti_add" } },
+      ],
+      nextCursor: null,
+      count: 2,
+    });
+  });
+
+  test("runSchemaBatch: a 404 becomes found:false without throwing", async () => {
+    get()
+      .mockResolvedValueOnce({ name: "keikka" })
+      .mockRejectedValueOnce(new CliError("Table not found", 404, {}, 5));
+    const res = await runSchemaBatch(mockClient, runSchemaTable, ["keikka", "nope"]);
+    expect(res.items).toEqual([
+      { name: "keikka", found: true, object: { name: "keikka" } },
+      { name: "nope", found: false, object: null },
+    ]);
+    expect(res.count).toBe(2);
+  });
+
+  test("runSchemaBatch: a non-404 error rejects the batch", async () => {
+    get()
+      .mockResolvedValueOnce({ name: "keikka" })
+      .mockRejectedValueOnce(new CliError("Backend error", 500, {}, 6));
+    await expect(
+      runSchemaBatch(mockClient, runSchemaTable, ["keikka", "boom"])
+    ).rejects.toBeInstanceOf(CliError);
   });
 });

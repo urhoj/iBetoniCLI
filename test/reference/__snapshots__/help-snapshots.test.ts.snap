@@ -2798,11 +2798,11 @@ exports[`Help snapshots — contract stability > help for ib dev schema proc mat
   ib dev schema proc <name> [flags]
 
 DESCRIPTION
-  Signature (parameters) and full definition (T-SQL) for one dbo proc/function. Developer-only.
+  Signature (parameters) and full definition (T-SQL) for one dbo proc/function — or several at once via a comma-separated list (read the procs you're about to CREATE OR ALTER in one call). Developer-only.
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
 
 ARGUMENTS
-  <name> STRING    bare dbo object name (no schema prefix) (required)
+  <name> STRING    bare dbo object name (no schema prefix); comma-separated for a batch (a,b,c) (required)
 
 FLAGS
   (none)
@@ -2811,7 +2811,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }
+  single name → { name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -2822,6 +2822,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib dev schema proc asiakas_find
+  ib dev schema proc sijainti_save,sijainti_add,asiakas_sijainnit_get
 "
 `;
 
@@ -2859,11 +2860,11 @@ exports[`Help snapshots — contract stability > help for ib dev schema table ma
   ib dev schema table <name> [flags]
 
 DESCRIPTION
-  Columns (type, nullability, default, key), primary key, foreign keys, and indexes for one dbo table. Developer-only.
+  Columns (type, nullability, default, key), primary key, foreign keys, and indexes for one dbo table — or several at once via a comma-separated list. Developer-only.
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
 
 ARGUMENTS
-  <name> STRING    bare dbo object name (no schema prefix) (required)
+  <name> STRING    bare dbo object name (no schema prefix); comma-separated for a batch (a,b,c) (required)
 
 FLAGS
   (none)
@@ -2872,7 +2873,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { name, columns:[{name,dataType,maxLength,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], indexes:[{name,columns,unique}] }
+  single name → { name, columns:[{name,dataType,maxLength,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], indexes:[{name,columns,unique}] }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -2883,6 +2884,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib dev schema table keikka
+  ib dev schema table keikka,asiakas,tyomaa
 "
 `;
 
@@ -2920,11 +2922,11 @@ exports[`Help snapshots — contract stability > help for ib dev schema view mat
   ib dev schema view <name> [flags]
 
 DESCRIPTION
-  Columns and full definition (T-SQL) for one dbo view. Developer-only.
+  Columns and full definition (T-SQL) for one dbo view — or several at once via a comma-separated list. Developer-only.
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
 
 ARGUMENTS
-  <name> STRING    bare dbo object name (no schema prefix) (required)
+  <name> STRING    bare dbo object name (no schema prefix); comma-separated for a batch (a,b,c) (required)
 
 FLAGS
   (none)
@@ -2933,7 +2935,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { name, columns:[{name,dataType,maxLength,nullable,default,key}], definition:'<T-SQL>' }
+  single name → { name, columns:[{name,dataType,maxLength,nullable,default,key}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -2944,6 +2946,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib dev schema view keikkaBetoniView
+  ib dev schema view keikkaBetoniView,asiakasView
 "
 `;
 
@@ -3242,7 +3245,7 @@ exports[`Help snapshots — contract stability > help for ib glossary set matche
   ib glossary set <term> [flags]
 
 DESCRIPTION
-  Create/update a glossary entry (developer only). PARTIAL update: only the fields you pass change — omit a flag to KEEP its current value, pass an empty value to CLEAR it. Auto-resolves a matching miss.
+  Create/update a glossary entry (developer only). UPSERT: creates the term if absent, pass --update-only to require it already exists (404 otherwise). PARTIAL update: only the fields you pass change — omit a flag to KEEP its current value, pass an empty value to CLEAR it. Auto-resolves a matching miss.
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
