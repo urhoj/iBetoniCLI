@@ -3832,21 +3832,28 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "place-id", type: "string", description: "Google placeId (lets the server trust client coords)" },
       { name: "formatted-address", type: "string", description: "Google formatted address" },
       { name: "boom", type: "number", description: "Required boom (m) — filters varikot by their puomiMin/puomiMax range (absent/0 = no boom filter)" },
+      { name: "explain", type: "boolean", description: "Add considered[] — per-varikko exclusion reasons for non-matching depots (developer/admin only)" },
+      { name: "asiakas", type: "number", description: "With --explain: force-include this company's varikot even if not yet Jerry-enabled (surfaces company-gate)" },
     ],
     outputShape:
-      "{ geocoded: boolean, deliverable?: boolean, lat?, lng?, placeId?, formattedAddress?, providerCount?, nearestVarikkoKm?, providers?: [{ asiakasId, asiakasNimi, distanceKm }] }",
+      "{ geocoded: boolean, deliverable?: boolean, lat?, lng?, placeId?, formattedAddress?, providerCount?, nearestVarikkoKm?, providers?: [{ asiakasId, asiakasNimi, distanceKm }], considered?: [{ asiakasId, asiakasNimi, sijaintiId, excludedBy: 'no-coords'|'company-gate'|'not-enrolled'|'radius'|'boom', detail }] }",
     errors: [
       apiErr(400, "osoite missing", "pass --address"),
       { exit: 4, meaning: "--boom not a non-negative number", remedy: "pass metres ≥ 0, or omit for no boom filter" },
+      { exit: 4, meaning: "--asiakas without --explain, or not a positive integer", remedy: "add --explain, or pass a positive asiakasId" },
       apiErr(429, "Rate limit (20/min/IP)", "wait and retry"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     notes: [
       "A varikko counts toward providerCount only when ALL of these hold: the company has isPumppuToimittaja = 1, the company has the HAS_JERRY setting on (ib jerry admin enable), the sijainti is enrolled (jerryActiveUntil in the future, ib sijainti set-jerry --on) with maxDeliveryDistance covering the point, and — when a boom is stated — the sijainti boom range covers it (puomiMin <= boom <= puomiMax, NULL bound = unbounded).",
+      "--explain answers 'why no offers?': considered[] lists the NON-matching varikot (passing ones are in providers[]), each tagged with the FIRST gate it failed — no-coords → company-gate → not-enrolled → radius → boom. Business-sensitive, so returned only to developer/admin tokens, exactly like providers[]. The default candidate set is every isPumppuToimittaja=1 company's varikot; --asiakas <id> additionally pulls in one company's varikot even before it is enabled, so the company-gate reason is visible during onboarding.",
+      "Deploy-gated: --explain / --asiakas are inert until the backend adding considered[] deploys (older backends silently ignore the extra body fields).",
     ],
     examples: [
       "ib jerry check-address --address 'Mannerheimintie 1, Helsinki'",
       "ib jerry check-address --address 'Hämeenkatu 1, Tampere' --lat 61.498 --lng 23.761 --place-id ChIJxxxx",
+      "ib jerry check-address --address 'Kauppakatu 5, Jyväskylä' --explain",
+      "ib jerry check-address --address 'Kauppakatu 5, Jyväskylä' --explain --asiakas 812",
     ],
   },
   {

@@ -193,6 +193,25 @@ describe("ib jerry check-address", () => {
     const [, body] = post.mock.calls[0];
     expect((body as Record<string, unknown>).requiredPuomi).toBe(36);
   });
+
+  test("--explain sends explain:true and --asiakas maps to asiakasId", async () => {
+    post.mockResolvedValueOnce({ geocoded: true, deliverable: false, considered: [] });
+    await runJerryCheckAddress(mockClient, {
+      address: "Kauppakatu 5, Jyväskylä",
+      explain: true,
+      asiakas: 812,
+    });
+    const [, body] = post.mock.calls[0];
+    expect(body).toEqual({ osoite: "Kauppakatu 5, Jyväskylä", explain: true, asiakasId: 812 });
+  });
+
+  test("omits explain/asiakasId keys when not requested", async () => {
+    post.mockResolvedValueOnce({ geocoded: true });
+    await runJerryCheckAddress(mockClient, { address: "Sarkatie 7, Vantaa" });
+    const [, body] = post.mock.calls[0];
+    expect(body).not.toHaveProperty("explain");
+    expect(body).not.toHaveProperty("asiakasId");
+  });
 });
 
 describe("ib jerry provider-settings", () => {

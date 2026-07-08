@@ -284,6 +284,8 @@ export interface JerryCheckAddressOpts {
   placeId?: string;
   formattedAddress?: string;
   boom?: number;
+  explain?: boolean;
+  asiakas?: number;
 }
 
 /**
@@ -293,6 +295,12 @@ export interface JerryCheckAddressOpts {
  * `--lat`/`--lng`/`--place-id` are all supplied the server trusts them instead
  * of re-geocoding. Not a mutation, so no write-safety flags. The `providers`
  * array is only present when the caller's token is a developer/admin.
+ *
+ * `--explain` adds a `considered[]` array of the varikot that did NOT match, each
+ * with the FIRST gate that excluded it (no-coords / company-gate / not-enrolled /
+ * radius / boom) — the "why no offers?" diagnostic. Like `providers`, it is
+ * returned only to developer/admin tokens. `--asiakas <id>` force-includes one
+ * (possibly not-yet-enabled) company's varikot so onboarding sees company-gate.
  */
 export async function runJerryCheckAddress(
   client: ApiClient,
@@ -304,6 +312,8 @@ export async function runJerryCheckAddress(
   if (opts.placeId) body.placeId = opts.placeId;
   if (opts.formattedAddress) body.formattedAddress = opts.formattedAddress;
   if (opts.boom !== undefined) body.requiredPuomi = opts.boom;
+  if (opts.explain) body.explain = true;
+  if (opts.asiakas !== undefined) body.asiakasId = opts.asiakas;
   return client.post<Row>("/api/pumppuRequests/checkAddress", body, { read: true });
 }
 
@@ -873,6 +883,8 @@ export function registerJerryCommands(
     .option("--place-id <s>", "Google placeId (lets the server trust client coords)")
     .option("--formatted-address <s>", "Google formatted address")
     .option("--boom <m>", "Required boom (m) — filters varikot by their puomiMin/puomiMax range (absent/0 = no boom filter)", Number)
+    .option("--explain", "Add considered[] — per-varikko exclusion reasons for non-matching depots (developer/admin only)")
+    .option("--asiakas <id>", "With --explain: force-include this company's varikot even if not yet Jerry-enabled (surfaces company-gate)", Number)
     .action(
       async (opts: {
         address: string;
@@ -881,12 +893,25 @@ export function registerJerryCommands(
         placeId?: string;
         formattedAddress?: string;
         boom?: number;
+        explain?: boolean;
+        asiakas?: number;
       }) => {
         // Reject a NaN --boom (e.g. Commander coercing "abc" → NaN) so the probe
         // fails loudly instead of silently dropping the boom filter the operator
         // asked for — misleading during onboarding verification.
         if (opts.boom !== undefined && (!Number.isFinite(opts.boom) || opts.boom < 0)) {
           failWith("--boom must be a non-negative number of metres", 4);
+        }
+        // --asiakas only makes sense alongside --explain (it scopes the considered[]
+        // universe); reject a positive id without --explain so the operator isn't
+        // silently ignored, and reject a non-positive-integer id like other targets.
+        if (opts.asiakas !== undefined) {
+          if (!Number.isInteger(opts.asiakas) || opts.asiakas <= 0) {
+            failWith("--asiakas must be a positive integer asiakasId", 4);
+          }
+          if (!opts.explain) {
+            failWith("--asiakas only applies with --explain", 4);
+          }
         }
         try {
           const client = await getClient();
