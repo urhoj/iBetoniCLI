@@ -3127,18 +3127,23 @@ DESCRIPTION
 
 FLAGS
   --strict BOOLEAN    Exit 1 if any warn-level finding exists (for CI)
+  --suggest-related BOOLEAN    Also emit stale-related suggestions: specs mentioning a term/synonym/entity but not yet linked (info-level)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ term, issue, detail, severity }>
+  ListEnvelope<{ term, issue: 'dead-related'|'near-duplicate'|'empty-definition'|'no-anchor'|'synonym-collision'|'stale-related', detail, severity }>
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a developer        → Developer access required
 
+NOTES
+  - --suggest-related is a grooming aid (fb#110): it proposes command paths whose path/flags/description mention the term (whole-word, >=4 chars), ranked path>flag>description, capped 6/term — review before adding, false positives are possible.
+
 EXAMPLES
   ib glossary lint
+  ib glossary lint --suggest-related
 "
 `;
 

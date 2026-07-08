@@ -334,9 +334,10 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
     .command("lint")
     .description("Audit entries: dead relatedCommands, near-duplicate terms, empty fields (developer only)")
     .option("--strict", "Exit 1 if any warn-level finding exists (for CI)")
-    .action(async (opts: { strict?: boolean }) => {
+    .option("--suggest-related", "Also suggest candidate relatedCommands: specs mentioning a term/synonym/entity but not yet linked (info-level, fb#110)")
+    .action(async (opts: { strict?: boolean; suggestRelated?: boolean }) => {
       try {
-        const res = await runGlossaryLint(await getClient());
+        const res = await runGlossaryLint(await getClient(), { suggestRelated: opts.suggestRelated });
         writeJson(res);
         if (opts.strict && res.items.some((f) => f.severity === "warn")) process.exitCode = 1;
       } catch (e) { exitWithError(e); }

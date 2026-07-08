@@ -5965,10 +5965,14 @@ const BASE_COMMAND_SPECS = [
         args: [],
         flags: [
             { name: "strict", type: "boolean", description: "Exit 1 if any warn-level finding exists (for CI)" },
+            { name: "suggest-related", type: "boolean", description: "Also emit stale-related suggestions: specs mentioning a term/synonym/entity but not yet linked (info-level)" },
         ],
-        outputShape: "ListEnvelope<{ term, issue, detail, severity }>",
+        outputShape: "ListEnvelope<{ term, issue: 'dead-related'|'near-duplicate'|'empty-definition'|'no-anchor'|'synonym-collision'|'stale-related', detail, severity }>",
         errors: [{ http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" }],
-        examples: ["ib glossary lint"],
+        notes: [
+            "--suggest-related is a grooming aid (fb#110): it proposes command paths whose path/flags/description mention the term (whole-word, >=4 chars), ranked path>flag>description, capped 6/term — review before adding, false positives are possible.",
+        ],
+        examples: ["ib glossary lint", "ib glossary lint --suggest-related"],
     },
 ];
 /**
