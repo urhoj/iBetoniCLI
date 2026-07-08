@@ -4,6 +4,7 @@ import { writeJson, exitWithError, failWith, errorMessage, } from "../../output/
 import { decodeJwtPayload, impersonationFromClaims, } from "../../auth/jwt.js";
 import { resolveCallerTier } from "../../tier.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
+import { runCombinatorDuplicates, runCombinatorMerge, } from "../_shared/combinator.js";
 import { roleNameForTypeId, resolveRoleTypeId, explainRole } from "../../roles.js";
 import { parseId, parseOptionalId } from "../../targets.js";
 import { runCompanyList } from "../company/index.js";
@@ -258,10 +259,34 @@ export async function runPersonCompanies(client, personId) {
     return { items, nextCursor: null, count: items.length };
 }
 /**
+/** person-combinator request-body id fields (see puminet5api personCombinatorRoutes). */
+const PERSON_MERGE_ID_FIELDS = {
+    mainField: "mainPersonId",
+    secondaryField: "secondaryPersonId",
+};
+/**
+ * GET /api/admin/person-combinator/duplicates — likely-duplicate person pairs
+ * for one tenant (same phone / email / first+last name). Admin gated server-side.
+ * Feeds `ib person merge`. See runCombinatorDuplicates for the envelope shape.
+ */
+export function runPersonDuplicates(client, ownerAsiakasId) {
+    return runCombinatorDuplicates(client, "person-combinator", ownerAsiakasId);
+}
+/**
+ * Merge two duplicate persons — the secondary's references move onto the main,
+ * then the secondary is deleted. IRREVERSIBLE, admin gated. `--dry-run` runs the
+ * read-only /validate safety check (works under --read-only). See runCombinatorMerge.
+ */
+export function runPersonMerge(client, opts, flags) {
+    return runCombinatorMerge(client, "person-combinator", PERSON_MERGE_ID_FIELDS, opts, flags);
+}
+/**
  * Register `ib person` read subcommands on the parent commander instance:
  *   - list    filterable by --role/--asiakas/--limit
  *   - get     single person by personId
  *   - search  free-text search (existing POST /api/person/search route)
+ *   - duplicates  likely-duplicate person pairs for a tenant (read; admin; feeds merge)
+ *   - merge   merge two duplicate persons (--dry-run = /validate; IRREVERSIBLE; requires --reason)
  *
  * Exit codes: 1 = generic API/runtime failure.
  */
@@ -657,6 +682,49 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
             const client = await getClient();
             const result = await runPersonCompanies(client, parseOptionalId(personIdStr, "personId"));
             writeJson(result);
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    p.command("duplicates")
+        .description("List likely-duplicate person pairs for a tenant (same phone / email / " +
+        "first+last name). Read-only; admin gated. Owner defaults to your active " +
+        "company; --owner scans another tenant. Feeds `ib person merge`.")
+        .option("--owner <id>", "ownerAsiakasId to scan (default: active company)", Number)
+        .action(async (opts) => {
+        try {
+            const client = await getClient();
+            const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
+            writeJson(await runPersonDuplicates(client, owner));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    const personMergeCmd = p
+        .command("merge")
+        .description("Merge two duplicate persons: the secondary's references move onto the main, " +
+        "then the secondary is DELETED. IRREVERSIBLE, admin gated. --dry-run runs the " +
+        "read-only /validate safety check (never merges). A real merge requires --reason.")
+        .requiredOption("--main <id>", "personId to KEEP (references merge into this)", Number)
+        .requiredOption("--secondary <id>", "personId to REMOVE (merged away, then deleted)", Number)
+        .option("--owner <id>", "ownerAsiakasId (default: active company)", Number);
+    addWriteFlagsToCommand(personMergeCmd).action(async (opts) => {
+        if (!Number.isInteger(opts.main) || opts.main <= 0 ||
+            !Number.isInteger(opts.secondary) || opts.secondary <= 0) {
+            failWith("--main and --secondary must be positive integer personIds", 4);
+        }
+        if (opts.main === opts.secondary) {
+            failWith("--main and --secondary must differ", 4);
+        }
+        if (!opts.dryRun && !opts.reason) {
+            failWith("person merge is irreversible — pass --reason (or --dry-run to preview via /validate)", 4);
+        }
+        try {
+            const client = await getClient();
+            const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
+            writeJson(await runPersonMerge(client, { mainId: opts.main, secondaryId: opts.secondary, ownerAsiakasId: owner }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
         }
         catch (e) {
             exitWithError(e);

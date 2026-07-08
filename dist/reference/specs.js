@@ -1271,6 +1271,54 @@ const BASE_COMMAND_SPECS = [
         seeAlso: ["ib log entity"],
         examples: ["ib worksite log 7"],
     },
+    {
+        command: "ib worksite duplicates",
+        description: "List likely-duplicate worksite (tyomaa) pairs for one tenant: strict name+address+number matches, plus the anonymous same-address cluster (nameless rows sharing an address + compatible number/memo/reference/contact). Read-only; admin gated server-side. Owner defaults to your active company; --owner scans another tenant. Feeds `ib worksite merge`.",
+        permissions: ["company admin on the tenant (system admin for another owner)"],
+        flags: [
+            { name: "owner", type: "number", description: "ownerAsiakasId to scan (default: active company)" },
+        ],
+        outputShape: "{ items: [{ id1, name1, id2, name2, matchCode: 'tyomaa_strict'|'tyomaa_anonymous', matchValue, confidence: 'high'|'medium' }], count, truncated? } — truncated=true when capped at 100 pairs",
+        errors: [
+            apiErr(400, "ownerAsiakasId missing/invalid", "pass --owner <id>, or set an active company"),
+            apiErr(403, "Not permitted on this tenant", "ib company switch to that owner, or use an admin token"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        notes: [
+            "tyomaa_anonymous is a medium-confidence heuristic (both rows nameless, same normalized address, matching number/memo/laskuViite/contact, both older than 1 month) — a human confirms before merging.",
+            "Each pair is returned once (id1 < id2), top 100 by confidence.",
+        ],
+        seeAlso: ["ib worksite merge", "ib worksite get"],
+        examples: ["ib worksite duplicates", "ib worksite duplicates --owner 1349"],
+    },
+    {
+        command: "ib worksite merge",
+        description: "Merge two duplicate worksites: the secondary's references (keikka / person / grid) move onto the main, then the secondary is DELETED. IRREVERSIBLE and admin gated. --dry-run runs the read-only /validate safety check (what would move + conflicts) and NEVER merges. A real merge requires --reason.",
+        permissions: ["company admin on the tenant (system admin for another owner)"],
+        flags: [
+            { name: "main", type: "number", description: "tyomaaId to KEEP — references merge into this one (required)" },
+            { name: "secondary", type: "number", description: "tyomaaId to REMOVE — merged away then deleted (required)" },
+            { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+        ],
+        writeFlags: true,
+        outputShape: "real: { success, safetyValidation, timestamp, ... } | dry-run: { dryRun: true, validation: { success, ... } }",
+        errors: [
+            apiErr(400, "Validation failed (missing/equal ids, or safety check)", "check --main/--secondary; run --dry-run first"),
+            apiErr(403, "Not permitted on this tenant", "ib company switch to that owner, or use an admin token"),
+            apiErr(404, "One or both worksites not found or access denied", "verify --main/--secondary and --owner"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        notes: [
+            "ALWAYS --dry-run first: the /merge route has no X-Dry-Run guard, so a real invocation merges immediately.",
+            "--dry-run issues a read-only POST to /validate (tagged `read`), so it runs even under --read-only / IB_READ_ONLY; only a real merge is blocked by the write-lock.",
+            "Affects keikka / person / grid rows and the change history; caches are invalidated server-side.",
+        ],
+        seeAlso: ["ib worksite duplicates", "ib worksite delete"],
+        examples: [
+            "ib worksite merge --main 701 --secondary 702 --dry-run",
+            "ib worksite merge --main 701 --secondary 702 --reason 'dedupe: same address'",
+        ],
+    },
     // ─── person (3) ──────────────────────────────────────────────────────────
     {
         command: "ib person list",
@@ -1455,6 +1503,54 @@ const BASE_COMMAND_SPECS = [
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
         examples: ["ib person log 63", "ib person log 63 --field asiakasPersonSetting", "ib person log 63 --owner 27 --limit 50"],
+    },
+    {
+        command: "ib person duplicates",
+        description: "List likely-duplicate person pairs for one tenant: same normalized phone (high), same email (high), or same first+last name (medium). Both rows must be older than 1 month. Read-only; admin gated server-side. Owner defaults to your active company; --owner scans another tenant. Feeds `ib person merge`.",
+        permissions: ["company admin on the tenant (system admin for another owner)"],
+        flags: [
+            { name: "owner", type: "number", description: "ownerAsiakasId to scan (default: active company)" },
+        ],
+        outputShape: "{ items: [{ id1, name1, id2, name2, matchCode: 'phone'|'email'|'full_name', matchValue, confidence: 'high'|'medium' }], count, truncated? } — truncated=true when capped at 100 pairs",
+        errors: [
+            apiErr(400, "ownerAsiakasId missing/invalid", "pass --owner <id>, or set an active company"),
+            apiErr(403, "Not permitted on this tenant", "ib company switch to that owner, or use an admin token"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        notes: [
+            "full_name is a medium-confidence heuristic (identical first+last name) — a human confirms before merging.",
+            "Each pair is returned once (id1 < id2), top 100 by confidence.",
+        ],
+        seeAlso: ["ib person merge", "ib person get"],
+        examples: ["ib person duplicates", "ib person duplicates --owner 1349"],
+    },
+    {
+        command: "ib person merge",
+        description: "Merge two duplicate persons: the secondary's references (keikka / vehicle / tyomaa / asiakas / betoni / tuote) move onto the main, then the secondary is DELETED. IRREVERSIBLE and admin gated; every merge is audited server-side. --dry-run runs the read-only /validate safety check (what would move + conflicts) and NEVER merges. A real merge requires --reason.",
+        permissions: ["company admin on the tenant (system admin for another owner)"],
+        flags: [
+            { name: "main", type: "number", description: "personId to KEEP — references merge into this one (required)" },
+            { name: "secondary", type: "number", description: "personId to REMOVE — merged away then deleted (required)" },
+            { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+        ],
+        writeFlags: true,
+        outputShape: "real: { success, safetyValidation, timestamp, ... } | dry-run: { dryRun: true, validation: { success, ... } }",
+        errors: [
+            apiErr(400, "Validation failed (missing/equal ids, or safety check)", "check --main/--secondary; run --dry-run first"),
+            apiErr(403, "Not permitted on this tenant", "ib company switch to that owner, or use an admin token"),
+            apiErr(404, "One or both persons not found or access denied", "verify --main/--secondary and --owner"),
+            ...COMMON_AUTH_ERRORS,
+        ],
+        notes: [
+            "ALWAYS --dry-run first: the /merge route has no X-Dry-Run guard, so a real invocation merges immediately.",
+            "--dry-run issues a read-only POST to /validate (tagged `read`), so it runs even under --read-only / IB_READ_ONLY; only a real merge is blocked by the write-lock.",
+            "Affects keikka / vehicle / tyomaa / asiakas / betoni / tuote rows and the change history; caches are invalidated server-side; a pre-merge snapshot is written to the person combinator audit log.",
+        ],
+        seeAlso: ["ib person duplicates", "ib person delete"],
+        examples: [
+            "ib person merge --main 6001 --secondary 6002 --dry-run",
+            "ib person merge --main 6001 --secondary 6002 --reason 'dedupe: same phone'",
+        ],
     },
     {
         command: "ib person day statuses",

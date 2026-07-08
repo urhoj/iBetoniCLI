@@ -5,6 +5,8 @@ import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { registerLogAlias } from "../log/index.js";
 import { resolveTarget, parseId } from "../../targets.js";
 import { runAddressDashboard, } from "../_shared/addressDashboard.js";
+import { runCombinatorDuplicates, runCombinatorMerge, } from "../_shared/combinator.js";
+import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 /**
  * GET /api/cli/worksite/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
@@ -247,6 +249,8 @@ export async function runWorksiteDashboard(client, opts) {
  *   - set-geofence    POST /api/tyomaa/:id/geofence-radius (write flags)
  *   - helsinki-fetch  POST /api/tyomaa/helsinki/fetch/:id (write flags)
  *   - person add/remove/list  tyomaaPerson link management
+ *   - duplicates      likely-duplicate worksite pairs for a tenant (read; admin; feeds merge)
+ *   - merge           merge two duplicate worksites (--dry-run = /validate; IRREVERSIBLE; requires --reason)
  *
  * The `update` action derives ownerAsiakasId from the session JWT via
  * `resolveOwnerAsiakasId` — no --owner-asiakas-id flag required.
@@ -254,6 +258,27 @@ export async function runWorksiteDashboard(client, opts) {
  *
  * Exit codes: 1 = generic API/runtime failure.
  */
+/** tyomaa-combinator request-body id fields (see puminet5api tyomaaCombinatorRoutes). */
+const TYOMAA_MERGE_ID_FIELDS = {
+    mainField: "mainTyomaaId",
+    secondaryField: "secondaryTyomaaId",
+};
+/**
+ * GET /api/admin/tyomaa-combinator/duplicates — likely-duplicate worksite pairs
+ * for one tenant (strict name+address+num, or the anonymous same-address cluster).
+ * Admin gated server-side. Feeds `ib worksite merge`. See runCombinatorDuplicates.
+ */
+export function runWorksiteDuplicates(client, ownerAsiakasId) {
+    return runCombinatorDuplicates(client, "tyomaa-combinator", ownerAsiakasId);
+}
+/**
+ * Merge two duplicate worksites — the secondary's references move onto the main,
+ * then the secondary is deleted. IRREVERSIBLE, admin gated. `--dry-run` runs the
+ * read-only /validate safety check (works under --read-only). See runCombinatorMerge.
+ */
+export function runWorksiteMerge(client, opts, flags) {
+    return runCombinatorMerge(client, "tyomaa-combinator", TYOMAA_MERGE_ID_FIELDS, opts, flags);
+}
 export function registerWorksiteCommands(parent, getClient) {
     const w = parent.command("worksite").description("Worksite commands");
     w.command("list")
@@ -499,5 +524,48 @@ export function registerWorksiteCommands(parent, getClient) {
         }
     });
     registerLogAlias(w, getClient, "tyomaa", "tyomaaId", "Change-tracker audit trail for one worksite (tyomaa). Alias of `ib log entity tyomaa`.");
+    w.command("duplicates")
+        .description("List likely-duplicate worksite pairs for a tenant (strict name+address+number, " +
+        "or the anonymous same-address cluster). Read-only; admin gated. Owner defaults " +
+        "to your active company; --owner scans another tenant. Feeds `ib worksite merge`.")
+        .option("--owner <id>", "ownerAsiakasId to scan (default: active company)", Number)
+        .action(async (opts) => {
+        try {
+            const client = await getClient();
+            const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
+            writeJson(await runWorksiteDuplicates(client, owner));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    const worksiteMergeCmd = w
+        .command("merge")
+        .description("Merge two duplicate worksites: the secondary's references move onto the main, " +
+        "then the secondary is DELETED. IRREVERSIBLE, admin gated. --dry-run runs the " +
+        "read-only /validate safety check (never merges). A real merge requires --reason.")
+        .requiredOption("--main <id>", "tyomaaId to KEEP (references merge into this)", Number)
+        .requiredOption("--secondary <id>", "tyomaaId to REMOVE (merged away, then deleted)", Number)
+        .option("--owner <id>", "ownerAsiakasId (default: active company)", Number);
+    addWriteFlagsToCommand(worksiteMergeCmd).action(async (opts) => {
+        if (!Number.isInteger(opts.main) || opts.main <= 0 ||
+            !Number.isInteger(opts.secondary) || opts.secondary <= 0) {
+            failWith("--main and --secondary must be positive integer tyomaaIds", 4);
+        }
+        if (opts.main === opts.secondary) {
+            failWith("--main and --secondary must differ", 4);
+        }
+        if (!opts.dryRun && !opts.reason) {
+            failWith("worksite merge is irreversible — pass --reason (or --dry-run to preview via /validate)", 4);
+        }
+        try {
+            const client = await getClient();
+            const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
+            writeJson(await runWorksiteMerge(client, { mainId: opts.main, secondaryId: opts.secondary, ownerAsiakasId: owner }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
 }
 //# sourceMappingURL=index.js.map
