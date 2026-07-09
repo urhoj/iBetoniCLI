@@ -18,6 +18,44 @@ import { type CallerTier, visibleSpecs, domainOf, hiddenDomainsAtTier } from "..
 /** Single source for the write classification used by `ib commands`. */
 const isWriteSpec = (s: CommandSpec): boolean => s.mutates ?? !!s.writeFlags;
 
+type ResolvedDomainFilter =
+  | { kind: "none" }
+  | { kind: "domain"; domain: string }
+  | { kind: "subgroup"; relativePrefix: string };
+
+function commandRelativePath(command: string): string {
+  return command.replace(/^ib\s+/, "");
+}
+
+function nestedSubgroupPrefixes(specs: CommandSpec[]): Map<string, Set<string>> {
+  const bySubgroup = new Map<string, Set<string>>();
+  for (const spec of specs) {
+    const [domain, subgroup, leaf] = commandRelativePath(spec.command).split(/\s+/);
+    if (!domain || !subgroup || !leaf) continue;
+    const prefixes = bySubgroup.get(subgroup) ?? new Set<string>();
+    prefixes.add(`${domain} ${subgroup}`);
+    bySubgroup.set(subgroup, prefixes);
+  }
+  return bySubgroup;
+}
+
+function resolveDomainFilter(
+  specs: CommandSpec[],
+  domain: string | undefined,
+  tier: CallerTier
+): ResolvedDomainFilter {
+  if (!domain) return { kind: "none" };
+  if (commandDomains(specs).includes(domain)) return { kind: "domain", domain };
+
+  const prefixes = nestedSubgroupPrefixes(specs).get(domain);
+  if (prefixes?.size === 1) {
+    return { kind: "subgroup", relativePrefix: [...prefixes][0] };
+  }
+
+  assertKnownDomain(specs, domain, tier);
+  return { kind: "none" };
+}
+
 /** Compact per-command summary surfaced by `ib commands`. */
 export interface CommandSummary {
   command: string;
@@ -112,13 +150,24 @@ export function filterCommandSpecs(
       4
     );
   }
-  // Validate against the FULL specs so an unknown domain still exit-4s, while a
-  // hidden-but-valid domain (e.g. `schema` at standard) yields an empty list.
-  if (filter.domain) assertKnownDomain(specs, filter.domain, tier);
+  // Resolve against the FULL specs so a hidden-but-valid domain/subgroup at
+  // standard tier yields an empty list instead of leaking developer-only names.
+  const domainFilter = resolveDomainFilter(specs, filter.domain, tier);
   const needle = filter.permission?.toLowerCase();
   return visibleSpecs(specs, tier)
     .filter((s) => {
-      if (filter.domain && domainOf(s.command) !== filter.domain) return false;
+      if (domainFilter.kind === "domain" && domainOf(s.command) !== domainFilter.domain) {
+        return false;
+      }
+      if (domainFilter.kind === "subgroup") {
+        const relativePath = commandRelativePath(s.command);
+        if (
+          relativePath !== domainFilter.relativePrefix &&
+          !relativePath.startsWith(`${domainFilter.relativePrefix} `)
+        ) {
+          return false;
+        }
+      }
       const mutates = isWriteSpec(s);
       if (filter.mutations && !mutates) return false;
       if (filter.reads && mutates) return false;

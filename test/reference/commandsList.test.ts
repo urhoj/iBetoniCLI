@@ -101,6 +101,38 @@ describe("buildCommandsList", () => {
     expect(buildCommandsList({}).hint).toBeUndefined();
     expect(buildCommandsList({ domain: "keikka" }).hint).toBeUndefined();
   });
+
+  test("nested dev subgroup token resolves to its canonical command list", () => {
+    const env = buildCommandsList({ domain: "changelog" }, "developer");
+    const commands = env.items.map((i) => i.command);
+    expect(commands).toContain("ib dev changelog add");
+    expect(commands).toContain("ib dev changelog list");
+    expect(commands.every((c) => c.startsWith("ib dev changelog "))).toBe(true);
+  });
+
+  test("nested subgroup token composes with read/write filters", () => {
+    const writes = buildCommandsList({ domain: "changelog", mutations: true }, "developer");
+    expect(writes.count).toBeGreaterThan(0);
+    expect(writes.items.every((i) => i.isWrite)).toBe(true);
+    expect(writes.items.map((i) => i.command)).toContain("ib dev changelog add");
+
+    const reads = buildCommandsList({ domain: "changelog", reads: true }, "developer");
+    expect(reads.count).toBeGreaterThan(0);
+    expect(reads.items.every((i) => !i.isWrite)).toBe(true);
+    expect(reads.items.map((i) => i.command)).toContain("ib dev changelog list");
+  });
+
+  test("developer-only nested subgroup token returns an empty list at standard tier", () => {
+    const env = buildCommandsList({ domain: "schema" }, "standard");
+    expect(env.items).toEqual([]);
+    expect(env.count).toBe(0);
+  });
+
+  test("schema nested subgroup token resolves at developer tier", () => {
+    const env = buildCommandsList({ domain: "schema" }, "developer");
+    expect(env.items.map((i) => i.command)).toContain("ib dev schema tables");
+    expect(env.items.every((i) => i.command.startsWith("ib dev schema "))).toBe(true);
+  });
 });
 
 describe("commandDomains", () => {
