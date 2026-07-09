@@ -18,6 +18,7 @@ import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveRoleTypeId } from "../../roles.js";
 import { resolveTarget, parseId } from "../../targets.js";
+import { resolveDate } from "../../dates.js";
 import { runPersonRoleList } from "../person/index.js";
 // PRH lookups live in the shared module (also powers `ib opendata prh`). Aliased
 // to the historical names so internal `--from-prh` call sites and the hidden
@@ -43,6 +44,10 @@ export interface CustomerListFilter {
   fields?: string[];
   /** With --include sijainnit: keep only these sijaintiTypeId location rows. */
   sijaintiTypes?: number[];
+  /** Only customers registered (entryTime) on/after this YYYY-MM-DD day. Server-side. */
+  since?: string;
+  /** Result ordering: "name" (default) or "registered" (newest-registered first). Server-side. */
+  sort?: "name" | "registered";
 }
 
 /**
@@ -102,6 +107,8 @@ export async function runCustomerList(
   if (opts.fields && opts.fields.length > 0) params.set("fields", opts.fields.join(","));
   if (opts.sijaintiTypes && opts.sijaintiTypes.length > 0)
     params.set("sijaintiTypes", opts.sijaintiTypes.join(","));
+  if (opts.since) params.set("since", opts.since);
+  if (opts.sort) params.set("sort", opts.sort);
   const qs = params.toString();
   const env = await client.get<ListEnvelope<Record<string, unknown>>>(
     `/api/cli/customer/list${qs ? `?${qs}` : ""}`
@@ -1131,9 +1138,14 @@ export function registerCustomerCommands(
     .option("--include <csv>", "Expand each row with per-customer arrays: contacts and/or sijainnit (best with --full)")
     .option("--fields <csv>", "Project each customer to just these columns (asiakasId always kept; contacts/sijainnit arrays preserved) — trims the diff payload")
     .option("--sijainti-types <csv>", "With --include sijainnit: keep only these sijaintiTypeId rows (e.g. 1,2) — filtered server-side")
-    .action(async (opts: CustomerListFilter & { full?: boolean; ids?: string; include?: string; fields?: string; sijaintiTypes?: string }) => {
+    .option("--since <date>", "Only customers registered on/after this date (YYYY-MM-DD, or today/yesterday) — 'new customers since X', server-side")
+    .option("--sort <field>", "Order results: name (default) or registered (newest-registered first) — server-side")
+    .action(async (opts: CustomerListFilter & { full?: boolean; ids?: string; include?: string; fields?: string; sijaintiTypes?: string; since?: string; sort?: string }) => {
       try {
         const client = await getClient();
+        if (opts.sort !== undefined && opts.sort !== "name" && opts.sort !== "registered") {
+          return failWith("--sort must be one of: name, registered", 4);
+        }
         const ids =
           typeof opts.ids === "string"
             ? opts.ids.split(",").map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0)
@@ -1158,6 +1170,8 @@ export function registerCustomerCommands(
           include,
           fields,
           sijaintiTypes,
+          since: resolveDate(opts.since),
+          sort: opts.sort as "name" | "registered" | undefined,
         });
         writeJson(result);
       } catch (e) {

@@ -822,9 +822,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "include", type: "string", description: "Expand each row with per-customer arrays: contacts and/or sijainnit (CSV; best with --full)" },
       { name: "fields", type: "string", description: "Project each customer to just these columns (CSV; asiakasId always kept, contacts/sijainnit arrays preserved) — cuts the diff payload" },
       { name: "sijainti-types", type: "string", description: "With --include sijainnit: keep only these sijaintiTypeId rows (CSV, e.g. 1,2) — filtered server-side so a 45-location supplier's irrelevant rows are never fetched" },
+      { name: "since", type: "string", description: "Only customers registered on/after this day (YYYY-MM-DD, or today/yesterday) — 'new customers since X'. Server-side filter on the registration timestamp." },
+      { name: "sort", type: "string", description: "Result ordering: name (default) or registered (newest-registered first). Server-side." },
     ],
     outputShape:
-      "ListEnvelope<{ asiakasId, name, yTunnus, type }> + truncated:boolean · with --full the items add { address, postalCode, city, email, contactPersonId, shortName, comment, companyDescription } · with --include each item adds contacts:[{personId,name,phone,email,contactPersonTypeId}] and/or sijainnit:[{sijaintiId,name,lyh,address,sijaintiTypeId,maxDeliveryDistance,jerryActiveUntil}] · with --ids the response adds missing:[{asiakasId, reason:'not_owned'|'not_found'}] for requested ids that didn't return",
+      "ListEnvelope<{ asiakasId, name, yTunnus, type, registeredAt }> + truncated:boolean · with --full the items add { address, postalCode, city, email, contactPersonId, shortName, comment, companyDescription } · with --include each item adds contacts:[{personId,name,phone,email,contactPersonTypeId}] and/or sijainnit:[{sijaintiId,name,lyh,address,sijaintiTypeId,maxDeliveryDistance,jerryActiveUntil}] · with --ids the response adds missing:[{asiakasId, reason:'not_owned'|'not_found'}] for requested ids that didn't return",
     errors: permErrors("auth.page.asiakas.read"),
     notes: [
       "Scope: regular users see their own tenant + their own company row; SYSTEM ADMINS list across ALL tenants (incl. cross-tenant --ids).",
@@ -832,6 +834,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "--ids 1,2,3 restricts to specific asiakasIds and returns ALL of them (NOT capped at the default 100 — bounded by the ids list, max 1000) — the efficient way to refresh only the rows you care about.",
       "Without --ids the list is capped (default 100 / max 500) and `truncated:true` flags when you hit the cap (narrow with --ids or raise --limit).",
       "--fields / --sijainti-types trim what you ingest: project to the columns you diff and keep only the location types you care about (e.g. varikko/asema). Server-side on a deployed backend, with a client-side fallback so they work pre-deploy.",
+      "registeredAt (the customer's registration timestamp) is on every row — combine --since (e.g. --since yesterday) with --sort registered for a 'new customers in the last 24h' report, incl. cross-tenant for system admins. --since/--sort are server-side (no client-side fallback — the server truncates at --limit before any client filter could run), so they need the backend deploy.",
     ],
     examples: [
       "ib customer list",
@@ -841,6 +844,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ib customer list --ids 26,42 --full --include contacts,sijainnit",
       "ib customer list --ids 26 --full --fields name,address,postalCode,city,contactPersonId,companyDescription",
       "ib customer list --ids 26 --include sijainnit --sijainti-types 1,2",
+      "ib customer list --since yesterday --sort registered",
     ],
   },
   {

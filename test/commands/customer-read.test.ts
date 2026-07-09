@@ -142,6 +142,16 @@ describe("ib customer list/get/search", () => {
     );
   });
 
+  test("runCustomerList: appends since and sort when set", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [], nextCursor: null, count: 0,
+    });
+    await runCustomerList(mockClient, { since: "2026-07-08", sort: "registered" });
+    expect(mockClient.get).toHaveBeenCalledWith(
+      "/api/cli/customer/list?since=2026-07-08&sort=registered"
+    );
+  });
+
   test("runCustomerList: re-applies fields/sijainti-types client-side over a full backend row", async () => {
     // Simulate an OLDER backend that ignored the params and returned full rows.
     (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
