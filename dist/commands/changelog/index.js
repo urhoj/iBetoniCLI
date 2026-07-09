@@ -289,7 +289,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         }
     });
     c.command("pending")
-        .description("Unreleased entries (versionTag IS NULL) + the max bump level they imply. Drives the deploy-time app version bump.")
+        .description("List PENDING/unreleased changelog entries (versionTag IS NULL) staged for the next release, + the max bump level they imply. Drives the deploy-time app version bump.")
         .action(async () => {
         try {
             writeJson(await runChangelogPending(await getClient()));
@@ -622,16 +622,25 @@ export const CHANGELOG_SPECS = [
                 remedy: "dev token",
             },
         ],
+        notes: [
+            "--month is required (YYYY-MM); this renders a released monthly report, not the pending queue.",
+            "To list UNRELEASED/pending entries staged for the next release, use `ib dev changelog pending` (there is no --unreleased flag here).",
+        ],
+        seeAlso: ["ib dev changelog pending"],
         examples: ["ib dev changelog report --month 2026-06"],
     },
     {
         command: "ib dev changelog pending",
-        description: "Unreleased entries (versionTag IS NULL) + the max bump level they imply. Drives the deploy-time app version bump.",
+        description: "List PENDING/unreleased changelog entries (versionTag IS NULL) staged for the next release, + the max bump level they imply. Drives the deploy-time app version bump.",
         auth: "any",
         tier: "developer",
         flags: [],
         outputShape: "{ entries, maxBumpLevel, count }",
         errors: [{ http: 403, exit: 3, meaning: "Developer only", remedy: "dev token" }],
+        notes: [
+            "This is the unreleased/pending view (mirrors `ib dev feedback list --unresolved`); `ib dev changelog report` needs --month and only covers already-released entries.",
+        ],
+        seeAlso: ["ib dev changelog report", "ib dev changelog release"],
         examples: ["ib dev changelog pending"],
     },
     {

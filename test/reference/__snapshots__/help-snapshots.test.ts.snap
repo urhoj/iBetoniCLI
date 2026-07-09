@@ -1997,7 +1997,7 @@ exports[`Help snapshots — contract stability > help for ib dev changelog pendi
   ib dev changelog pending [flags]
 
 DESCRIPTION
-  Unreleased entries (versionTag IS NULL) + the max bump level they imply. Drives the deploy-time app version bump.
+  List PENDING/unreleased changelog entries (versionTag IS NULL) staged for the next release, + the max bump level they imply. Drives the deploy-time app version bump.
   Auth: requires login (any authenticated user).
 
 FLAGS
@@ -2011,6 +2011,12 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
+
+NOTES
+  - This is the unreleased/pending view (mirrors \`ib dev feedback list --unresolved\`); \`ib dev changelog report\` needs --month and only covers already-released entries.
+
+SEE ALSO
+  ib dev changelog report, ib dev changelog release
 
 EXAMPLES
   ib dev changelog pending
@@ -2075,6 +2081,13 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
+
+NOTES
+  - --month is required (YYYY-MM); this renders a released monthly report, not the pending queue.
+  - To list UNRELEASED/pending entries staged for the next release, use \`ib dev changelog pending\` (there is no --unreleased flag here).
+
+SEE ALSO
+  ib dev changelog pending
 
 EXAMPLES
   ib dev changelog report --month 2026-06
