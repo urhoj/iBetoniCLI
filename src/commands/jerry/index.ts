@@ -416,7 +416,17 @@ export interface JerryOnboardingListOpts {
   status?: string;
   tier?: number;
   due?: boolean;
+  search?: string;
 }
+
+/** Fields a `--search` substring matches against (company name + outreach/contact). */
+const ONBOARDING_SEARCH_FIELDS = [
+  "asiakasNimi",
+  "outreachName",
+  "outreachEmail",
+  "contactPersonName",
+  "contactPersonEmail",
+] as const;
 
 /** List onboarding prospects (GET /api/admin/jerry-onboarding). System-admin only. */
 export async function runJerryOnboardingList(
@@ -430,8 +440,18 @@ export async function runJerryOnboardingList(
   const env = toEnvelope(
     await client.get<unknown>(`/api/admin/jerry-onboarding${qs ? `?${qs}` : ""}`)
   );
-  if (!opts.due) return env;
-  const items = (env.items as Row[]).filter((r) => r.muistutusDue === true);
+  let items = env.items as Row[];
+  if (opts.search) {
+    const needle = opts.search.toLowerCase();
+    items = items.filter((r) =>
+      ONBOARDING_SEARCH_FIELDS.some((f) => {
+        const v = r[f];
+        return typeof v === "string" && v.toLowerCase().includes(needle);
+      })
+    );
+  }
+  if (opts.due) items = items.filter((r) => r.muistutusDue === true);
+  if (items === env.items) return env;
   return { ...env, items, count: items.length };
 }
 
@@ -1047,6 +1067,7 @@ export function registerJerryCommands(
     .option("--status <key>", `Filter by pipeline status key: ${ONBOARDING_STATUS_KEYS}`)
     .option("--tier <n>", "Filter by tier (1/2)", Number)
     .option("--due", "Only rows where the email1b reminder is due")
+    .option("--search <text>", "Case-insensitive substring on company name / outreach / contact fields")
     .action(async (opts: JerryOnboardingListOpts) => {
       try {
         const client = await getClient();

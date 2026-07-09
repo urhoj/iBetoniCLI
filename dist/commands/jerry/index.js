@@ -232,6 +232,14 @@ export async function runJerryAdminToggle(client, asiakasId, on, flags) {
  * anything else. Shared by the option help here and the CommandSpecs.
  */
 export const ONBOARDING_STATUS_KEYS = "ei_aloitettu → email1_lahetetty → muistutus_lahetetty → vastasi_kylla → tiedot_pyydetty → tervetuloa_lahetetty (pipeline order); terminal: vastasi_ei / ei_vastausta / ei_sovellu";
+/** Fields a `--search` substring matches against (company name + outreach/contact). */
+const ONBOARDING_SEARCH_FIELDS = [
+    "asiakasNimi",
+    "outreachName",
+    "outreachEmail",
+    "contactPersonName",
+    "contactPersonEmail",
+];
 /** List onboarding prospects (GET /api/admin/jerry-onboarding). System-admin only. */
 export async function runJerryOnboardingList(client, opts = {}) {
     const params = new URLSearchParams();
@@ -241,9 +249,18 @@ export async function runJerryOnboardingList(client, opts = {}) {
         params.set("tier", String(opts.tier));
     const qs = params.toString();
     const env = toEnvelope(await client.get(`/api/admin/jerry-onboarding${qs ? `?${qs}` : ""}`));
-    if (!opts.due)
+    let items = env.items;
+    if (opts.search) {
+        const needle = opts.search.toLowerCase();
+        items = items.filter((r) => ONBOARDING_SEARCH_FIELDS.some((f) => {
+            const v = r[f];
+            return typeof v === "string" && v.toLowerCase().includes(needle);
+        }));
+    }
+    if (opts.due)
+        items = items.filter((r) => r.muistutusDue === true);
+    if (items === env.items)
         return env;
-    const items = env.items.filter((r) => r.muistutusDue === true);
     return { ...env, items, count: items.length };
 }
 /** Add a prospect (POST /api/admin/jerry-onboarding). System-admin only. */
@@ -721,6 +738,7 @@ export function registerJerryCommands(parent, getClient) {
         .option("--status <key>", `Filter by pipeline status key: ${ONBOARDING_STATUS_KEYS}`)
         .option("--tier <n>", "Filter by tier (1/2)", Number)
         .option("--due", "Only rows where the email1b reminder is due")
+        .option("--search <text>", "Case-insensitive substring on company name / outreach / contact fields")
         .action(async (opts) => {
         try {
             const client = await getClient();

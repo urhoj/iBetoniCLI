@@ -36,6 +36,27 @@ describe("jerry admin onboarding", () => {
     expect(env.count).toBe(1);
   });
 
+  test("list --search matches company name / contact fields case-insensitively", async () => {
+    g.mockResolvedValueOnce([
+      { asiakasId: 1, asiakasNimi: "Transsinkko Oy", muistutusDue: false },
+      { asiakasId: 2, asiakasNimi: "Betoni Ab", contactPersonEmail: "info@transsinkko.fi", muistutusDue: false },
+      { asiakasId: 3, asiakasNimi: "Muu Oy", muistutusDue: false },
+    ]);
+    const env = await runJerryOnboardingList(mockClient, { search: "TRANSSINKKO" });
+    expect(env.items.map((r) => r.asiakasId)).toEqual([1, 2]);
+    expect(env.count).toBe(2);
+  });
+
+  test("list --search composes with --due", async () => {
+    g.mockResolvedValueOnce([
+      { asiakasId: 1, asiakasNimi: "Transsinkko Oy", muistutusDue: true },
+      { asiakasId: 2, asiakasNimi: "Transsinkko Ab", muistutusDue: false },
+    ]);
+    const env = await runJerryOnboardingList(mockClient, { search: "transsinkko", due: true });
+    expect(env.items.map((r) => r.asiakasId)).toEqual([1]);
+    expect(env.count).toBe(1);
+  });
+
   test("add POSTs body + write-flag headers", async () => {
     p.mockResolvedValueOnce({ jerryOnboardingId: 7 });
     await runJerryOnboardingAdd(mockClient, 65, { tier: 1, alue: "Oulu", source: "scheduled" },

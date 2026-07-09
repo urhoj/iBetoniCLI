@@ -3242,13 +3242,14 @@ exports[`Help snapshots — contract stability > help for ib jerry admin onboard
   ib jerry admin onboarding list [flags]
 
 DESCRIPTION
-  List provider-onboarding prospects — pipeline status, tier, outreach contact, live Jerry-active flag, and muistutusDue (email1b reminder due) per company (GET /api/admin/jerry-onboarding). Filters: --status, --tier, --due (client-side on muistutusDue). System-admin only.
+  List provider-onboarding prospects — pipeline status, tier, outreach contact, live Jerry-active flag, and muistutusDue (email1b reminder due) per company (GET /api/admin/jerry-onboarding). Filters: --status, --tier, --due (client-side on muistutusDue), --search (client-side substring on company name / outreach / contact fields). System-admin only.
   Permissions: requires isSystemAdmin.
 
 FLAGS
   --status STRING    Filter by pipeline status key: ei_aloitettu → email1_lahetetty → muistutus_lahetetty → vastasi_kylla → tiedot_pyydetty → tervetuloa_lahetetty (pipeline order); terminal: vastasi_ei / ei_vastausta / ei_sovellu
   --tier NUMBER    Tier filter (1 priority / 2 secondary)
   --due BOOLEAN    Only rows where the email1b reminder is due
+  --search STRING    Case-insensitive substring on asiakasNimi / outreachName / outreachEmail / contactPersonName / contactPersonEmail
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -3263,7 +3264,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib jerry admin onboarding list --due
-  ib jerry admin onboarding list --status vastasi_kylla
+  ib jerry admin onboarding list --search transsinkko
 "
 `;
 

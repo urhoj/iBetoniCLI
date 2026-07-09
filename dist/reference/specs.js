@@ -3787,17 +3787,18 @@ const BASE_COMMAND_SPECS = [
     },
     {
         command: "ib jerry admin onboarding list",
-        description: "List provider-onboarding prospects — pipeline status, tier, outreach contact, live Jerry-active flag, and muistutusDue (email1b reminder due) per company (GET /api/admin/jerry-onboarding). Filters: --status, --tier, --due (client-side on muistutusDue). System-admin only.",
+        description: "List provider-onboarding prospects — pipeline status, tier, outreach contact, live Jerry-active flag, and muistutusDue (email1b reminder due) per company (GET /api/admin/jerry-onboarding). Filters: --status, --tier, --due (client-side on muistutusDue), --search (client-side substring on company name / outreach / contact fields). System-admin only.",
         permissions: ["isSystemAdmin"],
         tier: "developer",
         flags: [
             { name: "status", type: "string", description: `Filter by pipeline status key: ${ONBOARDING_STATUS_KEYS}` },
             { name: "tier", type: "number", description: "Tier filter (1 priority / 2 secondary)" },
             { name: "due", type: "boolean", description: "Only rows where the email1b reminder is due" },
+            { name: "search", type: "string", description: "Case-insensitive substring on asiakasNimi / outreachName / outreachEmail / contactPersonName / contactPersonEmail" },
         ],
         outputShape: "ListEnvelope<{ asiakasId, asiakasNimi, tier, status, alue, outreachEmail, jerryActive, lastEventTime, muistutusDue }>",
         errors: [apiErr(403, "Not a system admin", "use a system-admin token"), ...COMMON_AUTH_ERRORS],
-        examples: ["ib jerry admin onboarding list --due", "ib jerry admin onboarding list --status vastasi_kylla"],
+        examples: ["ib jerry admin onboarding list --due", "ib jerry admin onboarding list --search transsinkko"],
     },
     {
         command: "ib jerry admin onboarding add",
