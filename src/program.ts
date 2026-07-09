@@ -10,6 +10,7 @@ import packageJson from "../package.json" with { type: "json" };
 import { addGlobalOptions, getGlobalOptions, type GlobalOptions } from "./globals.js";
 import { defaultCredentialsPath } from "./auth/store.js";
 import { createCliContext } from "./cliContext.js";
+import { recordFriction } from "./friction.js";
 import type { ApiClient } from "./api/client.js";
 import { registerAuthCommands } from "./commands/auth/index.js";
 import { registerCompanyCommands } from "./commands/company/index.js";
@@ -629,6 +630,7 @@ export function handleParseRejection(
         emitStderr(
           JSON.stringify(buildUnknownCommandEnvelope(cmd, token, getCallerTier())) + "\n"
         );
+        recordFriction(err, 4);
         setExit(4);
         return;
       }
@@ -645,10 +647,12 @@ export function handleParseRejection(
         hint: "usage error — run `ib <command> --help` for the exact arguments and flags, or `ib commands` to discover commands",
       }) + "\n"
     );
+    recordFriction(err, 4);
     setExit(4);
     return;
   }
   const message = err instanceof Error ? err.message : String(err);
+  recordFriction(err, 1);
   emitStderr(`${message}\n`);
   setExit(1);
 }

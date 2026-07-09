@@ -3,6 +3,7 @@ import { isListEnvelope, type ListEnvelope } from "../api/envelopes.js";
 import { renderList, renderRecord } from "./pretty.js";
 import type { CommandError } from "./help.js";
 import { getEmbeddedCtx } from "../embedded.js";
+import { recordFriction } from "../friction.js";
 
 let outputMode: "json" | "pretty" = "json";
 
@@ -55,6 +56,9 @@ export function writeJson(value: unknown): void {
 }
 
 export function writeError(err: unknown): void {
+  // Local best-effort friction capture (non-embedded only) — the universal
+  // error funnel, so every non-zero exit is logged for the feedback groom step.
+  recordFriction(err);
   const activeErrors = getEmbeddedCtx()?.activeCommandErrors ?? activeCommandErrors;
   if (err instanceof CliError) {
     const body =
