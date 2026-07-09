@@ -267,8 +267,13 @@ export function registerAuthCommands(
         if (admin.impersonation) {
           failWith("Already impersonating. Run `ib auth impersonate --end` first.", 4);
         }
+        // Honor the global --endpoint (like `auth login`) so impersonation can be
+        // minted against a specific backend (e.g. staging) instead of always the
+        // stored credential endpoint. The stashed admin login keeps its OWN
+        // endpoint, so `--end` restores cleanly. Absent --endpoint → prior behavior.
+        const impEndpoint = getGlobalOptions(parent).endpoint ?? admin.endpoint;
         const { token } = await performImpersonate({
-          endpoint: admin.endpoint,
+          endpoint: impEndpoint,
           jwt: admin.jwt,
           personId,
           email: opts.email,
@@ -276,7 +281,7 @@ export function registerAuthCommands(
         const decoded = decodeJwtPayload(token);
         await store.save(admin, IMPERSONATOR_PROFILE); // stash the admin login
         await store.save(
-          buildImpersonationProfile(token, admin.endpoint, decoded, new Date().toISOString()),
+          buildImpersonationProfile(token, impEndpoint, decoded, new Date().toISOString()),
           "default",
         );
         writeJson({
