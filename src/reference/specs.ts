@@ -5194,7 +5194,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     args: [{ name: "id", type: "number", description: "feedbackId" }],
-    flags: [],
+    flags: [
+      {
+        name: "full",
+        type: "boolean",
+        description:
+          "Accepted for cross-command consistency; get always returns the full row (no-op).",
+      },
+    ],
     outputShape: "The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, ... }",
     errors: [
       apiErr(403, "Permission denied", "requires a developer token"),

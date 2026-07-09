@@ -2237,7 +2237,7 @@ ARGUMENTS
   <id> NUMBER    feedbackId (required)
 
 FLAGS
-  (none)
+  --full BOOLEAN    Accepted for cross-command consistency; get always returns the full row (no-op).
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID

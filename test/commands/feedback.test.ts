@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
+import { Command } from "commander";
 import {
   runFeedbackCreate,
   runFeedbackList,
@@ -6,6 +7,7 @@ import {
   runFeedbackResolve,
   runFeedbackCount,
   resolveFeedbackCreateDescription,
+  registerFeedbackCommands,
 } from "../../src/commands/feedback/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -337,6 +339,15 @@ describe("ib feedback get", () => {
     const out = await runFeedbackGet(mockClient, 42);
     expect(get).toHaveBeenCalledWith("/api/feedback/42");
     expect(out).toMatchObject({ feedbackId: 42 });
+  });
+
+  test("accepts --full (cross-command consistency; still returns the full row) — feedback #130", async () => {
+    get.mockResolvedValueOnce({ feedbackId: 42, status: "open", description: "x".repeat(500) });
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient);
+    // Would throw "unknown option '--full'" (exit 4) before the fix.
+    await program.parseAsync(["feedback", "get", "42", "--full"], { from: "user" });
+    expect(get).toHaveBeenCalledWith("/api/feedback/42");
   });
 });
 

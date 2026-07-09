@@ -318,6 +318,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
     });
     f.command("get <id>")
         .description("Fetch one feedback row by id (developer-only)")
+        .option("--full", "Accepted for cross-command consistency; get always returns the full row (no-op)")
         .action(async (idStr) => {
         try {
             writeJson(await runFeedbackGet(await getClient(), parseId(idStr, "feedbackId")));
