@@ -402,7 +402,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     errors: [
       { exit: 2, meaning: "Not logged in", remedy: "ib auth login" },
       apiErr(403, "Impersonation not allowed for the target", "needs systemAdmin/roleManager, same-tenant admin, or a grant"),
-      apiErr(404, "Target person not found", "check the personId / email"),
+      apiErr(404, "Target not found (or has no personEmail)", "no impersonatable person for that personId/email. NB: a personId that EXISTS but has no personEmail also 404s here (impersonation is email-keyed) — verify with `ib person get <id>`; an email-less person cannot be impersonated."),
       { exit: 3, meaning: "Read-only mode active (--read-only / IB_READ_ONLY)", remedy: "impersonation persists a rotated JWT; drop read-only" },
       { exit: 4, meaning: "No active session (--end/--extend), or neither personId nor --email given", remedy: "start with `ib auth impersonate <personId>`" },
     ],
@@ -410,6 +410,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "Persists a 10-minute impersonation JWT as the active credential — blocked under read-only (exit 3).",
       "Auto-refresh-on-401 is disabled while impersonating (it would escalate to a 7-day login); a 401 surfaces — re-run impersonate or `--extend`.",
       "`ib auth whoami` shows an `impersonating` block while a session is active.",
+      "Target resolution is email-keyed (getPersonDataFromEmail): a person with no personEmail cannot be impersonated and 404s identically to a missing person (feedback #113) — verify a suspect personId with `ib person get <id>`.",
       "Local CLI only — the `auth` group is denied over /api/cli/exec and MCP ib_exec.",
     ],
     examples: [

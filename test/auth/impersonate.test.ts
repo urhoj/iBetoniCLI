@@ -36,6 +36,31 @@ describe("performImpersonate", () => {
     await expect(performImpersonate({ endpoint: "https://x", jwt: "A", personId: 1 }))
       .rejects.toMatchObject({ statusCode: 403, exitCode: 3 });
   });
+
+  // feedback #113: the backend 404s identically whether the target is missing
+  // or exists-but-email-less. On the personId path, clarify both cases + hint.
+  test("clarifies the ambiguous 404 on the personId path (missing OR email-less)", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      new Response("Kohdehenkilöä ei löytynyt", { status: 404 }),
+    ));
+    const err = await performImpersonate({ endpoint: "https://x", jwt: "A", personId: 6259 })
+      .catch((e) => e);
+    expect(err).toMatchObject({ statusCode: 404, exitCode: 5 });
+    expect(err.message).toContain("personEmail");
+    expect(err.message).toContain("6259");
+    expect(err.hint).toContain("ib person get 6259");
+  });
+
+  test("does NOT rewrite the 404 on the --email path (email simply not registered)", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      new Response("Kohdehenkilöä ei löytynyt", { status: 404 }),
+    ));
+    const err = await performImpersonate({ endpoint: "https://x", jwt: "A", email: "nobody@x.fi" })
+      .catch((e) => e);
+    expect(err).toMatchObject({ statusCode: 404, exitCode: 5 });
+    expect(err.message).not.toContain("personEmail");
+    expect(err.hint).toBeUndefined();
+  });
 });
 
 describe("buildImpersonationProfile", () => {

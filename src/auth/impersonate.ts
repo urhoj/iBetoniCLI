@@ -45,9 +45,30 @@ export async function performImpersonate(opts: {
   const body: Record<string, unknown> = {};
   if (opts.email) body.email = opts.email;
   else body.personId = opts.personId;
-  const data = (await postJson(opts.endpoint, "/api/auth/impersonate", opts.jwt, body, "Impersonate")) as {
-    token?: string;
-  };
+  let data: { token?: string };
+  try {
+    data = (await postJson(opts.endpoint, "/api/auth/impersonate", opts.jwt, body, "Impersonate")) as {
+      token?: string;
+    };
+  } catch (e) {
+    // The backend returns the SAME 404 ("Kohdehenkilöä ei löytynyt") whether the
+    // target does not exist OR exists but has an empty personEmail — the target
+    // is resolved through the email-keyed login pipeline (getPersonDataFromEmail),
+    // so an email-less person 404s indistinguishably from a missing one
+    // (feedback #113). When the caller passed a personId (not --email), the raw
+    // "not found" misleads — a valid personId reads as wrong — so surface BOTH
+    // possibilities in the message and point at a verification step.
+    if (e instanceof CliError && e.statusCode === 404 && opts.personId !== undefined && !opts.email) {
+      throw new CliError(
+        `Impersonate failed: personId ${opts.personId} could not be impersonated — it does not exist, OR it exists but has no personEmail (impersonation is email-keyed and requires one).`,
+        404,
+        e.body,
+        e.exitCode,
+        `verify the target with \`ib person get ${opts.personId}\`; a person with no personEmail cannot be impersonated (set one first, or impersonate a different person)`,
+      );
+    }
+    throw e;
+  }
   if (!data.token) throw new CliError("Impersonate failed: response missing token", 0, data, 1);
   return { token: data.token };
 }
