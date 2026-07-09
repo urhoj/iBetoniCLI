@@ -11,22 +11,28 @@ function rootHelp(tier: "developer" | "standard"): string {
 }
 
 describe("root --help command listing is tier-filtered", () => {
+  // Anchor on the 2-space command column (/^ {2}name\b/), NOT /^\s+name\b/.
+  // Commander lists command entries at exactly a 2-space indent; a command's
+  // wrapped DESCRIPTION continuation lines sit at the description column
+  // (~31 spaces). The loose \s+ let a description that merely contains a word
+  // like "changelog" (the `dev` blurb does) false-match when it wrapped to a
+  // line start — which turned master red. Keep this anchored to the command col.
   test("standard omits ai/schema/changelog from the Commands list", () => {
     const h = rootHelp("standard");
     // The Commands: section should not list these as top-level groups.
-    expect(h).not.toMatch(/^\s+schema\b/m);
-    expect(h).not.toMatch(/^\s+changelog\b/m);
-    expect(h).not.toMatch(/^\s+ai\b/m);
-    expect(h).toMatch(/^\s+keikka\b/m); // visible domain still listed
+    expect(h).not.toMatch(/^ {2}schema\b/m);
+    expect(h).not.toMatch(/^ {2}changelog\b/m);
+    expect(h).not.toMatch(/^ {2}ai\b/m);
+    expect(h).toMatch(/^ {2}keikka\b/m); // visible domain still listed
   });
   test("developer sees dev umbrella; old hidden aliases not shown at root", () => {
     const h = rootHelp("developer");
     // dev is the new umbrella for schema/ai/changelog/bug/feedback/perf/cache/inbox
-    expect(h).toMatch(/^\s+dev\b/m);
+    expect(h).toMatch(/^ {2}dev\b/m);
     // back-compat aliases are registered as Commander-hidden — absent from root help
-    expect(h).not.toMatch(/^\s+schema\b/m);
-    expect(h).not.toMatch(/^\s+ai\b/m);
-    expect(h).not.toMatch(/^\s+changelog\b/m);
+    expect(h).not.toMatch(/^ {2}schema\b/m);
+    expect(h).not.toMatch(/^ {2}ai\b/m);
+    expect(h).not.toMatch(/^ {2}changelog\b/m);
   });
 });
 
