@@ -199,7 +199,7 @@ export function buildProgram(): Command {
   const dev = program
     .command("dev")
     .description(
-      "Developer & maintainer tools — bug reports, CLI feedback, changelog, perf, cache, schema, AI logs, operator inbox. Filing a bug or feedback is open to everyone."
+      "Developer & maintainer tools — CLI feedback, changelog, perf, cache, schema, AI logs, operator inbox. Filing feedback is open to everyone."
     );
   registerFeedbackCommands(dev, getClient);
   registerChangelogCommands(dev, getClient);

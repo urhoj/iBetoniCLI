@@ -180,7 +180,7 @@ export function buildProgram() {
     // spec-driven discovery and root --help), mirroring `ib opendata`/`ib weather`.
     const dev = program
         .command("dev")
-        .description("Developer & maintainer tools — bug reports, CLI feedback, changelog, perf, cache, schema, AI logs, operator inbox. Filing a bug or feedback is open to everyone.");
+        .description("Developer & maintainer tools — CLI feedback, changelog, perf, cache, schema, AI logs, operator inbox. Filing feedback is open to everyone.");
     registerFeedbackCommands(dev, getClient);
     registerChangelogCommands(dev, getClient);
     registerPerfCommands(dev, getClient);
