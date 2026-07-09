@@ -86,6 +86,28 @@ export interface FeedbackCreateInput {
   dryRun?: boolean;
 }
 
+/** Resolve the create description from the positional or --description alias. */
+export function resolveFeedbackCreateDescription(input: {
+  description?: string;
+  descriptionFlag?: string;
+}): string {
+  const positional = input.description?.trim();
+  const flagged = input.descriptionFlag?.trim();
+  if (positional && flagged && positional !== flagged) {
+    throw new CliError(
+      "Provide the description either positionally or with --description; if both are given, they must match",
+      400,
+      null,
+      4
+    );
+  }
+  const description = positional ?? flagged;
+  if (!description) {
+    throw new CliError("description is required", 400, null, 4);
+  }
+  return description;
+}
+
 interface FeedbackCreateBody {
   kind: Kind;
   scope: Scope;
@@ -341,10 +363,11 @@ export function registerFeedbackCommands(
     .command("feedback", { hidden: !!opts.hidden })
     .description("File & triage CLI improvement proposals / trouble reports");
 
-  f.command("create <description>")
+  f.command("create [description]")
     .description(
       "File a proposal/trouble report. Silent server-side; works under --read-only."
     )
+    .option("--description <text>", "Alias for the positional description")
     .option("--kind <kind>", "improvement | bug | idea | legal", "improvement")
     .option(
       "--scope <scope>",
@@ -357,8 +380,9 @@ export function registerFeedbackCommands(
     .option("--dry-run", "Print the payload without sending (client-side)")
     .action(
       async (
-        description: string,
+        description: string | undefined,
         opts: {
+          description?: string;
           kind?: string;
           scope?: string;
           command?: string;
@@ -369,7 +393,20 @@ export function registerFeedbackCommands(
       ) => {
         try {
           const client = await getClient();
-          writeJson(await runFeedbackCreate(client, { description, ...opts }));
+          writeJson(
+            await runFeedbackCreate(client, {
+              description: resolveFeedbackCreateDescription({
+                description,
+                descriptionFlag: opts.description,
+              }),
+              kind: opts.kind,
+              scope: opts.scope,
+              command: opts.command,
+              error: opts.error,
+              severity: opts.severity,
+              dryRun: opts.dryRun,
+            })
+          );
         } catch (e) {
           exitWithError(e);
         }

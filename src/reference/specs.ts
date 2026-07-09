@@ -5043,6 +5043,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     mutates: true,
     args: [{ name: "description", type: "string", description: "freetext description of the friction, gap, or bug" }],
     flags: [
+      { name: "description", type: "string", description: "Alias for the positional description; if both are passed, they must match" },
       { name: "kind", type: "string", default: "improvement", description: "improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal)" },
       { name: "scope", type: "string", default: "cli", description: "cli | app | jerry | bsg2 | workspace | other — which product surface this targets (routing key for triage; orthogonal to --kind)" },
       { name: "command", type: "string", description: "The ib command/argv that triggered the friction" },
@@ -5058,11 +5059,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     notes: [
+      "You can pass the description either positionally or as --description; if you pass both, they must match.",
       'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib dev feedback create --kind bug -- "--pretty output too wide". Everything after `--` is taken as positional text.',
       "When invoked by the betoni.online /ai assistant, the originating conversation id is auto-attached as context.conversationId (via the IB_CONVERSATION_ID env var the /ai loop injects) — a developer can then read the full conversation with `ib dev ai conversation <id>`. Manual CLI use does not set it.",
     ],
     examples: [
       'ib dev feedback create "schema table output should include row counts"',
+      'ib dev feedback create --description "schema table output should include row counts"',
       'ib dev feedback create "keikka list --pvm rejected my date" --kind bug --command "keikka list --pvm 1.6." --error "invalid date format"',
       'ib dev feedback create "ib customer search --email" --kind idea --dry-run',
       'ib dev feedback create "TOS 2.0 lacks a clause covering the AI assistant features; draft update suggested" --kind legal',

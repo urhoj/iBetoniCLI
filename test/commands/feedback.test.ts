@@ -5,6 +5,7 @@ import {
   runFeedbackGet,
   runFeedbackResolve,
   runFeedbackCount,
+  resolveFeedbackCreateDescription,
 } from "../../src/commands/feedback/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -30,6 +31,17 @@ beforeEach(() => {
 // ─── create ──────────────────────────────────────────────────────────────────
 
 describe("ib feedback create", () => {
+  test("accepts the description either positionally or via --description", () => {
+    expect(resolveFeedbackCreateDescription({ description: "  a  " })).toBe("a");
+    expect(resolveFeedbackCreateDescription({ descriptionFlag: "  b  " })).toBe("b");
+    expect(
+      resolveFeedbackCreateDescription({ description: "same", descriptionFlag: " same " })
+    ).toBe("same");
+    expect(() =>
+      resolveFeedbackCreateDescription({ description: "one", descriptionFlag: "two" })
+    ).toThrowError(/--description/);
+  });
+
   test("POSTs /api/feedback with kind+description as a META request (read-only exempt)", async () => {
     post.mockResolvedValueOnce({ feedbackId: 7 });
     const out = await runFeedbackCreate(mockClient, {
