@@ -100,7 +100,7 @@ Tagged — **developer tier** (~38 leaves): `ai conversation`; all `schema` (7);
 
 ### Acting-as write diagnostic
 
-On the **first write** of a process (the first non-GET that passes the read-only gate), the client prints one stderr line naming the target company — `[ib] write → asiakasId <N> (<name>)`, with a loud `⚠ BetoniJerry umbrella tenant` when `N === 1349`. A guardrail against "wrong company lens" writes after a company switch. `cliContext` decodes the JWT (free) into `actingAs` and passes it + `quiet` to `createApiClient`; suppressed by `--quiet`. stderr only — never pollutes the stdout JSON contract.
+On the **first write** of a process (the first non-GET that passes the read-only gate), the client prints one stderr line naming the company the token acts as — `[ib] write · acting as asiakasId <N> (<name>)`, with a loud `⚠ BetoniJerry umbrella tenant` when `N === 1349`. A guardrail against "wrong company lens" writes after a company switch. `<N>` is the token's AUTH/company lens, **not** a per-command cross-tenant `--asiakas <id>` target — a `--asiakas 1377` write is authorized under this lens yet persists against 1377, which the HTTP layer can't see; hence "acting as", not a "→ target" arrow (the old arrow read as a destination and masked wrong-target writes — feedback #118). `cliContext` decodes the JWT (free) into `actingAs` and passes it + `quiet` to `createApiClient`; suppressed by `--quiet`. stderr only — never pollutes the stdout JSON contract.
 
 ### `ib doctor`
 

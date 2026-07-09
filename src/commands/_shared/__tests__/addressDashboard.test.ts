@@ -151,7 +151,7 @@ describe("runAddressDashboard — address input", () => {
     });
 
     // read-over-POST: flagged { read: true } so it skips the --read-only
-    // write-lock and the "[ib] write → …" acting-as banner.
+    // write-lock and the "[ib] write · acting as …" acting-as banner.
     expect(post()).toHaveBeenCalledWith(
       "/api/geocode/getLatLng",
       { osoite: "Mannerheimintie 1, Helsinki" },

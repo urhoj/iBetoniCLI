@@ -56,9 +56,14 @@ interface ApiClientOptions {
   readOnly?: boolean;
   /**
    * The company the active JWT acts as. When set, the FIRST write (non-GET) of
-   * the process prints a one-line stderr diagnostic naming the target company —
-   * a guardrail against "wrong company lens" writes after a company switch.
-   * Decoded from the JWT by the caller (free, no network). Suppressed by `quiet`.
+   * the process prints a one-line stderr diagnostic naming that company — a
+   * guardrail against "wrong company lens" writes after a company switch. This
+   * is the token's AUTH/company lens, NOT a per-command cross-tenant `--asiakas`
+   * target: a write carrying `--asiakas 1377` is still authorized under this
+   * lens but persists against 1377, which this line does not (and cannot, at the
+   * HTTP layer) know — hence the "acting as" framing rather than a "→ target"
+   * arrow (feedback #118). Decoded from the JWT by the caller (free, no network).
+   * Suppressed by `quiet`.
    */
   actingAs?: { ownerAsiakasId: number; ownerAsiakasName?: string };
   /** Suppress non-data stderr diagnostics (the acting-as line). */
@@ -123,6 +128,12 @@ export function createApiClient({
   /**
    * Print the acting-as company once, before the process's first write. No-op
    * when quiet, when no identity was supplied, or already announced.
+   *
+   * "acting as", not "→ asiakasId": this names the token's company lens, which
+   * for a cross-tenant `--asiakas <id>` write is NOT the row's target (the write
+   * lands on `<id>`, not on the lens). The old "write → asiakasId N" arrow read
+   * as a destination and masked wrong-target mistakes (feedback #118); the HTTP
+   * layer can't see per-command targets, so we frame it as the auth lens.
    */
   function announceActingAs(): void {
     if (quiet || !actingAs || actingAsAnnounced) return;
@@ -133,7 +144,7 @@ export function createApiClient({
         ? "  ⚠ BetoniJerry umbrella tenant"
         : "";
     process.stderr.write(
-      `[ib] write → asiakasId ${actingAs.ownerAsiakasId}${name}${umbrella}\n`
+      `[ib] write · acting as asiakasId ${actingAs.ownerAsiakasId}${name}${umbrella}\n`
     );
   }
 

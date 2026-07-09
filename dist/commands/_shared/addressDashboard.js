@@ -160,7 +160,7 @@ async function resolvePoint(client, input) {
         const source = `address=${encodeURIComponent(input.address)}`;
         // Read-over-POST: geocoding an address mutates nothing. `{ read: true }`
         // exempts it from the `--read-only` write-lock AND suppresses the
-        // "[ib] write → asiakasId …" acting-as banner (a dashboard is read-only).
+        // "[ib] write · acting as asiakasId …" acting-as banner (dashboard is read-only).
         const geo = await client.post("/api/geocode/getLatLng", { osoite: input.address }, { read: true });
         const coords = extractGeocodedLatLng(geo);
         if (!coords) {

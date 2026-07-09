@@ -233,7 +233,13 @@ describe("ApiClient", () => {
       await client.post("/api/x", { a: 1 });
       await client.post("/api/y", { a: 2 }); // second write: no repeat
       expect(stderrSpy).toHaveBeenCalledTimes(1);
-      expect(stderrSpy.mock.calls[0][0]).toContain("asiakasId 8 (Kalle Urho Oy)");
+      const line = stderrSpy.mock.calls[0][0] as string;
+      expect(line).toContain("asiakasId 8 (Kalle Urho Oy)");
+      // feedback #118: the line names the token's AUTH/company lens, so it is
+      // framed "acting as" — not a "→ target" arrow, which read as a write
+      // destination and masked cross-tenant --asiakas writes.
+      expect(line).toContain("acting as");
+      expect(line).not.toContain("→");
     });
 
     test("flags the BetoniJerry umbrella tenant", async () => {

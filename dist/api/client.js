@@ -65,6 +65,12 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
     /**
      * Print the acting-as company once, before the process's first write. No-op
      * when quiet, when no identity was supplied, or already announced.
+     *
+     * "acting as", not "→ asiakasId": this names the token's company lens, which
+     * for a cross-tenant `--asiakas <id>` write is NOT the row's target (the write
+     * lands on `<id>`, not on the lens). The old "write → asiakasId N" arrow read
+     * as a destination and masked wrong-target mistakes (feedback #118); the HTTP
+     * layer can't see per-command targets, so we frame it as the auth lens.
      */
     function announceActingAs() {
         if (quiet || !actingAs || actingAsAnnounced)
@@ -74,7 +80,7 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
         const umbrella = actingAs.ownerAsiakasId === BETONIJERRY_UMBRELLA_ASIAKAS_ID
             ? "  ⚠ BetoniJerry umbrella tenant"
             : "";
-        process.stderr.write(`[ib] write → asiakasId ${actingAs.ownerAsiakasId}${name}${umbrella}\n`);
+        process.stderr.write(`[ib] write · acting as asiakasId ${actingAs.ownerAsiakasId}${name}${umbrella}\n`);
     }
     function buildHeaders(extra = {}, withBody = false) {
         const merged = {
