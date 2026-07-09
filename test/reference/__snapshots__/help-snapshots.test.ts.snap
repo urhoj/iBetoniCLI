@@ -4171,8 +4171,8 @@ exports[`Help snapshots — contract stability > help for ib jerry request list 
   ib jerry request list [flags]
 
 DESCRIPTION
-  List BetoniJerry pump requests (tarjouspyynnöt). Default --mine returns the caller's own requests (GET /api/pumppuRequests/mine). --open returns the provider inbox of open requests in your delivery area (GET /api/pumppuRequests/open) and requires a provider company (isPumppuToimittaja); customer PII is masked there until your offer is accepted. --status (CSV) and --limit apply to --mine only. (Whole-market visibility is system-admin only — see \`ib jerry admin requests\`.)
-  Permissions: requires --open: provider company (isPumppuToimittaja).
+  List BetoniJerry pump requests (tarjouspyynnöt). Default --mine returns the caller's own requests (GET /api/pumppuRequests/mine). --open returns the provider inbox of open requests in your delivery area (GET /api/pumppuRequests/open) and requires a provider company (isPumppuToimittaja); customer PII is masked there until your offer is accepted. --provider is the provider's own lifecycle view (GET /api/pumppuRequests/provider-list) — also provider-only, and includes your sent offers — selected by --tab <avoimet|tarjotut|voitetut|paattyneet> (default avoimet): avoimet = open requests to bid on, tarjotut = ones you have offered on (offer pending), voitetut = won (your offer accepted/confirmed), paattyneet = ended (expired, no_supply, or lost to another provider). --status (CSV) and --limit apply to --mine only. (Whole-market visibility is system-admin only — see \`ib jerry admin requests\`.)
+  Permissions: requires --open / --provider: provider company (isPumppuToimittaja).
 
 FLAGS
   --open BOOLEAN    Provider inbox of open requests in your delivery area (provider role)
@@ -4189,7 +4189,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ pumppuRequestId, status, createdAt, sentAt?, osoite, formattedAddress, totalM3|maaraM3, ... }> (fields differ between --mine and --open; --open is PII-masked)
 
 ERRORS (stderr, exit non-zero)
-  exit 3 (HTTP 403)  Not a provider (for --open) → switch to a provider company, or use --mine
+  exit 3 (HTTP 403)  Not a provider (for --open / --provider) → switch to a provider company, or use --mine
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 

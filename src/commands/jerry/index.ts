@@ -37,9 +37,12 @@ export interface JerryRequestListOpts {
 }
 
 /**
- * List pump requests (tarjouspyynnöt). Two views:
- *   --open  → GET /api/pumppuRequests/open       (provider inbox; isProvider; PII masked until your offer is accepted)
- *   --mine  → GET /api/pumppuRequests/mine        (the caller's own requests; default)
+ * List pump requests (tarjouspyynnöt). Three views:
+ *   --mine     → GET /api/pumppuRequests/mine          (the caller's own requests; default)
+ *   --open     → GET /api/pumppuRequests/open          (provider inbox; isProvider; PII masked until your offer is accepted)
+ *   --provider → GET /api/pumppuRequests/provider-list (provider lifecycle; isProvider; incl. your sent offers),
+ *                filtered by --tab (default avoimet): avoimet=open to bid on, tarjotut=offered (pending),
+ *                voitetut=won (offer accepted/confirmed), paattyneet=ended (expired/no_supply/lost).
  * `--status` (CSV) and `--limit` apply to the --mine view only. Projected into
  * the universal list envelope.
  */

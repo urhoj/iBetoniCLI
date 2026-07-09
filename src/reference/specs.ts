@@ -3650,8 +3650,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib jerry request list",
     description:
-      "List BetoniJerry pump requests (tarjouspyynnöt). Default --mine returns the caller's own requests (GET /api/pumppuRequests/mine). --open returns the provider inbox of open requests in your delivery area (GET /api/pumppuRequests/open) and requires a provider company (isPumppuToimittaja); customer PII is masked there until your offer is accepted. --status (CSV) and --limit apply to --mine only. (Whole-market visibility is system-admin only — see `ib jerry admin requests`.)",
-    permissions: ["--open: provider company (isPumppuToimittaja)"],
+      "List BetoniJerry pump requests (tarjouspyynnöt). Default --mine returns the caller's own requests (GET /api/pumppuRequests/mine). --open returns the provider inbox of open requests in your delivery area (GET /api/pumppuRequests/open) and requires a provider company (isPumppuToimittaja); customer PII is masked there until your offer is accepted. --provider is the provider's own lifecycle view (GET /api/pumppuRequests/provider-list) — also provider-only, and includes your sent offers — selected by --tab <avoimet|tarjotut|voitetut|paattyneet> (default avoimet): avoimet = open requests to bid on, tarjotut = ones you have offered on (offer pending), voitetut = won (your offer accepted/confirmed), paattyneet = ended (expired, no_supply, or lost to another provider). --status (CSV) and --limit apply to --mine only. (Whole-market visibility is system-admin only — see `ib jerry admin requests`.)",
+    permissions: ["--open / --provider: provider company (isPumppuToimittaja)"],
     flags: [
       { name: "open", type: "boolean", description: "Provider inbox of open requests in your delivery area (provider role)" },
       { name: "mine", type: "boolean", description: "Your own requests (default)" },
@@ -3663,7 +3663,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ pumppuRequestId, status, createdAt, sentAt?, osoite, formattedAddress, totalM3|maaraM3, ... }> (fields differ between --mine and --open; --open is PII-masked)",
     errors: [
-      apiErr(403, "Not a provider (for --open)", "switch to a provider company, or use --mine"),
+      apiErr(403, "Not a provider (for --open / --provider)", "switch to a provider company, or use --mine"),
       ...COMMON_AUTH_ERRORS,
     ],
     examples: [
