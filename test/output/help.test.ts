@@ -125,3 +125,32 @@ describe("formatGroupHelp tier filtering", () => {
     expect(std).not.toMatch(/^\s+list\b/m);
   });
 });
+
+describe("formatGroupHelp re-homed alias redirect", () => {
+  test("ib cache alias renders the canonical ib dev cache group help", () => {
+    const alias = formatGroupHelp("ib cache", "Cache", COMMAND_SPECS, "developer");
+    // Not the misleading tier fallback…
+    expect(alias).not.toContain("not available at your access level");
+    // …but the canonical group's help, listing its real subcommands.
+    expect(alias).toContain("SUBCOMMANDS");
+    expect(alias).toContain("stats");
+    // USAGE steers to the canonical path.
+    expect(alias).toContain("ib dev cache <command>");
+    // Identical to invoking the canonical path directly.
+    const canonical = formatGroupHelp(
+      "ib dev cache",
+      "Cache",
+      COMMAND_SPECS,
+      "developer"
+    );
+    expect(alias).toBe(canonical);
+  });
+
+  test("ib schema alias for a standard caller shows the canonical not-available message", () => {
+    const std = formatGroupHelp("ib schema", "Schema", COMMAND_SPECS, "standard");
+    expect(std).toContain("not available at your access level");
+    // Points at the canonical path, not the old alias.
+    expect(std).toContain("ib dev schema");
+  });
+});
+

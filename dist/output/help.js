@@ -139,6 +139,19 @@ export function formatGroupHelp(groupPath, fallbackDescription, specs, tier = "d
     const depth = groupPath.split(" ").length; // child = token at this index
     const domain = groupPath.split(" ")[1];
     const groupName = groupPath.split(" ").at(-1).toLowerCase();
+    // Re-homed back-compat alias: a top-level `ib <x>` whose specs now live at the
+    // canonical `ib dev <x>` path (feedback/changelog/perf/cache/schema/ai). The
+    // alias command still executes, but no spec matches its old path, so render
+    // the canonical group's help instead of the misleading "not available at your
+    // access level" message. (Genuinely tier-hidden groups DO have specs at their
+    // path — all filtered out below — and still get hiddenAtTierMessage.)
+    if (!groupPath.startsWith("ib dev ") &&
+        !specs.some((s) => s.command.startsWith(prefix))) {
+        const canonical = "ib dev " + groupPath.slice("ib ".length);
+        if (specs.some((s) => s.command.startsWith(canonical + " "))) {
+            return formatGroupHelp(canonical, fallbackDescription, specs, tier);
+        }
+    }
     const inGroup = specs.filter((s) => s.command.startsWith(prefix) && !isHiddenAtTier(s, tier));
     const children = [...new Set(inGroup.map((s) => s.command.split(" ")[depth]))];
     if (children.length === 0)
