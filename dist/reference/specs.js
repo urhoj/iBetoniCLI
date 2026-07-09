@@ -4670,6 +4670,51 @@ const BASE_COMMAND_SPECS = [
         notes: ["Deploy-gated: 404 until the backend ships GET /api/cli/inbox."],
         examples: ["ib dev inbox", "ib dev inbox --details"],
     },
+    // ─── impersonation (2) ───────────────────────────────────────────────────
+    {
+        command: "ib dev impersonation sessions",
+        description: "Reconstructed impersonation sessions from the personLog audit trail (typeId 30 start / 31 end / 32 extend), joined on sessionId into one row per session: actor, target, reason, ip, start/end time, extendCount, endReason (manual|timeout|error|logout), durationSeconds, and active. Answers 'did endReason=logout rows land in prod?' without hand-written SQL. Developer-only — the data includes IPs. Read-only.",
+        permissions: ["developer access (isSystemAdmin or isDeveloper)"],
+        tier: "developer",
+        flags: [
+            { name: "actor", type: "number", description: "Only sessions run BY this actor personId" },
+            { name: "target", type: "number", description: "Only sessions run AS this target personId" },
+            { name: "end-reason", type: "string", description: "Filter by endReason (manual|timeout|error|logout); implies ended" },
+            { name: "active", type: "boolean", description: "Only still-open sessions (no end row)" },
+            { name: "limit", type: "number", default: "100", description: "Max sessions (capped at 1000)" },
+        ],
+        outputShape: "{ items:[{ sessionId, actorPersonId, targetPersonId, reason, ip, userAgent, startTime, extendCount, lastExtendTime, endTime, endReason, durationSeconds, active }], nextCursor, count, truncated } — sorted startTime desc, 90-day window.",
+        errors: [
+            apiErr(500, "Backend error", "retry with --verbose"),
+            ...permErrors("developer access (isSystemAdmin or isDeveloper)"),
+        ],
+        notes: [
+            "Developer-gated server-side and hidden from non-developer discovery.",
+            "Sessions are reconstructed from personLog 30/31/32 (personLog.personId is always the actor). Deploy-gated: no-op until the puminet5api backend ships GET /api/cli/impersonation-sessions.",
+        ],
+        seeAlso: ["ib person activity", "ib dev impersonation grants"],
+        examples: [
+            "ib dev impersonation sessions",
+            "ib dev impersonation sessions --end-reason logout",
+            "ib dev impersonation sessions --target 63 --active",
+        ],
+    },
+    {
+        command: "ib dev impersonation grants",
+        description: "Standing impersonation grants for one person — who may impersonate whom (outbound = grants where the person is grantee, inbound = grants where the person is target). Surfaces the existing GET /api/persons/:id/impersonation-grants. Read-only.",
+        permissions: ["developer access (isSystemAdmin or isDeveloper)"],
+        tier: "developer",
+        args: [{ name: "personId", type: "number", description: "person.personId" }],
+        flags: [],
+        outputShape: "{ outbound:[{ personImpersonationGrantId, granteePersonId, targetPersonId, grantedByPersonId, grantedAt, notes, targetName, targetCompanyName }], inbound:[{ ...granteeName, granteeCompanyName }] }",
+        errors: [
+            apiErr(400, "personId is not a positive integer", "pass a numeric personId"),
+            ...permErrors("developer access (isSystemAdmin or isDeveloper)"),
+        ],
+        notes: ["The backend route additionally allows self and same-company reads; discovery is hidden below developer tier as defense-in-depth."],
+        seeAlso: ["ib dev impersonation sessions"],
+        examples: ["ib dev impersonation grants 63"],
+    },
     // ─── feedback (5) ────────────────────────────────────────────────────────
     // NOTE on classification: feedback create/resolve carry custom write semantics
     // (meta-exempt create, client-side --dry-run, no idempotency/reason), so they

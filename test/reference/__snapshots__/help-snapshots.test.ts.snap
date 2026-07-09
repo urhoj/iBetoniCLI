@@ -2337,6 +2337,84 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev impersonation grants matches snapshot 1`] = `
+"USAGE
+  ib dev impersonation grants <personId> [flags]
+
+DESCRIPTION
+  Standing impersonation grants for one person — who may impersonate whom (outbound = grants where the person is grantee, inbound = grants where the person is target). Surfaces the existing GET /api/persons/:id/impersonation-grants. Read-only.
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+
+ARGUMENTS
+  <personId> NUMBER    person.personId (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { outbound:[{ personImpersonationGrantId, granteePersonId, targetPersonId, grantedByPersonId, grantedAt, notes, targetName, targetCompanyName }], inbound:[{ ...granteeName, granteeCompanyName }] }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  personId is not a positive integer → pass a numeric personId
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check developer access (isSystemAdmin or isDeveloper)
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - The backend route additionally allows self and same-company reads; discovery is hidden below developer tier as defense-in-depth.
+
+SEE ALSO
+  ib dev impersonation sessions
+
+EXAMPLES
+  ib dev impersonation grants 63
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev impersonation sessions matches snapshot 1`] = `
+"USAGE
+  ib dev impersonation sessions [flags]
+
+DESCRIPTION
+  Reconstructed impersonation sessions from the personLog audit trail (typeId 30 start / 31 end / 32 extend), joined on sessionId into one row per session: actor, target, reason, ip, start/end time, extendCount, endReason (manual|timeout|error|logout), durationSeconds, and active. Answers 'did endReason=logout rows land in prod?' without hand-written SQL. Developer-only — the data includes IPs. Read-only.
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+
+FLAGS
+  --actor NUMBER    Only sessions run BY this actor personId
+  --target NUMBER    Only sessions run AS this target personId
+  --end-reason STRING    Filter by endReason (manual|timeout|error|logout); implies ended
+  --active BOOLEAN    Only still-open sessions (no end row)
+  --limit NUMBER    Max sessions (capped at 1000) (default: 100)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { items:[{ sessionId, actorPersonId, targetPersonId, reason, ip, userAgent, startTime, extendCount, lastExtendTime, endTime, endReason, durationSeconds, active }], nextCursor, count, truncated } — sorted startTime desc, 90-day window.
+
+ERRORS (stderr, exit non-zero)
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Permission denied      → check developer access (isSystemAdmin or isDeveloper)
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Developer-gated server-side and hidden from non-developer discovery.
+  - Sessions are reconstructed from personLog 30/31/32 (personLog.personId is always the actor). Deploy-gated: no-op until the puminet5api backend ships GET /api/cli/impersonation-sessions.
+
+SEE ALSO
+  ib person activity, ib dev impersonation grants
+
+EXAMPLES
+  ib dev impersonation sessions
+  ib dev impersonation sessions --end-reason logout
+  ib dev impersonation sessions --target 63 --active
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev inbox matches snapshot 1`] = `
 "USAGE
   ib dev inbox [flags]

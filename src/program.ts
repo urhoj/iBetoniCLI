@@ -44,6 +44,7 @@ import { registerHelpCommands } from "./commands/help/index.js";
 import { registerVersionCommand } from "./commands/version/index.js";
 import { registerDoctorCommand } from "./commands/doctor/index.js";
 import { registerInboxCommand } from "./commands/inbox/index.js";
+import { registerImpersonationCommands } from "./commands/dev/impersonation/index.js";
 import { runReferenceDump, fetchPrimerGlossary } from "./reference/dump.js";
 import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailEdit, runReferenceDetailDelete, runReferenceDetailLint } from "./reference/detail.js";
 import { parseEditOp } from "./textEdit.js";
@@ -208,6 +209,7 @@ export function buildProgram(): Command {
   registerSchemaCommands(dev, getClient);
   registerAiCommands(dev, getClient);
   registerInboxCommand(dev, getClient);
+  registerImpersonationCommands(dev, getClient);
   // Hidden back-compat aliases at the old top-level paths (still executable).
   registerFeedbackCommands(program, getClient, { hidden: true });
   registerChangelogCommands(program, getClient, { hidden: true });
