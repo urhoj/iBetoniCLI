@@ -25,6 +25,8 @@ const SCOPES = ["cli", "app", "jerry", "bsg2", "workspace", "other"] as const;
 type Scope = (typeof SCOPES)[number];
 const STATUSES = ["open", "reviewed", "applied", "dismissed"] as const;
 type Status = (typeof STATUSES)[number];
+const SEVERITIES = ["critical", "major", "minor", "cosmetic"] as const;
+type Severity = (typeof SEVERITIES)[number];
 
 const MAX_FREETEXT = 200;
 const CAP = 200;
@@ -80,6 +82,7 @@ export interface FeedbackCreateInput {
   scope?: string;
   command?: string;
   error?: string;
+  severity?: string;
   dryRun?: boolean;
 }
 
@@ -89,6 +92,7 @@ interface FeedbackCreateBody {
   description: string;
   command?: string;
   error?: string;
+  severity?: Severity;
   context?: { conversationId: number };
 }
 
@@ -100,6 +104,9 @@ function buildCreateBody(input: FeedbackCreateInput): FeedbackCreateBody {
   if (input.scope !== undefined && !SCOPES.includes(input.scope as Scope)) {
     throw new CliError(`--scope must be one of: ${SCOPES.join(", ")}`, 400, null, 4);
   }
+  if (input.severity !== undefined && !SEVERITIES.includes(input.severity as Severity)) {
+    throw new CliError(`--severity must be one of: ${SEVERITIES.join(", ")}`, 400, null, 4);
+  }
   const body: FeedbackCreateBody = {
     kind: KINDS.includes(input.kind as Kind) ? (input.kind as Kind) : "improvement",
     scope: (input.scope as Scope) ?? "cli",
@@ -107,6 +114,7 @@ function buildCreateBody(input: FeedbackCreateInput): FeedbackCreateBody {
   };
   if (input.command) body.command = input.command;
   if (input.error) body.error = input.error;
+  if (input.severity) body.severity = input.severity as Severity;
   const convId = Number(process.env.IB_CONVERSATION_ID);
   if (Number.isInteger(convId) && convId > 0) {
     body.context = { conversationId: convId };
@@ -345,11 +353,19 @@ export function registerFeedbackCommands(
     )
     .option("--command <argv>", "The ib command/argv that triggered the friction")
     .option("--error <msg>", "Error message you hit, if any")
+    .option("--severity <sev>", "critical | major | minor | cosmetic (optional; most useful for --kind bug)")
     .option("--dry-run", "Print the payload without sending (client-side)")
     .action(
       async (
         description: string,
-        opts: { kind?: string; scope?: string; command?: string; error?: string; dryRun?: boolean }
+        opts: {
+          kind?: string;
+          scope?: string;
+          command?: string;
+          error?: string;
+          severity?: string;
+          dryRun?: boolean;
+        }
       ) => {
         try {
           const client = await getClient();

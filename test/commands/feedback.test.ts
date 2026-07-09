@@ -126,6 +126,19 @@ describe("ib feedback create", () => {
     );
     expect(post).not.toHaveBeenCalled();
   });
+
+  test("create threads a valid severity into the body and rejects an unknown one", async () => {
+    post.mockResolvedValue({ feedbackId: 1 });
+    await runFeedbackCreate(mockClient, { description: "d", kind: "bug", severity: "major" });
+    expect(post).toHaveBeenCalledWith(
+      "/api/feedback",
+      expect.objectContaining({ severity: "major", kind: "bug" }),
+      { meta: true }
+    );
+    await expect(
+      runFeedbackCreate(mockClient, { description: "d", severity: "sev1" })
+    ).rejects.toMatchObject({ exitCode: 4 });
+  });
 });
 
 // ─── /ai conversation provenance ─────────────────────────────────────────────

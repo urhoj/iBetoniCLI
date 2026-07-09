@@ -5046,12 +5046,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "scope", type: "string", default: "cli", description: "cli | app | jerry | bsg2 | workspace | other — which product surface this targets (routing key for triage; orthogonal to --kind)" },
       { name: "command", type: "string", description: "The ib command/argv that triggered the friction" },
       { name: "error", type: "string", description: "Error message you hit, if any" },
+      { name: "severity", type: "string", description: "critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug" },
       { name: "dry-run", type: "boolean", description: "Print the payload without sending (client-side)" },
     ],
     outputShape:
       "{ feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
     errors: [
-      { exit: 4, meaning: "Validation", remedy: "description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|other (STRICT — unknown exits 4)" },
+      { exit: 4, meaning: "Validation", remedy: "description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|other (STRICT — unknown exits 4); --severity, when given, must be critical|major|minor|cosmetic" },
       apiErr(401, "Token expired", "ib auth refresh"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
@@ -5065,6 +5066,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       'ib dev feedback create "ib customer search --email" --kind idea --dry-run',
       'ib dev feedback create "TOS 2.0 lacks a clause covering the AI assistant features; draft update suggested" --kind legal',
       'ib dev feedback create "Jerry inbox should show boom length on request cards" --scope jerry --kind idea',
+      'ib dev feedback create "keikka editor throws on save" --kind bug --severity major',
     ],
   },
   {

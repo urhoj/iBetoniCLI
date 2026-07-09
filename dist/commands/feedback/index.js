@@ -4,6 +4,7 @@ import { parseId } from "../../targets.js";
 const KINDS = ["improvement", "bug", "idea", "legal"];
 const SCOPES = ["cli", "app", "jerry", "bsg2", "workspace", "other"];
 const STATUSES = ["open", "reviewed", "applied", "dismissed"];
+const SEVERITIES = ["critical", "major", "minor", "cosmetic"];
 const MAX_FREETEXT = 200;
 const CAP = 200;
 const TRUNCATED_FIELDS = ["description", "resolution", "errorText"];
@@ -57,6 +58,9 @@ function buildCreateBody(input) {
     if (input.scope !== undefined && !SCOPES.includes(input.scope)) {
         throw new CliError(`--scope must be one of: ${SCOPES.join(", ")}`, 400, null, 4);
     }
+    if (input.severity !== undefined && !SEVERITIES.includes(input.severity)) {
+        throw new CliError(`--severity must be one of: ${SEVERITIES.join(", ")}`, 400, null, 4);
+    }
     const body = {
         kind: KINDS.includes(input.kind) ? input.kind : "improvement",
         scope: input.scope ?? "cli",
@@ -66,6 +70,8 @@ function buildCreateBody(input) {
         body.command = input.command;
     if (input.error)
         body.error = input.error;
+    if (input.severity)
+        body.severity = input.severity;
     const convId = Number(process.env.IB_CONVERSATION_ID);
     if (Number.isInteger(convId) && convId > 0) {
         body.context = { conversationId: convId };
@@ -255,6 +261,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | other — product surface this feedback targets", "cli")
         .option("--command <argv>", "The ib command/argv that triggered the friction")
         .option("--error <msg>", "Error message you hit, if any")
+        .option("--severity <sev>", "critical | major | minor | cosmetic (optional; most useful for --kind bug)")
         .option("--dry-run", "Print the payload without sending (client-side)")
         .action(async (description, opts) => {
         try {
