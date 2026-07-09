@@ -3299,6 +3299,7 @@ const BASE_COMMAND_SPECS = [
             { name: "global", type: "boolean", description: "Create a global, owner-less person (ownerAsiakasId=null). Mutually exclusive with --asiakas." },
             { name: "get-or-create", type: "boolean", description: "On a duplicate email, return the existing person (reused:true) when visible to you; an email owned by a company you can't access errors with guidance" },
             { name: "body", type: "json", description: "Raw JSON body, merged under typed flags (optional)" },
+            { name: "from-json", type: "string", description: "Read the JSON body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body." },
             { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
@@ -3307,20 +3308,25 @@ const BASE_COMMAND_SPECS = [
             apiErr(400, "Missing required field, or duplicate email without --get-or-create", "provide --first and --last (email is optional); add --get-or-create to reuse an existing visible person, or use a different email"),
             ...permErrors("auth.page.person.edit"),
         ],
+        notes: [
+            "On Windows PowerShell inline --body JSON often fails (the shell strips the inner double-quotes) — prefer typed flags, or pass --from-json <file|-> (a file, or - for stdin) to avoid shell quoting entirely.",
+        ],
         examples: [
             'ib person create --first Matti --last Virtanen --phone "+358501234567" --reason "phone contact"',
             'ib person create --first Matti --last Virtanen --email m@x.com --get-or-create --reason "onboard"',
             'ib person create --body \'{"personFirstName":"Matti","personLastName":"M"}\' --reason "onboard"',
+            'ib person create --from-json ./person.json --reason "onboard"',
             'ib person create --first Matti --last Virtanen --global --reason "global self-managing person"',
         ],
     },
     {
         command: "ib person update",
-        description: "Update a person. Body REQUIRED via --body. Requires --reason.",
+        description: "Update a person. Body REQUIRED via --body or --from-json. Requires --reason.",
         permissions: ["auth.page.person.edit"],
         args: [{ name: "personId", type: "number", description: "personId to update" }],
         flags: [
-            { name: "body", type: "json", description: "Patch body (JSON)" },
+            { name: "body", type: "json", description: "Patch body (JSON). Mutually exclusive with --from-json." },
+            { name: "from-json", type: "string", description: "Read the patch body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body." },
             { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
         writeFlags: true,
@@ -3329,7 +3335,13 @@ const BASE_COMMAND_SPECS = [
             apiErr(404, "Person not found", "verify personId"),
             ...permErrors("auth.page.person.edit"),
         ],
-        examples: ['ib person update 5351 --body \'{"personPhone":"+358501234567"}\' --reason "phone change"'],
+        notes: [
+            "On Windows PowerShell inline --body JSON often fails (the shell strips the inner double-quotes, so the CLI sees e.g. {personEmail:x} unquoted) — pass --from-json <file|-> (a file, or - for stdin) to avoid shell quoting entirely.",
+        ],
+        examples: [
+            'ib person update 5351 --body \'{"personPhone":"+358501234567"}\' --reason "phone change"',
+            'ib person update 5351 --from-json ./patch.json --reason "phone change"',
+        ],
     },
     {
         command: "ib person owner",
@@ -3689,7 +3701,8 @@ const BASE_COMMAND_SPECS = [
         description: "Upsert a provider company's BetoniJerry settings (PUT /api/jerry-provider-settings). Partial-payload-safe: only the body keys present are written (omit a key to preserve it). jerryPersonId must belong to the target company. --asiakas targets another company. Returns the FULL saved settings (no follow-up GET needed) plus changed:boolean (whether anything actually changed vs an idempotent no-op). companyDescription is nvarchar — ä/ö are preserved. Requires --reason.",
         permissions: ["edit-tier on the target company (tarjousAdmin / company admin)"],
         flags: [
-            { name: "body", type: "json", description: "JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo? }" },
+            { name: "body", type: "json", description: "JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo? }. Mutually exclusive with --from-json." },
+            { name: "from-json", type: "string", description: "Read the JSON body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body." },
             { name: "asiakas", type: "number", description: "Target company asiakasId (default: your own)" },
             { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
         ],
@@ -3700,8 +3713,12 @@ const BASE_COMMAND_SPECS = [
             apiErr(403, "No edit rights on company", "use a tarjousAdmin/admin token for that company"),
             ...COMMON_AUTH_ERRORS,
         ],
+        notes: [
+            "On Windows PowerShell inline --body JSON often fails (the shell strips the inner double-quotes) — pass --from-json <file|-> (a file, or - for stdin) to avoid shell quoting entirely.",
+        ],
         examples: [
             'ib jerry provider-settings set --body \'{"openingHours":"ma-pe 7-16","maintainsOrderInfo":true}\' --reason "update opening hours"',
+            'ib jerry provider-settings set --from-json ./settings.json --reason "update opening hours"',
             'ib jerry provider-settings set --body \'{"jerryPersonId":6233}\' --asiakas 1402 --reason "set contact"',
         ],
     },

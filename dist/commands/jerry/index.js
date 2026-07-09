@@ -1,6 +1,6 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
-import { parseJsonBodyFlag } from "../../api/parseBody.js";
+import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { resolveAsiakasTarget } from "../customer/index.js";
 import { parseId } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
@@ -649,12 +649,16 @@ export function registerJerryCommands(parent, getClient) {
     addWriteFlagsToCommand(ps
         .command("set")
         .description("Upsert a provider's Jerry settings. Requires --reason.")
-        .requiredOption("--body <json>", "JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo? }")
+        .option("--body <json>", "JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo? }")
+        .option("--from-json <file>", "Read the JSON body from a file (or - for stdin) — shell-safe alternative to --body")
         .option("--asiakas <id>", "Target company asiakasId", Number)).action(async (opts) => {
         requireReason(opts);
         try {
             const client = await getClient();
-            const parsed = parseJsonBodyFlag(opts.body);
+            const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson });
+            if (!parsed) {
+                failWith("provider-settings set requires a body via --body or --from-json", 4);
+            }
             writeJson(await runJerryProviderSettingsSet(client, parsed, opts.asiakas, opts));
         }
         catch (e) {

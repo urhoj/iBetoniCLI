@@ -32,6 +32,7 @@ import {
   parseJsonObject,
 } from "../notification/index.js";
 import { CliError } from "../../api/errors.js";
+import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { registerPersonDayCommands } from "./day.js";
 import { registerPersonEmailCommands } from "./email.js";
 import { registerPersonAbsencesCommand } from "./absences.js";
@@ -602,9 +603,15 @@ export function registerPersonCommands(
       "--get-or-create",
       "On a duplicate email, return the existing person (reused:true) when visible to you; an email owned by a company you can't access errors with guidance"
     )
-    .option("--body <json>", "Raw JSON body (merged under typed flags)");
+    .option("--body <json>", "Raw JSON body (merged under typed flags)")
+    .option(
+      "--from-json <file>",
+      "Read the JSON body from a file (or - for stdin) — shell-safe alternative to --body"
+    );
   addWriteFlagsToCommand(createCmd).action(
-    async (opts: WriteFlags & PersonCreateFlags & { getOrCreate?: boolean; body?: string }) => {
+    async (
+      opts: WriteFlags & PersonCreateFlags & { getOrCreate?: boolean; body?: string; fromJson?: string }
+    ) => {
       if (!opts.reason) {
         failWith("Missing required flag: --reason", 4);
       }
@@ -613,12 +620,11 @@ export function registerPersonCommands(
         failWith("--global and --asiakas are mutually exclusive", 4);
       }
       let parsed: Record<string, unknown> = {};
-      if (opts.body) {
-        try {
-          parsed = JSON.parse(opts.body);
-        } catch {
-          failWith("--body must be valid JSON", 4);
-        }
+      try {
+        parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
+      } catch (e) {
+        exitWithError(e);
+        return;
       }
       const body = buildPersonCreateBody(parsed, {
         first: opts.first,
@@ -721,19 +727,21 @@ export function registerPersonCommands(
   addWriteFlagsToCommand(
     p
       .command("update <personId>")
-      .description("Update a person. Body REQUIRED via --body. Requires --reason.")
-      .requiredOption("--body <json>", "Patch body (JSON)")
-  ).action(async (personIdStr: string, opts: WriteFlags & { body: string }) => {
+      .description("Update a person. Body REQUIRED via --body or --from-json. Requires --reason.")
+      .option("--body <json>", "Patch body (JSON)")
+      .option(
+        "--from-json <file>",
+        "Read the patch body from a file (or - for stdin) — shell-safe alternative to --body"
+      )
+  ).action(async (personIdStr: string, opts: WriteFlags & { body?: string; fromJson?: string }) => {
     if (!opts.reason) {
       failWith("Missing required flag: --reason", 4);
     }
-    let patch: Record<string, unknown>;
     try {
-      patch = JSON.parse(opts.body);
-    } catch {
-      failWith("--body must be valid JSON", 4);
-    }
-    try {
+      const patch = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson });
+      if (!patch) {
+        failWith("update requires a patch body via --body or --from-json", 4);
+      }
       const client = await getClient();
       const result = await runPersonUpdate(client, parseId(personIdStr, "personId"), patch, opts);
       writeJson(result);

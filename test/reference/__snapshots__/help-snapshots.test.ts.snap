@@ -4040,7 +4040,8 @@ DESCRIPTION
   Permissions: requires edit-tier on the target company (tarjousAdmin / company admin).
 
 FLAGS
-  --body JSON    JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo? }
+  --body JSON    JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo? }. Mutually exclusive with --from-json.
+  --from-json STRING    Read the JSON body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body.
   --asiakas NUMBER    Target company asiakasId (default: your own)
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
@@ -4061,8 +4062,12 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - On Windows PowerShell inline --body JSON often fails (the shell strips the inner double-quotes) — pass --from-json <file|-> (a file, or - for stdin) to avoid shell quoting entirely.
+
 EXAMPLES
   ib jerry provider-settings set --body '{"openingHours":"ma-pe 7-16","maintainsOrderInfo":true}' --reason "update opening hours"
+  ib jerry provider-settings set --from-json ./settings.json --reason "update opening hours"
   ib jerry provider-settings set --body '{"jerryPersonId":6233}' --asiakas 1402 --reason "set contact"
 "
 `;
@@ -7590,6 +7595,7 @@ FLAGS
   --global BOOLEAN    Create a global, owner-less person (ownerAsiakasId=null). Mutually exclusive with --asiakas.
   --get-or-create BOOLEAN    On a duplicate email, return the existing person (reused:true) when visible to you; an email owned by a company you can't access errors with guidance
   --body JSON    Raw JSON body, merged under typed flags (optional)
+  --from-json STRING    Read the JSON body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body.
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
@@ -7609,10 +7615,14 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → check auth.page.person.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - On Windows PowerShell inline --body JSON often fails (the shell strips the inner double-quotes) — prefer typed flags, or pass --from-json <file|-> (a file, or - for stdin) to avoid shell quoting entirely.
+
 EXAMPLES
   ib person create --first Matti --last Virtanen --phone "+358501234567" --reason "phone contact"
   ib person create --first Matti --last Virtanen --email m@x.com --get-or-create --reason "onboard"
   ib person create --body '{"personFirstName":"Matti","personLastName":"M"}' --reason "onboard"
+  ib person create --from-json ./person.json --reason "onboard"
   ib person create --first Matti --last Virtanen --global --reason "global self-managing person"
 "
 `;
@@ -8436,14 +8446,15 @@ exports[`Help snapshots — contract stability > help for ib person update match
   ib person update <personId> [flags]
 
 DESCRIPTION
-  Update a person. Body REQUIRED via --body. Requires --reason.
+  Update a person. Body REQUIRED via --body or --from-json. Requires --reason.
   Permissions: requires auth.page.person.edit.
 
 ARGUMENTS
   <personId> NUMBER    personId to update (required)
 
 FLAGS
-  --body JSON    Patch body (JSON)
+  --body JSON    Patch body (JSON). Mutually exclusive with --from-json.
+  --from-json STRING    Read the patch body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body.
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
@@ -8463,8 +8474,12 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → check auth.page.person.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - On Windows PowerShell inline --body JSON often fails (the shell strips the inner double-quotes, so the CLI sees e.g. {personEmail:x} unquoted) — pass --from-json <file|-> (a file, or - for stdin) to avoid shell quoting entirely.
+
 EXAMPLES
   ib person update 5351 --body '{"personPhone":"+358501234567"}' --reason "phone change"
+  ib person update 5351 --from-json ./patch.json --reason "phone change"
 "
 `;
 
