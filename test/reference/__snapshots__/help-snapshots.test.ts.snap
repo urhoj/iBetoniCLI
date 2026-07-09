@@ -2173,6 +2173,7 @@ ARGUMENTS
   <description> STRING    freetext description of the friction, gap, or bug (required)
 
 FLAGS
+  --description STRING    Alias for the positional description; if both are passed, they must match
   --kind STRING    improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal) (default: improvement)
   --scope STRING    cli | app | jerry | bsg2 | workspace | other — which product surface this targets (routing key for triage; orthogonal to --kind) (default: cli)
   --command STRING    The ib command/argv that triggered the friction
@@ -2192,11 +2193,13 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
+  - You can pass the description either positionally or as --description; if you pass both, they must match.
   - A description starting with "-" is parsed as an option (exit 4) — put a bare \`--\` terminator before it: ib dev feedback create --kind bug -- "--pretty output too wide". Everything after \`--\` is taken as positional text.
   - When invoked by the betoni.online /ai assistant, the originating conversation id is auto-attached as context.conversationId (via the IB_CONVERSATION_ID env var the /ai loop injects) — a developer can then read the full conversation with \`ib dev ai conversation <id>\`. Manual CLI use does not set it.
 
 EXAMPLES
   ib dev feedback create "schema table output should include row counts"
+  ib dev feedback create --description "schema table output should include row counts"
   ib dev feedback create "keikka list --pvm rejected my date" --kind bug --command "keikka list --pvm 1.6." --error "invalid date format"
   ib dev feedback create "ib customer search --email" --kind idea --dry-run
   ib dev feedback create "TOS 2.0 lacks a clause covering the AI assistant features; draft update suggested" --kind legal
@@ -2582,7 +2585,7 @@ exports[`Help snapshots — contract stability > help for ib dev schema table ma
   ib dev schema table <name> [flags]
 
 DESCRIPTION
-  Columns (type, nullability, default, key), primary key, foreign keys, and indexes for one dbo table — or several at once via a comma-separated list. Developer-only.
+  Columns (type, nullability, default, key), primary key, foreign keys (outbound), inbound references (tables/columns whose FK points AT this table), and indexes for one dbo table — or several at once via a comma-separated list. Developer-only.
   Permissions: requires developer access (isSystemAdmin or isDeveloper).
 
 ARGUMENTS
@@ -2595,7 +2598,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  single name → { name, columns:[{name,dataType,maxLength,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], indexes:[{name,columns,unique}] }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)
+  single name → { name, columns:[{name,dataType,maxLength,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], inboundForeignKeys:[{refTable,refColumn,column}], indexes:[{name,columns,unique}] }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
