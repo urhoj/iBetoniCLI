@@ -71,7 +71,7 @@ describe("Rich --help wiring — real command tree", () => {
       // live at `ib dev <group> *`; the old top-level subtrees are spec-less
       // runtime aliases (still run, absent from discovery).
       .filter((p) => {
-        const ALIAS_ROOTS = ["ib bug", "ib feedback", "ib changelog", "ib perf", "ib cache", "ib schema", "ib ai", "ib inbox"];
+        const ALIAS_ROOTS = ["ib feedback", "ib changelog", "ib perf", "ib cache", "ib schema", "ib ai", "ib inbox"];
         return !ALIAS_ROOTS.some((r) => p === r || p.startsWith(r + " "));
       });
     const missing = leaves.filter((p) => !specPaths.has(p));

@@ -242,7 +242,7 @@ describe("tier filtering — flat list", () => {
 describe("fullyHiddenDomains", () => {
   test("standard has no fully-hidden domains (all dev-only groups consolidated under 'dev' which has standard-visible leaves)", () => {
     const hidden = fullyHiddenDomains("standard");
-    // dev domain has standard-visible specs (feedback create, cache invalidate, bug create/list/get/comment)
+    // dev domain has standard-visible specs (feedback create, cache invalidate)
     expect(hidden.has("dev")).toBe(false);
     // old standalone domains no longer exist in COMMAND_SPECS — not present, so not hidden
     expect(hidden.has("ai")).toBe(false);
@@ -287,7 +287,7 @@ describe("tier filtering — domain index", () => {
     expect(domains).not.toContain("ai");
     expect(domains).not.toContain("schema");
     expect(domains).not.toContain("changelog");
-    // dev appears because it has standard-visible specs (feedback create, cache invalidate, bug create/list/get/comment)
+    // dev appears because it has standard-visible specs (feedback create, cache invalidate)
     expect(domains).toContain("dev");
   });
   test("developer index keeps dev umbrella (containing ai, schema, changelog, etc.)", () => {

@@ -27,7 +27,7 @@ describe("root --help command listing is tier-filtered", () => {
   });
   test("developer sees dev umbrella; old hidden aliases not shown at root", () => {
     const h = rootHelp("developer");
-    // dev is the new umbrella for schema/ai/changelog/bug/feedback/perf/cache/inbox
+    // dev is the new umbrella for schema/ai/changelog/feedback/perf/cache/inbox
     expect(h).toMatch(/^ {2}dev\b/m);
     // back-compat aliases are registered as Commander-hidden — absent from root help
     expect(h).not.toMatch(/^ {2}schema\b/m);
