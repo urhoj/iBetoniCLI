@@ -61,6 +61,17 @@ describe("parser errors → JSON envelope", () => {
     expect(process.exitCode).toBe(4);
   });
 
+  test("missing required options are reported together", async () => {
+    await run(["dev", "changelog", "add", "--repo", "betonicli", "--title", "x"]);
+    const parsed = lastStderrJson();
+    const error = String(parsed.error);
+    expect(parsed.code).toBe("USAGE");
+    expect(error).toContain("--type");
+    expect(error).toContain("--area");
+    expect(error).toContain("--description");
+    expect(process.exitCode).toBe(4);
+  });
+
   test("unknown flag → USAGE envelope, exit 4", async () => {
     await run(["company", "list", "--nope"]);
     const parsed = lastStderrJson();

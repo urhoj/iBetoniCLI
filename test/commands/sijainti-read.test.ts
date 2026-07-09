@@ -443,6 +443,7 @@ describe("runSijaintiListJoined", () => {
     const result = await runSijaintiListJoined(mockClient, { search: "kivikko" });
     expect(result.items).toEqual([]);
     expect(result.hint).toContain("--all");
+    expect(result.hint).toContain("--all --asiakas <id>");
   });
 
   test("empty result WITH --all has no hint (nothing wider to suggest)", async () => {

@@ -5,7 +5,7 @@
  * `--help` wiring — is importable by tests without triggering argv parsing.
  * `bin/ib.ts` is now just a thin shell: build, then `parseAsync`.
  */
-import { Command, Help } from "commander";
+import { Command, Help, type Option } from "commander";
 import packageJson from "../package.json" with { type: "json" };
 import { addGlobalOptions, getGlobalOptions, type GlobalOptions } from "./globals.js";
 import { defaultCredentialsPath } from "./auth/store.js";
@@ -584,6 +584,24 @@ function setExit(code: number): void {
   else process.exitCode = code;
 }
 
+function commandPath(cmd: Command): string {
+  const parts: string[] = [];
+  for (let c: Command | null = cmd; c; c = c.parent) parts.unshift(c.name());
+  return parts.join(" ");
+}
+
+function missingMandatoryOptions(cmd: Command): string[] {
+  const missing: string[] = [];
+  for (let c: Command | null = cmd; c; c = c.parent) {
+    for (const option of c.options as Option[]) {
+      if (option.mandatory && c.getOptionValue(option.attributeName()) === undefined) {
+        missing.push(option.flags);
+      }
+    }
+  }
+  return missing;
+}
+
 /**
  * Terminal handler for `program.parseAsync(...).catch(...)`. Never calls
  * `process.exit()` (Windows-unsafe post-fetch) — sets `process.exitCode` and
@@ -628,6 +646,25 @@ export function handleParseRejection(
           "";
         emitStderr(
           JSON.stringify(buildUnknownCommandEnvelope(cmd, token, getCallerTier())) + "\n"
+        );
+        recordFriction(err, 4);
+        setExit(4);
+        return;
+      }
+    }
+    if (err.code === "commander.missingMandatoryOptionValue" && erroringCommand) {
+      const cmd = erroringCommand();
+      const missing = cmd ? missingMandatoryOptions(cmd) : [];
+      if (cmd && missing.length > 1) {
+        emitStderr(
+          JSON.stringify({
+            success: false,
+            error: `required options not specified for ${commandPath(cmd)}: ${missing.join(", ")}`,
+            code: "USAGE",
+            statusCode: 0,
+            missingOptions: missing,
+            hint: "usage error — run `ib <command> --help` for the exact arguments and flags, or `ib commands` to discover commands",
+          }) + "\n"
         );
         recordFriction(err, 4);
         setExit(4);
