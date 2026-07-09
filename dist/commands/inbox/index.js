@@ -1,7 +1,7 @@
 import { writeJson, exitWithError } from "../../output/json.js";
 /**
- * `ib inbox` — one aggregated rollup of the eight open/incomplete operator signals
- * (deploy-pending changelog, unresolved feedback, new bugs, open support
+ * `ib inbox` — one aggregated rollup of the seven open/incomplete operator signals
+ * (deploy-pending changelog, unresolved feedback, open support
  * escalations, staged legal drafts, glossary misses, live no_supply
  * tarjouspyynnot, and a memory-groom signal). The single source of truth
  * behind the daily morning-report routine and the /admin operator dashboard.
@@ -14,8 +14,8 @@ export async function runInbox(client, opts = {}) {
 export function registerInboxCommand(parent, getClient, opts = {}) {
     parent
         .command("inbox", { hidden: !!opts.hidden })
-        .description("Aggregated operator inbox: counts of every open/incomplete signal (deploy-pending changelog, unresolved feedback, new bugs, open support, staged legal drafts, glossary misses, live no_supply tarjouspyynnot) plus a memory-groom signal and a `needsYou` headline")
-        .option("--details", "Include slimmed top-items per signal (bugs stripped of sessionData), not just counts")
+        .description("Aggregated operator inbox: counts of every open/incomplete signal (deploy-pending changelog, unresolved feedback, open support, staged legal drafts, glossary misses, live no_supply tarjouspyynnot) plus a memory-groom signal and a `needsYou` headline")
+        .option("--details", "Include slimmed top-items per signal, not just counts")
         .action(async (opts) => {
         try {
             const client = await getClient();

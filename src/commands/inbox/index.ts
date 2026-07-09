@@ -8,7 +8,7 @@ import { writeJson, exitWithError } from "../../output/json.js";
  */
 export interface InboxRollup {
   generatedAt: string | null;
-  /** Headline: open feedback + new bugs + legal drafts + open support + deploy-pending(bump!=none). */
+  /** Headline: open feedback + legal drafts + open support + deploy-pending(bump!=none). */
   needsYou: number;
   changelog: {
     pending: number;
@@ -22,7 +22,6 @@ export interface InboxRollup {
     byKind: { open: Record<string, number>; reviewed: Record<string, number> };
     items?: { open: unknown[]; reviewed: unknown[] };
   };
-  bugs: { new: number; items?: unknown[] };
   support: { open: number; truncated: boolean; items?: unknown[] };
   legal: { drafts: number; items?: unknown[] };
   glossary: { misses: number; items?: unknown[] };
@@ -43,8 +42,8 @@ export interface InboxRollup {
 }
 
 /**
- * `ib inbox` — one aggregated rollup of the eight open/incomplete operator signals
- * (deploy-pending changelog, unresolved feedback, new bugs, open support
+ * `ib inbox` — one aggregated rollup of the seven open/incomplete operator signals
+ * (deploy-pending changelog, unresolved feedback, open support
  * escalations, staged legal drafts, glossary misses, live no_supply
  * tarjouspyynnot, and a memory-groom signal). The single source of truth
  * behind the daily morning-report routine and the /admin operator dashboard.
@@ -66,11 +65,11 @@ export function registerInboxCommand(
   parent
     .command("inbox", { hidden: !!opts.hidden })
     .description(
-      "Aggregated operator inbox: counts of every open/incomplete signal (deploy-pending changelog, unresolved feedback, new bugs, open support, staged legal drafts, glossary misses, live no_supply tarjouspyynnot) plus a memory-groom signal and a `needsYou` headline"
+      "Aggregated operator inbox: counts of every open/incomplete signal (deploy-pending changelog, unresolved feedback, open support, staged legal drafts, glossary misses, live no_supply tarjouspyynnot) plus a memory-groom signal and a `needsYou` headline"
     )
     .option(
       "--details",
-      "Include slimmed top-items per signal (bugs stripped of sessionData), not just counts"
+      "Include slimmed top-items per signal, not just counts"
     )
     .action(async (opts: { details?: boolean }) => {
       try {
