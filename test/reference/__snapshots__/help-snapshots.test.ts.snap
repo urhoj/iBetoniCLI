@@ -4836,7 +4836,7 @@ exports[`Help snapshots — contract stability > help for ib legal get matches s
   ib legal get <documentId> [flags]
 
 DESCRIPTION
-  One document version by documentId, including full markdown content.
+  One document version by documentId. The body is returned in the \`markdownContent\` field.
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
@@ -4855,6 +4855,9 @@ ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Document not found     → list ids via ib legal versions <typeName>
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - The document body is the \`markdownContent\` field — NOT \`content\` or \`body\`. Reading \`.content\` returns undefined (an empty body) with no error: a silent false-negative. \`ib legal show\` uses the same field name.
 
 SEE ALSO
   ib legal versions, ib legal diff
@@ -4946,6 +4949,9 @@ ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  No active document of this type → check ib legal versions <typeName>
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - The document body is the \`markdownContent\` field — NOT \`content\` or \`body\` (with --meta it is omitted and only \`contentLength\` is returned). \`ib legal get\` uses the same field name.
 
 SEE ALSO
   ib legal types, ib legal versions

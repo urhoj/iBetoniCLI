@@ -3047,6 +3047,9 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "{documentId, typeName, version, title, effectiveDate, markdownContent | contentLength, ...}",
+    notes: [
+      "The document body is the `markdownContent` field — NOT `content` or `body` (with --meta it is omitted and only `contentLength` is returned). `ib legal get` uses the same field name.",
+    ],
     errors: [
       apiErr(404, "No active document of this type", "check ib legal versions <typeName>"),
       ...COMMON_AUTH_ERRORS,
@@ -3115,12 +3118,15 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     command: "ib legal get",
-    description: "One document version by documentId, including full markdown content.",
+    description: "One document version by documentId. The body is returned in the `markdownContent` field.",
     auth: "any",
     args: [{ name: "documentId", type: "number", description: "legalDocuments.documentId" }],
     flags: [],
     outputShape:
       "{documentId, documentTypeId, typeName, version, title, status, markdownContent, isActive, ...}",
+    notes: [
+      "The document body is the `markdownContent` field — NOT `content` or `body`. Reading `.content` returns undefined (an empty body) with no error: a silent false-negative. `ib legal show` uses the same field name.",
+    ],
     errors: [
       apiErr(404, "Document not found", "list ids via ib legal versions <typeName>"),
       ...COMMON_AUTH_ERRORS,

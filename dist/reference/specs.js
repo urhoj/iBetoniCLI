@@ -2794,6 +2794,9 @@ const BASE_COMMAND_SPECS = [
             { name: "meta", type: "boolean", description: "Omit markdownContent (returns contentLength instead)" },
         ],
         outputShape: "{documentId, typeName, version, title, effectiveDate, markdownContent | contentLength, ...}",
+        notes: [
+            "The document body is the `markdownContent` field — NOT `content` or `body` (with --meta it is omitted and only `contentLength` is returned). `ib legal get` uses the same field name.",
+        ],
         errors: [
             apiErr(404, "No active document of this type", "check ib legal versions <typeName>"),
             ...COMMON_AUTH_ERRORS,
@@ -2854,11 +2857,14 @@ const BASE_COMMAND_SPECS = [
     },
     {
         command: "ib legal get",
-        description: "One document version by documentId, including full markdown content.",
+        description: "One document version by documentId. The body is returned in the `markdownContent` field.",
         auth: "any",
         args: [{ name: "documentId", type: "number", description: "legalDocuments.documentId" }],
         flags: [],
         outputShape: "{documentId, documentTypeId, typeName, version, title, status, markdownContent, isActive, ...}",
+        notes: [
+            "The document body is the `markdownContent` field — NOT `content` or `body`. Reading `.content` returns undefined (an empty body) with no error: a silent false-negative. `ib legal show` uses the same field name.",
+        ],
         errors: [
             apiErr(404, "Document not found", "list ids via ib legal versions <typeName>"),
             ...COMMON_AUTH_ERRORS,
@@ -4007,12 +4013,12 @@ const BASE_COMMAND_SPECS = [
             },
             {
                 command: "ib dev schema table",
-                description: "Columns (type, nullability, default, key), primary key, foreign keys, and indexes for one dbo table — or several at once via a comma-separated list. Developer-only.",
+                description: "Columns (type, nullability, default, key), primary key, foreign keys (outbound), inbound references (tables/columns whose FK points AT this table), and indexes for one dbo table — or several at once via a comma-separated list. Developer-only.",
                 permissions: DEV_PERMS,
                 tier: "developer",
                 args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix); comma-separated for a batch (a,b,c)" }],
                 flags: [],
-                outputShape: "single name → { name, columns:[{name,dataType,maxLength,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], indexes:[{name,columns,unique}] }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)",
+                outputShape: "single name → { name, columns:[{name,dataType,maxLength,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], inboundForeignKeys:[{refTable,refColumn,column}], indexes:[{name,columns,unique}] }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)",
                 errors: [...devErrors, invalidNameErr, apiErr(404, "Table not found", "check the name via `ib dev schema tables`")],
                 examples: ["ib dev schema table keikka", "ib dev schema table keikka,asiakas,tyomaa"],
             },
@@ -4655,6 +4661,7 @@ const BASE_COMMAND_SPECS = [
         mutates: true,
         args: [{ name: "description", type: "string", description: "freetext description of the friction, gap, or bug" }],
         flags: [
+            { name: "description", type: "string", description: "Alias for the positional description; if both are passed, they must match" },
             { name: "kind", type: "string", default: "improvement", description: "improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal)" },
             { name: "scope", type: "string", default: "cli", description: "cli | app | jerry | bsg2 | workspace | other — which product surface this targets (routing key for triage; orthogonal to --kind)" },
             { name: "command", type: "string", description: "The ib command/argv that triggered the friction" },
@@ -4669,11 +4676,13 @@ const BASE_COMMAND_SPECS = [
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
         notes: [
+            "You can pass the description either positionally or as --description; if you pass both, they must match.",
             'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib dev feedback create --kind bug -- "--pretty output too wide". Everything after `--` is taken as positional text.',
             "When invoked by the betoni.online /ai assistant, the originating conversation id is auto-attached as context.conversationId (via the IB_CONVERSATION_ID env var the /ai loop injects) — a developer can then read the full conversation with `ib dev ai conversation <id>`. Manual CLI use does not set it.",
         ],
         examples: [
             'ib dev feedback create "schema table output should include row counts"',
+            'ib dev feedback create --description "schema table output should include row counts"',
             'ib dev feedback create "keikka list --pvm rejected my date" --kind bug --command "keikka list --pvm 1.6." --error "invalid date format"',
             'ib dev feedback create "ib customer search --email" --kind idea --dry-run',
             'ib dev feedback create "TOS 2.0 lacks a clause covering the AI assistant features; draft update suggested" --kind legal',
