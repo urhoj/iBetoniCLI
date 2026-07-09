@@ -48,7 +48,7 @@ export const DOMAIN_BLURBS: Record<string, string> = {
   legal: "Versioned legal documents and per-person acceptances.",
   validate: "Company and person readiness validation profiles.",
   log: "Field-level audit trail (changeTracker).",
-  dev: "Developer & maintainer tools — bug reports, CLI feedback, changelog, perf, cache, schema, AI logs, operator inbox.",
+  dev: "Developer & maintainer tools — CLI feedback, changelog, perf, cache, schema, AI logs, operator inbox.",
   glossary: "Domain glossary — resolve a term/synonym to its meaning + commands.",
   ohje: "UI help-text content behind HelperIcon.",
   reference: "Machine-readable CLI catalogue (dump / detail).",

@@ -15,14 +15,12 @@ function paths(root: Command): Set<string> {
   return set;
 }
 
-const MOVED = ["bug", "feedback", "changelog", "perf", "cache", "schema", "ai", "inbox"];
+const MOVED = ["feedback", "changelog", "perf", "cache", "schema", "ai", "inbox"];
 
 describe("ib dev umbrella", () => {
   const tree = paths(buildProgram());
 
   test("canonical paths live under `ib dev`", () => {
-    expect(tree.has("ib dev bug")).toBe(true);
-    expect(tree.has("ib dev bug get")).toBe(true);
     expect(tree.has("ib dev changelog")).toBe(true);
     expect(tree.has("ib dev inbox")).toBe(true);
     expect(tree.has("ib dev schema")).toBe(true);
@@ -30,12 +28,11 @@ describe("ib dev umbrella", () => {
 
   test("old top-level paths still resolve as runtime aliases", () => {
     // Hidden, but still in the command tree → still executable.
-    expect(tree.has("ib bug get")).toBe(true);
     expect(tree.has("ib changelog")).toBe(true);
     expect(tree.has("ib inbox")).toBe(true);
   });
 
-  test("domain index shows `dev`, not the 8 old domains (developer tier)", () => {
+  test("domain index shows `dev`, not the 7 old domains (developer tier)", () => {
     const domains = buildDomainIndex(COMMAND_SPECS, "developer").items.map((d) => d.domain);
     expect(domains).toContain("dev");
     for (const d of MOVED) expect(domains).not.toContain(d);
@@ -51,9 +48,9 @@ describe("ib dev umbrella", () => {
       const row = buildDomainIndex(COMMAND_SPECS, tier).items.find((d) => d.domain === "dev");
       return row ? row.count : 0;
     };
-    // Open leaves (bug create/list/get/comment, feedback create) keep dev visible at standard…
+    // Open leaves (feedback create) keep dev visible at standard…
     expect(devAt("standard")).toBeGreaterThan(0);
-    // …but developer-only leaves (changelog/schema/perf/ai/cache, feedback list/get/resolve, bug admin) are hidden.
+    // …but developer-only leaves (changelog/schema/perf/ai/cache, feedback list/get/resolve) are hidden.
     expect(devAt("standard")).toBeLessThan(devAt("developer"));
   });
 });

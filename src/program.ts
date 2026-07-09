@@ -39,7 +39,6 @@ import { registerOpendataCommands } from "./commands/opendata/index.js";
 import { registerChangelogCommands } from "./commands/changelog/index.js";
 import { registerFeedbackCommands } from "./commands/feedback/index.js";
 import { registerAiCommands } from "./commands/ai/index.js";
-import { registerBugCommands } from "./commands/bug/index.js";
 import { registerGlossaryCommands } from "./commands/glossary/index.js";
 import { registerHelpCommands } from "./commands/help/index.js";
 import { registerVersionCommand } from "./commands/version/index.js";
@@ -202,7 +201,6 @@ export function buildProgram(): Command {
     .description(
       "Developer & maintainer tools — bug reports, CLI feedback, changelog, perf, cache, schema, AI logs, operator inbox. Filing a bug or feedback is open to everyone."
     );
-  registerBugCommands(dev, getClient);
   registerFeedbackCommands(dev, getClient);
   registerChangelogCommands(dev, getClient);
   registerPerfCommands(dev, getClient);
@@ -211,7 +209,6 @@ export function buildProgram(): Command {
   registerAiCommands(dev, getClient);
   registerInboxCommand(dev, getClient);
   // Hidden back-compat aliases at the old top-level paths (still executable).
-  registerBugCommands(program, getClient, { hidden: true });
   registerFeedbackCommands(program, getClient, { hidden: true });
   registerChangelogCommands(program, getClient, { hidden: true });
   registerPerfCommands(program, getClient, { hidden: true });
