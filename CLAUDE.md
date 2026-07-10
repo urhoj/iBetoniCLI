@@ -25,7 +25,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Run from the `betonicli/` directory:
 
 - `npm run dev -- <args>` — run the CLI from source via tsx, e.g. `npm run dev -- keikka list --pretty`
-- `npm run build` — compile `src/` → `dist/` (tsc); `bin` entry is `dist/bin/ib.js`
+- `npm run build` — compile `src/` → `dist/` (tsc); `bin` entry is `dist/bin/ib.js`. The prebuild hook `rm -rf`'s `dist/` first, so every build emits an exact tree (no orphaned artifacts from deleted src).
+- `npm run check:dist` — **dist/ is COMMITTED and is what ships** (vendored into puminet5api; deploys never build). This compiles src to a temp dir and byte-compares against `dist/`, failing on stale/unbuilt/orphaned files — CI runs it in place of a bare build, so **a src change without a dist rebuild goes red**. After ANY src change: `npm run build` and commit the `dist/` diff in the same commit.
 - `npm test` — vitest run (all tests)
 - `npm run test:watch` — vitest watch
 - `npx vitest run test/commands/company.test.ts` — run a single test file

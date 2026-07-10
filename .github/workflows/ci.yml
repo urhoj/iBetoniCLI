@@ -39,7 +39,11 @@ jobs:
       - run: npm run type-check
       - run: npm run lint
       - run: npm test
-      - run: npm run build
+      # Compiles the same tsconfig as `npm run build` AND fails when the
+      # committed dist/ doesn't match the fresh output (stale/unbuilt/orphaned).
+      # dist/ is what actually ships (vendored into puminet5api; deploys never
+      # build), so a src-only commit must go red here (feedback #135/#136).
+      - run: npm run check:dist
 
   # On a green master push, tell puminet5api to move its vendored-CLI
   # submodule pointer (bump-vendored-cli.yml there). Gated on build-and-test

@@ -14,7 +14,9 @@
     "node": ">=20.10.0"
   },
   "scripts": {
+    "prebuild": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc -p tsconfig.json",
+    "check:dist": "node scripts/check-dist-fresh.js",
     "dev": "tsx src/bin/ib.ts",
     "test": "vitest run",
     "test:watch": "vitest",
