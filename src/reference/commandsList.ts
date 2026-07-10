@@ -112,9 +112,21 @@ export function assertKnownDomain(
 ): void {
   const valid = commandDomains(specs); // FULL set — validation
   if (!valid.includes(domain)) {
-    const suggest = commandDomains(visibleSpecs(specs, tier)); // visible-only — suggestion
+    const visible = visibleSpecs(specs, tier); // visible-only — never leak a hidden subtree
+    const suggest = commandDomains(visible);
+    // Did-you-mean when the unknown token is really a nested subgroup addressed
+    // by its bare leaf name (e.g. `changelog` → `dev changelog`). `ib commands
+    // <sub>` already resolves these in resolveDomainFilter; this covers the
+    // callers that hit the validator directly (`ib reference dump <sub>`, and
+    // subgroups that live under more than one domain). Tier-filtered so a
+    // developer-only subgroup is never suggested to a standard caller.
+    const subgroups = nestedSubgroupPrefixes(visible).get(domain);
+    const didYouMean =
+      subgroups && subgroups.size
+        ? ` Did you mean: ${[...subgroups].map((p) => `\`${p}\``).join(" or ")}?`
+        : "";
     throw new CliError(
-      `unknown domain: ${domain}. Valid: ${suggest.join(", ")}`,
+      `unknown domain: ${domain}.${didYouMean} Valid: ${suggest.join(", ")}`,
       0,
       null,
       4

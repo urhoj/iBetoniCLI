@@ -450,6 +450,23 @@ function setExit(code) {
     else
         process.exitCode = code;
 }
+function commandPath(cmd) {
+    const parts = [];
+    for (let c = cmd; c; c = c.parent)
+        parts.unshift(c.name());
+    return parts.join(" ");
+}
+function missingMandatoryOptions(cmd) {
+    const missing = [];
+    for (let c = cmd; c; c = c.parent) {
+        for (const option of c.options) {
+            if (option.mandatory && c.getOptionValue(option.attributeName()) === undefined) {
+                missing.push(option.flags);
+            }
+        }
+    }
+    return missing;
+}
 /**
  * Terminal handler for `program.parseAsync(...).catch(...)`. Never calls
  * `process.exit()` (Windows-unsafe post-fetch) — sets `process.exitCode` and
@@ -489,6 +506,23 @@ export function handleParseRejection(err, parserText, erroringCommand) {
                     text.match(/unknown command '([^']+)'/)?.[1] ||
                     "";
                 emitStderr(JSON.stringify(buildUnknownCommandEnvelope(cmd, token, getCallerTier())) + "\n");
+                recordFriction(err, 4);
+                setExit(4);
+                return;
+            }
+        }
+        if (err.code === "commander.missingMandatoryOptionValue" && erroringCommand) {
+            const cmd = erroringCommand();
+            const missing = cmd ? missingMandatoryOptions(cmd) : [];
+            if (cmd && missing.length > 1) {
+                emitStderr(JSON.stringify({
+                    success: false,
+                    error: `required options not specified for ${commandPath(cmd)}: ${missing.join(", ")}`,
+                    code: "USAGE",
+                    statusCode: 0,
+                    missingOptions: missing,
+                    hint: "usage error — run `ib <command> --help` for the exact arguments and flags, or `ib commands` to discover commands",
+                }) + "\n");
                 recordFriction(err, 4);
                 setExit(4);
                 return;

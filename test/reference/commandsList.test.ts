@@ -310,6 +310,27 @@ describe("assertKnownDomain tier-filtered error list", () => {
   });
 });
 
+describe("assertKnownDomain nested-subgroup did-you-mean", () => {
+  test("suggests the fully-qualified path when the token is a nested subgroup", () => {
+    let msg = "";
+    try { assertKnownDomain(COMMAND_SPECS, "changelog", "developer"); } catch (e) { msg = (e as Error).message; }
+    expect(msg).toContain("unknown domain: changelog");
+    expect(msg).toContain("Did you mean: `dev changelog`?");
+  });
+  test("does NOT leak a developer-only subgroup to a standard caller", () => {
+    let msg = "";
+    try { assertKnownDomain(COMMAND_SPECS, "changelog", "standard"); } catch (e) { msg = (e as Error).message; }
+    expect(msg).toContain("unknown domain: changelog");
+    expect(msg).not.toContain("Did you mean");
+    expect(msg).not.toContain("dev changelog");
+  });
+  test("no did-you-mean for a genuinely unknown token", () => {
+    let msg = "";
+    try { assertKnownDomain(COMMAND_SPECS, "bogusxyz", "developer"); } catch (e) { msg = (e as Error).message; }
+    expect(msg).not.toContain("Did you mean");
+  });
+});
+
 describe("tier filtering — domain index", () => {
   test("standard drops old top-level developer domains; dev umbrella still shows (has standard-visible leaves)", () => {
     const domains = buildDomainIndex(undefined, "standard").items.map(

@@ -2390,7 +2390,7 @@ const BASE_COMMAND_SPECS = [
             { name: "asiakas", type: "number", description: "Only rows owned by this asiakasId (client-side filter on ownerAsiakasId; combine with --all for another company's rows)" },
             { name: "jerry", type: "boolean", description: "BetoniJerry audit lens: only Jerry-enrolled varikot (jerryActiveUntil set; expired included), each stamped with a derived `matchable` boolean" },
         ],
-        outputShape: "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil, maxDeliveryDistance }> (+matchable:boolean on each row when --jerry is set; +truncated:true when the result hit the limit; +hint pointing at --all when 0 rows came back without --all)",
+        outputShape: "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil, maxDeliveryDistance }> (+matchable:boolean on each row when --jerry is set; +truncated:true when the result hit the limit; +hint pointing at --all / --all --asiakas <id> when 0 rows came back without --all)",
         errors: [
             { exit: 4, meaning: "Unknown or ambiguous --type name", remedy: "the error lists the valid types; or run `ib sijainti types`" },
             ...permErrors("auth.page.sijainnit.read"),
@@ -2399,7 +2399,7 @@ const BASE_COMMAND_SPECS = [
             "The list is capped (default 100 / max 500) with NO cursor — `truncated:true` flags a result that filled the limit (raise --limit or narrow with --search/--type). Backend signal needs a backend deployed ≥ 2026-06-11; the client-side --search slice sets it on every backend.",
             "typeName is joined client-side from the sijaintiTypes lookup (one extra GET, automatic); newer backends also emit it directly, plus ownerAsiakasId/ownerName.",
             "jerryActiveUntil (enrolment) + coords + maxDeliveryDistance (km delivery radius) are the set required for a Jerry-enabled varikko to be matchable — a row that is Jerry-active but has null coords or maxDeliveryDistance covers nothing. maxDeliveryDistance is deploy-gated (null on backends older than 2026-07-07). The optional boom range (puomiMin/puomiMax) is NOT in the list — get it via `ib sijainti get <id>`.",
-            "Supplier locations (betoniasemat, depots) usually belong to ANOTHER company — without --all they are invisible here even though `ib vehicle visits sijainti <id>` and the GPS timeline reference them. To resolve such a location by name use --search <name> --all. An empty result without --all carries a `hint` saying exactly this.",
+            "Supplier locations (betoniasemat, depots) usually belong to ANOTHER company — without --all they are invisible here even though `ib vehicle visits sijainti <id>` and the GPS timeline reference them. To resolve such a location by name use --search <name> --all, or --all --asiakas <id> when you know the owner company. An empty result without --all carries a `hint` saying exactly this.",
             "--all needs a backend deployed ≥ 2026-06-10; an older backend silently ignores it (returns the own+shared scope). --search works on every backend (client-side fallback).",
             "An unknown numeric --type id is passed through and simply returns zero rows; an unknown type NAME exits 4.",
             "--asiakas filters client-side on the server-emitted ownerAsiakasId field — needs a backend deployed ≥ 2026-06-11 (older backends omit the field, so it matches nothing).",
@@ -2493,7 +2493,7 @@ const BASE_COMMAND_SPECS = [
     },
     {
         command: "ib sijainti create",
-        description: "Create a new sijainti (POST /api/geocode/sijainti/add). REQUIRED: --name (sijaintiNimi) and --type (sijaintiTypeId). The CLI auto-fills the other NOT NULL columns the add proc needs: --lyh defaults to --name (truncated to 50 chars), --max-distance to 50, and --asiakas to your active company. Coordinates (--lat/--lng or --geocode) are persisted via a follow-up updateLatLng call (the add proc binds no lat/lng) and echoed as { lat, lng, coordsPersisted } so geocoding is verifiable without a re-read. Provide typed flags or --body JSON; typed flags win over --body.",
+        description: "Create a new sijainti (POST /api/geocode/sijainti/add). REQUIRED: --name (sijaintiNimi) and --type (sijaintiTypeId). The CLI auto-fills the other NOT NULL columns the add proc needs: --lyh defaults to --name (truncated to 50 chars), --max-distance is the general delivery radius in km (default 50; independent of BetoniJerry enrolment), and --asiakas to your active company. Coordinates (--lat/--lng or --geocode) are persisted via a follow-up updateLatLng call (the add proc binds no lat/lng) and echoed as { lat, lng, coordsPersisted } so geocoding is verifiable without a re-read. Provide typed flags or --body JSON; typed flags win over --body.",
         permissions: ["auth.page.sijainnit.edit"],
         flags: [
             { name: "body", type: "json", description: "JSON object with the new sijainti fields (optional if typed flags given)" },
@@ -2503,7 +2503,7 @@ const BASE_COMMAND_SPECS = [
             { name: "lat", type: "number", description: "Latitude (persisted via updateLatLng + echoed)" },
             { name: "lng", type: "number", description: "Longitude (persisted via updateLatLng + echoed)" },
             { name: "lyh", type: "string", description: "sijaintiLyh — short code/abbreviation, ≤50 chars (defaults to --name)" },
-            { name: "max-distance", type: "number", description: "maxDeliveryDistance in km (default 50)" },
+            { name: "max-distance", type: "number", description: "Delivery radius in km, stored as maxDeliveryDistance (default 50; not Jerry-only)" },
             { name: "asiakas", type: "number", description: "Owner asiakasId (defaults to your active company)" },
             { name: "puomi-min", type: "number", description: "puomiMin — smallest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)" },
             { name: "puomi-max", type: "number", description: "puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)" },
@@ -2526,7 +2526,7 @@ const BASE_COMMAND_SPECS = [
     },
     {
         command: "ib sijainti update",
-        description: "Update a sijainti via read-merge-write (GET current row + POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Omitted fields KEEP their current values (the save proc assigns directly — a sparse body would NULL e.g. jerryActiveUntil, dates, phone); pass an explicit null in --body to clear a field. An address change re-geocodes the new address automatically when no --lat/--lng are given (soft-fail: geocodeFailed echoed; --geocode forces re-resolution and fails fast). --lat/--lng are persisted via a follow-up updateLatLng call (the save proc itself binds no lat/lng) and echoed as { lat, lng, coordsPersisted }. Provide typed flags or --body JSON; typed flags win over --body.",
+        description: "Update a sijainti via read-merge-write (GET current row + POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Omitted fields KEEP their current values (the save proc assigns directly — a sparse body would NULL e.g. jerryActiveUntil, dates, phone); pass an explicit null in --body to clear a field. --max-distance is the general delivery radius in km (stored as maxDeliveryDistance), independent of BetoniJerry enrolment. An address change re-geocodes the new address automatically when no --lat/--lng are given (soft-fail: geocodeFailed echoed; --geocode forces re-resolution and fails fast). --lat/--lng are persisted via a follow-up updateLatLng call (the save proc itself binds no lat/lng) and echoed as { lat, lng, coordsPersisted }. Provide typed flags or --body JSON; typed flags win over --body.",
         permissions: ["auth.page.sijainnit.edit"],
         flags: [
             { name: "body", type: "json", description: "JSON object with fields to update (optional if typed flags given)" },
@@ -2537,7 +2537,7 @@ const BASE_COMMAND_SPECS = [
             { name: "lat", type: "number", description: "Latitude (persisted via updateLatLng + echoed)" },
             { name: "lng", type: "number", description: "Longitude (persisted via updateLatLng + echoed)" },
             { name: "lyh", type: "string", description: "sijaintiLyh — short code/abbreviation (≤50 chars)" },
-            { name: "max-distance", type: "number", description: "maxDeliveryDistance in km" },
+            { name: "max-distance", type: "number", description: "Delivery radius in km, stored as maxDeliveryDistance (not Jerry-only)" },
             { name: "puomi-min", type: "number", description: "puomiMin — smallest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)" },
             { name: "puomi-max", type: "number", description: "puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)" },
             { name: "geocode", type: "boolean", description: "Force re-resolving lat/lng from the address via Google Maps (fails fast on no match). Address changes auto-geocode even without this flag when no coordinates are given" },

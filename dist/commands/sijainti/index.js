@@ -430,9 +430,10 @@ export function resolveSijaintiTypeId(types, input) {
  * `owner` (--asiakas) is a client-side filter on `ownerAsiakasId` and uses the
  * same scan-then-slice path as `search`.
  *
- * An EMPTY result without `all` carries a `hint` pointing at `--all` (feedback
- * #30): supplier sijainnit belong to other companies and are invisible in the
- * default scope, so "0 rows" alone reads as "does not exist".
+ * An EMPTY result without `all` carries a `hint` pointing at `--all` and
+ * `--all --asiakas <id>` (feedback #30/#133): supplier sijainnit belong to
+ * other companies and are invisible in the default scope, so "0 rows" alone
+ * reads as "does not exist".
  */
 export async function runSijaintiListJoined(client, opts) {
     const types = await runSijaintiTypes(client);
@@ -487,7 +488,7 @@ export async function runSijaintiListJoined(client, opts) {
         out.truncated = true;
     if (items.length === 0 && !opts.all) {
         out.hint =
-            "0 rows in the default own+shared scope — supplier locations (betoniasemat, depots) belong to OTHER companies; retry with --all to search every company's sijainnit";
+            "0 rows in the default own+shared scope — supplier locations (betoniasemat, depots) belong to OTHER companies; retry with --all to search every company's sijainnit, or --all --asiakas <id> when you know the owner company";
     }
     return out;
 }
@@ -758,7 +759,7 @@ export function registerSijaintiCommands(parent, getClient) {
     const createCmd = s
         .command("create")
         .description("Create a new sijainti (POST /api/geocode/sijainti/add). Required: --name, --type. " +
-        "--lyh defaults to --name (≤50 chars), --max-distance to 50, --asiakas to your active company. " +
+        "--lyh defaults to --name (≤50 chars), --max-distance is the general delivery radius in km (default 50; independent of BetoniJerry enrolment), --asiakas to your active company. " +
         "--geocode resolves lat/lng from the address when coordinates are not given. " +
         "Coordinates (--lat/--lng or --geocode) are persisted via a follow-up updateLatLng " +
         "call and echoed back as { lat, lng, coordsPersisted } so geocoding is verifiable. " +
@@ -770,7 +771,7 @@ export function registerSijaintiCommands(parent, getClient) {
         .option("--lat <n>", "Latitude", Number)
         .option("--lng <n>", "Longitude", Number)
         .option("--lyh <s>", "sijaintiLyh — short code/abbreviation (≤50 chars; defaults to --name)")
-        .option("--max-distance <n>", "maxDeliveryDistance in km (default 50)", Number)
+        .option("--max-distance <n>", "Delivery radius in km, stored as maxDeliveryDistance (default 50; not Jerry-only)", Number)
         .option("--asiakas <id>", "Owner asiakasId (defaults to your active company)", Number)
         .option("--puomi-min <m>", "puomiMin — smallest boom (m) served from this sijainti (BetoniJerry matching)", Number)
         .option("--puomi-max <m>", "puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching)", Number)
@@ -832,6 +833,7 @@ export function registerSijaintiCommands(parent, getClient) {
         .command("update")
         .description("Update a sijainti (read-merge-write over POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Typed flags win over --body. " +
         "Omitted fields KEEP their current values (the save proc would otherwise NULL e.g. jerryActiveUntil and dates); pass an explicit null in --body to clear a field. " +
+        "--max-distance is the general delivery radius in km (stored as maxDeliveryDistance), independent of BetoniJerry enrolment. " +
         "An address change re-geocodes the new address automatically when no --lat/--lng are given (--geocode forces re-resolution). " +
         "Coords are persisted via a follow-up updateLatLng call (the save proc itself drops them) and echoed as { lat, lng, coordsPersisted }.")
         .option("--body <json>", "JSON object forwarded as the request body")
@@ -842,7 +844,7 @@ export function registerSijaintiCommands(parent, getClient) {
         .option("--lat <n>", "Latitude", Number)
         .option("--lng <n>", "Longitude", Number)
         .option("--lyh <s>", "sijaintiLyh — short code/abbreviation (≤50 chars)")
-        .option("--max-distance <n>", "maxDeliveryDistance in km", Number)
+        .option("--max-distance <n>", "Delivery radius in km, stored as maxDeliveryDistance (not Jerry-only)", Number)
         .option("--puomi-min <m>", "puomiMin — smallest boom (m) served from this sijainti (BetoniJerry matching)", Number)
         .option("--puomi-max <m>", "puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching)", Number)
         .option("--geocode", "Re-resolve lat/lng from the (changed) address via Google Maps when coordinates are not given (then persisted + echoed)");

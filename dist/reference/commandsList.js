@@ -4,6 +4,33 @@ import { domainBlurb } from "./domain.js";
 import { visibleSpecs, domainOf, hiddenDomainsAtTier } from "../tier.js";
 /** Single source for the write classification used by `ib commands`. */
 const isWriteSpec = (s) => s.mutates ?? !!s.writeFlags;
+function commandRelativePath(command) {
+    return command.replace(/^ib\s+/, "");
+}
+function nestedSubgroupPrefixes(specs) {
+    const bySubgroup = new Map();
+    for (const spec of specs) {
+        const [domain, subgroup, leaf] = commandRelativePath(spec.command).split(/\s+/);
+        if (!domain || !subgroup || !leaf)
+            continue;
+        const prefixes = bySubgroup.get(subgroup) ?? new Set();
+        prefixes.add(`${domain} ${subgroup}`);
+        bySubgroup.set(subgroup, prefixes);
+    }
+    return bySubgroup;
+}
+function resolveDomainFilter(specs, domain, tier) {
+    if (!domain)
+        return { kind: "none" };
+    if (commandDomains(specs).includes(domain))
+        return { kind: "domain", domain };
+    const prefixes = nestedSubgroupPrefixes(specs).get(domain);
+    if (prefixes?.size === 1) {
+        return { kind: "subgroup", relativePrefix: [...prefixes][0] };
+    }
+    assertKnownDomain(specs, domain, tier);
+    return { kind: "none" };
+}
 /** Unique, sorted set of command domains (the token after `ib`), derived from the specs. */
 export function commandDomains(specs) {
     return [...new Set(specs.map((s) => domainOf(s.command)).filter(Boolean))].sort();
@@ -29,8 +56,19 @@ export function fullyHiddenDomains(tier) {
 export function assertKnownDomain(specs, domain, tier = "developer") {
     const valid = commandDomains(specs); // FULL set — validation
     if (!valid.includes(domain)) {
-        const suggest = commandDomains(visibleSpecs(specs, tier)); // visible-only — suggestion
-        throw new CliError(`unknown domain: ${domain}. Valid: ${suggest.join(", ")}`, 0, null, 4);
+        const visible = visibleSpecs(specs, tier); // visible-only — never leak a hidden subtree
+        const suggest = commandDomains(visible);
+        // Did-you-mean when the unknown token is really a nested subgroup addressed
+        // by its bare leaf name (e.g. `changelog` → `dev changelog`). `ib commands
+        // <sub>` already resolves these in resolveDomainFilter; this covers the
+        // callers that hit the validator directly (`ib reference dump <sub>`, and
+        // subgroups that live under more than one domain). Tier-filtered so a
+        // developer-only subgroup is never suggested to a standard caller.
+        const subgroups = nestedSubgroupPrefixes(visible).get(domain);
+        const didYouMean = subgroups && subgroups.size
+            ? ` Did you mean: ${[...subgroups].map((p) => `\`${p}\``).join(" or ")}?`
+            : "";
+        throw new CliError(`unknown domain: ${domain}.${didYouMean} Valid: ${suggest.join(", ")}`, 0, null, 4);
     }
 }
 /**
@@ -43,15 +81,22 @@ export function filterCommandSpecs(specs, filter, tier = "developer") {
     if (filter.mutations && filter.reads) {
         throw new CliError("--mutations and --reads are mutually exclusive", 0, null, 4);
     }
-    // Validate against the FULL specs so an unknown domain still exit-4s, while a
-    // hidden-but-valid domain (e.g. `schema` at standard) yields an empty list.
-    if (filter.domain)
-        assertKnownDomain(specs, filter.domain, tier);
+    // Resolve against the FULL specs so a hidden-but-valid domain/subgroup at
+    // standard tier yields an empty list instead of leaking developer-only names.
+    const domainFilter = resolveDomainFilter(specs, filter.domain, tier);
     const needle = filter.permission?.toLowerCase();
     return visibleSpecs(specs, tier)
         .filter((s) => {
-        if (filter.domain && domainOf(s.command) !== filter.domain)
+        if (domainFilter.kind === "domain" && domainOf(s.command) !== domainFilter.domain) {
             return false;
+        }
+        if (domainFilter.kind === "subgroup") {
+            const relativePath = commandRelativePath(s.command);
+            if (relativePath !== domainFilter.relativePrefix &&
+                !relativePath.startsWith(`${domainFilter.relativePrefix} `)) {
+                return false;
+            }
+        }
         const mutates = isWriteSpec(s);
         if (filter.mutations && !mutates)
             return false;
