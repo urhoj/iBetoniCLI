@@ -3992,6 +3992,22 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib jerry coverage",
+    description:
+      "Developer view of BetoniJerry supply coverage: the candidate-area table (covered + not, with providerCount + region) plus every enrolled provider depot circle (company, lat/lng, delivery radius km, boom range). Reuses the live geofence rule (services/varikkoMatching + modules/betonijerry/coverageAreas), so it matches real request feasibility. Use it to align ad geo-targeting to actual supply.",
+    auth: "any",
+    tier: "developer",
+    flags: [],
+    outputShape:
+      "{ summary: { varikkoCount, providerCount, coveredAreas, coveredRegions: string[] }, coveredRegions: string[], areas: { key, listLocative, tailRegion, probeLat, probeLng, covered, providerCount }[], varikot: { asiakasId, asiakasNimi, sijaintiId, sijaintiNimi, lat, lng, maxDeliveryDistanceKm, puomiMin, puomiMax, jerryActiveUntil }[], computedAt } — `coveredRegions` (distinct tailRegions of covered areas) is the Google-Ads geo-targeting answer.",
+    errors: [
+      { exit: 2, meaning: "Not logged in / token expired", remedy: "ib auth login (or set IB_TOKEN)" },
+      apiErr(403, "Developer/sysadmin only (server-enforced)", "use a developer account token"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    examples: ["ib jerry coverage"],
+  },
+  {
     command: "ib jerry provider-settings get",
     description:
       "Read a provider company's BetoniJerry settings — contact person, opening hours, company description, maintainsOrderInfo (GET /api/jerry-provider-settings). Defaults to the caller's own company; --asiakas targets another company you have edit rights on. Returns defaults when no row exists yet.",

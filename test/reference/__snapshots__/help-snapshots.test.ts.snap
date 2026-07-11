@@ -3870,6 +3870,33 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib jerry coverage matches snapshot 1`] = `
+"USAGE
+  ib jerry coverage [flags]
+
+DESCRIPTION
+  Developer view of BetoniJerry supply coverage: the candidate-area table (covered + not, with providerCount + region) plus every enrolled provider depot circle (company, lat/lng, delivery radius km, boom range). Reuses the live geofence rule (services/varikkoMatching + modules/betonijerry/coverageAreas), so it matches real request feasibility. Use it to align ad geo-targeting to actual supply.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { summary: { varikkoCount, providerCount, coveredAreas, coveredRegions: string[] }, coveredRegions: string[], areas: { key, listLocative, tailRegion, probeLat, probeLng, covered, providerCount }[], varikot: { asiakasId, asiakasNimi, sijaintiId, sijaintiNimi, lat, lng, maxDeliveryDistanceKm, puomiMin, puomiMax, jerryActiveUntil }[], computedAt } — \`coveredRegions\` (distinct tailRegions of covered areas) is the Google-Ads geo-targeting answer.
+
+ERRORS (stderr, exit non-zero)
+  exit 2  Not logged in / token expired → ib auth login (or set IB_TOKEN)
+  exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry coverage
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib jerry offer accept matches snapshot 1`] = `
 "USAGE
   ib jerry offer accept <requestId> <offerId> [flags]

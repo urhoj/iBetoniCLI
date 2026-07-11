@@ -983,6 +983,18 @@ export function registerJerryCommands(
       }
     );
 
+  // coverage ─────────────────────────────────────────────────────────────────
+  j.command("coverage")
+    .description("Developer view of BetoniJerry supply coverage — covered areas + enrolled depot circles")
+    .action(async () => {
+      try {
+        const client = await getClient();
+        writeJson(await runJerryCoverage(client));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
   // provider-settings ──────────────────────────────────────────────────────────
   const ps = j
     .command("provider-settings")

@@ -180,6 +180,35 @@ export async function runJerryCheckAddress(client, opts) {
         body.asiakasId = opts.asiakas;
     return client.post("/api/pumppuRequests/checkAddress", body, { read: true });
 }
+/**
+ * Developer view of BetoniJerry supply coverage (GET /api/betonijerry/coverage-areas/detail;
+ * developer/admin only — 403 otherwise). Returns the candidate-area coverage table
+ * (covered + not, with providerCount) and the raw enrolled depot circles, then
+ * derives a summary + the distinct covered regions (the ad-geo-targeting answer).
+ */
+export async function runJerryCoverage(client) {
+    const data = await client.get("/api/betonijerry/coverage-areas/detail");
+    const areas = Array.isArray(data?.areas) ? data.areas : [];
+    const varikot = Array.isArray(data?.varikot) ? data.varikot : [];
+    const coveredRegions = [];
+    for (const a of areas) {
+        if (a.covered && typeof a.tailRegion === "string" && !coveredRegions.includes(a.tailRegion)) {
+            coveredRegions.push(a.tailRegion);
+        }
+    }
+    const providerIds = new Set(varikot.map((v) => v.asiakasId));
+    return {
+        summary: {
+            varikkoCount: varikot.length,
+            providerCount: providerIds.size,
+            coveredAreas: areas.filter((a) => a.covered).length,
+            coveredRegions,
+        },
+        coveredRegions,
+        areas,
+        varikot,
+    };
+}
 // ─── provider settings ──────────────────────────────────────────────────────
 /**
  * Read a provider company's BetoniJerry settings (GET /api/jerry-provider-settings).
@@ -625,6 +654,18 @@ export function registerJerryCommands(parent, getClient) {
         try {
             const client = await getClient();
             writeJson(await runJerryCheckAddress(client, opts));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    // coverage ─────────────────────────────────────────────────────────────────
+    j.command("coverage")
+        .description("Developer view of BetoniJerry supply coverage — covered areas + enrolled depot circles")
+        .action(async () => {
+        try {
+            const client = await getClient();
+            writeJson(await runJerryCoverage(client));
         }
         catch (e) {
             exitWithError(e);
