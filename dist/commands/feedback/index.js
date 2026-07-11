@@ -2,7 +2,7 @@ import { CliError } from "../../api/errors.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 import { parseId } from "../../targets.js";
 const KINDS = ["improvement", "bug", "idea", "legal"];
-const SCOPES = ["cli", "app", "jerry", "bsg2", "workspace", "other"];
+const SCOPES = ["cli", "app", "jerry", "bsg2", "workspace", "security", "ops", "other"];
 const STATUSES = ["open", "reviewed", "applied", "dismissed"];
 const SEVERITIES = ["critical", "major", "minor", "cosmetic"];
 const MAX_FREETEXT = 200;
@@ -272,7 +272,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .description("File a proposal/trouble report. Silent server-side; works under --read-only.")
         .option("--description <text>", "Alias for the positional description")
         .option("--kind <kind>", "improvement | bug | idea | legal", "improvement")
-        .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | other — product surface this feedback targets", "cli")
+        .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | other — product surface this feedback targets", "cli")
         .option("--command <argv>", "The ib command/argv that triggered the friction")
         .option("--error <msg>", "Error message you hit, if any")
         .option("--severity <sev>", "critical | major | minor | cosmetic (optional; most useful for --kind bug)")
@@ -304,7 +304,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .option("--all", "Include every status (open,reviewed,applied,dismissed); overrides the open+reviewed default")
         .option("--full", "Return untruncated description/resolution (default: capped at 200 chars)")
         .option("--kind <kind>", "improvement | bug | idea | legal")
-        .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | other")
+        .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | other")
         .option("--search <text>", "Substring match over description/command/resolution/errorText (deploy-gated)")
         .option("--limit <n>", "Max rows (default 50, cap 200)", Number)
         .option("--offset <n>", "Pagination offset", Number)
@@ -344,7 +344,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
     f.command("count")
         .description("Counts of feedback by status/kind/scope (developer-only)")
         .option("--kind <kind>", "improvement | bug | idea | legal")
-        .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | other")
+        .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | other")
         .action(async (opts) => {
         try {
             writeJson(await runFeedbackCount(await getClient(), opts));

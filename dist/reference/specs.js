@@ -4730,7 +4730,7 @@ const BASE_COMMAND_SPECS = [
         flags: [
             { name: "description", type: "string", description: "Alias for the positional description; if both are passed, they must match" },
             { name: "kind", type: "string", default: "improvement", description: "improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal)" },
-            { name: "scope", type: "string", default: "cli", description: "cli | app | jerry | bsg2 | workspace | other — which product surface this targets (routing key for triage; orthogonal to --kind)" },
+            { name: "scope", type: "string", default: "cli", description: "cli | app | jerry | bsg2 | workspace | security | ops | other — which product surface this targets (routing key for triage; orthogonal to --kind)" },
             { name: "command", type: "string", description: "The ib command/argv that triggered the friction" },
             { name: "error", type: "string", description: "Error message you hit, if any" },
             { name: "severity", type: "string", description: "critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug" },
@@ -4738,7 +4738,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|other (STRICT — unknown exits 4); --severity, when given, must be critical|major|minor|cosmetic" },
+            { exit: 4, meaning: "Validation", remedy: "description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|security|ops|other (STRICT — unknown exits 4); --severity, when given, must be critical|major|minor|cosmetic" },
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
@@ -4767,7 +4767,7 @@ const BASE_COMMAND_SPECS = [
             { name: "unresolved", type: "boolean", description: "Shortcut for --status open,reviewed (un-closed items) — same as the default; mutually exclusive with --status/--all" },
             { name: "all", type: "boolean", description: "Include every status (open,reviewed,applied,dismissed); overrides the open+reviewed default; mutually exclusive with --status/--unresolved" },
             { name: "kind", type: "string", description: "improvement | bug | idea | legal" },
-            { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | other" },
+            { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | other" },
             { name: "search", type: "string", description: "Substring match over description/command/resolution/errorText (deploy-gated)" },
             { name: "limit", type: "number", default: "50", description: "Max rows (cap 200)" },
             { name: "offset", type: "number", default: "0", description: "Pagination offset" },
@@ -4846,7 +4846,7 @@ const BASE_COMMAND_SPECS = [
         tier: "developer",
         flags: [
             { name: "kind", type: "string", description: "improvement | bug | idea | legal — count only this kind" },
-            { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | other — count only this scope" },
+            { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | other — count only this scope" },
         ],
         outputShape: "{ total, byStatus: { open, reviewed, applied, dismissed }, byKind, byScope, truncated?, hint? }",
         errors: [
