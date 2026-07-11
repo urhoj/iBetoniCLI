@@ -2337,6 +2337,46 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev feedback update matches snapshot 1`] = `
+"USAGE
+  ib dev feedback update <id> [flags]
+
+DESCRIPTION
+  Edit a filed row's classification (--scope/--kind/--severity) or its --description (developer-only). The correction twin of \`resolve\` (which sets status/note) — same PUT /api/feedback/:id endpoint. A real write, blocked under --read-only (exit 3). --dry-run previews the body client-side. Deploy-gated: an older backend ignores these fields and 400s on a status-less body.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <id> NUMBER    feedbackId (required)
+
+FLAGS
+  --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | other
+  --kind STRING    improvement | bug | idea | legal
+  --severity STRING    critical | major | minor | cosmetic
+  --description STRING    Replace the freetext description
+  --dry-run BOOLEAN    Print the update body without sending (client-side)
+  --full BOOLEAN    Return the full updated row instead of the compact ack
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  A compact ack { feedbackId, scope, kind, severity, updatedAt, description? } (description capped at 200 chars; the full row with --full). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → provide at least one of --scope/--kind/--severity/--description; enum values must be valid
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\`
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib dev feedback resolve
+
+EXAMPLES
+  ib dev feedback update 42 --scope security
+  ib dev feedback update 42 --kind bug --severity major
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev impersonation grants matches snapshot 1`] = `
 "USAGE
   ib dev impersonation grants <personId> [flags]

@@ -257,12 +257,62 @@ export async function runFeedbackResolve(client, id, input) {
     const row = await client.put(`/api/feedback/${id}`, body);
     return input.full ? row : compactAck(row);
 }
+/** Project an updated row to the compact edit-ack fields (description capped). */
+function compactUpdateAck(row) {
+    const ack = {};
+    for (const k of ["feedbackId", "scope", "kind", "severity", "updatedAt"]) {
+        if (k in row)
+            ack[k] = row[k];
+    }
+    if ("description" in row)
+        ack.description = truncateField(row.description).value;
+    return ack;
+}
+/**
+ * PUT /api/feedback/:id — developer edit of a filed row's classification
+ * (scope/kind/severity) or description; the correction twin of `resolve`
+ * (which sets status/note), same endpoint. A REAL write — blocked under
+ * --read-only (exit 3). `--dry-run` previews the body client-side. Deploy-gated:
+ * an older backend ignores these fields and 400s on a status-less body.
+ */
+export async function runFeedbackUpdate(client, id, input) {
+    if (input.scope !== undefined && !SCOPES.includes(input.scope)) {
+        throw new CliError(`--scope must be one of: ${SCOPES.join(", ")}`, 400, null, 4);
+    }
+    if (input.kind !== undefined && !KINDS.includes(input.kind)) {
+        throw new CliError(`--kind must be one of: ${KINDS.join(", ")}`, 400, null, 4);
+    }
+    if (input.severity !== undefined && !SEVERITIES.includes(input.severity)) {
+        throw new CliError(`--severity must be one of: ${SEVERITIES.join(", ")}`, 400, null, 4);
+    }
+    if (input.description !== undefined && !input.description.trim()) {
+        throw new CliError("--description must be non-empty", 400, null, 4);
+    }
+    const body = {};
+    if (input.scope !== undefined)
+        body.scope = input.scope;
+    if (input.kind !== undefined)
+        body.kind = input.kind;
+    if (input.severity !== undefined)
+        body.severity = input.severity;
+    if (input.description !== undefined)
+        body.description = input.description.trim();
+    if (Object.keys(body).length === 0) {
+        throw new CliError("Provide at least one of --scope / --kind / --severity / --description", 400, null, 4);
+    }
+    if (input.dryRun) {
+        return { dryRun: true, wouldSend: { method: "PUT", path: `/api/feedback/${id}`, body } };
+    }
+    const row = await client.put(`/api/feedback/${id}`, body);
+    return input.full ? row : compactUpdateAck(row);
+}
 /**
  * Register all `ib feedback` subcommands:
  *   create   POST /api/feedback   (any user; meta → read-only exempt)
  *   list     GET  /api/feedback   (developer-only)
  *   get      GET  /api/feedback/:id (developer-only)
- *   resolve  PUT  /api/feedback/:id (developer-only; a real write)
+ *   resolve  PUT  /api/feedback/:id (developer-only; status/note write)
+ *   update   PUT  /api/feedback/:id (developer-only; scope/kind/severity/description edit)
  */
 export function registerFeedbackCommands(parent, getClient, opts = {}) {
     const f = parent
@@ -336,6 +386,22 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .action(async (idStr, opts) => {
         try {
             writeJson(await runFeedbackResolve(await getClient(), parseId(idStr, "feedbackId"), opts));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    f.command("update <id>")
+        .description("Edit a filed row's classification (--scope/--kind/--severity) or --description (developer-only; a write)")
+        .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | other")
+        .option("--kind <kind>", "improvement | bug | idea | legal")
+        .option("--severity <sev>", "critical | major | minor | cosmetic")
+        .option("--description <text>", "Replace the freetext description")
+        .option("--dry-run", "Print the update body without sending (client-side)")
+        .option("--full", "Return the full updated row (default: a compact ack)")
+        .action(async (idStr, opts) => {
+        try {
+            writeJson(await runFeedbackUpdate(await getClient(), parseId(idStr, "feedbackId"), opts));
         }
         catch (e) {
             exitWithError(e);

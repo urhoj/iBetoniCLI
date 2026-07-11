@@ -5,6 +5,7 @@ import {
   runFeedbackList,
   runFeedbackGet,
   runFeedbackResolve,
+  runFeedbackUpdate,
   runFeedbackCount,
   resolveFeedbackCreateDescription,
   registerFeedbackCommands,
@@ -418,6 +419,85 @@ describe("ib feedback resolve", () => {
     put.mockResolvedValueOnce({ feedbackId: 42, status: "applied", description: "huge original" });
     const out = await runFeedbackResolve(mockClient, 42, { status: "applied", full: true });
     expect(out).toMatchObject({ feedbackId: 42, status: "applied", description: "huge original" });
+  });
+});
+
+// ─── update ──────────────────────────────────────────────────────────────────
+
+describe("ib feedback update", () => {
+  test("PUTs scope to /api/feedback/:id", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42, scope: "security" });
+    const out = await runFeedbackUpdate(mockClient, 42, { scope: "security" });
+    expect(put).toHaveBeenCalledWith("/api/feedback/42", { scope: "security" });
+    expect(out).toMatchObject({ scope: "security" });
+  });
+
+  test("PUTs kind + severity + trimmed description together", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42, kind: "bug", severity: "major" });
+    await runFeedbackUpdate(mockClient, 42, { kind: "bug", severity: "major", description: "  x  " });
+    expect(put).toHaveBeenCalledWith("/api/feedback/42", {
+      kind: "bug",
+      severity: "major",
+      description: "x",
+    });
+  });
+
+  test.each([
+    ["scope", { scope: "bogus" }],
+    ["kind", { kind: "bogus" }],
+    ["severity", { severity: "sev1" }],
+  ])("rejects an unknown %s (exit 4), no PUT", async (_label, input) => {
+    await expect(runFeedbackUpdate(mockClient, 1, input)).rejects.toThrowError(CliError);
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  test("requires at least one editable field", async () => {
+    await expect(runFeedbackUpdate(mockClient, 1, {})).rejects.toThrowError(CliError);
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  test("rejects a blank description", async () => {
+    await expect(
+      runFeedbackUpdate(mockClient, 1, { description: "   " })
+    ).rejects.toThrowError(CliError);
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  test("--dry-run previews the PUT body and never sends", async () => {
+    const out = await runFeedbackUpdate(mockClient, 42, { scope: "ops", dryRun: true });
+    expect(put).not.toHaveBeenCalled();
+    expect(out).toEqual({
+      dryRun: true,
+      wouldSend: { method: "PUT", path: "/api/feedback/42", body: { scope: "ops" } },
+    });
+  });
+
+  test("returns a compact ack by default (caps description, drops resolution)", async () => {
+    put.mockResolvedValueOnce({
+      feedbackId: 42,
+      scope: "security",
+      kind: "bug",
+      severity: "major",
+      updatedAt: "2026-07-11T00:00:00Z",
+      description: "d".repeat(250),
+      resolution: "should be dropped",
+    });
+    const out = await runFeedbackUpdate(mockClient, 42, { scope: "security" });
+    expect(out).toEqual({
+      feedbackId: 42,
+      scope: "security",
+      kind: "bug",
+      severity: "major",
+      updatedAt: "2026-07-11T00:00:00Z",
+      description: "d".repeat(200) + "...",
+    });
+    expect(out).not.toHaveProperty("resolution");
+  });
+
+  test("--full returns the whole updated row", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42, scope: "ops", resolution: "kept" });
+    const out = await runFeedbackUpdate(mockClient, 42, { scope: "ops", full: true });
+    expect(out).toMatchObject({ feedbackId: 42, scope: "ops", resolution: "kept" });
   });
 });
 
