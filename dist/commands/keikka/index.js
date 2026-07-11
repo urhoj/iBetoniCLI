@@ -8,6 +8,33 @@ import { parseId } from "../../targets.js";
 // Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
 export { resolveDate };
 /**
+ * Build the count:0 disambiguation hint (feedback #165). An AI seeing an empty
+ * list can't tell "no access" from "no data" from "date-filtered"; this spells
+ * it out: 0 rows on a 200/exit-0 is a PERMITTED-but-empty result (access denial
+ * is exit 3 / HTTP 403), names the searched window, flags the today-only default,
+ * and points at the two ways to see more (widen --from/--to, or `ib keikka latest`
+ * for the most recent match regardless of date).
+ */
+function zeroRowHint(range, opts) {
+    const window = range.from && range.to
+        ? range.from === range.to
+            ? range.from
+            : `${range.from}..${range.to}`
+        : "the requested window";
+    const today = todayHelsinki();
+    const scopedToToday = range.from === today && range.to === today;
+    const hasFilters = opts.customer !== undefined ||
+        opts.vehicle !== undefined ||
+        opts.worksite !== undefined ||
+        opts.status !== undefined;
+    return (`0 rows: no keikka in ${window}${hasFilters ? " matching the given filters" : ""}. ` +
+        `A 0 count on a successful (exit 0) query means no data in this window, NOT an access error ` +
+        `(denied access surfaces as exit 3 / HTTP 403). ` +
+        (scopedToToday ? "The default window is TODAY only. " : "") +
+        "Widen the range with --from/--to, or run `ib keikka latest` to fetch the most recent " +
+        "keikka regardless of date.");
+}
+/**
  * GET /api/cli/keikka/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
  */
@@ -33,7 +60,12 @@ export async function runKeikkaList(client, opts) {
     const envelope = await client.get(`/api/cli/keikka/list${qs ? `?${qs}` : ""}`);
     // Echo the interpreted date window so a count:0 result is self-evidently
     // scoped — without it an empty list is indistinguishable from a mis-aimed query.
-    return { ...envelope, range: { from: opts.from ?? null, to: opts.to ?? null } };
+    const range = { from: opts.from ?? null, to: opts.to ?? null };
+    // On an empty result add the "why zero rows" hint so an AI reader doesn't
+    // mistake permitted-but-empty for an access block (feedback #165).
+    return envelope.count === 0
+        ? { ...envelope, range, hint: zeroRowHint(range, opts) }
+        : { ...envelope, range };
 }
 /** Window sizes (days) walked backwards from today; the last size repeats until --lookback is covered. */
 const LATEST_WINDOW_DAYS = [7, 30, 90, 365];

@@ -4,6 +4,7 @@ import {
   runKeikkaGet,
   resolveDate,
 } from "../../src/commands/keikka/index.js";
+import { todayHelsinki } from "../../src/dates.js";
 import type { ApiClient } from "../../src/api/client.js";
 
 const mockClient = {
@@ -84,6 +85,50 @@ describe("ib keikka list/get", () => {
     await runKeikkaList(mockClient, { from: "2026-06-01", to: "2026-06-30", worksite: 42 });
     const url = (mockClient.get as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
     expect(url).toContain("worksite=42");
+  });
+
+  test("runKeikkaList: count:0 attaches a why-empty hint (feedback #165)", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      count: 0,
+    });
+    const result = await runKeikkaList(mockClient, {
+      from: "2026-06-01",
+      to: "2026-06-30",
+    });
+    expect(result.hint).toBeTruthy();
+    // Names the window, disambiguates from an access block, points at `latest`.
+    expect(result.hint).toContain("2026-06-01..2026-06-30");
+    expect(result.hint).toContain("exit 3");
+    expect(result.hint).toContain("ib keikka latest");
+    // A dated window is not the default → no today-only note.
+    expect(result.hint).not.toContain("TODAY only");
+  });
+
+  test("runKeikkaList: count:0 on the default today window flags today-only scoping", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [],
+      nextCursor: null,
+      count: 0,
+    });
+    const today = todayHelsinki();
+    const result = await runKeikkaList(mockClient, { from: today, to: today });
+    expect(result.hint).toContain("TODAY only");
+    expect(result.hint).toContain(today);
+  });
+
+  test("runKeikkaList: a non-empty result carries no hint", async () => {
+    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [{ keikkaId: 1, pvm: "2026-06-01" }],
+      nextCursor: null,
+      count: 1,
+    });
+    const result = await runKeikkaList(mockClient, {
+      from: "2026-06-01",
+      to: "2026-06-30",
+    });
+    expect(result.hint).toBeUndefined();
   });
 
   test("runKeikkaGet: GET /api/cli/keikka/get/9001", async () => {
