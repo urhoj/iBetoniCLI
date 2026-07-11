@@ -28,6 +28,28 @@ type Status = (typeof STATUSES)[number];
 const SEVERITIES = ["critical", "major", "minor", "cosmetic"] as const;
 type Severity = (typeof SEVERITIES)[number];
 
+// complexity = an AI-agent triage estimate (1-5), orthogonal to severity
+// (severity = urgency/impact; complexity = effort + how autonomously an agent
+// can act). 1 simple/autonomous · 2 simple/wants-input-proceeds-on-recommendation
+// · 3 complex/autonomous · 4 complex/needs-user · 5 very-complex/needs-user +
+// heavier model (opus/fable). See `ib help complexity`.
+const COMPLEXITY_MIN = 1;
+const COMPLEXITY_MAX = 5;
+
+/** Coerce+validate a complexity estimate to an integer in [1,5]; else exit 4. */
+function validateComplexity(value: unknown, flag = "--complexity"): number {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < COMPLEXITY_MIN || n > COMPLEXITY_MAX) {
+    throw new CliError(
+      `${flag} must be an integer ${COMPLEXITY_MIN}-${COMPLEXITY_MAX}`,
+      400,
+      null,
+      4
+    );
+  }
+  return n;
+}
+
 const MAX_FREETEXT = 200;
 const CAP = 200;
 const TRUNCATED_FIELDS = ["description", "resolution", "errorText"] as const;
@@ -62,13 +84,24 @@ function compactRow(
 /** Build the query string and GET a page of feedback rows (always an array). */
 async function fetchRows(
   client: ApiClient,
-  params: { status?: string; kind?: string; scope?: string; search?: string; limit?: number; offset?: number }
+  params: {
+    status?: string;
+    kind?: string;
+    scope?: string;
+    search?: string;
+    complexity?: number;
+    maxComplexity?: number;
+    limit?: number;
+    offset?: number;
+  }
 ): Promise<Record<string, unknown>[]> {
   const qs = new URLSearchParams();
   if (params.status) qs.set("status", params.status);
   if (params.kind) qs.set("kind", params.kind);
   if (params.scope) qs.set("scope", params.scope);
   if (params.search) qs.set("search", params.search);
+  if (params.complexity !== undefined) qs.set("complexity", String(params.complexity));
+  if (params.maxComplexity !== undefined) qs.set("maxComplexity", String(params.maxComplexity));
   if (params.limit !== undefined) qs.set("limit", String(params.limit));
   if (params.offset !== undefined) qs.set("offset", String(params.offset));
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
@@ -83,6 +116,7 @@ export interface FeedbackCreateInput {
   command?: string;
   error?: string;
   severity?: string;
+  complexity?: number;
   dryRun?: boolean;
 }
 
@@ -115,6 +149,7 @@ interface FeedbackCreateBody {
   command?: string;
   error?: string;
   severity?: Severity;
+  complexity?: number;
   context?: { conversationId: number };
 }
 
@@ -137,6 +172,7 @@ function buildCreateBody(input: FeedbackCreateInput): FeedbackCreateBody {
   if (input.command) body.command = input.command;
   if (input.error) body.error = input.error;
   if (input.severity) body.severity = input.severity as Severity;
+  if (input.complexity !== undefined) body.complexity = validateComplexity(input.complexity);
   const convId = Number(process.env.IB_CONVERSATION_ID);
   if (Number.isInteger(convId) && convId > 0) {
     body.context = { conversationId: convId };
@@ -212,6 +248,8 @@ export async function runFeedbackList(
     kind?: string;
     scope?: string;
     search?: string;
+    complexity?: number;
+    maxComplexity?: number;
     limit?: number;
     offset?: number;
     unresolved?: boolean;
@@ -229,13 +267,23 @@ export async function runFeedbackList(
       kind: opts.kind,
       scope: opts.scope,
       search: opts.search,
+      complexity: opts.complexity,
+      maxComplexity: opts.maxComplexity,
       limit: opts.limit,
       offset: opts.offset,
     });
   } else {
     const pages = await Promise.all(
       statuses.map((s) =>
-        fetchRows(client, { status: s, kind: opts.kind, scope: opts.scope, search: opts.search, limit: CAP })
+        fetchRows(client, {
+          status: s,
+          kind: opts.kind,
+          scope: opts.scope,
+          search: opts.search,
+          complexity: opts.complexity,
+          maxComplexity: opts.maxComplexity,
+          limit: CAP,
+        })
       )
     );
     if (pages.some((p) => p.length >= CAP)) truncated = true;
@@ -350,7 +398,7 @@ export async function runFeedbackResolve(
 /** Project an updated row to the compact edit-ack fields (description capped). */
 function compactUpdateAck(row: Record<string, unknown>): Record<string, unknown> {
   const ack: Record<string, unknown> = {};
-  for (const k of ["feedbackId", "scope", "kind", "severity", "updatedAt"]) {
+  for (const k of ["feedbackId", "scope", "kind", "severity", "complexity", "updatedAt"]) {
     if (k in row) ack[k] = row[k];
   }
   if ("description" in row) ack.description = truncateField(row.description).value;
@@ -361,6 +409,7 @@ export interface FeedbackUpdateInput {
   scope?: string;
   kind?: string;
   severity?: string;
+  complexity?: number;
   description?: string;
   dryRun?: boolean;
   full?: boolean;
@@ -394,10 +443,11 @@ export async function runFeedbackUpdate(
   if (input.scope !== undefined) body.scope = input.scope;
   if (input.kind !== undefined) body.kind = input.kind;
   if (input.severity !== undefined) body.severity = input.severity;
+  if (input.complexity !== undefined) body.complexity = validateComplexity(input.complexity);
   if (input.description !== undefined) body.description = input.description.trim();
   if (Object.keys(body).length === 0) {
     throw new CliError(
-      "Provide at least one of --scope / --kind / --severity / --description",
+      "Provide at least one of --scope / --kind / --severity / --complexity / --description",
       400,
       null,
       4
@@ -441,6 +491,11 @@ export function registerFeedbackCommands(
     .option("--command <argv>", "The ib command/argv that triggered the friction")
     .option("--error <msg>", "Error message you hit, if any")
     .option("--severity <sev>", "critical | major | minor | cosmetic (optional; most useful for --kind bug)")
+    .option(
+      "--complexity <n>",
+      "1-5 agent-triage estimate: 1 simple+autonomous · 2 simple+wants-input · 3 complex+autonomous · 4 complex+needs-user · 5 very-complex+needs-user & heavier model (see `ib help complexity`)",
+      Number
+    )
     .option("--dry-run", "Print the payload without sending (client-side)")
     .action(
       async (
@@ -452,6 +507,7 @@ export function registerFeedbackCommands(
           command?: string;
           error?: string;
           severity?: string;
+          complexity?: number;
           dryRun?: boolean;
         }
       ) => {
@@ -468,6 +524,7 @@ export function registerFeedbackCommands(
               command: opts.command,
               error: opts.error,
               severity: opts.severity,
+              complexity: opts.complexity,
               dryRun: opts.dryRun,
             })
           );
@@ -486,6 +543,8 @@ export function registerFeedbackCommands(
     .option("--kind <kind>", "improvement | bug | idea | legal")
     .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | other")
     .option("--search <text>", "Substring match over description/command/resolution/errorText (deploy-gated)")
+    .option("--complexity <n>", "Only items with this exact complexity (1-5)", Number)
+    .option("--max-complexity <n>", "Only items with complexity <= n — the autonomously-workable slice (deploy-gated)", Number)
     .option("--limit <n>", "Max rows (default 50, cap 200)", Number)
     .option("--offset <n>", "Pagination offset", Number)
     .action(
@@ -494,6 +553,8 @@ export function registerFeedbackCommands(
         kind?: string;
         scope?: string;
         search?: string;
+        complexity?: number;
+        maxComplexity?: number;
         limit?: number;
         offset?: number;
         unresolved?: boolean;
@@ -547,6 +608,7 @@ export function registerFeedbackCommands(
     .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | other")
     .option("--kind <kind>", "improvement | bug | idea | legal")
     .option("--severity <sev>", "critical | major | minor | cosmetic")
+    .option("--complexity <n>", "1-5 agent-triage estimate — promote/downgrade after investigation (see `ib help complexity`)", Number)
     .option("--description <text>", "Replace the freetext description")
     .option("--dry-run", "Print the update body without sending (client-side)")
     .option("--full", "Return the full updated row (default: a compact ack)")
@@ -557,6 +619,7 @@ export function registerFeedbackCommands(
           scope?: string;
           kind?: string;
           severity?: string;
+          complexity?: number;
           description?: string;
           dryRun?: boolean;
           full?: boolean;

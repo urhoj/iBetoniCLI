@@ -154,6 +154,22 @@ describe("ib feedback create", () => {
       runFeedbackCreate(mockClient, { description: "d", severity: "sev1" })
     ).rejects.toMatchObject({ exitCode: 4 });
   });
+
+  test("create threads a valid complexity into the body", async () => {
+    post.mockResolvedValueOnce({ feedbackId: 1 });
+    await runFeedbackCreate(mockClient, { description: "d", complexity: 3 });
+    expect(post.mock.calls[0][1]).toMatchObject({ complexity: 3 });
+  });
+
+  test.each([0, 6, 2.5, NaN])(
+    "create rejects out-of-range complexity %s (exit 4), no POST",
+    async (complexity) => {
+      await expect(
+        runFeedbackCreate(mockClient, { description: "d", complexity })
+      ).rejects.toMatchObject({ exitCode: 4 });
+      expect(post).not.toHaveBeenCalled();
+    }
+  );
 });
 
 // ─── /ai conversation provenance ─────────────────────────────────────────────
@@ -243,6 +259,20 @@ describe("ib feedback list", () => {
     get.mockResolvedValueOnce([]);
     await runFeedbackList(mockClient, { status: "open", search: "IDOR" });
     expect(get).toHaveBeenCalledWith("/api/feedback?status=open&search=IDOR");
+  });
+
+  test("forwards --max-complexity to each default-bucket page", async () => {
+    get.mockResolvedValueOnce([]);
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { maxComplexity: 3 });
+    expect(get).toHaveBeenNthCalledWith(1, "/api/feedback?status=open&maxComplexity=3&limit=200");
+    expect(get).toHaveBeenNthCalledWith(2, "/api/feedback?status=reviewed&maxComplexity=3&limit=200");
+  });
+
+  test("forwards exact --complexity on the single-status path", async () => {
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { status: "open", complexity: 5 });
+    expect(get).toHaveBeenCalledWith("/api/feedback?status=open&complexity=5");
   });
 
   test("forwards --search to every page on the multi-status fan-out", async () => {
@@ -446,9 +476,17 @@ describe("ib feedback update", () => {
     ["scope", { scope: "bogus" }],
     ["kind", { kind: "bogus" }],
     ["severity", { severity: "sev1" }],
+    ["complexity", { complexity: 9 }],
   ])("rejects an unknown %s (exit 4), no PUT", async (_label, input) => {
     await expect(runFeedbackUpdate(mockClient, 1, input)).rejects.toThrowError(CliError);
     expect(put).not.toHaveBeenCalled();
+  });
+
+  test("promotes complexity on its own (the promote-after-investigation path)", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42, complexity: 4 });
+    const out = await runFeedbackUpdate(mockClient, 42, { complexity: 4 });
+    expect(put).toHaveBeenCalledWith("/api/feedback/42", { complexity: 4 });
+    expect(out).toMatchObject({ complexity: 4 });
   });
 
   test("requires at least one editable field", async () => {

@@ -136,6 +136,12 @@ export const TOPICS: Topic[] = [
     body:
       "LOCAL: `attachment upload <file> --<entity> <id>` does mint->PUT->register in one step; `attachment download <id>` saves to disk. REMOTE (/api/cli/exec, MCP): upload/download are DENIED (they would touch the SERVER's filesystem). Instead: `attachment upload-url --name f.ext` -> PUT the bytes yourself (header x-ms-blob-type: BlockBlob) -> `attachment register ...`; for downloads run `attachment get <id>` and fetch blobUrl yourself (expires in 1h). Groups/types are NAMES or ids — legend: `ib attachment types`. delete is irreversible (blob hard-delete) and needs --reason.",
   },
+  {
+    id: "complexity",
+    title: "Feedback complexity (AI-agent triage 1-5)",
+    body:
+      "`feedback create/update --complexity <1-5>` is a self-estimated difficulty+autonomy grade, ORTHOGONAL to --severity (severity = urgency/impact; complexity = effort + can an agent act unattended). Ladder: 1 = simple, an agent fixes it autonomously with no questions; 2 = simple, benefits from user input but proceeds on a recommended approach; 3 = complex but still autonomous; 4 = complex, needs user feedback; 5 = very complex, needs user feedback AND a heavier model (opus/fable). Workflow: a batch-fix agent pulls `feedback list --max-complexity 3 --unresolved` (ascending is the natural order — bank cheap wins first) and works them in sequence; if investigation reveals more than the initial estimate, PROMOTE with `feedback update <id> --complexity 4` so it drops out of the autonomous slice into the human-gated bucket. The filing agent sets the initial estimate; treat `<=3` as \"attempt, then bail/promote if reality disagrees\", not a guarantee.",
+  },
 ];
 
 /**

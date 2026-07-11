@@ -4748,11 +4748,12 @@ const BASE_COMMAND_SPECS = [
             { name: "command", type: "string", description: "The ib command/argv that triggered the friction" },
             { name: "error", type: "string", description: "Error message you hit, if any" },
             { name: "severity", type: "string", description: "critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug" },
+            { name: "complexity", type: "number", description: "1-5 agent-triage estimate (orthogonal to --severity): 1 simple+autonomous · 2 simple+wants-input · 3 complex+autonomous · 4 complex+needs-user · 5 very-complex+needs-user & heavier model. Lets a batch-fix agent pull `list --max-complexity 3`. See `ib help complexity`." },
             { name: "dry-run", type: "boolean", description: "Print the payload without sending (client-side)" },
         ],
         outputShape: "{ feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|security|ops|other (STRICT — unknown exits 4); --severity, when given, must be critical|major|minor|cosmetic" },
+            { exit: 4, meaning: "Validation", remedy: "description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|security|ops|other (STRICT — unknown exits 4); --severity, when given, must be critical|major|minor|cosmetic; --complexity, when given, must be an integer 1-5" },
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
@@ -4769,6 +4770,7 @@ const BASE_COMMAND_SPECS = [
             'ib dev feedback create "TOS 2.0 lacks a clause covering the AI assistant features; draft update suggested" --kind legal',
             'ib dev feedback create "Jerry inbox should show boom length on request cards" --scope jerry --kind idea',
             'ib dev feedback create "keikka editor throws on save" --kind bug --severity major',
+            'ib dev feedback create "add row counts to schema table output" --kind idea --complexity 2',
         ],
     },
     {
@@ -4783,6 +4785,8 @@ const BASE_COMMAND_SPECS = [
             { name: "kind", type: "string", description: "improvement | bug | idea | legal" },
             { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | other" },
             { name: "search", type: "string", description: "Substring match over description/command/resolution/errorText (deploy-gated)" },
+            { name: "complexity", type: "number", description: "Only items with this exact complexity 1-5 (deploy-gated)" },
+            { name: "max-complexity", type: "number", description: "Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls (deploy-gated)" },
             { name: "limit", type: "number", default: "50", description: "Max rows (cap 200)" },
             { name: "offset", type: "number", default: "0", description: "Pagination offset" },
             { name: "full", type: "boolean", description: "Return untruncated description/resolution (default: each capped at 200 chars)" },
@@ -4797,6 +4801,7 @@ const BASE_COMMAND_SPECS = [
         notes: [
             "Default scope is the active bucket (open + reviewed). Pass --all to include closed (applied/dismissed) items, or --status applied to target them.",
             "--search is a server-side substring filter added in a later backend version; against an older backend it is silently ignored (the list returns unfiltered) — deploy-gated.",
+            "--complexity / --max-complexity filter on the AI-triage complexity estimate (1-5). `--max-complexity 3 --unresolved` is the autonomously-workable backlog for a batch-fix agent; also deploy-gated (ignored by an older backend).",
         ],
         examples: [
             "ib dev feedback list",
@@ -4804,6 +4809,7 @@ const BASE_COMMAND_SPECS = [
             "ib dev feedback list --status applied --scope cli",
             "ib dev feedback list --kind bug --limit 20",
             "ib dev feedback list --search IDOR",
+            "ib dev feedback list --max-complexity 3 --unresolved",
         ],
     },
     {
@@ -4855,7 +4861,7 @@ const BASE_COMMAND_SPECS = [
     },
     {
         command: "ib dev feedback update",
-        description: "Edit a filed row's classification (--scope/--kind/--severity) or its --description (developer-only). The correction twin of `resolve` (which sets status/note) — same PUT /api/feedback/:id endpoint. A real write, blocked under --read-only (exit 3). --dry-run previews the body client-side. Deploy-gated: an older backend ignores these fields and 400s on a status-less body.",
+        description: "Edit a filed row's classification (--scope/--kind/--severity/--complexity) or its --description (developer-only). The correction twin of `resolve` (which sets status/note) — same PUT /api/feedback/:id endpoint. A real write, blocked under --read-only (exit 3). --dry-run previews the body client-side. Deploy-gated: an older backend ignores these fields and 400s on a status-less body.",
         permissions: ["isSystemAdmin or isDeveloper"],
         tier: "developer",
         mutates: true,
@@ -4864,13 +4870,14 @@ const BASE_COMMAND_SPECS = [
             { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | other" },
             { name: "kind", type: "string", description: "improvement | bug | idea | legal" },
             { name: "severity", type: "string", description: "critical | major | minor | cosmetic" },
+            { name: "complexity", type: "number", description: "1-5 agent-triage estimate — promote/downgrade after investigation (see `ib help complexity`)" },
             { name: "description", type: "string", description: "Replace the freetext description" },
             { name: "dry-run", type: "boolean", description: "Print the update body without sending (client-side)" },
             { name: "full", type: "boolean", description: "Return the full updated row instead of the compact ack" },
         ],
-        outputShape: "A compact ack { feedbackId, scope, kind, severity, updatedAt, description? } (description capped at 200 chars; the full row with --full). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
+        outputShape: "A compact ack { feedbackId, scope, kind, severity, complexity, updatedAt, description? } (description capped at 200 chars; the full row with --full). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "provide at least one of --scope/--kind/--severity/--description; enum values must be valid" },
+            { exit: 4, meaning: "Validation", remedy: "provide at least one of --scope/--kind/--severity/--complexity/--description; enum values must be valid; --complexity must be an integer 1-5" },
             apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
             apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
             apiErr(500, "Backend error", "retry with --verbose"),
@@ -4879,6 +4886,7 @@ const BASE_COMMAND_SPECS = [
         examples: [
             "ib dev feedback update 42 --scope security",
             "ib dev feedback update 42 --kind bug --severity major",
+            "ib dev feedback update 42 --complexity 4",
         ],
     },
     {
