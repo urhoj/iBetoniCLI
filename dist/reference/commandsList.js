@@ -31,6 +31,31 @@ function resolveDomainFilter(specs, domain, tier) {
     assertKnownDomain(specs, domain, tier);
     return { kind: "none" };
 }
+/**
+ * Resolve a discovery token (the arg to `ib commands <x>` / `ib reference dump
+ * <x>`) into a spec predicate. Accepts a top-level domain (the token after `ib`)
+ * OR a bare nested-subgroup name that lives under exactly one domain (e.g.
+ * `changelog` → `dev changelog`) — the same aliases the executable command
+ * surface accepts as hidden runtime paths after the 2026-06-30 `ib dev`
+ * re-homing. Unknown token → exit-4 `CliError` (via {@link assertKnownDomain},
+ * tier-filtered suggestions). Shared by `ib commands` ({@link filterCommandSpecs})
+ * and `ib reference dump` (`buildReference`) so the two discovery surfaces
+ * resolve tokens identically and can never drift (feedback #137).
+ */
+export function specMatcherForToken(specs, token, tier = "developer") {
+    const filter = resolveDomainFilter(specs, token, tier);
+    if (filter.kind === "subgroup") {
+        const prefix = filter.relativePrefix;
+        return (s) => {
+            const rel = commandRelativePath(s.command);
+            return rel === prefix || rel.startsWith(`${prefix} `);
+        };
+    }
+    // "domain" (or the unreachable "none": token is defined and resolveDomainFilter
+    // throws on an unknown token before returning "none").
+    const domain = filter.kind === "domain" ? filter.domain : token;
+    return (s) => domainOf(s.command) === domain;
+}
 /** Unique, sorted set of command domains (the token after `ib`), derived from the specs. */
 export function commandDomains(specs) {
     return [...new Set(specs.map((s) => domainOf(s.command)).filter(Boolean))].sort();
@@ -83,20 +108,16 @@ export function filterCommandSpecs(specs, filter, tier = "developer") {
     }
     // Resolve against the FULL specs so a hidden-but-valid domain/subgroup at
     // standard tier yields an empty list instead of leaking developer-only names.
-    const domainFilter = resolveDomainFilter(specs, filter.domain, tier);
+    // The domain/subgroup matcher is shared with `ib reference dump` so the two
+    // surfaces resolve a token identically (feedback #137).
+    const matchesToken = filter.domain
+        ? specMatcherForToken(specs, filter.domain, tier)
+        : () => true;
     const needle = filter.permission?.toLowerCase();
     return visibleSpecs(specs, tier)
         .filter((s) => {
-        if (domainFilter.kind === "domain" && domainOf(s.command) !== domainFilter.domain) {
+        if (!matchesToken(s))
             return false;
-        }
-        if (domainFilter.kind === "subgroup") {
-            const relativePath = commandRelativePath(s.command);
-            if (relativePath !== domainFilter.relativePrefix &&
-                !relativePath.startsWith(`${domainFilter.relativePrefix} `)) {
-                return false;
-            }
-        }
         const mutates = isWriteSpec(s);
         if (filter.mutations && !mutates)
             return false;

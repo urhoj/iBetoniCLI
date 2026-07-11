@@ -3,6 +3,7 @@ import type { Command } from "commander";
 import { buildProgram } from "../../src/program.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
 import { buildCommandsList, buildDomainIndex, assertKnownDomain } from "../../src/reference/commandsList.js";
+import { buildReference } from "../../src/reference/dump.js";
 
 function paths(root: Command): Set<string> {
   const set = new Set<string>();
@@ -43,6 +44,16 @@ describe("ib dev umbrella", () => {
     const changelog = buildCommandsList({ domain: "changelog" }, "developer");
     expect(changelog.items.map((i) => i.command)).toContain("ib dev changelog add");
     expect(changelog.items.every((i) => i.command.startsWith("ib dev changelog "))).toBe(true);
+  });
+
+  test("reference dump resolves old subgroup aliases too, like `ib commands` (feedback #137)", () => {
+    // `ib reference dump changelog` must mirror `ib commands changelog`, not throw
+    // `unknown domain` — both surfaces resolve the bare `dev` subgroup alias.
+    const cmds = Object.keys(buildReference("changelog", "developer").commands);
+    expect(cmds).toContain("ib dev changelog add");
+    expect(cmds.every((c) => c.startsWith("ib dev changelog "))).toBe(true);
+    // A genuinely unknown token still throws exit-4.
+    expect(() => buildReference("bug", "developer")).toThrowError(/unknown domain/);
   });
 
   test("`dev` is visible at standard tier but shows fewer leaves than at developer", () => {

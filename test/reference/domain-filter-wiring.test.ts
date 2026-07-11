@@ -39,6 +39,18 @@ describe("domain positional wiring", () => {
     expect(Array.isArray(ref.glossary)).toBe(true);
   });
 
+  test("ib reference dump <dev-subgroup> narrows like `ib commands` (feedback #137)", async () => {
+    // `changelog` is a bare alias for the `dev changelog` subgroup; reference dump
+    // must resolve it (not throw `unknown domain`) exactly as `ib commands` does.
+    // --commands-only keeps it offline (skips the glossary DB fetch).
+    const ref = JSON.parse(
+      await runCapture(["reference", "dump", "changelog", "--commands-only"])
+    );
+    const cmds = Object.keys(ref.commands);
+    expect(cmds.length).toBeGreaterThan(0);
+    expect(cmds.every((c) => c.startsWith("ib dev changelog "))).toBe(true);
+  });
+
   test("ib reference dump <d1> <d2> --commands-only: both groups, no primer", async () => {
     // --commands-only skips the glossary fetch, so this parses fully offline.
     const ref = JSON.parse(

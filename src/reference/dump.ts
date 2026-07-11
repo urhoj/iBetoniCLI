@@ -9,7 +9,7 @@
  * out of sync — there is exactly one source of truth (`./specs.ts`).
  */
 import { COMMAND_SPECS, COMMON_AUTH_ERRORS } from "./specs.js";
-import { assertKnownDomain } from "./commandsList.js";
+import { specMatcherForToken } from "./commandsList.js";
 import {
   DOMAIN_OVERVIEW,
   FEEDBACK_GUIDANCE,
@@ -146,8 +146,11 @@ function stripProse(spec: CommandSpec): CommandSpec {
  * `ib`) while the primer (overview/glossary/topics/feedbackGuidance) is kept in
  * full — it is small, high-value context that keeps a filtered dump
  * self-contained, and emitted ONCE no matter how many domains are passed (so
- * `dump ai attachment` beats two single-domain dumps). Unknown domain → exit-4
- * CliError (via assertKnownDomain). At a non-developer tier each surviving
+ * `dump ai attachment` beats two single-domain dumps). Each `domain` may be a
+ * top-level domain OR a bare nested-subgroup alias (`changelog` → `dev
+ * changelog`), resolved via {@link specMatcherForToken} exactly like `ib
+ * commands` (feedback #137). Unknown domain → exit-4 CliError. At a
+ * non-developer tier each surviving
  * spec's prose is run through `scrubSpecForTier` so no cross-reference leaks a
  * hidden command path.
  */
@@ -160,9 +163,12 @@ export function buildReference(
   let specs = visibleSpecs(COMMAND_SPECS, tier);
   const domains = domain == null ? [] : Array.isArray(domain) ? domain : [domain];
   if (domains.length) {
-    for (const d of domains) assertKnownDomain(COMMAND_SPECS, d, tier);
-    const wanted = new Set(domains);
-    specs = specs.filter((s) => wanted.has(s.command.split(" ")[1]));
+    // Resolve each token the same way `ib commands` does — a top-level domain OR
+    // a bare nested-subgroup alias (e.g. `changelog` → `dev changelog`), so
+    // `reference dump changelog` mirrors `ib commands changelog` (feedback #137).
+    // Unknown token still throws exit-4 via the shared resolver.
+    const matchers = domains.map((d) => specMatcherForToken(COMMAND_SPECS, d, tier));
+    specs = specs.filter((s) => matchers.some((m) => m(s)));
   }
   const hiddenCommands = COMMAND_SPECS.filter((s) => isHiddenAtTier(s, tier)).map(
     (s) => s.command
