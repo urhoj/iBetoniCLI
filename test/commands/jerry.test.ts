@@ -7,6 +7,7 @@ import {
   runJerryRequestCancel,
   runJerryCounts,
   runJerryCheckAddress,
+  runJerryCoverage,
   runJerryProviderSettingsGet,
   runJerryProviderSettingsSet,
   runJerryAdminList,
@@ -513,5 +514,45 @@ describe("ib jerry admin request write commands", () => {
     const result = await runJerryAdminRequestGet(mockClient, 41);
     expect(get).toHaveBeenCalledWith("/api/admin/jerry-requests/41");
     expect(result).toEqual({ pumppuRequestId: 41, status: "open" });
+  });
+});
+
+describe("ib jerry coverage", () => {
+  test("derives summary + coveredRegions from the endpoint payload", async () => {
+    get.mockResolvedValueOnce({
+      areas: [
+        { key: "pks", tailRegion: "Etelä-Suomessa", covered: true, providerCount: 3 },
+        { key: "tampere", tailRegion: "Etelä-Suomessa", covered: true, providerCount: 2 },
+        { key: "jyvaskyla", tailRegion: "Keski-Suomessa", covered: true, providerCount: 2 },
+        { key: "oulu", tailRegion: "Pohjois-Suomessa", covered: false, providerCount: 0 },
+      ],
+      varikot: [
+        { asiakasId: 1390, asiakasNimi: "RSC Trans Oy" },
+        { asiakasId: 1390, asiakasNimi: "RSC Trans Oy" },
+        { asiakasId: 1377, asiakasNimi: "Betonipumppaus Roine Oy" },
+      ],
+      computedAt: "2026-07-11T10:00:00.000Z",
+    });
+    const result = await runJerryCoverage(mockClient);
+    expect(get).toHaveBeenCalledWith("/api/betonijerry/coverage-areas/detail");
+    expect(result.summary).toEqual({
+      varikkoCount: 3,
+      providerCount: 2,
+      coveredAreas: 3,
+      coveredRegions: ["Etelä-Suomessa", "Keski-Suomessa"],
+    });
+    expect(result.coveredRegions).toEqual(["Etelä-Suomessa", "Keski-Suomessa"]);
+    expect((result.varikot as unknown[]).length).toBe(3);
+  });
+
+  test("tolerates an empty / non-object body", async () => {
+    get.mockResolvedValueOnce(null);
+    const result = await runJerryCoverage(mockClient);
+    expect(result).toEqual({
+      summary: { varikkoCount: 0, providerCount: 0, coveredAreas: 0, coveredRegions: [] },
+      coveredRegions: [],
+      areas: [],
+      varikot: [],
+    });
   });
 });

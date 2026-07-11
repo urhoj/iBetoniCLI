@@ -320,6 +320,44 @@ export async function runJerryCheckAddress(
   return client.post<Row>("/api/pumppuRequests/checkAddress", body, { read: true });
 }
 
+// ─── coverage (developer supply map) ─────────────────────────────────────────
+
+interface CoverageArea { covered?: boolean; tailRegion?: string; [k: string]: unknown }
+
+/**
+ * Developer view of BetoniJerry supply coverage (GET /api/betonijerry/coverage-areas/detail;
+ * developer/admin only — 403 otherwise). Returns the candidate-area coverage table
+ * (covered + not, with providerCount) and the raw enrolled depot circles, then
+ * derives a summary + the distinct covered regions (the ad-geo-targeting answer).
+ */
+export async function runJerryCoverage(client: ApiClient): Promise<Row> {
+  const data = await client.get<{ areas?: CoverageArea[]; varikot?: Row[] }>(
+    "/api/betonijerry/coverage-areas/detail"
+  );
+  const areas = Array.isArray(data?.areas) ? data.areas : [];
+  const varikot = Array.isArray(data?.varikot) ? data.varikot : [];
+
+  const coveredRegions: string[] = [];
+  for (const a of areas) {
+    if (a.covered && typeof a.tailRegion === "string" && !coveredRegions.includes(a.tailRegion)) {
+      coveredRegions.push(a.tailRegion);
+    }
+  }
+  const providerIds = new Set(varikot.map((v) => v.asiakasId));
+
+  return {
+    summary: {
+      varikkoCount: varikot.length,
+      providerCount: providerIds.size,
+      coveredAreas: areas.filter((a) => a.covered).length,
+      coveredRegions,
+    },
+    coveredRegions,
+    areas,
+    varikot,
+  };
+}
+
 // ─── provider settings ──────────────────────────────────────────────────────
 
 /**
