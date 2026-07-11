@@ -331,7 +331,7 @@ interface CoverageArea { covered?: boolean; tailRegion?: string; [k: string]: un
  * derives a summary + the distinct covered regions (the ad-geo-targeting answer).
  */
 export async function runJerryCoverage(client: ApiClient): Promise<Row> {
-  const data = await client.get<{ areas?: CoverageArea[]; varikot?: Row[] }>(
+  const data = await client.get<{ areas?: CoverageArea[]; varikot?: Row[]; computedAt?: string }>(
     "/api/betonijerry/coverage-areas/detail"
   );
   const areas = Array.isArray(data?.areas) ? data.areas : [];
@@ -344,6 +344,7 @@ export async function runJerryCoverage(client: ApiClient): Promise<Row> {
     }
   }
   const providerIds = new Set(varikot.map((v) => v.asiakasId));
+  const computedAt = typeof data?.computedAt === "string" ? data.computedAt : null;
 
   return {
     summary: {
@@ -355,6 +356,7 @@ export async function runJerryCoverage(client: ApiClient): Promise<Row> {
     coveredRegions,
     areas,
     varikot,
+    computedAt,
   };
 }
 

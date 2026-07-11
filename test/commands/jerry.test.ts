@@ -543,6 +543,7 @@ describe("ib jerry coverage", () => {
     });
     expect(result.coveredRegions).toEqual(["Etelä-Suomessa", "Keski-Suomessa"]);
     expect((result.varikot as unknown[]).length).toBe(3);
+    expect(result.computedAt).toBe("2026-07-11T10:00:00.000Z");
   });
 
   test("tolerates an empty / non-object body", async () => {
@@ -553,6 +554,7 @@ describe("ib jerry coverage", () => {
       coveredRegions: [],
       areas: [],
       varikot: [],
+      computedAt: null,
     });
   });
 });

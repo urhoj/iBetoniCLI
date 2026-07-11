@@ -197,6 +197,7 @@ export async function runJerryCoverage(client) {
         }
     }
     const providerIds = new Set(varikot.map((v) => v.asiakasId));
+    const computedAt = typeof data?.computedAt === "string" ? data.computedAt : null;
     return {
         summary: {
             varikkoCount: varikot.length,
@@ -207,6 +208,7 @@ export async function runJerryCoverage(client) {
         coveredRegions,
         areas,
         varikot,
+        computedAt,
     };
 }
 // ─── provider settings ──────────────────────────────────────────────────────
