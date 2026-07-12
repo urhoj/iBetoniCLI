@@ -2,7 +2,7 @@ import { test, expect, vi, beforeEach, describe } from "vitest";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, normalizeSentryRef, normalizeLanguage, readJsonInput, validateEnums }
+import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, normalizeSentryRef, normalizeLanguage, readJsonInput, validateEnums, resolveChangelogDescription }
   from "../../src/commands/changelog/index.js";
 import type { ChangelogAddBody } from "../../src/commands/changelog/index.js";
 import type { ApiClient } from "../../src/api/client.js";
@@ -203,6 +203,32 @@ describe("changelog --source flag", () => {
     c.get.mockResolvedValue([]);
     await runChangelogList(c as never, { source: "routine" });
     expect(c.get).toHaveBeenCalledWith("/api/changelog?source=routine");
+  });
+});
+
+describe("changelog add description positional-or-flag (fb#172)", () => {
+  test("resolves the positional when no --description", () => {
+    expect(resolveChangelogDescription("from positional", undefined)).toBe("from positional");
+  });
+
+  test("resolves --description when no positional", () => {
+    expect(resolveChangelogDescription(undefined, "from flag")).toBe("from flag");
+  });
+
+  test("accepts both when they agree", () => {
+    expect(resolveChangelogDescription("same", "same")).toBe("same");
+  });
+
+  test("rejects conflicting positional and --description (exit 4)", () => {
+    expect(() => resolveChangelogDescription("one", "two")).toThrow(/either positionally or with --description/);
+  });
+
+  test("rejects when neither is given (exit 4)", () => {
+    expect(() => resolveChangelogDescription(undefined, undefined)).toThrow(/description.*required/);
+  });
+
+  test("treats whitespace-only as absent", () => {
+    expect(() => resolveChangelogDescription("   ", undefined)).toThrow(/required/);
   });
 });
 

@@ -1870,18 +1870,21 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib dev changelog add matches snapshot 1`] = `
 "USAGE
-  ib dev changelog add [flags]
+  ib dev changelog add <description> [flags]
 
 DESCRIPTION
   Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row.
   Auth: requires login (any authenticated user).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
+ARGUMENTS
+  <description> STRING    Kuvaus (or pass as --description) — free length, the column is nvarchar(max) (required)
+
 FLAGS
   --type STRING    feature|improvement|bugfix (required)
   --area STRING    frontend|backend|cli|database|cicd (required)
   --title STRING    Entry title (required)
-  --description STRING    Kuvaus (free length — the column is nvarchar(max), no practical cap) (required)
+  --description STRING    Alias for the positional description; if both are passed, they must match
   --benefits STRING    Hyödyt
   --impact STRING    Vaikutus
   --status STRING    Tila (Julkaistu/Korjattu/...)
@@ -1914,6 +1917,8 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
 
 NOTES
+  - You can pass the description either positionally or as --description; if you pass both, they must match (mirrors \`ib dev feedback create\`).
+  - A description starting with "-" is parsed as an option (exit 4) — put a bare \`--\` terminator before it: ib dev changelog add --type bugfix --area cli --title "x" -- "-5% render time". Everything after \`--\` is taken as positional text.
   - --dry-run is SERVER-side (X-Dry-Run): the backend validates the payload then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s under --dry-run.
   - Developer-gated.
 
@@ -1922,6 +1927,7 @@ SEE ALSO
 
 EXAMPLES
   ib dev changelog add --type bugfix --area cli --title "x" --description "y" --feedback 12 --sha 59d9cc5
+  ib dev changelog add "positional description works too" --type bugfix --area cli --title "x"
   ib dev changelog add --type bugfix --area backend --title "fix npe" --description "y" --sentry PUMINET5API-1A2
 "
 `;

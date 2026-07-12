@@ -103,6 +103,21 @@ export function validateEnums(type, area, bumpLevel, source) {
     if (source !== undefined && !SOURCES.includes(source))
         failWith(`--source must be ${SOURCES.join("|")}`, 4);
 }
+/**
+ * Resolve the entry description from the positional OR the --description alias
+ * (mirrors `ib dev feedback create` — feedback #172). Exactly one is required;
+ * both are allowed only when they agree. Exits 4 on conflict or absence.
+ */
+export function resolveChangelogDescription(positional, flag) {
+    const p = positional?.trim();
+    const f = flag?.trim();
+    if (p && f && p !== f)
+        failWith("Provide the description either positionally or with --description; if both are given, they must match", 4);
+    const description = p || f;
+    if (!description)
+        failWith("--description (or a positional description) is required", 4);
+    return description;
+}
 /** Normalize --language to a validated lowercase fi|en, or undefined when not passed. Exits 4 on a bad code. */
 export function normalizeLanguage(lang) {
     if (lang === undefined)
@@ -117,12 +132,12 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .command("changelog", { hidden: !!opts.hidden })
         .description("Development changelog entries (source of the monthly report)");
     addWriteFlagsToCommand(c
-        .command("add")
+        .command("add [description]")
         .description("Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row.")
         .requiredOption("--type <t>", "feature|improvement|bugfix")
         .requiredOption("--area <a>", "frontend|backend|cli|database|cicd")
         .requiredOption("--title <s>", "Entry title")
-        .requiredOption("--description <s>", "Kuvaus")
+        .option("--description <s>", "Kuvaus — alias for the positional; if both are given, they must match")
         .option("--benefits <s>", "Hyödyt")
         .option("--impact <s>", "Vaikutus")
         .option("--status <s>", "Tila (Julkaistu/Korjattu/...)")
@@ -136,14 +151,14 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--sentry <ref>", "Sentry issue short id or URL this fixes")
         .option("--source <s>", "Source: human|routine (default: human)")
         .option("--date <d>", "Entry date (YYYY-MM-DD|today), default today")
-        .option("--language <l>", "Entry language (fi|en), default fi")).action(async (o) => {
+        .option("--language <l>", "Entry language (fi|en), default fi")).action(async (description, o) => {
         validateEnums(o.type, o.area, o.bumpLevel, o.source);
         const entryDate = resolveDate(o.date || "today");
         const body = {
             type: o.type,
             area: o.area,
             title: o.title,
-            description: o.description,
+            description: resolveChangelogDescription(description, o.description),
             entryDate,
         };
         if (o.benefits)
@@ -334,7 +349,7 @@ export const CHANGELOG_SPECS = [
         description: "Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row.",
         auth: "any",
         tier: "developer",
-        args: [],
+        args: [{ name: "description", type: "string", description: "Kuvaus (or pass as --description) — free length, the column is nvarchar(max)" }],
         flags: [
             {
                 name: "type",
@@ -357,8 +372,7 @@ export const CHANGELOG_SPECS = [
             {
                 name: "description",
                 type: "string",
-                required: true,
-                description: "Kuvaus (free length — the column is nvarchar(max), no practical cap)",
+                description: "Alias for the positional description; if both are passed, they must match",
             },
             { name: "benefits", type: "string", description: "Hyödyt" },
             { name: "impact", type: "string", description: "Vaikutus" },
@@ -419,12 +433,15 @@ export const CHANGELOG_SPECS = [
             },
         ],
         notes: [
+            "You can pass the description either positionally or as --description; if you pass both, they must match (mirrors `ib dev feedback create`).",
+            'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib dev changelog add --type bugfix --area cli --title "x" -- "-5% render time". Everything after `--` is taken as positional text.',
             "--dry-run is SERVER-side (X-Dry-Run): the backend validates the payload then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s under --dry-run.",
             "Developer-gated.",
         ],
         seeAlso: ["ib dev changelog report", "ib dev feedback resolve"],
         examples: [
             'ib dev changelog add --type bugfix --area cli --title "x" --description "y" --feedback 12 --sha 59d9cc5',
+            'ib dev changelog add "positional description works too" --type bugfix --area cli --title "x"',
             'ib dev changelog add --type bugfix --area backend --title "fix npe" --description "y" --sentry PUMINET5API-1A2',
         ],
     },

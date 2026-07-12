@@ -68,7 +68,8 @@ describe("parser errors → JSON envelope", () => {
     expect(parsed.code).toBe("USAGE");
     expect(error).toContain("--type");
     expect(error).toContain("--area");
-    expect(error).toContain("--description");
+    // --description is no longer a parser-required option (fb#172: accepted
+    // positionally or via --description, resolved in the action → exit 4 there).
     expect(process.exitCode).toBe(4);
   });
 
