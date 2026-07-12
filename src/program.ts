@@ -301,13 +301,15 @@ export function buildProgram(): Command {
       .option("--stalest <n>", "Return up to N entries sorted by least-recently reviewed", (v: string) => Number(v))
       .option("--domain <d>", "Only commands in this ib domain (e.g. attachment) — narrows BEFORE --stalest")
       .option("--with-detail", "Include each entry's full detail text, folding the per-command `reference detail get` into one call (needs the backend deployed)")
-  ).action(async (opts: { stalest?: number; domain?: string; withDetail?: boolean; needsReview?: boolean; maxConfidence?: number }) => {
+      .option("--search <substr>", "Only rows whose command PATH contains this substring (case-insensitive; client-side)")
+      .option("--orphans", "Only orphan rows — keys whose command no longer exists in the live catalogue (the discover half of discover→`reference detail delete`)")
+  ).action(async (opts: { stalest?: number; domain?: string; withDetail?: boolean; needsReview?: boolean; maxConfidence?: number; search?: string; orphans?: boolean }) => {
     try {
       // Validate the domain offline (exit 4 on unknown) before any network call,
       // mirroring `ib commands <domain>`.
       if (opts.domain) assertKnownDomain(COMMAND_SPECS, opts.domain, getCallerTier());
       const client = await getClient();
-      writeJson(await runReferenceDetailList(client, opts.stalest, opts.domain, opts.withDetail ?? false, opts.needsReview ?? false, opts.maxConfidence));
+      writeJson(await runReferenceDetailList(client, opts.stalest, opts.domain, opts.withDetail ?? false, opts.needsReview ?? false, opts.maxConfidence, opts.search, opts.orphans ?? false));
     } catch (e) {
       exitWithError(e);
     }

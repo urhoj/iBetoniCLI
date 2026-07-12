@@ -4845,11 +4845,18 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       },
       { name: "needs-review", type: "boolean", description: "Only rows still needing grooming: aiConfidence below the threshold (or unassessed) AND not parked, oldest-first." },
       { name: "max-confidence", type: "number", description: "Threshold for --needs-review (default 90)." },
+      { name: "search", type: "string", description: "Only rows whose command PATH contains this substring (case-insensitive). Client-side, so it works without a raw DB LIKE — the discover half of `reference detail delete`." },
+      { name: "orphans", type: "boolean", description: "Only ORPHAN rows: keys whose command no longer exists in the live catalogue (re-homed/renamed leftovers). Same set as `reference detail lint`, but streamed as normal list rows so you can pipe → `delete`. Compose with --search to narrow." },
     ],
-    outputShape: "{ items: [{ command, summary, lastReviewed, runs, aiConfidence, needsHumanReview, detail? }], count } — `detail` present only with --with-detail",
+    outputShape: "{ items: [{ command, summary, lastReviewed, runs, aiConfidence, needsHumanReview, detail? }], count } — `detail` present only with --with-detail. --search/--orphans filter client-side and recompute count.",
     errors: [
       { exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" },
       { exit: 4, meaning: "Unknown --domain", remedy: "`ib commands` for valid domains" },
+    ],
+    notes: [
+      "--search and --orphans are client-side post-filters (no backend deploy needed): the full catalog is fetched, then narrowed locally.",
+      "Because --stalest caps the server page first, run --orphans WITHOUT --stalest for a full-catalog orphan scan (with --stalest it only scans that page).",
+      "--orphans returns the same set as `reference detail lint` but as plain list rows, so `reference detail list --orphans` → `reference detail delete <key>` is a self-contained discover→prune workflow for an MCP/exec-only caller.",
     ],
     examples: [
       "ib reference detail list",
@@ -4857,6 +4864,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ib reference detail list --stalest 10 --domain attachment",
       "ib reference detail list --stalest 10 --domain attachment --with-detail",
       "ib reference detail list --needs-review --max-confidence 90",
+      "ib reference detail list --search 'dev bug'",
+      "ib reference detail list --orphans",
     ],
   },
   {

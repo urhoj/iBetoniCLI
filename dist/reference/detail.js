@@ -24,7 +24,13 @@ export async function runReferenceDetail(client, commandParts, tier = getCallerT
     const command = resolveCommand(commandParts, tier);
     return client.get(`/api/cli/command-catalog/${encodeURIComponent(command)}`);
 }
-export async function runReferenceDetailList(client, stalest, domain, withDetail = false, needsReview = false, maxConfidence) {
+export async function runReferenceDetailList(client, stalest, domain, withDetail = false, needsReview = false, maxConfidence, 
+// Client-side discovery filters (fb#164) — applied AFTER the fetch so no
+// backend change is needed, mirroring `runReferenceDetailLint`. `search` keeps
+// rows whose command PATH contains the substring (the `LIKE` an exec-only
+// caller can't run); `orphans` keeps only rows whose command no longer exists
+// in the live spec catalogue (the discover half of the discover→delete flow).
+search, orphans = false) {
     const p = new URLSearchParams();
     if (stalest)
         p.set("stalest", String(stalest));
@@ -37,7 +43,21 @@ export async function runReferenceDetailList(client, stalest, domain, withDetail
     if (needsReview && maxConfidence != null)
         p.set("maxConfidence", String(maxConfidence));
     const q = p.toString();
-    return client.get(`/api/cli/command-catalog${q ? `?${q}` : ""}`);
+    const res = await client.get(`/api/cli/command-catalog${q ? `?${q}` : ""}`);
+    if (!search && !orphans)
+        return res;
+    // Compare orphans against the FULL spec set (NOT tier-filtered) — a
+    // developer-tier command still has a spec, so its row is not an orphan.
+    const live = orphans ? new Set(COMMAND_SPECS.map((s) => s.command)) : null;
+    const needle = search?.toLowerCase();
+    const items = res.items.filter((row) => {
+        if (live && live.has(row.command))
+            return false;
+        if (needle && !row.command.toLowerCase().includes(needle))
+            return false;
+        return true;
+    });
+    return { ...res, items, count: items.length };
 }
 /**
  * Normalize a command path to the exact catalog key format (`ib <path>`) WITHOUT

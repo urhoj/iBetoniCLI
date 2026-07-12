@@ -39,14 +39,7 @@ export async function runReferenceDetail(
   return client.get(`/api/cli/command-catalog/${encodeURIComponent(command)}`);
 }
 
-export async function runReferenceDetailList(
-  client: ApiClient,
-  stalest?: number,
-  domain?: string,
-  withDetail = false,
-  needsReview = false,
-  maxConfidence?: number
-): Promise<{
+export interface ReferenceDetailListResult {
   items: Array<{
     command: string;
     summary: string | null;
@@ -59,7 +52,23 @@ export async function runReferenceDetailList(
     detail?: string | null;
   }>;
   count: number;
-}> {
+}
+
+export async function runReferenceDetailList(
+  client: ApiClient,
+  stalest?: number,
+  domain?: string,
+  withDetail = false,
+  needsReview = false,
+  maxConfidence?: number,
+  // Client-side discovery filters (fb#164) — applied AFTER the fetch so no
+  // backend change is needed, mirroring `runReferenceDetailLint`. `search` keeps
+  // rows whose command PATH contains the substring (the `LIKE` an exec-only
+  // caller can't run); `orphans` keeps only rows whose command no longer exists
+  // in the live spec catalogue (the discover half of the discover→delete flow).
+  search?: string,
+  orphans = false
+): Promise<ReferenceDetailListResult> {
   const p = new URLSearchParams();
   if (stalest) p.set("stalest", String(stalest));
   if (domain) p.set("domain", domain);
@@ -67,7 +76,18 @@ export async function runReferenceDetailList(
   if (needsReview) p.set("needsReview", "1");
   if (needsReview && maxConfidence != null) p.set("maxConfidence", String(maxConfidence));
   const q = p.toString();
-  return client.get(`/api/cli/command-catalog${q ? `?${q}` : ""}`);
+  const res = await client.get<ReferenceDetailListResult>(`/api/cli/command-catalog${q ? `?${q}` : ""}`);
+  if (!search && !orphans) return res;
+  // Compare orphans against the FULL spec set (NOT tier-filtered) — a
+  // developer-tier command still has a spec, so its row is not an orphan.
+  const live = orphans ? new Set(COMMAND_SPECS.map((s) => s.command)) : null;
+  const needle = search?.toLowerCase();
+  const items = res.items.filter((row) => {
+    if (live && live.has(row.command)) return false;
+    if (needle && !row.command.toLowerCase().includes(needle)) return false;
+    return true;
+  });
+  return { ...res, items, count: items.length };
 }
 
 /**

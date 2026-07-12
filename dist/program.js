@@ -254,14 +254,16 @@ export function buildProgram() {
         .description("List command-catalog entries, optionally ordered by stalest (DB-backed)")
         .option("--stalest <n>", "Return up to N entries sorted by least-recently reviewed", (v) => Number(v))
         .option("--domain <d>", "Only commands in this ib domain (e.g. attachment) — narrows BEFORE --stalest")
-        .option("--with-detail", "Include each entry's full detail text, folding the per-command `reference detail get` into one call (needs the backend deployed)")).action(async (opts) => {
+        .option("--with-detail", "Include each entry's full detail text, folding the per-command `reference detail get` into one call (needs the backend deployed)")
+        .option("--search <substr>", "Only rows whose command PATH contains this substring (case-insensitive; client-side)")
+        .option("--orphans", "Only orphan rows — keys whose command no longer exists in the live catalogue (the discover half of discover→`reference detail delete`)")).action(async (opts) => {
         try {
             // Validate the domain offline (exit 4 on unknown) before any network call,
             // mirroring `ib commands <domain>`.
             if (opts.domain)
                 assertKnownDomain(COMMAND_SPECS, opts.domain, getCallerTier());
             const client = await getClient();
-            writeJson(await runReferenceDetailList(client, opts.stalest, opts.domain, opts.withDetail ?? false, opts.needsReview ?? false, opts.maxConfidence));
+            writeJson(await runReferenceDetailList(client, opts.stalest, opts.domain, opts.withDetail ?? false, opts.needsReview ?? false, opts.maxConfidence, opts.search, opts.orphans ?? false));
         }
         catch (e) {
             exitWithError(e);

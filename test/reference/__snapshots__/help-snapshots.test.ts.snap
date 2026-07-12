@@ -8757,16 +8757,23 @@ FLAGS
   --with-detail    Include each entry's full detail text (adds a \`detail\` field per item), folding the per-command \`reference detail get\` into this one call. Needs the backend deployed; on an old backend the field is simply absent.
   --needs-review    Only rows still needing grooming: aiConfidence below the threshold (or unassessed) AND not parked, oldest-first.
   --max-confidence NUMBER    Threshold for --needs-review (default 90).
+  --search STRING    Only rows whose command PATH contains this substring (case-insensitive). Client-side, so it works without a raw DB LIKE — the discover half of \`reference detail delete\`.
+  --orphans    Only ORPHAN rows: keys whose command no longer exists in the live catalogue (re-homed/renamed leftovers). Same set as \`reference detail lint\`, but streamed as normal list rows so you can pipe → \`delete\`. Compose with --search to narrow.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { items: [{ command, summary, lastReviewed, runs, aiConfidence, needsHumanReview, detail? }], count } — \`detail\` present only with --with-detail
+  { items: [{ command, summary, lastReviewed, runs, aiConfidence, needsHumanReview, detail? }], count } — \`detail\` present only with --with-detail. --search/--orphans filter client-side and recompute count.
 
 ERRORS (stderr, exit non-zero)
   exit 2  Not authenticated      → Run \`ib auth login\`
   exit 4  Unknown --domain       → \`ib commands\` for valid domains
+
+NOTES
+  - --search and --orphans are client-side post-filters (no backend deploy needed): the full catalog is fetched, then narrowed locally.
+  - Because --stalest caps the server page first, run --orphans WITHOUT --stalest for a full-catalog orphan scan (with --stalest it only scans that page).
+  - --orphans returns the same set as \`reference detail lint\` but as plain list rows, so \`reference detail list --orphans\` → \`reference detail delete <key>\` is a self-contained discover→prune workflow for an MCP/exec-only caller.
 
 EXAMPLES
   ib reference detail list
@@ -8774,6 +8781,8 @@ EXAMPLES
   ib reference detail list --stalest 10 --domain attachment
   ib reference detail list --stalest 10 --domain attachment --with-detail
   ib reference detail list --needs-review --max-confidence 90
+  ib reference detail list --search 'dev bug'
+  ib reference detail list --orphans
 "
 `;
 

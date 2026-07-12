@@ -132,6 +132,50 @@ describe("runReferenceDetail", () => {
     await runReferenceDetailList(c, 10, undefined, false);
     expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10");
   });
+
+  describe("client-side discovery filters (fb#164)", () => {
+    // A mixed catalog: `ib keikka list`/`ib keikka latest` are live specs; the two
+    // `ib dev bug *` keys are orphans (the group was removed — fb#134).
+    const CATALOG = {
+      items: [
+        { command: "ib keikka list", summary: "Lists orders", lastReviewed: null, runs: 9 },
+        { command: "ib keikka latest", summary: "Latest order", lastReviewed: null, runs: 4 },
+        { command: "ib dev bug create", summary: "orphan", lastReviewed: null, runs: 1 },
+        { command: "ib dev bug list", summary: "orphan", lastReviewed: null, runs: 0 },
+      ],
+      count: 4,
+    };
+
+    test("no filter passes the server response through untouched", async () => {
+      const c = client({ get: vi.fn().mockResolvedValue(CATALOG) });
+      const out = await runReferenceDetailList(c);
+      expect(out).toBe(CATALOG);
+      expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog");
+    });
+
+    test("--search keeps only rows whose command PATH contains the substring (case-insensitive) and recomputes count", async () => {
+      const c = client({ get: vi.fn().mockResolvedValue(CATALOG) });
+      const out = await runReferenceDetailList(c, undefined, undefined, false, false, undefined, "DEV BUG");
+      expect(out.items.map((r) => r.command)).toEqual(["ib dev bug create", "ib dev bug list"]);
+      expect(out.count).toBe(2);
+    });
+
+    test("--orphans keeps only rows whose command is absent from the live spec catalogue", async () => {
+      const c = client({ get: vi.fn().mockResolvedValue(CATALOG) });
+      const out = await runReferenceDetailList(c, undefined, undefined, false, false, undefined, undefined, true);
+      expect(out.items.map((r) => r.command)).toEqual(["ib dev bug create", "ib dev bug list"]);
+      expect(out.count).toBe(2);
+      // live commands survive the round-trip and are NOT flagged as orphans
+      expect(out.items.some((r) => r.command === "ib keikka list")).toBe(false);
+    });
+
+    test("--search and --orphans compose (AND)", async () => {
+      const c = client({ get: vi.fn().mockResolvedValue(CATALOG) });
+      const out = await runReferenceDetailList(c, undefined, undefined, false, false, undefined, "create", true);
+      expect(out.items.map((r) => r.command)).toEqual(["ib dev bug create"]);
+      expect(out.count).toBe(1);
+    });
+  });
 });
 
 describe("runReferenceDetailDelete", () => {
