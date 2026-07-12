@@ -75,21 +75,35 @@ export function buildSijaintiBody(
 }
 
 /**
- * Guard the `--puomi-min`/`--puomi-max` flag pair (metres). Each must be a
- * non-negative finite number when supplied, and min must not exceed max;
- * otherwise exit 4. Without this, a typo like `--puomi-min 3O` makes Commander
- * coerce `Number("3O")` → `NaN`, which serializes to JSON `null` and silently
- * CLEARS a stored bound on the server (the save proc assigns puomiMin directly,
- * no COALESCE). Shared by `sijainti create`, `sijainti update`, and `set-jerry`
- * so all three reject bad input identically.
+ * Largest boom the DB can store: `sijainti.puomiMin`/`puomiMax` are DECIMAL(5,2),
+ * so 999.99 m is the hard ceiling. Mirrors the server's `validatePuomiRange`
+ * (geocode.js) `v > 999.99 → 400` — kept in sync so the client rejects the same
+ * range the backend would, one round-trip earlier.
+ */
+const PUOMI_MAX_M = 999.99;
+
+/**
+ * Guard the `--puomi-min`/`--puomi-max` flag pair (metres). Each must be a finite
+ * number in 0–999.99 when supplied, and min must not exceed max; otherwise exit 4.
+ * Without this, a typo like `--puomi-min 3O` makes Commander coerce `Number("3O")`
+ * → `NaN`, which serializes to JSON `null` and silently CLEARS a stored bound on
+ * the server (the save proc assigns puomiMin directly, no COALESCE); and an
+ * out-of-range value like `--puomi-min 1500` would only be caught after a wasted
+ * round-trip (server 400) or overflow the DECIMAL(5,2) column. This mirrors the
+ * server's `validatePuomiRange` exactly. Shared by `sijainti create`, `sijainti
+ * update`, and `set-jerry` so all three reject bad input identically.
  */
 export function assertPuomiFlags(puomiMin?: number, puomiMax?: number): void {
   for (const [flag, v] of [
     ["--puomi-min", puomiMin],
     ["--puomi-max", puomiMax],
   ] as const) {
-    if (v !== undefined && (!Number.isFinite(v) || v < 0)) {
+    if (v === undefined) continue;
+    if (!Number.isFinite(v) || v < 0) {
       failWith(`${flag} must be a non-negative number of metres`, 4);
+    }
+    if (v > PUOMI_MAX_M) {
+      failWith(`${flag} cannot exceed ${PUOMI_MAX_M} metres`, 4);
     }
   }
   if (puomiMin !== undefined && puomiMax !== undefined && puomiMin > puomiMax) {

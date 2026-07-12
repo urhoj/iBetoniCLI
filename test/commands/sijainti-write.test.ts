@@ -374,6 +374,14 @@ describe("assertPuomiFlags", () => {
   test("rejects min > max", () => {
     expect(() => assertPuomiFlags(50, 40)).toThrow(/--puomi-min cannot exceed --puomi-max/);
   });
+
+  test("rejects values above the DECIMAL(5,2) ceiling (mirrors server validatePuomiRange)", () => {
+    // 999.99 is the largest storable boom; > that would overflow the column /
+    // 400 on the server — catch it client-side one round-trip earlier.
+    expect(() => assertPuomiFlags(1500, undefined)).toThrow(/--puomi-min cannot exceed 999.99 metres/);
+    expect(() => assertPuomiFlags(20, 1000)).toThrow(/--puomi-max cannot exceed 999.99 metres/);
+    expect(() => assertPuomiFlags(999.99, 999.99)).not.toThrow(); // the ceiling itself is valid
+  });
 });
 
 describe("applySijaintiCreateDefaults", () => {
