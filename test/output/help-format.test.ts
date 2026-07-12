@@ -55,6 +55,21 @@ describe("formatHelp ARGUMENTS", () => {
     });
     expect(out).toMatch(/--asiakas NUMBER.*\(required\)/);
   });
+
+  test("boolean flags render as bare switches with no type placeholder (fb#176)", () => {
+    const out = formatHelp({
+      ...base,
+      flags: [
+        { name: "full", type: "boolean", description: "return the full row" },
+        { name: "limit", type: "number", description: "cap" },
+      ],
+    });
+    // no "BOOLEAN" placeholder anywhere, and --full is a bare switch
+    expect(out).not.toContain("BOOLEAN");
+    expect(out).toMatch(/--full {4}return the full row/);
+    // non-boolean flags keep their type placeholder
+    expect(out).toContain("--limit NUMBER");
+  });
 });
 
 describe("formatHelp AUTH + timezone", () => {

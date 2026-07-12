@@ -69,7 +69,11 @@ export function formatHelp(spec) {
         for (const f of spec.flags) {
             const def = f.default ? ` (default: ${f.default})` : "";
             const req = f.required ? " (required)" : "";
-            lines.push(`  --${f.name} ${f.type.toUpperCase()}    ${f.description}${def}${req}`);
+            // Boolean flags are valueless switches — omit the "BOOLEAN" placeholder,
+            // which reads as "pass a value" and leads callers to write `--flag false`
+            // (a stray positional → a confusing "too many arguments" error). fb#176.
+            const type = f.type === "boolean" ? "" : ` ${f.type.toUpperCase()}`;
+            lines.push(`  --${f.name}${type}    ${f.description}${def}${req}`);
         }
     }
     if (spec.writeFlags) {

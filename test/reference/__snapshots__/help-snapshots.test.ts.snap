@@ -173,7 +173,7 @@ ARGUMENTS
 
 FLAGS
   --out STRING    Output path (default: origFileName in cwd)
-  --force BOOLEAN    Overwrite an existing file
+  --force    Overwrite an existing file
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -361,7 +361,7 @@ ARGUMENTS
   <text> STRING    Search text; omit to list all (or combine with --missing) (optional)
 
 FLAGS
-  --missing BOOLEAN    Only attachments with NO linked entity
+  --missing    Only attachments with NO linked entity
   --limit NUMBER    Max rows (capped at 500) (default: 100)
 
 GLOBAL FLAGS
@@ -580,8 +580,8 @@ ARGUMENTS
 
 FLAGS
   --email STRING    Target email (alternative to the personId positional)
-  --end BOOLEAN    End the active impersonation session and restore your own login
-  --extend BOOLEAN    Extend the active impersonation session by 10 minutes
+  --end    End the active impersonation session and restore your own login
+  --extend    Extend the active impersonation session by 10 minutes
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -756,10 +756,10 @@ ARGUMENTS
   <domain> STRING    Only commands in this domain (the token after \`ib\`, e.g. keikka, jerry). Unknown domain exits 4 listing valid domains. (optional)
 
 FLAGS
-  --mutations BOOLEAN    Only commands that write (carry write-safety flags)
-  --reads BOOLEAN    Only read-only commands (no writes)
+  --mutations    Only commands that write (carry write-safety flags)
+  --reads    Only read-only commands (no writes)
   --permission STRING    Only commands whose required permissions contain this substring
-  --all BOOLEAN    Full flat list of every command (~43 KB at 149 leaves). Default (no args) is the domain index.
+  --all    Full flat list of every command (~43 KB at 149 leaves). Default (no args) is the domain index.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -916,7 +916,7 @@ FLAGS
   --address STRING    Billing street address (laskutusOsoite)
   --postal-code STRING    Billing postal code (laskutusPostinumero)
   --city STRING    Billing city (laskutusKaupunki)
-  --get-or-create BOOLEAN    If a customer with this yTunnus already exists, return it (reused:true) instead of creating a duplicate
+  --get-or-create    If a customer with this yTunnus already exists, return it (reused:true) instead of creating a duplicate
   --body JSON    Raw JSON body (overrides typed flags)
 
 WRITE-SAFETY FLAGS
@@ -1136,7 +1136,7 @@ DESCRIPTION
 FLAGS
   --limit NUMBER    Max rows for the unbounded list (capped at 500). Ignored when --ids is given. (default: 100)
   --cursor STRING    Pagination cursor
-  --full BOOLEAN    Return full customer fields + companyDescription (not just id/name/ytunnus/type)
+  --full    Return full customer fields + companyDescription (not just id/name/ytunnus/type)
   --ids STRING    Comma-separated asiakasIds to return ALL of (max 1000) — preferred for targeted/incremental fetches
   --include STRING    Expand each row with per-customer arrays: contacts and/or sijainnit (CSV; best with --full)
   --fields STRING    Project each customer to just these columns (CSV; asiakasId always kept, contacts/sijainnit arrays preserved) — cuts the diff payload
@@ -1218,7 +1218,7 @@ FLAGS
   --main NUMBER    asiakasId to KEEP — references merge into this one (required)
   --secondary NUMBER    asiakasId to REMOVE — merged away then deleted (required)
   --owner NUMBER    ownerAsiakasId (default: active company)
-  --allow-big-merge BOOLEAN    System-admin: permit a merge above the safety row cap
+  --allow-big-merge    System-admin: permit a merge above the safety row cap
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -1311,8 +1311,8 @@ ARGUMENTS
 
 FLAGS
   --asiakas NUMBER    Target asiakasId (alias for the positional)
-  --set BOOLEAN    Turn ALL 9 operator flags ON
-  --reset BOOLEAN    Turn ALL 9 operator flags OFF
+  --set    Turn ALL 9 operator flags ON
+  --reset    Turn ALL 9 operator flags OFF
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -1389,7 +1389,7 @@ ARGUMENTS
 FLAGS
   --asiakas NUMBER    Target asiakasId (alias for the positional; same flag as person add/remove)
   --role STRING    Filter by role name (e.g. keikkaHandler)
-  --include-roles BOOLEAN    Add permissionRoles[] (full per-company role names) to each person — N extra GETs, opt-in
+  --include-roles    Add permissionRoles[] (full per-company role names) to each person — N extra GETs, opt-in
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -1462,7 +1462,7 @@ ARGUMENTS
 
 FLAGS
   --limit NUMBER    Max results (default: 50)
-  --my-companies BOOLEAN    Search across every company you belong to (customer/worksite/person)
+  --my-companies    Search across every company you belong to (customer/worksite/person)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -1683,8 +1683,8 @@ DESCRIPTION
   Permissions: requires isSystemAdmin or isDeveloper.
 
 FLAGS
-  --confirm BOOLEAN    Execute the operation (default is dry-run preview)
-  --force-prod BOOLEAN    Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec.
+  --confirm    Execute the operation (default is dry-run preview)
+  --force-prod    Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec.
   --reason STRING    Audit-log reason (X-Action-Reason)
 
 GLOBAL FLAGS
@@ -1745,9 +1745,9 @@ ARGUMENTS
 FLAGS
   --id NUMBER    Entity id (e.g. keikkaId)
   --asiakas-id NUMBER    Tenant scope (developers may target others; non-devs use their own)
-  --cascade BOOLEAN    Also invalidate related families (keikka only)
-  --confirm BOOLEAN    Execute the operation (default is dry-run preview)
-  --force-prod BOOLEAN    Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec.
+  --cascade    Also invalidate related families (keikka only)
+  --confirm    Execute the operation (default is dry-run preview)
+  --force-prod    Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec.
   --reason STRING    Audit-log reason (X-Action-Reason)
 
 GLOBAL FLAGS
@@ -1818,8 +1818,8 @@ ARGUMENTS
   <glob> STRING    Raw Redis key glob (e.g. 'keikka:*') (required)
 
 FLAGS
-  --confirm BOOLEAN    Execute the operation (default is dry-run preview)
-  --force-prod BOOLEAN    Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec.
+  --confirm    Execute the operation (default is dry-run preview)
+  --force-prod    Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec.
   --reason STRING    Audit-log reason (X-Action-Reason)
 
 GLOBAL FLAGS
@@ -1979,8 +1979,8 @@ FLAGS
   --source STRING    human|routine
   --search STRING    Substring match over title/description/files/commitShas (deploy-gated)
   --status STRING    Substring match on the free-text status field, e.g. 'Deployed' (deploy-gated)
-  --has-feedback BOOLEAN    Only entries linked to a feedback id (deploy-gated)
-  --has-sentry BOOLEAN    Only entries linked to a Sentry issue (deploy-gated)
+  --has-feedback    Only entries linked to a feedback id (deploy-gated)
+  --has-sentry    Only entries linked to a Sentry issue (deploy-gated)
   --limit NUMBER    Max rows
 
 GLOBAL FLAGS
@@ -2203,7 +2203,7 @@ FLAGS
   --error STRING    Error message you hit, if any
   --severity STRING    critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug
   --complexity NUMBER    1-5 agent-triage estimate (orthogonal to --severity): 1 simple+autonomous · 2 simple+wants-input · 3 complex+autonomous · 4 complex+needs-user · 5 very-complex+needs-user & heavier model. Lets a batch-fix agent pull \`list --max-complexity 3\`. See \`ib help complexity\`.
-  --dry-run BOOLEAN    Print the payload without sending (client-side)
+  --dry-run    Print the payload without sending (client-side)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -2245,7 +2245,7 @@ ARGUMENTS
   <id> NUMBER    feedbackId (required)
 
 FLAGS
-  --full BOOLEAN    Accepted for cross-command consistency; get always returns the full row (no-op).
+  --full    Accepted for cross-command consistency; get always returns the full row (no-op).
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -2276,8 +2276,8 @@ DESCRIPTION
 
 FLAGS
   --status STRING    open | reviewed | applied | dismissed, or a comma-separated list (e.g. open,reviewed)
-  --unresolved BOOLEAN    Shortcut for --status open,reviewed (un-closed items) — same as the default; mutually exclusive with --status/--all
-  --all BOOLEAN    Include every status (open,reviewed,applied,dismissed); overrides the open+reviewed default; mutually exclusive with --status/--unresolved
+  --unresolved    Shortcut for --status open,reviewed (un-closed items) — same as the default; mutually exclusive with --status/--all
+  --all    Include every status (open,reviewed,applied,dismissed); overrides the open+reviewed default; mutually exclusive with --status/--unresolved
   --kind STRING    improvement | bug | idea | legal
   --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | other
   --search STRING    Substring match over description/command/resolution/errorText (deploy-gated)
@@ -2285,7 +2285,7 @@ FLAGS
   --max-complexity NUMBER    Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls (deploy-gated)
   --limit NUMBER    Max rows (cap 200) (default: 50)
   --offset NUMBER    Pagination offset (default: 0)
-  --full BOOLEAN    Return untruncated description/resolution (default: each capped at 200 chars)
+  --full    Return untruncated description/resolution (default: each capped at 200 chars)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -2328,8 +2328,8 @@ ARGUMENTS
 FLAGS
   --status STRING    open | reviewed | applied | dismissed
   --note STRING    Resolution note stored on the row
-  --dry-run BOOLEAN    Print the update body without sending (client-side)
-  --full BOOLEAN    Return the full updated row instead of the compact ack
+  --dry-run    Print the update body without sending (client-side)
+  --full    Return the full updated row instead of the compact ack
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -2366,8 +2366,8 @@ FLAGS
   --severity STRING    critical | major | minor | cosmetic
   --complexity NUMBER    1-5 agent-triage estimate — promote/downgrade after investigation (see \`ib help complexity\`)
   --description STRING    Replace the freetext description
-  --dry-run BOOLEAN    Print the update body without sending (client-side)
-  --full BOOLEAN    Return the full updated row instead of the compact ack
+  --dry-run    Print the update body without sending (client-side)
+  --full    Return the full updated row instead of the compact ack
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -2440,7 +2440,7 @@ FLAGS
   --actor NUMBER    Only sessions run BY this actor personId
   --target NUMBER    Only sessions run AS this target personId
   --end-reason STRING    Filter by endReason (manual|timeout|error|logout); implies ended
-  --active BOOLEAN    Only still-open sessions (no end row)
+  --active    Only still-open sessions (no end row)
   --limit NUMBER    Max sessions (capped at 1000) (default: 100)
 
 GLOBAL FLAGS
@@ -2478,7 +2478,7 @@ DESCRIPTION
   Auth: requires login (any authenticated user).
 
 FLAGS
-  --details BOOLEAN    Include slimmed top-items per signal, not just counts
+  --details    Include slimmed top-items per signal, not just counts
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -2963,7 +2963,7 @@ ARGUMENTS
   <file> STRING    JSON array file of {term, definition, synonyms?, relatedCommands?, relatedEntity?, domain?} objects (or - for stdin) (required)
 
 FLAGS
-  --update-only BOOLEAN    Only update existing terms; never insert
+  --update-only    Only update existing terms; never insert
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -3000,8 +3000,8 @@ DESCRIPTION
   Auth: requires login (any authenticated user).
 
 FLAGS
-  --strict BOOLEAN    Exit 1 if any warn-level finding exists (for CI)
-  --suggest-related BOOLEAN    Also emit stale-related suggestions: specs mentioning a term/synonym/entity but not yet linked (info-level)
+  --strict    Exit 1 if any warn-level finding exists (for CI)
+  --suggest-related    Also emit stale-related suggestions: specs mentioning a term/synonym/entity but not yet linked (info-level)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -3034,8 +3034,8 @@ FLAGS
   --stalest NUMBER    Return up to N entries, stalest first
   --domain STRING    Filter to a domain (exact match)
   --related STRING    Filter to terms whose relatedCommands contain this substring
-  --terms-only BOOLEAN    Return only {term, synonyms} per entry — the cheap INDEX view (strips definitions); use to discover which terms exist.
-  --needs-review BOOLEAN    Only terms still needing grooming: aiConfidence below the threshold (or unassessed) AND not parked, oldest-first.
+  --terms-only    Return only {term, synonyms} per entry — the cheap INDEX view (strips definitions); use to discover which terms exist.
+  --needs-review    Only terms still needing grooming: aiConfidence below the threshold (or unassessed) AND not parked, oldest-first.
   --max-confidence NUMBER    Threshold for --needs-review (default 90).
 
 GLOBAL FLAGS
@@ -3136,13 +3136,13 @@ FLAGS
   --related STRING    Comma-separated command paths, e.g. "ib person,ib vehicle driver board". Omit to keep; pass "" to clear.
   --entity STRING    Related DB entity, e.g. Person / personId. Omit to keep.
   --domain STRING    Domain grouping (e.g. vacation). Omit to keep.
-  --update-only BOOLEAN    Only update an existing term; do not create a new one (404 if absent)
+  --update-only    Only update an existing term; do not create a new one (404 if absent)
   --from-json STRING    Read fields from a JSON object file (or - for stdin); flags override. Only keys present in the object are written (others kept).
   --add-synonyms STRING    Comma-separated synonyms to ADD to the existing list — no full resend. Excl. --synonyms.
   --remove-synonyms STRING    Comma-separated synonyms to REMOVE by name (idempotent). Excl. --synonyms.
   --append-definition STRING    Append a clause to the current definition (single-space join; re-appending identical text is a no-op). Excl. --definition.
   --ai-confidence NUMBER    Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score.
-  --needs-human-review BOOLEAN    Park the term for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked.
+  --needs-human-review    Park the term for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -3397,7 +3397,7 @@ DESCRIPTION
 FLAGS
   --status STRING    Filter by pipeline status key: ei_aloitettu → email1_lahetetty → muistutus_lahetetty → vastasi_kylla → tiedot_pyydetty → tervetuloa_lahetetty (pipeline order); terminal: vastasi_ei / ei_vastausta / ei_sovellu
   --tier NUMBER    Tier filter (1 priority / 2 secondary)
-  --due BOOLEAN    Only rows where the email1b reminder is due
+  --due    Only rows where the email1b reminder is due
   --search STRING    Case-insensitive substring on asiakasNimi / outreachName / outreachEmail / contactPersonName / contactPersonEmail
 
 GLOBAL FLAGS
@@ -3826,7 +3826,7 @@ FLAGS
   --place-id STRING    Google placeId (lets the server trust client coords)
   --formatted-address STRING    Google formatted address
   --boom NUMBER    Required boom (m) — filters varikot by their puomiMin/puomiMax range (absent/0 = no boom filter)
-  --explain BOOLEAN    Add considered[] — per-varikko exclusion reasons for non-matching depots (developer/admin only)
+  --explain    Add considered[] — per-varikko exclusion reasons for non-matching depots (developer/admin only)
   --asiakas NUMBER    With --explain: force-include this company's varikot even if not yet Jerry-enabled (surfaces company-gate)
 
 GLOBAL FLAGS
@@ -3864,8 +3864,8 @@ DESCRIPTION
   Permissions: requires --provider: provider company (isPumppuToimittaja).
 
 FLAGS
-  --provider BOOLEAN    Provider badge counts (provider role)
-  --mine BOOLEAN    Customer counts (default)
+  --provider    Provider badge counts (provider role)
+  --mine    Customer counts (default)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -4332,7 +4332,7 @@ ARGUMENTS
   <requestId> NUMBER    pumppuRequestId (required)
 
 FLAGS
-  --provider BOOLEAN    Provider-facing detail view (provider role)
+  --provider    Provider-facing detail view (provider role)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -4361,11 +4361,11 @@ DESCRIPTION
   Permissions: requires --open / --provider: provider company (isPumppuToimittaja).
 
 FLAGS
-  --open BOOLEAN    Provider inbox of open requests in your delivery area (provider role)
-  --mine BOOLEAN    Your own requests (default)
+  --open    Provider inbox of open requests in your delivery area (provider role)
+  --mine    Your own requests (default)
   --status STRING    Filter --mine by status (CSV: open,pending_verification,accepted,cancelled,expired,no_supply)
   --limit NUMBER    Max rows for --mine (server caps at 200) (default: 100)
-  --provider BOOLEAN    Provider lifecycle view via /provider-list (incl. sent offers)
+  --provider    Provider lifecycle view via /provider-list (incl. sent offers)
   --tab STRING    With --provider: avoimet|tarjotut|voitetut|paattyneet
 
 GLOBAL FLAGS
@@ -5071,13 +5071,13 @@ FLAGS
   --owner NUMBER    ownerAsiakasId tenant scope (1349 = BetoniJerry); omit for global
   --notes STRING    Internal notes
   --effective-date DATE    Effective date YYYY-MM-DD (default: now)
-  --activate BOOLEAN    Publish immediately (archives the prior active version). Default: inactive draft
-  --validate-json BOOLEAN    Validate the embedded \`\`\`json block parses to an object before saving (recommended for BETONIJERRY_* structured types)
+  --activate    Publish immediately (archives the prior active version). Default: inactive draft
+  --validate-json    Validate the embedded \`\`\`json block parses to an object before saving (recommended for BETONIJERRY_* structured types)
   --replace STRING    Edit mode: replace this literal text in the current ACTIVE version's markdown (must match exactly once unless --all)
   --with STRING    Replacement for --replace ("" deletes the matched text)
   --append STRING    Edit mode: append text to the end of the current markdown (verbatim)
   --prepend STRING    Edit mode: prepend text to the start of the current markdown (verbatim)
-  --all BOOLEAN    With --replace: substitute every occurrence instead of erroring on multiple matches
+  --all    With --replace: substitute every occurrence instead of erroring on multiple matches
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -5123,7 +5123,7 @@ ARGUMENTS
   <typeName> STRING    Document type name (see ib legal types) (required)
 
 FLAGS
-  --meta BOOLEAN    Omit markdownContent (returns contentLength instead)
+  --meta    Omit markdownContent (returns contentLength instead)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -5889,7 +5889,7 @@ FLAGS
   --tarjous NUMBER    Resolve the thread from this pumppuRequestId
   --since STRING    Only messages created after this ISO timestamp
   --limit NUMBER    Max messages (server max 500) (default: 100)
-  --deleted BOOLEAN    Include soft-deleted messages (your own; all for developers)
+  --deleted    Include soft-deleted messages (your own; all for developers)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -6135,7 +6135,7 @@ DESCRIPTION
   Auth: requires login (any authenticated user).
 
 FLAGS
-  --unread BOOLEAN    Only threads with unreadCount > 0
+  --unread    Only threads with unreadCount > 0
   --tarjous NUMBER    Only threads for this pumppuRequestId
 
 GLOBAL FLAGS
@@ -6178,7 +6178,7 @@ FLAGS
   --asiakas NUMBER    Owner asiakasId (alias for the positional)
   --date DATE    Date the box is for (default 00000000 = undated default box)
   --title STRING    Box title
-  --init BOOLEAN    Caller's own company's first box via /box/initialize (no asiakasId)
+  --init    Caller's own company's first box via /box/initialize (no asiakasId)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -6474,7 +6474,7 @@ ARGUMENTS
 FLAGS
   --date DATE    Date the message applies to (required)
   --message STRING    Message text to store
-  --clear BOOLEAN    Clear the message for the date (mutually exclusive with --message)
+  --clear    Clear the message for the date (mutually exclusive with --message)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -6589,7 +6589,7 @@ FLAGS
   --tarjous NUMBER    pumppuRequestId this escalation is about
   --keikka NUMBER    keikkaId this escalation is about
   --body STRING    The message to support (required)
-  --dry-run BOOLEAN    Print the payload without sending (client-side)
+  --dry-run    Print the payload without sending (client-side)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -6698,8 +6698,8 @@ ARGUMENTS
   <threadId> NUMBER    support messageThread id (required)
 
 FLAGS
-  --reopen BOOLEAN    Set status back to open instead of resolved
-  --dry-run BOOLEAN    Print the update body without sending (client-side)
+  --reopen    Set status back to open instead of resolved
+  --dry-run    Print the update body without sending (client-side)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -7138,10 +7138,10 @@ DESCRIPTION
 
 FLAGS
   --limit NUMBER    Max rows to return (client-side cap, after filter+sort)
-  --empty-shorttext BOOLEAN    Only rows whose shorttext is blank (grooming backfill targets)
+  --empty-shorttext    Only rows whose shorttext is blank (grooming backfill targets)
   --fields STRING    Comma-separated columns to keep, e.g. helpId,title,shorttext,accessCount (drops the large htmltext)
   --sort STRING    Sort by a column, e.g. accessCount:desc (numeric fields compare numerically)
-  --needs-review BOOLEAN    Only help rows still needing grooming: aiConfidence below the threshold (or unassessed) AND not parked, oldest-first by lastModifiedTime.
+  --needs-review    Only help rows still needing grooming: aiConfidence below the threshold (or unassessed) AND not parked, oldest-first by lastModifiedTime.
   --max-confidence NUMBER    Threshold for --needs-review (default 90).
 
 GLOBAL FLAGS
@@ -7177,15 +7177,15 @@ FLAGS
   --shorttext STRING    Short text
   --htmltext STRING    Modal body — rendered as MARKDOWN (react-markdown + GFM), NOT HTML despite the column name. Use markdown (**bold**, - bullets, blank line = paragraph); raw <p>/<ul> tags show literally.
   --img STRING    Image reference (pass "" to clear it to null)
-  --must-exist BOOLEAN    Fail (exit 4) instead of creating a new row when the helpId has no entry — guards against a typo'd helpId silently spawning a junk row
+  --must-exist    Fail (exit 4) instead of creating a new row when the helpId has no entry — guards against a typo'd helpId silently spawning a junk row
   --ai-confidence NUMBER    Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score and re-open the row.
-  --needs-human-review BOOLEAN    Park the help row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked.
+  --needs-human-review    Park the help row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked.
   --field STRING    Edit-mode target field: title | shorttext | htmltext (default htmltext)
   --replace STRING    Edit mode: replace this literal text in the target field (exactly once unless --all)
   --with STRING    Replacement for --replace ("" deletes the matched text)
   --append STRING    Edit mode: append text to the target field (verbatim)
   --prepend STRING    Edit mode: prepend text to the target field (verbatim)
-  --all BOOLEAN    With --replace: substitute every occurrence
+  --all    With --replace: substitute every occurrence
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -7278,7 +7278,7 @@ FLAGS
   --lat NUMBER    Latitude (WGS84) — pair with --lng
   --lng NUMBER    Longitude (WGS84) — pair with --lat
   --address STRING    Street address to geocode (e.g. 'Sarkatie 7, Vantaa')
-  --with-buildings BOOLEAN    Also count buildings on the parcel via national Ryhti (permit-based, best-effort); adds buildingCount + buildings to the parcel
+  --with-buildings    Also count buildings on the parcel via national Ryhti (permit-based, best-effort); adds buildingCount + buildings to the parcel
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -7451,7 +7451,7 @@ ARGUMENTS
   <keikkaId> NUMBER    keikkaId (coordinates resolved from its worksite) (required)
 
 FLAGS
-  --force-refresh BOOLEAN    Bypass the cache and refetch from FMI
+  --force-refresh    Bypass the cache and refetch from FMI
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -7574,8 +7574,8 @@ DESCRIPTION
   Auth: requires login (any authenticated user).
 
 FLAGS
-  --on BOOLEAN    Enable the module
-  --off BOOLEAN    Disable the module
+  --on    Enable the module
+  --off    Disable the module
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -7612,7 +7612,7 @@ ARGUMENTS
   <tyomaaId> NUMBER    tyomaaId (coordinates resolved server-side) (required)
 
 FLAGS
-  --force-refresh BOOLEAN    Bypass the cache and refetch from FMI
+  --force-refresh    Bypass the cache and refetch from FMI
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -7755,8 +7755,8 @@ FLAGS
   --email STRING    personEmail (optional)
   --memo STRING    personMemo — free-text note/comment (optional)
   --asiakas NUMBER    Owner asiakasId (defaults to your active company)
-  --global BOOLEAN    Create a global, owner-less person (ownerAsiakasId=null). Mutually exclusive with --asiakas.
-  --get-or-create BOOLEAN    On a duplicate email, return the existing person (reused:true) when visible to you; an email owned by a company you can't access errors with guidance
+  --global    Create a global, owner-less person (ownerAsiakasId=null). Mutually exclusive with --asiakas.
+  --get-or-create    On a duplicate email, return the existing person (reused:true) when visible to you; an email owned by a company you can't access errors with guidance
   --body JSON    Raw JSON body, merged under typed flags (optional)
   --from-json STRING    Read the JSON body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body.
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
@@ -7928,7 +7928,7 @@ DESCRIPTION
   Auth: requires login (any authenticated user).
 
 FLAGS
-  --full BOOLEAN    Include prefix/style/description/active/ownerAsiakasId
+  --full    Include prefix/style/description/active/ownerAsiakasId
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -8220,7 +8220,7 @@ DESCRIPTION
 FLAGS
   --role STRING    Filter by role name (e.g. driver, admin, laskuAdmin)
   --asiakas NUMBER    Scope to the MEMBERS of this asiakasId instead of the active company (you must belong to it). Combine with --owned for the persons it owns.
-  --owned BOOLEAN    List persons the company OWNS (person.ownerAsiakasId) instead of its asiakasPerson members (the default).
+  --owned    List persons the company OWNS (person.ownerAsiakasId) instead of its asiakasPerson members (the default).
   --limit NUMBER    Max rows (capped at 500) (default: 100)
 
 GLOBAL FLAGS
@@ -8406,7 +8406,7 @@ ARGUMENTS
   <personId> NUMBER    personId whose owner to change (required)
 
 FLAGS
-  --global BOOLEAN    Make the person global (ownerAsiakasId=null)
+  --global    Make the person global (ownerAsiakasId=null)
   --asiakas NUMBER    Set owner to this asiakasId
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
@@ -8585,7 +8585,7 @@ ARGUMENTS
 
 FLAGS
   --limit NUMBER    Max results (default: 50)
-  --my-companies BOOLEAN    Search across all companies you belong to; each hit carries its asiakasId/asiakasName
+  --my-companies    Search across all companies you belong to; each hit carries its asiakasId/asiakasName
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -8719,7 +8719,7 @@ DESCRIPTION
   Auth: requires login (any authenticated user).
 
 FLAGS
-  --strict BOOLEAN    Exit 1 if any orphan row exists (for CI)
+  --strict    Exit 1 if any orphan row exists (for CI)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -8754,8 +8754,8 @@ DESCRIPTION
 FLAGS
   --stalest NUMBER    Return up to N entries sorted by least-recently reviewed
   --domain STRING    Only commands in this ib domain (e.g. attachment) — narrows BEFORE --stalest, so the budget isn't spent on unrelated commands
-  --with-detail BOOLEAN    Include each entry's full detail text (adds a \`detail\` field per item), folding the per-command \`reference detail get\` into this one call. Needs the backend deployed; on an old backend the field is simply absent.
-  --needs-review BOOLEAN    Only rows still needing grooming: aiConfidence below the threshold (or unassessed) AND not parked, oldest-first.
+  --with-detail    Include each entry's full detail text (adds a \`detail\` field per item), folding the per-command \`reference detail get\` into this one call. Needs the backend deployed; on an old backend the field is simply absent.
+  --needs-review    Only rows still needing grooming: aiConfidence below the threshold (or unassessed) AND not parked, oldest-first.
   --max-confidence NUMBER    Threshold for --needs-review (default 90).
 
 GLOBAL FLAGS
@@ -8792,13 +8792,13 @@ FLAGS
   --summary STRING    Short one-line summary stored in the catalog
   --detail STRING    Full markdown business-context detail
   --ai-confidence NUMBER    Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score.
-  --needs-human-review BOOLEAN    Park the row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked.
+  --needs-human-review    Park the row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked.
   --field STRING    Edit-mode target field: summary | detail (default detail)
   --replace STRING    Edit mode: replace this literal text in the target field (exactly once unless --all)
   --with STRING    Replacement for --replace ("" deletes the matched text)
   --append STRING    Edit mode: append text to the target field (verbatim)
   --prepend STRING    Edit mode: prepend text to the target field (verbatim)
-  --all BOOLEAN    With --replace: substitute every occurrence
+  --all    With --replace: substitute every occurrence
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -8833,9 +8833,9 @@ ARGUMENTS
   <domain...> STRING    Restrict the commands map to one or more domains (the token after \`ib\`, e.g. keikka). Multiple domains share a single primer. Unknown domain exits 4 listing valid domains. (optional)
 
 FLAGS
-  --glossary BOOLEAN    Include the term+synonyms vocabulary INDEX (fetched from the DB) under \`glossary\`. Off by default to keep the dump small; fetch definitions on demand with \`ib glossary lookup <term>\` / \`ib glossary list\`.
-  --commands-only BOOLEAN    Emit only { version, generatedAt, commonErrors, commands } — drop the overview/topics/feedbackGuidance primer and skip the glossary fetch (no token needed). Fewer bytes per dump.
-  --lean BOOLEAN    Drop each command's \`notes\`/\`seeAlso\` prose (KEEPS \`examples\`) — ~7.6k fewer tokens on the full surface. For a whole-surface scan you get what exists + how to call it; fetch the dropped caveats/cross-refs per-command via \`ib <command> --help\`. Composes with --commands-only and domain filters.
+  --glossary    Include the term+synonyms vocabulary INDEX (fetched from the DB) under \`glossary\`. Off by default to keep the dump small; fetch definitions on demand with \`ib glossary lookup <term>\` / \`ib glossary list\`.
+  --commands-only    Emit only { version, generatedAt, commonErrors, commands } — drop the overview/topics/feedbackGuidance primer and skip the glossary fetch (no token needed). Fewer bytes per dump.
+  --lean    Drop each command's \`notes\`/\`seeAlso\` prose (KEEPS \`examples\`) — ~7.6k fewer tokens on the full surface. For a whole-surface scan you get what exists + how to call it; fetch the dropped caveats/cross-refs per-command via \`ib <command> --help\`. Composes with --commands-only and domain filters.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -8961,7 +8961,7 @@ ARGUMENTS
 FLAGS
   --in STRING    Comma-separated subset of: customer,worksite,person,vehicle,keikka,sijainti
   --limit NUMBER    Max hits per entity (default: 5)
-  --my-companies BOOLEAN    Search across every company you belong to (customer/worksite/person)
+  --my-companies    Search across every company you belong to (customer/worksite/person)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -9043,7 +9043,7 @@ FLAGS
   --asiakas NUMBER    Owner asiakasId (defaults to your active company)
   --puomi-min NUMBER    puomiMin — smallest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)
   --puomi-max NUMBER    puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)
-  --geocode BOOLEAN    Resolve lat/lng from the address via Google Maps when coordinates are not given (then persisted + echoed)
+  --geocode    Resolve lat/lng from the address via Google Maps when coordinates are not given (then persisted + echoed)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -9249,10 +9249,10 @@ FLAGS
   --search STRING    Case-insensitive substring over name/address/typeName (client-side scan up to 500 rows; newer backends also pre-filter server-side)
   --limit NUMBER    Max rows (capped at 500) (default: 100)
   --valid-at DATE    Only sijainnit valid on this date (startDate/endDate window)
-  --include-deleted BOOLEAN    Include soft-deleted sijainnit
-  --all BOOLEAN    Include ALL companies' sijainnit, not just own + shared (ownerAsiakasId 0)
+  --include-deleted    Include soft-deleted sijainnit
+  --all    Include ALL companies' sijainnit, not just own + shared (ownerAsiakasId 0)
   --asiakas NUMBER    Only rows owned by this asiakasId (client-side filter on ownerAsiakasId; combine with --all for another company's rows)
-  --jerry BOOLEAN    BetoniJerry audit lens: only Jerry-enrolled varikot (jerryActiveUntil set; expired included), each stamped with a derived \`matchable\` boolean
+  --jerry    BetoniJerry audit lens: only Jerry-enrolled varikot (jerryActiveUntil set; expired included), each stamped with a derived \`matchable\` boolean
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -9343,8 +9343,8 @@ ARGUMENTS
   <sijaintiId> NUMBER    sijaintiId to toggle (required)
 
 FLAGS
-  --on BOOLEAN    Enrol (jerryActiveUntil = sentinel) + ensure a delivery radius
-  --off BOOLEAN    Unenrol (jerryActiveUntil = null)
+  --on    Enrol (jerryActiveUntil = sentinel) + ensure a delivery radius
+  --off    Unenrol (jerryActiveUntil = null)
   --radius NUMBER    Delivery radius in km (maxDeliveryDistance) to set when enrolling; defaults to 50 when the varikko has none
   --puomi-min NUMBER    puomiMin (m) to set while enrolling — betonijerry matches requests with puomiMin <= boom <= puomiMax (NULL bound = unbounded)
   --puomi-max NUMBER    puomiMax (m) to set while enrolling
@@ -9391,7 +9391,7 @@ DESCRIPTION
   Permissions: requires auth.page.sijainnit.read.
 
 FLAGS
-  --jerry BOOLEAN    Use the BetoniJerry type set (useJerry=1)
+  --jerry    Use the BetoniJerry type set (useJerry=1)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -9466,7 +9466,7 @@ FLAGS
   --max-distance NUMBER    Delivery radius in km, stored as maxDeliveryDistance (not Jerry-only)
   --puomi-min NUMBER    puomiMin — smallest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)
   --puomi-max NUMBER    puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)
-  --geocode BOOLEAN    Force re-resolving lat/lng from the address via Google Maps (fails fast on no match). Address changes auto-geocode even without this flag when no coordinates are given
+  --geocode    Force re-resolving lat/lng from the address via Google Maps (fails fast on no match). Address changes auto-geocode even without this flag when no coordinates are given
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -9506,11 +9506,11 @@ DESCRIPTION
 FLAGS
   --from DATE    Start date (YYYY-MM-DD or today/yesterday/tomorrow)
   --to DATE    End date (YYYY-MM-DD or today/yesterday/tomorrow)
-  --today BOOLEAN    Shortcut for --from today --to today
+  --today    Shortcut for --from today --to today
   --month STRING    Whole calendar month YYYY-MM (expands to first→last day)
   --week DATE    7-day window starting <start>
   --by STRING    Single breakdown: customer|vehicle|driver|worksite|status|day (omit for full bundle)
-  --all BOOLEAN    All tenants (requires developer/system-admin access; 403 otherwise)
+  --all    All tenants (requires developer/system-admin access; 403 otherwise)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -10144,8 +10144,8 @@ DESCRIPTION
 
 FLAGS
   --limit NUMBER    Max rows (capped at 500) (default: 100)
-  --deleted BOOLEAN    Include soft-deleted vehicles (default: excluded)
-  --grid-only BOOLEAN    Only vehicles shown in the grid (showInGrid=1)
+  --deleted    Include soft-deleted vehicles (default: excluded)
+  --grid-only    Only vehicles shown in the grid (showInGrid=1)
   --valid-on DATE    Only vehicles whose validity window covers this day (YYYY-MM-DD or today/yesterday/tomorrow)
   --type NUMBER    Only this vehicleTypeId (see \`ib vehicle types\`)
   --asiakas NUMBER    List another company's fleet (cross-tenant). Requires sysadmin/developer or a vehicle-manage role on that tenant; default = active company.
@@ -10423,7 +10423,7 @@ FLAGS
   --capacity NUMBER    Concrete capacity in m3
   --puomi NUMBER    Boom length in metres (vehiclePuomi — informational; BetoniJerry matching uses sijainti puomiMin/puomiMax since 2026-07)
   --asiakas NUMBER    Owning asiakasId
-  --show-in-grid BOOLEAN    Whether the vehicle appears in the grid (true/false)
+  --show-in-grid    Whether the vehicle appears in the grid (true/false)
   --first-date DATE    Start of validity window (firstDate); YYYY-MM-DD or today/yesterday/tomorrow
   --last-date DATE    End of validity window (lastDate); YYYY-MM-DD or today/yesterday/tomorrow
 
@@ -10735,8 +10735,8 @@ ARGUMENTS
   <tyomaaId> NUMBER    tyomaaId to fetch (required)
 
 FLAGS
-  --include-building BOOLEAN    Attach parsed Helsinki building registry data as rakennusData (heavy; default off)
-  --include-cameras BOOLEAN    Attach nearby traffic cameras as cameras[] (heavy; default off)
+  --include-building    Attach parsed Helsinki building registry data as rakennusData (heavy; default off)
+  --include-cameras    Attach nearby traffic cameras as cameras[] (heavy; default off)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -11084,7 +11084,7 @@ ARGUMENTS
 
 FLAGS
   --limit NUMBER    Max results (backend caps at 100) (default: 50)
-  --my-companies BOOLEAN    Search across every company you belong to (customer/worksite/person)
+  --my-companies    Search across every company you belong to (customer/worksite/person)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
