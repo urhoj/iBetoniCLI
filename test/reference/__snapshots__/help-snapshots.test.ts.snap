@@ -1881,7 +1881,7 @@ ARGUMENTS
   <description> STRING    Kuvaus (or pass as --description) — free length, the column is nvarchar(max) (required)
 
 FLAGS
-  --type STRING    feature|improvement|bugfix (required)
+  --type STRING    feature|improvement|bugfix (conventional-commit synonyms accepted: fix→bugfix, feat→feature) (required)
   --area STRING    frontend|backend|cli|database|cicd (required)
   --title STRING    Entry title (required)
   --description STRING    Alias for the positional description; if both are passed, they must match
@@ -2117,7 +2117,7 @@ ARGUMENTS
   <changelogId> NUMBER    Entry id (required)
 
 FLAGS
-  --type STRING    feature|improvement|bugfix
+  --type STRING    feature|improvement|bugfix (conventional-commit synonyms accepted: fix→bugfix, feat→feature)
   --area STRING    frontend|backend|cli|database|cicd
   --title STRING    New title
   --description STRING    New description

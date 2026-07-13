@@ -118,6 +118,23 @@ export function resolveChangelogDescription(positional, flag) {
         failWith("--description (or a positional description) is required", 4);
     return description;
 }
+/**
+ * Conventional-commit synonyms for --type. Commit messages in this codebase use
+ * `fix:` / `feat:`, so agents and devs repeatedly pass those to `changelog add`
+ * (feedback #188). Map them to the canonical devChangelog enum before validation.
+ */
+const TYPE_SYNONYMS = { fix: "bugfix", feat: "feature" };
+/**
+ * Trim + lowercase --type and resolve a conventional-commit synonym
+ * (`fix`→`bugfix`, `feat`→`feature`). Unknown values pass through unchanged for
+ * validateEnums to reject; undefined passes through as undefined.
+ */
+export function normalizeType(type) {
+    if (type === undefined)
+        return undefined;
+    const v = type.trim().toLowerCase();
+    return TYPE_SYNONYMS[v] ?? v;
+}
 /** Normalize --language to a validated lowercase fi|en, or undefined when not passed. Exits 4 on a bad code. */
 export function normalizeLanguage(lang) {
     if (lang === undefined)
@@ -134,7 +151,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
     addWriteFlagsToCommand(c
         .command("add [description]")
         .description("Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row.")
-        .requiredOption("--type <t>", "feature|improvement|bugfix")
+        .requiredOption("--type <t>", "feature|improvement|bugfix (accepts fix→bugfix, feat→feature)")
         .requiredOption("--area <a>", "frontend|backend|cli|database|cicd")
         .requiredOption("--title <s>", "Entry title")
         .option("--description <s>", "Kuvaus — alias for the positional; if both are given, they must match")
@@ -152,6 +169,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--source <s>", "Source: human|routine (default: human)")
         .option("--date <d>", "Entry date (YYYY-MM-DD|today), default today")
         .option("--language <l>", "Entry language (fi|en), default fi")).action(async (description, o) => {
+        o.type = normalizeType(o.type);
         validateEnums(o.type, o.area, o.bumpLevel, o.source);
         const entryDate = resolveDate(o.date || "today");
         const body = {
@@ -236,7 +254,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
     addWriteFlagsToCommand(c
         .command("update <changelogId>")
         .description("Edit an entry")
-        .option("--type <t>", "feature|improvement|bugfix")
+        .option("--type <t>", "feature|improvement|bugfix (accepts fix→bugfix, feat→feature)")
         .option("--area <a>", "frontend|backend|cli|database|cicd")
         .option("--title <s>", "New title")
         .option("--description <s>", "New description")
@@ -251,6 +269,8 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--source <s>", "Source: human|routine")
         .option("--date <d>", "Entry date (YYYY-MM-DD|today)")
         .option("--language <l>", "Entry language (fi|en)")).action(async (id, o) => {
+        if (o.type !== undefined)
+            o.type = normalizeType(o.type);
         validateEnums(o.type, o.area, undefined, o.source);
         const patch = {};
         for (const k of [
@@ -355,7 +375,7 @@ export const CHANGELOG_SPECS = [
                 name: "type",
                 type: "string",
                 required: true,
-                description: "feature|improvement|bugfix",
+                description: "feature|improvement|bugfix (conventional-commit synonyms accepted: fix→bugfix, feat→feature)",
             },
             {
                 name: "area",
@@ -560,7 +580,7 @@ export const CHANGELOG_SPECS = [
             {
                 name: "type",
                 type: "string",
-                description: "feature|improvement|bugfix",
+                description: "feature|improvement|bugfix (conventional-commit synonyms accepted: fix→bugfix, feat→feature)",
             },
             {
                 name: "area",

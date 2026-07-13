@@ -2,7 +2,7 @@ import { test, expect, vi, beforeEach, describe } from "vitest";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, normalizeSentryRef, normalizeLanguage, readJsonInput, validateEnums, resolveChangelogDescription }
+import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, normalizeSentryRef, normalizeLanguage, normalizeType, readJsonInput, validateEnums, resolveChangelogDescription }
   from "../../src/commands/changelog/index.js";
 import type { ChangelogAddBody } from "../../src/commands/changelog/index.js";
 import type { ApiClient } from "../../src/api/client.js";
@@ -84,6 +84,38 @@ test("normalizeLanguage lowercases, trims, and passes undefined through", () => 
 
 test("normalizeLanguage rejects an unsupported code (exit 4)", () => {
   expect(() => normalizeLanguage("de")).toThrow(/fi\|en/);
+});
+
+describe("normalizeType conventional-commit synonyms (fb#188)", () => {
+  test("maps fix→bugfix and feat→feature", () => {
+    expect(normalizeType("fix")).toBe("bugfix");
+    expect(normalizeType("feat")).toBe("feature");
+  });
+
+  test("trims and lowercases before matching", () => {
+    expect(normalizeType("  FIX ")).toBe("bugfix");
+    expect(normalizeType("Feat")).toBe("feature");
+  });
+
+  test("passes canonical values through unchanged", () => {
+    expect(normalizeType("bugfix")).toBe("bugfix");
+    expect(normalizeType("feature")).toBe("feature");
+    expect(normalizeType("improvement")).toBe("improvement");
+  });
+
+  test("passes an unknown value through (lowercased) for validateEnums to reject", () => {
+    expect(normalizeType("nonsense")).toBe("nonsense");
+    expect(() => validateEnums(normalizeType("nonsense"))).toThrow(/feature\|improvement\|bugfix/);
+  });
+
+  test("passes undefined through", () => {
+    expect(normalizeType(undefined)).toBeUndefined();
+  });
+
+  test("the mapped synonym then passes validateEnums", () => {
+    expect(() => validateEnums(normalizeType("fix"))).not.toThrow();
+    expect(() => validateEnums(normalizeType("feat"))).not.toThrow();
+  });
 });
 
 test("normalizeSentryRef returns a bare short id unchanged", () => {
