@@ -291,7 +291,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib attachment register matches snapshot 1`] = `
 "USAGE
-  ib attachment register [flags]
+  ib attachment register --name <name> --orig-name <orig-name> --folder <folder> --size <size> --mime <mime> [flags]
 
 DESCRIPTION
   Persist attachment metadata AFTER the bytes are in Azure (remote-safe primitive; step 3 of the upload flow). Server stamps identity from the JWT (entryByPersonId, ownerAsiakasId) and rejects fileFolder values outside the active company.
@@ -535,7 +535,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib attachment upload-url matches snapshot 1`] = `
 "USAGE
-  ib attachment upload-url [flags]
+  ib attachment upload-url --name <name> [flags]
 
 DESCRIPTION
   Mint a 1-hour write-SAS upload URL (remote-safe primitive). The SERVER picks the blob path ({ownerAsiakasId}/{year}/{uuid}.{ext}) — callers cannot choose it. PUT your bytes to uploadUrl with header x-ms-blob-type: BlockBlob, then call \`ib attachment register\`.
@@ -1870,7 +1870,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib dev changelog add matches snapshot 1`] = `
 "USAGE
-  ib dev changelog add <description> [flags]
+  ib dev changelog add <description> --type <type> --area <area> --title <title> [flags]
 
 DESCRIPTION
   Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row.
@@ -2073,7 +2073,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib dev changelog report matches snapshot 1`] = `
 "USAGE
-  ib dev changelog report [flags]
+  ib dev changelog report --month <month> [flags]
 
 DESCRIPTION
   Generate the monthly report (markdown or json) from entries.
@@ -5055,7 +5055,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib legal save matches snapshot 1`] = `
 "USAGE
-  ib legal save [flags]
+  ib legal save --type <type> --doc-version <doc-version> [flags]
 
 DESCRIPTION
   Create a NEW document version (developer/sysadmin only). Versions are IMMUTABLE — any content/title change is a new version; there is no in-place edit. Saved as status='draft' (isActive=0) by default; --activate publishes atomically (status='active', archives the prior active version of the same type+tenant). Content from --file (local) or --content (inline; required over /api/cli/exec). --reason required unless --dry-run.
@@ -5182,7 +5182,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib legal type create matches snapshot 1`] = `
 "USAGE
-  ib legal type create [flags]
+  ib legal type create --name <name> --display-name <display-name> [flags]
 
 DESCRIPTION
   Create a new legal document TYPE (developer/sysadmin only). Types are the catalogue rows behind ib legal types; document versions attach to a type via ib legal save. --setting-type-id wires acceptance tracking — the id must exist in personSettingTypes and not be mapped to another type. --reason required unless --dry-run.
@@ -5339,7 +5339,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib log by-entity-date matches snapshot 1`] = `
 "USAGE
-  ib log by-entity-date [flags]
+  ib log by-entity-date --entity-type <entity-type> --from <from> --to <to> [flags]
 
 DESCRIPTION
   Changes affecting deliveries DATED in the window — filters by the entity's own date (keikka.pumppuAika / grid_palkit.starttime), NOT the change timestamp. This is what the grid Muutoshistoria drawer shows: 'everything that touched that day's deliveries, whenever the change was made'. GET /api/changes/by-entity-date/:ownerAsiakasId. Admin only. NOTE: reason/impersonatedByPersonName are null until the 2026-06 aggregate-procs backend deploy.
@@ -5451,7 +5451,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib log range matches snapshot 1`] = `
 "USAGE
-  ib log range [flags]
+  ib log range --from <from> --to <to> [flags]
 
 DESCRIPTION
   All changes MADE within a time window (by change timestamp), optional entityType/person filters — admin forensic view. GET /api/changes/range/:ownerAsiakasId. The backend has no row cap; --limit slices client-side (truncated:true when cut). NOTE: reason/impersonatedByPersonName are null until the 2026-06 aggregate-procs backend deploy.
@@ -5578,7 +5578,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib message board create matches snapshot 1`] = `
 "USAGE
-  ib message board create [flags]
+  ib message board create --title <title> --text <text> [flags]
 
 DESCRIPTION
   Create a notice (POST). --title, --text and --start-date are required; --priority defaults to info; --expires-at is optional (omit = never expires). Requires admin/editor. --reason required.
@@ -5827,7 +5827,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib message chat edit matches snapshot 1`] = `
 "USAGE
-  ib message chat edit <messageId> [flags]
+  ib message chat edit <messageId> --body <body> [flags]
 
 DESCRIPTION
   Edit a chat message's body (PATCH /api/messages/threads/:id/messages/:messageId). Author-only and only while unanswered (no later reply from a different participant). Moderators cannot edit. Sets editedAt, emits message:edited, no-ops if the body is unchanged. --dry-run previews the from→to diff CLIENT-SIDE.
@@ -6041,7 +6041,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib message chat send matches snapshot 1`] = `
 "USAGE
-  ib message chat send [<threadId>] [flags]
+  ib message chat send [<threadId>] --body <body> [flags]
 
 DESCRIPTION
   Send a message to a thread (POST /api/messages/threads/:id/messages). Outward-facing: the recipient sees it and gets a push. --dry-run previews the body + recipients CLIENT-SIDE without sending. --reason is stored as the message's sourceNote (optional).
@@ -6242,7 +6242,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib message daily get matches snapshot 1`] = `
 "USAGE
-  ib message daily get <boxId> [flags]
+  ib message daily get <boxId> --asiakas <asiakas> [flags]
 
 DESCRIPTION
   One daily box's row + its message for the date + its permission rows, resolved client-side over the list (there is no per-box GET).
@@ -6275,7 +6275,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib message daily grant matches snapshot 1`] = `
 "USAGE
-  ib message daily grant <boxId> [flags]
+  ib message daily grant <boxId> --to <to> --role <role> --box-asiakas <box-asiakas> [flags]
 
 DESCRIPTION
   Add a per-role ACL row on a shared box. The row defaults read-only — adjust read/edit afterwards with \`perm-set\`.
@@ -6354,7 +6354,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib message daily perm-set matches snapshot 1`] = `
 "USAGE
-  ib message daily perm-set <dailyMessageBoxAsiakasPermissionsId> [flags]
+  ib message daily perm-set <dailyMessageBoxAsiakasPermissionsId> --role <role> --access <access> [flags]
 
 DESCRIPTION
   Set a permission row's role + access (read = read-only, edit = read/write).
@@ -6425,7 +6425,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib message daily save matches snapshot 1`] = `
 "USAGE
-  ib message daily save <boxId> [flags]
+  ib message daily save <boxId> --title <title> [flags]
 
 DESCRIPTION
   Rename a box / edit its lisätieto (box metadata — distinct from \`set\`, which writes message content).
@@ -6461,7 +6461,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib message daily set matches snapshot 1`] = `
 "USAGE
-  ib message daily set <boxId> [flags]
+  ib message daily set <boxId> --date <date> [flags]
 
 DESCRIPTION
   Write or clear a box's message for a date — the core daily-message write. The backend also broadcasts a dailyMessage:updated socket to every associated company.
@@ -6506,7 +6506,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib message daily share matches snapshot 1`] = `
 "USAGE
-  ib message daily share <boxId> [flags]
+  ib message daily share <boxId> --to <to> [flags]
 
 DESCRIPTION
   Share a box to another tenant. The share starts read-only; add a per-role rule with \`grant\` then set access with \`perm-set\`.
@@ -6579,7 +6579,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib message support contact matches snapshot 1`] = `
 "USAGE
-  ib message support contact [flags]
+  ib message support contact --body <body> [flags]
 
 DESCRIPTION
   Open (or append to) a support thread escalating a tarjous (pumppuRequest) or keikka to the platform. Any authenticated user. A REAL write — honours the read-only write-lock. --dry-run resolves CLIENT-SIDE (prints the payload, never POSTs). Reply later with \`ib message chat send <threadId> --body ...\`.
@@ -6771,7 +6771,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib message thread participant add matches snapshot 1`] = `
 "USAGE
-  ib message thread participant add [<threadId>] [flags]
+  ib message thread participant add [<threadId>] --person <person> [flags]
 
 DESCRIPTION
   Add a colleague to a thread (POST /api/messages/threads/:id/participants; body { personId, role? }). The person must be a member of the thread's owning company (asiakasPerson membership check — the privacy gate; cross-company adds are blocked at 403). Idempotent via MERGE (reactivates a soft-left row). Manager-gated.
@@ -6821,7 +6821,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib message thread participant remove matches snapshot 1`] = `
 "USAGE
-  ib message thread participant remove [<threadId>] [flags]
+  ib message thread participant remove [<threadId>] --person <person> [flags]
 
 DESCRIPTION
   Soft-remove a participant from a thread (DELETE /api/messages/threads/:id/participants/:personId; sets leftAt = now). Manager-gated: owning-company admin or sysadmin/developer.
@@ -6867,7 +6867,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib message thread rename matches snapshot 1`] = `
 "USAGE
-  ib message thread rename [<threadId>] [flags]
+  ib message thread rename [<threadId>] --title <title> [flags]
 
 DESCRIPTION
   Set or clear the thread title (PATCH /api/messages/threads/:id; body { title }). Title max 200 chars; empty string clears it (sets to NULL). Manager-gated: owning-company admin or sysadmin/developer. Requires the messageThread.title migration to have run on the DB before the rename route is deployed.
@@ -6959,7 +6959,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib notification email send matches snapshot 1`] = `
 "USAGE
-  ib notification email send <recipient> [flags]
+  ib notification email send <recipient> --subject <subject> [flags]
 
 DESCRIPTION
   Send an email to one person (resolved within your company) or a raw address. Admin/HR/developer-gated server-side. Pick the sender domain with --from-brand (betoni=noreply@ibetoni.fi default, betonijerry=noreply@betonijerry.fi bypassing the demo reroute). One of --body/--html/--html-body required; --dry-run previews the resolved recipient + sender without sending.
@@ -7014,7 +7014,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib notification fcm send matches snapshot 1`] = `
 "USAGE
-  ib notification fcm send [flags]
+  ib notification fcm send --person <person> --title <title> --body <body> [flags]
 
 DESCRIPTION
   Send an FCM push notification to one person's registered devices. Admin/HR-gated server-side; the recipient is scoped to your company (a cross-tenant personId returns 404, not a push). --dry-run previews the recipient + active device count without sending.
@@ -7634,7 +7634,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib person absences matches snapshot 1`] = `
 "USAGE
-  ib person absences [flags]
+  ib person absences --from <from> --to <to> [flags]
 
 DESCRIPTION
   Staff absences (personPvm 'pois' rows — vacation / sick / etc.) in a date range. Staff-wide and person-keyed: the canonical 'who is away' query. An absent person cannot be set as a day driver, so this is also the driver-availability blocker list.
@@ -7792,7 +7792,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib person day clear matches snapshot 1`] = `
 "USAGE
-  ib person day clear [flags]
+  ib person day clear --person <person> --date <date> [flags]
 
 DESCRIPTION
   Delete a person's day row for a date (remove status entry). Requires --reason.
@@ -7836,7 +7836,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib person day get matches snapshot 1`] = `
 "USAGE
-  ib person day get [flags]
+  ib person day get --person <person> --from <from> [flags]
 
 DESCRIPTION
   List a person's day rows (status / vehicle / text) over a date range
@@ -7873,7 +7873,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib person day set matches snapshot 1`] = `
 "USAGE
-  ib person day set [flags]
+  ib person day set --person <person> --date <date> --status <status> [flags]
 
 DESCRIPTION
   Set a person's day availability status (vacation/sick/free/…). Requires --reason.
@@ -8350,7 +8350,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib person notify matches snapshot 1`] = `
 "USAGE
-  ib person notify <person> [flags]
+  ib person notify <person> --title <title> --body <body> [flags]
 
 DESCRIPTION
   Send an FCM push to a person — ergonomic alias for \`ib notification fcm send --person <person>\`. Admin/HR-gated. <person> is a personId or a name resolved within your company. --dry-run previews recipient + device count.
@@ -9697,7 +9697,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib vehicle driver assign matches snapshot 1`] = `
 "USAGE
-  ib vehicle driver assign <vehicleId> <date> [flags]
+  ib vehicle driver assign <vehicleId> <date> --person <person> [flags]
 
 DESCRIPTION
   Set the DAY driver of a vehicle for a date. ATOMIC (the same transaction the web grid uses): writes personPvm.vehicleId AND the driver on every keikka (keikkaPerson) and palkki (palkkiPerson) on that vehicle that day, and relocates the driver off any other vehicle they held that day. Returns the full set of affected rows. Requires --reason.
@@ -9950,7 +9950,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib vehicle driver default set matches snapshot 1`] = `
 "USAGE
-  ib vehicle driver default set <vehicleId> [flags]
+  ib vehicle driver default set <vehicleId> --person <person> [flags]
 
 DESCRIPTION
   Set the vehicle's STANDING default driver via /api/vehicle/setDefaultPumppari — the exact endpoint the FE 'Oletus pumppari' control uses. Cascades to FUTURE dates and returns a cascade summary. Requires --reason.
@@ -10033,7 +10033,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib vehicle driver history matches snapshot 1`] = `
 "USAGE
-  ib vehicle driver history <vehicleId> [flags]
+  ib vehicle driver history <vehicleId> --from <from> --to <to> [flags]
 
 DESCRIPTION
   Who was the DAY driver of one vehicle on each day of a range, sourced from personPvm (the live day-driver table) — NOT the legacy vehicleDriverDays. One row per day that had a driver.

@@ -120,7 +120,15 @@ export function formatHelp(spec: CommandSpec): string {
   const argSig = (spec.args ?? [])
     .map((a) => (a.required === false ? `[<${a.name}>]` : `<${a.name}>`))
     .join(" ");
-  lines.push(`  ${spec.command}${argSig ? " " + argSig : ""} [flags]`);
+  // Surface REQUIRED flags inline in the usage line so the mandatory set is
+  // learnable at a glance, not discovered one-at-a-time via runtime "required
+  // option not specified" rejections (fb#189). Optional flags stay behind [flags].
+  const requiredFlagSig = spec.flags
+    .filter((f) => f.required)
+    .map((f) => (f.type === "boolean" ? `--${f.name}` : `--${f.name} <${f.name}>`))
+    .join(" ");
+  const usageParts = [spec.command, argSig, requiredFlagSig, "[flags]"].filter(Boolean);
+  lines.push(`  ${usageParts.join(" ")}`);
   lines.push("");
 
   lines.push("DESCRIPTION");
