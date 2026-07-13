@@ -9,7 +9,7 @@ export function readJsonInput(path) {
 const TYPES = ["feature", "improvement", "bugfix"];
 const AREAS = ["frontend", "backend", "cli", "database", "cicd"];
 const BUMP_LEVELS = ["none", "patch", "minor", "major"];
-const LANGUAGES = ["fi", "en"]; // devChangelog.language is CHAR(2) NOT NULL DEFAULT 'fi'
+const LANGUAGES = ["fi", "en"]; // devChangelog.language is CHAR(2) NOT NULL DEFAULT 'en'
 const SOURCES = ["human", "routine"];
 /**
  * The repos whose versions `npm run deploy` Step 0 bumps independently, each
@@ -168,7 +168,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--sentry <ref>", "Sentry issue short id or URL this fixes")
         .option("--source <s>", "Source: human|routine (default: human)")
         .option("--date <d>", "Entry date (YYYY-MM-DD|today), default today")
-        .option("--language <l>", "Entry language (fi|en), default fi")).action(async (description, o) => {
+        .option("--language <l>", "Entry language (fi|en), default en")).action(async (description, o) => {
         o.type = normalizeType(o.type);
         validateEnums(o.type, o.area, o.bumpLevel, o.source);
         const entryDate = resolveDate(o.date || "today");
@@ -427,7 +427,7 @@ export const CHANGELOG_SPECS = [
                 type: "date",
                 description: "Entry date (YYYY-MM-DD|today)",
             },
-            { name: "language", type: "string", description: "Entry language (fi|en), default fi" },
+            { name: "language", type: "string", description: "Entry language (fi|en), default en" },
         ],
         writeFlags: true,
         mutates: true,

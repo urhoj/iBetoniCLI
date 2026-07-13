@@ -38,7 +38,7 @@ type Row = Record<string, unknown>;
 const TYPES = ["feature", "improvement", "bugfix"];
 const AREAS = ["frontend", "backend", "cli", "database", "cicd"];
 const BUMP_LEVELS = ["none", "patch", "minor", "major"];
-const LANGUAGES = ["fi", "en"]; // devChangelog.language is CHAR(2) NOT NULL DEFAULT 'fi'
+const LANGUAGES = ["fi", "en"]; // devChangelog.language is CHAR(2) NOT NULL DEFAULT 'en'
 const SOURCES = ["human", "routine"];
 
 /**
@@ -270,7 +270,7 @@ export function registerChangelogCommands(
       .option("--sentry <ref>", "Sentry issue short id or URL this fixes")
       .option("--source <s>", "Source: human|routine (default: human)")
       .option("--date <d>", "Entry date (YYYY-MM-DD|today), default today")
-      .option("--language <l>", "Entry language (fi|en), default fi")
+      .option("--language <l>", "Entry language (fi|en), default en")
   ).action(
     async (
       description: string | undefined,
@@ -543,7 +543,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         type: "date",
         description: "Entry date (YYYY-MM-DD|today)",
       },
-      { name: "language", type: "string", description: "Entry language (fi|en), default fi" },
+      { name: "language", type: "string", description: "Entry language (fi|en), default en" },
     ],
     writeFlags: true,
     mutates: true,
