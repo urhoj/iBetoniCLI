@@ -4321,6 +4321,43 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib jerry request decline matches snapshot 1`] = `
+"USAGE
+  ib jerry request decline <requestId> [flags]
+
+DESCRIPTION
+  Decline a request as a provider WITHOUT making an offer (POST /api/pumppuRequests/:id/decline). Your company bows out; --reason is stored and shown to the customer (who is emailed + pushed that a provider passed). The request leaves your Avoimet tab (moves to Päättyneet). Blocked (409) if you already have an active offer — use \`ib jerry offer withdraw\` instead. Idempotent. Requires provider role + --reason.
+  Permissions: requires provider company (isPumppuToimittaja).
+
+ARGUMENTS
+  <requestId> NUMBER    pumppuRequestId you were sent (required)
+
+FLAGS
+  --reason STRING    Decline reason — stored, shown to the customer, and audited (X-Action-Reason); REQUIRED
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success: true, declined: true, hasOtherProviders } (or { …, alreadyDeclined: true }) · { dryRun: true, wouldDecline: { pumppuRequestId, reason } } on --dry-run
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  Request not found / not a recipient → verify the requestId and that it was sent to your company
+  exit 4 (HTTP 409)  You already have an offer → withdraw the offer instead (ib jerry offer withdraw)
+  exit 3 (HTTP 403)  Not a provider         → switch to a provider company (company switch)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry request decline 88 --reason "kalusto varattu kyseiselle päivälle"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib jerry request get matches snapshot 1`] = `
 "USAGE
   ib jerry request get <requestId> [flags]
@@ -4416,6 +4453,42 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib jerry request offers 4012
   ib jerry request offers 4012 --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry request undecline matches snapshot 1`] = `
+"USAGE
+  ib jerry request undecline <requestId> [flags]
+
+DESCRIPTION
+  Reverse a prior decline as a provider (POST /api/pumppuRequests/:id/undecline). The request returns to your Avoimet tab and is offerable again. Idempotent (no-op success if you had not declined). No customer notification. Requires provider role + --reason.
+  Permissions: requires provider company (isPumppuToimittaja).
+
+ARGUMENTS
+  <requestId> NUMBER    pumppuRequestId you previously declined (required)
+
+FLAGS
+  --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { success: true, undeclined: boolean } · { dryRun: true, wouldUndecline: { pumppuRequestId } } on --dry-run
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  Request not found / not a recipient → verify the requestId and that it was sent to your company
+  exit 3 (HTTP 403)  Not a provider         → switch to a provider company (company switch)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry request undecline 88 --reason "kalusto vapautui"
 "
 `;
 

@@ -248,6 +248,42 @@ export async function runJerryRequestCancel(
 }
 
 /**
+ * Decline a whole request (provider-side; POST /api/pumppuRequests/:id/decline).
+ * The caller's company bows out WITHOUT making an offer; `reason` (also carried as
+ * the audit X-Action-Reason) is stored and shown to the customer, who is notified
+ * (email + push). Blocked (409) if the caller already has an active offer — use
+ * `offer withdraw` instead. Idempotent. The request leaves the provider's Avoimet
+ * tab. Requires provider role.
+ */
+export async function runJerryRequestDecline(
+  client: ApiClient,
+  id: number,
+  reason: string | undefined,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>(
+    `/api/pumppuRequests/${id}/decline`,
+    { reason: reason ?? null },
+    { headers: writeFlagsToHeaders(flags) }
+  );
+}
+
+/**
+ * Reverse a prior decline (provider-side; POST /api/pumppuRequests/:id/undecline).
+ * The request returns to the caller's Avoimet tab and is offerable again. Idempotent
+ * (a no-op success when there was no decline). No customer notification. Provider role.
+ */
+export async function runJerryRequestUndecline(
+  client: ApiClient,
+  id: number,
+  flags: WriteFlags
+): Promise<unknown> {
+  return client.post<unknown>(`/api/pumppuRequests/${id}/undecline`, {}, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/**
  * Create a customer pump request / tarjouspyyntö (POST /api/pumppuRequests).
  * CUSTOMER side — distinct from `runJerryOfferCreate` (the provider bid). The
  * backend geocodes `osoite` and inserts the request as status:'open', visible
@@ -787,6 +823,34 @@ export function registerJerryCommands(
     try {
       const client = await getClient();
       writeJson(await runJerryRequestCancel(client, parseId(idStr, "requestId"), opts));
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
+
+  addWriteFlagsToCommand(
+    request
+      .command("decline <requestId>")
+      .description("Decline a request WITHOUT offering (provider); --reason is stored + shown to the customer. Requires --reason.")
+  ).action(async (idStr: string, opts: WriteOpts) => {
+    requireReason(opts);
+    try {
+      const client = await getClient();
+      writeJson(await runJerryRequestDecline(client, parseId(idStr, "requestId"), opts.reason, opts));
+    } catch (e) {
+      exitWithError(e);
+    }
+  });
+
+  addWriteFlagsToCommand(
+    request
+      .command("undecline <requestId>")
+      .description("Reverse a prior decline (provider) — the request returns to your Avoimet tab. Requires --reason.")
+  ).action(async (idStr: string, opts: WriteOpts) => {
+    requireReason(opts);
+    try {
+      const client = await getClient();
+      writeJson(await runJerryRequestUndecline(client, parseId(idStr, "requestId"), opts));
     } catch (e) {
       exitWithError(e);
     }
