@@ -8,6 +8,17 @@ import type { ChangelogAddBody } from "../../src/commands/changelog/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
 const client = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn() } as unknown as ApiClient;
+
+/** Run a fn expected to throw and return the thrown value for structural assertions. */
+function captureThrow(fn: () => void): { exitCode?: number; body?: { problems?: Array<{ flag: string; got?: string; allowed?: string[]; synonyms?: Record<string, string> }>; sample?: string } } {
+  try {
+    fn();
+  } catch (e) {
+    return e as never;
+  }
+  throw new Error("expected fn to throw");
+}
+
 const asPost = () => client.post as ReturnType<typeof vi.fn>;
 const asGet = () => client.get as ReturnType<typeof vi.fn>;
 const asPut = () => client.put as ReturnType<typeof vi.fn>;
@@ -105,7 +116,15 @@ describe("normalizeType conventional-commit synonyms (fb#188)", () => {
 
   test("passes an unknown value through (lowercased) for validateEnums to reject", () => {
     expect(normalizeType("nonsense")).toBe("nonsense");
-    expect(() => validateEnums(normalizeType("nonsense"))).toThrow(/feature\|improvement\|bugfix/);
+    // Allowed values now live in the structured problems[] body (fb#204), not the
+    // message string — the caller gets them + synonyms + a sample in one response.
+    const err = captureThrow(() => validateEnums(normalizeType("nonsense")));
+    expect(err.exitCode).toBe(4);
+    const p = err.body?.problems?.[0];
+    expect(p).toMatchObject({ flag: "--type", issue: "invalid", got: "nonsense" });
+    expect(p?.allowed).toEqual(["feature", "improvement", "bugfix"]);
+    expect(p?.synonyms).toMatchObject({ fix: "bugfix", feat: "feature" });
+    expect(err.body?.sample).toContain("ib dev changelog add");
   });
 
   test("passes undefined through", () => {
@@ -228,7 +247,19 @@ describe("changelog --source flag", () => {
   });
 
   test("add --source xxx fails validation (exit 4)", () => {
-    expect(() => validateEnums(undefined, undefined, undefined, "xxx")).toThrow(/human\|routine/);
+    const err = captureThrow(() => validateEnums(undefined, undefined, undefined, "xxx"));
+    expect(err.exitCode).toBe(4);
+    const p = err.body?.problems?.[0];
+    expect(p).toMatchObject({ flag: "--source", issue: "invalid", got: "xxx" });
+    expect(p?.allowed).toEqual(["human", "routine"]);
+  });
+
+  test("multiple bad enums are reported together (aggregated) with a sample", () => {
+    const err = captureThrow(() => validateEnums("nope", "bogus", "huge", "alien"));
+    expect(err.exitCode).toBe(4);
+    const flags = (err.body?.problems ?? []).map((p) => p.flag);
+    expect(flags).toEqual(["--type", "--area", "--bump-level", "--source"]);
+    expect(err.body?.sample).toContain("ib dev changelog add");
   });
 
   test("list --source routine maps to the source query param", async () => {

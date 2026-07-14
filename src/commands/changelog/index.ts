@@ -25,7 +25,8 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { readFileSync } from "node:fs";
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, exitWithError, failWith, failValidation } from "../../output/json.js";
+import type { FlagProblem } from "../../output/validationEnvelope.js";
 import { resolveDate } from "../../dates.js";
 
 export function readJsonInput(path: string): unknown {
@@ -184,15 +185,34 @@ export async function runChangelogReleaseMap(
   );
 }
 
-export function validateEnums(type?: string, area?: string, bumpLevel?: string, source?: string): void {
+/**
+ * Validate the enum flags, reporting ALL bad values at once via the prescriptive
+ * validation envelope (feedback #204): each problem carries its allowed values
+ * (and, for --type, the accepted synonyms), plus a copy-paste sample resolved
+ * from the command's spec — so a caller fixes every enum in one re-run instead
+ * of hitting them one at a time. `commandPath` selects which spec (add/update)
+ * supplies the sample. (--language is validated separately in normalizeLanguage.)
+ */
+export function validateEnums(
+  type?: string,
+  area?: string,
+  bumpLevel?: string,
+  source?: string,
+  commandPath = "ib dev changelog add"
+): void {
+  const problems: FlagProblem[] = [];
   if (type !== undefined && !TYPES.includes(type))
-    failWith(`--type must be ${TYPES.join("|")}`, 4);
+    problems.push({ flag: "--type", issue: "invalid", got: type, allowed: TYPES, synonyms: TYPE_SYNONYMS });
   if (area !== undefined && !AREAS.includes(area))
-    failWith(`--area must be ${AREAS.join("|")}`, 4);
+    problems.push({ flag: "--area", issue: "invalid", got: area, allowed: AREAS });
   if (bumpLevel !== undefined && !BUMP_LEVELS.includes(bumpLevel))
-    failWith(`--bump-level must be ${BUMP_LEVELS.join("|")}`, 4);
+    problems.push({ flag: "--bump-level", issue: "invalid", got: bumpLevel, allowed: BUMP_LEVELS });
   if (source !== undefined && !SOURCES.includes(source))
-    failWith(`--source must be ${SOURCES.join("|")}`, 4);
+    problems.push({ flag: "--source", issue: "invalid", got: source, allowed: SOURCES });
+  if (problems.length)
+    failValidation(commandPath, problems, {
+      spec: CHANGELOG_SPECS.find((s) => s.command === commandPath),
+    });
 }
 
 /**
@@ -388,7 +408,7 @@ export function registerChangelogCommands(
       .option("--language <l>", "Entry language (fi|en)")
   ).action(async (id: string, o: Record<string, string> & WriteFlags & { vtag?: string }) => {
     if (o.type !== undefined) o.type = normalizeType(o.type)!;
-    validateEnums(o.type, o.area, undefined, o.source);
+    validateEnums(o.type, o.area, undefined, o.source, "ib dev changelog update");
     const patch: Partial<ChangelogAddBody> = {};
     for (const k of [
       "type",
@@ -515,12 +535,15 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         name: "type",
         type: "string",
         required: true,
+        allowed: TYPES,
+        synonyms: TYPE_SYNONYMS,
         description: "feature|improvement|bugfix (conventional-commit synonyms accepted: fix→bugfix, feat→feature)",
       },
       {
         name: "area",
         type: "string",
         required: true,
+        allowed: AREAS,
         description: "frontend|backend|cli|database|cicd",
       },
       {
@@ -546,7 +569,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       { name: "repo", type: "string", description: REPO_FLAG_DESC },
       { name: "sha", type: "string", description: "Commit SHAs (CSV)" },
       { name: "vtag", type: "string", description: "Version tag" },
-      { name: "bump-level", type: "string", default: "patch", description: "App version bump this implies: none|patch|minor|major" },
+      { name: "bump-level", type: "string", default: "patch", allowed: BUMP_LEVELS, description: "App version bump this implies: none|patch|minor|major" },
       {
         name: "feedback",
         type: "number",
@@ -560,6 +583,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       {
         name: "source",
         type: "string",
+        allowed: SOURCES,
         description: "Source: human (default) | routine (automated AI-routine entry)",
       },
       {
@@ -567,7 +591,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         type: "date",
         description: "Entry date (YYYY-MM-DD|today)",
       },
-      { name: "language", type: "string", description: "Entry language (fi|en), default en" },
+      { name: "language", type: "string", allowed: LANGUAGES, description: "Entry language (fi|en), default en" },
     ],
     writeFlags: true,
     mutates: true,

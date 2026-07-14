@@ -55,6 +55,20 @@ export interface CommandFlag {
   description: string;
   /** When true, a (required) suffix is appended in the FLAGS section. */
   required?: boolean;
+  /**
+   * Machine-readable set of accepted values for an enum flag (e.g. `["fi","en"]`).
+   * NOT rendered in `--help` (the prose description already states them) — it is
+   * consumed by the prescriptive validation envelope (`buildValidationEnvelope`)
+   * so a missing/invalid-flag error can list the allowed values inline, sparing
+   * the caller a follow-up `--help` round-trip (feedback #204).
+   */
+  allowed?: string[];
+  /**
+   * Accepted input synonyms mapped to their canonical `allowed` value
+   * (e.g. `{ fix: "bugfix", feat: "feature" }`). Surfaced in the validation
+   * envelope alongside `allowed`; not rendered in `--help`.
+   */
+  synonyms?: Record<string, string>;
 }
 
 export interface CommandSpec {

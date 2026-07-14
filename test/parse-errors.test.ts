@@ -53,15 +53,21 @@ describe("parser errors → JSON envelope", () => {
     expect(process.exitCode).toBe(4);
   });
 
-  test("missing required option → USAGE envelope, exit 4", async () => {
+  test("missing required option → prescriptive USAGE envelope, exit 4", async () => {
     await run(["customer", "person", "add", "--person", "1"]);
     const parsed = lastStderrJson();
     expect(parsed.code).toBe("USAGE");
     expect(String(parsed.error)).toMatch(/--asiakas/);
+    // Even a SINGLE missing flag now gets the structured problems[] + a sample
+    // (previously only ≥2 missing produced structured output) — fb#204.
+    const problems = parsed.problems as Array<{ flag: string; issue: string }>;
+    expect(problems.map((p) => p.flag)).toContain("--asiakas");
+    expect(problems.every((p) => p.issue === "missing")).toBe(true);
+    expect(typeof parsed.sample).toBe("string");
     expect(process.exitCode).toBe(4);
   });
 
-  test("missing required options are reported together", async () => {
+  test("missing required options are reported together, with allowed values + sample", async () => {
     await run(["dev", "changelog", "add", "--repo", "betonicli", "--title", "x"]);
     const parsed = lastStderrJson();
     const error = String(parsed.error);
@@ -70,6 +76,13 @@ describe("parser errors → JSON envelope", () => {
     expect(error).toContain("--area");
     // --description is no longer a parser-required option (fb#172: accepted
     // positionally or via --description, resolved in the action → exit 4 there).
+    const problems = parsed.problems as Array<{ flag: string; allowed?: string[] }>;
+    const byFlag = Object.fromEntries(problems.map((p) => [p.flag, p]));
+    // Allowed values are pulled from the command spec so the caller re-runs
+    // correctly without a --help round-trip (fb#204).
+    expect(byFlag["--type"].allowed).toEqual(["feature", "improvement", "bugfix"]);
+    expect(byFlag["--area"].allowed).toEqual(["frontend", "backend", "cli", "database", "cicd"]);
+    expect(String(parsed.sample)).toContain("ib dev changelog add");
     expect(process.exitCode).toBe(4);
   });
 

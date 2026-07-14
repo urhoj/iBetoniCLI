@@ -54,6 +54,7 @@ import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
 import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, setActiveCommandErrors } from "./output/json.js";
+import { buildValidationEnvelope } from "./output/validationEnvelope.js";
 import { buildUnknownCommandEnvelope } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { createApiClient } from "./api/client.js";
@@ -469,6 +470,11 @@ function missingMandatoryOptions(cmd) {
     }
     return missing;
 }
+/** Extract the long flag from a Commander flags string: `-t, --type <t>` → `--type`. */
+function longFlag(flags) {
+    const m = flags.match(/--[a-zA-Z0-9][\w-]*/);
+    return m ? m[0] : flags.split(/\s+/)[0];
+}
 /**
  * Terminal handler for `program.parseAsync(...).catch(...)`. Never calls
  * `process.exit()` (Windows-unsafe post-fetch) — sets `process.exitCode` and
@@ -516,15 +522,18 @@ export function handleParseRejection(err, parserText, erroringCommand) {
         if (err.code === "commander.missingMandatoryOptionValue" && erroringCommand) {
             const cmd = erroringCommand();
             const missing = cmd ? missingMandatoryOptions(cmd) : [];
-            if (cmd && missing.length > 1) {
-                emitStderr(JSON.stringify({
-                    success: false,
-                    error: `required options not specified for ${commandPath(cmd)}: ${missing.join(", ")}`,
-                    code: "USAGE",
-                    statusCode: 0,
-                    missingOptions: missing,
-                    hint: "usage error — run `ib <command> --help` for the exact arguments and flags, or `ib commands` to discover commands",
-                }) + "\n");
+            // Emit the PRESCRIPTIVE envelope for any number of missing required flags
+            // (previously only for >1): the caller gets every missing flag, its allowed
+            // values (from the command spec), and a copy-paste sample in ONE response —
+            // no `--help` round-trip, even for a single omitted flag (feedback #204).
+            if (cmd && missing.length) {
+                const path = commandPath(cmd);
+                const spec = COMMAND_SPECS.find((s) => s.command === path);
+                const problems = missing.map((f) => ({
+                    flag: longFlag(f),
+                    issue: "missing",
+                }));
+                emitStderr(JSON.stringify(buildValidationEnvelope(path, problems, { spec })) + "\n");
                 recordFriction(err, 4);
                 setExit(4);
                 return;

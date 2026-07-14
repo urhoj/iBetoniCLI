@@ -1,7 +1,8 @@
 import { CliError, exitCodeForError, hintForError } from "../api/errors.js";
 import { isListEnvelope, type ListEnvelope } from "../api/envelopes.js";
 import { renderList, renderRecord } from "./pretty.js";
-import type { CommandError } from "./help.js";
+import type { CommandError, CommandSpec } from "./help.js";
+import { buildValidationEnvelope, type FlagProblem } from "./validationEnvelope.js";
 import { getEmbeddedCtx } from "../embedded.js";
 import { recordFriction } from "../friction.js";
 
@@ -69,12 +70,20 @@ export function writeError(err: unknown): void {
     // the command's --help NOTES beforehand (e.g. 404 = deploy-gated endpoint?).
     // Prefers the running command's own spec remedy when one matches.
     const hint = hintForError(err, activeErrors);
+    // A prescriptive validation error (thrown via `failValidation`) carries an
+    // aggregated `problems` list (+ optional `sample`) in its body — spread them
+    // into the envelope so the caller gets every missing/invalid flag, its
+    // allowed values, and a copy-paste sample in ONE response (feedback #204).
+    const problems = Array.isArray(body.problems) ? body.problems : undefined;
+    const sample = typeof body.sample === "string" ? body.sample : undefined;
     emitStderr(
       JSON.stringify({
         success: false,
         error: err.message,
         code: body.code ?? null,
         statusCode: err.statusCode,
+        ...(problems ? { problems } : {}),
+        ...(sample ? { sample } : {}),
         ...(hint ? { hint } : {}),
       }) + "\n"
     );
@@ -147,6 +156,34 @@ export function failWith(message: string, exitCode: number, hint?: string): neve
  */
 export function failUsage(message: string, hint = ""): never {
   return failWith(message, 4, hint);
+}
+
+/**
+ * Terminate a command with an AGGREGATED, prescriptive validation error
+ * (feedback #204). Builds the standard validation envelope for `commandPath`
+ * from the supplied flag `problems` — enriching each with its allowed values /
+ * synonyms and a copy-paste `sample` from the injected `spec` — then throws a
+ * {@link CliError} (exit 4) carrying `{ code, problems, sample }` in its body.
+ * {@link writeError} spreads those into the stderr envelope, so the caller sees
+ * every problem, its allowed values, and a runnable sample in ONE response
+ * instead of fixing one flag, re-running, and hitting the next.
+ *
+ * Unlike `failWith` (single free-text message), use this whenever ≥1 enum/required
+ * flag is wrong so the fixes come back together.
+ */
+export function failValidation(
+  commandPath: string,
+  problems: FlagProblem[],
+  opts: { spec?: CommandSpec; sample?: string } = {}
+): never {
+  const env = buildValidationEnvelope(commandPath, problems, opts);
+  throw new CliError(
+    env.error,
+    0,
+    { code: env.code, problems: env.problems, ...(env.sample ? { sample: env.sample } : {}) },
+    4,
+    env.hint
+  );
 }
 
 /** Message extraction for failWith when re-raising a caught unknown. */
