@@ -93,6 +93,7 @@ async function fetchRows(
     maxComplexity?: number;
     limit?: number;
     offset?: number;
+    oldest?: boolean;
   }
 ): Promise<Record<string, unknown>[]> {
   const qs = new URLSearchParams();
@@ -104,6 +105,12 @@ async function fetchRows(
   if (params.maxComplexity !== undefined) qs.set("maxComplexity", String(params.maxComplexity));
   if (params.limit !== undefined) qs.set("limit", String(params.limit));
   if (params.offset !== undefined) qs.set("offset", String(params.offset));
+  // Oldest-first (FIFO) — the draining-loop order. Default (no flag) stays the
+  // backend's newest-first, which suits human "what just broke" triage.
+  if (params.oldest) {
+    qs.set("orderBy", "createdAt");
+    qs.set("orderDirection", "ASC");
+  }
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
   const rows = await client.get<Record<string, unknown>[]>(`/api/feedback${suffix}`);
   return Array.isArray(rows) ? rows : [];
@@ -238,8 +245,9 @@ function resolveStatuses(opts: {
  * (`open` + `reviewed`); pass `--all` for every status or `--status`/`--unresolved`
  * to filter. One status is a single server-filtered GET; the default,
  * `--unresolved`, and a CSV `--status` fan out to one GET per status, merged
- * newest-first and sliced [offset, offset+limit) client-side. Long free-text is
- * capped at 200 chars unless `--full`.
+ * newest-first (or oldest-first under `--oldest`) and sliced [offset,
+ * offset+limit) client-side. Long free-text is capped at 200 chars unless
+ * `--full`.
  */
 export async function runFeedbackList(
   client: ApiClient,
@@ -255,6 +263,7 @@ export async function runFeedbackList(
     unresolved?: boolean;
     all?: boolean;
     full?: boolean;
+    oldest?: boolean;
   }
 ): Promise<ListEnvelope<Record<string, unknown>>> {
   const statuses = resolveStatuses(opts);
@@ -271,6 +280,7 @@ export async function runFeedbackList(
       maxComplexity: opts.maxComplexity,
       limit: opts.limit,
       offset: opts.offset,
+      oldest: opts.oldest,
     });
   } else {
     const pages = await Promise.all(
@@ -283,13 +293,17 @@ export async function runFeedbackList(
           complexity: opts.complexity,
           maxComplexity: opts.maxComplexity,
           limit: CAP,
+          oldest: opts.oldest,
         })
       )
     );
     if (pages.some((p) => p.length >= CAP)) truncated = true;
+    // feedbackId is monotonic with createdAt, so it doubles as the merge key.
+    // dir = +1 oldest-first (ASC), -1 newest-first (DESC, the default).
+    const dir = opts.oldest ? 1 : -1;
     const merged = pages
       .flat()
-      .sort((a, b) => Number(b.feedbackId) - Number(a.feedbackId));
+      .sort((a, b) => dir * (Number(a.feedbackId) - Number(b.feedbackId)));
     const offset = opts.offset ?? 0;
     const limit = opts.limit ?? 50;
     if (merged.length > offset + limit) truncated = true;
@@ -545,6 +559,7 @@ export function registerFeedbackCommands(
     .option("--search <text>", "Substring match over description/command/resolution/errorText (deploy-gated)")
     .option("--complexity <n>", "Only items with this exact complexity (1-5)", Number)
     .option("--max-complexity <n>", "Only items with complexity <= n — the autonomously-workable slice (deploy-gated)", Number)
+    .option("--oldest", "Oldest-first (createdAt ASC) — FIFO drain order for the triage loop; default is newest-first")
     .option("--limit <n>", "Max rows (default 50, cap 200)", Number)
     .option("--offset <n>", "Pagination offset", Number)
     .action(
@@ -560,6 +575,7 @@ export function registerFeedbackCommands(
         unresolved?: boolean;
         all?: boolean;
         full?: boolean;
+        oldest?: boolean;
       }) => {
         try {
           writeJson(await runFeedbackList(await getClient(), opts));

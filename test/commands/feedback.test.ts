@@ -275,6 +275,36 @@ describe("ib feedback list", () => {
     expect(get).toHaveBeenCalledWith("/api/feedback?status=open&complexity=5");
   });
 
+  test("--oldest sets createdAt ASC ordering on the single-status path", async () => {
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { status: "open", oldest: true });
+    expect(get).toHaveBeenCalledWith(
+      "/api/feedback?status=open&orderBy=createdAt&orderDirection=ASC"
+    );
+  });
+
+  test("without --oldest no ordering params are sent (backend default newest-first)", async () => {
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { status: "open" });
+    expect(get).toHaveBeenCalledWith("/api/feedback?status=open");
+  });
+
+  test("--oldest forwards ASC ordering to every page AND merges oldest-first", async () => {
+    get.mockResolvedValueOnce([{ feedbackId: 3, status: "open" }]); // open page
+    get.mockResolvedValueOnce([{ feedbackId: 5, status: "reviewed" }]); // reviewed page
+    const out = await runFeedbackList(mockClient, { unresolved: true, oldest: true });
+    expect(get).toHaveBeenNthCalledWith(
+      1,
+      "/api/feedback?status=open&limit=200&orderBy=createdAt&orderDirection=ASC"
+    );
+    expect(get).toHaveBeenNthCalledWith(
+      2,
+      "/api/feedback?status=reviewed&limit=200&orderBy=createdAt&orderDirection=ASC"
+    );
+    // oldest-first: lower feedbackId leads (opposite of the newest-first default)
+    expect(out.items.map((r) => r.feedbackId)).toEqual([3, 5]);
+  });
+
   test("forwards --search to every page on the multi-status fan-out", async () => {
     get.mockResolvedValueOnce([]);
     get.mockResolvedValueOnce([]);

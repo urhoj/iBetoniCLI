@@ -4829,6 +4829,7 @@ const BASE_COMMAND_SPECS = [
             { name: "search", type: "string", description: "Substring match over description/command/resolution/errorText (deploy-gated)" },
             { name: "complexity", type: "number", description: "Only items with this exact complexity 1-5 (deploy-gated)" },
             { name: "max-complexity", type: "number", description: "Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls (deploy-gated)" },
+            { name: "oldest", type: "boolean", description: "Oldest-first (createdAt ASC) — FIFO drain order so the triage loop clears the backlog before newer arrivals; default is newest-first" },
             { name: "limit", type: "number", default: "50", description: "Max rows (cap 200)" },
             { name: "offset", type: "number", default: "0", description: "Pagination offset" },
             { name: "full", type: "boolean", description: "Return untruncated description/resolution (default: each capped at 200 chars)" },
@@ -4844,6 +4845,7 @@ const BASE_COMMAND_SPECS = [
             "Default scope is the active bucket (open + reviewed). Pass --all to include closed (applied/dismissed) items, or --status applied to target them.",
             "--search is a server-side substring filter added in a later backend version; against an older backend it is silently ignored (the list returns unfiltered) — deploy-gated.",
             "--complexity / --max-complexity filter on the AI-triage complexity estimate (1-5). `--max-complexity 3 --unresolved` is the autonomously-workable backlog for a batch-fix agent; also deploy-gated (ignored by an older backend).",
+            "--oldest sorts createdAt ASC so the automated triage loop drains the backlog oldest-first (FIFO) instead of favouring the newest reports it reads first; the human default stays newest-first. Layer it under a priority filter (e.g. `--kind bug --oldest`) to keep breakages ahead of age.",
         ],
         examples: [
             "ib dev feedback list",
@@ -4852,6 +4854,7 @@ const BASE_COMMAND_SPECS = [
             "ib dev feedback list --kind bug --limit 20",
             "ib dev feedback list --search IDOR",
             "ib dev feedback list --max-complexity 3 --unresolved",
+            "ib dev feedback list --scope cli --oldest",
         ],
     },
     {

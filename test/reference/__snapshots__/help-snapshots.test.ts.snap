@@ -2283,6 +2283,7 @@ FLAGS
   --search STRING    Substring match over description/command/resolution/errorText (deploy-gated)
   --complexity NUMBER    Only items with this exact complexity 1-5 (deploy-gated)
   --max-complexity NUMBER    Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls (deploy-gated)
+  --oldest    Oldest-first (createdAt ASC) — FIFO drain order so the triage loop clears the backlog before newer arrivals; default is newest-first
   --limit NUMBER    Max rows (cap 200) (default: 50)
   --offset NUMBER    Pagination offset (default: 0)
   --full    Return untruncated description/resolution (default: each capped at 200 chars)
@@ -2303,6 +2304,7 @@ NOTES
   - Default scope is the active bucket (open + reviewed). Pass --all to include closed (applied/dismissed) items, or --status applied to target them.
   - --search is a server-side substring filter added in a later backend version; against an older backend it is silently ignored (the list returns unfiltered) — deploy-gated.
   - --complexity / --max-complexity filter on the AI-triage complexity estimate (1-5). \`--max-complexity 3 --unresolved\` is the autonomously-workable backlog for a batch-fix agent; also deploy-gated (ignored by an older backend).
+  - --oldest sorts createdAt ASC so the automated triage loop drains the backlog oldest-first (FIFO) instead of favouring the newest reports it reads first; the human default stays newest-first. Layer it under a priority filter (e.g. \`--kind bug --oldest\`) to keep breakages ahead of age.
 
 EXAMPLES
   ib dev feedback list
@@ -2311,6 +2313,7 @@ EXAMPLES
   ib dev feedback list --kind bug --limit 20
   ib dev feedback list --search IDOR
   ib dev feedback list --max-complexity 3 --unresolved
+  ib dev feedback list --scope cli --oldest
 "
 `;
 
