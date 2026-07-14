@@ -1981,24 +1981,28 @@ FLAGS
   --status STRING    Substring match on the free-text status field, e.g. 'Deployed' (deploy-gated)
   --has-feedback    Only entries linked to a feedback id (deploy-gated)
   --has-sentry    Only entries linked to a Sentry issue (deploy-gated)
+  --unreleased    List only UNRELEASED/pending entries (versionTag IS NULL) + the max bump level — routes to \`changelog pending\`
+  --pending    Alias for --unreleased
   --limit NUMBER    Max rows
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<entry>
+  ListEnvelope<entry> | (with --unreleased) { items, entries, maxBumpLevel, count }
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
 
 NOTES
   - --search / --status / --has-feedback / --has-sentry are server-side filters added in a later backend version; against an older backend they are silently ignored (the list returns unfiltered) — deploy-gated.
+  - --unreleased/--pending ignores every other filter and returns the pending queue (\`changelog pending\`): the entries that drive the next deploy's per-repo version bump, plus the implied max bump level.
 
 EXAMPLES
   ib dev changelog list --month 2026-06 --type feature
   ib dev changelog list --search weather
   ib dev changelog list --has-feedback --status Deployed
+  ib dev changelog list --unreleased
 "
 `;
 
@@ -2023,7 +2027,7 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
 
 NOTES
-  - This is the unreleased/pending view (mirrors \`ib dev feedback list --unresolved\`); \`ib dev changelog report\` needs --month and only covers already-released entries.
+  - This is the unreleased/pending view (mirrors \`ib dev feedback list --unresolved\`). \`ib dev changelog list --unreleased\` and \`ib dev changelog report --unreleased\` are aliases that route here; \`report --month\` covers already-released months.
 
 SEE ALSO
   ib dev changelog report, ib dev changelog release
@@ -2073,34 +2077,37 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib dev changelog report matches snapshot 1`] = `
 "USAGE
-  ib dev changelog report --month <month> [flags]
+  ib dev changelog report [flags]
 
 DESCRIPTION
   Generate the monthly report (markdown or json) from entries.
   Auth: requires login (any authenticated user).
 
 FLAGS
-  --month STRING    YYYY-MM (required)
+  --month STRING    YYYY-MM (required unless --unreleased)
+  --unreleased    Report UNRELEASED/pending entries staged for the next release instead of a month — routes to \`changelog pending\`
+  --pending    Alias for --unreleased
   --format STRING    md|json (default: md)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { month, markdown } | { month, rows }
+  { month, markdown } | { month, rows } | (with --unreleased) { items, entries, maxBumpLevel, count }
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
+  exit 4  Neither --month nor --unreleased given (or bad --month) → pass --month YYYY-MM for a released month, or --unreleased for the pending queue
 
 NOTES
-  - --month is required (YYYY-MM); this renders a released monthly report, not the pending queue.
-  - To list UNRELEASED/pending entries staged for the next release, use \`ib dev changelog pending\` (there is no --unreleased flag here).
+  - --month (YYYY-MM) renders a released monthly report; --unreleased/--pending instead returns the pending queue (\`changelog pending\`) staged for the next release. Exactly one is needed.
 
 SEE ALSO
   ib dev changelog pending
 
 EXAMPLES
   ib dev changelog report --month 2026-06
+  ib dev changelog report --unreleased
 "
 `;
 
@@ -2332,6 +2339,7 @@ FLAGS
   --status STRING    open | reviewed | applied | dismissed
   --note STRING    Resolution note stored on the row
   --reason STRING    Alias for --note
+  --resolution STRING    Alias for --note (matches the output field name)
   --dry-run    Print the update body without sending (client-side)
   --full    Return the full updated row instead of the compact ack
 

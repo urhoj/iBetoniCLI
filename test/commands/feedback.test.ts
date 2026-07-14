@@ -435,6 +435,20 @@ describe("ib feedback resolve", () => {
     expect(put).not.toHaveBeenCalled();
   });
 
+  test("--resolution is an alias for --note (matches the output field name; feedback #203)", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 7, status: "dismissed" });
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient);
+    await program.parseAsync(
+      ["feedback", "resolve", "7", "--status", "dismissed", "--resolution", "by design"],
+      { from: "user" }
+    );
+    expect(put).toHaveBeenCalledWith("/api/feedback/7", {
+      status: "dismissed",
+      resolution: "by design",
+    });
+  });
+
   test("requires at least one of --status / --note", async () => {
     await expect(runFeedbackResolve(mockClient, 1, {})).rejects.toThrowError(CliError);
     expect(put).not.toHaveBeenCalled();

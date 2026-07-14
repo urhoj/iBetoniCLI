@@ -339,9 +339,18 @@ export function registerChangelogCommands(
     .option("--status <substr>", "Substring match on the free-text status field, e.g. 'Deployed' (deploy-gated)")
     .option("--has-feedback", "Only entries linked to a feedback id (deploy-gated)")
     .option("--has-sentry", "Only entries linked to a Sentry issue (deploy-gated)")
+    .option("--unreleased", "List only UNRELEASED/pending entries (versionTag IS NULL) staged for the next release, + the max bump level — routes to `changelog pending`")
+    .option("--pending", "Alias for --unreleased")
     .option("--limit <n>", "Max rows", Number)
     .action(async (o: Record<string, string | number | boolean>) => {
       try {
+        // --unreleased/--pending is the pending-queue view, not a month filter;
+        // route it to the dedicated endpoint so the literal command an agent
+        // reaches for works (feedback #196/#197).
+        if (o.unreleased || o.pending) {
+          writeJson(await runChangelogPending(await getClient()));
+          return;
+        }
         writeJson(await runChangelogList(await getClient(), o));
       } catch (e) {
         exitWithError(e);
@@ -421,12 +430,27 @@ export function registerChangelogCommands(
     .description(
       "Generate the monthly report from entries (markdown or json)"
     )
-    .requiredOption("--month <YYYY-MM>", "Month to render")
+    .option("--month <YYYY-MM>", "Month to render")
+    .option("--unreleased", "Report UNRELEASED/pending entries staged for the next release instead of a month — routes to `changelog pending`")
+    .option("--pending", "Alias for --unreleased")
     .option("--format <f>", "md|json", "md")
-    .action(async (o: { month: string; format: string }) => {
-      if (!/^\d{4}-\d{2}$/.test(o.month))
-        failWith("--month must be YYYY-MM", 4);
+    .action(async (o: { month?: string; unreleased?: boolean; pending?: boolean; format: string }) => {
       try {
+        // `report` covers already-RELEASED months; the unreleased/pending queue
+        // has its own endpoint. Accept --unreleased/--pending here so the
+        // natural `report --unreleased` an agent tries works instead of dead-
+        // ending on "required option --month" (feedback #196/#197).
+        if (o.unreleased || o.pending) {
+          writeJson(await runChangelogPending(await getClient()));
+          return;
+        }
+        if (!o.month)
+          failWith(
+            "--month <YYYY-MM> is required for a monthly report. For UNRELEASED/pending entries staged for the next release, use `ib dev changelog pending` (or `report --unreleased`).",
+            4
+          );
+        if (!/^\d{4}-\d{2}$/.test(o.month))
+          failWith("--month must be YYYY-MM", 4);
         writeJson(
           await runChangelogReport(await getClient(), o.month, o.format)
         );
@@ -630,9 +654,15 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         type: "boolean",
         description: "Only entries linked to a Sentry issue (deploy-gated)",
       },
+      {
+        name: "unreleased",
+        type: "boolean",
+        description: "List only UNRELEASED/pending entries (versionTag IS NULL) + the max bump level — routes to `changelog pending`",
+      },
+      { name: "pending", type: "boolean", description: "Alias for --unreleased" },
       { name: "limit", type: "number", description: "Max rows" },
     ],
-    outputShape: "ListEnvelope<entry>",
+    outputShape: "ListEnvelope<entry> | (with --unreleased) { items, entries, maxBumpLevel, count }",
     errors: [
       {
         http: 403,
@@ -643,11 +673,13 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     ],
     notes: [
       "--search / --status / --has-feedback / --has-sentry are server-side filters added in a later backend version; against an older backend they are silently ignored (the list returns unfiltered) — deploy-gated.",
+      "--unreleased/--pending ignores every other filter and returns the pending queue (`changelog pending`): the entries that drive the next deploy's per-repo version bump, plus the implied max bump level.",
     ],
     examples: [
       "ib dev changelog list --month 2026-06 --type feature",
       "ib dev changelog list --search weather",
       "ib dev changelog list --has-feedback --status Deployed",
+      "ib dev changelog list --unreleased",
     ],
   },
   {
@@ -757,9 +789,14 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       {
         name: "month",
         type: "string",
-        required: true,
-        description: "YYYY-MM",
+        description: "YYYY-MM (required unless --unreleased)",
       },
+      {
+        name: "unreleased",
+        type: "boolean",
+        description: "Report UNRELEASED/pending entries staged for the next release instead of a month — routes to `changelog pending`",
+      },
+      { name: "pending", type: "boolean", description: "Alias for --unreleased" },
       {
         name: "format",
         type: "string",
@@ -767,7 +804,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         description: "md|json",
       },
     ],
-    outputShape: "{ month, markdown } | { month, rows }",
+    outputShape: "{ month, markdown } | { month, rows } | (with --unreleased) { items, entries, maxBumpLevel, count }",
     errors: [
       {
         http: 403,
@@ -775,13 +812,20 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         meaning: "Developer only",
         remedy: "dev token",
       },
+      {
+        exit: 4,
+        meaning: "Neither --month nor --unreleased given (or bad --month)",
+        remedy: "pass --month YYYY-MM for a released month, or --unreleased for the pending queue",
+      },
     ],
     notes: [
-      "--month is required (YYYY-MM); this renders a released monthly report, not the pending queue.",
-      "To list UNRELEASED/pending entries staged for the next release, use `ib dev changelog pending` (there is no --unreleased flag here).",
+      "--month (YYYY-MM) renders a released monthly report; --unreleased/--pending instead returns the pending queue (`changelog pending`) staged for the next release. Exactly one is needed.",
     ],
     seeAlso: ["ib dev changelog pending"],
-    examples: ["ib dev changelog report --month 2026-06"],
+    examples: [
+      "ib dev changelog report --month 2026-06",
+      "ib dev changelog report --unreleased",
+    ],
   },
   {
     command: "ib dev changelog pending",
@@ -793,7 +837,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     outputShape: "{ entries, maxBumpLevel, count }",
     errors: [{ http: 403, exit: 3, meaning: "Developer only", remedy: "dev token" }],
     notes: [
-      "This is the unreleased/pending view (mirrors `ib dev feedback list --unresolved`); `ib dev changelog report` needs --month and only covers already-released entries.",
+      "This is the unreleased/pending view (mirrors `ib dev feedback list --unresolved`). `ib dev changelog list --unreleased` and `ib dev changelog report --unreleased` are aliases that route here; `report --month` covers already-released months.",
     ],
     seeAlso: ["ib dev changelog report", "ib dev changelog release"],
     examples: ["ib dev changelog pending"],

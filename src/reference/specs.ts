@@ -5294,6 +5294,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "status", type: "string", description: "open | reviewed | applied | dismissed" },
       { name: "note", type: "string", description: "Resolution note stored on the row" },
       { name: "reason", type: "string", description: "Alias for --note" },
+      { name: "resolution", type: "string", description: "Alias for --note (matches the output field name)" },
       { name: "dry-run", type: "boolean", description: "Print the update body without sending (client-side)" },
       { name: "full", type: "boolean", description: "Return the full updated row instead of the compact ack" },
     ],

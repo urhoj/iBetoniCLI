@@ -603,18 +603,19 @@ export function registerFeedbackCommands(
     .option("--status <status>", "open | reviewed | applied | dismissed")
     .option("--note <text>", "Resolution note stored on the row")
     .option("--reason <text>", "Alias for --note")
+    .option("--resolution <text>", "Alias for --note (matches the output field name)")
     .option("--dry-run", "Print the update body without sending (client-side)")
     .option("--full", "Return the full updated row (default: a compact ack)")
     .action(
       async (
         idStr: string,
-        opts: { status?: string; note?: string; reason?: string; dryRun?: boolean; full?: boolean }
+        opts: { status?: string; note?: string; reason?: string; resolution?: string; dryRun?: boolean; full?: boolean }
       ) => {
         try {
           writeJson(
             await runFeedbackResolve(await getClient(), parseId(idStr, "feedbackId"), {
               status: opts.status,
-              note: opts.note ?? opts.reason,
+              note: opts.note ?? opts.reason ?? opts.resolution,
               dryRun: opts.dryRun,
               full: opts.full,
             })

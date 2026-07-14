@@ -153,7 +153,12 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
             }
             catch (e) {
                 const detail = e instanceof Error ? e.message : String(e);
-                throw new CliError(detail, 401, null, 2);
+                // A FAILED refresh means the stored token is fully expired/invalid —
+                // `ib auth refresh` can't recover it (it 401s the same way), so the
+                // generic 401 remedy ("run ib auth refresh") is a dead end. Carry an
+                // explicit hint that overrides it and sends the caller straight to
+                // `ib auth login` (feedback #195).
+                throw new CliError(detail, 401, null, 2, "session refresh failed — the stored token is expired/invalid and cannot be refreshed; run `ib auth login` to re-authenticate");
             }
             currentToken = newToken;
             res = await fetchOrNetworkError(method, path, body, opts);

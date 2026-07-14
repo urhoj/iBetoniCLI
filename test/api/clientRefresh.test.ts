@@ -105,6 +105,9 @@ describe("ApiClient auto-refresh on 401", () => {
     await expect(client.get("/api/something")).rejects.toMatchObject({
       name: "CliError",
       exitCode: 2,
+      // A dead-token refresh failure carries an explicit hint sending the caller
+      // to `ib auth login` (not the dead-end `ib auth refresh`) — feedback #195.
+      hint: expect.stringContaining("ib auth login"),
     });
     // No retry fetch was issued because refresh failed.
     expect(mockFetch).toHaveBeenCalledTimes(1);

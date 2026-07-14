@@ -177,7 +177,8 @@ describe("changelog add bumpLevel", () => {
   });
 });
 
-import { runChangelogPending, runChangelogRelease, runChangelogReleaseMap } from "../../src/commands/changelog/index.js";
+import { runChangelogPending, runChangelogRelease, runChangelogReleaseMap, registerChangelogCommands } from "../../src/commands/changelog/index.js";
+import { Command } from "commander";
 
 describe("changelog pending/release", () => {
   test("pending GETs /api/changelog/pending", async () => {
@@ -291,6 +292,34 @@ describe("changelog list search / status / presence filters", () => {
     c.get.mockResolvedValue([]);
     await runChangelogList(c as never, { search: "x", hasFeedback: false });
     expect(c.get).toHaveBeenCalledWith("/api/changelog?search=x");
+  });
+});
+
+describe("changelog --unreleased routes to the pending queue (fb#196/197)", () => {
+  test("list --unreleased GETs /api/changelog/pending (not the month list)", async () => {
+    asGet().mockResolvedValue({ items: [], entries: [], maxBumpLevel: null, count: 0 });
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    await program.parseAsync(["changelog", "list", "--unreleased"], { from: "user" });
+    expect(asGet()).toHaveBeenCalledWith("/api/changelog/pending");
+  });
+
+  test("report --unreleased GETs /api/changelog/pending (no --month required)", async () => {
+    asGet().mockResolvedValue({ items: [], entries: [], maxBumpLevel: null, count: 0 });
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    await program.parseAsync(["changelog", "report", "--unreleased"], { from: "user" });
+    expect(asGet()).toHaveBeenCalledWith("/api/changelog/pending");
+  });
+
+  test("report with neither --month nor --unreleased exits 4 without any fetch", async () => {
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    const prevExit = process.exitCode;
+    await program.parseAsync(["changelog", "report"], { from: "user" });
+    expect(process.exitCode).toBe(4);
+    expect(asGet()).not.toHaveBeenCalled();
+    process.exitCode = prevExit;
   });
 });
 
