@@ -2328,6 +2328,7 @@ ARGUMENTS
 FLAGS
   --status STRING    open | reviewed | applied | dismissed
   --note STRING    Resolution note stored on the row
+  --reason STRING    Alias for --note
   --dry-run    Print the update body without sending (client-side)
   --full    Return the full updated row instead of the compact ack
 
