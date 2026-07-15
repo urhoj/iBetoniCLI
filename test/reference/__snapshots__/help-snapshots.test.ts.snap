@@ -1893,6 +1893,7 @@ FLAGS
   --files STRING    CSV of file paths
   --repo STRING    Repo this entry ships in — coordinated: puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace. ⚠ An unrecognized value fail-safe-bumps ALL coordinated repos on next deploy; for the standalone lane (betonicli, @ibetoni/*) also pass --bump-level none.
   --sha STRING    Commit SHAs (CSV)
+  --commit STRING    Alias for --sha — Commit SHAs (CSV); if both are given, they must match
   --vtag STRING    Version tag
   --bump-level STRING    App version bump this implies: none|patch|minor|major (default: patch)
   --feedback NUMBER    cliFeedback id this entry resolves
@@ -2183,6 +2184,7 @@ FLAGS
   --files STRING    CSV of file paths
   --repo STRING    Repo/submodule
   --sha STRING    Commit SHAs (CSV)
+  --commit STRING    Alias for --sha — Commit SHAs (CSV); if both are given, they must match
   --vtag STRING    Version tag
   --source STRING    Source: human|routine
   --date DATE    Entry date (YYYY-MM-DD|today)
@@ -3714,7 +3716,7 @@ exports[`Help snapshots — contract stability > help for ib jerry admin request
   ib jerry admin request get <requestId> [flags]
 
 DESCRIPTION
-  One request's full detail — date, customer, placing operator, worksite, m³, status, offer count, accepted/best price (GET /api/admin/jerry-requests/:id). For the offers use \`ib jerry admin request offers\`. System-admin only.
+  One request's full detail — date, customer, placing operator, worksite, m³, status, offer count, accepted/best price, plus the send-time recipient list with per-company fanout state (notified/viewed/declined/hasOffer) (GET /api/admin/jerry-requests/:id). For the offers use \`ib jerry admin request offers\`. System-admin only.
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
@@ -3727,7 +3729,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { pumppuRequestId, status, createdAt, sentAt, expiresAt, totalM3, kayttokohde, customerAsiakasId, customerNimi, operatorName, osoite, offerCount, acceptedPriceCents, bestPriceCents }
+  { pumppuRequestId, status, createdAt, sentAt, expiresAt, totalM3, kayttokohde, customerAsiakasId, customerNimi, operatorName, osoite, offerCount, acceptedPriceCents, bestPriceCents, recipients: [{ asiakasId, asiakasNimi, notifiedAt, viewedAt, declinedAt, declineReason, hasOffer }] }
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Invalid id             → pass a numeric requestId

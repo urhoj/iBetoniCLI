@@ -182,6 +182,17 @@ export function resolveChangelogDescription(positional, flag, summary) {
     return description;
 }
 /**
+ * Resolve --sha from itself or its --commit alias (feedback #210 — commit SHAs
+ * are near-universally called "commit", so first tries reach for --commit).
+ * Both may be given only when they agree. Shared by `add` and `update`; fold in
+ * BEFORE validateFieldLengths so the 500-char sha cap applies to the alias too.
+ */
+export function resolveShaAlias(sha, commit) {
+    if (sha !== undefined && commit !== undefined && sha.trim() !== commit.trim())
+        failWith("--commit is an alias for --sha — pass one, or identical values", 4);
+    return sha ?? commit;
+}
+/**
  * Conventional-commit synonyms for --type. Commit messages in this codebase use
  * `fix:` / `feat:`, so agents and devs repeatedly pass those to `changelog add`
  * (feedback #188). Map them to the canonical devChangelog enum before validation.
@@ -226,6 +237,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--files <csv>", "Comma-separated file paths")
         .option("--repo <r>", REPO_FLAG_DESC)
         .option("--sha <csv>", "Commit SHAs (CSV)")
+        .option("--commit <csv>", "Alias for --sha — Commit SHAs (CSV); if both are given, they must match")
         .option("--vtag <s>", "Version tag")
         .option("--bump-level <l>", "App version bump this implies: none|patch|minor|major", "patch")
         .option("--feedback <id>", "cliFeedback id this resolves", Number)
@@ -235,6 +247,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--language <l>", "Entry language (fi|en), default en")).action(async (description, o) => {
         o.type = normalizeType(o.type);
         validateEnums(o.type, o.area, o.bumpLevel, o.source);
+        o.sha = resolveShaAlias(o.sha, o.commit);
         validateFieldLengths(o);
         const entryDate = resolveDate(o.date || "today");
         const body = {
@@ -350,6 +363,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--files <csv>", "Comma-separated file paths")
         .option("--repo <r>", "Repo/submodule")
         .option("--sha <csv>", "Commit SHAs (CSV)")
+        .option("--commit <csv>", "Alias for --sha — Commit SHAs (CSV); if both are given, they must match")
         .option("--vtag <s>", "Version tag")
         .option("--source <s>", "Source: human|routine")
         .option("--date <d>", "Entry date (YYYY-MM-DD|today)")
@@ -366,6 +380,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
             if (o.description === undefined)
                 o.description = o.summary;
         }
+        o.sha = resolveShaAlias(o.sha, o.commit);
         validateFieldLengths(o);
         const patch = {};
         for (const k of [
@@ -520,6 +535,7 @@ export const CHANGELOG_SPECS = [
             { name: "files", type: "string", description: "CSV of file paths" },
             { name: "repo", type: "string", description: REPO_FLAG_DESC },
             { name: "sha", type: "string", description: "Commit SHAs (CSV)" },
+            { name: "commit", type: "string", description: "Alias for --sha — Commit SHAs (CSV); if both are given, they must match" },
             { name: "vtag", type: "string", description: "Version tag" },
             { name: "bump-level", type: "string", default: "patch", allowed: BUMP_LEVELS, description: "App version bump this implies: none|patch|minor|major" },
             {
@@ -726,6 +742,7 @@ export const CHANGELOG_SPECS = [
             { name: "files", type: "string", description: "CSV of file paths" },
             { name: "repo", type: "string", description: "Repo/submodule" },
             { name: "sha", type: "string", description: "Commit SHAs (CSV)" },
+            { name: "commit", type: "string", description: "Alias for --sha — Commit SHAs (CSV); if both are given, they must match" },
             { name: "vtag", type: "string", description: "Version tag" },
             { name: "source", type: "string", description: "Source: human|routine" },
             {

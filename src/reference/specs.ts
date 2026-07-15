@@ -4310,13 +4310,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin request get",
     description:
-      "One request's full detail — date, customer, placing operator, worksite, m³, status, offer count, accepted/best price (GET /api/admin/jerry-requests/:id). For the offers use `ib jerry admin request offers`. System-admin only.",
+      "One request's full detail — date, customer, placing operator, worksite, m³, status, offer count, accepted/best price, plus the send-time recipient list with per-company fanout state (notified/viewed/declined/hasOffer) (GET /api/admin/jerry-requests/:id). For the offers use `ib jerry admin request offers`. System-admin only.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
     flags: [],
     outputShape:
-      "{ pumppuRequestId, status, createdAt, sentAt, expiresAt, totalM3, kayttokohde, customerAsiakasId, customerNimi, operatorName, osoite, offerCount, acceptedPriceCents, bestPriceCents }",
+      "{ pumppuRequestId, status, createdAt, sentAt, expiresAt, totalM3, kayttokohde, customerAsiakasId, customerNimi, operatorName, osoite, offerCount, acceptedPriceCents, bestPriceCents, recipients: [{ asiakasId, asiakasNimi, notifiedAt, viewedAt, declinedAt, declineReason, hasOffer }] }",
     errors: [
       apiErr(400, "Invalid id", "pass a numeric requestId"),
       apiErr(403, "Not a system admin", "use a system-admin token"),

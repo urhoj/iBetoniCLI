@@ -2,7 +2,7 @@ import { test, expect, vi, beforeEach, describe } from "vitest";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, runChangelogDelete, normalizeSentryRef, normalizeLanguage, normalizeType, readJsonInput, validateEnums, validateFieldLengths, resolveChangelogDescription }
+import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, runChangelogDelete, normalizeSentryRef, normalizeLanguage, normalizeType, readJsonInput, validateEnums, validateFieldLengths, resolveChangelogDescription, resolveShaAlias }
   from "../../src/commands/changelog/index.js";
 import type { ChangelogAddBody } from "../../src/commands/changelog/index.js";
 import type { ApiClient } from "../../src/api/client.js";
@@ -438,6 +438,59 @@ describe("changelog list search / status / presence filters", () => {
     c.get.mockResolvedValue([]);
     await runChangelogList(c as never, { search: "x", hasFeedback: false });
     expect(c.get).toHaveBeenCalledWith("/api/changelog?search=x");
+  });
+});
+
+describe("changelog --commit alias for --sha (fb#210)", () => {
+  test("resolveShaAlias resolves either flag and rejects a conflict", () => {
+    expect(resolveShaAlias("abc", undefined)).toBe("abc");
+    expect(resolveShaAlias(undefined, "abc")).toBe("abc");
+    expect(resolveShaAlias(undefined, undefined)).toBeUndefined();
+    expect(resolveShaAlias("abc", "abc")).toBe("abc");
+    expect(() => resolveShaAlias("abc", "def")).toThrow(/alias for --sha/);
+  });
+
+  test("add accepts --commit and POSTs it as commitShas", async () => {
+    asPost().mockResolvedValue({ changelogId: 12 });
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    await program.parseAsync(
+      ["changelog", "add", "--type", "bugfix", "--area", "cli", "--title", "t",
+        "--description", "d", "--commit", "88a04698"],
+      { from: "user" }
+    );
+    expect(asPost()).toHaveBeenCalledWith(
+      "/api/changelog",
+      expect.objectContaining({ commitShas: "88a04698" }),
+      expect.any(Object)
+    );
+  });
+
+  test("update folds --commit into the commitShas patch", async () => {
+    asPut().mockResolvedValue({ changelogId: 12 });
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    await program.parseAsync(
+      ["changelog", "update", "12", "--commit", "9799cc6"],
+      { from: "user" }
+    );
+    expect(asPut()).toHaveBeenCalledWith(
+      "/api/changelog/12",
+      expect.objectContaining({ commitShas: "9799cc6" }),
+      expect.any(Object)
+    );
+  });
+
+  test("the aliased value still hits the 500-char sha length cap (exit 4, no POST)", async () => {
+    asPost().mockResolvedValue({ changelogId: 1 });
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    await expect(program.parseAsync(
+      ["changelog", "add", "--type", "bugfix", "--area", "cli", "--title", "t",
+        "--description", "d", "--commit", "x".repeat(501)],
+      { from: "user" }
+    )).rejects.toMatchObject({ exitCode: 4 });
+    expect(asPost()).not.toHaveBeenCalled();
   });
 });
 
