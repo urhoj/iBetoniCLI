@@ -2,7 +2,7 @@ import { test, expect, vi, beforeEach, describe } from "vitest";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, normalizeSentryRef, normalizeLanguage, normalizeType, readJsonInput, validateEnums, resolveChangelogDescription }
+import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, normalizeSentryRef, normalizeLanguage, normalizeType, readJsonInput, validateEnums, validateFieldLengths, resolveChangelogDescription }
   from "../../src/commands/changelog/index.js";
 import type { ChangelogAddBody } from "../../src/commands/changelog/index.js";
 import type { ApiClient } from "../../src/api/client.js";
@@ -267,6 +267,56 @@ describe("changelog --source flag", () => {
     c.get.mockResolvedValue([]);
     await runChangelogList(c as never, { source: "routine" });
     expect(c.get).toHaveBeenCalledWith("/api/changelog?source=routine");
+  });
+});
+
+describe("validateFieldLengths — bounded free-text caps (fb#206)", () => {
+  test("rejects an over-length --status (30-char varchar) with exit 4 naming the cap", () => {
+    const err = captureThrow(() => validateFieldLengths({ status: "x".repeat(31) }));
+    expect(err.exitCode).toBe(4);
+    expect((err as unknown as Error).message).toMatch(/--status/);
+    expect((err as unknown as Error).message).toMatch(/30/);
+    expect((err as unknown as Error).message).toMatch(/31/);
+  });
+
+  test("passes a --status exactly at the 30-char boundary", () => {
+    expect(() => validateFieldLengths({ status: "x".repeat(30) })).not.toThrow();
+  });
+
+  test("aggregates every over-length field in one error", () => {
+    const err = captureThrow(() =>
+      validateFieldLengths({ status: "x".repeat(31), severity: "y".repeat(21) })
+    );
+    expect(err.exitCode).toBe(4);
+    expect((err as unknown as Error).message).toMatch(/--status/);
+    expect((err as unknown as Error).message).toMatch(/--severity/);
+  });
+
+  test("ignores undefined and within-limit fields", () => {
+    expect(() =>
+      validateFieldLengths({ status: "Deployed", title: "short title", repo: "puminet5api" })
+    ).not.toThrow();
+  });
+
+  test("checks --sha/--vtag which map to longer columns", () => {
+    expect(() => validateFieldLengths({ sha: "a".repeat(500) })).not.toThrow();
+    expect(() => validateFieldLengths({ sha: "a".repeat(501) })).toThrow(/--sha/);
+    expect(() => validateFieldLengths({ vtag: "v".repeat(201) })).toThrow(/--vtag/);
+  });
+
+  test("add with an over-length --status exits 4 without POSTing (fb#206)", async () => {
+    // validateFieldLengths runs (like validateEnums) outside the action try, so
+    // the CliError propagates out of parseAsync to the bin's CliError-aware catch
+    // (exit 4) — the POST is never reached.
+    asPost().mockResolvedValue({ changelogId: 1 });
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    await expect(program.parseAsync(
+      ["changelog", "add", "--type", "bugfix", "--area", "cli", "--title", "t",
+        "--description", "d", "--status", "x".repeat(40)],
+      { from: "user" }
+    )).rejects.toMatchObject({ exitCode: 4 });
+    expect(asPost()).not.toHaveBeenCalled();
   });
 });
 

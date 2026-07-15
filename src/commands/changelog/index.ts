@@ -216,6 +216,46 @@ export function validateEnums(
 }
 
 /**
+ * Bounded free-text flags → their devChangelog column width (from
+ * `ib dev schema table devChangelog`). An over-length value otherwise reaches
+ * SQL and surfaces as a raw 500 ("String or binary data would be truncated",
+ * feedback #206) instead of a clean client-side validation error. Keyed by the
+ * CLI FLAG name (what the caller typed), so `--sha`→commitShas(500) and
+ * `--vtag`→versionTag(200). description/benefits/files are nvarchar(max)
+ * (unbounded, absent here); --sentry is pre-capped by normalizeSentryRef.
+ */
+const FIELD_MAX_LENGTHS: Record<string, number> = {
+  title: 300,
+  impact: 500,
+  status: 30,
+  severity: 20,
+  repo: 200,
+  sha: 500,
+  vtag: 200,
+};
+
+/**
+ * Reject over-length free-text flags BEFORE POSTing so they exit 4 (validation)
+ * naming each flag + its cap + the actual length, instead of the backend 500ing
+ * on "String or binary data would be truncated" (feedback #206). Every offending
+ * flag is reported together (aggregated) so the caller fixes them in one re-run.
+ * Shared by `add` and `update` (identical flag names). Exits 4; returns void.
+ */
+export function validateFieldLengths(o: Record<string, unknown>): void {
+  const over: string[] = [];
+  for (const [flag, cap] of Object.entries(FIELD_MAX_LENGTHS)) {
+    const v = o[flag];
+    if (typeof v === "string" && v.length > cap)
+      over.push(`--${flag} is ${v.length} chars (max ${cap})`);
+  }
+  if (over.length)
+    failWith(
+      `value too long — ${over.join("; ")}; shorten to fit the devChangelog column`,
+      4
+    );
+}
+
+/**
  * Resolve the entry description from the positional OR the --description alias
  * (mirrors `ib dev feedback create` — feedback #172). Exactly one is required;
  * both are allowed only when they agree. Exits 4 on conflict or absence.
@@ -298,6 +338,7 @@ export function registerChangelogCommands(
     ) => {
       o.type = normalizeType(o.type)!;
       validateEnums(o.type, o.area, o.bumpLevel, o.source);
+      validateFieldLengths(o);
       const entryDate = resolveDate(o.date || "today")!;
       const body: ChangelogAddBody = {
         type: o.type,
@@ -409,6 +450,7 @@ export function registerChangelogCommands(
   ).action(async (id: string, o: Record<string, string> & WriteFlags & { vtag?: string }) => {
     if (o.type !== undefined) o.type = normalizeType(o.type)!;
     validateEnums(o.type, o.area, undefined, o.source, "ib dev changelog update");
+    validateFieldLengths(o);
     const patch: Partial<ChangelogAddBody> = {};
     for (const k of [
       "type",
@@ -620,6 +662,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       "You can pass the description either positionally or as --description; if you pass both, they must match (mirrors `ib dev feedback create`).",
       'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib dev changelog add --type bugfix --area cli --title "x" -- "-5% render time". Everything after `--` is taken as positional text.',
       "--dry-run is SERVER-side (X-Dry-Run): the backend validates the payload then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s under --dry-run.",
+      "Bounded free-text flags are length-checked client-side (exit 4) before POSTing: --status ≤30, --severity ≤20, --title ≤300, --impact ≤500, --repo/--vtag ≤200, --sha ≤500. (--description/--benefits/--files are unbounded.)",
       "Developer-gated.",
     ],
     seeAlso: ["ib dev changelog report", "ib dev feedback resolve"],
