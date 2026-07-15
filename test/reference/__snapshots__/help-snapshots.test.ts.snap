@@ -1885,6 +1885,7 @@ FLAGS
   --area STRING    frontend|backend|cli|database|cicd (required)
   --title STRING    Entry title (required)
   --description STRING    Alias for the positional description; if both are passed, they must match
+  --summary STRING    Alias for --description (the entry body); if both are passed, they must match
   --benefits STRING    Hyödyt
   --impact STRING    Vaikutus
   --status STRING    Tila (Julkaistu/Korjattu/...)
@@ -1917,7 +1918,7 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
 
 NOTES
-  - You can pass the description either positionally or as --description; if you pass both, they must match (mirrors \`ib dev feedback create\`).
+  - You can pass the description positionally, as --description, or as --summary (an alias) — if you pass more than one they must match (mirrors \`ib dev feedback create\`).
   - A description starting with "-" is parsed as an option (exit 4) — put a bare \`--\` terminator before it: ib dev changelog add --type bugfix --area cli --title "x" -- "-5% render time". Everything after \`--\` is taken as positional text.
   - --dry-run is SERVER-side (X-Dry-Run): the backend validates the payload then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s under --dry-run.
   - Bounded free-text flags are length-checked client-side (exit 4) before POSTing: --status ≤30, --severity ≤20, --title ≤300, --impact ≤500, --repo/--vtag ≤200, --sha ≤500. (--description/--benefits/--files are unbounded.)
@@ -2129,6 +2130,7 @@ FLAGS
   --area STRING    frontend|backend|cli|database|cicd
   --title STRING    New title
   --description STRING    New description
+  --summary STRING    Alias for --description; if both are passed, they must match
   --benefits STRING    Hyödyt
   --impact STRING    Vaikutus
   --status STRING    Status update (e.g. mark deployed)

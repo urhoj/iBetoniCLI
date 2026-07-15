@@ -334,7 +334,7 @@ describe("changelog add description positional-or-flag (fb#172)", () => {
   });
 
   test("rejects conflicting positional and --description (exit 4)", () => {
-    expect(() => resolveChangelogDescription("one", "two")).toThrow(/either positionally or with --description/);
+    expect(() => resolveChangelogDescription("one", "two")).toThrow(/must match/);
   });
 
   test("rejects when neither is given (exit 4)", () => {
@@ -343,6 +343,55 @@ describe("changelog add description positional-or-flag (fb#172)", () => {
 
   test("treats whitespace-only as absent", () => {
     expect(() => resolveChangelogDescription("   ", undefined)).toThrow(/required/);
+  });
+});
+
+describe("changelog --summary alias for --description (fb#205)", () => {
+  test("resolves --summary alone", () => {
+    expect(resolveChangelogDescription(undefined, undefined, "from summary")).toBe("from summary");
+  });
+
+  test("accepts --summary agreeing with --description / positional", () => {
+    expect(resolveChangelogDescription(undefined, "same", "same")).toBe("same");
+    expect(resolveChangelogDescription("same", undefined, "same")).toBe("same");
+  });
+
+  test("rejects --summary conflicting with --description (exit 4)", () => {
+    expect(() => resolveChangelogDescription(undefined, "a", "b")).toThrow(/must match/);
+  });
+
+  test("rejects --summary conflicting with the positional (exit 4)", () => {
+    expect(() => resolveChangelogDescription("pos", undefined, "other")).toThrow(/must match/);
+  });
+
+  test("add resolves the body from --summary and POSTs it as description", async () => {
+    asPost().mockResolvedValue({ changelogId: 11 });
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    await program.parseAsync(
+      ["changelog", "add", "--type", "bugfix", "--area", "cli", "--title", "t", "--summary", "body via summary"],
+      { from: "user" }
+    );
+    expect(asPost()).toHaveBeenCalledWith(
+      "/api/changelog",
+      expect.objectContaining({ description: "body via summary" }),
+      expect.any(Object)
+    );
+  });
+
+  test("update folds --summary into the description patch", async () => {
+    asPut().mockResolvedValue({ changelogId: 11 });
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    await program.parseAsync(
+      ["changelog", "update", "11", "--summary", "new body"],
+      { from: "user" }
+    );
+    expect(asPut()).toHaveBeenCalledWith(
+      "/api/changelog/11",
+      expect.objectContaining({ description: "new body" }),
+      expect.any(Object)
+    );
   });
 });
 

@@ -152,18 +152,21 @@ export function validateFieldLengths(o) {
         failWith(`value too long — ${over.join("; ")}; shorten to fit the devChangelog column`, 4);
 }
 /**
- * Resolve the entry description from the positional OR the --description alias
- * (mirrors `ib dev feedback create` — feedback #172). Exactly one is required;
- * both are allowed only when they agree. Exits 4 on conflict or absence.
+ * Resolve the entry description from the positional, the --description alias, OR
+ * the --summary alias (mirrors `ib dev feedback create` — feedback #172/#205;
+ * "summary" is the word an AI reaches for naturally for the entry body). All
+ * three are equivalent; exactly one value is required, and if several are given
+ * they must agree. Exits 4 on conflict or absence.
  */
-export function resolveChangelogDescription(positional, flag) {
-    const p = positional?.trim();
-    const f = flag?.trim();
-    if (p && f && p !== f)
-        failWith("Provide the description either positionally or with --description; if both are given, they must match", 4);
-    const description = p || f;
+export function resolveChangelogDescription(positional, flag, summary) {
+    const given = [positional, flag, summary]
+        .map((s) => s?.trim())
+        .filter((s) => !!s);
+    if (new Set(given).size > 1)
+        failWith("Provide the description once — via the positional, --description, or --summary; if several are given they must match", 4);
+    const description = given[0];
     if (!description)
-        failWith("--description (or a positional description) is required", 4);
+        failWith("--description (or --summary, or a positional description) is required", 4);
     return description;
 }
 /**
@@ -203,6 +206,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .requiredOption("--area <a>", "frontend|backend|cli|database|cicd")
         .requiredOption("--title <s>", "Entry title")
         .option("--description <s>", "Kuvaus — alias for the positional; if both are given, they must match")
+        .option("--summary <s>", "Alias for --description (the entry body); if both are given, they must match")
         .option("--benefits <s>", "Hyödyt")
         .option("--impact <s>", "Vaikutus")
         .option("--status <s>", "Tila (Julkaistu/Korjattu/...)")
@@ -225,7 +229,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
             type: o.type,
             area: o.area,
             title: o.title,
-            description: resolveChangelogDescription(description, o.description),
+            description: resolveChangelogDescription(description, o.description, o.summary),
             entryDate,
         };
         if (o.benefits)
@@ -316,6 +320,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--area <a>", "frontend|backend|cli|database|cicd")
         .option("--title <s>", "New title")
         .option("--description <s>", "New description")
+        .option("--summary <s>", "Alias for --description; if both are given, they must match")
         .option("--benefits <s>", "Hyödyt")
         .option("--impact <s>", "Vaikutus")
         .option("--status <s>", "Status update (e.g. mark deployed)")
@@ -330,6 +335,15 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         if (o.type !== undefined)
             o.type = normalizeType(o.type);
         validateEnums(o.type, o.area, undefined, o.source, "ib dev changelog update");
+        // --summary is an alias for --description (feedback #205); fold it in before
+        // the patch build so the loop below picks it up. Both may be given only when
+        // they agree.
+        if (o.summary !== undefined) {
+            if (o.description !== undefined && o.description.trim() !== o.summary.trim())
+                failWith("Provide the description via --description or --summary, not both with different values", 4);
+            if (o.description === undefined)
+                o.description = o.summary;
+        }
         validateFieldLengths(o);
         const patch = {};
         for (const k of [
@@ -468,6 +482,11 @@ export const CHANGELOG_SPECS = [
                 type: "string",
                 description: "Alias for the positional description; if both are passed, they must match",
             },
+            {
+                name: "summary",
+                type: "string",
+                description: "Alias for --description (the entry body); if both are passed, they must match",
+            },
             { name: "benefits", type: "string", description: "Hyödyt" },
             { name: "impact", type: "string", description: "Vaikutus" },
             { name: "status", type: "string", description: "Tila (Julkaistu/Korjattu/...)" },
@@ -528,7 +547,7 @@ export const CHANGELOG_SPECS = [
             },
         ],
         notes: [
-            "You can pass the description either positionally or as --description; if you pass both, they must match (mirrors `ib dev feedback create`).",
+            "You can pass the description positionally, as --description, or as --summary (an alias) — if you pass more than one they must match (mirrors `ib dev feedback create`).",
             'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib dev changelog add --type bugfix --area cli --title "x" -- "-5% render time". Everything after `--` is taken as positional text.',
             "--dry-run is SERVER-side (X-Dry-Run): the backend validates the payload then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s under --dry-run.",
             "Bounded free-text flags are length-checked client-side (exit 4) before POSTing: --status ≤30, --severity ≤20, --title ≤300, --impact ≤500, --repo/--vtag ≤200, --sha ≤500. (--description/--benefits/--files are unbounded.)",
@@ -673,6 +692,7 @@ export const CHANGELOG_SPECS = [
             },
             { name: "title", type: "string", description: "New title" },
             { name: "description", type: "string", description: "New description" },
+            { name: "summary", type: "string", description: "Alias for --description; if both are passed, they must match" },
             { name: "benefits", type: "string", description: "Hyödyt" },
             { name: "impact", type: "string", description: "Vaikutus" },
             {
