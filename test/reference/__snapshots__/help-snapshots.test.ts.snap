@@ -3971,6 +3971,35 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib jerry email-activity matches snapshot 1`] = `
+"USAGE
+  ib jerry email-activity [flags]
+
+DESCRIPTION
+  Developer SendGrid deliverability diagnostic for betonijerry.fi (GET /api/betonijerry/email-activity). READ-ONLY: reports domain-authentication validity (DKIM/DMARC), aggregate send stats over the window (delivered/bounces/spam with rate %), and recent suppressions (bounces/blocks/spam_reports/invalid_emails, incl. how many are @betonijerry.fi). Backed by a SEPARATE read-only SendGrid key on the server (KV sendgrid-diag-key) — never the app's mail.send key; the report includes a key.readOnly guardrail. Use it to watch deliverability as email volume grows (e.g. the re-added loser-notification #5).
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --days NUMBER    Window in days (1..90) (default: 7)
+  --domain STRING    Sending domain to report on (default: betonijerry.fi)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { domain, days, checkedAt, key:{ readOnly, hasWhitelabel, hasSuppression, hasStats }, domainAuth:{ valid, records:{ mail_cname, dkim1, dkim2 } }, suppressions:{ bounces|blocks|spam_reports|invalid_emails: { count, forDomain, recent[] } }, stats:{ delivered, bounces, spam_reports, bounceRatePct, spamRatePct }, verdict:{ domainAuthValid, deliverabilityFlags[] } }
+
+ERRORS (stderr, exit non-zero)
+  exit 2  Not logged in / token expired → ib auth login (or set IB_TOKEN)
+  exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
+  exit 6 (HTTP 503)  Diagnostic key not configured on this backend → set KV secret sendgrid-diag-key (read-only SendGrid key)
+
+EXAMPLES
+  ib jerry email-activity
+  ib jerry email-activity --days 30 --pretty
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib jerry offer accept matches snapshot 1`] = `
 "USAGE
   ib jerry offer accept <requestId> <offerId> [flags]

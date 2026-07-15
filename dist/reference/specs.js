@@ -3730,6 +3730,23 @@ const BASE_COMMAND_SPECS = [
         examples: ["ib jerry coverage"],
     },
     {
+        command: "ib jerry email-activity",
+        description: "Developer SendGrid deliverability diagnostic for betonijerry.fi (GET /api/betonijerry/email-activity). READ-ONLY: reports domain-authentication validity (DKIM/DMARC), aggregate send stats over the window (delivered/bounces/spam with rate %), and recent suppressions (bounces/blocks/spam_reports/invalid_emails, incl. how many are @betonijerry.fi). Backed by a SEPARATE read-only SendGrid key on the server (KV sendgrid-diag-key) — never the app's mail.send key; the report includes a key.readOnly guardrail. Use it to watch deliverability as email volume grows (e.g. the re-added loser-notification #5).",
+        auth: "any",
+        tier: "developer",
+        flags: [
+            { name: "days", type: "number", default: "7", description: "Window in days (1..90)" },
+            { name: "domain", type: "string", default: "betonijerry.fi", description: "Sending domain to report on" },
+        ],
+        outputShape: "{ domain, days, checkedAt, key:{ readOnly, hasWhitelabel, hasSuppression, hasStats }, domainAuth:{ valid, records:{ mail_cname, dkim1, dkim2 } }, suppressions:{ bounces|blocks|spam_reports|invalid_emails: { count, forDomain, recent[] } }, stats:{ delivered, bounces, spam_reports, bounceRatePct, spamRatePct }, verdict:{ domainAuthValid, deliverabilityFlags[] } }",
+        errors: [
+            { exit: 2, meaning: "Not logged in / token expired", remedy: "ib auth login (or set IB_TOKEN)" },
+            apiErr(403, "Developer/sysadmin only (server-enforced)", "use a developer account token"),
+            apiErr(503, "Diagnostic key not configured on this backend", "set KV secret sendgrid-diag-key (read-only SendGrid key)"),
+        ],
+        examples: ["ib jerry email-activity", "ib jerry email-activity --days 30 --pretty"],
+    },
+    {
         command: "ib jerry provider-settings get",
         description: "Read a provider company's BetoniJerry settings — contact person, opening hours, company description, maintainsOrderInfo (GET /api/jerry-provider-settings). Defaults to the caller's own company; --asiakas targets another company you have edit rights on. Returns defaults when no row exists yet.",
         permissions: ["edit-tier on the target company (tarjousAdmin / company admin)"],

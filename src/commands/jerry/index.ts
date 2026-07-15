@@ -396,6 +396,27 @@ export async function runJerryCoverage(client: ApiClient): Promise<Row> {
   };
 }
 
+/**
+ * BetoniJerry SendGrid deliverability / activity diagnostic (developer-only;
+ * GET /api/betonijerry/email-activity). READ-ONLY: domain-auth validity, 7-day
+ * send stats (delivered/bounces/spam), and recent suppressions. Backed by a
+ * separate read-only SendGrid key on the server — never the app's send key.
+ */
+export interface JerryEmailActivityOpts {
+  days?: number;
+  domain?: string;
+}
+export async function runJerryEmailActivity(
+  client: ApiClient,
+  opts: JerryEmailActivityOpts = {}
+): Promise<Row> {
+  const qs = new URLSearchParams();
+  if (opts.days != null) qs.set("days", String(opts.days));
+  if (opts.domain) qs.set("domain", opts.domain);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return client.get<Row>(`/api/betonijerry/email-activity${suffix}`);
+}
+
 // ─── provider settings ──────────────────────────────────────────────────────
 
 /**
@@ -1056,6 +1077,20 @@ export function registerJerryCommands(
       try {
         const client = await getClient();
         writeJson(await runJerryCoverage(client));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  // email-activity ─────────────────────────────────────────────────────────────
+  j.command("email-activity")
+    .description("Developer SendGrid deliverability check — domain-auth validity, send stats, suppressions")
+    .option("--days <n>", "Window in days (1..90, default 7)", (v: string) => Math.min(90, Math.max(1, Number(v))))
+    .option("--domain <d>", "Sending domain (default betonijerry.fi)")
+    .action(async (opts: JerryEmailActivityOpts) => {
+      try {
+        const client = await getClient();
+        writeJson(await runJerryEmailActivity(client, opts));
       } catch (e) {
         exitWithError(e);
       }
