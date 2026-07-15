@@ -60,6 +60,25 @@ const COORDINATED_REPOS = [
 ];
 const REPO_FLAG_DESC =
   "Repo this entry ships in — coordinated: puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace. ⚠ An unrecognized value fail-safe-bumps ALL coordinated repos on next deploy; for the standalone lane (betonicli, @ibetoni/*) also pass --bump-level none.";
+const AREA_FLAG_DESC =
+  "Technical layer: frontend|backend|cli|database|cicd (repo granularity goes in --repo, not here)";
+
+/**
+ * Repo-shaped values agents predictably pass to --area (feedback #212 —
+ * `ib feedback --scope` accepts "jerry", so `--area jerry` is a natural first
+ * reach when the work is in a specific repo). Maps the mistaken value to the
+ * --repo it almost certainly meant, so the validation problem can carry a
+ * targeted remedy instead of only the allowed-values list.
+ */
+const AREA_REPO_REMEDIES: Record<string, string> = {
+  jerry: "betonijerry",
+  betonijerry: "betonijerry",
+  puminet4: "puminet4",
+  puminet5api: "puminet5api",
+  "puminet7-functions-app": "puminet7-functions-app",
+  workspace: "workspace",
+  betonicli: "betonicli",
+};
 
 /**
  * Normalize a Sentry issue reference: accept a bare short id (e.g. PUMINET5API-1A2)
@@ -220,8 +239,20 @@ export function validateEnums(
   const problems: FlagProblem[] = [];
   if (type !== undefined && !TYPES.includes(type))
     problems.push({ flag: "--type", issue: "invalid", got: type, allowed: TYPES, synonyms: TYPE_SYNONYMS });
-  if (area !== undefined && !AREAS.includes(area))
-    problems.push({ flag: "--area", issue: "invalid", got: area, allowed: AREAS });
+  if (area !== undefined && !AREAS.includes(area)) {
+    const repo = AREA_REPO_REMEDIES[area.toLowerCase()];
+    problems.push({
+      flag: "--area",
+      issue: "invalid",
+      got: area,
+      allowed: AREAS,
+      ...(repo
+        ? {
+            remedy: `--area is the technical layer, not the repo — pass --repo ${repo} and pick the layer from the allowed values`,
+          }
+        : {}),
+    });
+  }
   if (bumpLevel !== undefined && !BUMP_LEVELS.includes(bumpLevel))
     problems.push({ flag: "--bump-level", issue: "invalid", got: bumpLevel, allowed: BUMP_LEVELS });
   if (source !== undefined && !SOURCES.includes(source))
@@ -346,7 +377,7 @@ export function registerChangelogCommands(
         "Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row."
       )
       .requiredOption("--type <t>", "feature|improvement|bugfix (accepts fix→bugfix, feat→feature)")
-      .requiredOption("--area <a>", "frontend|backend|cli|database|cicd")
+      .requiredOption("--area <a>", AREA_FLAG_DESC)
       .requiredOption("--title <s>", "Entry title")
       .option("--description <s>", "Kuvaus — alias for the positional; if both are given, they must match")
       .option("--summary <s>", "Alias for --description (the entry body); if both are given, they must match")
@@ -426,7 +457,7 @@ export function registerChangelogCommands(
     )
     .option("--month <YYYY-MM>", "Filter to a month")
     .option("--type <t>", "feature|improvement|bugfix")
-    .option("--area <a>", "frontend|backend|cli|database|cicd")
+    .option("--area <a>", AREA_FLAG_DESC)
     .option("--repo <r>", "Repo/submodule")
     .option("--feedback <id>", "Entries linked to a feedback id", Number)
     .option("--sentry <ref>", "Entries linked to a Sentry issue short id")
@@ -482,7 +513,7 @@ export function registerChangelogCommands(
       .command("update <changelogId>")
       .description("Edit an entry")
       .option("--type <t>", "feature|improvement|bugfix (accepts fix→bugfix, feat→feature)")
-      .option("--area <a>", "frontend|backend|cli|database|cicd")
+      .option("--area <a>", AREA_FLAG_DESC)
       .option("--title <s>", "New title")
       .option("--description <s>", "New description")
       .option("--summary <s>", "Alias for --description; if both are given, they must match")
@@ -646,7 +677,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         type: "string",
         required: true,
         allowed: AREAS,
-        description: "frontend|backend|cli|database|cicd",
+        description: AREA_FLAG_DESC,
       },
       {
         name: "title",
@@ -753,7 +784,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       {
         name: "area",
         type: "string",
-        description: "frontend|backend|cli|database|cicd",
+        description: AREA_FLAG_DESC,
       },
       { name: "repo", type: "string", description: "Repo/submodule" },
       {
@@ -866,7 +897,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       {
         name: "area",
         type: "string",
-        description: "frontend|backend|cli|database|cicd",
+        description: AREA_FLAG_DESC,
       },
       { name: "title", type: "string", description: "New title" },
       { name: "description", type: "string", description: "New description" },

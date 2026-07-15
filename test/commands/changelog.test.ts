@@ -286,6 +286,29 @@ describe("changelog --source flag", () => {
   });
 });
 
+describe("--area repo-name remedy (fb#212)", () => {
+  test("--area jerry carries a remedy pointing at --repo betonijerry", () => {
+    const err = captureThrow(() => validateEnums(undefined, "jerry"));
+    expect(err.exitCode).toBe(4);
+    const p = err.body?.problems?.[0];
+    expect(p).toMatchObject({ flag: "--area", issue: "invalid", got: "jerry" });
+    expect(p?.allowed).toEqual(["frontend", "backend", "cli", "database", "cicd"]);
+    expect(p?.remedy).toContain("--repo betonijerry");
+  });
+
+  test("--area puminet5api remedies to --repo puminet5api (case-insensitive)", () => {
+    const err = captureThrow(() => validateEnums(undefined, "Puminet5api"));
+    expect(err.body?.problems?.[0]?.remedy).toContain("--repo puminet5api");
+  });
+
+  test("a non-repo-shaped invalid --area gets no remedy, just the allowed list", () => {
+    const err = captureThrow(() => validateEnums(undefined, "bogus"));
+    const p = err.body?.problems?.[0];
+    expect(p?.allowed).toEqual(["frontend", "backend", "cli", "database", "cicd"]);
+    expect(p?.remedy).toBeUndefined();
+  });
+});
+
 describe("validateFieldLengths — bounded free-text caps (fb#206)", () => {
   test("rejects an over-length --status (30-char varchar) with exit 4 naming the cap", () => {
     const err = captureThrow(() => validateFieldLengths({ status: "x".repeat(31) }));

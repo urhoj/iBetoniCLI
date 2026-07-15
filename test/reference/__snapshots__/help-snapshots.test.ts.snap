@@ -1882,7 +1882,7 @@ ARGUMENTS
 
 FLAGS
   --type STRING    feature|improvement|bugfix (conventional-commit synonyms accepted: fix→bugfix, feat→feature) (required)
-  --area STRING    frontend|backend|cli|database|cicd (required)
+  --area STRING    Technical layer: frontend|backend|cli|database|cicd (repo granularity goes in --repo, not here) (required)
   --title STRING    Entry title (required)
   --description STRING    Alias for the positional description; if both are passed, they must match
   --summary STRING    Alias for --description (the entry body); if both are passed, they must match
@@ -2020,7 +2020,7 @@ DESCRIPTION
 FLAGS
   --month STRING    YYYY-MM
   --type STRING    feature|improvement|bugfix
-  --area STRING    frontend|backend|cli|database|cicd
+  --area STRING    Technical layer: frontend|backend|cli|database|cicd (repo granularity goes in --repo, not here)
   --repo STRING    Repo/submodule
   --feedback NUMBER    linked feedback id
   --sentry STRING    linked Sentry issue short id
@@ -2173,7 +2173,7 @@ ARGUMENTS
 
 FLAGS
   --type STRING    feature|improvement|bugfix (conventional-commit synonyms accepted: fix→bugfix, feat→feature)
-  --area STRING    frontend|backend|cli|database|cicd
+  --area STRING    Technical layer: frontend|backend|cli|database|cicd (repo granularity goes in --repo, not here)
   --title STRING    New title
   --description STRING    New description
   --summary STRING    Alias for --description; if both are passed, they must match

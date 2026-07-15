@@ -32,6 +32,12 @@ export interface FlagProblem {
   allowed?: string[];
   /** Accepted input synonyms → canonical value (e.g. `{ fix: "bugfix" }`). */
   synonyms?: Record<string, string>;
+  /**
+   * Targeted next step for THIS problem when the mistake is recognizable
+   * (e.g. a repo name passed to --area → "pass --repo <name> instead",
+   * feedback #212). Complements the envelope-level generic `hint`.
+   */
+  remedy?: string;
 }
 
 /** The prescriptive validation envelope emitted to stderr (exit 4). */
