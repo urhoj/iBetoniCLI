@@ -1934,6 +1934,51 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev changelog delete matches snapshot 1`] = `
+"USAGE
+  ib dev changelog delete <changelogId> [flags]
+
+DESCRIPTION
+  Soft-delete a change entry (isDeleted=1; retained for audit, hidden from all reads, no CLI undelete).
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <changelogId> NUMBER    Entry id (required)
+
+FLAGS
+  (none)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { deleted: true } | { dryRun, wouldDelete }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Developer only         → dev token
+  exit 5 (HTTP 404)  Not found (or already deleted) → ib dev changelog list
+
+NOTES
+  - Soft-delete: sets isDeleted=1 — the row is kept for audit but hidden from every read (get/list/report/pending), and there is no CLI undelete.
+  - Deleting an already-released entry (one with a versionTag) removes it from that month's generated report.
+  - --dry-run resolves CLIENT-side (echoes wouldDelete, issues no DELETE); the backend route has no X-Dry-Run guard.
+  - Deleting an already-deleted/missing id returns 404 (exit 5), not a no-op.
+  - Developer-gated.
+
+SEE ALSO
+  ib dev changelog update, ib dev changelog get
+
+EXAMPLES
+  ib dev changelog delete 805 --reason "test entry cleanup"
+  ib dev changelog delete 805 --dry-run
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev changelog get matches snapshot 1`] = `
 "USAGE
   ib dev changelog get <changelogId> [flags]

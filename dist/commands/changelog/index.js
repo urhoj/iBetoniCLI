@@ -81,6 +81,18 @@ export async function runChangelogUpdate(client, id, patch, flags) {
         headers: writeFlagsToHeaders(flags),
     });
 }
+/**
+ * DELETE /api/changelog/:id (backend soft-deletes: sets isDeleted=1). The route
+ * has no X-Dry-Run guard, so --dry-run resolves CLIENT-side (echoes wouldDelete,
+ * issues no DELETE) — mirrors runChangelogUpdate.
+ */
+export async function runChangelogDelete(client, id, flags) {
+    if (flags.dryRun)
+        return { dryRun: true, wouldDelete: { id } };
+    return client.delete(`/api/changelog/${id}`, {
+        headers: writeFlagsToHeaders(flags),
+    });
+}
 export async function runChangelogReport(client, month, format) {
     return client.get(`/api/changelog/report?month=${month}&format=${format}`);
 }
@@ -308,6 +320,16 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .action(async (id) => {
         try {
             writeJson(await runChangelogGet(await getClient(), Number(id)));
+        }
+        catch (e) {
+            exitWithError(e);
+        }
+    });
+    addWriteFlagsToCommand(c
+        .command("delete <changelogId>")
+        .description("Soft-delete an entry (sets isDeleted=1; retained for audit but hidden from all reads, no CLI undelete). Use to retract a mistaken/test entry.")).action(async (id, o) => {
+        try {
+            writeJson(await runChangelogDelete(await getClient(), Number(id), o));
         }
         catch (e) {
             exitWithError(e);
@@ -733,6 +755,33 @@ export const CHANGELOG_SPECS = [
         examples: [
             'ib dev changelog update 7 --status "Deployed prod"',
             "ib dev changelog update 386 --language en",
+        ],
+    },
+    {
+        command: "ib dev changelog delete",
+        description: "Soft-delete a change entry (isDeleted=1; retained for audit, hidden from all reads, no CLI undelete).",
+        auth: "any",
+        tier: "developer",
+        args: [{ name: "changelogId", type: "number", description: "Entry id" }],
+        flags: [],
+        writeFlags: true,
+        mutates: true,
+        outputShape: "{ deleted: true } | { dryRun, wouldDelete }",
+        errors: [
+            { http: 403, exit: 3, meaning: "Developer only", remedy: "dev token" },
+            { http: 404, exit: 5, meaning: "Not found (or already deleted)", remedy: "ib dev changelog list" },
+        ],
+        notes: [
+            "Soft-delete: sets isDeleted=1 — the row is kept for audit but hidden from every read (get/list/report/pending), and there is no CLI undelete.",
+            "Deleting an already-released entry (one with a versionTag) removes it from that month's generated report.",
+            "--dry-run resolves CLIENT-side (echoes wouldDelete, issues no DELETE); the backend route has no X-Dry-Run guard.",
+            "Deleting an already-deleted/missing id returns 404 (exit 5), not a no-op.",
+            "Developer-gated.",
+        ],
+        seeAlso: ["ib dev changelog update", "ib dev changelog get"],
+        examples: [
+            'ib dev changelog delete 805 --reason "test entry cleanup"',
+            "ib dev changelog delete 805 --dry-run",
         ],
     },
     {

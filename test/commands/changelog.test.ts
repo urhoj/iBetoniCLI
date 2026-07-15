@@ -2,10 +2,11 @@ import { test, expect, vi, beforeEach, describe } from "vitest";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, normalizeSentryRef, normalizeLanguage, normalizeType, readJsonInput, validateEnums, validateFieldLengths, resolveChangelogDescription }
+import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, runChangelogDelete, normalizeSentryRef, normalizeLanguage, normalizeType, readJsonInput, validateEnums, validateFieldLengths, resolveChangelogDescription }
   from "../../src/commands/changelog/index.js";
 import type { ChangelogAddBody } from "../../src/commands/changelog/index.js";
 import type { ApiClient } from "../../src/api/client.js";
+import { writeFlagsToHeaders } from "../../src/api/writeFlags.js";
 
 const client = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn() } as unknown as ApiClient;
 
@@ -77,6 +78,21 @@ test("update puts language in the patch body", async () => {
   await runChangelogUpdate(client, 7, { language: "en" }, {});
   expect(asPut()).toHaveBeenCalledWith("/api/changelog/7",
     expect.objectContaining({ language: "en" }), { headers: {} });
+});
+
+test("delete --dry-run never issues a DELETE", async () => {
+  const r = await runChangelogDelete(client, 7, { dryRun: true });
+  expect(r).toEqual({ dryRun: true, wouldDelete: { id: 7 } });
+  expect(client.delete as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
+});
+
+test("delete issues DELETE /api/changelog/:id with the write headers", async () => {
+  const asDelete = client.delete as ReturnType<typeof vi.fn>;
+  asDelete.mockResolvedValue({ deleted: true });
+  const r = await runChangelogDelete(client, 7, { reason: "cleanup" });
+  expect(asDelete).toHaveBeenCalledWith("/api/changelog/7",
+    { headers: writeFlagsToHeaders({ reason: "cleanup" }) });
+  expect(r).toEqual({ deleted: true });
 });
 
 test("add posts language in the body", async () => {
