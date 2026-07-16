@@ -5122,14 +5122,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib dev inbox",
     description:
-      "Aggregated operator inbox: counts of every open/incomplete signal (deploy-pending changelog, unresolved feedback, open support, staged legal drafts, glossary misses, live no_supply tarjouspyynnot) plus a memory-groom signal and a `needsYou` headline",
+      "Aggregated operator inbox: counts of every open/incomplete signal (deploy-pending changelog, unresolved feedback, open support, staged legal drafts, glossary misses, live no_supply tarjouspyynnot) plus a `needsYou` headline",
     auth: "any",
     tier: "developer",
     flags: [
       { name: "details", type: "boolean", description: "Include slimmed top-items per signal, not just counts" },
     ],
     outputShape:
-      "{ generatedAt, needsYou, changelog:{ pending, deployPending, maxBumpLevel }, feedback:{ open, reviewed, byKind:{ open, reviewed } }, support:{ open, truncated }, legal:{ drafts }, glossary:{ misses }, jerry:{ noSupplyLive, noSupplyExpired }, memory:{ feedbackId, entryCount, flaggedForRetire, groomDate, daysSince } | null } — with --details each signal also carries an `items` array (feedback.items splits into { open, reviewed }; each reviewed item also carries { readyToClose, activeVersion, activatedAt }; jerry.items carry an `expired` flag).",
+      "{ generatedAt, needsYou, changelog:{ pending, deployPending, maxBumpLevel }, feedback:{ open, reviewed, byKind:{ open, reviewed } }, support:{ open, truncated }, legal:{ drafts }, glossary:{ misses }, jerry:{ noSupplyLive, noSupplyExpired } } — with --details each signal also carries an `items` array (feedback.items splits into { open, reviewed }; each reviewed item also carries { readyToClose, activeVersion, activatedAt }; jerry.items carry an `expired` flag).",
     errors: [
       apiErr(401, "Token expired", "ib auth refresh"),
       apiErr(403, "Developer access required", "inbox is developer-gated; use a developer/sysadmin token"),

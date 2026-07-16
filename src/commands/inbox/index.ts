@@ -30,22 +30,13 @@ export interface InboxRollup {
     noSupplyExpired: number;
     items?: unknown[];
   };
-  memory:
-    | {
-        feedbackId: number;
-        entryCount: number | null;
-        flaggedForRetire: number | null;
-        groomDate: string | null;
-        daysSince: number | null;
-      }
-    | null;
 }
 
 /**
- * `ib inbox` — one aggregated rollup of the seven open/incomplete operator signals
+ * `ib inbox` — one aggregated rollup of the six open/incomplete operator signals
  * (deploy-pending changelog, unresolved feedback, open support
  * escalations, staged legal drafts, glossary misses, live no_supply
- * tarjouspyynnot, and a memory-groom signal). The single source of truth
+ * tarjouspyynnot). The single source of truth
  * behind the daily morning-report routine and the /admin operator dashboard.
  * Read-only; developer-gated server-side.
  */
@@ -65,7 +56,7 @@ export function registerInboxCommand(
   parent
     .command("inbox", { hidden: !!opts.hidden })
     .description(
-      "Aggregated operator inbox: counts of every open/incomplete signal (deploy-pending changelog, unresolved feedback, open support, staged legal drafts, glossary misses, live no_supply tarjouspyynnot) plus a memory-groom signal and a `needsYou` headline"
+      "Aggregated operator inbox: counts of every open/incomplete signal (deploy-pending changelog, unresolved feedback, open support, staged legal drafts, glossary misses, live no_supply tarjouspyynnot) plus a `needsYou` headline"
     )
     .option(
       "--details",
