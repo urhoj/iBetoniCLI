@@ -5,6 +5,7 @@ import {
   runFeedbackList,
   runFeedbackGet,
   runFeedbackResolve,
+  mergeNoteFlags,
   runFeedbackUpdate,
   runFeedbackCount,
   resolveFeedbackCreateDescription,
@@ -447,6 +448,27 @@ describe("ib feedback resolve", () => {
       status: "dismissed",
       resolution: "by design",
     });
+  });
+
+  test("distinct values across --resolution + --reason merge into one note (feedback #216)", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 8, status: "applied" });
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient);
+    await program.parseAsync(
+      ["feedback", "resolve", "8", "--status", "applied",
+        "--resolution", "detailed verification text", "--reason", "verified via ib legal"],
+      { from: "user" }
+    );
+    expect(put).toHaveBeenCalledWith("/api/feedback/8", {
+      status: "applied",
+      resolution: "detailed verification text\n\nverified via ib legal",
+    });
+  });
+
+  test("mergeNoteFlags dedupes identical values and returns undefined when none given", () => {
+    expect(mergeNoteFlags("same", "same", undefined)).toBe("same");
+    expect(mergeNoteFlags(undefined, undefined, undefined)).toBeUndefined();
+    expect(mergeNoteFlags("a", undefined, "b")).toBe("a\n\nb");
   });
 
   test("requires at least one of --status / --note", async () => {

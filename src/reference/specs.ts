@@ -5312,8 +5312,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [
       { name: "status", type: "string", description: "open | reviewed | applied | dismissed" },
       { name: "note", type: "string", description: "Resolution note stored on the row" },
-      { name: "reason", type: "string", description: "Alias for --note" },
-      { name: "resolution", type: "string", description: "Alias for --note (matches the output field name)" },
+      { name: "reason", type: "string", description: "Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header" },
+      { name: "resolution", type: "string", description: "Alias for --note (matches the output field name); distinct values across the three note flags are merged into one note" },
       { name: "dry-run", type: "boolean", description: "Print the update body without sending (client-side)" },
       { name: "full", type: "boolean", description: "Return the full updated row instead of the compact ack" },
     ],
@@ -5324,6 +5324,9 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
       apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    notes: [
+      "--note/--reason/--resolution write the SAME stored note. Passing several with different values merges them (joined in note→resolution→reason order) instead of dropping any — so mixing up --reason with the audit header loses nothing.",
     ],
     examples: [
       'ib dev feedback resolve 42 --status applied --note "added row counts in CLI v1.3"',

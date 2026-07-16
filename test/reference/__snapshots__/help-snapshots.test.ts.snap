@@ -2388,8 +2388,8 @@ ARGUMENTS
 FLAGS
   --status STRING    open | reviewed | applied | dismissed
   --note STRING    Resolution note stored on the row
-  --reason STRING    Alias for --note
-  --resolution STRING    Alias for --note (matches the output field name)
+  --reason STRING    Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header
+  --resolution STRING    Alias for --note (matches the output field name); distinct values across the three note flags are merged into one note
   --dry-run    Print the update body without sending (client-side)
   --full    Return the full updated row instead of the compact ack
 
@@ -2404,6 +2404,9 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\`
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - --note/--reason/--resolution write the SAME stored note. Passing several with different values merges them (joined in note→resolution→reason order) instead of dropping any — so mixing up --reason with the audit header loses nothing.
 
 EXAMPLES
   ib dev feedback resolve 42 --status applied --note "added row counts in CLI v1.3"

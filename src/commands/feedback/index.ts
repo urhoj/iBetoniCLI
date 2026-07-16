@@ -384,6 +384,17 @@ export interface FeedbackResolveInput {
 }
 
 /**
+ * --note / --reason / --resolution are aliases for the same stored note. When a
+ * caller passes more than one with DIFFERENT values — natural for an AI, since
+ * --reason means the X-Action-Reason audit header on every other write command —
+ * keep them all (joined), instead of silently dropping all but one (feedback #216).
+ */
+export function mergeNoteFlags(...values: Array<string | undefined>): string | undefined {
+  const distinct = [...new Set(values.filter((v): v is string => v !== undefined))];
+  return distinct.length ? distinct.join("\n\n") : undefined;
+}
+
+/**
  * PUT /api/feedback/:id — developer triage (status and/or resolution note).
  * A REAL write — blocked under --read-only (exit 3). `--dry-run` previews the
  * body client-side without sending.
@@ -602,8 +613,8 @@ export function registerFeedbackCommands(
     )
     .option("--status <status>", "open | reviewed | applied | dismissed")
     .option("--note <text>", "Resolution note stored on the row")
-    .option("--reason <text>", "Alias for --note")
-    .option("--resolution <text>", "Alias for --note (matches the output field name)")
+    .option("--reason <text>", "Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header")
+    .option("--resolution <text>", "Alias for --note (matches the output field name); distinct values across the three note flags are merged into one note")
     .option("--dry-run", "Print the update body without sending (client-side)")
     .option("--full", "Return the full updated row (default: a compact ack)")
     .action(
@@ -615,7 +626,7 @@ export function registerFeedbackCommands(
           writeJson(
             await runFeedbackResolve(await getClient(), parseId(idStr, "feedbackId"), {
               status: opts.status,
-              note: opts.note ?? opts.reason ?? opts.resolution,
+              note: mergeNoteFlags(opts.note, opts.resolution, opts.reason),
               dryRun: opts.dryRun,
               full: opts.full,
             })
