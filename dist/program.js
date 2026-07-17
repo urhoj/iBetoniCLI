@@ -13,6 +13,7 @@ import { createCliContext } from "./cliContext.js";
 import { recordFriction } from "./friction.js";
 import { registerAuthCommands } from "./commands/auth/index.js";
 import { registerCompanyCommands } from "./commands/company/index.js";
+import { registerFennoaCommands } from "./commands/fennoa/index.js";
 import { registerValidateCommands } from "./commands/validate/index.js";
 import { registerKeikkaCommands } from "./commands/keikka/index.js";
 import { registerCustomerCommands } from "./commands/customer/index.js";
@@ -151,6 +152,7 @@ export function buildProgram() {
     // authenticated commands so the spec catalogue and wiring tests can find it.
     registerHelpCommands(program, getClient);
     registerCompanyCommands(program, getClient, isReadOnly);
+    registerFennoaCommands(program, getClient);
     registerValidateCommands(program, getClient);
     registerKeikkaCommands(program, getClient);
     registerCustomerCommands(program, getClient);

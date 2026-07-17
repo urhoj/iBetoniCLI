@@ -14,6 +14,7 @@ import { recordFriction } from "./friction.js";
 import type { ApiClient } from "./api/client.js";
 import { registerAuthCommands } from "./commands/auth/index.js";
 import { registerCompanyCommands } from "./commands/company/index.js";
+import { registerFennoaCommands } from "./commands/fennoa/index.js";
 import { registerValidateCommands } from "./commands/validate/index.js";
 import { registerKeikkaCommands } from "./commands/keikka/index.js";
 import { registerCustomerCommands } from "./commands/customer/index.js";
@@ -163,6 +164,7 @@ export function buildProgram(): Command {
   registerHelpCommands(program, getClient);
 
   registerCompanyCommands(program, getClient, isReadOnly);
+  registerFennoaCommands(program, getClient);
   registerValidateCommands(program, getClient);
   registerKeikkaCommands(program, getClient);
   registerCustomerCommands(program, getClient);

@@ -375,6 +375,28 @@ const BASE_COMMAND_SPECS = [
             "ib auth impersonate --end",
         ],
     },
+    // ─── fennoa (system admin) ───────────────────────────────────────────────
+    {
+        command: "ib fennoa purchases",
+        description: "Open purchase invoices (payables) fetched live from Fennoa — default target PumiNet Oy (asiakasId 26). System-admin only; result cached 15 min server-side.",
+        permissions: ["isSystemAdmin"],
+        tier: "developer",
+        flags: [
+            { name: "all", type: "boolean", description: "Include settled invoices in the window, not only open (total_due > 0)" },
+            { name: "months", type: "number", default: "6", description: "Created-after window in months (default 6, max 12)" },
+            { name: "asiakas", type: "number", description: "Target company override (e.g. 8 = Kalle Urho Oy verification path)" },
+            { name: "refresh", type: "boolean", description: "Bypass the server's 15-minute cache" },
+        ],
+        outputShape: "ListEnvelope<{ id, supplierName, invoiceNumber, dueDate, totalDue, totalGross, paymentStatus, approvalStatus, ... }> & { summary: { count, totalDue, overdueCount, overdueTotal, oldestDueDate }, fetchedAt, asiakasId, months, cached? }",
+        errors: [
+            apiErr(401, "Token expired", "ib auth refresh"),
+            apiErr(403, "Not a system admin", "requires isSystemAdmin"),
+            apiErr(424, "Fennoa credentials missing for the target company", "add apiKeys rows (ownerAsiakasId + apiKeySourceId 16, USER/KEY) or use --asiakas 8"),
+            apiErr(500, "Backend or Fennoa API error", "retry with --verbose"),
+        ],
+        notes: ["Live two-phase Fennoa fetch (list + per-invoice detail); 'open' = total_due > 0 — the Fennoa API has no unpaid filter."],
+        examples: ["ib fennoa purchases", "ib fennoa purchases --asiakas 8 --months 2", "ib fennoa purchases --all --refresh"],
+    },
     // ─── company (4) ─────────────────────────────────────────────────────────
     {
         command: "ib company list",

@@ -23,6 +23,7 @@ export const DOMAIN_BLURBS = {
     vehicle: "Pump and mixer trucks — incl. `vehicle driver` (day-driver dispatch + standing default driver).",
     person: "System users — drivers, admins, office staff (incl. `person absences`).",
     company: "The tenant company your token acts as (multi-tenancy).",
+    fennoa: "Fennoa accounting integration — PumiNet Oy purchase invoices (system admin).",
     schedule: "Date-scoped views of keikkas: today / a day / a week.",
     stats: "Aggregated delivery statistics.",
     opendata: "Free/open external-data APIs — building registries, FMI weather, PRH business registry.",
