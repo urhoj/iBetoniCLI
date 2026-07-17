@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { CliError, exitCodeFromStatus } from "./errors.js";
 import { recordRequest, statsEnabled } from "../stats.js";
+import { getAmbientCommandPath } from "../commandContext.js";
 
 /**
  * BetoniJerry umbrella tenant (`@ibetoni/constants` BETONIJERRY.OWNER_ASIAKAS_ID).
@@ -152,10 +153,12 @@ export function createApiClient({
     extra: Record<string, string> = {},
     withBody = false
   ): Record<string, string> {
+    const ambientCommand = getAmbientCommandPath();
     const merged: Record<string, string> = {
       Authorization: `Bearer ${currentToken}`,
       "User-Agent": userAgent,
       "X-Request-ID": requestId || randomUUID(),
+      ...(ambientCommand ? { "X-Ib-Command": ambientCommand } : {}),
       ...(withBody ? { "Content-Type": "application/json" } : {}),
       ...extra,
     };

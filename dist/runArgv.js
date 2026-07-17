@@ -1,6 +1,7 @@
 import { buildProgram, enableParserThrow, handleParseRejection, applySpecErrors } from "./program.js";
 import { runEmbedded } from "./embedded.js";
 import { setCallerTier, resolveCallerTier, getCallerTier } from "./tier.js";
+import { setAmbientCommandPath, getAmbientCommandPath, commandPathOf } from "./commandContext.js";
 /**
  * Run an `ib` argv inside this process and return its captured result instead
  * of writing to stdout/exiting. A FRESH program is built per call: the
@@ -12,7 +13,10 @@ export async function runArgv(argv, opts) {
     const program = buildProgram();
     const { parserText, erroringCommand } = enableParserThrow(program);
     // Mirror bin/ib.ts: resolve each command's CommandSpec errors for hint output.
-    program.hook("preAction", (_t, actionCommand) => applySpecErrors(actionCommand));
+    program.hook("preAction", (_t, actionCommand) => {
+        setAmbientCommandPath(commandPathOf(actionCommand));
+        applySpecErrors(actionCommand);
+    });
     // Set the caller's visibility tier for this run; restore it in finally so the
     // module-global never leaks across calls. NOTE: the ambient tier is a module
     // global (unlike stdout/exitCode, which are per-call via AsyncLocalStorage).
@@ -24,6 +28,7 @@ export async function runArgv(argv, opts) {
     // this module global. The live path currently spawns a fresh process per call,
     // so there is no race today.
     const priorTier = getCallerTier();
+    const priorCommandPath = getAmbientCommandPath();
     setCallerTier(resolveCallerTier(opts.token));
     const ctx = {
         token: opts.token,
@@ -47,6 +52,7 @@ export async function runArgv(argv, opts) {
     }
     finally {
         setCallerTier(priorTier);
+        setAmbientCommandPath(priorCommandPath);
     }
     return {
         exitCode: ctx.exitCode ?? 0,

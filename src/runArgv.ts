@@ -1,6 +1,7 @@
 import { buildProgram, enableParserThrow, handleParseRejection, applySpecErrors } from "./program.js";
 import { runEmbedded, type EmbeddedCtx } from "./embedded.js";
 import { setCallerTier, resolveCallerTier, getCallerTier } from "./tier.js";
+import { setAmbientCommandPath, getAmbientCommandPath, commandPathOf } from "./commandContext.js";
 
 export interface RunArgvOpts {
   token: string;
@@ -29,7 +30,10 @@ export async function runArgv(
   const { parserText, erroringCommand } = enableParserThrow(program);
 
   // Mirror bin/ib.ts: resolve each command's CommandSpec errors for hint output.
-  program.hook("preAction", (_t, actionCommand) => applySpecErrors(actionCommand));
+  program.hook("preAction", (_t, actionCommand) => {
+    setAmbientCommandPath(commandPathOf(actionCommand));
+    applySpecErrors(actionCommand);
+  });
 
   // Set the caller's visibility tier for this run; restore it in finally so the
   // module-global never leaks across calls. NOTE: the ambient tier is a module
@@ -42,6 +46,7 @@ export async function runArgv(
   // this module global. The live path currently spawns a fresh process per call,
   // so there is no race today.
   const priorTier = getCallerTier();
+  const priorCommandPath = getAmbientCommandPath();
   setCallerTier(resolveCallerTier(opts.token));
 
   const ctx: EmbeddedCtx = {
@@ -65,6 +70,7 @@ export async function runArgv(
     });
   } finally {
     setCallerTier(priorTier);
+    setAmbientCommandPath(priorCommandPath);
   }
 
   return {

@@ -4,6 +4,7 @@ import {
   setAmbientCommandPath,
   getAmbientCommandPath,
 } from "../src/commandContext.js";
+import { runArgv } from "../src/runArgv.js";
 
 type Node = { name(): string; parent: Node | null };
 const node = (name: string, parent: Node | null = null): Node => ({ name: () => name, parent });
@@ -33,6 +34,15 @@ describe("ambient holder", () => {
     setAmbientCommandPath("keikka list");
     expect(getAmbientCommandPath()).toBe("keikka list");
     setAmbientCommandPath("");
+    expect(getAmbientCommandPath()).toBeNull();
+  });
+});
+
+describe("runArgv ambient command path", () => {
+  test("restored to the prior value after a run (offline command)", async () => {
+    setAmbientCommandPath(null);
+    // `ib commands` is fully offline (bundled index) — no network needed.
+    await runArgv(["commands"], { token: "not-a-jwt", endpoint: "http://127.0.0.1:9" });
     expect(getAmbientCommandPath()).toBeNull();
   });
 });

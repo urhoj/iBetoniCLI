@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { CliError, exitCodeFromStatus } from "./errors.js";
 import { recordRequest, statsEnabled } from "../stats.js";
+import { getAmbientCommandPath } from "../commandContext.js";
 /**
  * BetoniJerry umbrella tenant (`@ibetoni/constants` BETONIJERRY.OWNER_ASIAKAS_ID).
  * Writes resolved against it touch the shared umbrella org, so the acting-as
@@ -83,10 +84,12 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
         process.stderr.write(`[ib] write · acting as asiakasId ${actingAs.ownerAsiakasId}${name}${umbrella}\n`);
     }
     function buildHeaders(extra = {}, withBody = false) {
+        const ambientCommand = getAmbientCommandPath();
         const merged = {
             Authorization: `Bearer ${currentToken}`,
             "User-Agent": userAgent,
             "X-Request-ID": requestId || randomUUID(),
+            ...(ambientCommand ? { "X-Ib-Command": ambientCommand } : {}),
             ...(withBody ? { "Content-Type": "application/json" } : {}),
             ...extra,
         };

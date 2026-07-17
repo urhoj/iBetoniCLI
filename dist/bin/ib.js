@@ -6,6 +6,7 @@ import { setOutputMode } from "../output/json.js";
 import { resolveAuth } from "../auth/resolve.js";
 import { defaultCredentialsPath } from "../auth/store.js";
 import { setCallerTier, resolveCallerTier } from "../tier.js";
+import { setAmbientCommandPath, commandPathOf } from "../commandContext.js";
 const program = buildProgram();
 // Throw-instead-of-exit for the parser (usage errors become the JSON envelope
 // in handleParseRejection; help/version pass through) + capture its stderr.
@@ -15,6 +16,9 @@ program.hook("preAction", (_thisCommand, actionCommand) => {
         setOutputMode("pretty");
     if (getGlobalOptions(program).stats)
         enableStats();
+    // Which command is running — attached to every request as X-Ib-Command
+    // (command NAMES only) for the /systemmap live-activity stream.
+    setAmbientCommandPath(commandPathOf(actionCommand));
     // Resolve the running command's CommandSpec so error envelopes can echo ITS
     // documented per-error remedy as `hint` (feedback #25). Shared with runArgv.
     applySpecErrors(actionCommand);
