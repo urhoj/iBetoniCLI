@@ -1288,14 +1288,29 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib worksite update",
     description:
-      "Update a worksite via POST /api/tyomaa/set (ownerAsiakasId derived from the session JWT; yyyymmdd defaults to today).",
+      "Update a worksite via POST /api/tyomaa/set (ownerAsiakasId derived from the session JWT; yyyymmdd defaults to today). Set fields with typed flags (--name/--num/--address/--address2/--postal-code/--city/--driving-instructions/--comment/--invoice-ref/--contact-person) and/or a --body/--from-json JSON patch with backend column names (typed flags win); at least one field is required. Omitted fields are PRESERVED (the backend read-merges the stored row); pass an empty string to CLEAR a field (e.g. --comment \"\").",
     permissions: ["auth.page.tyomaa.edit"],
     args: [{ name: "tyomaaId", type: "number", description: "tyomaaId to update" }],
     flags: [
+      { name: "name", type: "string", description: "Worksite name (tyomaaNimi)" },
+      { name: "num", type: "string", description: "Worksite number (tyomaaNum)" },
+      { name: "address", type: "string", description: "Street address (tyomaaOsoite1)" },
+      { name: "address2", type: "string", description: "Address line 2 (tyomaaOsoite2)" },
+      { name: "postal-code", type: "string", description: "Postal code (tyomaaOsoite3)" },
+      { name: "city", type: "string", description: "City (tyomaaOsoite4)" },
+      { name: "driving-instructions", type: "string", description: "Driving instructions (tyomaaAjoOhje)" },
+      { name: "comment", type: "string", description: "Free-text memo (tyomaaMemo; pass \"\" to clear)" },
+      { name: "invoice-ref", type: "string", description: "Invoice reference (laskuViite)" },
+      { name: "contact-person", type: "number", description: "Contact personId (tyomaaContactPersonId; 0 = none)" },
       {
         name: "body",
         type: "json",
-        description: "JSON object with the fields to update",
+        description: "Patch body (JSON, backend column names e.g. tyomaaMemo — NOT the camelCase read keys), merged UNDER the typed flags. Mutually exclusive with --from-json.",
+      },
+      {
+        name: "from-json",
+        type: "string",
+        description: "Read the patch body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body.",
       },
       {
         name: "yyyymmdd",
@@ -1305,14 +1320,23 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     writeFlags: true,
-    outputShape: "{ ok: true, ... } (raw backend response)",
+    outputShape: "{ ok: true, ... } (raw backend response); --dry-run returns { dryRun: true, wouldUpdate: { <provided fields>, omittedFieldsPreserved: true } }",
     errors: [
-      apiErr(400, "Validation failed", "fix --body fields"),
+      apiErr(400, "No fields to update", "pass at least one typed flag or a --body/--from-json patch"),
+      apiErr(400, "Validation failed", "fix the patch fields"),
       apiErr(404, "Worksite not found", "verify tyomaaId"),
       ...permErrors("auth.page.tyomaa.edit"),
     ],
+    notes: [
+      "Prefer typed flags for the common fields — --comment maps to tyomaaMemo, --address to tyomaaOsoite1. Use --body/--from-json only for columns without a typed flag (e.g. rakennusDataJSON, asiakasId).",
+      "Address changes re-geocode the worksite server-side (lat/lng refresh).",
+      "Partial-update safety is server-side (tyomaa.setData read-merge, fb#234) — against an older backend without it, a partial body NULLs omitted columns. Verify with --dry-run first.",
+    ],
     examples: [
-      "ib worksite update 99 --body '{\"comment\":\"Pickup at gate B\"}'",
+      'ib worksite update 99 --comment "Pickup at gate B" --reason "gate info"',
+      'ib worksite update 99 --address "Uusikatu 2" --postal-code 00100 --city Helsinki --reason "address fix"',
+      'ib worksite update 99 --comment "" --reason "clear memo"',
+      "ib worksite update 99 --body '{\"tyomaaMemo\":\"Pickup at gate B\"}' --reason \"gate info\"",
     ],
   },
   {

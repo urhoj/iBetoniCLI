@@ -11337,7 +11337,7 @@ exports[`Help snapshots — contract stability > help for ib worksite update mat
   ib worksite update <tyomaaId> [flags]
 
 DESCRIPTION
-  Update a worksite via POST /api/tyomaa/set (ownerAsiakasId derived from the session JWT; yyyymmdd defaults to today).
+  Update a worksite via POST /api/tyomaa/set (ownerAsiakasId derived from the session JWT; yyyymmdd defaults to today). Set fields with typed flags (--name/--num/--address/--address2/--postal-code/--city/--driving-instructions/--comment/--invoice-ref/--contact-person) and/or a --body/--from-json JSON patch with backend column names (typed flags win); at least one field is required. Omitted fields are PRESERVED (the backend read-merges the stored row); pass an empty string to CLEAR a field (e.g. --comment "").
   Permissions: requires auth.page.tyomaa.edit.
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -11345,7 +11345,18 @@ ARGUMENTS
   <tyomaaId> NUMBER    tyomaaId to update (required)
 
 FLAGS
-  --body JSON    JSON object with the fields to update
+  --name STRING    Worksite name (tyomaaNimi)
+  --num STRING    Worksite number (tyomaaNum)
+  --address STRING    Street address (tyomaaOsoite1)
+  --address2 STRING    Address line 2 (tyomaaOsoite2)
+  --postal-code STRING    Postal code (tyomaaOsoite3)
+  --city STRING    City (tyomaaOsoite4)
+  --driving-instructions STRING    Driving instructions (tyomaaAjoOhje)
+  --comment STRING    Free-text memo (tyomaaMemo; pass "" to clear)
+  --invoice-ref STRING    Invoice reference (laskuViite)
+  --contact-person NUMBER    Contact personId (tyomaaContactPersonId; 0 = none)
+  --body JSON    Patch body (JSON, backend column names e.g. tyomaaMemo — NOT the camelCase read keys), merged UNDER the typed flags. Mutually exclusive with --from-json.
+  --from-json STRING    Read the patch body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body.
   --yyyymmdd DATE    Effective date segment YYYYMMDD (defaults to today) (default: today)
 
 WRITE-SAFETY FLAGS
@@ -11357,16 +11368,25 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { ok: true, ... } (raw backend response)
+  { ok: true, ... } (raw backend response); --dry-run returns { dryRun: true, wouldUpdate: { <provided fields>, omittedFieldsPreserved: true } }
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Validation failed      → fix --body fields
+  exit 4 (HTTP 400)  No fields to update    → pass at least one typed flag or a --body/--from-json patch
+  exit 4 (HTTP 400)  Validation failed      → fix the patch fields
   exit 5 (HTTP 404)  Worksite not found     → verify tyomaaId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.tyomaa.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - Prefer typed flags for the common fields — --comment maps to tyomaaMemo, --address to tyomaaOsoite1. Use --body/--from-json only for columns without a typed flag (e.g. rakennusDataJSON, asiakasId).
+  - Address changes re-geocode the worksite server-side (lat/lng refresh).
+  - Partial-update safety is server-side (tyomaa.setData read-merge, fb#234) — against an older backend without it, a partial body NULLs omitted columns. Verify with --dry-run first.
+
 EXAMPLES
-  ib worksite update 99 --body '{"comment":"Pickup at gate B"}'
+  ib worksite update 99 --comment "Pickup at gate B" --reason "gate info"
+  ib worksite update 99 --address "Uusikatu 2" --postal-code 00100 --city Helsinki --reason "address fix"
+  ib worksite update 99 --comment "" --reason "clear memo"
+  ib worksite update 99 --body '{"tyomaaMemo":"Pickup at gate B"}' --reason "gate info"
 "
 `;

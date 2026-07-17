@@ -1,7 +1,7 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
-import { parseJsonBodyFlag } from "../../api/parseBody.js";
+import { parseJsonBodyFlag, resolveJsonObjectBody } from "../../api/parseBody.js";
 import { registerLogAlias } from "../log/index.js";
 import { resolveTarget, parseId } from "../../targets.js";
 import { runAddressDashboard, } from "../_shared/addressDashboard.js";
@@ -111,16 +111,54 @@ function todayYyyymmdd() {
     return `${y}${m}${day}`;
 }
 /**
- * POST /api/tyomaa/set/:ownerAsiakasId/:tyomaaId/:yyyymmdd with a free-form
+ * Merge typed update flags over a parsed --body/--from-json patch (typed flags
+ * win) into the /api/tyomaa/set patch body. Only fields whose flag was actually
+ * provided are included, so any column the caller omitted is left out of the
+ * patch — the backend `tyomaa.setData` read-merges omitted columns back to the
+ * stored row (an explicit "" still clears). Body keys not covered by a typed
+ * flag are preserved untouched. Flag vocabulary mirrors the `worksite get`
+ * read projection (name/address/postalCode/city/comment/invoiceRef/…), and
+ * matches `customer update` naming. Mirrors buildPersonUpdateBody (fb#234).
+ */
+export function buildWorksiteUpdateBody(parsedBody, typed) {
+    const body = { ...parsedBody };
+    if (typed.name !== undefined)
+        body.tyomaaNimi = typed.name;
+    if (typed.num !== undefined)
+        body.tyomaaNum = typed.num;
+    if (typed.address !== undefined)
+        body.tyomaaOsoite1 = typed.address;
+    if (typed.address2 !== undefined)
+        body.tyomaaOsoite2 = typed.address2;
+    if (typed.postalCode !== undefined)
+        body.tyomaaOsoite3 = typed.postalCode;
+    if (typed.city !== undefined)
+        body.tyomaaOsoite4 = typed.city;
+    if (typed.drivingInstructions !== undefined)
+        body.tyomaaAjoOhje = typed.drivingInstructions;
+    if (typed.comment !== undefined)
+        body.tyomaaMemo = typed.comment;
+    if (typed.invoiceRef !== undefined)
+        body.laskuViite = typed.invoiceRef;
+    if (typed.contactPerson !== undefined)
+        body.tyomaaContactPersonId = typed.contactPerson;
+    return body;
+}
+/**
+ * POST /api/tyomaa/set/:ownerAsiakasId/:tyomaaId/:yyyymmdd with the patch
  * body. `ownerAsiakasId` comes from the caller's credentials context and must
  * be passed in by the action wiring. `yyyymmdd` defaults to today in local
  * time (YYYYMMDD, no separators).
  *
- * Body shape pitfall verified by the lifecycle smoke
+ * Body shape pitfalls verified by the lifecycle smoke
  * (`puminet5api/utils/test/test-cli-lifecycle.js`):
  *   - The handler runs `validateRequiredFields(body, ["tyomaaId", "ownerAsiakasId"])`,
  *     so both ids must be present in the BODY (not just the URL). We inject them
- *     from `opts` so callers only need to put the fields-to-update in `--body`.
+ *     from `opts` so callers only need to put the fields-to-update in the body.
+ *   - Partial-body safety is SERVER-side: `tyomaa.setData` read-merges omitted
+ *     columns from the stored row (fb#234; the `tyomaa_save` proc itself
+ *     blanket-overwrites every column). DEPLOY-GATED — against a backend
+ *     without that merge, a partial body NULLs the omitted columns.
  */
 export async function runWorksiteUpdate(client, opts, body, flags) {
     const yyyymmdd = opts.yyyymmdd || todayYyyymmdd();
@@ -406,15 +444,52 @@ export function registerWorksiteCommands(parent, getClient) {
     });
     const updateCmd = w
         .command("update <tyomaaId>")
-        .description("Update a worksite (owner auto-derived from the session)")
-        .requiredOption("--body <json>", "JSON object forwarded verbatim as the request body")
+        .description("Update a worksite (owner auto-derived from the session). Set fields with typed flags " +
+        "(--name/--num/--address/--address2/--postal-code/--city/--driving-instructions/" +
+        "--comment/--invoice-ref/--contact-person) and/or a --body/--from-json JSON patch " +
+        "(typed flags win). At least one field is required. Omitted fields are PRESERVED; " +
+        'pass an empty string to CLEAR a field (e.g. --comment "").')
+        .option("--name <s>", "Worksite name (tyomaaNimi)")
+        .option("--num <s>", "Worksite number (tyomaaNum)")
+        .option("--address <s>", "Street address (tyomaaOsoite1)")
+        .option("--address2 <s>", "Address line 2 (tyomaaOsoite2)")
+        .option("--postal-code <s>", "Postal code (tyomaaOsoite3)")
+        .option("--city <s>", "City (tyomaaOsoite4)")
+        .option("--driving-instructions <s>", "Driving instructions (tyomaaAjoOhje)")
+        .option("--comment <s>", "Free-text memo (tyomaaMemo)")
+        .option("--invoice-ref <s>", "Invoice reference (laskuViite)")
+        .option("--contact-person <id>", "Contact personId (tyomaaContactPersonId; 0 = none)", (v) => Number(v))
+        .option("--body <json>", "Patch body (JSON), merged under the typed flags")
+        .option("--from-json <file>", "Read the patch body from a file (or - for stdin) — shell-safe alternative to --body")
         .option("--yyyymmdd <date>", "Date segment YYYYMMDD (defaults to today)");
     addWriteFlagsToCommand(updateCmd).action(async (idStr, opts) => {
+        let parsed = {};
+        try {
+            parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
+        }
+        catch (e) {
+            exitWithError(e);
+            return;
+        }
+        const patch = buildWorksiteUpdateBody(parsed, {
+            name: opts.name,
+            num: opts.num,
+            address: opts.address,
+            address2: opts.address2,
+            postalCode: opts.postalCode,
+            city: opts.city,
+            drivingInstructions: opts.drivingInstructions,
+            comment: opts.comment,
+            invoiceRef: opts.invoiceRef,
+            contactPerson: opts.contactPerson,
+        });
+        if (Object.keys(patch).length === 0) {
+            failWith("update requires at least one field: typed flags (--name/--num/--address/--address2/--postal-code/--city/--driving-instructions/--comment/--invoice-ref/--contact-person) or a --body/--from-json JSON patch", 4);
+        }
         try {
             const client = await getClient();
             const ownerAsiakasId = resolveOwnerAsiakasId(client);
-            const parsed = parseJsonBodyFlag(opts.body);
-            const result = await runWorksiteUpdate(client, { tyomaaId: parseId(idStr, "tyomaaId"), ownerAsiakasId, yyyymmdd: opts.yyyymmdd }, parsed, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason });
+            const result = await runWorksiteUpdate(client, { tyomaaId: parseId(idStr, "tyomaaId"), ownerAsiakasId, yyyymmdd: opts.yyyymmdd }, patch, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason });
             writeJson(result);
         }
         catch (e) {

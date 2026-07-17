@@ -6,6 +6,7 @@ import {
   runWorksiteSetGeofence,
   runWorksiteHelsinkiFetch,
   resolveOwnerAsiakasId,
+  buildWorksiteUpdateBody,
 } from "../../src/commands/worksite/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { decodeJwtPayload } from "../../src/auth/jwt.js";
@@ -127,3 +128,48 @@ describe("ib worksite create/update", () => {
     expect(() => resolveOwnerAsiakasId(mockClient)).toThrow();
   });
 });
+
+describe("buildWorksiteUpdateBody (typed-flag merge, fb#234)", () => {
+  test("maps typed flags to backend column names", () => {
+    expect(
+      buildWorksiteUpdateBody({}, {
+        name: "Site A",
+        comment: "Pickup at gate B",
+        address: "Uusikatu 2",
+        postalCode: "00100",
+        city: "Helsinki",
+        invoiceRef: "REF-9",
+        contactPerson: 55,
+      })
+    ).toEqual({
+      tyomaaNimi: "Site A",
+      tyomaaMemo: "Pickup at gate B",
+      tyomaaOsoite1: "Uusikatu 2",
+      tyomaaOsoite3: "00100",
+      tyomaaOsoite4: "Helsinki",
+      laskuViite: "REF-9",
+      tyomaaContactPersonId: 55,
+    });
+  });
+
+  test("omits any field whose flag was not provided (so it is preserved server-side)", () => {
+    const body = buildWorksiteUpdateBody({}, { comment: "x" });
+    expect(body).toEqual({ tyomaaMemo: "x" });
+    expect("tyomaaNimi" in body).toBe(false);
+    expect("tyomaaOsoite1" in body).toBe(false);
+  });
+
+  test("an explicit empty string is kept (clears the column, not omitted)", () => {
+    expect(buildWorksiteUpdateBody({}, { invoiceRef: "" })).toEqual({ laskuViite: "" });
+  });
+
+  test("typed flags win over --body keys; uncovered body keys pass through", () => {
+    expect(
+      buildWorksiteUpdateBody(
+        { tyomaaMemo: "from body", rakennusDataJSON: '{"x":1}' },
+        { comment: "from flag" }
+      )
+    ).toEqual({ tyomaaMemo: "from flag", rakennusDataJSON: '{"x":1}' });
+  });
+});
+
