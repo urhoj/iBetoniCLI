@@ -82,6 +82,38 @@ export function buildPersonCreateBody(
   return body;
 }
 
+/** Typed convenience fields for `person update`, mapped to backend column names. */
+export interface PersonUpdateFlags {
+  first?: string;
+  last?: string;
+  phone?: string;
+  email?: string;
+  memo?: string;
+}
+
+/**
+ * Merge typed update flags over a parsed --body patch (typed flags win) into the
+ * /api/person/set patch body. Only fields whose flag was actually provided are
+ * included, so any column the caller omitted is left out of the patch — the
+ * backend `personSql.setData` read-merges omitted columns back to the stored row
+ * (an explicit "" still clears). Body keys not covered by a typed flag are
+ * preserved untouched. Mirrors buildPersonCreateBody so `create`/`update` share
+ * one flag vocabulary. Owner changes are intentionally NOT here — use
+ * `ib person owner` (separate authz).
+ */
+export function buildPersonUpdateBody(
+  parsedBody: Record<string, unknown>,
+  typed: PersonUpdateFlags
+): Record<string, unknown> {
+  const body = { ...parsedBody };
+  if (typed.first !== undefined) body.personFirstName = typed.first;
+  if (typed.last !== undefined) body.personLastName = typed.last;
+  if (typed.phone !== undefined) body.personPhone = typed.phone;
+  if (typed.email !== undefined) body.personEmail = typed.email;
+  if (typed.memo !== undefined) body.personMemo = typed.memo;
+  return body;
+}
+
 /**
  * Required-field check for person create: first + last name (email is optional).
  * Treats null/empty as missing. Returns the missing flag labels (empty = ok).
@@ -727,28 +759,59 @@ export function registerPersonCommands(
   addWriteFlagsToCommand(
     p
       .command("update <personId>")
-      .description("Update a person. Body REQUIRED via --body or --from-json. Requires --reason.")
-      .option("--body <json>", "Patch body (JSON)")
+      .description(
+        "Update a person. Set fields with typed flags (--first/--last/--phone/--email/--memo) " +
+          "and/or a --body/--from-json JSON patch (typed flags win). At least one field is " +
+          "required. Omitted fields are PRESERVED; pass an empty string to CLEAR a field " +
+          "(e.g. --email \"\"). Requires --reason."
+      )
+      .option("--first <s>", "personFirstName")
+      .option("--last <s>", "personLastName")
+      .option("--phone <s>", "personPhone")
+      .option("--email <s>", "personEmail")
+      .option("--memo <s>", "personMemo — free-text note/comment")
+      .option("--body <json>", "Patch body (JSON), merged under the typed flags")
       .option(
         "--from-json <file>",
         "Read the patch body from a file (or - for stdin) — shell-safe alternative to --body"
       )
-  ).action(async (personIdStr: string, opts: WriteFlags & { body?: string; fromJson?: string }) => {
-    if (!opts.reason) {
-      failWith("Missing required flag: --reason", 4);
-    }
-    try {
-      const patch = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson });
-      if (!patch) {
-        failWith("update requires a patch body via --body or --from-json", 4);
+  ).action(
+    async (
+      personIdStr: string,
+      opts: WriteFlags & PersonUpdateFlags & { body?: string; fromJson?: string }
+    ) => {
+      if (!opts.reason) {
+        failWith("Missing required flag: --reason", 4);
       }
-      const client = await getClient();
-      const result = await runPersonUpdate(client, parseId(personIdStr, "personId"), patch, opts);
-      writeJson(result);
-    } catch (e) {
-      exitWithError(e);
+      let parsed: Record<string, unknown> = {};
+      try {
+        parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
+      } catch (e) {
+        exitWithError(e);
+        return;
+      }
+      const patch = buildPersonUpdateBody(parsed, {
+        first: opts.first,
+        last: opts.last,
+        phone: opts.phone,
+        email: opts.email,
+        memo: opts.memo,
+      });
+      if (Object.keys(patch).length === 0) {
+        failWith(
+          "update requires at least one field: typed flags (--first/--last/--phone/--email/--memo) or a --body/--from-json JSON patch",
+          4
+        );
+      }
+      try {
+        const client = await getClient();
+        const result = await runPersonUpdate(client, parseId(personIdStr, "personId"), patch, opts);
+        writeJson(result);
+      } catch (e) {
+        exitWithError(e);
+      }
     }
-  });
+  );
 
   addWriteFlagsToCommand(
     p

@@ -8781,14 +8781,19 @@ exports[`Help snapshots — contract stability > help for ib person update match
   ib person update <personId> [flags]
 
 DESCRIPTION
-  Update a person. Body REQUIRED via --body or --from-json. Requires --reason.
+  Update a person. Set fields with typed flags (--first/--last/--phone/--email/--memo) and/or a --body/--from-json JSON patch (typed flags win); at least one field is required. Omitted fields are PRESERVED (the backend read-merges the stored row); pass an empty string to CLEAR a field (e.g. --email ""). Owner changes are separate — use \`ib person owner\`. Requires --reason.
   Permissions: requires auth.page.person.edit.
 
 ARGUMENTS
   <personId> NUMBER    personId to update (required)
 
 FLAGS
-  --body JSON    Patch body (JSON). Mutually exclusive with --from-json.
+  --first STRING    personFirstName
+  --last STRING    personLastName
+  --phone STRING    personPhone
+  --email STRING    personEmail (pass "" to clear)
+  --memo STRING    personMemo — free-text note/comment
+  --body JSON    Patch body (JSON), merged UNDER the typed flags. Mutually exclusive with --from-json.
   --from-json STRING    Read the patch body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body.
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
@@ -8804,15 +8809,20 @@ OUTPUT (JSON, stdout)
   { ok: true, updated: { personId } } or { dryRun: true, wouldUpdate: { personId, ... } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  No fields to update    → pass at least one typed flag (--first/--last/--phone/--email/--memo) or a --body/--from-json patch
   exit 5 (HTTP 404)  Person not found       → verify personId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.person.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - On Windows PowerShell inline --body JSON often fails (the shell strips the inner double-quotes, so the CLI sees e.g. {personEmail:x} unquoted) — pass --from-json <file|-> (a file, or - for stdin) to avoid shell quoting entirely.
+  - Prefer typed flags for the common contact fields — --email/--phone map to personEmail/personPhone. Use --body/--from-json for columns without a typed flag.
+  - On Windows PowerShell inline --body JSON often fails (the shell strips the inner double-quotes, so the CLI sees e.g. {personEmail:x} unquoted) — use typed flags, or pass --from-json <file|-> (a file, or - for stdin) to avoid shell quoting entirely.
 
 EXAMPLES
+  ib person update 6268 --email jussi@ariem.fi --phone 0405164758 --reason "onboarding contact details"
+  ib person update 5351 --phone "+358501234567" --reason "phone change"
+  ib person update 5351 --email "" --reason "clear email"
   ib person update 5351 --body '{"personPhone":"+358501234567"}' --reason "phone change"
   ib person update 5351 --from-json ./patch.json --reason "phone change"
 "

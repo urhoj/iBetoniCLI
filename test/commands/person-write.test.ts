@@ -5,6 +5,7 @@ import {
   runPersonDelete,
   runPersonSetOwner,
   buildPersonCreateBody,
+  buildPersonUpdateBody,
   missingPersonCreateFields,
   extractPersonId,
   isDuplicateEmailError,
@@ -71,6 +72,37 @@ describe("buildPersonCreateBody (typed-flag merge)", () => {
     expect(buildPersonCreateBody({ ownerAsiakasId: 8 }, { global: true })).toEqual({
       ownerAsiakasId: null,
     });
+  });
+});
+
+describe("buildPersonUpdateBody (typed-flag merge)", () => {
+  test("maps typed contact/name flags to backend column names", () => {
+    expect(
+      buildPersonUpdateBody({}, { email: "jussi@ariem.fi", phone: "0405164758" })
+    ).toEqual({ personEmail: "jussi@ariem.fi", personPhone: "0405164758" });
+  });
+
+  test("omits any field whose flag was not provided (so it is preserved server-side)", () => {
+    const body = buildPersonUpdateBody({}, { phone: "050 5050 498" });
+    expect(body).toEqual({ personPhone: "050 5050 498" });
+    expect("personEmail" in body).toBe(false);
+    expect("personFirstName" in body).toBe(false);
+  });
+
+  test("an explicit empty string is kept (clears the column, not omitted)", () => {
+    const body = buildPersonUpdateBody({}, { email: "" });
+    expect(body).toEqual({ personEmail: "" });
+    expect("personEmail" in body).toBe(true);
+  });
+
+  test("typed flags win over --body keys; untouched body keys preserved", () => {
+    expect(
+      buildPersonUpdateBody({ personPhone: "old", personMemo: "keep" }, { phone: "new" })
+    ).toEqual({ personPhone: "new", personMemo: "keep" });
+  });
+
+  test("no flags and empty body → empty patch (the action rejects this)", () => {
+    expect(buildPersonUpdateBody({}, {})).toEqual({});
   });
 });
 
