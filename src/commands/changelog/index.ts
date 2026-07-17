@@ -29,6 +29,8 @@ import { readFileSync } from "node:fs";
 import { writeJson, exitWithError, failWith, failValidation } from "../../output/json.js";
 import type { FlagProblem } from "../../output/validationEnvelope.js";
 import { resolveDate } from "../../dates.js";
+import { parseRefId } from "../../targets.js";
+import { runWithSiblingHint } from "../../refHint.js";
 import { COORDINATED as COORDINATED_REPOS, normalizeRepoCsv } from "./repos.js";
 
 export function readJsonInput(path: string): unknown {
@@ -480,9 +482,11 @@ export function registerChangelogCommands(
 
   c.command("get <changelogId>")
     .description("Get one entry")
-    .action(async (id: string) => {
+    .action(async (idStr: string) => {
       try {
-        writeJson(await runChangelogGet(await getClient(), Number(id)));
+        const id = parseRefId(idStr, "changelog", "get");
+        const client = await getClient();
+        writeJson(await runWithSiblingHint(client, id, "feedback", () => runChangelogGet(client, id)));
       } catch (e) {
         exitWithError(e);
       }
@@ -494,9 +498,11 @@ export function registerChangelogCommands(
       .description(
         "Soft-delete an entry (sets isDeleted=1; retained for audit but hidden from all reads, no CLI undelete). Use to retract a mistaken/test entry."
       )
-  ).action(async (id: string, o: WriteFlags) => {
+  ).action(async (idStr: string, o: WriteFlags) => {
     try {
-      writeJson(await runChangelogDelete(await getClient(), Number(id), o));
+      const id = parseRefId(idStr, "changelog", "delete");
+      const client = await getClient();
+      writeJson(await runWithSiblingHint(client, id, "feedback", () => runChangelogDelete(client, id, o)));
     } catch (e) {
       exitWithError(e);
     }
@@ -523,7 +529,8 @@ export function registerChangelogCommands(
       .option("--source <s>", "Source: human|routine")
       .option("--date <d>", "Entry date (YYYY-MM-DD|today)")
       .option("--language <l>", "Entry language (fi|en)")
-  ).action(async (id: string, o: Record<string, string> & WriteFlags & { vtag?: string }) => {
+  ).action(async (idStr: string, o: Record<string, string> & WriteFlags & { vtag?: string }) => {
+    const id = parseRefId(idStr, "changelog", "update");
     if (o.type !== undefined) o.type = normalizeType(o.type)!;
     validateEnums(o.type, o.area, undefined, o.source, "ib dev changelog update");
     // --summary is an alias for --description (feedback #205); fold it in before
@@ -565,8 +572,11 @@ export function registerChangelogCommands(
     const updLang = normalizeLanguage(o.language);
     if (updLang) patch.language = updLang;
     try {
+      const client = await getClient();
       writeJson(
-        await runChangelogUpdate(await getClient(), Number(id), patch, o)
+        await runWithSiblingHint(client, id, "feedback", () =>
+          runChangelogUpdate(client, id, patch, o)
+        )
       );
     } catch (e) {
       exitWithError(e);
@@ -849,7 +859,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       {
         name: "changelogId",
         type: "number",
-        description: "Entry id",
+        description: "Entry id — accepts an optional `cl#` anchor (e.g. `cl#858`); a `fb#` id is rejected (exit 4) with the feedback command to use (feedback #230)",
       },
     ],
     flags: [],
@@ -865,10 +875,10 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         http: 404,
         exit: 5,
         meaning: "Not found",
-        remedy: "ib dev changelog list",
+        remedy: "ib dev changelog list — a bare id that is actually a feedback id 404s here and the error hint names the feedback command (feedback #230)",
       },
     ],
-    examples: ["ib dev changelog get 7"],
+    examples: ["ib dev changelog get 7", "ib dev changelog get cl#7"],
   },
   {
     command: "ib dev changelog update",
@@ -879,7 +889,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       {
         name: "changelogId",
         type: "number",
-        description: "Entry id",
+        description: "Entry id — accepts an optional `cl#` anchor (e.g. `cl#858`); a `fb#` id is rejected (exit 4) with the feedback command to use (feedback #230)",
       },
     ],
     flags: [
@@ -945,14 +955,14 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       "Soft-delete a change entry (isDeleted=1; retained for audit, hidden from all reads, no CLI undelete).",
     auth: "any",
     tier: "developer",
-    args: [{ name: "changelogId", type: "number", description: "Entry id" }],
+    args: [{ name: "changelogId", type: "number", description: "Entry id — accepts an optional `cl#` anchor (e.g. `cl#858`); a `fb#` id is rejected (exit 4) with the feedback command to use (feedback #230)" }],
     flags: [],
     writeFlags: true,
     mutates: true,
     outputShape: "{ deleted: true } | { dryRun, wouldDelete }",
     errors: [
       { http: 403, exit: 3, meaning: "Developer only", remedy: "dev token" },
-      { http: 404, exit: 5, meaning: "Not found (or already deleted)", remedy: "ib dev changelog list" },
+      { http: 404, exit: 5, meaning: "Not found (or already deleted)", remedy: "ib dev changelog list — a bare id that is actually a feedback id 404s here and the error hint names the feedback command (feedback #230)" },
     ],
     notes: [
       "Soft-delete: sets isDeleted=1 — the row is kept for audit but hidden from every read (get/list/report/pending), and there is no CLI undelete.",

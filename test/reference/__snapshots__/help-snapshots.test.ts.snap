@@ -1944,7 +1944,7 @@ DESCRIPTION
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
-  <changelogId> NUMBER    Entry id (required)
+  <changelogId> NUMBER    Entry id — accepts an optional \`cl#\` anchor (e.g. \`cl#858\`); a \`fb#\` id is rejected (exit 4) with the feedback command to use (feedback #230) (required)
 
 FLAGS
   (none)
@@ -1962,7 +1962,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
-  exit 5 (HTTP 404)  Not found (or already deleted) → ib dev changelog list
+  exit 5 (HTTP 404)  Not found (or already deleted) → ib dev changelog list — a bare id that is actually a feedback id 404s here and the error hint names the feedback command (feedback #230)
 
 NOTES
   - Soft-delete: sets isDeleted=1 — the row is kept for audit but hidden from every read (get/list/report/pending), and there is no CLI undelete.
@@ -1989,7 +1989,7 @@ DESCRIPTION
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
-  <changelogId> NUMBER    Entry id (required)
+  <changelogId> NUMBER    Entry id — accepts an optional \`cl#\` anchor (e.g. \`cl#858\`); a \`fb#\` id is rejected (exit 4) with the feedback command to use (feedback #230) (required)
 
 FLAGS
   (none)
@@ -2002,10 +2002,11 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
-  exit 5 (HTTP 404)  Not found              → ib dev changelog list
+  exit 5 (HTTP 404)  Not found              → ib dev changelog list — a bare id that is actually a feedback id 404s here and the error hint names the feedback command (feedback #230)
 
 EXAMPLES
   ib dev changelog get 7
+  ib dev changelog get cl#7
 "
 `;
 
@@ -2169,7 +2170,7 @@ DESCRIPTION
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
-  <changelogId> NUMBER    Entry id (required)
+  <changelogId> NUMBER    Entry id — accepts an optional \`cl#\` anchor (e.g. \`cl#858\`); a \`fb#\` id is rejected (exit 4) with the feedback command to use (feedback #230) (required)
 
 FLAGS
   --type STRING    feature|improvement|bugfix (conventional-commit synonyms accepted: fix→bugfix, feat→feature)
@@ -2299,7 +2300,7 @@ DESCRIPTION
   Permissions: requires isSystemAdmin or isDeveloper.
 
 ARGUMENTS
-  <id> NUMBER    feedbackId (required)
+  <id> NUMBER    feedbackId — accepts an optional \`fb#\` anchor (e.g. \`fb#42\`); a \`cl#\` id is rejected (exit 4) with the changelog command to use (feedback #230) (required)
 
 FLAGS
   --full    Accepted for cross-command consistency; get always returns the full row (no-op).
@@ -2312,14 +2313,18 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → requires a developer token
-  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\`
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\` — if the id exists in devChangelog the error hint names the changelog command (feedback #230)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - The id accepts an optional \`fb#\` type anchor (e.g. \`fb#42\`); a \`cl#\` id is rejected up front (exit 4, code WRONG_REF_TYPE) with the corresponding \`ib dev changelog get\` command in the hint — feedback #230. A bare id that is actually a changelog id 404s here and the error hint points at the changelog command.
+
 SEE ALSO
-  ib dev feedback list
+  ib dev feedback list, ib dev changelog get
 
 EXAMPLES
   ib dev feedback get 42
+  ib dev feedback get fb#42
 "
 `;
 
@@ -2383,7 +2388,7 @@ DESCRIPTION
   Permissions: requires isSystemAdmin or isDeveloper.
 
 ARGUMENTS
-  <id> NUMBER    feedbackId (required)
+  <id> NUMBER    feedbackId — accepts an optional \`fb#\` anchor (e.g. \`fb#42\`); a \`cl#\` id is rejected (exit 4) with the changelog command to use (feedback #230) (required)
 
 FLAGS
   --status STRING    open | reviewed | applied | dismissed
@@ -2402,7 +2407,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4  Validation             → provide --status and/or --note; status must be a known value
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
-  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\`
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\` — a bare id that is actually a changelog id 404s here and the error hint names the changelog command (feedback #230)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
@@ -2423,7 +2428,7 @@ DESCRIPTION
   Permissions: requires isSystemAdmin or isDeveloper.
 
 ARGUMENTS
-  <id> NUMBER    feedbackId (required)
+  <id> NUMBER    feedbackId — accepts an optional \`fb#\` anchor (e.g. \`fb#42\`); a \`cl#\` id is rejected (exit 4) with the changelog command to use (feedback #230) (required)
 
 FLAGS
   --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | other
@@ -2443,7 +2448,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4  Validation             → provide at least one of --scope/--kind/--severity/--complexity/--description; enum values must be valid; --complexity must be an integer 1-5
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
-  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\`
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\` — a bare id that is actually a changelog id 404s here and the error hint names the changelog command (feedback #230)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 SEE ALSO

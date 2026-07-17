@@ -5283,7 +5283,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "Fetch one feedback row by id (developer-only).",
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
-    args: [{ name: "id", type: "number", description: "feedbackId" }],
+    args: [{ name: "id", type: "number", description: "feedbackId — accepts an optional `fb#` anchor (e.g. `fb#42`); a `cl#` id is rejected (exit 4) with the changelog command to use (feedback #230)" }],
     flags: [
       {
         name: "full",
@@ -5295,11 +5295,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape: "The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, ... }",
     errors: [
       apiErr(403, "Permission denied", "requires a developer token"),
-      apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
+      apiErr(404, "Not found", "check the id via `ib dev feedback list` — if the id exists in devChangelog the error hint names the changelog command (feedback #230)"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
-    seeAlso: ["ib dev feedback list"],
-    examples: ["ib dev feedback get 42"],
+    notes: [
+      "The id accepts an optional `fb#` type anchor (e.g. `fb#42`); a `cl#` id is rejected up front (exit 4, code WRONG_REF_TYPE) with the corresponding `ib dev changelog get` command in the hint — feedback #230. A bare id that is actually a changelog id 404s here and the error hint points at the changelog command.",
+    ],
+    seeAlso: ["ib dev feedback list", "ib dev changelog get"],
+    examples: ["ib dev feedback get 42", "ib dev feedback get fb#42"],
   },
   {
     command: "ib dev feedback resolve",
@@ -5308,7 +5311,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     mutates: true,
-    args: [{ name: "id", type: "number", description: "feedbackId" }],
+    args: [{ name: "id", type: "number", description: "feedbackId — accepts an optional `fb#` anchor (e.g. `fb#42`); a `cl#` id is rejected (exit 4) with the changelog command to use (feedback #230)" }],
     flags: [
       { name: "status", type: "string", description: "open | reviewed | applied | dismissed" },
       { name: "note", type: "string", description: "Resolution note stored on the row" },
@@ -5322,7 +5325,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     errors: [
       { exit: 4, meaning: "Validation", remedy: "provide --status and/or --note; status must be a known value" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
-      apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
+      apiErr(404, "Not found", "check the id via `ib dev feedback list` — a bare id that is actually a changelog id 404s here and the error hint names the changelog command (feedback #230)"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     notes: [
@@ -5340,7 +5343,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     mutates: true,
-    args: [{ name: "id", type: "number", description: "feedbackId" }],
+    args: [{ name: "id", type: "number", description: "feedbackId — accepts an optional `fb#` anchor (e.g. `fb#42`); a `cl#` id is rejected (exit 4) with the changelog command to use (feedback #230)" }],
     flags: [
       { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | other" },
       { name: "kind", type: "string", description: "improvement | bug | idea | legal" },
@@ -5355,7 +5358,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     errors: [
       { exit: 4, meaning: "Validation", remedy: "provide at least one of --scope/--kind/--severity/--complexity/--description; enum values must be valid; --complexity must be an integer 1-5" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
-      apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
+      apiErr(404, "Not found", "check the id via `ib dev feedback list` — a bare id that is actually a changelog id 404s here and the error hint names the changelog command (feedback #230)"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     seeAlso: ["ib dev feedback resolve"],

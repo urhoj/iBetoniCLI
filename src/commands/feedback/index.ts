@@ -17,7 +17,8 @@ import type { ApiClient } from "../../api/client.js";
 import { CliError } from "../../api/errors.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError } from "../../output/json.js";
-import { parseId } from "../../targets.js";
+import { parseRefId } from "../../targets.js";
+import { runWithSiblingHint } from "../../refHint.js";
 
 const KINDS = ["improvement", "bug", "idea", "legal"] as const;
 type Kind = (typeof KINDS)[number];
@@ -601,7 +602,9 @@ export function registerFeedbackCommands(
     .option("--full", "Accepted for cross-command consistency; get always returns the full row (no-op)")
     .action(async (idStr: string) => {
       try {
-        writeJson(await runFeedbackGet(await getClient(), parseId(idStr, "feedbackId")));
+        const id = parseRefId(idStr, "feedback", "get");
+        const client = await getClient();
+        writeJson(await runWithSiblingHint(client, id, "changelog", () => runFeedbackGet(client, id)));
       } catch (e) {
         exitWithError(e);
       }
@@ -623,13 +626,17 @@ export function registerFeedbackCommands(
         opts: { status?: string; note?: string; reason?: string; resolution?: string; dryRun?: boolean; full?: boolean }
       ) => {
         try {
+          const id = parseRefId(idStr, "feedback", "resolve");
+          const client = await getClient();
           writeJson(
-            await runFeedbackResolve(await getClient(), parseId(idStr, "feedbackId"), {
-              status: opts.status,
-              note: mergeNoteFlags(opts.note, opts.resolution, opts.reason),
-              dryRun: opts.dryRun,
-              full: opts.full,
-            })
+            await runWithSiblingHint(client, id, "changelog", () =>
+              runFeedbackResolve(client, id, {
+                status: opts.status,
+                note: mergeNoteFlags(opts.note, opts.resolution, opts.reason),
+                dryRun: opts.dryRun,
+                full: opts.full,
+              })
+            )
           );
         } catch (e) {
           exitWithError(e);
@@ -662,7 +669,11 @@ export function registerFeedbackCommands(
         }
       ) => {
         try {
-          writeJson(await runFeedbackUpdate(await getClient(), parseId(idStr, "feedbackId"), opts));
+          const id = parseRefId(idStr, "feedback", "update");
+          const client = await getClient();
+          writeJson(
+            await runWithSiblingHint(client, id, "changelog", () => runFeedbackUpdate(client, id, opts))
+          );
         } catch (e) {
           exitWithError(e);
         }
