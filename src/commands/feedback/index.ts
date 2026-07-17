@@ -504,6 +504,10 @@ export function registerFeedbackCommands(
     .description("File & triage CLI improvement proposals / trouble reports");
 
   f.command("create [description]")
+    // `add` — hidden alias: an agent fresh off `ib dev changelog add` (the lone
+    // group using `add` to create a top-level entry) naturally types
+    // `feedback add`; accept it instead of dead-ending on exit 4 (feedback #229).
+    .alias("add")
     .description(
       "File a proposal/trouble report. Silent server-side; works under --read-only."
     )

@@ -22,9 +22,23 @@ export function levenshtein(a, b) {
     return prev[n];
 }
 /**
+ * Verb synonyms an AI naturally reaches for but that edit distance can't bridge
+ * (feedback #229): the `add` (changelog) vs `create` (every other group) split,
+ * and `show`/`view` for the canonical `get`. Consulted only after prefix + edit
+ * distance both miss, so a real near-match always wins. Keyed by the mistyped
+ * verb → the canonical sibling(s) to try, in order.
+ */
+const VERB_SYNONYMS = {
+    add: ["create"],
+    create: ["add"],
+    show: ["get"],
+    view: ["get"],
+};
+/**
  * Closest name to `target` within an edit-distance threshold, else null.
- * A prefix match (`acc`→`accept`, target ≥ 2 chars) always wins; otherwise the
- * minimum edit distance, accepted only when ≤ max(2, floor(len/2)).
+ * A prefix match (`acc`→`accept`, target ≥ 2 chars) always wins; then the
+ * minimum edit distance, accepted only when ≤ max(2, floor(len/2)); finally a
+ * known verb-synonym (`add`→`create`, `show`→`get`) present among `names`.
  */
 export function closestName(target, names) {
     if (!target || names.length === 0)
@@ -43,7 +57,15 @@ export function closestName(target, names) {
             best = n;
         }
     }
-    return best !== null && bestDist <= threshold ? best : null;
+    if (best !== null && bestDist <= threshold)
+        return best;
+    // Edit distance missed — fall back to a known verb synonym present in `names`.
+    for (const syn of VERB_SYNONYMS[t] ?? []) {
+        const hit = names.find((n) => n.toLowerCase() === syn);
+        if (hit)
+            return hit;
+    }
+    return null;
 }
 /** Space-joined path of a command up its parent chain (e.g. "ib legal"). */
 export function commandPath(cmd) {

@@ -247,6 +247,10 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .description("Development changelog entries (source of the monthly report)");
     addWriteFlagsToCommand(c
         .command("add [description]")
+        // `create` — reciprocal hidden alias: `changelog` is the outlier that uses
+        // `add` where every other group uses `create`, so an agent primed on
+        // `create` types `changelog create`; accept it (feedback #229).
+        .alias("create")
         .description("Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row.")
         .requiredOption("--type <t>", "feature|improvement|bugfix (accepts fix→bugfix, feat→feature)")
         .requiredOption("--area <a>", AREA_FLAG_DESC)

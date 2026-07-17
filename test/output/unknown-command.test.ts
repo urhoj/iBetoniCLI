@@ -26,6 +26,16 @@ describe("levenshtein / closestName (#1)", () => {
   test("prefix wins", () => {
     expect(closestName("acc", ["accept", "acceptances", "active"])).toBe("accept");
   });
+  test("verb-synonym fallback add↔create, show/view→get (#229)", () => {
+    expect(closestName("add", ["create", "list"])).toBe("create");
+    expect(closestName("create", ["add", "list"])).toBe("add");
+    expect(closestName("show", ["get", "list"])).toBe("get");
+    expect(closestName("view", ["get", "list"])).toBe("get");
+    // the synonym only helps when the canonical sibling is actually present
+    expect(closestName("add", ["list", "resolve"])).toBeNull();
+    // an edit-distance near-match still wins over the synonym table
+    expect(closestName("add", ["aad", "create"])).toBe("aad");
+  });
 });
 
 describe("buildUnknownCommandEnvelope (#1)", () => {
@@ -53,6 +63,26 @@ describe("buildUnknownCommandEnvelope (#1)", () => {
     expect(env.available).not.toContain("save");
     expect(env.available).not.toContain("acceptances");
     expect(env.available).toContain("active");
+  });
+  test("verb synonym surfaces in the envelope: `add` on a create-group → create (#229)", () => {
+    const keikka = buildProgram().commands.find((c) => c.name() === "keikka")!;
+    const env = buildUnknownCommandEnvelope(keikka, "add", "developer");
+    expect(env.available).toContain("create");
+    expect(env.didYouMean).toBe("create");
+    expect(env.hint).toContain("ib keikka create");
+  });
+});
+
+describe("verb aliases (#229)", () => {
+  const leafOf = (group: string, leaf: string) => {
+    const g = buildProgram().commands.find((c) => c.name() === group)!;
+    return g.commands.find((c) => c.name() === leaf)!;
+  };
+  test("`feedback create` answers to `add`", () => {
+    expect(leafOf("feedback", "create").aliases()).toContain("add");
+  });
+  test("`changelog add` answers to `create` (reciprocal)", () => {
+    expect(leafOf("changelog", "add").aliases()).toContain("create");
   });
 });
 
