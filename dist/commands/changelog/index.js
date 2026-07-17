@@ -2,6 +2,7 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFla
 import { readFileSync } from "node:fs";
 import { writeJson, exitWithError, failWith, failValidation } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
+import { COORDINATED as COORDINATED_REPOS, normalizeRepoCsv } from "./repos.js";
 export function readJsonInput(path) {
     const raw = (path === "-" ? readFileSync(0, "utf8") : readFileSync(path, "utf8")).replace(/^\uFEFF/, "");
     return JSON.parse(raw);
@@ -11,21 +12,12 @@ const AREAS = ["frontend", "backend", "cli", "database", "cicd"];
 const BUMP_LEVELS = ["none", "patch", "minor", "major"];
 const LANGUAGES = ["fi", "en"]; // devChangelog.language is CHAR(2) NOT NULL DEFAULT 'en'
 const SOURCES = ["human", "routine"];
-/**
- * The repos whose versions `npm run deploy` Step 0 bumps independently, each
- * from the max --bump-level across the unreleased entries that name it. A
- * --repo value NOT in this set is unknown to Step 0 and triggers a fail-safe
- * bump of EVERY coordinated repo (unless --bump-level none). The standalone
- * lane (betonicli, @ibetoni/*) versions separately via `npm run final`, so
- * target those with `--repo <name> --bump-level none`.
- */
-const COORDINATED_REPOS = [
-    "puminet4",
-    "puminet5api",
-    "puminet7-functions-app",
-    "betonijerry",
-    "workspace",
-];
+// COORDINATED_REPOS / normalizeRepoCsv: see ./repos.ts (mirror of the backend
+// repo model). Step 0 bumps coordinated repos independently from the max
+// --bump-level across the unreleased entries naming them; a --repo whose CSV
+// resolves to NO known repo at all fail-safe-bumps EVERY coordinated repo
+// (unless --bump-level none). The standalone lane (betonicli, @ibetoni/*)
+// versions separately via `npm run final` — target it with --bump-level none.
 const REPO_FLAG_DESC = "Repo this entry ships in — coordinated: puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace. ⚠ An unrecognized value fail-safe-bumps ALL coordinated repos on next deploy; for the standalone lane (betonicli, @ibetoni/*) also pass --bump-level none.";
 const AREA_FLAG_DESC = "Technical layer: frontend|backend|cli|database|cicd (repo granularity goes in --repo, not here)";
 /**
@@ -301,10 +293,14 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
                 .filter(Boolean));
         if (o.repo)
             body.repo = o.repo;
-        if (o.repo &&
-            !COORDINATED_REPOS.includes(o.repo) &&
-            (o.bumpLevel || "patch") !== "none")
-            console.error(`[ib] ⚠ --repo "${o.repo}" is not a coordinated repo (${COORDINATED_REPOS.join(", ")}) — on next deploy this fail-safe-bumps ALL of them. For the standalone lane (betonicli, @ibetoni/*) add --bump-level none.`);
+        // fb#228: warn only when the deploy planner would actually fail-safe-bump
+        // (computeReleasePlan: coordinated=[] AND canonical=[] — nothing in the
+        // CSV recognized). Per-token semantics, not a whole-CSV membership test.
+        if (o.repo && (o.bumpLevel || "patch") !== "none") {
+            const { coordinated, canonical } = normalizeRepoCsv(o.repo);
+            if (coordinated.length === 0 && canonical.length === 0)
+                console.error(`[ib] ⚠ --repo "${o.repo}" resolves to no known repo (coordinated: ${COORDINATED_REPOS.join(", ")}) — on next deploy this fail-safe-bumps ALL coordinated repos. For the standalone lane (betonicli, @ibetoni/*) add --bump-level none.`);
+        }
         if (o.sha)
             body.commitShas = o.sha;
         if (o.vtag)
