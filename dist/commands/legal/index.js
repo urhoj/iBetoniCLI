@@ -110,8 +110,37 @@ export async function runLegalDrafts(client) {
     const items = perType.flat();
     return { items, nextCursor: null, count: items.length };
 }
-export async function runLegalGet(client, documentId) {
-    return client.get(`/api/legal-documents/document/${documentId}`);
+/**
+ * Classify `legal get`'s positional (feedback #231): `ib legal list` keys its
+ * rows by typeName, so `ib legal get PRIVACY` must work as the natural
+ * follow-up. Digits-only → documentId (parseId's canonical-integer guard);
+ * the server-side typeName grammar (`^[A-Z][A-Z0-9_]*$` in
+ * puminet5api modules/legalDocument, matched case-insensitively here and
+ * uppercased) → typeName. Anything else exits 4 naming both remedies.
+ */
+export function parseLegalGetRef(ref) {
+    const trimmed = ref.trim();
+    if (/^\d+$/.test(trimmed))
+        return parseId(trimmed, "documentId");
+    const upper = trimmed.toUpperCase();
+    if (/^[A-Z][A-Z0-9_]*$/.test(upper))
+        return upper;
+    failWith(`invalid documentId or typeName: "${ref}" — pass a numeric documentId (see ib legal list) or a typeName like PRIVACY (see ib legal types)`, 4);
+}
+/** A numeric ref reads that exact version; a typeName ref resolves to the
+ * type's current ACTIVE document via /current/:typeName (feedback #231). */
+export async function runLegalGet(client, ref) {
+    if (typeof ref === "number")
+        return client.get(`/api/legal-documents/document/${ref}`);
+    try {
+        return await client.get(`/api/legal-documents/current/${encodeURIComponent(ref)}`);
+    }
+    catch (e) {
+        if (e instanceof CliError && e.statusCode === 404) {
+            throw new CliError(`no active document of type "${ref}"`, 404, null, 5, `ib legal versions ${ref} lists drafts/history; ib legal types lists valid typeNames`);
+        }
+        throw e;
+    }
 }
 /**
  * Line diff between two document versions. Two modes:
@@ -428,13 +457,13 @@ export function registerLegalCommands(parent, getClient) {
         }
     });
     legal
-        .command("get <documentId>")
-        .description("One document version by id, incl. markdown content")
-        .action(async (documentIdStr) => {
-        const documentId = parseId(documentIdStr, "documentId");
+        .command("get <documentIdOrType>")
+        .description("One document version by id — or a typeName (e.g. PRIVACY) for its current ACTIVE version")
+        .action(async (refStr) => {
         try {
+            const ref = parseLegalGetRef(refStr);
             const client = await getClient();
-            writeJson(await runLegalGet(client, documentId));
+            writeJson(await runLegalGet(client, ref));
         }
         catch (e) {
             exitWithError(e);

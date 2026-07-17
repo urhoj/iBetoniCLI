@@ -5191,14 +5191,14 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib legal get matches snapshot 1`] = `
 "USAGE
-  ib legal get <documentId> [flags]
+  ib legal get <documentIdOrType> [flags]
 
 DESCRIPTION
-  One document version by documentId. The body is returned in the \`markdownContent\` field.
+  One document version by documentId — or by typeName (e.g. PRIVACY) to read that type's current ACTIVE version, so the typeName-keyed rows of ib legal list chain directly into get. The body is returned in the \`markdownContent\` field.
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
-  <documentId> NUMBER    legalDocuments.documentId (required)
+  <documentIdOrType> STRING    legalDocuments.documentId, or a typeName (UPPER_SNAKE, see ib legal types) resolving to its active version (required)
 
 FLAGS
   (none)
@@ -5210,7 +5210,8 @@ OUTPUT (JSON, stdout)
   {documentId, documentTypeId, typeName, version, title, status, markdownContent, isActive, ...}
 
 ERRORS (stderr, exit non-zero)
-  exit 5 (HTTP 404)  Document not found     → list ids via ib legal versions <typeName>
+  exit 4  Argument is neither a numeric documentId nor a typeName → pass a documentId from ib legal list, or a typeName like PRIVACY
+  exit 5 (HTTP 404)  Document not found / type has no active document → list ids via ib legal versions <typeName>
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -5222,6 +5223,7 @@ SEE ALSO
 
 EXAMPLES
   ib legal get 12
+  ib legal get PRIVACY
 "
 `;
 

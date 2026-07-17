@@ -3124,9 +3124,16 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     command: "ib legal get",
-    description: "One document version by documentId. The body is returned in the `markdownContent` field.",
+    description:
+      "One document version by documentId — or by typeName (e.g. PRIVACY) to read that type's current ACTIVE version, so the typeName-keyed rows of ib legal list chain directly into get. The body is returned in the `markdownContent` field.",
     auth: "any",
-    args: [{ name: "documentId", type: "number", description: "legalDocuments.documentId" }],
+    args: [
+      {
+        name: "documentIdOrType",
+        type: "string",
+        description: "legalDocuments.documentId, or a typeName (UPPER_SNAKE, see ib legal types) resolving to its active version",
+      },
+    ],
     flags: [],
     outputShape:
       "{documentId, documentTypeId, typeName, version, title, status, markdownContent, isActive, ...}",
@@ -3134,11 +3141,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "The document body is the `markdownContent` field — NOT `content` or `body`. Reading `.content` returns undefined (an empty body) with no error: a silent false-negative. `ib legal show` uses the same field name.",
     ],
     errors: [
-      apiErr(404, "Document not found", "list ids via ib legal versions <typeName>"),
+      { exit: 4, meaning: "Argument is neither a numeric documentId nor a typeName", remedy: "pass a documentId from ib legal list, or a typeName like PRIVACY" },
+      apiErr(404, "Document not found / type has no active document", "list ids via ib legal versions <typeName>"),
       ...COMMON_AUTH_ERRORS,
     ],
     seeAlso: ["ib legal versions", "ib legal diff"],
-    examples: ["ib legal get 12"],
+    examples: ["ib legal get 12", "ib legal get PRIVACY"],
   },
   {
     command: "ib legal diff",

@@ -7,6 +7,7 @@ import {
   runLegalStatus,
   runLegalVersions,
   runLegalGet,
+  parseLegalGetRef,
   runLegalDiff,
   runLegalSave,
   runLegalSaveWithEdit,
@@ -239,6 +240,65 @@ describe("ib legal reads", () => {
     (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({ documentId: 9 });
     await runLegalGet(c, 9);
     expect(c.get).toHaveBeenCalledWith("/api/legal-documents/document/9");
+  });
+
+  // feedback #231: `ib legal list` keys rows by typeName, so `ib legal get
+  // PRIVACY` must resolve the type's current ACTIVE document instead of exit 4.
+  test("get with a typeName resolves via /current/:typeName", async () => {
+    const c = mockClient();
+    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({ documentId: 12, typeName: "PRIVACY" });
+    const out = await runLegalGet(c, "PRIVACY");
+    expect(c.get).toHaveBeenCalledWith("/api/legal-documents/current/PRIVACY");
+    expect(out).toEqual({ documentId: 12, typeName: "PRIVACY" });
+  });
+
+  test("get with a typeName and no active doc -> exit 5 with versions hint", async () => {
+    const c = mockClient();
+    (c.get as ReturnType<typeof vi.fn>).mockRejectedValue(new CliError("Asiakirjaa ei löytynyt.", 404, null, 5));
+    await expect(runLegalGet(c, "COOKIES")).rejects.toMatchObject({
+      exitCode: 5,
+      message: expect.stringContaining('no active document of type "COOKIES"'),
+      hint: expect.stringContaining("ib legal versions COOKIES"),
+    });
+  });
+
+  test("get with a typeName rethrows non-404 errors untouched", async () => {
+    const c = mockClient();
+    (c.get as ReturnType<typeof vi.fn>).mockRejectedValue(new CliError("boom", 500, null, 6));
+    await expect(runLegalGet(c, "TOS")).rejects.toMatchObject({ exitCode: 6, message: "boom" });
+  });
+
+  test("parseLegalGetRef classifies digits as documentId", () => {
+    expect(parseLegalGetRef("42")).toBe(42);
+    expect(parseLegalGetRef(" 7 ")).toBe(7);
+  });
+
+  test("parseLegalGetRef classifies UPPER_SNAKE as typeName, uppercasing input", () => {
+    expect(parseLegalGetRef("PRIVACY")).toBe("PRIVACY");
+    expect(parseLegalGetRef("privacy")).toBe("PRIVACY");
+    expect(parseLegalGetRef("BETONIJERRY_TOS")).toBe("BETONIJERRY_TOS");
+  });
+
+  test("parseLegalGetRef rejects anything else with a dual remedy (exit 4)", () => {
+    const errorOf = (fn: () => void): CliError | undefined => {
+      try {
+        fn();
+        return undefined;
+      } catch (e) {
+        return e as CliError;
+      }
+    };
+    for (const bad of ["5.5", "TOS-1", "-3", "1e3", ""]) {
+      const e = errorOf(() => parseLegalGetRef(bad));
+      expect(e?.exitCode).toBe(4);
+      expect(e?.message).toMatch(/ib legal list/);
+      expect(e?.message).toMatch(/ib legal types/);
+    }
+    // All-digits input is unambiguously a documentId attempt → parseId's
+    // canonical-integer guard fires, not the dual remedy.
+    const zero = errorOf(() => parseLegalGetRef("0"));
+    expect(zero?.exitCode).toBe(4);
+    expect(zero?.message).toMatch(/expected a positive integer/);
   });
 
   test("acceptances projects server payload into envelope with truncated", async () => {
