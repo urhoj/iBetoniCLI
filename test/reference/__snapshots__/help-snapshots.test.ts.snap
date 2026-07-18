@@ -9772,6 +9772,243 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib task add matches snapshot 1`] = `
+"USAGE
+  ib task add [flags]
+
+DESCRIPTION
+  Create a recurring task (developer-only; a write). executor=human tasks surface in the morning report for a person to complete; executor=ai tasks are picked up by the daily runner when --skill names a workspace skill (--agent claude) — skill-less or hermes tasks wait and surface in the morning report. Default first due = immediately; the first completion sets the rhythm (nextDueAt = completion time + cadence, rolling, not day-anchored).
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --title STRING    Task title, max 200 chars (required)
+  --executor STRING    human | ai (required)
+  --cadence STRING    <count>/<unit>, unit day|week|month, e.g. 1/month or 2/week (required)
+  --instructions STRING    Freetext checklist for humans / prompt context for the AI runner
+  --skill STRING    Workspace skill the AI runner invokes (e.g. cleanup-docs); omit for human tasks
+  --agent STRING    claude | hermes — recommended AI executor tier (claude = code/advanced, hermes = light local-LLM work)
+  --assignee NUMBER    Human assignee personId
+  --asiakas NUMBER    Company (asiakasId) the task is scoped to; omit = internal/global
+  --first-due STRING    First due date (YYYY-MM-DD or today/tomorrow); default: due immediately
+  --feedback NUMBER    cliFeedback id this task graduated from (provenance link)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { taskId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldWrite:{...} } (server-side preview).
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → --title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib task add --title "Open purchase invoices review" --executor human --assignee 10 --cadence 1/month --reason "monthly finance check"
+  ib task add --title "Docs prune sweep" --executor ai --agent claude --skill cleanup-docs --cadence 1/month --reason "ops hygiene"
+  ib task add --title "KU-oy invoice chase" --executor human --asiakas 8 --cadence 2/week --first-due tomorrow --reason "per-company cadence"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib task complete matches snapshot 1`] = `
+"USAGE
+  ib task complete <id> [flags]
+
+DESCRIPTION
+  Complete a task: append a done-log row and advance nextDueAt = now + cadence (rolling). --skipped also advances; --failed only logs — the task STAYS due (the runner's failure path). AI completions pass --agent so the log distinguishes human vs AI. Developer-only; a write.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <id> NUMBER    taskId (required)
+
+FLAGS
+  --notes STRING    Result summary stored on the log row
+  --skipped    Log outcome=skipped (advances nextDueAt); mutually exclusive with --failed
+  --failed    Log outcome=failed — nextDueAt untouched, task stays due
+  --agent STRING    claude | hermes — set when an AI completes the task
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { logId, task } (task = the updated row; nextDueAt advanced unless --failed). With --dry-run: { dryRun:true, wouldComplete:{ taskId, outcome, advancesNextDue } }.
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → --skipped and --failed are mutually exclusive; --agent must be claude|hermes
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib task list\`
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib task complete 7 --notes "reviewed 12 invoices, 2 chased" --reason "monthly run"
+  ib task complete 7 --agent claude --notes "cleanup-docs pruned 9 files" --reason "recurring-task runner"
+  ib task complete 7 --failed --agent claude --notes "skill errored: …"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib task get matches snapshot 1`] = `
+"USAGE
+  ib task get <id> [flags]
+
+DESCRIPTION
+  Fetch one recurring task by id (developer-only).
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <id> NUMBER    taskId (required)
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  The full task row { taskId, title, instructions, skillRef, executor, recommendedAgent, assigneePersonId, asiakasId, cadenceUnit, cadenceCount, nextDueAt, lastDoneAt, active, feedbackId, createdAt, updatedAt, ... }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib task list --inactive\`
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib task list, ib task log
+
+EXAMPLES
+  ib task get 7
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib task list matches snapshot 1`] = `
+"USAGE
+  ib task list [flags]
+
+DESCRIPTION
+  List recurring operator tasks, most-overdue first (nextDueAt ASC). Developer-only. Default scope: active tasks; --due narrows to tasks due NOW (nextDueAt <= now); --inactive includes deactivated ones. The daily AI runner sweeps \`ib task list --due --executor ai --agent claude\`.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --due    Only tasks due now (nextDueAt <= now)
+  --executor STRING    human | ai
+  --agent STRING    claude | hermes — recommendedAgent filter (AI tasks)
+  --assignee NUMBER    Only tasks assigned to this personId
+  --asiakas NUMBER    Only tasks scoped to this company (asiakasId); internal/global tasks have asiakasId NULL
+  --inactive    Include deactivated tasks (default: active only)
+  --limit NUMBER    Max rows (cap 200) (default: 50)
+  --offset NUMBER    Pagination offset (default: 0)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { items: TaskRow[], nextCursor: null, count, truncated? } — TaskRow = { taskId, title, instructions, skillRef, executor, recommendedAgent, assigneePersonId, asiakasId, cadenceUnit, cadenceCount, nextDueAt, lastDoneAt, active, feedbackId, ... }
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → --executor must be human|ai; --agent must be claude|hermes
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib task list --due
+  ib task list --due --executor ai --agent claude
+  ib task list --executor human --assignee 10
+  ib task list --asiakas 8 --inactive
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib task log matches snapshot 1`] = `
+"USAGE
+  ib task log <id> [flags]
+
+DESCRIPTION
+  Completion history for one task, newest first (developer-only). agent non-null = AI completion; outcome failed rows explain why a task is still due.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <id> NUMBER    taskId (required)
+
+FLAGS
+  --limit NUMBER    Max rows (cap 200) (default: 50)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { items: LogRow[], nextCursor: null, count } — LogRow = { logId, taskId, doneAt, donePersonId, agent, outcome, notes }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib task list --inactive\`
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib task complete, ib task get
+
+EXAMPLES
+  ib task log 7
+  ib task log 7 --limit 10
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib task set matches snapshot 1`] = `
+"USAGE
+  ib task set <id> [flags]
+
+DESCRIPTION
+  Partial update of a recurring task (developer-only; a write). Omit a flag to KEEP the current value; pass "" to CLEAR a text field (--instructions/--skill/--agent). --deactivate soft-retires the task (history kept); --activate restores it. --next-due overrides the due date without logging a completion.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <id> NUMBER    taskId (required)
+
+FLAGS
+  --title STRING    New title
+  --instructions STRING    New instructions ("" clears)
+  --skill STRING    New skillRef ("" clears)
+  --executor STRING    human | ai
+  --agent STRING    claude | hermes ("" clears)
+  --assignee NUMBER    New assignee personId
+  --asiakas NUMBER    New company scope (asiakasId)
+  --cadence STRING    <count>/<unit>, unit day|week|month
+  --next-due STRING    Override nextDueAt (YYYY-MM-DD or today/tomorrow)
+  --activate    Reactivate; mutually exclusive with --deactivate
+  --deactivate    Soft-retire the task (active=0)
+
+WRITE-SAFETY FLAGS
+  --dry-run            Validate without persisting. Returns the would-be response.
+  --idempotency-key K  Replay protection. Cached for 24h.
+  --reason TEXT        Free-text justification. Stored in audit log.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  The full updated task row. With --dry-run: { dryRun:true, wouldWrite:{...} } (server-side preview).
+
+ERRORS (stderr, exit non-zero)
+  exit 4  Validation             → provide at least one field; --activate/--deactivate and enum values as documented
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib task list --inactive\`
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib task set 7 --cadence 2/month --reason "cadence tuning"
+  ib task set 7 --deactivate --reason "task retired"
+  ib task set 7 --skill "" --reason "no automation yet — back to morning-report surfacing"
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib validate matches snapshot 1`] = `
 "USAGE
   ib validate [<action>] [flags]
