@@ -3,7 +3,7 @@ import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { parseJsonBodyFlag, resolveJsonObjectBody } from "../../api/parseBody.js";
 import { registerLogAlias } from "../log/index.js";
-import { resolveTarget, parseId } from "../../targets.js";
+import { resolveTarget, parseId, resolveSearchQuery } from "../../targets.js";
 import { runAddressDashboard, } from "../_shared/addressDashboard.js";
 import { runCombinatorDuplicates, runCombinatorMerge, } from "../_shared/combinator.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
@@ -389,14 +389,15 @@ export function registerWorksiteCommands(parent, getClient) {
             exitWithError(e);
         }
     });
-    w.command("search <query>")
+    w.command("search [query]")
         .description("Free-text search for worksites")
+        .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max results", (v) => Math.min(Number(v), 500))
         .option("--my-companies", "Search across every company you belong to (rows tagged with ownerAsiakasId)")
         .action(async (query, opts) => {
         try {
             const client = await getClient();
-            const result = await runWorksiteSearch(client, query, opts.limit, !!opts.myCompanies);
+            const result = await runWorksiteSearch(client, resolveSearchQuery(query, opts.search), opts.limit, !!opts.myCompanies);
             writeJson(result);
         }
         catch (e) {

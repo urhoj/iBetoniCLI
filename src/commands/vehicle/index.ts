@@ -9,7 +9,7 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
-import { parseId } from "../../targets.js";
+import { parseId, resolveSearchQuery } from "../../targets.js";
 import { CliError } from "../../api/errors.js";
 import { diffFields } from "../../diff.js";
 import { registerVehicleDriverCommands } from "./driver.js";
@@ -563,8 +563,9 @@ export function registerVehicleCommands(
       }
     });
 
-  v.command("search <query>")
+  v.command("search [query]")
     .description("Search vehicles by reg-no / name substring")
+    .option("--search <s>", "Search query (alias for the <query> positional)")
     .option("--limit <n>", "Max rows", (val: string) =>
       Math.min(Number(val), 500)
     )
@@ -573,9 +574,9 @@ export function registerVehicleCommands(
       "Search another company's fleet (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant)",
       (val: string) => Number(val)
     )
-    .action(async (query: string, opts: { limit?: number; asiakas?: number }) => {
+    .action(async (query: string | undefined, opts: { search?: string; limit?: number; asiakas?: number }) => {
       try {
-        writeJson(await runVehicleSearch(await getClient(), query, opts.limit, opts.asiakas));
+        writeJson(await runVehicleSearch(await getClient(), resolveSearchQuery(query, opts.search), opts.limit, opts.asiakas));
       } catch (e) {
         exitWithError(e);
       }

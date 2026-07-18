@@ -6,7 +6,7 @@ import { resolveCallerTier } from "../../tier.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { runCombinatorDuplicates, runCombinatorMerge, } from "../_shared/combinator.js";
 import { roleNameForTypeId, resolveRoleTypeId, explainRole } from "../../roles.js";
-import { parseId, parseOptionalId } from "../../targets.js";
+import { parseId, parseOptionalId, resolveSearchQuery } from "../../targets.js";
 import { runCompanyList } from "../company/index.js";
 import { runNotificationFcmSend, parseJsonObject, } from "../notification/index.js";
 import { CliError } from "../../api/errors.js";
@@ -349,26 +349,28 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
             exitWithError(e);
         }
     });
-    p.command("search <query>")
+    p.command("search [query]")
         .description("Free-text search for persons")
+        .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max results", (v) => Math.min(Number(v), 500))
         .option("--my-companies", "Search across every company you belong to (each hit tagged with its asiakasId)")
         .action(async (query, opts) => {
         try {
             const client = await getClient();
+            const q = resolveSearchQuery(query, opts.search);
             if (opts.myCompanies) {
-                const result = await runPersonSearchMyCompanies(client, query, {
+                const result = await runPersonSearchMyCompanies(client, q, {
                     limit: opts.limit,
                     // Fallback used only if the server endpoint isn't deployed yet.
                     fallback: () => runPersonSearchMyCompaniesFanout(async () => (await runCompanyList(client)).items.map((c) => ({
                         asiakasId: c.asiakasId,
                         name: c.name,
-                    })), async (asiakasId) => runPersonSearch(await getClientForAsiakas(asiakasId), query, opts.limit)),
+                    })), async (asiakasId) => runPersonSearch(await getClientForAsiakas(asiakasId), q, opts.limit)),
                 });
                 writeJson(result);
                 return;
             }
-            const result = await runPersonSearch(client, query, opts.limit);
+            const result = await runPersonSearch(client, q, opts.limit);
             writeJson(result);
         }
         catch (e) {

@@ -10,7 +10,7 @@ import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { parseJsonBodyFlag, resolveJsonObjectBody } from "../../api/parseBody.js";
 import { registerLogAlias } from "../log/index.js";
-import { resolveTarget, parseId } from "../../targets.js";
+import { resolveTarget, parseId, resolveSearchQuery } from "../../targets.js";
 import {
   runAddressDashboard,
   type AddressDashboardReport,
@@ -585,14 +585,15 @@ export function registerWorksiteCommands(
       }
     });
 
-  w.command("search <query>")
+  w.command("search [query]")
     .description("Free-text search for worksites")
+    .option("--search <s>", "Search query (alias for the <query> positional)")
     .option("--limit <n>", "Max results", (v: string) => Math.min(Number(v), 500))
     .option("--my-companies", "Search across every company you belong to (rows tagged with ownerAsiakasId)")
-    .action(async (query: string, opts: { limit?: number; myCompanies?: boolean }) => {
+    .action(async (query: string | undefined, opts: { search?: string; limit?: number; myCompanies?: boolean }) => {
       try {
         const client = await getClient();
-        const result = await runWorksiteSearch(client, query, opts.limit, !!opts.myCompanies);
+        const result = await runWorksiteSearch(client, resolveSearchQuery(query, opts.search), opts.limit, !!opts.myCompanies);
         writeJson(result);
       } catch (e) {
         exitWithError(e);

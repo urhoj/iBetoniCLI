@@ -2,7 +2,7 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFla
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { resolveAsiakasTarget } from "../customer/index.js";
-import { parseId } from "../../targets.js";
+import { parseId, resolveSearchQuery } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
 /**
  * Wrap a backend array into the universal `{ items, nextCursor, count }` list
@@ -793,12 +793,13 @@ export function registerJerryCommands(parent, getClient) {
         }
     });
     admin
-        .command("search <query>")
+        .command("search [query]")
         .description("Search non-Jerry companies (Add picker)")
-        .action(async (query) => {
+        .option("--search <s>", "Search query (alias for the <query> positional)")
+        .action(async (query, opts) => {
         try {
             const client = await getClient();
-            writeJson(await runJerryAdminSearch(client, query));
+            writeJson(await runJerryAdminSearch(client, resolveSearchQuery(query, opts.search)));
         }
         catch (e) {
             exitWithError(e);

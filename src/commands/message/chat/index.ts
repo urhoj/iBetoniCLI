@@ -4,7 +4,7 @@ import type { ListEnvelope } from "../../../api/envelopes.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../../output/json.js";
 import { resolveThreadId, type ThreadTarget } from "./resolveThread.js";
-import { parseOptionalId } from "../../../targets.js";
+import { parseOptionalId, resolveSearchQuery } from "../../../targets.js";
 
 type Row = Record<string, unknown>;
 
@@ -327,13 +327,14 @@ export function registerMessageChatCommands(
       }
     );
 
-  c.command("search <query>")
+  c.command("search [query]")
     .description("Search your own messages by body text across all your threads (newest first)")
+    .option("--search <s>", "Search query (alias for the <query> positional)")
     .option("--limit <n>", "Max results (default 50, server max 200)", Number)
-    .action(async (query: string, opts: { limit?: number }) => {
+    .action(async (query: string | undefined, opts: { search?: string; limit?: number }) => {
       try {
         const client = await getClient();
-        writeJson(await runChatSearch(client, query, opts));
+        writeJson(await runChatSearch(client, resolveSearchQuery(query, opts.search), opts));
       } catch (e) {
         exitWithError(e);
       }

@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { CliError } from "../../api/errors.js";
+import { resolveSearchQuery } from "../../targets.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { runCustomerSearch } from "../customer/index.js";
 import { runPersonSearch, type PersonSearchHit } from "../person/index.js";
@@ -271,17 +272,19 @@ export function registerSearchCommands(
   getClient: () => Promise<ApiClient>
 ): void {
   parent
-    .command("search <query>")
+    .command("search [query]")
     .description("Cross-entity search: customers, worksites, persons, vehicles, keikkas, sijainnit (one flat ranked list)")
+    .option("--search <s>", "Search query (alias for the <query> positional)")
     .option("--in <entities>", `Comma-separated subset of: ${SEARCH_ENTITIES.join(",")}`)
     .option("--limit <n>", "Max hits per entity", (v: string) => Number(v), DEFAULT_LIMIT)
     .option("--my-companies", "Also search every company you belong to (customer/worksite/person only; vehicle, keikka & sijainti stay active-company)")
-    .action(async (query: string, opts: { in?: string; limit: number; myCompanies?: boolean }) => {
+    .action(async (query: string | undefined, opts: { search?: string; in?: string; limit: number; myCompanies?: boolean }) => {
       try {
+        const q = resolveSearchQuery(query, opts.search);
         const entities = parseEntityFilter(opts.in);
         const client = await getClient();
-        const srcs = buildSearchSources(client, query, opts.limit, !!opts.myCompanies);
-        const result = await runUnifiedSearch(query, srcs, entities, opts.limit);
+        const srcs = buildSearchSources(client, q, opts.limit, !!opts.myCompanies);
+        const result = await runUnifiedSearch(q, srcs, entities, opts.limit);
         writeJson(result);
       } catch (e) {
         exitWithError(e);

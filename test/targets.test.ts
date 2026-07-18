@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { parseId, parseOptionalId, parseRefId } from "../src/targets.js";
+import { parseId, parseOptionalId, parseRefId, resolveSearchQuery } from "../src/targets.js";
 
 /** Run fn and return the CliError exitCode it threw (or undefined if it didn't throw). */
 const exitCodeOf = (fn: () => void): number | undefined => {
@@ -107,5 +107,34 @@ describe("parseRefId (feedback #230 fb#/cl# anchor)", () => {
     for (const bad of ["x230", "abc", "5.5", "230abc", "0x10"]) {
       expect(exitCodeOf(() => parseRefId(bad, "feedback", "get"))).toBe(4);
     }
+  });
+});
+
+describe("resolveSearchQuery (feedback #235 — positional OR --search)", () => {
+  test("positional alone resolves (trimmed)", () => {
+    expect(resolveSearchQuery("Puminet", undefined)).toBe("Puminet");
+    expect(resolveSearchQuery("  Betoni Oy  ", undefined)).toBe("Betoni Oy");
+  });
+
+  test("--search flag alone resolves (the fb#235 case)", () => {
+    expect(resolveSearchQuery(undefined, "Puminet")).toBe("Puminet");
+  });
+
+  test("both allowed when they agree (after trim)", () => {
+    expect(resolveSearchQuery("Puminet", " Puminet ")).toBe("Puminet");
+  });
+
+  test("both differ → exit 4", () => {
+    expect(exitCodeOf(() => resolveSearchQuery("Puminet", "Betoni"))).toBe(4);
+  });
+
+  test("neither (or whitespace-only) → exit 4", () => {
+    expect(exitCodeOf(() => resolveSearchQuery(undefined, undefined))).toBe(4);
+    expect(exitCodeOf(() => resolveSearchQuery("   ", undefined))).toBe(4);
+    expect(exitCodeOf(() => resolveSearchQuery(undefined, "  "))).toBe(4);
+  });
+
+  test("missing-query error names both input forms", () => {
+    expect(() => resolveSearchQuery(undefined, undefined)).toThrow(/<query>.*--search/);
   });
 });

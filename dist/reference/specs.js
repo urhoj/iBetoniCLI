@@ -518,6 +518,11 @@ const BASE_COMMAND_SPECS = [
                 description: "End date (YYYY-MM-DD or today/yesterday/tomorrow)",
             },
             {
+                name: "date",
+                type: "date",
+                description: "Single-day shorthand: sets --from and --to to this one day (YYYY-MM-DD or today/yesterday/tomorrow). Mutually exclusive with --from/--to.",
+            },
+            {
                 name: "customer",
                 type: "number",
                 description: "Filter by asiakasId",
@@ -548,6 +553,7 @@ const BASE_COMMAND_SPECS = [
         seeAlso: ["ib keikka latest"],
         examples: [
             "ib keikka list --from 2026-05-28 --to 2026-05-30",
+            "ib keikka list --date today",
             "ib keikka list --customer 1349 --status planned --limit 50",
             "ib keikka list --from today --to tomorrow --pretty",
         ],
@@ -669,8 +675,9 @@ const BASE_COMMAND_SPECS = [
         command: "ib keikka search",
         description: "Search keikkas via the backend full-text search: phone number, keikkaId, worksite name/number, invoice reference. Returns deduped hits (one per keikka), newest first.",
         auth: "any",
-        args: [{ name: "query", type: "string", description: "Full-text search string (phone, keikkaId, worksite name/number, invoice ref)" }],
+        args: [{ name: "query", type: "string", required: false, description: "Full-text search string (phone, keikkaId, worksite name/number, invoice ref) — or pass --search" }],
         flags: [
+            { name: "search", type: "string", description: "Search query (alias for the <query> positional)" },
             { name: "limit", type: "number", description: "Max hits (client-side; backend caps at 100)" },
         ],
         outputShape: "ListEnvelope<{ keikkaId, title, pumppuAika, customerName, worksiteName, address, contactPerson, contactPhone }>",
@@ -923,8 +930,13 @@ const BASE_COMMAND_SPECS = [
         command: "ib customer search",
         description: "Free-text search across customer names / yTunnus / contacts. GET /api/asiakas/search?searchString=...",
         permissions: ["auth.page.asiakas.read"],
-        args: [{ name: "query", type: "string", description: "search string" }],
+        args: [{ name: "query", type: "string", required: false, description: "search string (or pass --search)" }],
         flags: [
+            {
+                name: "search",
+                type: "string",
+                description: "Search query (alias for the <query> positional)",
+            },
             {
                 name: "limit",
                 type: "number",
@@ -1253,8 +1265,13 @@ const BASE_COMMAND_SPECS = [
         command: "ib worksite search",
         description: "Free-text worksite search (POST /api/tyomaa/search). The query full-text-matches the worksite name, ALL FOUR address lines (street / line 2 / postal code / city), driving instructions, memo, formatted address, worksite number AND the contact person's name / phone / email — so a street fragment like 'Mannerheimintie' finds the worksite. Scoped to the active company. Safe under --read-only (sent as a read request — a tenant-scoped read over POST, distinct from a meta/diagnostic call — so it does NOT trip the read-only lock or the acting-as write line).",
         permissions: ["auth.page.tyomaa.read"],
-        args: [{ name: "query", type: "string", description: "search string" }],
+        args: [{ name: "query", type: "string", required: false, description: "search string (or pass --search)" }],
         flags: [
+            {
+                name: "search",
+                type: "string",
+                description: "Search query (alias for the <query> positional)",
+            },
             {
                 name: "limit",
                 type: "number",
@@ -1436,8 +1453,13 @@ const BASE_COMMAND_SPECS = [
             "flat list tagged with the asiakasId/name of each hit. " +
             "Global persons (ownerAsiakasId=null) are included in every company's results.",
         permissions: ["auth.page.person.read"],
-        args: [{ name: "query", type: "string", description: "search string" }],
+        args: [{ name: "query", type: "string", required: false, description: "search string (or pass --search)" }],
         flags: [
+            {
+                name: "search",
+                type: "string",
+                description: "Search query (alias for the <query> positional)",
+            },
             {
                 name: "limit",
                 type: "number",
@@ -1851,8 +1873,9 @@ const BASE_COMMAND_SPECS = [
         command: "ib vehicle search",
         description: "Search vehicles by reg-no / name / fleet-number substring (LIKE on vehicleRegNo / vehicleNimi / vehicleNo). --asiakas searches ANOTHER company's fleet (cross-tenant; same gate as `ib vehicle list --asiakas`).",
         permissions: ["auth.page.vehicle.read", VEHICLE_ASIAKAS_PERMISSION],
-        args: [{ name: "query", type: "string", description: "substring to match (reg-no, name, or fleet number)" }],
+        args: [{ name: "query", type: "string", required: false, description: "substring to match (reg-no, name, or fleet number) — or pass --search" }],
         flags: [
+            { name: "search", type: "string", description: "Search query (alias for the <query> positional)" },
             { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
             {
                 name: "asiakas",
@@ -3867,8 +3890,10 @@ const BASE_COMMAND_SPECS = [
         description: "Search companies NOT yet fully Jerry-enabled, for the Add picker (GET /api/admin/jerry-companies/search?q=). Name LIKE match, min 2 chars, top 20. System-admin only.",
         permissions: ["isSystemAdmin"],
         tier: "developer",
-        args: [{ name: "query", type: "string", description: "name search (min 2 chars)" }],
-        flags: [],
+        args: [{ name: "query", type: "string", required: false, description: "name search (min 2 chars) — or pass --search" }],
+        flags: [
+            { name: "search", type: "string", description: "Search query (alias for the <query> positional)" },
+        ],
         outputShape: "ListEnvelope<{ asiakasId, name }>",
         errors: [
             apiErr(403, "Not a system admin", "use a system-admin token"),
@@ -5403,8 +5428,9 @@ const BASE_COMMAND_SPECS = [
         command: "ib search",
         description: "Cross-entity unified search: customers, worksites, persons, vehicles, keikkas and sijainnit in ONE flat ranked list. Client-side parallel fan-out over the per-entity searches — use this to resolve \"who/what is X\" without guessing the entity type.",
         auth: "any",
-        args: [{ name: "query", type: "string", description: "Search string" }],
+        args: [{ name: "query", type: "string", required: false, description: "Search string (or pass --search)" }],
         flags: [
+            { name: "search", type: "string", description: "Search query (alias for the <query> positional)" },
             { name: "in", type: "string", description: "Comma-separated subset of: customer,worksite,person,vehicle,keikka,sijainti" },
             { name: "limit", type: "number", default: "5", description: "Max hits per entity" },
             { name: "my-companies", type: "boolean", description: "Search across every company you belong to (customer/worksite/person)" },
@@ -5645,8 +5671,11 @@ const BASE_COMMAND_SPECS = [
         command: "ib message chat search",
         description: "Search your own chat messages by body text (GET /api/messages/search). Scoped to threads you participate in (the participant JOIN is the tenant boundary); non-deleted only; newest first. q min 2 chars; --limit default 50, max 200.",
         auth: "any",
-        args: [{ name: "query", type: "string", required: true, description: "Body substring to search for (min 2 chars)" }],
-        flags: [{ name: "limit", type: "number", default: "50", description: "Max results (server max 200)" }],
+        args: [{ name: "query", type: "string", required: false, description: "Body substring to search for (min 2 chars) — or pass --search" }],
+        flags: [
+            { name: "search", type: "string", description: "Search query (alias for the <query> positional)" },
+            { name: "limit", type: "number", default: "50", description: "Max results (server max 200)" },
+        ],
         outputShape: "ListEnvelope<{ messageId, threadId, contextType, contextId, senderPersonId, body, createdAt, personFirstName, personLastName }>",
         errors: [
             apiErr(400, "Query too short", "q must be at least 2 characters"),

@@ -124,3 +124,32 @@ export function resolveTarget(
   }
   return id;
 }
+
+/**
+ * Resolve a free-text search query that may arrive as a positional `<query>`
+ * OR the `--search <s>` flag alias — the string sibling of {@link resolveTarget}
+ * (feedback #235). AIs learn the `--search` convention from list commands
+ * (`glossary list`, `dev schema tables`) and reach for it on search-style
+ * commands too; accepting both spellings removes that friction. Exactly one is
+ * required; passing both is allowed only when they match (after trim). A
+ * missing / whitespace-only query exits 4.
+ */
+export function resolveSearchQuery(
+  positional: string | undefined,
+  flag: string | undefined
+): string {
+  const norm = (s: string | undefined): string | undefined => {
+    const t = s?.trim();
+    return t ? t : undefined;
+  };
+  const pos = norm(positional);
+  const fl = norm(flag);
+  const query = pos ?? fl;
+  if (query === undefined) {
+    failWith("missing search query: pass <query> positionally or via --search <s>", 4);
+  }
+  if (pos !== undefined && fl !== undefined && pos !== fl) {
+    failWith(`positional query ("${pos}") and --search ("${fl}") differ — pass only one`, 4);
+  }
+  return query;
+}

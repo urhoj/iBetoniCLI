@@ -4,7 +4,7 @@ import { writeJson, exitWithError, failWith, errorMessage, setExitCode, } from "
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveRoleTypeId } from "../../roles.js";
-import { resolveTarget, parseId } from "../../targets.js";
+import { resolveTarget, parseId, resolveSearchQuery } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
 import { runPersonRoleList } from "../person/index.js";
 // PRH lookups live in the shared module (also powers `ib opendata prh`). Aliased
@@ -938,14 +938,15 @@ export function registerCustomerCommands(parent, getClient) {
             exitWithError(e);
         }
     });
-    c.command("search <query>")
+    c.command("search [query]")
         .description("Free-text search for customers")
+        .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max results", (v) => Math.min(Number(v), 500))
         .option("--my-companies", "Search across every company you belong to (rows tagged with ownerAsiakasId)")
         .action(async (query, opts) => {
         try {
             const client = await getClient();
-            const result = await runCustomerSearch(client, query, opts.limit, !!opts.myCompanies);
+            const result = await runCustomerSearch(client, resolveSearchQuery(query, opts.search), opts.limit, !!opts.myCompanies);
             writeJson(result);
         }
         catch (e) {

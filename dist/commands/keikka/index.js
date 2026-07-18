@@ -4,7 +4,7 @@ import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveDate, todayHelsinki, addDaysISO } from "../../dates.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { registerLogAlias } from "../log/index.js";
-import { parseId } from "../../targets.js";
+import { parseId, resolveSearchQuery } from "../../targets.js";
 // Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
 export { resolveDate };
 /**
@@ -235,19 +235,35 @@ export function registerKeikkaCommands(parent, getClient) {
         .description("List keikkas matching the filters")
         .option("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
         .option("--to <date>", "End date YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
+        .option("--date <date>", "Single-day shorthand: sets --from and --to to this one day (YYYY-MM-DD or today/yesterday/tomorrow). Mutually exclusive with --from/--to.")
         .option("--customer <id>", "Filter by asiakasId", (v) => Number(v))
         .option("--vehicle <id>", "Filter by vehicleId", (v) => Number(v))
         .option("--worksite <id>", "Filter by worksite (tyomaaId)", (v) => Number(v))
         .option("--status <s>", "Filter by status")
         .option("--limit <n>", "Max rows", (v) => Math.min(Number(v), 500))
         .option("--cursor <c>", "Pagination cursor")
-        .action(async (opts) => {
+        .action(async (rawOpts, command) => {
         try {
             const client = await getClient();
+            const { date, ...opts } = rawOpts;
+            let { from, to } = opts;
+            // --date is a single-day convenience (fb#236): an AI reaching for a
+            // `--date` on `keikka list` (schedule commands own dates) now works
+            // instead of hitting "unknown option". It expands to from=to=<day>; a
+            // conflict with an EXPLICIT --from/--to (the source is "cli", not the
+            // "today" default) is a caller error, not a silent override.
+            if (date !== undefined) {
+                if (command.getOptionValueSource("from") === "cli" ||
+                    command.getOptionValueSource("to") === "cli") {
+                    failWith("--date is a single-day shorthand for --from/--to — pass it alone, not together with --from/--to", 4);
+                }
+                from = date;
+                to = date;
+            }
             const resolved = {
                 ...opts,
-                from: resolveDate(opts.from),
-                to: resolveDate(opts.to),
+                from: resolveDate(from),
+                to: resolveDate(to),
             };
             const result = await runKeikkaList(client, resolved);
             writeJson(result);
@@ -284,15 +300,16 @@ export function registerKeikkaCommands(parent, getClient) {
             exitWithError(e);
         }
     });
-    k.command("search <query>")
+    k.command("search [query]")
         .description("Search keikkas (full-text: phone, keikkaId, worksite name/number, invoice ref)")
+        .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max hits (client-side; backend caps at 100)", (v) => Number(v))
         .action(async (query, opts) => {
         try {
             const client = await getClient();
             const ownerAsiakasId = decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId ??
                 failWith("could not resolve ownerAsiakasId from the active token", 4);
-            const result = await runKeikkaSearch(client, query, ownerAsiakasId, opts.limit);
+            const result = await runKeikkaSearch(client, resolveSearchQuery(query, opts.search), ownerAsiakasId, opts.limit);
             writeJson(result);
         }
         catch (e) {

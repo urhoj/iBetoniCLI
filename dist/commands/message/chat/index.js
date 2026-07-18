@@ -1,7 +1,7 @@
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../../output/json.js";
 import { resolveThreadId } from "./resolveThread.js";
-import { parseOptionalId } from "../../../targets.js";
+import { parseOptionalId, resolveSearchQuery } from "../../../targets.js";
 /** Wrap a backend array into the universal `{ items, nextCursor, count }` envelope. */
 function toEnvelope(value) {
     const items = Array.isArray(value) ? value : [];
@@ -227,13 +227,14 @@ export function registerMessageChatCommands(parent, getClient) {
             exitWithError(e);
         }
     });
-    c.command("search <query>")
+    c.command("search [query]")
         .description("Search your own messages by body text across all your threads (newest first)")
+        .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max results (default 50, server max 200)", Number)
         .action(async (query, opts) => {
         try {
             const client = await getClient();
-            writeJson(await runChatSearch(client, query, opts));
+            writeJson(await runChatSearch(client, resolveSearchQuery(query, opts.search), opts));
         }
         catch (e) {
             exitWithError(e);

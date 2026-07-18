@@ -9,7 +9,7 @@ import {
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { resolveAsiakasTarget } from "../customer/index.js";
-import { parseId } from "../../targets.js";
+import { parseId, resolveSearchQuery } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
 
 type Row = Record<string, unknown>;
@@ -1160,12 +1160,13 @@ export function registerJerryCommands(
     });
 
   admin
-    .command("search <query>")
+    .command("search [query]")
     .description("Search non-Jerry companies (Add picker)")
-    .action(async (query: string) => {
+    .option("--search <s>", "Search query (alias for the <query> positional)")
+    .action(async (query: string | undefined, opts: { search?: string }) => {
       try {
         const client = await getClient();
-        writeJson(await runJerryAdminSearch(client, query));
+        writeJson(await runJerryAdminSearch(client, resolveSearchQuery(query, opts.search)));
       } catch (e) {
         exitWithError(e);
       }

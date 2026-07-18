@@ -1,15 +1,25 @@
 import { describe, test, expect } from "vitest";
+import type { Command } from "commander";
 import { buildProgram } from "../../src/program.js";
 import {
   levenshtein,
   closestName,
   visibleSubcommands,
   buildUnknownCommandEnvelope,
+  buildUnknownOptionEnvelope,
+  OPTION_REDIRECTS,
 } from "../../src/output/unknownCommand.js";
 
 const legalOf = () => {
   const program = buildProgram();
   return program.commands.find((c) => c.name() === "legal")!;
+};
+
+/** Walk the built program tree to a leaf command by its path (after `ib`). */
+const leafByPath = (...path: string[]): Command => {
+  let cmd: Command = buildProgram();
+  for (const name of path) cmd = cmd.commands.find((c) => c.name() === name)!;
+  return cmd;
 };
 
 describe("levenshtein / closestName (#1)", () => {
@@ -70,6 +80,49 @@ describe("buildUnknownCommandEnvelope (#1)", () => {
     expect(env.available).toContain("create");
     expect(env.didYouMean).toBe("create");
     expect(env.hint).toContain("ib keikka create");
+  });
+});
+
+describe("buildUnknownOptionEnvelope (#235/#236)", () => {
+  test("names the command's positionals + accepted flags; USAGE/exit shape", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("customer", "search"), "--qeury");
+    expect(env.code).toBe("USAGE");
+    expect(env.statusCode).toBe(0);
+    expect(env.command).toBe("ib customer search");
+    expect(env.unknownOption).toBe("--qeury");
+    // query is now an optional positional (Part 2) → rendered with brackets.
+    expect(env.positionals).toContain("[<query>]");
+    expect(env.availableOptions).toContain("--search");
+    expect(env.availableOptions).toContain("--limit");
+    expect(env.hint).toContain("ib customer search --help");
+  });
+
+  test("fuzzy did-you-mean among the command's real flags", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("customer", "create"), "--nam");
+    expect(env.didYouMean).toBe("--name");
+    expect(env.hint).toContain("Did you mean `--name`?");
+  });
+
+  test("no near flag → didYouMean null (no misleading suggestion)", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("keikka", "list"), "--zzzzzz");
+    expect(env.didYouMean).toBeNull();
+  });
+
+  test("curated cross-command redirect: cache invalidate --pattern → `cache pattern`", () => {
+    const env = buildUnknownOptionEnvelope(
+      leafByPath("dev", "cache", "invalidate"),
+      "--pattern"
+    );
+    expect(env.command).toBe("ib dev cache invalidate");
+    expect(env.positionals).toContain("<entityType>");
+    expect(env.hint).toContain("ib dev cache pattern");
+    expect(env.hint).toContain("<entityType> positional");
+    // write-safety flags surface as accepted flags for a mutating command.
+    expect(env.availableOptions).toContain("--reason");
+  });
+
+  test("OPTION_REDIRECTS is keyed by full command path + flag", () => {
+    expect(OPTION_REDIRECTS).toHaveProperty("ib dev cache invalidate --pattern");
   });
 });
 

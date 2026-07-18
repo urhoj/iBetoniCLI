@@ -25,7 +25,7 @@ import {
   type CombinatorMergeOptions,
 } from "../_shared/combinator.js";
 import { roleNameForTypeId, resolveRoleTypeId, explainRole } from "../../roles.js";
-import { parseId, parseOptionalId } from "../../targets.js";
+import { parseId, parseOptionalId, resolveSearchQuery } from "../../targets.js";
 import { runCompanyList } from "../company/index.js";
 import {
   runNotificationFcmSend,
@@ -529,19 +529,21 @@ export function registerPersonCommands(
       }
     });
 
-  p.command("search <query>")
+  p.command("search [query]")
     .description("Free-text search for persons")
+    .option("--search <s>", "Search query (alias for the <query> positional)")
     .option("--limit <n>", "Max results", (v: string) => Math.min(Number(v), 500))
     .option(
       "--my-companies",
       "Search across every company you belong to (each hit tagged with its asiakasId)"
     )
     .action(
-      async (query: string, opts: { limit?: number; myCompanies?: boolean }) => {
+      async (query: string | undefined, opts: { search?: string; limit?: number; myCompanies?: boolean }) => {
         try {
           const client = await getClient();
+          const q = resolveSearchQuery(query, opts.search);
           if (opts.myCompanies) {
-            const result = await runPersonSearchMyCompanies(client, query, {
+            const result = await runPersonSearchMyCompanies(client, q, {
               limit: opts.limit,
               // Fallback used only if the server endpoint isn't deployed yet.
               fallback: () =>
@@ -554,7 +556,7 @@ export function registerPersonCommands(
                   async (asiakasId) =>
                     runPersonSearch(
                       await getClientForAsiakas(asiakasId),
-                      query,
+                      q,
                       opts.limit
                     )
                 ),
@@ -562,7 +564,7 @@ export function registerPersonCommands(
             writeJson(result);
             return;
           }
-          const result = await runPersonSearch(client, query, opts.limit);
+          const result = await runPersonSearch(client, q, opts.limit);
           writeJson(result);
         } catch (e) {
           exitWithError(e);

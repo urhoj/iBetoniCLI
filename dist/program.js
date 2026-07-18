@@ -56,7 +56,7 @@ import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
 import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, setActiveCommandErrors } from "./output/json.js";
 import { buildValidationEnvelope } from "./output/validationEnvelope.js";
-import { buildUnknownCommandEnvelope } from "./output/unknownCommand.js";
+import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { createApiClient } from "./api/client.js";
 import { CliError } from "./api/errors.js";
@@ -536,6 +536,21 @@ export function handleParseRejection(err, parserText, erroringCommand) {
                     issue: "missing",
                 }));
                 emitStderr(JSON.stringify(buildValidationEnvelope(path, problems, { spec })) + "\n");
+                recordFriction(err, 4);
+                setExit(4);
+                return;
+            }
+        }
+        // Unknown option → enriched envelope: the command's real positionals + flags,
+        // a fuzzy did-you-mean among its actual flags, and any curated cross-command
+        // redirect (feedback #235/#236 — the flag analogue of the unknown-command path).
+        if (err.code === "commander.unknownOption" && erroringCommand) {
+            const cmd = erroringCommand();
+            const token = text.match(/unknown option '([^']+)'/)?.[1] ||
+                err.message?.match(/unknown option '([^']+)'/)?.[1] ||
+                "";
+            if (cmd && token) {
+                emitStderr(JSON.stringify(buildUnknownOptionEnvelope(cmd, token)) + "\n");
                 recordFriction(err, 4);
                 setExit(4);
                 return;

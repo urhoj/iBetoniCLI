@@ -129,4 +129,85 @@ export function buildUnknownCommandEnvelope(cmd, unknownToken, tier) {
         hint: `${suggestion}${availableStr}Run ${discover} to discover them.`,
     };
 }
+/**
+ * Curated cross-command redirects for flags an AI naturally guesses on the
+ * WRONG command — where the right form lives on a sibling command, not just a
+ * differently-named flag here (so a same-command "did you mean" can't express
+ * it). Keyed by `"<full command path> <flag>"`. Consulted only at runtime by
+ * {@link buildUnknownOptionEnvelope}, and only when the caller actually invoked
+ * that exact command — so it never leaks into the spec-driven reference dump
+ * (keeping the tier-scrub contract intact) and appears solely to a caller who
+ * already reached that subtree. The flag analogue of `VERB_SYNONYMS`.
+ */
+export const OPTION_REDIRECTS = {
+    "ib dev cache invalidate --pattern": "`cache invalidate` targets an entity FAMILY by its <entityType> positional (e.g. `ib dev cache invalidate keikka --id 123`). For a raw Redis key glob use `ib dev cache pattern <glob>` instead.",
+};
+/** Long flags a command accepts, derived from its curated spec (tier-blind — the
+ *  caller already invoked this command; only sibling ENUMERATION is tier-gated). */
+function specOptionLongs(spec) {
+    const longs = spec.flags.map((f) => `--${f.name}`);
+    if (spec.writeFlags)
+        longs.push("--dry-run", "--idempotency-key", "--reason");
+    return longs;
+}
+/** Real long options wired on a Commander command (fallback when no spec — e.g.
+ *  a hidden back-compat alias). Drops the framework-added `--help`. */
+function commanderOptionLongs(cmd) {
+    return cmd.options
+        .map((o) => o.long)
+        .filter((l) => Boolean(l) && l !== "--help");
+}
+/** Positional signature of a command from its spec: `<query>` / `[<query>]`. */
+function specPositionals(spec) {
+    return (spec.args ?? []).map((a) => a.required === false ? `[<${a.name}>]` : `<${a.name}>`);
+}
+/**
+ * Enriched "unknown option" error envelope — the flag analogue of
+ * {@link buildUnknownCommandEnvelope}. When Commander rejects a guessed flag
+ * (`ib customer search --search X`) the default USAGE envelope only echoes
+ * "unknown option '--search'" with a generic hint — a dead end that doesn't say
+ * what the command DOES accept (feedback #235/#236). This lists the command's
+ * real positionals + flags, a fuzzy "did you mean" among its actual flags, and
+ * (when present) a curated cross-command redirect. `cmd` is the command that
+ * threw (a leaf — options belong to leaves); `unknownOption` is the bad flag
+ * verbatim incl. leading dashes (e.g. `--search`).
+ */
+export function buildUnknownOptionEnvelope(cmd, unknownOption) {
+    const command = commandPath(cmd);
+    const spec = COMMAND_SPECS.find((s) => s.command === command);
+    const availableOptions = spec ? specOptionLongs(spec) : commanderOptionLongs(cmd);
+    const positionals = spec ? specPositionals(spec) : [];
+    const bare = unknownOption.replace(/^-+/, "");
+    const guess = closestName(bare, availableOptions.map((o) => o.replace(/^-+/, "")));
+    const didYouMean = guess ? `--${guess}` : null;
+    const redirect = OPTION_REDIRECTS[`${command} ${unknownOption}`];
+    const domain = command.split(" ")[1]; // token after `ib`, e.g. customer
+    const discover = domain
+        ? `\`${command} --help\` or \`ib commands ${domain}\``
+        : "`ib --help` or `ib commands`";
+    const parts = [];
+    if (redirect)
+        parts.push(redirect);
+    if (didYouMean)
+        parts.push(`Did you mean \`${didYouMean}\`?`);
+    if (positionals.length) {
+        parts.push(`This command takes positional argument(s): ${positionals.join(" ")}.`);
+    }
+    parts.push(availableOptions.length
+        ? `Accepted flags: ${availableOptions.join(", ")}.`
+        : "This command takes no command-specific flags.");
+    parts.push(`Run ${discover} for the full spec.`);
+    return {
+        success: false,
+        error: `unknown option "${unknownOption}" on \`${command}\``,
+        code: "USAGE",
+        statusCode: 0,
+        command,
+        unknownOption,
+        didYouMean,
+        availableOptions,
+        positionals,
+        hint: parts.join(" "),
+    };
+}
 //# sourceMappingURL=unknownCommand.js.map
