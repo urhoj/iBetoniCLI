@@ -41,6 +41,7 @@ import { registerChangelogCommands } from "./commands/changelog/index.js";
 import { registerFeedbackCommands } from "./commands/feedback/index.js";
 import { registerAiCommands } from "./commands/ai/index.js";
 import { registerGlossaryCommands } from "./commands/glossary/index.js";
+import { registerTaskCommands } from "./commands/task/index.js";
 import { registerHelpCommands } from "./commands/help/index.js";
 import { registerVersionCommand } from "./commands/version/index.js";
 import { registerDoctorCommand } from "./commands/doctor/index.js";
@@ -186,6 +187,7 @@ export function buildProgram(): Command {
   registerOpendataCommands(program, getClient);
   registerWeatherCommands(program, getClient, { hidden: true });
   registerGlossaryCommands(program, getClient);
+  registerTaskCommands(program, getClient);
   registerSearchCommands(program, getClient);
   registerAttachmentCommands(program, getClient);
   registerVersionCommand(program, packageJson.version, getEndpoint);
