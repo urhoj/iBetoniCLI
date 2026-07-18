@@ -128,10 +128,15 @@ export interface FeedbackCreateInput {
   dryRun?: boolean;
 }
 
-/** Resolve the create description from the positional or --description alias. */
+/**
+ * Resolve the create description from the positional or --description alias.
+ * `--title` folds in as the description's first line (there is no stored title
+ * column — gh-issue-style `--title X --description Y` habit, feedback #240/#241).
+ */
 export function resolveFeedbackCreateDescription(input: {
   description?: string;
   descriptionFlag?: string;
+  title?: string;
 }): string {
   const positional = input.description?.trim();
   const flagged = input.descriptionFlag?.trim();
@@ -143,11 +148,13 @@ export function resolveFeedbackCreateDescription(input: {
       4
     );
   }
+  const title = input.title?.trim();
   const description = positional ?? flagged;
   if (!description) {
+    if (title) return title;
     throw new CliError("description is required", 400, null, 4);
   }
-  return description;
+  return title ? `${title}\n\n${description}` : description;
 }
 
 interface FeedbackCreateBody {
@@ -512,6 +519,10 @@ export function registerFeedbackCommands(
       "File a proposal/trouble report. Silent server-side; works under --read-only."
     )
     .option("--description <text>", "Alias for the positional description")
+    .option(
+      "--title <text>",
+      "Optional title, folded into the description as its first line (no stored title column)"
+    )
     .option("--kind <kind>", "improvement | bug | idea | legal", "improvement")
     .option(
       "--scope <scope>",
@@ -532,6 +543,7 @@ export function registerFeedbackCommands(
         description: string | undefined,
         opts: {
           description?: string;
+          title?: string;
           kind?: string;
           scope?: string;
           command?: string;
@@ -548,6 +560,7 @@ export function registerFeedbackCommands(
               description: resolveFeedbackCreateDescription({
                 description,
                 descriptionFlag: opts.description,
+                title: opts.title,
               }),
               kind: opts.kind,
               scope: opts.scope,

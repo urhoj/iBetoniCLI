@@ -46,6 +46,40 @@ describe("ib feedback create", () => {
     ).toThrowError(/--description/);
   });
 
+  test("--title folds into the description as its first line (feedback #240/#241)", () => {
+    expect(
+      resolveFeedbackCreateDescription({ title: " T ", descriptionFlag: "body" })
+    ).toBe("T\n\nbody");
+    expect(resolveFeedbackCreateDescription({ title: "T", description: "body" })).toBe(
+      "T\n\nbody"
+    );
+    // Title alone is accepted as the whole description.
+    expect(resolveFeedbackCreateDescription({ title: "just a title" })).toBe("just a title");
+    // No title → unchanged behaviour, including the required-description error.
+    expect(resolveFeedbackCreateDescription({ description: "body" })).toBe("body");
+    expect(() => resolveFeedbackCreateDescription({})).toThrowError(/description is required/);
+  });
+
+  test("gh-issue-style `feedback add --title X --description Y` parses and POSTs the folded description (feedback #240/#241)", async () => {
+    post.mockResolvedValueOnce({ feedbackId: 240 });
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient);
+    // Would throw "unknown option '--title'" (exit 4) before the fix.
+    await program.parseAsync(
+      ["feedback", "add", "--title", "Row counts missing", "--description", "schema table output should include row counts"],
+      { from: "user" }
+    );
+    expect(post).toHaveBeenCalledWith(
+      "/api/feedback",
+      {
+        kind: "improvement",
+        scope: "cli",
+        description: "Row counts missing\n\nschema table output should include row counts",
+      },
+      { meta: true }
+    );
+  });
+
   test("POSTs /api/feedback with kind+description as a META request (read-only exempt)", async () => {
     post.mockResolvedValueOnce({ feedbackId: 7 });
     const out = await runFeedbackCreate(mockClient, {
