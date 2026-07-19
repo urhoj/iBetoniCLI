@@ -6603,7 +6603,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ items: TaskRow[], nextCursor: null, count, truncated? } — TaskRow = { taskId, title, instructions, skillRef, executor, recommendedAgent, assigneePersonId, asiakasId, cadenceUnit, cadenceCount, nextDueAt, lastDoneAt, active, feedbackId, ... }",
     errors: [
-      { exit: 4, meaning: "Validation", remedy: "--executor must be human|ai; --agent must be claude|hermes" },
+      { exit: 4, meaning: "Validation", remedy: "--executor must be human|ai; --agent must be claude|hermes; --assignee/--asiakas/--limit/--offset must be integers" },
       apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
       apiErr(401, "Token expired", "ib auth refresh"),
       apiErr(500, "Backend error", "retry with --verbose"),
@@ -6643,7 +6643,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [
       { name: "title", type: "string", description: "Task title, max 200 chars (required)" },
       { name: "executor", type: "string", description: "human | ai (required)" },
-      { name: "cadence", type: "string", description: "<count>/<unit>, unit day|week|month, e.g. 1/month or 2/week (required)" },
+      { name: "cadence", type: "string", description: "<count>/<unit>, unit day|week|month, count 1-120, e.g. 1/month or 2/week (required)" },
       { name: "instructions", type: "string", description: "Freetext checklist for humans / prompt context for the AI runner" },
       { name: "skill", type: "string", description: "Workspace skill the AI runner invokes (e.g. cleanup-docs); omit for human tasks" },
       { name: "agent", type: "string", description: "claude | hermes — recommended AI executor tier (claude = code/advanced, hermes = light local-LLM work)" },
@@ -6654,7 +6654,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "{ taskId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldWrite:{...} } (server-side preview).",
     errors: [
-      { exit: 4, meaning: "Validation", remedy: "--title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month" },
+      { exit: 4, meaning: "Validation", remedy: "--title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month, count 1-120" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
@@ -6710,7 +6710,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "agent", type: "string", description: 'claude | hermes ("" clears)' },
       { name: "assignee", type: "number", description: "New assignee personId" },
       { name: "asiakas", type: "number", description: "New company scope (asiakasId)" },
-      { name: "cadence", type: "string", description: "<count>/<unit>, unit day|week|month" },
+      { name: "cadence", type: "string", description: "<count>/<unit>, unit day|week|month, count 1-120" },
       { name: "next-due", type: "string", description: "Override nextDueAt (YYYY-MM-DD or today/tomorrow)" },
       { name: "activate", type: "boolean", description: "Reactivate; mutually exclusive with --deactivate" },
       { name: "deactivate", type: "boolean", description: "Soft-retire the task (active=0)" },
@@ -6736,7 +6736,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "id", type: "number", description: "taskId" }],
     flags: [{ name: "limit", type: "number", default: "50", description: "Max rows (cap 200)" }],
     outputShape:
-      "{ items: LogRow[], nextCursor: null, count } — LogRow = { logId, taskId, doneAt, donePersonId, agent, outcome, notes }",
+      "{ items: LogRow[], nextCursor: null, count, truncated? } — LogRow = { logId, taskId, doneAt, donePersonId, agent, outcome, notes }",
     errors: [
       apiErr(403, "Permission denied", "requires a developer token"),
       apiErr(404, "Not found", "check the id via `ib task list --inactive`"),

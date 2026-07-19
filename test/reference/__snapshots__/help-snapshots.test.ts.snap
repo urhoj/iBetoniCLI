@@ -9794,7 +9794,7 @@ DESCRIPTION
 FLAGS
   --title STRING    Task title, max 200 chars (required)
   --executor STRING    human | ai (required)
-  --cadence STRING    <count>/<unit>, unit day|week|month, e.g. 1/month or 2/week (required)
+  --cadence STRING    <count>/<unit>, unit day|week|month, count 1-120, e.g. 1/month or 2/week (required)
   --instructions STRING    Freetext checklist for humans / prompt context for the AI runner
   --skill STRING    Workspace skill the AI runner invokes (e.g. cleanup-docs); omit for human tasks
   --agent STRING    claude | hermes — recommended AI executor tier (claude = code/advanced, hermes = light local-LLM work)
@@ -9815,7 +9815,7 @@ OUTPUT (JSON, stdout)
   { taskId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldWrite:{...} } (server-side preview).
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → --title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month
+  exit 4  Validation             → --title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month, count 1-120
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -9925,7 +9925,7 @@ OUTPUT (JSON, stdout)
   { items: TaskRow[], nextCursor: null, count, truncated? } — TaskRow = { taskId, title, instructions, skillRef, executor, recommendedAgent, assigneePersonId, asiakasId, cadenceUnit, cadenceCount, nextDueAt, lastDoneAt, active, feedbackId, ... }
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → --executor must be human|ai; --agent must be claude|hermes
+  exit 4  Validation             → --executor must be human|ai; --agent must be claude|hermes; --assignee/--asiakas/--limit/--offset must be integers
   exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -9956,7 +9956,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { items: LogRow[], nextCursor: null, count } — LogRow = { logId, taskId, doneAt, donePersonId, agent, outcome, notes }
+  { items: LogRow[], nextCursor: null, count, truncated? } — LogRow = { logId, taskId, doneAt, donePersonId, agent, outcome, notes }
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → requires a developer token
@@ -9991,7 +9991,7 @@ FLAGS
   --agent STRING    claude | hermes ("" clears)
   --assignee NUMBER    New assignee personId
   --asiakas NUMBER    New company scope (asiakasId)
-  --cadence STRING    <count>/<unit>, unit day|week|month
+  --cadence STRING    <count>/<unit>, unit day|week|month, count 1-120
   --next-due STRING    Override nextDueAt (YYYY-MM-DD or today/tomorrow)
   --activate    Reactivate; mutually exclusive with --deactivate
   --deactivate    Soft-retire the task (active=0)

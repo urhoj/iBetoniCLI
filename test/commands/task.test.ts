@@ -1,10 +1,13 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import {
   parseCadence,
+  intFlag,
   runTaskList,
+  runTaskGet,
   runTaskAdd,
   runTaskComplete,
   runTaskSet,
+  runTaskLog,
 } from "../../src/commands/task/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -29,16 +32,34 @@ describe("parseCadence", () => {
     expect(parseCadence("2/week")).toEqual({ cadenceCount: 2, cadenceUnit: "week" });
   });
 
-  test.each(["monthly", "0/month", "1/year", "1-month", ""])("rejects %j with exit 4", (v) => {
-    expect(() => parseCadence(v)).toThrowError(/--cadence/);
+  test.each(["monthly", "0/month", "1/year", "1-month", "", "121/month", "9999/day"])(
+    "rejects %j with exit 4",
+    (v) => {
+      expect(() => parseCadence(v)).toThrowError(/--cadence/);
+    }
+  );
+
+  test("accepts the 120 cap boundary", () => {
+    expect(parseCadence("120/month")).toEqual({ cadenceCount: 120, cadenceUnit: "month" });
+  });
+});
+
+describe("intFlag", () => {
+  test("parses integers at or above min", () => {
+    expect(intFlag("--assignee")("10")).toBe(10);
+    expect(intFlag("--offset", 0)("0")).toBe(0);
+  });
+
+  test.each(["abc", "12abc", "1.5", "-1", "0"])("rejects %j with exit 4 (no NaN passthrough)", (v) => {
+    expect(() => intFlag("--assignee")(v)).toThrowError(/--assignee must be an integer/);
   });
 });
 
 describe("runTaskList", () => {
-  test("builds the filter query string", async () => {
+  test("builds the filter query string with a probe limit", async () => {
     await runTaskList(client, { due: true, executor: "ai", agent: "claude", assignee: 10, asiakas: 8, inactive: true });
     expect(client.get).toHaveBeenCalledWith(
-      "/api/tasks?due=1&executor=ai&agent=claude&assignee=10&asiakas=8&includeInactive=1"
+      "/api/tasks?due=1&executor=ai&agent=claude&assignee=10&asiakas=8&includeInactive=1&limit=51"
     );
   });
 
@@ -48,9 +69,60 @@ describe("runTaskList", () => {
     expect(env).toEqual({ items: [{ taskId: 1 }], nextCursor: null, count: 1 });
   });
 
+  test("exactly --limit rows is NOT truncated (probe row absent)", async () => {
+    (client.get as ReturnType<typeof vi.fn>).mockResolvedValue([{ taskId: 1 }, { taskId: 2 }]);
+    const env = await runTaskList(client, { limit: 2 });
+    expect(client.get).toHaveBeenCalledWith("/api/tasks?limit=3");
+    expect(env.truncated).toBeUndefined();
+    expect(env.count).toBe(2);
+  });
+
+  test("probe row present → truncated and sliced to --limit", async () => {
+    (client.get as ReturnType<typeof vi.fn>).mockResolvedValue([{ taskId: 1 }, { taskId: 2 }, { taskId: 3 }]);
+    const env = await runTaskList(client, { limit: 2 });
+    expect(env.truncated).toBe(true);
+    expect(env.items).toEqual([{ taskId: 1 }, { taskId: 2 }]);
+    expect(env.count).toBe(2);
+  });
+
+  test("--limit past the server cap clamps to 200 and flags a full page", async () => {
+    const rows = Array.from({ length: 200 }, (_, i) => ({ taskId: i + 1 }));
+    (client.get as ReturnType<typeof vi.fn>).mockResolvedValue(rows);
+    const env = await runTaskList(client, { limit: 500 });
+    expect(client.get).toHaveBeenCalledWith("/api/tasks?limit=200");
+    expect(env.truncated).toBe(true);
+    expect(env.count).toBe(200);
+  });
+
   test("unknown executor exits 4 before any fetch", async () => {
     await expect(runTaskList(client, { executor: "robot" })).rejects.toThrowError(/--executor/);
     expect(client.get).not.toHaveBeenCalled();
+  });
+});
+
+describe("runTaskGet", () => {
+  test("fetches one task by id", async () => {
+    (client.get as ReturnType<typeof vi.fn>).mockResolvedValue({ taskId: 7, title: "t" });
+    const row = await runTaskGet(client, 7);
+    expect(client.get).toHaveBeenCalledWith("/api/tasks/7");
+    expect(row).toEqual({ taskId: 7, title: "t" });
+  });
+});
+
+describe("runTaskLog", () => {
+  test("fetches with a probe limit and returns the envelope", async () => {
+    (client.get as ReturnType<typeof vi.fn>).mockResolvedValue([{ logId: 1 }]);
+    const env = await runTaskLog(client, 7, {});
+    expect(client.get).toHaveBeenCalledWith("/api/tasks/7/log?limit=51");
+    expect(env).toEqual({ items: [{ logId: 1 }], nextCursor: null, count: 1 });
+  });
+
+  test("probe row present → truncated and sliced to --limit", async () => {
+    (client.get as ReturnType<typeof vi.fn>).mockResolvedValue([{ logId: 1 }, { logId: 2 }]);
+    const env = await runTaskLog(client, 7, { limit: 1 });
+    expect(client.get).toHaveBeenCalledWith("/api/tasks/7/log?limit=2");
+    expect(env.truncated).toBe(true);
+    expect(env.items).toEqual([{ logId: 1 }]);
   });
 });
 

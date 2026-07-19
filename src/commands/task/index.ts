@@ -23,19 +23,59 @@ const EXECUTORS = ["human", "ai"] as const;
 type Executor = (typeof EXECUTORS)[number];
 const AGENTS = ["claude", "hermes"] as const;
 type Agent = (typeof AGENTS)[number];
+const SERVER_LIST_CAP = 200;
+// Uncapped cadenceCount only fails at COMPLETE time (SQL DATEADD overflow 517,
+// far from the bad input) — cap it where it is typed. 120 months = 10 years.
+const CADENCE_COUNT_MAX = 120;
 
 /** Parse "<count>/<unit>" (e.g. 1/month, 2/week) → cadence fields; exit 4 otherwise. */
 export function parseCadence(value: string): { cadenceCount: number; cadenceUnit: string } {
   const m = /^(\d+)\/(day|week|month)$/.exec((value ?? "").trim());
-  if (!m || Number(m[1]) < 1) {
+  const count = m ? Number(m[1]) : 0;
+  if (!m || count < 1 || count > CADENCE_COUNT_MAX) {
     throw new CliError(
-      "--cadence must be <count>/<unit> with unit day|week|month (e.g. 1/month, 2/week)",
+      `--cadence must be <count>/<unit> with unit day|week|month and count 1-${CADENCE_COUNT_MAX} (e.g. 1/month, 2/week)`,
       400,
       null,
       4
     );
   }
-  return { cadenceCount: Number(m[1]), cadenceUnit: m[2] };
+  return { cadenceCount: count, cadenceUnit: m[2] };
+}
+
+/**
+ * Commander argParser: strict integer >= min; exit 4 otherwise. Bare `Number`
+ * lets NaN through — the backend silently drops a NaN filter and returns ALL
+ * rows (fb#249).
+ */
+export function intFlag(flag: string, min = 1): (value: string) => number {
+  return (value: string) => {
+    const n = Number((value ?? "").trim());
+    if (!Number.isSafeInteger(n) || n < min) {
+      throw new CliError(`${flag} must be an integer >= ${min}`, 400, null, 4);
+    }
+    return n;
+  };
+}
+
+/**
+ * Envelope from a probe-limit fetch: the request asked for one row PAST
+ * `requested` (server cap permitting), so more rows than requested proves
+ * truncation exactly; a full page at the server cap stays a heuristic.
+ */
+function probedEnvelope(
+  rows: Record<string, unknown>[],
+  requested: number
+): ListEnvelope<Record<string, unknown>> {
+  const all = Array.isArray(rows) ? rows : [];
+  const items = all.slice(0, requested);
+  const env: ListEnvelope<Record<string, unknown>> = {
+    items,
+    nextCursor: null,
+    count: items.length,
+  };
+  if (all.length > requested || all.length >= SERVER_LIST_CAP) env.truncated = true;
+  return env;
 }
 
 function parseTaskId(v: string, cmd: string): number {
@@ -70,6 +110,7 @@ export async function runTaskList(
 ): Promise<ListEnvelope<Record<string, unknown>>> {
   assertEnum(opts.executor, EXECUTORS, "--executor");
   assertEnum(opts.agent, AGENTS, "--agent");
+  const requested = Math.min(Math.max(opts.limit ?? 50, 1), SERVER_LIST_CAP);
   const qs = new URLSearchParams();
   if (opts.due) qs.set("due", "1");
   if (opts.executor) qs.set("executor", opts.executor);
@@ -77,18 +118,10 @@ export async function runTaskList(
   if (opts.assignee !== undefined) qs.set("assignee", String(opts.assignee));
   if (opts.asiakas !== undefined) qs.set("asiakas", String(opts.asiakas));
   if (opts.inactive) qs.set("includeInactive", "1");
-  if (opts.limit !== undefined) qs.set("limit", String(opts.limit));
+  qs.set("limit", String(Math.min(requested + 1, SERVER_LIST_CAP)));
   if (opts.offset !== undefined) qs.set("offset", String(opts.offset));
-  const suffix = qs.toString() ? `?${qs.toString()}` : "";
-  const rows = await client.get<Record<string, unknown>[]>(`/api/tasks${suffix}`);
-  const items = Array.isArray(rows) ? rows : [];
-  const env: ListEnvelope<Record<string, unknown>> = {
-    items,
-    nextCursor: null,
-    count: items.length,
-  };
-  if (items.length >= (opts.limit ?? 50)) env.truncated = true;
-  return env;
+  const rows = await client.get<Record<string, unknown>[]>(`/api/tasks?${qs.toString()}`);
+  return probedEnvelope(rows, requested);
 }
 
 /** GET /api/tasks/:id */
@@ -231,10 +264,10 @@ export async function runTaskLog(
   id: number,
   opts: { limit?: number }
 ): Promise<ListEnvelope<Record<string, unknown>>> {
-  const suffix = opts.limit !== undefined ? `?limit=${opts.limit}` : "";
-  const rows = await client.get<Record<string, unknown>[]>(`/api/tasks/${id}/log${suffix}`);
-  const items = Array.isArray(rows) ? rows : [];
-  return { items, nextCursor: null, count: items.length };
+  const requested = Math.min(Math.max(opts.limit ?? 50, 1), SERVER_LIST_CAP);
+  const probe = Math.min(requested + 1, SERVER_LIST_CAP);
+  const rows = await client.get<Record<string, unknown>[]>(`/api/tasks/${id}/log?limit=${probe}`);
+  return probedEnvelope(rows, requested);
 }
 
 /**
@@ -255,11 +288,11 @@ export function registerTaskCommands(
     .option("--due", "Only tasks due now (nextDueAt <= now)")
     .option("--executor <executor>", "human | ai")
     .option("--agent <agent>", "claude | hermes (recommendedAgent filter)")
-    .option("--assignee <personId>", "Only tasks assigned to this person", Number)
-    .option("--asiakas <id>", "Only tasks scoped to this company", Number)
+    .option("--assignee <personId>", "Only tasks assigned to this person", intFlag("--assignee"))
+    .option("--asiakas <id>", "Only tasks scoped to this company", intFlag("--asiakas"))
     .option("--inactive", "Include deactivated tasks (default: active only)")
-    .option("--limit <n>", "Max rows (default 50, cap 200)", Number)
-    .option("--offset <n>", "Pagination offset", Number)
+    .option("--limit <n>", "Max rows (default 50, cap 200)", intFlag("--limit"))
+    .option("--offset <n>", "Pagination offset", intFlag("--offset", 0))
     .action(async (opts: TaskListOptions) => {
       try {
         writeJson(await runTaskList(await getClient(), opts));
@@ -286,11 +319,11 @@ export function registerTaskCommands(
       .option("--instructions <text>", "Freetext checklist / AI prompt context")
       .option("--skill <ref>", "Skill the AI runner invokes (e.g. cleanup-docs); omit for human tasks")
       .option("--agent <agent>", "claude | hermes — recommended AI executor tier")
-      .option("--assignee <personId>", "Human assignee personId", Number)
-      .option("--asiakas <id>", "Company (asiakas) the task is scoped to; omit = internal/global", Number)
-      .option("--cadence <spec>", "<count>/<unit>, unit day|week|month (e.g. 1/month, 2/week) — required")
+      .option("--assignee <personId>", "Human assignee personId", intFlag("--assignee"))
+      .option("--asiakas <id>", "Company (asiakas) the task is scoped to; omit = internal/global", intFlag("--asiakas"))
+      .option("--cadence <spec>", "<count>/<unit>, unit day|week|month, count 1-120 (e.g. 1/month, 2/week) — required")
       .option("--first-due <date>", "First due date (YYYY-MM-DD or today/tomorrow); default: due immediately")
-      .option("--feedback <id>", "cliFeedback id this task graduated from (provenance)", Number)
+      .option("--feedback <id>", "cliFeedback id this task graduated from (provenance)", intFlag("--feedback"))
   ).action(
     async (opts: TaskAddInput & { dryRun?: boolean; idempotencyKey?: string; reason?: string }) => {
       try {
@@ -341,9 +374,9 @@ export function registerTaskCommands(
       .option("--skill <ref>", 'New skillRef ("" clears)')
       .option("--executor <executor>", "human | ai")
       .option("--agent <agent>", 'claude | hermes ("" clears)')
-      .option("--assignee <personId>", "New assignee personId", Number)
-      .option("--asiakas <id>", "New company scope", Number)
-      .option("--cadence <spec>", "<count>/<unit>, unit day|week|month")
+      .option("--assignee <personId>", "New assignee personId", intFlag("--assignee"))
+      .option("--asiakas <id>", "New company scope", intFlag("--asiakas"))
+      .option("--cadence <spec>", "<count>/<unit>, unit day|week|month, count 1-120")
       .option("--next-due <date>", "Override nextDueAt (YYYY-MM-DD or today/tomorrow)")
       .option("--activate", "Reactivate the task")
       .option("--deactivate", "Deactivate (soft-retire) the task")
@@ -368,7 +401,7 @@ export function registerTaskCommands(
 
   t.command("log <id>")
     .description("Completion history for one task, newest first (developer-only)")
-    .option("--limit <n>", "Max rows (default 50, cap 200)", Number)
+    .option("--limit <n>", "Max rows (default 50, cap 200)", intFlag("--limit"))
     .action(async (idStr: string, opts: { limit?: number }) => {
       try {
         writeJson(await runTaskLog(await getClient(), parseTaskId(idStr, "log"), opts));
