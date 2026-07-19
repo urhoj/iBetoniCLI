@@ -35,4 +35,32 @@ describe("ib message thread run fns", () => {
     await runThreadParticipantRemove(mockClient, 3, 42, {});
     expect(mockClient.delete).toHaveBeenCalledWith("/api/messages/threads/3/participants/42", { headers: {} });
   });
+
+  // fb#244: the messages routes honour no X-Dry-Run — --dry-run must resolve
+  // client-side and NEVER issue the write, or it would silently persist.
+  test("archive --dry-run never POSTs and echoes the would-be call", async () => {
+    const res = await runThreadArchive(mockClient, 3, { dryRun: true });
+    expect(mockClient.post).not.toHaveBeenCalled();
+    expect(res).toEqual({ dryRun: true, wouldArchive: { method: "POST", path: "/api/messages/threads/3/archive", threadId: 3 } });
+  });
+  test("reopen --dry-run never POSTs", async () => {
+    const res = await runThreadReopen(mockClient, 3, { dryRun: true });
+    expect(mockClient.post).not.toHaveBeenCalled();
+    expect(res).toMatchObject({ dryRun: true, wouldReopen: { threadId: 3 } });
+  });
+  test("rename --dry-run never PATCHes and echoes the title", async () => {
+    const res = await runThreadRename(mockClient, 3, "X", { dryRun: true });
+    expect(mockClient.patch).not.toHaveBeenCalled();
+    expect(res).toMatchObject({ dryRun: true, wouldRename: { threadId: 3, title: "X" } });
+  });
+  test("participant add --dry-run never POSTs and echoes personId + role", async () => {
+    const res = await runThreadParticipantAdd(mockClient, 3, 42, { dryRun: true, role: "pumppu" });
+    expect(mockClient.post).not.toHaveBeenCalled();
+    expect(res).toMatchObject({ dryRun: true, wouldAdd: { threadId: 3, personId: 42, role: "pumppu" } });
+  });
+  test("participant remove --dry-run never DELETEs", async () => {
+    const res = await runThreadParticipantRemove(mockClient, 3, 42, { dryRun: true });
+    expect(mockClient.delete).not.toHaveBeenCalled();
+    expect(res).toMatchObject({ dryRun: true, wouldRemove: { threadId: 3, personId: 42 } });
+  });
 });

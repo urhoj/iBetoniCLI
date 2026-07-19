@@ -626,11 +626,14 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  stderr: 'Logged in as <email> at <company>.'; credentials file written
+  stderr: the authorization URL + 'Waiting for the OAuth callback…' immediately, then 'Logged in as <email> at <company>.'; credentials file written
 
 ERRORS (stderr, exit non-zero)
   exit 2  OAuth flow failed      → retry; check network / browser
   exit 6 (HTTP 500)  Backend error          → retry later
+
+NOTES
+  - HEADLESS/no-browser environments (CI, sandboxes): the OAuth callback must land on the machine running the CLI, so this command cannot complete there — set IB_TOKEN=<jwt> (a betoni.online JWT) in the env instead; every command picks it up (non-refreshable; a 401 surfaces immediately). The authorization URL and a waiting message are printed to stderr so a stuck flow is visible.
 
 EXAMPLES
   ib auth login
@@ -4632,14 +4635,14 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib keikka create matches snapshot 1`] = `
 "USAGE
-  ib keikka create [flags]
+  ib keikka create --body <body> [flags]
 
 DESCRIPTION
   Create a new keikka. The body is forwarded verbatim to POST /api/keikka/newKeikka — see the backend route for required fields.
   Permissions: requires auth.page.grid.tilaus.edit.
 
 FLAGS
-  --body JSON    JSON object with the new keikka fields
+  --body JSON    JSON object with the new keikka fields (required)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -4719,7 +4722,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { keikkaId, pvm, time, customer:{asiakasId,name}, worksite:{tyomaaId,address}, vehicle:{vehicleId,plate}, driver:{personId,name}, m3, status }
+  { keikkaId, ownerAsiakasId, pvm, time, customer:{asiakasId,name}|null, worksite:{tyomaaId,address}|null, vehicle:{vehicleId,plate}|null, driver:{personId,name}|null, m3, status }
 
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Keikka not found       → verify keikkaId
@@ -4790,7 +4793,7 @@ FLAGS
   --vehicle NUMBER    Filter by vehicleId
   --worksite NUMBER    Filter by worksite (tyomaaId)
   --status STRING    Filter by tila/status
-  --limit NUMBER    Max rows (server caps at 500) (default: 100)
+  --limit NUMBER    Max rows. Omitting it sends no limit param — the backend applies the default 100 server-side (caps at 500) (default: 100)
   --cursor STRING    Pagination cursor
 
 GLOBAL FLAGS
@@ -4816,7 +4819,7 @@ SEE ALSO
 EXAMPLES
   ib keikka list --from 2026-05-28 --to 2026-05-30
   ib keikka list --date today
-  ib keikka list --customer 1349 --status planned --limit 50
+  ib keikka list --from 2026-05-01 --to 2026-05-31 --customer 1349 --status 9 --limit 50
   ib keikka list --from today --to tomorrow --pretty
 "
 `;
@@ -6112,7 +6115,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ messageId, threadId, senderPersonId, senderAsiakasId, kind, body, source, sourceNote, createdAt, editedAt, personFirstName, personLastName, senderAsiakasNimi }>
+  ListEnvelope<{ messageId, threadId, senderPersonId, senderAsiakasId, kind, body, source, sourceNote, createdAt, editedAt, isDeleted, personFirstName, personLastName, senderAsiakasNimi }>
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a participant of this thread → you can only read threads you are part of
@@ -6976,6 +6979,7 @@ NOTES
   - Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.
   - Archived thread is read-only — send/edit/restore return 409 until reopened.
   - Idempotent: archiving an already-archived thread returns alreadyArchived:true (no error).
+  - --dry-run resolves CLIENT-SIDE (the messages routes honour no X-Dry-Run): it returns { dryRun:true, wouldArchive:{...} } and never POSTs — works under --read-only.
   - Deploy-gated: the archive route must be deployed to the target backend.
 
 SEE ALSO
@@ -7025,6 +7029,7 @@ NOTES
   - Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.
   - Privacy gate: the added person must be a member of the thread's owning company (asiakasPerson JOIN). Cross-company adds are blocked at 403.
   - Idempotent: re-adding a participant who left reactivates the row (sets leftAt = NULL) and updates role.
+  - --dry-run resolves CLIENT-SIDE (the messages routes honour no X-Dry-Run): it returns { dryRun:true, wouldAdd:{...} } and never POSTs — works under --read-only.
   - Deploy-gated: the participants route must be deployed to the target backend.
 
 SEE ALSO
@@ -7072,6 +7077,7 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.
   - Soft-remove: sets leftAt = now (the row is kept for audit). removed:false when the participant had already left.
+  - --dry-run resolves CLIENT-SIDE (the messages routes honour no X-Dry-Run): it returns { dryRun:true, wouldRemove:{...} } and never DELETEs — works under --read-only.
   - Deploy-gated: the participants route must be deployed to the target backend.
 
 SEE ALSO
@@ -7119,6 +7125,7 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.
   - Pass --title "" to clear the title (sets messageThread.title = NULL).
+  - --dry-run resolves CLIENT-SIDE (the messages routes honour no X-Dry-Run): it returns { dryRun:true, wouldRename:{...} } and never PATCHes — works under --read-only.
   - Deploy-gated: requires the messageThread.title migration (2026-06-21-messageThread-title.sql) to run on the DB BEFORE the rename route deploys — otherwise the backend 500s on missing column.
 
 SEE ALSO
@@ -7164,6 +7171,7 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.
   - Idempotent: reopening an already-open thread returns alreadyOpen:true (no error).
+  - --dry-run resolves CLIENT-SIDE (the messages routes honour no X-Dry-Run): it returns { dryRun:true, wouldReopen:{...} } and never POSTs — works under --read-only.
   - Deploy-gated: the reopen route must be deployed to the target backend.
 
 SEE ALSO

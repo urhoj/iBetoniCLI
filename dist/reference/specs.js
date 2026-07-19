@@ -266,10 +266,13 @@ const BASE_COMMAND_SPECS = [
                 description: "API endpoint to authorize against",
             },
         ],
-        outputShape: "stderr: 'Logged in as <email> at <company>.'; credentials file written",
+        outputShape: "stderr: the authorization URL + 'Waiting for the OAuth callback…' immediately, then 'Logged in as <email> at <company>.'; credentials file written",
         errors: [
             { exit: 2, meaning: "OAuth flow failed", remedy: "retry; check network / browser" },
             apiErr(500, "Backend error", "retry later"),
+        ],
+        notes: [
+            "HEADLESS/no-browser environments (CI, sandboxes): the OAuth callback must land on the machine running the CLI, so this command cannot complete there — set IB_TOKEN=<jwt> (a betoni.online JWT) in the env instead; every command picks it up (non-refreshable; a 401 surfaces immediately). The authorization URL and a waiting message are printed to stderr so a stuck flow is visible.",
         ],
         examples: [
             "ib auth login",
@@ -538,7 +541,7 @@ const BASE_COMMAND_SPECS = [
                 name: "limit",
                 type: "number",
                 default: "100",
-                description: "Max rows (server caps at 500)",
+                description: "Max rows. Omitting it sends no limit param — the backend applies the default 100 server-side (caps at 500)",
             },
             { name: "cursor", type: "string", description: "Pagination cursor" },
         ],
@@ -554,7 +557,7 @@ const BASE_COMMAND_SPECS = [
         examples: [
             "ib keikka list --from 2026-05-28 --to 2026-05-30",
             "ib keikka list --date today",
-            "ib keikka list --customer 1349 --status planned --limit 50",
+            "ib keikka list --from 2026-05-01 --to 2026-05-31 --customer 1349 --status 9 --limit 50",
             "ib keikka list --from today --to tomorrow --pretty",
         ],
     },
@@ -598,7 +601,7 @@ const BASE_COMMAND_SPECS = [
         permissions: ["auth.page.grid.tilaus.read"],
         args: [{ name: "keikkaId", type: "number", description: "keikkaId to fetch" }],
         flags: [],
-        outputShape: "{ keikkaId, pvm, time, customer:{asiakasId,name}, worksite:{tyomaaId,address}, vehicle:{vehicleId,plate}, driver:{personId,name}, m3, status }",
+        outputShape: "{ keikkaId, ownerAsiakasId, pvm, time, customer:{asiakasId,name}|null, worksite:{tyomaaId,address}|null, vehicle:{vehicleId,plate}|null, driver:{personId,name}|null, m3, status }",
         errors: [
             apiErr(404, "Keikka not found", "verify keikkaId"),
             ...permErrors("auth.page.grid.tilaus.read"),
@@ -613,6 +616,7 @@ const BASE_COMMAND_SPECS = [
             {
                 name: "body",
                 type: "json",
+                required: true,
                 description: "JSON object with the new keikka fields",
             },
         ],
@@ -5511,7 +5515,7 @@ const BASE_COMMAND_SPECS = [
             { name: "limit", type: "number", default: "100", description: "Max messages (server max 500)" },
             { name: "deleted", type: "boolean", description: "Include soft-deleted messages (your own; all for developers)" },
         ],
-        outputShape: "ListEnvelope<{ messageId, threadId, senderPersonId, senderAsiakasId, kind, body, source, sourceNote, createdAt, editedAt, personFirstName, personLastName, senderAsiakasNimi }>",
+        outputShape: "ListEnvelope<{ messageId, threadId, senderPersonId, senderAsiakasId, kind, body, source, sourceNote, createdAt, editedAt, isDeleted, personFirstName, personLastName, senderAsiakasNimi }>",
         errors: [
             apiErr(403, "Not a participant of this thread", "you can only read threads you are part of"),
             ...COMMON_AUTH_ERRORS,
@@ -5816,6 +5820,7 @@ const BASE_COMMAND_SPECS = [
             "Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.",
             "Archived thread is read-only — send/edit/restore return 409 until reopened.",
             "Idempotent: archiving an already-archived thread returns alreadyArchived:true (no error).",
+            "--dry-run resolves CLIENT-SIDE (the messages routes honour no X-Dry-Run): it returns { dryRun:true, wouldArchive:{...} } and never POSTs — works under --read-only.",
             "Deploy-gated: the archive route must be deployed to the target backend.",
         ],
         seeAlso: ["ib message thread reopen", "ib message chat send"],
@@ -5842,6 +5847,7 @@ const BASE_COMMAND_SPECS = [
         notes: [
             "Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.",
             "Idempotent: reopening an already-open thread returns alreadyOpen:true (no error).",
+            "--dry-run resolves CLIENT-SIDE (the messages routes honour no X-Dry-Run): it returns { dryRun:true, wouldReopen:{...} } and never POSTs — works under --read-only.",
             "Deploy-gated: the reopen route must be deployed to the target backend.",
         ],
         seeAlso: ["ib message thread archive", "ib message chat send"],
@@ -5870,6 +5876,7 @@ const BASE_COMMAND_SPECS = [
         notes: [
             "Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.",
             'Pass --title "" to clear the title (sets messageThread.title = NULL).',
+            "--dry-run resolves CLIENT-SIDE (the messages routes honour no X-Dry-Run): it returns { dryRun:true, wouldRename:{...} } and never PATCHes — works under --read-only.",
             "Deploy-gated: requires the messageThread.title migration (2026-06-21-messageThread-title.sql) to run on the DB BEFORE the rename route deploys — otherwise the backend 500s on missing column.",
         ],
         seeAlso: ["ib message chat thread", "ib message thread archive"],
@@ -5900,6 +5907,7 @@ const BASE_COMMAND_SPECS = [
             "Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.",
             "Privacy gate: the added person must be a member of the thread's owning company (asiakasPerson JOIN). Cross-company adds are blocked at 403.",
             "Idempotent: re-adding a participant who left reactivates the row (sets leftAt = NULL) and updates role.",
+            "--dry-run resolves CLIENT-SIDE (the messages routes honour no X-Dry-Run): it returns { dryRun:true, wouldAdd:{...} } and never POSTs — works under --read-only.",
             "Deploy-gated: the participants route must be deployed to the target backend.",
         ],
         seeAlso: ["ib message thread participant remove", "ib message chat thread"],
@@ -5928,6 +5936,7 @@ const BASE_COMMAND_SPECS = [
         notes: [
             "Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.",
             "Soft-remove: sets leftAt = now (the row is kept for audit). removed:false when the participant had already left.",
+            "--dry-run resolves CLIENT-SIDE (the messages routes honour no X-Dry-Run): it returns { dryRun:true, wouldRemove:{...} } and never DELETEs — works under --read-only.",
             "Deploy-gated: the participants route must be deployed to the target backend.",
         ],
         seeAlso: ["ib message thread participant add", "ib message chat thread"],

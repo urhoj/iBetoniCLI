@@ -126,7 +126,10 @@ export async function runKeikkaLatest(client, opts) {
     return { item: null, searched: { from: earliest, to: today } };
 }
 /**
- * GET /api/cli/keikka/get/:keikkaId. Returns the flat backend record as-is.
+ * GET /api/cli/keikka/get/:keikkaId. Passes the backend record through as-is —
+ * the route already projects the related sub-objects server-side
+ * (customer/worksite/vehicle/driver, each `{...} | null`), so no client-side
+ * reshaping happens here (fb#246: the spec's nested outputShape IS the wire shape).
  */
 export async function runKeikkaGet(client, keikkaId) {
     return client.get(`/api/cli/keikka/get/${keikkaId}`);

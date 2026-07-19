@@ -5,25 +5,35 @@ import { writeJson, exitWithError } from "../../../output/json.js";
 import { resolveThreadId } from "../chat/resolveThread.js";
 import { parseOptionalId } from "../../../targets.js";
 
+// --dry-run on every thread write resolves CLIENT-SIDE: the messages routes
+// honour no X-Dry-Run (messageRoutes.js has no guard), so a dry-run that POSTed
+// would actually persist (fb#244; same footgun class as fb#76). Each run* fn
+// short-circuits before the request and echoes the would-be call instead.
+
 export async function runThreadArchive(client: ApiClient, threadId: number, flags: WriteFlags): Promise<unknown> {
+  if (flags.dryRun) return { dryRun: true, wouldArchive: { method: "POST", path: `/api/messages/threads/${threadId}/archive`, threadId } };
   return client.post(`/api/messages/threads/${threadId}/archive`, {}, { headers: writeFlagsToHeaders(flags) });
 }
 
 export async function runThreadReopen(client: ApiClient, threadId: number, flags: WriteFlags): Promise<unknown> {
+  if (flags.dryRun) return { dryRun: true, wouldReopen: { method: "POST", path: `/api/messages/threads/${threadId}/reopen`, threadId } };
   return client.post(`/api/messages/threads/${threadId}/reopen`, {}, { headers: writeFlagsToHeaders(flags) });
 }
 
 export async function runThreadRename(client: ApiClient, threadId: number, title: string, flags: WriteFlags): Promise<unknown> {
+  if (flags.dryRun) return { dryRun: true, wouldRename: { method: "PATCH", path: `/api/messages/threads/${threadId}`, threadId, title } };
   return client.patch(`/api/messages/threads/${threadId}`, { title }, { headers: writeFlagsToHeaders(flags) });
 }
 
 export async function runThreadParticipantAdd(client: ApiClient, threadId: number, personId: number, opts: WriteFlags & { role?: string }): Promise<unknown> {
   const body: Record<string, unknown> = { personId };
   if (opts.role) body.role = opts.role;
+  if (opts.dryRun) return { dryRun: true, wouldAdd: { method: "POST", path: `/api/messages/threads/${threadId}/participants`, threadId, ...body } };
   return client.post(`/api/messages/threads/${threadId}/participants`, body, { headers: writeFlagsToHeaders(opts) });
 }
 
 export async function runThreadParticipantRemove(client: ApiClient, threadId: number, personId: number, flags: WriteFlags): Promise<unknown> {
+  if (flags.dryRun) return { dryRun: true, wouldRemove: { method: "DELETE", path: `/api/messages/threads/${threadId}/participants/${personId}`, threadId, personId } };
   return client.delete(`/api/messages/threads/${threadId}/participants/${personId}`, { headers: writeFlagsToHeaders(flags) });
 }
 

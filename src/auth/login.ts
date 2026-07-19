@@ -48,9 +48,23 @@ export async function performLogin(opts: LoginOptions): Promise<void> {
   authorizeUrl.searchParams.set("code_challenge_method", method);
   authorizeUrl.searchParams.set("state", state);
 
-  // 3. Launch browser.
-  const { default: open } = await import("open");
-  await open(authorizeUrl.toString());
+  // 3. Launch browser. Print the URL and the waiting state FIRST (fb#243): in a
+  // headless/no-browser environment `open` fails or silently does nothing, and
+  // without these lines the command hangs with zero feedback until the caller's
+  // timeout kills it. stderr only — stdout stays parseable.
+  process.stderr.write(
+    `Authorize in the browser:\n  ${authorizeUrl.toString()}\n` +
+      `Waiting for the OAuth callback on 127.0.0.1:${server.port} (timeout ${Math.round(timeoutMs / 60_000)} min)…\n` +
+      `Headless/no-browser environment? The callback must land on THIS machine, so copy-pasting the URL elsewhere won't finish the flow — set IB_TOKEN=<jwt> instead and skip \`ib auth login\` entirely.\n`
+  );
+  try {
+    const { default: open } = await import("open");
+    await open(authorizeUrl.toString());
+  } catch {
+    process.stderr.write(
+      "Could not launch a browser — open the URL above manually on this machine, or use IB_TOKEN.\n"
+    );
+  }
 
   // 4. Wait for callback then tear down listener regardless of outcome.
   let codeResult;
