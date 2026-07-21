@@ -1,7 +1,7 @@
 import { resolveAuth } from "./auth/resolve.js";
 import { createApiClient, type ApiClient } from "./api/client.js";
 import { createStore } from "./auth/store.js";
-import { refreshToken } from "./auth/refresh.js";
+import { refreshAndPersistSession } from "./auth/refresh.js";
 import { performSwitch } from "./auth/switch.js";
 import { decodeJwtPayload } from "./auth/jwt.js";
 import { CliError } from "./api/errors.js";
@@ -172,14 +172,12 @@ export async function createCliContext(opts: {
     // ephemeral `--company` token is single-command and bound to a different
     // company — persisting a refreshed copy would clobber the saved active
     // company, so it gets no refresh path (a 401 mid-command surfaces).
+    // refreshAndPersistSession falls back to the OAuth refresh_token grant when
+    // the JWT-bearer refresh fails (fb#258: heals a session whose JWT lapsed),
+    // persisting the rotated refresh token + expiry alongside the fresh JWT.
     onRefresh:
       auth.refreshable && !eph.switched && !isImpersonating
-        ? async (currentJwt: string) => {
-            const fresh = await refreshToken({ endpoint, currentJwt });
-            const creds = await store.load();
-            if (creds) await store.save({ ...creds, jwt: fresh });
-            return fresh;
-          }
+        ? (currentJwt: string) => refreshAndPersistSession({ endpoint, store, currentJwt })
         : undefined,
   });
 

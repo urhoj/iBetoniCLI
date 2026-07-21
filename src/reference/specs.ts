@@ -331,13 +331,32 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib auth whoami",
     description:
-      "One-shot orientation for the active session: who/where you are, what you can do (tier), and where else you can act (companies). Decoded from the JWT, so it works for IB_TOKEN sessions too (not just the on-disk creds store). Run it first.",
+      "One-shot orientation for the active session: who/where you are, what you can do (tier), and where else you can act (companies). Decoded from the JWT, so it works for IB_TOKEN sessions too (not just the on-disk creds store). An EXPIRED file session self-heals (refresh, incl. the OAuth refresh-token grant) or exits 2 — a dead session is caught here, not on your next write. Run it first.",
     auth: "any",
     flags: [],
     outputShape:
-      "{ personId, email?, activeCompany: { asiakasId, name, betoniJerryUmbrella? }, tier: 'developer'|'admin'|'standard', companies: { asiakasId, roles }[], endpoint, source: 'file'|'env', readOnly, tokenExpiresAt?, tokenExpired?, impersonating? } — `tier` is the discovery/capability gate; `companies` are the `company switch` targets (no name in the JWT — use `ib company list` for names); `source:'env'` = IB_TOKEN (non-refreshable).",
+      "{ personId, email?, activeCompany: { asiakasId, name, betoniJerryUmbrella? }, tier: 'developer'|'admin'|'standard', companies: { asiakasId, roles }[], endpoint, source: 'file'|'env', readOnly, tokenExpiresAt?, tokenExpired?, refreshed?, impersonating? } — `tier` is the discovery/capability gate; `companies` are the `company switch` targets (no name in the JWT — use `ib company list` for names); `source:'env'` = IB_TOKEN (non-refreshable); `refreshed: true` = the stored JWT had expired and whoami self-healed the session before reporting.",
     errors: [
       { exit: 2, meaning: "Not logged in", remedy: "ib auth login first (or set IB_TOKEN)" },
+      {
+        exit: 2,
+        meaning: "Session expired and unrefreshable (both the JWT-bearer refresh and the OAuth refresh-token grant failed)",
+        remedy: "ib auth login to re-authenticate",
+      },
+      {
+        exit: 2,
+        meaning: "IB_TOKEN expired (env sessions have no refresh path)",
+        remedy: "mint a fresh JWT and update IB_TOKEN",
+      },
+      {
+        exit: 2,
+        meaning: "Impersonation session expired (never auto-refreshed — it would escalate)",
+        remedy: "ib auth impersonate --end to restore your own login, or re-impersonate",
+      },
+    ],
+    notes: [
+      "Exit 0 means the session is USABLE: a non-expired token, or an expired file session that was just self-healed (`refreshed: true`; the rotated tokens are persisted). Exit 2 means re-auth is required — so `ib auth whoami && <write>` is a sound guard (fb#258).",
+      "Self-heal persists a rotated JWT/refresh token to the creds file even under --read-only — same stance as the client's transparent refresh-on-401 (local session maintenance, not a domain write).",
     ],
     examples: ["ib auth whoami"],
   },
@@ -376,12 +395,24 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib auth refresh",
     description:
-      "Manually refresh the JWT against /api/auth/refresh-token. Automatic refresh-on-401 also happens in the API client.",
+      "Manually refresh the JWT: JWT-bearer refresh (/api/auth/refresh-token) first, falling back to the OAuth refresh-token grant (/oauth/token) when the JWT has already expired — so a session idle past the 7-day JWT lifetime still recovers without a browser reflow (90-day refresh-token window). Automatic refresh-on-401 (same chain) also happens in the API client.",
     auth: "any",
     flags: [],
     outputShape: "{ ok: true }",
     errors: [
-      { exit: 2, meaning: "Refresh failed", remedy: "ib auth login to re-authenticate" },
+      {
+        exit: 2,
+        meaning: "Refresh failed on every path (JWT-bearer AND OAuth refresh-token grant)",
+        remedy: "ib auth login to re-authenticate",
+      },
+      {
+        exit: 4,
+        meaning: "Refresh refused while impersonating (it would escalate to a permanent login as the target)",
+        remedy: "ib auth impersonate --extend (10 more minutes) or --end (restore your own login)",
+      },
+    ],
+    notes: [
+      "The OAuth grant rotates the stored refresh token (single-use, reuse-detected) and persists the successor immediately. It re-mints the LOGIN-time company; if you had `auth switch`ed since, the CLI switches the fresh JWT back to your persisted active company automatically.",
     ],
     examples: ["ib auth refresh"],
   },

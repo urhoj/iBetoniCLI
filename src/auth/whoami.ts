@@ -32,6 +32,9 @@ export interface WhoamiOutput {
   /** ISO timestamp the JWT expires; with `tokenExpired` for a one-glance check. */
   tokenExpiresAt?: string;
   tokenExpired?: boolean;
+  /** True when whoami found the stored JWT expired and self-healed the session
+   * (JWT-bearer refresh or OAuth refresh_token grant) before reporting. */
+  refreshed?: true;
   /** Present only while an impersonation session is active. */
   impersonating?: { actorPersonId: number; sessionId: string };
 }

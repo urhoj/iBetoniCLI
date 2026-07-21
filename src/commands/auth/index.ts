@@ -8,10 +8,11 @@ import {
   performSwitch,
   assertPersistedSwitchAllowed,
 } from "../../auth/switch.js";
-import { refreshToken } from "../../auth/refresh.js";
-import { decodeJwtPayload } from "../../auth/jwt.js";
+import { refreshAndPersistSession } from "../../auth/refresh.js";
+import { decodeJwtPayload, impersonationFromClaims } from "../../auth/jwt.js";
 import { resolveAuth } from "../../auth/resolve.js";
 import { resolveCallerTier } from "../../tier.js";
+import { CliError } from "../../api/errors.js";
 import {
   performImpersonate,
   performImpersonateExtend,
@@ -24,6 +25,7 @@ import {
   writeError,
   exitWithError,
   failWith,
+  errorMessage,
 } from "../../output/json.js";
 
 /**
@@ -107,24 +109,61 @@ export function registerAuthCommands(
           failWith("Not logged in. Run `ib auth login` first (or set IB_TOKEN).", 2);
           return;
         }
-        const claims = decodeJwtPayload(resolved.token);
-        const tier = resolveCallerTier(resolved.token);
+        const store = createStore(defaultCredentialsPath());
+        let token = resolved.token;
+        let claims = decodeJwtPayload(token);
         // Impersonation marker lives on the creds profile (file sessions);
         // renderWhoami falls back to the JWT imp claims for IB_TOKEN sessions.
-        const profile =
-          resolved.source === "file"
-            ? await createStore(defaultCredentialsPath()).load()
-            : null;
-        writeJson(
-          renderWhoami({
-            claims,
-            endpoint: resolved.endpoint,
-            source: resolved.source,
-            readOnly: isReadOnly(),
-            tier,
-            impersonation: profile?.impersonation,
-          })
-        );
+        const profile = resolved.source === "file" ? await store.load() : null;
+        let refreshed = false;
+
+        // A dead session must be caught HERE, at the orientation read — not on
+        // the next write (fb#258). Expired file sessions self-heal (bearer
+        // refresh → OAuth refresh_token grant); anything unrecoverable exits 2.
+        if (claims.exp != null && claims.exp * 1000 < Date.now()) {
+          const expiredAt = new Date(claims.exp * 1000).toISOString();
+          if (resolved.source === "env") {
+            failWith(
+              `IB_TOKEN is expired (since ${expiredAt}) and non-refreshable`,
+              2,
+              "mint a fresh JWT and update IB_TOKEN"
+            );
+          }
+          if (profile?.impersonation ?? impersonationFromClaims(claims)) {
+            failWith(
+              `impersonation session expired (since ${expiredAt})`,
+              2,
+              "run `ib auth impersonate --end` to restore your own login, or re-impersonate"
+            );
+          }
+          try {
+            token = await refreshAndPersistSession({
+              endpoint: resolved.endpoint,
+              store,
+              currentJwt: token,
+            });
+            claims = decodeJwtPayload(token);
+            refreshed = true;
+          } catch (e) {
+            failWith(
+              `session expired (since ${expiredAt}) and unrefreshable: ${errorMessage(e)}`,
+              2,
+              "run `ib auth login` to re-authenticate"
+            );
+          }
+        }
+
+        const tier = resolveCallerTier(token);
+        const out = renderWhoami({
+          claims,
+          endpoint: resolved.endpoint,
+          source: resolved.source,
+          readOnly: isReadOnly(),
+          tier,
+          impersonation: profile?.impersonation,
+        });
+        if (refreshed) out.refreshed = true;
+        writeJson(out);
       } catch (e) {
         exitWithError(e);
       }
@@ -175,16 +214,29 @@ export function registerAuthCommands(
         if (!creds) {
           failWith("Not logged in. Run `ib auth login` first.", 2);
         }
-        const fresh = await refreshToken({
+        // The bearer refresh re-derives DB claims and would DROP imp/imp_sid +
+        // the 10-min cap — silently escalating an impersonation into a
+        // permanent login as the target. Same invariant as the disabled
+        // refresh-on-401 in cliContext.
+        if (creds.impersonation) {
+          failWith(
+            "refresh is disabled while impersonating (it would escalate to a permanent login as the target)",
+            4,
+            "use `ib auth impersonate --extend` for 10 more minutes, or `--end` to restore your own login"
+          );
+        }
+        // Bearer refresh first; OAuth refresh_token grant fallback when the
+        // JWT already lapsed (fb#258). Persists JWT + rotated refresh token.
+        await refreshAndPersistSession({
           endpoint: creds.endpoint,
+          store,
           currentJwt: creds.jwt,
         });
-        await store.save({ ...creds, jwt: fresh });
         writeJson({ ok: true });
       } catch (e) {
         // exitCode + return — see `auth login` (Windows libuv crash).
         writeError(e);
-        process.exitCode = 2;
+        process.exitCode = e instanceof CliError ? e.exitCode : 2;
       }
     });
 
