@@ -30,7 +30,7 @@ Run from the `betonicli/` directory:
 - `npm test` — vitest run (all tests)
 - `npm run test:watch` — vitest watch
 - `npx vitest run test/commands/company.test.ts` — run a single test file
-- `npm run lint` / `npm run lint:fix` — eslint (note: forced legacy `.eslintrc.cjs` via `ESLINT_USE_FLAT_CONFIG=false`)
+- `npm run lint` / `npm run lint:fix` — eslint (flat config, `eslint.config.js`)
 - `npm run type-check` — `tsc --noEmit`
 
 ## Architecture

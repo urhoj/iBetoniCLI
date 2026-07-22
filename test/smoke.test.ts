@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 
 describe("ib CLI smoke", () => {
   test("--version prints the package version", () => {
-    const result = spawnSync("npx", ["tsx", "src/bin/ib.ts", "--version"], {
+    const result = spawnSync("npx tsx src/bin/ib.ts --version", {
       encoding: "utf8",
       shell: true,
     });
