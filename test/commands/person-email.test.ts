@@ -1,7 +1,10 @@
 import { describe, test, expect, vi } from "vitest";
 import { runPersonEmailList, runPersonEmailAdd, runPersonEmailRemove } from "../../src/commands/person/email.js";
+import type { ApiClient } from "../../src/api/client.js";
 
-function mockClient(over: Partial<Record<string, unknown>> = {}) {
+type MockClient = ApiClient & Record<"get" | "put" | "post" | "delete" | "getCurrentToken", ReturnType<typeof vi.fn>>;
+
+function mockClient(over: Partial<Record<string, unknown>> = {}): MockClient {
   return {
     get: vi.fn(),
     post: vi.fn(),
@@ -9,7 +12,7 @@ function mockClient(over: Partial<Record<string, unknown>> = {}) {
     delete: vi.fn(),
     getCurrentToken: vi.fn(),
     ...over,
-  } as any;
+  } as unknown as MockClient;
 }
 
 describe("person email", () => {

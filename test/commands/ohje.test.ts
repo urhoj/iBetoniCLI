@@ -305,8 +305,10 @@ describe("isValidHelpId", () => {
   });
 });
 
-function client(over: Record<string, unknown> = {}) {
-  return { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn(), ...over } as never;
+type MockClient = ApiClient & Record<"get" | "put" | "post" | "delete" | "getCurrentToken", ReturnType<typeof vi.fn>>;
+
+function client(over: Record<string, unknown> = {}): MockClient {
+  return { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn(), ...over } as unknown as MockClient;
 }
 
 describe("ib ohje aiConfidence", () => {
@@ -316,7 +318,7 @@ describe("ib ohje aiConfidence", () => {
       put: vi.fn().mockResolvedValue({ success: true }),
     });
     await runOhjeUpdate(c, "x", { shorttext: "new" }, { reason: "groom" }, {}, { aiConfidence: 88 });
-    const body = (c as any).put.mock.calls[0][1];
+    const body = c.put.mock.calls[0][1];
     expect(body.aiConfidence).toBe(88);            // from the flag
     expect(body.shorttext).toBe("new");
     expect(body.title).toBe("T");                  // GET-merged content survives
@@ -328,7 +330,7 @@ describe("ib ohje aiConfidence", () => {
       put: vi.fn().mockResolvedValue({ success: true }),
     });
     await runOhjeUpdate(c, "x", { shorttext: "new" }, { reason: "edit" });
-    const body = (c as any).put.mock.calls[0][1];
+    const body = c.put.mock.calls[0][1];
     expect("aiConfidence" in body).toBe(false);     // NOT carried back from the row's 42
   });
 
@@ -341,7 +343,7 @@ describe("ib ohje aiConfidence", () => {
     ];
     const c = client({ get: vi.fn().mockResolvedValue(rows) });
     const out = await runOhjeList(c, { needsReview: true });
-    expect(out.items.map((r: any) => r.helpId)).toEqual(["b", "c"]);
+    expect(out.items.map((r) => r.helpId)).toEqual(["b", "c"]);
   });
 });
 

@@ -1,33 +1,36 @@
 import { describe, test, expect, vi } from "vitest";
 import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailLint } from "../../src/reference/detail.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
+import type { ApiClient } from "../../src/api/client.js";
 
-function client(over: Record<string, unknown> = {}) {
-  return { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn(), ...over } as never;
+type MockClient = ApiClient & Record<"get" | "put" | "post" | "delete" | "getCurrentToken", ReturnType<typeof vi.fn>>;
+
+function client(over: Record<string, unknown> = {}): MockClient {
+  return { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn(), ...over } as unknown as MockClient;
 }
 
 describe("ib reference detail (DB-backed)", () => {
   test("get fetches /api/cli/command-catalog/:command", async () => {
     const c = client({ get: vi.fn().mockResolvedValue({ command: "ib keikka list", detail: "d", hint: "h" }) });
     const out = await runReferenceDetail(c, ["keikka", "list"], "developer");
-    expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog/ib%20keikka%20list");
+    expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog/ib%20keikka%20list");
     expect(out.detail).toBe("d");
   });
   test("set PUTs summary+detail", async () => {
     const c = client({ put: vi.fn().mockResolvedValue({ command: "ib keikka list", runs: 1 }) });
     await runReferenceDetailSet(c, ["keikka", "list"], { summary: "s", detail: "d" });
-    expect((c as any).put).toHaveBeenCalledWith("/api/cli/command-catalog/ib%20keikka%20list", { summary: "s", detail: "d" }, expect.anything());
+    expect(c.put).toHaveBeenCalledWith("/api/cli/command-catalog/ib%20keikka%20list", { summary: "s", detail: "d" }, expect.anything());
   });
   test("list passes stalest", async () => {
     const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
     await runReferenceDetailList(c, 10);
-    expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10");
+    expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10");
   });
 
   test("set sends aiConfidence + needsHumanReview when provided", async () => {
     const c = client({ put: vi.fn().mockResolvedValue({ command: "ib keikka list", runs: 1 }) });
     await runReferenceDetailSet(c, ["keikka", "list"], { summary: "s", aiConfidence: 80, needsHumanReview: true });
-    expect((c as any).put).toHaveBeenCalledWith(
+    expect(c.put).toHaveBeenCalledWith(
       "/api/cli/command-catalog/ib%20keikka%20list",
       { summary: "s", aiConfidence: 80, needsHumanReview: true },
       expect.anything()
@@ -37,7 +40,7 @@ describe("ib reference detail (DB-backed)", () => {
   test("set omits aiConfidence key when not provided (backend resets)", async () => {
     const c = client({ put: vi.fn().mockResolvedValue({}) });
     await runReferenceDetailSet(c, ["keikka", "list"], { summary: "s" });
-    const body = (c as any).put.mock.calls[0][1];
+    const body = c.put.mock.calls[0][1];
     expect("aiConfidence" in body).toBe(false);
     expect("needsHumanReview" in body).toBe(false);
   });
@@ -45,7 +48,7 @@ describe("ib reference detail (DB-backed)", () => {
   test("list passes needsReview + maxConfidence", async () => {
     const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
     await runReferenceDetailList(c, 10, undefined, false, true, 90);
-    expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10&needsReview=1&maxConfidence=90");
+    expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10&needsReview=1&maxConfidence=90");
   });
 
   describe("lint (orphan catalog rows)", () => {
@@ -63,7 +66,7 @@ describe("ib reference detail (DB-backed)", () => {
         }),
       });
       const res = await runReferenceDetailLint(c);
-      expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog");
+      expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog");
       expect(res.count).toBe(2);
       expect(res.items.map((f) => f.command).sort()).toEqual(["ib customer prh", "ib weather forecast"]);
       const prh = res.items.find((f) => f.command === "ib customer prh")!;

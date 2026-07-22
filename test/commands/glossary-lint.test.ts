@@ -20,8 +20,8 @@ describe("glossary lint", () => {
 
   test("flags dead-related, empty-definition, near-duplicate", () => {
     const findings = lintEntries([
-      { term: "loma", synonyms: ["lomat"], definition: "vacation", relatedCommands: [{ command: "ib bogus", summary: null }], relatedEntity: null } as any,
-      { term: "lomaa", synonyms: [], definition: "", relatedCommands: [], relatedEntity: null } as any,
+      { term: "loma", synonyms: ["lomat"], definition: "vacation", relatedCommands: [{ command: "ib bogus" }], relatedEntity: null },
+      { term: "lomaa", synonyms: [], definition: "", relatedCommands: [], relatedEntity: null },
     ]);
     const issues = findings.map((f) => f.issue);
     expect(issues).toContain("dead-related");      // ib bogus
@@ -31,9 +31,9 @@ describe("glossary lint", () => {
 
   test("flags synonym-collision and no-anchor", () => {
     const findings = lintEntries([
-      { term: "asiakas", synonyms: [], definition: "customer", relatedCommands: [{ command: "ib customer", summary: null }], relatedEntity: "Asiakas" } as any,
-      { term: "company", synonyms: ["asiakas"], definition: "tenant", relatedCommands: [{ command: "ib company", summary: null }], relatedEntity: "Asiakas" } as any,
-      { term: "orphan", synonyms: [], definition: "x", relatedCommands: [], relatedEntity: null } as any,
+      { term: "asiakas", synonyms: [], definition: "customer", relatedCommands: [{ command: "ib customer" }], relatedEntity: "Asiakas" },
+      { term: "company", synonyms: ["asiakas"], definition: "tenant", relatedCommands: [{ command: "ib company" }], relatedEntity: "Asiakas" },
+      { term: "orphan", synonyms: [], definition: "x", relatedCommands: [], relatedEntity: null },
     ]);
     const issues = findings.map((f) => f.issue);
     expect(issues).toContain("synonym-collision"); // company's synonym 'asiakas' == another term
@@ -81,7 +81,7 @@ describe("glossary lint --suggest-related (fb#110)", () => {
 
   test("stale-related only appears when suggestRelated is set", () => {
     const entries = [
-      { term: "puomi", synonyms: [], definition: "boom", relatedCommands: [{ command: "ib keikka" }], relatedEntity: null } as any,
+      { term: "puomi", synonyms: [], definition: "boom", relatedCommands: [{ command: "ib keikka" }], relatedEntity: null },
     ];
     // Uses the real COMMAND_SPECS (default arg) — off by default, on when requested.
     expect(lintEntries(entries).some((f) => f.issue === "stale-related")).toBe(false);

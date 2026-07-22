@@ -10,7 +10,9 @@ import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runR
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
 
-function client(over: Record<string, unknown> = {}) {
+type MockClient = ApiClient & Record<"get" | "put" | "post" | "delete" | "getCurrentToken", ReturnType<typeof vi.fn>>;
+
+function client(over: Record<string, unknown> = {}): MockClient {
   return {
     get: vi.fn(),
     put: vi.fn(),
@@ -18,7 +20,7 @@ function client(over: Record<string, unknown> = {}) {
     delete: vi.fn(),
     getCurrentToken: vi.fn(),
     ...over,
-  } as never;
+  } as unknown as MockClient;
 }
 
 describe("runReferenceDetail", () => {
@@ -26,7 +28,7 @@ describe("runReferenceDetail", () => {
     const mockResult = { command: "ib keikka latest", summary: null, detail: "Keikka = yksi betonin...", hint: "h" };
     const c = client({ get: vi.fn().mockResolvedValue(mockResult) });
     const out = await runReferenceDetail(c, ["keikka", "latest"], "developer");
-    expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog/ib%20keikka%20latest");
+    expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog/ib%20keikka%20latest");
     expect(out.command).toBe("ib keikka latest");
     expect(out.detail).toBe("Keikka = yksi betonin...");
   });
@@ -38,21 +40,21 @@ describe("runReferenceDetail", () => {
     // as separate args: ["ib","vehicle","driver","available"]
     const c1 = client({ get: vi.fn().mockResolvedValue(mockResult) });
     await runReferenceDetail(c1, ["ib", "vehicle", "driver", "available"], "developer");
-    expect((c1 as any).get).toHaveBeenCalledWith("/api/cli/command-catalog/ib%20vehicle%20driver%20available");
+    expect(c1.get).toHaveBeenCalledWith("/api/cli/command-catalog/ib%20vehicle%20driver%20available");
     // as one quoted string: ["ib vehicle driver available"]
     const c2 = client({ get: vi.fn().mockResolvedValue(mockResult) });
     await runReferenceDetail(c2, ["ib vehicle driver available"], "developer");
-    expect((c2 as any).get).toHaveBeenCalledWith("/api/cli/command-catalog/ib%20vehicle%20driver%20available");
+    expect(c2.get).toHaveBeenCalledWith("/api/cli/command-catalog/ib%20vehicle%20driver%20available");
     // prefix-less form still resolves to the same key
     const c3 = client({ get: vi.fn().mockResolvedValue(mockResult) });
     await runReferenceDetail(c3, ["vehicle", "driver", "available"], "developer");
-    expect((c3 as any).get).toHaveBeenCalledWith("/api/cli/command-catalog/ib%20vehicle%20driver%20available");
+    expect(c3.get).toHaveBeenCalledWith("/api/cli/command-catalog/ib%20vehicle%20driver%20available");
   });
 
   test("normalizes the `ib` prefix on the write path too (set)", async () => {
     const c = client({ put: vi.fn().mockResolvedValue({ command: "ib keikka list", runs: 1 }) });
     await runReferenceDetailSet(c, ["ib keikka list"], { summary: "s" }, { reason: "t" });
-    expect((c as any).put).toHaveBeenCalledWith(
+    expect(c.put).toHaveBeenCalledWith(
       "/api/cli/command-catalog/ib%20keikka%20list",
       { summary: "s" },
       { headers: { "X-Action-Reason": "t" } }
@@ -90,7 +92,7 @@ describe("runReferenceDetail", () => {
   test("runReferenceDetailSet PUTs body with write-safety headers", async () => {
     const c = client({ put: vi.fn().mockResolvedValue({ command: "ib keikka list", runs: 1 }) });
     await runReferenceDetailSet(c, ["keikka", "list"], { summary: "s", detail: "d" }, { reason: "test" });
-    expect((c as any).put).toHaveBeenCalledWith(
+    expect(c.put).toHaveBeenCalledWith(
       "/api/cli/command-catalog/ib%20keikka%20list",
       { summary: "s", detail: "d" },
       { headers: { "X-Action-Reason": "test" } }
@@ -100,37 +102,37 @@ describe("runReferenceDetail", () => {
   test("runReferenceDetailList passes stalest query param", async () => {
     const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
     await runReferenceDetailList(c, 10);
-    expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10");
+    expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10");
   });
 
   test("runReferenceDetailList omits stalest when undefined", async () => {
     const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
     await runReferenceDetailList(c);
-    expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog");
+    expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog");
   });
 
   test("runReferenceDetailList forwards the domain filter alongside stalest", async () => {
     const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
     await runReferenceDetailList(c, 10, "attachment");
-    expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10&domain=attachment");
+    expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10&domain=attachment");
   });
 
   test("runReferenceDetailList sends domain alone when no stalest", async () => {
     const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
     await runReferenceDetailList(c, undefined, "attachment");
-    expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog?domain=attachment");
+    expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog?domain=attachment");
   });
 
   test("runReferenceDetailList appends withDetail=1 when requested", async () => {
     const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
     await runReferenceDetailList(c, 10, "attachment", true);
-    expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10&domain=attachment&withDetail=1");
+    expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10&domain=attachment&withDetail=1");
   });
 
   test("runReferenceDetailList omits withDetail when false (default slim shape)", async () => {
     const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
     await runReferenceDetailList(c, 10, undefined, false);
-    expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10");
+    expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10");
   });
 
   describe("client-side discovery filters (fb#164)", () => {
@@ -150,7 +152,7 @@ describe("runReferenceDetail", () => {
       const c = client({ get: vi.fn().mockResolvedValue(CATALOG) });
       const out = await runReferenceDetailList(c);
       expect(out).toBe(CATALOG);
-      expect((c as any).get).toHaveBeenCalledWith("/api/cli/command-catalog");
+      expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog");
     });
 
     test("--search keeps only rows whose command PATH contains the substring (case-insensitive) and recomputes count", async () => {
@@ -182,7 +184,7 @@ describe("runReferenceDetailDelete", () => {
   test("DELETEs the exact key with the write-safety reason header", async () => {
     const c = client({ delete: vi.fn().mockResolvedValue({ deleted: 1 }) });
     const out = await runReferenceDetailDelete(c, ["ai", "conversation"], { reason: "orphan cleanup" });
-    expect((c as any).delete).toHaveBeenCalledWith(
+    expect(c.delete).toHaveBeenCalledWith(
       "/api/cli/command-catalog/ib%20ai%20conversation",
       { headers: { "X-Action-Reason": "orphan cleanup" } }
     );
@@ -194,7 +196,7 @@ describe("runReferenceDetailDelete", () => {
     // but delete must reach it so the orphan row can be pruned.
     const c = client({ delete: vi.fn().mockResolvedValue({ deleted: 1 }) });
     await runReferenceDetailDelete(c, ["ib", "ai", "conversation"], { reason: "r" });
-    expect((c as any).delete).toHaveBeenCalledWith(
+    expect(c.delete).toHaveBeenCalledWith(
       "/api/cli/command-catalog/ib%20ai%20conversation",
       { headers: { "X-Action-Reason": "r" } }
     );
@@ -203,7 +205,7 @@ describe("runReferenceDetailDelete", () => {
   test("maps --dry-run to the X-Dry-Run header", async () => {
     const c = client({ delete: vi.fn().mockResolvedValue({ dryRun: true, wouldDelete: { command: "ib ai conversation", exists: true } }) });
     await runReferenceDetailDelete(c, ["ai conversation"], { dryRun: true });
-    expect((c as any).delete).toHaveBeenCalledWith(
+    expect(c.delete).toHaveBeenCalledWith(
       "/api/cli/command-catalog/ib%20ai%20conversation",
       { headers: { "X-Dry-Run": "1" } }
     );
@@ -212,7 +214,7 @@ describe("runReferenceDetailDelete", () => {
   test("exit 4 on an empty command path", async () => {
     const c = client({ delete: vi.fn() });
     await expect(runReferenceDetailDelete(c, ["ib"], { reason: "r" })).rejects.toMatchObject({ exitCode: 4 });
-    expect((c as any).delete).not.toHaveBeenCalled();
+    expect(c.delete).not.toHaveBeenCalled();
   });
 });
 

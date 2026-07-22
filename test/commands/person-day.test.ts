@@ -155,7 +155,7 @@ describe("statuses --full", () => {
           prefix: "L", style: "indianred", active: true, ownerAsiakasId: 8 },
       ]),
       getCurrentToken: vi.fn().mockReturnValue(tokenWith({ ownerAsiakasId: 8 })),
-    } as any;
+    } as unknown as ApiClient;
 
     const full = await runPersonDayStatuses(client, { full: true });
     expect(full.items[0]).toMatchObject({
