@@ -884,6 +884,8 @@ export function registerJerryCommands(parent, getClient) {
             out.outreachEmail = o.outreachEmail;
         if (o.outreachPhone !== undefined)
             out.outreachPhone = o.outreachPhone;
+        if (o.companyType !== undefined)
+            out.companyType = o.companyType;
         return out;
     };
     addWriteFlagsToCommand(onboarding
@@ -893,6 +895,7 @@ export function registerJerryCommands(parent, getClient) {
         .option("--malli <v>", "Email variant (A/B)")
         .option("--kanava <text>", "Preferred channel")
         .option("--alue <text>", "Operating area ({alue} merge field)")
+        .option("--company-type <t>", "pumppu | betoni | all | owner")
         .option("--source <s>", "manual|import|scheduled (default manual)")).action(async (idStr, opts) => {
         try {
             const client = await getClient();
@@ -910,6 +913,7 @@ export function registerJerryCommands(parent, getClient) {
         .option("--malli <v>", "Email variant (A/B)")
         .option("--kanava <text>", "Preferred channel")
         .option("--alue <text>", "Operating area")
+        .option("--company-type <t>", "pumppu | betoni | all | owner")
         .option("--notes <text>", "muistiinpanot")
         .option("--outreach-name <text>", "Contact override name")
         .option("--outreach-email <email>", "Contact override email")

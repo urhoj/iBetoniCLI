@@ -1247,6 +1247,7 @@ export function registerJerryCommands(
     if (o.outreachName !== undefined) out.outreachName = o.outreachName;
     if (o.outreachEmail !== undefined) out.outreachEmail = o.outreachEmail;
     if (o.outreachPhone !== undefined) out.outreachPhone = o.outreachPhone;
+    if (o.companyType !== undefined) out.companyType = o.companyType;
     return out;
   };
 
@@ -1258,6 +1259,7 @@ export function registerJerryCommands(
       .option("--malli <v>", "Email variant (A/B)")
       .option("--kanava <text>", "Preferred channel")
       .option("--alue <text>", "Operating area ({alue} merge field)")
+      .option("--company-type <t>", "pumppu | betoni | all | owner")
       .option("--source <s>", "manual|import|scheduled (default manual)")
   ).action(async (idStr: string, opts: WriteOpts & Record<string, unknown>) => {
     try {
@@ -1284,6 +1286,7 @@ export function registerJerryCommands(
       .option("--malli <v>", "Email variant (A/B)")
       .option("--kanava <text>", "Preferred channel")
       .option("--alue <text>", "Operating area")
+      .option("--company-type <t>", "pumppu | betoni | all | owner")
       .option("--notes <text>", "muistiinpanot")
       .option("--outreach-name <text>", "Contact override name")
       .option("--outreach-email <email>", "Contact override email")

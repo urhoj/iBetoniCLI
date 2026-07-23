@@ -3487,6 +3487,7 @@ FLAGS
   --malli STRING    Email variant (A/B)
   --kanava STRING    Preferred channel, free text
   --alue STRING    Operating area ({alue} merge field)
+  --company-type STRING    pumppu | betoni | all | owner
   --source STRING    manual | import | scheduled (default manual)
 
 WRITE-SAFETY FLAGS
@@ -3599,6 +3600,7 @@ FLAGS
   --malli STRING    Email variant (A/B)
   --kanava STRING    Preferred channel
   --alue STRING    Operating area
+  --company-type STRING    pumppu | betoni | all | owner
   --notes STRING    muistiinpanot
   --outreach-name STRING    Contact override name
   --outreach-email STRING    Contact override email
