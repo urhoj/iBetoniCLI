@@ -138,7 +138,7 @@ describe("ib feedback create", () => {
     expect(post.mock.calls[0][1]).toMatchObject({ scope: "cli" });
   });
 
-  test.each(["cli", "app", "jerry", "bsg2", "workspace", "security", "ops", "other"])(
+  test.each(["cli", "app", "jerry", "bsg2", "workspace", "security", "ops", "impeccable", "other"])(
     "--scope %s is accepted and forwarded",
     async (scope) => {
       post.mockResolvedValueOnce({ feedbackId: 1 });

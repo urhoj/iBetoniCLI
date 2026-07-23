@@ -3,7 +3,7 @@ import { writeJson, exitWithError } from "../../output/json.js";
 import { parseRefId } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 const KINDS = ["improvement", "bug", "idea", "legal"];
-const SCOPES = ["cli", "app", "jerry", "bsg2", "workspace", "security", "ops", "other"];
+const SCOPES = ["cli", "app", "jerry", "bsg2", "workspace", "security", "ops", "impeccable", "other"];
 const STATUSES = ["open", "reviewed", "applied", "dismissed"];
 const SEVERITIES = ["critical", "major", "minor", "cosmetic"];
 // complexity = an AI-agent triage estimate (1-5), orthogonal to severity
@@ -390,7 +390,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .option("--description <text>", "Alias for the positional description")
         .option("--title <text>", "Optional title, folded into the description as its first line (no stored title column)")
         .option("--kind <kind>", "improvement | bug | idea | legal", "improvement")
-        .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | other — product surface this feedback targets", "cli")
+        .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — product surface this feedback targets (impeccable = auto-piped design-hook findings)", "cli")
         .option("--command <argv>", "The ib command/argv that triggered the friction")
         .option("--error <msg>", "Error message you hit, if any")
         .option("--severity <sev>", "critical | major | minor | cosmetic (optional; most useful for --kind bug)")
@@ -425,7 +425,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .option("--all", "Include every status (open,reviewed,applied,dismissed); overrides the open+reviewed default")
         .option("--full", "Return untruncated description/resolution (default: capped at 200 chars)")
         .option("--kind <kind>", "improvement | bug | idea | legal")
-        .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | other")
+        .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other")
         .option("--search <text>", "Substring match over description/command/resolution/errorText (deploy-gated)")
         .option("--complexity <n>", "Only items with this exact complexity (1-5)", Number)
         .option("--max-complexity <n>", "Only items with complexity <= n — the autonomously-workable slice (deploy-gated)", Number)
@@ -478,7 +478,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
     });
     f.command("update <id>")
         .description("Edit a filed row's classification (--scope/--kind/--severity) or --description (developer-only; a write)")
-        .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | other")
+        .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other")
         .option("--kind <kind>", "improvement | bug | idea | legal")
         .option("--severity <sev>", "critical | major | minor | cosmetic")
         .option("--complexity <n>", "1-5 agent-triage estimate — promote/downgrade after investigation (see `ib help complexity`)", Number)
@@ -498,7 +498,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
     f.command("count")
         .description("Counts of feedback by status/kind/scope (developer-only)")
         .option("--kind <kind>", "improvement | bug | idea | legal")
-        .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | other")
+        .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other")
         .action(async (opts) => {
         try {
             writeJson(await runFeedbackCount(await getClient(), opts));

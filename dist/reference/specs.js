@@ -4927,7 +4927,7 @@ const BASE_COMMAND_SPECS = [
             { name: "description", type: "string", description: "Alias for the positional description; if both are passed, they must match" },
             { name: "title", type: "string", description: "Optional title, folded into the description as its first line (feedback rows have no stored title column). Alone it becomes the whole description." },
             { name: "kind", type: "string", default: "improvement", description: "improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal)" },
-            { name: "scope", type: "string", default: "cli", description: "cli | app | jerry | bsg2 | workspace | security | ops | other — which product surface this targets (routing key for triage; orthogonal to --kind)" },
+            { name: "scope", type: "string", default: "cli", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — which product surface this targets (routing key for triage; orthogonal to --kind; impeccable = auto-piped design-hook findings)" },
             { name: "command", type: "string", description: "The ib command/argv that triggered the friction" },
             { name: "error", type: "string", description: "Error message you hit, if any" },
             { name: "severity", type: "string", description: "critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug" },
@@ -4936,7 +4936,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|security|ops|other (STRICT — unknown exits 4); --severity, when given, must be critical|major|minor|cosmetic; --complexity, when given, must be an integer 1-5" },
+            { exit: 4, meaning: "Validation", remedy: "description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (STRICT — unknown exits 4); --severity, when given, must be critical|major|minor|cosmetic; --complexity, when given, must be an integer 1-5" },
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
@@ -4968,7 +4968,7 @@ const BASE_COMMAND_SPECS = [
             { name: "unresolved", type: "boolean", description: "Shortcut for --status open,reviewed (un-closed items) — same as the default; mutually exclusive with --status/--all" },
             { name: "all", type: "boolean", description: "Include every status (open,reviewed,applied,dismissed); overrides the open+reviewed default; mutually exclusive with --status/--unresolved" },
             { name: "kind", type: "string", description: "improvement | bug | idea | legal" },
-            { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | other" },
+            { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other" },
             { name: "search", type: "string", description: "Substring match over description/command/resolution/errorText (deploy-gated)" },
             { name: "complexity", type: "number", description: "Only items with this exact complexity 1-5 (deploy-gated)" },
             { name: "max-complexity", type: "number", description: "Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls (deploy-gated)" },
@@ -5063,7 +5063,7 @@ const BASE_COMMAND_SPECS = [
         mutates: true,
         args: [{ name: "id", type: "number", description: "feedbackId — accepts an optional `fb#` anchor (e.g. `fb#42`); a `cl#` id is rejected (exit 4) with the changelog command to use (feedback #230)" }],
         flags: [
-            { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | other" },
+            { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other" },
             { name: "kind", type: "string", description: "improvement | bug | idea | legal" },
             { name: "severity", type: "string", description: "critical | major | minor | cosmetic" },
             { name: "complexity", type: "number", description: "1-5 agent-triage estimate — promote/downgrade after investigation (see `ib help complexity`)" },
@@ -5092,7 +5092,7 @@ const BASE_COMMAND_SPECS = [
         tier: "developer",
         flags: [
             { name: "kind", type: "string", description: "improvement | bug | idea | legal — count only this kind" },
-            { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | other — count only this scope" },
+            { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — count only this scope" },
         ],
         outputShape: "{ total, byStatus: { open, reviewed, applied, dismissed }, byKind, byScope, truncated?, hint? }",
         errors: [

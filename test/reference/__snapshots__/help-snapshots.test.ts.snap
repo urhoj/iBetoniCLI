@@ -2237,7 +2237,7 @@ DESCRIPTION
 
 FLAGS
   --kind STRING    improvement | bug | idea | legal — count only this kind
-  --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | other — count only this scope
+  --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — count only this scope
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
@@ -2272,7 +2272,7 @@ FLAGS
   --description STRING    Alias for the positional description; if both are passed, they must match
   --title STRING    Optional title, folded into the description as its first line (feedback rows have no stored title column). Alone it becomes the whole description.
   --kind STRING    improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal) (default: improvement)
-  --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | other — which product surface this targets (routing key for triage; orthogonal to --kind) (default: cli)
+  --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — which product surface this targets (routing key for triage; orthogonal to --kind; impeccable = auto-piped design-hook findings) (default: cli)
   --command STRING    The ib command/argv that triggered the friction
   --error STRING    Error message you hit, if any
   --severity STRING    critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug
@@ -2286,7 +2286,7 @@ OUTPUT (JSON, stdout)
   { feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|security|ops|other (STRICT — unknown exits 4); --severity, when given, must be critical|major|minor|cosmetic; --complexity, when given, must be an integer 1-5
+  exit 4  Validation             → description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (STRICT — unknown exits 4); --severity, when given, must be critical|major|minor|cosmetic; --complexity, when given, must be an integer 1-5
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -2359,7 +2359,7 @@ FLAGS
   --unresolved    Shortcut for --status open,reviewed (un-closed items) — same as the default; mutually exclusive with --status/--all
   --all    Include every status (open,reviewed,applied,dismissed); overrides the open+reviewed default; mutually exclusive with --status/--unresolved
   --kind STRING    improvement | bug | idea | legal
-  --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | other
+  --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other
   --search STRING    Substring match over description/command/resolution/errorText (deploy-gated)
   --complexity NUMBER    Only items with this exact complexity 1-5 (deploy-gated)
   --max-complexity NUMBER    Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls (deploy-gated)
@@ -2449,7 +2449,7 @@ ARGUMENTS
   <id> NUMBER    feedbackId — accepts an optional \`fb#\` anchor (e.g. \`fb#42\`); a \`cl#\` id is rejected (exit 4) with the changelog command to use (feedback #230) (required)
 
 FLAGS
-  --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | other
+  --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other
   --kind STRING    improvement | bug | idea | legal
   --severity STRING    critical | major | minor | cosmetic
   --complexity NUMBER    1-5 agent-triage estimate — promote/downgrade after investigation (see \`ib help complexity\`)
