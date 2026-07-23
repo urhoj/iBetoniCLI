@@ -550,6 +550,40 @@ describe("ib feedback resolve", () => {
     const out = await runFeedbackResolve(mockClient, 42, { status: "applied", full: true });
     expect(out).toMatchObject({ feedbackId: 42, status: "applied", description: "huge original" });
   });
+
+  test("note-only resolve that leaves the row open acks with a hint (feedback #270)", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42, status: "open", resolution: "investigated" });
+    const out = await runFeedbackResolve(mockClient, 42, { note: "investigated" });
+    expect(put).toHaveBeenCalledWith("/api/feedback/42", { resolution: "investigated" });
+    expect(out.hint).toBe(
+      "status unchanged (open) - pass --status applied|dismissed to close"
+    );
+  });
+
+  test("note-only hint also fires on a still-reviewed row and under --full", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 7, status: "reviewed", description: "orig" });
+    const out = await runFeedbackResolve(mockClient, 7, { note: "n", full: true });
+    expect(out).toMatchObject({ feedbackId: 7, status: "reviewed", description: "orig" });
+    expect(out.hint).toBe(
+      "status unchanged (reviewed) - pass --status applied|dismissed to close"
+    );
+  });
+
+  test("no hint when --status closes the row or is an explicit open/reviewed", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 1, status: "applied" });
+    const closed = await runFeedbackResolve(mockClient, 1, { status: "applied", note: "done" });
+    expect(closed).not.toHaveProperty("hint");
+
+    put.mockResolvedValueOnce({ feedbackId: 2, status: "reviewed" });
+    const explicit = await runFeedbackResolve(mockClient, 2, { status: "reviewed", note: "later" });
+    expect(explicit).not.toHaveProperty("hint");
+  });
+
+  test("no hint when a note-only call lands on an already-closed row", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 3, status: "applied", resolution: "post-close note" });
+    const out = await runFeedbackResolve(mockClient, 3, { note: "post-close note" });
+    expect(out).not.toHaveProperty("hint");
+  });
 });
 
 // ─── update ──────────────────────────────────────────────────────────────────

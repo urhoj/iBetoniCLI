@@ -5454,7 +5454,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "full", type: "boolean", description: "Return the full updated row instead of the compact ack" },
     ],
     outputShape:
-      "A compact ack { feedbackId, status, updatedAt, resolution } (resolution capped at 200 chars; the full row with --full). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
+      "A compact ack { feedbackId, status, updatedAt, resolution } (resolution capped at 200 chars; the full row with --full). A note-only call that leaves the row open/reviewed adds hint naming the closing statuses. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
     errors: [
       { exit: 4, meaning: "Validation", remedy: "provide --status and/or --note; status must be a known value" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
@@ -5463,6 +5463,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     notes: [
       "--note/--reason/--resolution write the SAME stored note. Passing several with different values merges them (joined in note→resolution→reason order) instead of dropping any — so mixing up --reason with the audit header loses nothing.",
+      "A note WITHOUT --status does NOT close the row — it stays open/reviewed and the ack carries a hint saying so; pass --status applied|dismissed to close (feedback #270).",
     ],
     examples: [
       'ib dev feedback resolve 42 --status applied --note "added row counts in CLI v1.3"',

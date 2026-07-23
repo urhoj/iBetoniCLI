@@ -2420,7 +2420,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  A compact ack { feedbackId, status, updatedAt, resolution } (resolution capped at 200 chars; the full row with --full). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
+  A compact ack { feedbackId, status, updatedAt, resolution } (resolution capped at 200 chars; the full row with --full). A note-only call that leaves the row open/reviewed adds hint naming the closing statuses. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
   exit 4  Validation             → provide --status and/or --note; status must be a known value
@@ -2430,6 +2430,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - --note/--reason/--resolution write the SAME stored note. Passing several with different values merges them (joined in note→resolution→reason order) instead of dropping any — so mixing up --reason with the audit header loses nothing.
+  - A note WITHOUT --status does NOT close the row — it stays open/reviewed and the ack carries a hint saying so; pass --status applied|dismissed to close (feedback #270).
 
 EXAMPLES
   ib dev feedback resolve 42 --status applied --note "added row counts in CLI v1.3"

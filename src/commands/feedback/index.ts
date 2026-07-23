@@ -406,6 +406,12 @@ export function mergeNoteFlags(...values: Array<string | undefined>): string | u
  * PUT /api/feedback/:id — developer triage (status and/or resolution note).
  * A REAL write — blocked under --read-only (exit 3). `--dry-run` previews the
  * body client-side without sending.
+ *
+ * A note-only call (no --status) does NOT close the row — the name "resolve"
+ * primes callers to assume it does, so when the row comes back still
+ * open/reviewed the ack carries a `hint` naming the closing statuses
+ * (feedback #270). An explicit `--status open|reviewed` is a deliberate
+ * choice — no hint.
  */
 export async function runFeedbackResolve(
   client: ApiClient,
@@ -425,7 +431,11 @@ export async function runFeedbackResolve(
     return { dryRun: true, wouldSend: { method: "PUT", path: `/api/feedback/${id}`, body } };
   }
   const row = await client.put<Record<string, unknown>>(`/api/feedback/${id}`, body);
-  return input.full ? row : compactAck(row);
+  const out = input.full ? { ...row } : compactAck(row);
+  if (input.status === undefined && (row.status === "open" || row.status === "reviewed")) {
+    out.hint = `status unchanged (${row.status}) - pass --status applied|dismissed to close`;
+  }
+  return out;
 }
 
 /** Project an updated row to the compact edit-ack fields (description capped). */
