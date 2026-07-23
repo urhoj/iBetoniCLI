@@ -56,9 +56,6 @@ export function writeJson(value) {
     emitStdout(JSON.stringify(value) + "\n");
 }
 export function writeError(err) {
-    // Local best-effort friction capture (non-embedded only) — the universal
-    // error funnel, so every non-zero exit is logged for the feedback groom step.
-    recordFriction(err);
     const activeErrors = getEmbeddedCtx()?.activeCommandErrors ?? activeCommandErrors;
     if (err instanceof CliError) {
         const body = err.body && typeof err.body === "object"
@@ -68,6 +65,11 @@ export function writeError(err) {
         // the command's --help NOTES beforehand (e.g. 404 = deploy-gated endpoint?).
         // Prefers the running command's own spec remedy when one matches.
         const hint = hintForError(err, activeErrors);
+        // Local best-effort friction capture (non-embedded only) — the universal
+        // error funnel, so every non-zero exit is logged for the feedback groom
+        // step. Record the hint alongside the message when one was displayed, so
+        // the groomer sees what the caller saw (fb#275 fidelity contract).
+        recordFriction(err, undefined, hint ? `${err.message} — ${hint}` : undefined);
         // A prescriptive validation error (thrown via `failValidation`) carries an
         // aggregated `problems` list (+ optional `sample`) in its body — spread them
         // into the envelope so the caller gets every missing/invalid flag, its
@@ -85,6 +87,7 @@ export function writeError(err) {
         }) + "\n");
         return;
     }
+    recordFriction(err);
     const message = err instanceof Error ? err.message : String(err);
     emitStderr(JSON.stringify({
         success: false,

@@ -29,7 +29,11 @@ export function frictionPath(): string {
   return join(frictionDir(), "cli-friction.jsonl");
 }
 
-export function recordFriction(err: unknown, exitCodeOverride?: number): void {
+export function recordFriction(
+  err: unknown,
+  exitCodeOverride?: number,
+  displayed?: string
+): void {
   try {
     if (getEmbeddedCtx()) return; // real local CLI only
     // Never write from the test suite — vitest exercises writeError() in many
@@ -41,7 +45,15 @@ export function recordFriction(err: unknown, exitCodeOverride?: number): void {
     const exitCode = exitCodeOverride ?? exitCodeForError(err);
     if (!exitCode) return; // 0 / success is never friction
     const argv = process.argv.slice(2).join(" ").slice(0, 400);
-    const message = (err instanceof Error ? err.message : String(err)).slice(0, 400);
+    // `displayed` is what the caller actually SAW (enriched envelope error +
+    // hint) — prefer it over the raw internal err.message so the groom step
+    // never files "the error gave no pointer" for a hint that WAS shown
+    // (feedback #275: the show→get did-you-mean existed, but the log recorded
+    // Commander's bare `unknown command 'show'` and a groomer re-requested it).
+    const message = (displayed ?? (err instanceof Error ? err.message : String(err))).slice(
+      0,
+      400
+    );
     const code =
       err instanceof CliError && err.body && typeof err.body === "object"
         ? ((err.body as Record<string, unknown>).code ?? null)

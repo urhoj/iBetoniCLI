@@ -26,7 +26,7 @@ function frictionDir() {
 export function frictionPath() {
     return join(frictionDir(), "cli-friction.jsonl");
 }
-export function recordFriction(err, exitCodeOverride) {
+export function recordFriction(err, exitCodeOverride, displayed) {
     try {
         if (getEmbeddedCtx())
             return; // real local CLI only
@@ -41,7 +41,12 @@ export function recordFriction(err, exitCodeOverride) {
         if (!exitCode)
             return; // 0 / success is never friction
         const argv = process.argv.slice(2).join(" ").slice(0, 400);
-        const message = (err instanceof Error ? err.message : String(err)).slice(0, 400);
+        // `displayed` is what the caller actually SAW (enriched envelope error +
+        // hint) — prefer it over the raw internal err.message so the groom step
+        // never files "the error gave no pointer" for a hint that WAS shown
+        // (feedback #275: the show→get did-you-mean existed, but the log recorded
+        // Commander's bare `unknown command 'show'` and a groomer re-requested it).
+        const message = (displayed ?? (err instanceof Error ? err.message : String(err))).slice(0, 400);
         const code = err instanceof CliError && err.body && typeof err.body === "object"
             ? (err.body.code ?? null)
             : null;

@@ -517,8 +517,12 @@ export function handleParseRejection(err, parserText, erroringCommand) {
                 const token = (Array.isArray(cmd.args) && cmd.args[0]) ||
                     text.match(/unknown command '([^']+)'/)?.[1] ||
                     "";
-                emitStderr(JSON.stringify(buildUnknownCommandEnvelope(cmd, token, getCallerTier())) + "\n");
-                recordFriction(err, 4);
+                const env = buildUnknownCommandEnvelope(cmd, token, getCallerTier());
+                emitStderr(JSON.stringify(env) + "\n");
+                // Record what was DISPLAYED (error + did-you-mean hint), not Commander's
+                // bare internal message — the friction groomer only sees this log, and a
+                // bare `unknown command 'x'` reads as "no pointer was given" (fb#275).
+                recordFriction(err, 4, `${env.error} — ${env.hint}`);
                 setExit(4);
                 return;
             }
@@ -537,8 +541,9 @@ export function handleParseRejection(err, parserText, erroringCommand) {
                     flag: longFlag(f),
                     issue: "missing",
                 }));
-                emitStderr(JSON.stringify(buildValidationEnvelope(path, problems, { spec })) + "\n");
-                recordFriction(err, 4);
+                const env = buildValidationEnvelope(path, problems, { spec });
+                emitStderr(JSON.stringify(env) + "\n");
+                recordFriction(err, 4, `${env.error} — ${env.hint}`);
                 setExit(4);
                 return;
             }
@@ -552,8 +557,9 @@ export function handleParseRejection(err, parserText, erroringCommand) {
                 err.message?.match(/unknown option '([^']+)'/)?.[1] ||
                 "";
             if (cmd && token) {
-                emitStderr(JSON.stringify(buildUnknownOptionEnvelope(cmd, token)) + "\n");
-                recordFriction(err, 4);
+                const env = buildUnknownOptionEnvelope(cmd, token);
+                emitStderr(JSON.stringify(env) + "\n");
+                recordFriction(err, 4, `${env.error} — ${env.hint}`);
                 setExit(4);
                 return;
             }
@@ -561,14 +567,15 @@ export function handleParseRejection(err, parserText, erroringCommand) {
         const detail = (text || err.message || "usage error")
             .replace(/^error:\s*/gm, "")
             .trim();
+        const genericHint = "usage error — run `ib <command> --help` for the exact arguments and flags, or `ib commands` to discover commands";
         emitStderr(JSON.stringify({
             success: false,
             error: detail,
             code: "USAGE",
             statusCode: 0,
-            hint: "usage error — run `ib <command> --help` for the exact arguments and flags, or `ib commands` to discover commands",
+            hint: genericHint,
         }) + "\n");
-        recordFriction(err, 4);
+        recordFriction(err, 4, `${detail} — ${genericHint}`);
         setExit(4);
         return;
     }
