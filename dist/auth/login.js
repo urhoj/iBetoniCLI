@@ -31,12 +31,46 @@ export async function performLogin(opts) {
     authorizeUrl.searchParams.set("code_challenge", challenge);
     authorizeUrl.searchParams.set("code_challenge_method", method);
     authorizeUrl.searchParams.set("state", state);
-    // 3. Launch browser. Print the URL and the waiting state FIRST (fb#243): in a
-    // headless/no-browser environment `open` fails or silently does nothing, and
-    // without these lines the command hangs with zero feedback until the caller's
-    // timeout kills it. stderr only — stdout stays parseable.
-    process.stderr.write(`Authorize in the browser:\n  ${authorizeUrl.toString()}\n` +
-        `Waiting for the OAuth callback on 127.0.0.1:${server.port} (timeout ${Math.round(timeoutMs / 60_000)} min)…\n` +
+    // 3. Print the URL FIRST (fb#243): in a headless/no-browser environment
+    // `open` fails or silently does nothing, and without this line the command
+    // hangs with zero feedback. stderr only — stdout stays parseable.
+    process.stderr.write(`Authorize in the browser:\n  ${authorizeUrl.toString()}\n`);
+    // 3b. Preflight the authorize URL (fb#274): a 400/500 here (missing OAuth
+    // client registration after a Redis wipe — fb#271 — or Redis down) would
+    // otherwise only render in the browser tab while the CLI waits the full
+    // callback timeout in silence. GET is side-effect-free server-side
+    // (validate → 302 to the login page; no auth state stored, no rate limit).
+    // A preflight TIMEOUT fails open — a slow cold-start must not block a login
+    // the browser flow could still complete.
+    let probe;
+    try {
+        probe = await fetch(authorizeUrl.toString(), {
+            redirect: "manual",
+            signal: AbortSignal.timeout(10_000),
+        });
+    }
+    catch (e) {
+        const name = typeof e === "object" && e !== null ? e.name : undefined;
+        if (name === "TimeoutError") {
+            process.stderr.write("Authorize preflight timed out after 10s — proceeding with the browser flow anyway.\n");
+        }
+        else {
+            server.close();
+            const msg = e instanceof Error ? e.message : String(e);
+            const cause = e instanceof Error && e.cause instanceof Error ? `: ${e.cause.message}` : "";
+            throw new Error(`Cannot reach ${opts.endpoint} (${msg}${cause}) — login cannot succeed from this machine, so the browser was not opened. Check the endpoint/network, or set IB_TOKEN=<jwt> instead.`);
+        }
+    }
+    if (probe && probe.status >= 400) {
+        server.close();
+        const body = await probe.text().catch(() => "");
+        // Error pages are buildErrorHtml HTML with the message in <p>…</p>.
+        const detail = /<p>([^<]*)<\/p>/.exec(body)?.[1] ??
+            body.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 200);
+        throw new Error(`Authorize preflight failed: HTTP ${probe.status}${detail ? ` — ${detail}` : ""}. The server rejected the authorize URL, so the browser was not opened (no point waiting for a callback).`);
+    }
+    // 3c. Launch browser.
+    process.stderr.write(`Waiting for the OAuth callback on 127.0.0.1:${server.port} (timeout ${Math.round(timeoutMs / 60_000)} min)…\n` +
         `Headless/no-browser environment? The callback must land on THIS machine, so copy-pasting the URL elsewhere won't finish the flow — set IB_TOKEN=<jwt> instead and skip \`ib auth login\` entirely.\n`);
     try {
         const { default: open } = await import("open");

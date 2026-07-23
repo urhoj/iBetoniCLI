@@ -41,11 +41,15 @@ describe("performLogin", () => {
       email: "test@example.com",
     });
 
-    // Our stubbed fetch only handles the token exchange. The simulated browser
-    // callback uses node:http directly to bypass the stub and exercise the
-    // real callback listener.
+    // Our stubbed fetch handles the authorize preflight (fb#274) and the token
+    // exchange. The simulated browser callback uses node:http directly to
+    // bypass the stub and exercise the real callback listener.
     mockFetch.mockImplementation(async (input: RequestInfo | URL) => {
       const urlStr = input.toString();
+      if (urlStr.includes("/oauth/authorize")) {
+        // Server-side success: 302 redirect to the frontend login page.
+        return new Response(null, { status: 302 });
+      }
       if (urlStr.endsWith("/oauth/token")) {
         return new Response(
           JSON.stringify({
@@ -98,6 +102,14 @@ describe("performLogin", () => {
       /^http:\/\/127\.0\.0\.1:\d+\/callback$/
     );
 
+    // Verify the preflight probe (fb#274): same authorize URL, manual redirect.
+    const probeCalls = mockFetch.mock.calls.filter((c) =>
+      c[0].toString().includes("/oauth/authorize")
+    );
+    expect(probeCalls).toHaveLength(1);
+    expect(probeCalls[0][0].toString()).toBe(authorizeUrl.toString());
+    expect((probeCalls[0][1] as RequestInit).redirect).toBe("manual");
+
     // Verify the token exchange call.
     const tokenCalls = mockFetch.mock.calls.filter((c) =>
       c[0].toString().endsWith("/oauth/token")
@@ -122,5 +134,92 @@ describe("performLogin", () => {
     expect(creds?.ownerAsiakasId).toBe(1349);
     expect(creds?.ownerAsiakasName).toBe("Test Oy");
     expect(creds?.endpoint).toBe("https://api.example.com");
+  });
+
+  test("fails fast when the authorize preflight returns 4xx (fb#274)", async () => {
+    // fb#271 scenario: OAuth client registration missing → 400 error page that
+    // previously only rendered in the browser while the CLI hung for 5 min.
+    mockFetch.mockImplementation(async (input: RequestInfo | URL) => {
+      const urlStr = input.toString();
+      if (urlStr.includes("/oauth/authorize")) {
+        return new Response(
+          '<!DOCTYPE html><html><body><div class="error"><h2>Error</h2>' +
+            "<p>Unknown client_id or invalid redirect_uri</p></div></body></html>",
+          { status: 400, headers: { "content-type": "text/html" } }
+        );
+      }
+      throw new Error(`Unexpected fetch in mock: ${urlStr}`);
+    });
+
+    await expect(
+      performLogin({
+        endpoint: "https://api.example.com",
+        credentialsPath: join(dir, "credentials.json"),
+        timeoutMs: 5000,
+      })
+    ).rejects.toThrow(/HTTP 400.*Unknown client_id or invalid redirect_uri/);
+    // The browser must never open on a failed preflight.
+    expect(mockOpen).not.toHaveBeenCalled();
+  });
+
+  test("fails fast when the endpoint is unreachable (fb#274)", async () => {
+    mockFetch.mockImplementation(async () => {
+      throw Object.assign(new TypeError("fetch failed"), {
+        cause: new Error("connect ECONNREFUSED 127.0.0.1:443"),
+      });
+    });
+
+    await expect(
+      performLogin({
+        endpoint: "https://api.example.com",
+        credentialsPath: join(dir, "credentials.json"),
+        timeoutMs: 5000,
+      })
+    ).rejects.toThrow(/Cannot reach https:\/\/api\.example\.com.*ECONNREFUSED/);
+    expect(mockOpen).not.toHaveBeenCalled();
+  });
+
+  test("proceeds with the browser flow when the preflight times out (fb#274)", async () => {
+    // A slow cold-start must not block a login the browser could complete:
+    // TimeoutError → warn + fail-open.
+    const fakeJwt = buildFakeJwt({ personId: 42, ownerAsiakasId: 1349 });
+    mockFetch.mockImplementation(async (input: RequestInfo | URL) => {
+      const urlStr = input.toString();
+      if (urlStr.includes("/oauth/authorize")) {
+        throw Object.assign(new Error("The operation timed out"), {
+          name: "TimeoutError",
+        });
+      }
+      if (urlStr.endsWith("/oauth/token")) {
+        return new Response(
+          JSON.stringify({ access_token: fakeJwt, expires_in: 604800 }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected fetch in mock: ${urlStr}`);
+    });
+    mockOpen.mockImplementation((authorizeUrl: string) => {
+      const url = new URL(authorizeUrl);
+      const redirectUri = url.searchParams.get("redirect_uri") ?? "";
+      const port = redirectUri.match(/:(\d+)/)?.[1];
+      const state = url.searchParams.get("state") ?? "";
+      setTimeout(() => {
+        void import("node:http").then((http) => {
+          http
+            .get(`http://127.0.0.1:${port}/callback?code=test_auth_code&state=${state}`)
+            .on("error", () => {
+              /* ignore */
+            });
+        });
+      }, 30);
+      return Promise.resolve({} as never);
+    });
+
+    await performLogin({
+      endpoint: "https://api.example.com",
+      credentialsPath: join(dir, "credentials.json"),
+      timeoutMs: 5000,
+    });
+    expect(mockOpen).toHaveBeenCalledTimes(1);
   });
 });

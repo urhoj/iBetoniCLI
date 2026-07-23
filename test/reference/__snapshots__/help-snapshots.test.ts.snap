@@ -630,10 +630,12 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 2  OAuth flow failed      → retry; check network / browser
+  exit 2  Authorize preflight failed (4xx/5xx from /oauth/authorize, or endpoint unreachable) → the server's error is surfaced immediately without opening the browser (no 5-min callback hang) — fix the server-side cause (e.g. OAuth client registration / Redis) or the endpoint/network, then retry
   exit 6 (HTTP 500)  Backend error          → retry later
 
 NOTES
   - HEADLESS/no-browser environments (CI, sandboxes): the OAuth callback must land on the machine running the CLI, so this command cannot complete there — set IB_TOKEN=<jwt> (a betoni.online JWT) in the env instead; every command picks it up (non-refreshable; a 401 surfaces immediately). The authorization URL and a waiting message are printed to stderr so a stuck flow is visible.
+  - Fail-fast preflight: before opening the browser the CLI GETs the /oauth/authorize URL (10s timeout, side-effect-free server-side); a 4xx/5xx or unreachable endpoint fails immediately with the server's error instead of the silent 5-minute callback-timeout hang. A preflight TIMEOUT fails open (browser flow proceeds) so a slow cold-start never blocks a login that would have worked.
 
 EXAMPLES
   ib auth login
