@@ -22,7 +22,9 @@ interface TokenResponse {
  * Steps:
  *   1. Generate PKCE verifier/challenge + CSRF state.
  *   2. Start a 127.0.0.1 callback listener on a random port.
- *   3. Build `/oauth/authorize` URL and open it in the user's browser.
+ *   3. Build the `/oauth/authorize` URL, preflight it (GET, 10s timeout —
+ *      fail fast on 4xx/5xx/unreachable instead of hanging until the callback
+ *      timeout; fb#274), then open it in the user's browser.
  *   4. Await the callback with `code` + `state` (state checked inside the server).
  *   5. POST `/oauth/token` to exchange the code for an access token.
  *   6. Decode the JWT to extract personId / ownerAsiakasId / email / tenant name.
