@@ -5117,12 +5117,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       {
         name: "summary",
         type: "string",
-        description: "Short one-line summary stored in the catalog",
+        description: "Short one-line summary stored in the catalog (≤160 chars, server-enforced)",
       },
       {
         name: "detail",
         type: "string",
-        description: "Full markdown business-context detail",
+        description: "Full markdown business-context detail (≤2000 chars, server-enforced). Don't recap flags/exit codes — those already render in `--help` from the spec; spend the budget on business context only found here.",
       },
       { name: "ai-confidence", type: "number", description: "Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score." },
       { name: "needs-human-review", type: "boolean", description: "Park the row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked." },
@@ -5139,6 +5139,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         exit: 5,
         meaning: "Unknown command",
         remedy: "`ib commands` for valid paths",
+      },
+      {
+        http: 400,
+        exit: 4,
+        meaning: "summary >160 or detail >2000 chars (the message names the submitted length)",
+        remedy: "Trim to the cap — cut any flag/exit-code recap first (it already renders in `--help`), keep the business context",
       },
     ],
     examples: [
@@ -6601,7 +6607,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" },
       { http: 404, exit: 5, meaning: "Term not found (with --update-only)", remedy: "Omit --update-only to create the entry" },
       { http: 404, exit: 5, meaning: "append/add/remove on a non-existent term", remedy: "Create the term first (set --definition …); append requires an existing entry" },
-      { http: 422, exit: 4, meaning: "definition >2000 chars", remedy: "Shorten the definition" },
+      { http: 400, exit: 4, meaning: "definition >2000 chars", remedy: "Shorten the definition" },
       { exit: 4, meaning: "--from-json file is not valid JSON or not readable", remedy: "Check the file path and contents" },
     ],
     examples: ['ib glossary set valumassa --definition "Pumpattava betonimassa." --synonyms "massaa,valua" --related "ib keikka" --reason "groom"', 'ib glossary set puomi --synonyms "boom,nollakone,puomiton" --reason "add synonyms only"', 'ib glossary set pumppari --definition "Updated def." --update-only --reason "groom"', 'ib glossary set loma --from-json loma.json --reason "groom"', 'ib glossary set puomi --add-synonyms "nollakone" --reason "add one synonym"', 'ib glossary set tilaus --append-definition "Convention: UI says tilaus, code says keikka." --reason "append clause"'],

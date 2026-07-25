@@ -248,3 +248,43 @@ describe("ib reference detail set — edit mode (in-field partial)", () => {
     expect(c.put).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("field caps (fb#284)", () => {
+  const CURRENT = { command: "ib keikka list", summary: "Lists orders", detail: "x".repeat(1990), hint: "" };
+
+  test("over-cap --detail exits 4 naming the submitted length, before any PUT", async () => {
+    const c = client({ put: vi.fn() });
+    await expect(
+      runReferenceDetailSet(c, ["keikka", "list"], { detail: "x".repeat(2431) }, {}, "developer")
+    ).rejects.toMatchObject({ exitCode: 4, message: "detail is 2431 chars, max 2000" });
+    expect(c.put).not.toHaveBeenCalled();
+  });
+
+  test("over-cap --summary exits 4 naming the submitted length", async () => {
+    const c = client({ put: vi.fn() });
+    await expect(
+      runReferenceDetailSet(c, ["keikka", "list"], { summary: "s".repeat(161) }, {}, "developer")
+    ).rejects.toMatchObject({ exitCode: 4, message: "summary is 161 chars, max 160" });
+    expect(c.put).not.toHaveBeenCalled();
+  });
+
+  test("at the cap is accepted", async () => {
+    const c = client({ put: vi.fn().mockResolvedValue({ command: "ib keikka list" }) });
+    await runReferenceDetailSet(c, ["keikka", "list"], { detail: "x".repeat(2000) }, {}, "developer");
+    expect(c.put).toHaveBeenCalledTimes(1);
+  });
+
+  test("an --append that overflows fails in the DRY-RUN preview, not only on write", async () => {
+    // The merge is computed client-side, so without this guard the preview would
+    // return a clean diff and the real write would then 400.
+    const c = client({ get: vi.fn().mockResolvedValue(CURRENT), put: vi.fn() });
+    await expect(
+      runReferenceDetailEdit(
+        c, ["keikka", "list"], "detail",
+        { kind: "append", text: "y".repeat(20) },
+        { dryRun: true }, "developer"
+      )
+    ).rejects.toMatchObject({ exitCode: 4, message: "detail would be 2010 chars, max 2000" });
+    expect(c.put).not.toHaveBeenCalled();
+  });
+});

@@ -120,6 +120,22 @@ export async function runReferenceDetailDelete(
   });
 }
 
+/**
+ * Server-enforced field caps (`MAX_SUMMARY` / `MAX_DETAIL` in puminet5api
+ * `routes/cli/commandCatalogCliRoutes.js`). Mirrored here so an over-cap write
+ * fails offline naming the submitted length instead of costing a round trip, and
+ * so an `--append` that overflows surfaces in the `--dry-run` PREVIEW rather than
+ * only on the real write (fb#284). Keep in sync if the server cap moves.
+ */
+const FIELD_MAX = { summary: 160, detail: 2000 } as const;
+
+function assertWithinCap(field: DetailEditableField, text: string, verb = "is"): void {
+  const max = FIELD_MAX[field];
+  if (text.length > max) {
+    throw new CliError(`${field} ${verb} ${text.length} chars, max ${max}`, 0, null, 4);
+  }
+}
+
 export async function runReferenceDetailSet(
   client: ApiClient,
   commandParts: string[],
@@ -130,6 +146,8 @@ export async function runReferenceDetailSet(
   // Same client-side visibility gate as the read: an unknown (or tier-hidden)
   // command exits 5 before any write leaves the process.
   const command = resolveCommand(commandParts, tier);
+  if (body.summary !== undefined) assertWithinCap("summary", body.summary);
+  if (body.detail !== undefined) assertWithinCap("detail", body.detail);
   const payload: Record<string, unknown> = {};
   if (body.summary !== undefined) payload.summary = body.summary;
   if (body.detail !== undefined) payload.detail = body.detail;
@@ -198,6 +216,9 @@ export async function runReferenceDetailEdit(
   const current = await runReferenceDetail(client, commandParts, tier);
   const before = String((current as Record<string, unknown>)[field] ?? "");
   const { next, matchCount } = applyTextEdit(before, op);
+  // Cap-check the MERGED text before the dry-run branch, so a preview that would
+  // 400 on write reports it here instead of returning a clean-looking diff.
+  assertWithinCap(field, next, "would be");
   if (flags.dryRun) {
     const diff = lineDiff(before, next);
     return {
