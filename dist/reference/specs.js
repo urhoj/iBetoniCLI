@@ -4493,7 +4493,7 @@ const BASE_COMMAND_SPECS = [
         outputShape: "{ temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }",
         errors: [
             apiErr(403, "Weather module off or permission denied", "enable via 'ib opendata weather toggle --on'"),
-            { exit: 5, meaning: "Sijainti not found or has no coordinates", remedy: "check sijaintiId; ensure the location has a GPS pin (`ib sijainti list`)" },
+            { http: 404, exit: 5, meaning: "Sijainti not found or has no coordinates", remedy: "check sijaintiId; ensure the location has a GPS pin (`ib sijainti list`)" },
             apiErr(401, "Not authenticated", "run 'ib auth login'"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
@@ -4513,7 +4513,7 @@ const BASE_COMMAND_SPECS = [
         outputShape: "{ temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }",
         errors: [
             apiErr(403, "Weather module off or permission denied", "enable via 'ib opendata weather toggle --on'"),
-            { exit: 5, meaning: "Keikka not found or has no worksite", remedy: "check keikkaId; the keikka must have a worksite with coordinates" },
+            { http: 404, exit: 5, meaning: "Keikka not found or has no worksite", remedy: "check keikkaId; the keikka must have a worksite with coordinates" },
             apiErr(401, "Not authenticated", "run 'ib auth login'"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
@@ -4534,7 +4534,7 @@ const BASE_COMMAND_SPECS = [
         outputShape: "{ temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }",
         errors: [
             apiErr(403, "Weather module off or permission denied", "enable via 'ib opendata weather toggle --on'"),
-            { exit: 5, meaning: "Address not found (ZERO_RESULTS)", remedy: "try a more specific Finnish address" },
+            { http: 404, exit: 5, meaning: "Address not found (ZERO_RESULTS)", remedy: "try a more specific Finnish address" },
             apiErr(401, "Not authenticated", "run 'ib auth login'"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
@@ -4651,10 +4651,25 @@ const BASE_COMMAND_SPECS = [
         flags: [],
         outputShape: "{ command, summary, detail, hint }. exit 5 when unknown or no detail yet.",
         errors: [
+            // Two DIFFERENT origins share exit 5, and they must stay separate rows so
+            // hintForError can match each: the unknown-command guard is client-side
+            // (statusCode 0, matched by exit), while "no detail yet" is a real HTTP 404
+            // from the catalog route (matched by http). A single http-less row left the
+            // 404 case falling through to the generic hint, which wrongly blamed the
+            // active company — the catalog is global, not tenant-scoped (feedback #280).
             {
                 exit: 5,
-                meaning: "Unknown command or no detail yet",
+                meaning: "Unknown command (client-side guard)",
                 remedy: "`ib commands` / `ib reference dump` for valid paths; or `<cmd> --help`",
+            },
+            {
+                // NB: the remedy must not name `reference detail set` — that command is
+                // developer-only while THIS one is open to any caller, and the dump's
+                // hidden-path scrub does not reach error remedies (dump.test.ts fails on it).
+                http: 404,
+                exit: 5,
+                meaning: "Known command, but no detail recorded yet",
+                remedy: "no business-context detail is recorded for this command yet — fall back to `<cmd> --help`, which is self-contained; a developer can fill the catalog entry",
             },
         ],
         examples: [

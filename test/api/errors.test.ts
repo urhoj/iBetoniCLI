@@ -28,13 +28,54 @@ describe("hintForError — 404 deploy-gate disambiguation", () => {
   test("a plain 404 (no code) yields the resource-not-found hint", () => {
     const err = new CliError("Not found", 404, { code: null }, 5);
     const hint = hintForError(err, null);
-    expect(hint).toMatch(/does not exist in the ACTIVE company/i);
+    expect(hint).toMatch(/no such resource/i);
+  });
+
+  // feedback #280: the generic 404 hint used to assert "the id likely does not
+  // exist in the ACTIVE company". Plenty of 404s are on GLOBAL resources (command
+  // catalog, glossary, reference data) where that is a false lead, so tenancy may
+  // only be offered conditionally.
+  test("the generic 404 hint does not blame the active company outright", () => {
+    const err = new CliError("Not found", 404, { code: null }, 5);
+    const hint = hintForError(err, null) ?? "";
+    expect(hint).not.toMatch(/likely does not exist in the ACTIVE company/i);
+    expect(hint).toMatch(/if it IS tenant-scoped/i);
   });
 
   test("a command's own 404 remedy still wins for a plain resource-404", () => {
     const err = new CliError("Not found", 404, { code: null }, 5);
     const specErrors = [{ http: 404, exit: 5, meaning: "Not found", remedy: "no keikka with that id" }];
     expect(hintForError(err, specErrors)).toBe("no keikka with that id");
+  });
+});
+
+// The matcher keys a spec row to an error by `http` (server-originated) or, for
+// client-side errors only (statusCode 0), by `exit`. A row written WITHOUT `http`
+// is therefore unreachable for a real HTTP failure — the trap behind feedback #280,
+// where `ib reference detail get`'s single http-less exit-5 row never matched the
+// catalog route's 404 and the caller got the generic tenancy hint instead.
+describe("hintForError — http-less spec rows only match client-side errors", () => {
+  const httpLess = [{ exit: 5, meaning: "Unknown command", remedy: "`ib commands` for valid paths" }];
+
+  test("an http-less exit-5 row matches a client-side exit-5 error (statusCode 0)", () => {
+    const err = new CliError("unknown command: ib bogus", 0, null, 5);
+    expect(hintForError(err, httpLess)).toBe("`ib commands` for valid paths");
+  });
+
+  test("an http-less exit-5 row does NOT match a real HTTP 404 — generic hint instead", () => {
+    const err = new CliError("no detail recorded", 404, { code: null }, 5);
+    expect(hintForError(err, httpLess)).toMatch(/no such resource/i);
+  });
+
+  test("pairing it with an http:404 row makes the server case match too", () => {
+    const paired = [
+      ...httpLess,
+      { http: 404, exit: 5, meaning: "No detail yet", remedy: "add it with `ib reference detail set`" },
+    ];
+    const clientSide = new CliError("unknown command: ib bogus", 0, null, 5);
+    const server = new CliError("no detail recorded", 404, { code: null }, 5);
+    expect(hintForError(clientSide, paired)).toBe("`ib commands` for valid paths");
+    expect(hintForError(server, paired)).toBe("add it with `ib reference detail set`");
   });
 });
 

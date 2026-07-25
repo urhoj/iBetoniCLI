@@ -7678,7 +7678,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Weather module off or permission denied → enable via 'ib opendata weather toggle --on'
-  exit 5  Address not found (ZERO_RESULTS) → try a more specific Finnish address
+  exit 5 (HTTP 404)  Address not found (ZERO_RESULTS) → try a more specific Finnish address
   exit 2 (HTTP 401)  Not authenticated      → run 'ib auth login'
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -7772,7 +7772,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Weather module off or permission denied → enable via 'ib opendata weather toggle --on'
-  exit 5  Keikka not found or has no worksite → check keikkaId; the keikka must have a worksite with coordinates
+  exit 5 (HTTP 404)  Keikka not found or has no worksite → check keikkaId; the keikka must have a worksite with coordinates
   exit 2 (HTTP 401)  Not authenticated      → run 'ib auth login'
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -7840,7 +7840,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Weather module off or permission denied → enable via 'ib opendata weather toggle --on'
-  exit 5  Sijainti not found or has no coordinates → check sijaintiId; ensure the location has a GPS pin (\`ib sijainti list\`)
+  exit 5 (HTTP 404)  Sijainti not found or has no coordinates → check sijaintiId; ensure the location has a GPS pin (\`ib sijainti list\`)
   exit 2 (HTTP 401)  Not authenticated      → run 'ib auth login'
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -9024,7 +9024,8 @@ OUTPUT (JSON, stdout)
   { command, summary, detail, hint }. exit 5 when unknown or no detail yet.
 
 ERRORS (stderr, exit non-zero)
-  exit 5  Unknown command or no detail yet → \`ib commands\` / \`ib reference dump\` for valid paths; or \`<cmd> --help\`
+  exit 5  Unknown command (client-side guard) → \`ib commands\` / \`ib reference dump\` for valid paths; or \`<cmd> --help\`
+  exit 5 (HTTP 404)  Known command, but no detail recorded yet → no business-context detail is recorded for this command yet — fall back to \`<cmd> --help\`, which is self-contained; a developer can fill the catalog entry
 
 EXAMPLES
   ib reference detail get keikka latest

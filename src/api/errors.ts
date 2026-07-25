@@ -92,10 +92,13 @@ export function hintForError(
       return "permission denied — check the PERMISSIONS line in the command's --help and the active company via `ib auth whoami`";
     case 404:
       // Reached only when the body is NOT code:ROUTE_NOT_FOUND (handled above): so
-      // the route IS deployed on a current backend → resource-not-found. The trailing
+      // the route IS deployed on a current backend → resource-not-found. Deliberately
+      // does NOT assert tenancy as the likely cause — plenty of 404s are on GLOBAL,
+      // non-tenant resources (command catalog, glossary, reference data), where
+      // "check the ACTIVE company" is a false lead (feedback #280). The trailing
       // clause keeps the old ambiguity note for OLDER backends that predate the
       // ROUTE_NOT_FOUND catch-all (their unmatched routes still 404 without a code).
-      return "not found — the id likely does not exist in the ACTIVE company. (On a current backend an undeployed endpoint instead returns code \"ROUTE_NOT_FOUND\"; older backends omit it, so a 404 there can still mean not-deployed — check `ib version`.)";
+      return "not found — no such resource; if it IS tenant-scoped, check the active company with `ib auth whoami`. (On a current backend an undeployed endpoint instead returns code \"ROUTE_NOT_FOUND\"; older backends omit it, so a 404 there can still mean not-deployed — check `ib version`.)";
     default:
       if (err.statusCode >= 500) return "backend error — retry with --verbose; if it persists, file `ib dev feedback create --kind bug`";
       return null;
