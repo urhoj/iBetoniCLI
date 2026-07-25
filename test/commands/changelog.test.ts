@@ -434,6 +434,52 @@ describe("changelog --summary alias for --description (fb#205)", () => {
   });
 });
 
+describe("changelog --body alias for --description (fb#278)", () => {
+  test("resolves --body alone", () => {
+    expect(resolveChangelogDescription(undefined, undefined, undefined, "from body")).toBe("from body");
+  });
+
+  test("accepts --body agreeing with the positional / --description / --summary", () => {
+    expect(resolveChangelogDescription("same", undefined, undefined, "same")).toBe("same");
+    expect(resolveChangelogDescription(undefined, "same", undefined, "same")).toBe("same");
+    expect(resolveChangelogDescription(undefined, undefined, "same", "same")).toBe("same");
+  });
+
+  test("rejects --body conflicting with any other source (exit 4)", () => {
+    expect(() => resolveChangelogDescription("pos", undefined, undefined, "other")).toThrow(/must match/);
+    expect(() => resolveChangelogDescription(undefined, "a", undefined, "b")).toThrow(/must match/);
+    expect(() => resolveChangelogDescription(undefined, undefined, "a", "b")).toThrow(/must match/);
+  });
+
+  test("add resolves the body from --body and POSTs it as description", async () => {
+    asPost().mockResolvedValue({ changelogId: 12 });
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    // Would exit 4 with `unknown option "--body"` before the fix.
+    await program.parseAsync(
+      ["changelog", "add", "--type", "bugfix", "--area", "cli", "--title", "t", "--body", "body via body"],
+      { from: "user" }
+    );
+    expect(asPost()).toHaveBeenCalledWith(
+      "/api/changelog",
+      expect.objectContaining({ description: "body via body" }),
+      expect.any(Object)
+    );
+  });
+
+  test("update folds --body into the description patch", async () => {
+    asPut().mockResolvedValue({ changelogId: 12 });
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    await program.parseAsync(["changelog", "update", "12", "--body", "new body"], { from: "user" });
+    expect(asPut()).toHaveBeenCalledWith(
+      "/api/changelog/12",
+      expect.objectContaining({ description: "new body" }),
+      expect.any(Object)
+    );
+  });
+});
+
 describe("changelog list search / status / presence filters", () => {
   test("list maps --search to the search query param", async () => {
     const c = mockClient();

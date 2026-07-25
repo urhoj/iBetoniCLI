@@ -129,20 +129,27 @@ export interface FeedbackCreateInput {
 }
 
 /**
- * Resolve the create description from the positional or --description alias.
- * `--title` folds in as the description's first line (there is no stored title
- * column — gh-issue-style `--title X --description Y` habit, feedback #240/#241).
+ * Resolve the create description from the positional or its --description /
+ * --body aliases (--body is the gh/git convention an agent reaches for by
+ * default, and already this CLI's free-text body flag on `message chat send` —
+ * feedback #278). `--title` folds in as the description's first line (there is
+ * no stored title column — gh-issue-style `--title X --description Y` habit,
+ * feedback #240/#241).
  */
 export function resolveFeedbackCreateDescription(input: {
   description?: string;
   descriptionFlag?: string;
+  bodyFlag?: string;
   title?: string;
 }): string {
   const positional = input.description?.trim();
-  const flagged = input.descriptionFlag?.trim();
-  if (positional && flagged && positional !== flagged) {
+  const given = [input.descriptionFlag, input.bodyFlag]
+    .map((s) => s?.trim())
+    .filter((s): s is string => !!s);
+  const flagged = given[0];
+  if (new Set(given).size > 1 || (positional && flagged && positional !== flagged)) {
     throw new CliError(
-      "Provide the description either positionally or with --description; if both are given, they must match",
+      "Provide the description once — positionally, with --description, or with --body; if several are given, they must match",
       400,
       null,
       4
@@ -529,6 +536,7 @@ export function registerFeedbackCommands(
       "File a proposal/trouble report. Silent server-side; works under --read-only."
     )
     .option("--description <text>", "Alias for the positional description")
+    .option("--body <text>", "Alias for --description (free text, not JSON); if several are given, they must match")
     .option(
       "--title <text>",
       "Optional title, folded into the description as its first line (no stored title column)"
@@ -553,6 +561,7 @@ export function registerFeedbackCommands(
         description: string | undefined,
         opts: {
           description?: string;
+          body?: string;
           title?: string;
           kind?: string;
           scope?: string;
@@ -570,6 +579,7 @@ export function registerFeedbackCommands(
               description: resolveFeedbackCreateDescription({
                 description,
                 descriptionFlag: opts.description,
+                bodyFlag: opts.body,
                 title: opts.title,
               }),
               kind: opts.kind,
@@ -680,6 +690,7 @@ export function registerFeedbackCommands(
     .option("--severity <sev>", "critical | major | minor | cosmetic")
     .option("--complexity <n>", "1-5 agent-triage estimate — promote/downgrade after investigation (see `ib help complexity`)", Number)
     .option("--description <text>", "Replace the freetext description")
+    .option("--body <text>", "Alias for --description (free text, not JSON); if both are given, they must match")
     .option("--dry-run", "Print the update body without sending (client-side)")
     .option("--full", "Return the full updated row (default: a compact ack)")
     .action(
@@ -691,12 +702,25 @@ export function registerFeedbackCommands(
           severity?: string;
           complexity?: number;
           description?: string;
+          body?: string;
           dryRun?: boolean;
           full?: boolean;
         }
       ) => {
         try {
           const id = parseRefId(idStr, "feedback", "update");
+          // --body is an alias for --description (feedback #278); fold it in so
+          // runFeedbackUpdate sees one field. Both only when they agree.
+          if (opts.body !== undefined) {
+            if (opts.description !== undefined && opts.description.trim() !== opts.body.trim())
+              throw new CliError(
+                "Provide the description via --description or --body, not both with different values",
+                400,
+                null,
+                4
+              );
+            if (opts.description === undefined) opts.description = opts.body;
+          }
           const client = await getClient();
           writeJson(
             await runWithSiblingHint(client, id, "changelog", () => runFeedbackUpdate(client, id, opts))

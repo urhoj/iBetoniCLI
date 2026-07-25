@@ -187,21 +187,23 @@ export function validateFieldLengths(o) {
         failWith(`value too long — ${over.join("; ")}; shorten to fit the devChangelog column`, 4);
 }
 /**
- * Resolve the entry description from the positional, the --description alias, OR
- * the --summary alias (mirrors `ib dev feedback create` — feedback #172/#205;
- * "summary" is the word an AI reaches for naturally for the entry body). All
- * three are equivalent; exactly one value is required, and if several are given
- * they must agree. Exits 4 on conflict or absence.
+ * Resolve the entry description from the positional, the --description alias,
+ * the --summary alias, OR the --body alias (mirrors `ib dev feedback create` —
+ * feedback #172/#205/#278; "summary" and "body" are the words an AI reaches for
+ * naturally for the entry text, --body being the gh/git convention and already
+ * this CLI's name for a free-text body on `message chat send`). All four are
+ * equivalent; exactly one value is required, and if several are given they must
+ * agree. Exits 4 on conflict or absence.
  */
-export function resolveChangelogDescription(positional, flag, summary) {
-    const given = [positional, flag, summary]
+export function resolveChangelogDescription(positional, flag, summary, body) {
+    const given = [positional, flag, summary, body]
         .map((s) => s?.trim())
         .filter((s) => !!s);
     if (new Set(given).size > 1)
-        failWith("Provide the description once — via the positional, --description, or --summary; if several are given they must match", 4);
+        failWith("Provide the description once — via the positional, --description, --summary, or --body; if several are given they must match", 4);
     const description = given[0];
     if (!description)
-        failWith("--description (or --summary, or a positional description) is required", 4);
+        failWith("--description (or --summary/--body, or a positional description) is required", 4);
     return description;
 }
 /**
@@ -257,6 +259,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .requiredOption("--title <s>", "Entry title")
         .option("--description <s>", "Kuvaus — alias for the positional; if both are given, they must match")
         .option("--summary <s>", "Alias for --description (the entry body); if both are given, they must match")
+        .option("--body <s>", "Alias for --description (free text, not JSON); if both are given, they must match")
         .option("--benefits <s>", "Hyödyt")
         .option("--impact <s>", "Vaikutus")
         .option("--status <s>", "Tila (Julkaistu/Korjattu/...)")
@@ -281,7 +284,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
             type: o.type,
             area: o.area,
             title: o.title,
-            description: resolveChangelogDescription(description, o.description, o.summary),
+            description: resolveChangelogDescription(description, o.description, o.summary, o.body),
             entryDate,
         };
         if (o.benefits)
@@ -391,6 +394,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--title <s>", "New title")
         .option("--description <s>", "New description")
         .option("--summary <s>", "Alias for --description; if both are given, they must match")
+        .option("--body <s>", "Alias for --description (free text, not JSON); if both are given, they must match")
         .option("--benefits <s>", "Hyödyt")
         .option("--impact <s>", "Vaikutus")
         .option("--status <s>", "Status update (e.g. mark deployed)")
@@ -407,14 +411,17 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         if (o.type !== undefined)
             o.type = normalizeType(o.type);
         validateEnums(o.type, o.area, undefined, o.source, "ib dev changelog update");
-        // --summary is an alias for --description (feedback #205); fold it in before
-        // the patch build so the loop below picks it up. Both may be given only when
-        // they agree.
-        if (o.summary !== undefined) {
-            if (o.description !== undefined && o.description.trim() !== o.summary.trim())
-                failWith("Provide the description via --description or --summary, not both with different values", 4);
+        // --summary/--body are aliases for --description (feedback #205/#278); fold
+        // them in before the patch build so the loop below picks them up. Several may
+        // be given only when they agree.
+        for (const alias of ["summary", "body"]) {
+            const v = o[alias];
+            if (v === undefined)
+                continue;
+            if (o.description !== undefined && o.description.trim() !== v.trim())
+                failWith("Provide the description via --description, --summary, or --body, not several with different values", 4);
             if (o.description === undefined)
-                o.description = o.summary;
+                o.description = v;
         }
         o.sha = resolveShaAlias(o.sha, o.commit);
         validateFieldLengths(o);
@@ -561,6 +568,11 @@ export const CHANGELOG_SPECS = [
                 type: "string",
                 description: "Alias for --description (the entry body); if both are passed, they must match",
             },
+            {
+                name: "body",
+                type: "string",
+                description: "Alias for --description (the entry body, free text — NOT the raw-JSON --body of the update commands); if both are passed, they must match",
+            },
             { name: "benefits", type: "string", description: "Hyödyt" },
             { name: "impact", type: "string", description: "Vaikutus" },
             { name: "status", type: "string", description: "Tila (Julkaistu/Korjattu/...)" },
@@ -622,7 +634,7 @@ export const CHANGELOG_SPECS = [
             },
         ],
         notes: [
-            "You can pass the description positionally, as --description, or as --summary (an alias) — if you pass more than one they must match (mirrors `ib dev feedback create`).",
+            "You can pass the description positionally, as --description, or as its --summary/--body aliases — if you pass more than one they must match (mirrors `ib dev feedback create`). Here --body is FREE TEXT, unlike the raw-JSON --body on the entity update commands.",
             'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib dev changelog add --type bugfix --area cli --title "x" -- "-5% render time". Everything after `--` is taken as positional text.',
             "--dry-run is SERVER-side (X-Dry-Run): the backend validates the payload then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s under --dry-run.",
             "Bounded free-text flags are length-checked client-side (exit 4) before POSTing: --status ≤30, --severity ≤20, --title ≤300, --impact ≤500, --repo/--vtag ≤200, --sha ≤500. (--description/--benefits/--files are unbounded.)",
@@ -632,6 +644,7 @@ export const CHANGELOG_SPECS = [
         examples: [
             'ib dev changelog add --type bugfix --area cli --title "x" --description "y" --feedback 12 --sha 59d9cc5',
             'ib dev changelog add "positional description works too" --type bugfix --area cli --title "x"',
+            'ib dev changelog add --type feature --area backend --title "x" --body "gh-style --body works as a --description alias"',
             'ib dev changelog add --type bugfix --area backend --title "fix npe" --description "y" --sentry PUMINET5API-1A2',
         ],
     },
@@ -768,6 +781,7 @@ export const CHANGELOG_SPECS = [
             { name: "title", type: "string", description: "New title" },
             { name: "description", type: "string", description: "New description" },
             { name: "summary", type: "string", description: "Alias for --description; if both are passed, they must match" },
+            { name: "body", type: "string", description: "Alias for --description (free text, not JSON); if both are passed, they must match" },
             { name: "benefits", type: "string", description: "Hyödyt" },
             { name: "impact", type: "string", description: "Vaikutus" },
             {

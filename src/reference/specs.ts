@@ -5377,6 +5377,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "description", type: "string", description: "freetext description of the friction, gap, or bug" }],
     flags: [
       { name: "description", type: "string", description: "Alias for the positional description; if both are passed, they must match" },
+      { name: "body", type: "string", description: "Alias for --description (free text — NOT the raw-JSON --body of the entity update commands); if several are passed, they must match" },
       { name: "title", type: "string", description: "Optional title, folded into the description as its first line (feedback rows have no stored title column). Alone it becomes the whole description." },
       { name: "kind", type: "string", default: "improvement", description: "improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal)" },
       { name: "scope", type: "string", default: "cli", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — which product surface this targets (routing key for triage; orthogonal to --kind; impeccable = auto-piped design-hook findings)" },
@@ -5394,7 +5395,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     notes: [
-      "You can pass the description either positionally or as --description; if you pass both, they must match.",
+      "You can pass the description positionally or as its --description/--body aliases; if you pass more than one, they must match. Here --body is FREE TEXT, unlike the raw-JSON --body on the entity update commands.",
       "gh-issue-style invocation works: `feedback add --title X --description Y` — `add` aliases `create`, and --title is prepended to the description as its first line (blank line between). Feedback rows store only a description, so the title is a formatting convenience, not a separate field.",
       'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib dev feedback create --kind bug -- "--pretty output too wide". Everything after `--` is taken as positional text.',
       "When invoked by the betoni.online /ai assistant, the originating conversation id is auto-attached as context.conversationId (via the IB_CONVERSATION_ID env var the /ai loop injects) — a developer can then read the full conversation with `ib dev ai conversation <id>`. Manual CLI use does not set it.",
@@ -5402,6 +5403,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: [
       'ib dev feedback create "schema table output should include row counts"',
       'ib dev feedback create --description "schema table output should include row counts"',
+      'ib dev feedback create --body "gh-style --body works as a --description alias"',
       'ib feedback add --title "Row counts missing" --description "schema table output should include row counts"',
       'ib dev feedback create "keikka list --pvm rejected my date" --kind bug --command "keikka list --pvm 1.6." --error "invalid date format"',
       'ib dev feedback create "ib customer search --email" --kind idea --dry-run',
@@ -5529,6 +5531,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "severity", type: "string", description: "critical | major | minor | cosmetic" },
       { name: "complexity", type: "number", description: "1-5 agent-triage estimate — promote/downgrade after investigation (see `ib help complexity`)" },
       { name: "description", type: "string", description: "Replace the freetext description" },
+      { name: "body", type: "string", description: "Alias for --description (free text, not JSON); if both are passed, they must match" },
       { name: "dry-run", type: "boolean", description: "Print the update body without sending (client-side)" },
       { name: "full", type: "boolean", description: "Return the full updated row instead of the compact ack" },
     ],

@@ -46,6 +46,36 @@ describe("ib feedback create", () => {
     ).toThrowError(/--description/);
   });
 
+  test("accepts the description via the --body alias (feedback #278)", async () => {
+    expect(resolveFeedbackCreateDescription({ bodyFlag: "  via body  " })).toBe("via body");
+    // Agreeing sources are fine; disagreeing ones exit 4.
+    expect(
+      resolveFeedbackCreateDescription({ description: "same", bodyFlag: " same " })
+    ).toBe("same");
+    expect(
+      resolveFeedbackCreateDescription({ descriptionFlag: "same", bodyFlag: "same" })
+    ).toBe("same");
+    expect(() =>
+      resolveFeedbackCreateDescription({ descriptionFlag: "a", bodyFlag: "b" })
+    ).toThrowError(/must match/);
+    expect(() =>
+      resolveFeedbackCreateDescription({ description: "a", bodyFlag: "b" })
+    ).toThrowError(/must match/);
+    // --title still folds in on top of --body.
+    expect(resolveFeedbackCreateDescription({ title: "T", bodyFlag: "b" })).toBe("T\n\nb");
+
+    // End-to-end through the parser: would exit 4 on `unknown option "--body"` before the fix.
+    post.mockResolvedValueOnce({ feedbackId: 278 });
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient);
+    await program.parseAsync(["feedback", "create", "--body", "filed via --body"], { from: "user" });
+    expect(post).toHaveBeenCalledWith(
+      "/api/feedback",
+      expect.objectContaining({ description: "filed via --body" }),
+      expect.objectContaining({ meta: true })
+    );
+  });
+
   test("--title folds into the description as its first line (feedback #240/#241)", () => {
     expect(
       resolveFeedbackCreateDescription({ title: " T ", descriptionFlag: "body" })
@@ -633,6 +663,29 @@ describe("ib feedback update", () => {
       runFeedbackUpdate(mockClient, 1, { description: "   " })
     ).rejects.toThrowError(CliError);
     expect(put).not.toHaveBeenCalled();
+  });
+
+  test("folds the --body alias into the description patch (feedback #278)", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42, description: "edited via body" });
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient);
+    // Would exit 4 with `unknown option "--body"` before the fix.
+    await program.parseAsync(["feedback", "update", "42", "--body", "edited via body"], {
+      from: "user",
+    });
+    expect(put).toHaveBeenCalledWith("/api/feedback/42", { description: "edited via body" });
+  });
+
+  test("rejects --description and --body with different values (exit 4, no PUT)", async () => {
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient);
+    const prevExit = process.exitCode;
+    await program.parseAsync(["feedback", "update", "42", "--description", "a", "--body", "b"], {
+      from: "user",
+    });
+    expect(process.exitCode).toBe(4);
+    expect(put).not.toHaveBeenCalled();
+    process.exitCode = prevExit;
   });
 
   test("--dry-run previews the PUT body and never sends", async () => {
