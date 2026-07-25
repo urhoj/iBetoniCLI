@@ -28,6 +28,8 @@ import {
   runJerryAdminRequestResend,
   runJerryAdminRequestExtend,
   runJerryAdminRequestDelete,
+  runJerryAdminSearches,
+  runJerryAdminFunnel,
 } from "../../src/commands/jerry/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import type { WriteFlags } from "../../src/api/writeFlags.js";
@@ -556,5 +558,46 @@ describe("ib jerry coverage", () => {
       varikot: [],
       computedAt: null,
     });
+  });
+});
+
+describe("ib jerry admin searches", () => {
+  test("list forwards filters and wraps rows in an envelope with truncated", async () => {
+    get.mockResolvedValueOnce({
+      rows: [{ label: "Vihti", searchCount: 3, noSupplyCount: 3 }],
+      truncated: false,
+    });
+    const out = await runJerryAdminSearches(mockClient, {
+      from: "2026-07-01", to: "2026-07-24", deliverable: "no_supply", q: "Vihti", limit: 50,
+    });
+    expect(get).toHaveBeenCalledWith(
+      "/api/admin/jerry-searches?from=2026-07-01&to=2026-07-24&deliverable=no_supply&q=Vihti&limit=50"
+    );
+    expect(out).toEqual({
+      items: [{ label: "Vihti", searchCount: 3, noSupplyCount: 3 }],
+      nextCursor: null,
+      count: 1,
+      truncated: false,
+    });
+  });
+
+  test("list with no options hits the bare path", async () => {
+    get.mockResolvedValueOnce({ rows: [] });
+    const out = await runJerryAdminSearches(mockClient, {});
+    expect(get).toHaveBeenCalledWith("/api/admin/jerry-searches");
+    expect(out.count).toBe(0);
+    expect(out.truncated).toBe(false);
+  });
+
+  test("funnel forwards the date window and returns the object as-is", async () => {
+    const funnel = {
+      coverageChecks: { total: 10, deliverable: 7, notDeliverable: 2, notGeocoded: 1 },
+      wizard: { sessions: 5, step1: 5, step2: 4, step3: 3, step4: 2, step5: 1, claimed: 1 },
+      outcomes: { open: 1 },
+    };
+    get.mockResolvedValueOnce(funnel);
+    const out = await runJerryAdminFunnel(mockClient, { from: "2026-07-01", to: "2026-07-24" });
+    expect(get).toHaveBeenCalledWith("/api/admin/jerry-searches/funnel?from=2026-07-01&to=2026-07-24");
+    expect(out).toEqual(funnel);
   });
 });

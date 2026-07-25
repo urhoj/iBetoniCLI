@@ -4478,6 +4478,42 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib jerry admin request offers 41"],
   },
   {
+    command: "ib jerry admin searches list",
+    description:
+      "Searched addresses (BetoniJerry coverage-checks) aggregated by place, with searchCount and a covered vs no_supply split — the signal for where to expand provider coverage (GET /api/admin/jerry-searches). Filters: --from/--to (createdAt), --deliverable (covered | no_supply), --q (address substring), --limit. System-admin only.",
+    permissions: ["isSystemAdmin"],
+    tier: "developer",
+    flags: [
+      { name: "from", type: "string", description: "createdAt from (YYYY-MM-DD/today/yesterday)" },
+      { name: "to", type: "string", description: "createdAt to (inclusive)" },
+      { name: "deliverable", type: "string", description: "covered | no_supply (never covered)" },
+      { name: "q", type: "string", description: "Address substring filter" },
+      { name: "limit", type: "number", default: "500", description: "Max rows (max 500)" },
+    ],
+    outputShape:
+      "ListEnvelope<{ label, osoite, formattedAddress, placeId, lat, lng, searchCount, noSupplyCount, notGeocodedCount, deliverableEver, maxProviderCount, nearestVarikkoKm, lastSearchedAt }>",
+    errors: [apiErr(403, "Not a system admin", "use a system-admin token"), ...COMMON_AUTH_ERRORS],
+    examples: [
+      "ib jerry admin searches list --deliverable no_supply",
+      "ib jerry admin searches list --from 2026-07-01 --q Vihti",
+    ],
+  },
+  {
+    command: "ib jerry admin searches funnel",
+    description:
+      "BetoniJerry conversion funnel over a date window (GET /api/admin/jerry-searches/funnel): top-of-funnel coverage checks, wizard step 1..5 by distinct session, claimed count, and the outcome breakdown of claimed requests by status. System-admin only.",
+    permissions: ["isSystemAdmin"],
+    tier: "developer",
+    flags: [
+      { name: "from", type: "string", description: "createdAt from (YYYY-MM-DD/today/yesterday)" },
+      { name: "to", type: "string", description: "createdAt to (inclusive)" },
+    ],
+    outputShape:
+      "{ coverageChecks: { total, deliverable, notDeliverable, notGeocoded }, wizard: { sessions, step1, step2, step3, step4, step5, claimed }, outcomes: { [status]: count } }",
+    errors: [apiErr(403, "Not a system admin", "use a system-admin token"), ...COMMON_AUTH_ERRORS],
+    examples: ["ib jerry admin searches funnel --from 2026-07-01 --to 2026-07-24"],
+  },
+  {
     command: "ib jerry admin request expire",
     description:
       "Force-expire an open/no_supply/pending_verification request (POST /api/admin/jerry-requests/:id/expire). status → expired. System-admin only. Requires --reason.",

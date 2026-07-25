@@ -3940,6 +3940,66 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib jerry admin searches funnel matches snapshot 1`] = `
+"USAGE
+  ib jerry admin searches funnel [flags]
+
+DESCRIPTION
+  BetoniJerry conversion funnel over a date window (GET /api/admin/jerry-searches/funnel): top-of-funnel coverage checks, wizard step 1..5 by distinct session, claimed count, and the outcome breakdown of claimed requests by status. System-admin only.
+  Permissions: requires isSystemAdmin.
+
+FLAGS
+  --from STRING    createdAt from (YYYY-MM-DD/today/yesterday)
+  --to STRING    createdAt to (inclusive)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { coverageChecks: { total, deliverable, notDeliverable, notGeocoded }, wizard: { sessions, step1, step2, step3, step4, step5, claimed }, outcomes: { [status]: count } }
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry admin searches funnel --from 2026-07-01 --to 2026-07-24
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry admin searches list matches snapshot 1`] = `
+"USAGE
+  ib jerry admin searches list [flags]
+
+DESCRIPTION
+  Searched addresses (BetoniJerry coverage-checks) aggregated by place, with searchCount and a covered vs no_supply split — the signal for where to expand provider coverage (GET /api/admin/jerry-searches). Filters: --from/--to (createdAt), --deliverable (covered | no_supply), --q (address substring), --limit. System-admin only.
+  Permissions: requires isSystemAdmin.
+
+FLAGS
+  --from STRING    createdAt from (YYYY-MM-DD/today/yesterday)
+  --to STRING    createdAt to (inclusive)
+  --deliverable STRING    covered | no_supply (never covered)
+  --q STRING    Address substring filter
+  --limit NUMBER    Max rows (max 500) (default: 500)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ label, osoite, formattedAddress, placeId, lat, lng, searchCount, noSupplyCount, notGeocodedCount, deliverableEver, maxProviderCount, nearestVarikkoKm, lastSearchedAt }>
+
+ERRORS (stderr, exit non-zero)
+  exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+EXAMPLES
+  ib jerry admin searches list --deliverable no_supply
+  ib jerry admin searches list --from 2026-07-01 --q Vihti
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib jerry check-address matches snapshot 1`] = `
 "USAGE
   ib jerry check-address [flags]

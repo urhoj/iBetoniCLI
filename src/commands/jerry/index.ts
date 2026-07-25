@@ -639,6 +639,59 @@ export async function runJerryAdminRequestOffers(
   return toEnvelope(await client.get<unknown>(`/api/admin/jerry-requests/${id}/offers`));
 }
 
+// ─── admin searches (Osoitehaut: address demand + conversion funnel) ─────────
+
+export interface JerryAdminSearchesOpts {
+  from?: string;
+  to?: string;
+  deliverable?: string; // 'covered' | 'no_supply'
+  q?: string;
+  limit?: number;
+}
+
+export interface JerryAdminFunnelOpts {
+  from?: string;
+  to?: string;
+}
+
+/**
+ * Aggregated searched-address demand (GET /api/admin/jerry-searches). System-admin only.
+ * Each row is one address (collapsed by place), with searchCount + noSupplyCount — the
+ * signal for where to expand provider coverage. --deliverable no_supply isolates the gaps.
+ */
+export async function runJerryAdminSearches(
+  client: ApiClient,
+  opts: JerryAdminSearchesOpts
+): Promise<ListEnvelope<Row>> {
+  const params = new URLSearchParams();
+  if (opts.from) params.set("from", opts.from);
+  if (opts.to) params.set("to", opts.to);
+  if (opts.deliverable) params.set("deliverable", opts.deliverable);
+  if (opts.q) params.set("q", opts.q);
+  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
+  const qs = params.toString();
+  const data = await client.get<{ rows?: unknown; truncated?: boolean }>(
+    `/api/admin/jerry-searches${qs ? `?${qs}` : ""}`
+  );
+  const items = Array.isArray(data?.rows) ? (data.rows as Row[]) : [];
+  return { items, nextCursor: null, count: items.length, truncated: !!data?.truncated };
+}
+
+/**
+ * BetoniJerry conversion funnel (GET /api/admin/jerry-searches/funnel). System-admin only.
+ * Returns { coverageChecks, wizard: step1..5 + claimed, outcomes } over the date window.
+ */
+export async function runJerryAdminFunnel(
+  client: ApiClient,
+  opts: JerryAdminFunnelOpts
+): Promise<Row> {
+  const params = new URLSearchParams();
+  if (opts.from) params.set("from", opts.from);
+  if (opts.to) params.set("to", opts.to);
+  const qs = params.toString();
+  return client.get<Row>(`/api/admin/jerry-searches/funnel${qs ? `?${qs}` : ""}`);
+}
+
 // ─── admin request write commands ────────────────────────────────────────────
 
 /**
@@ -1401,4 +1454,40 @@ export function registerJerryCommands(
       exitWithError(e);
     }
   });
+
+  // admin searches — Osoitehaut: address demand + conversion funnel ─────────────
+  const adminSearches = admin
+    .command("searches")
+    .description("Address-search demand + wizard conversion funnel (Osoitehaut)");
+
+  adminSearches
+    .command("list")
+    .description("Searched addresses aggregated by place, with covered vs no_supply split")
+    .option("--from <date>", "createdAt from (YYYY-MM-DD / today / yesterday)", resolveDate)
+    .option("--to <date>", "createdAt to (inclusive)", resolveDate)
+    .option("--deliverable <k>", "Filter: covered | no_supply (never covered)")
+    .option("--q <text>", "Address substring filter")
+    .option("--limit <n>", "Max rows (max 500)", (v: string) => Math.min(Number(v), 500))
+    .action(async (opts: JerryAdminSearchesOpts) => {
+      try {
+        const client = await getClient();
+        writeJson(await runJerryAdminSearches(client, opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+
+  adminSearches
+    .command("funnel")
+    .description("Conversion funnel: coverage-check → wizard step 1..5 → sent, + outcomes")
+    .option("--from <date>", "createdAt from (YYYY-MM-DD / today / yesterday)", resolveDate)
+    .option("--to <date>", "createdAt to (inclusive)", resolveDate)
+    .action(async (opts: JerryAdminFunnelOpts) => {
+      try {
+        const client = await getClient();
+        writeJson(await runJerryAdminFunnel(client, opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
 }
