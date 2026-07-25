@@ -4759,7 +4759,12 @@ const BASE_COMMAND_SPECS = [
             { name: "prepend", type: "string", description: "Edit mode: prepend text to the target field (verbatim)" },
             { name: "all", type: "boolean", description: "With --replace: substitute every occurrence" },
         ],
-        outputShape: "{ command, runs, … } (backend response) | edit dry-run: {dryRun:true, command, field, matchCount?, addedLines, removedLines, sameContent, unified}",
+        outputShape: "{ command, runs, … } (backend response) | plain --dry-run: {dryRun:true, wouldSave:{command, exists, writes:{summaryChars?, detailChars?}, aiConfidence, needsHumanReview}, validation} | edit-mode --dry-run: {dryRun:true, command, field, matchCount?, addedLines, removedLines, sameContent, unified}",
+        notes: [
+            "--dry-run has two resolutions. EDIT mode (--replace/--append/--prepend) resolves CLIENT-side and never PUTs — safe on any backend. A plain --summary/--detail --dry-run is SERVER-side (X-Dry-Run) and DEPLOY-GATED: the PUT handler ignored the header until puminet5api shipped the wouldSave branch, so against an older backend a plain --dry-run WRITES FOR REAL and overwrites the entry (fb#286). Until that backend deploys, preview a full-field rewrite with `reference detail get` first, or use edit mode.",
+            "Caps are validated BEFORE the dry-run branch, so an over-cap payload still exits 4 under --dry-run rather than reporting a would-be write.",
+            "The save proc COALESCEs the CONTENT fields — an omitted --summary/--detail keeps its current value (pass \"\" to clear), which is why the dry-run's `writes` lists only the fields you sent. aiConfidence/needsHumanReview are DIRECT-assigned: omitting them RESETS the score and un-parks the row for the grooming routine.",
+        ],
         errors: [
             {
                 exit: 5,
