@@ -5163,7 +5163,9 @@ const BASE_COMMAND_SPECS = [
             ...COMMON_AUTH_ERRORS,
         ],
         notes: [
-            "Deploy-gated: 404 until puminet5api ships the /api/cli/ai/conversations route.",
+            "Cross-tenant by design: rows from EVERY tenant are returned and the active --company does NOT narrow them (each row carries its own ownerAsiakasId). Transcripts may contain PII — hence the developer gate.",
+            "Excludes archived conversations (gptConversations.isArchived=1) and conversations with zero messages, so an id taken from a feedback row can legitimately be absent here while `ib dev ai conversation <id>` still returns it.",
+            "No cursor: nextCursor is always null. truncated:true means the page filled --limit — raise --limit (max 100) rather than trying to page.",
         ],
         seeAlso: ["ib dev ai conversation", "ib dev feedback list"],
         examples: [
@@ -5174,12 +5176,12 @@ const BASE_COMMAND_SPECS = [
     },
     {
         command: "ib dev ai conversation",
-        description: "Fetch the full transcript of an /ai assistant conversation by id (gptConversations/gptMessages). Developer/sysadmin tooling. The id originates from an `ib feedback` row's context.conversationId, stamped automatically when the AI files feedback from the /ai page.",
+        description: "Fetch the full transcript of an /ai assistant conversation by id (gptConversations/gptMessages). Developer/sysadmin tooling. Get an id by browsing with `ib dev ai conversations`, or from an `ib feedback` row's context.conversationId — stamped automatically when the AI files feedback from the /ai page.",
         permissions: ["isSystemAdmin or isDeveloper"],
         tier: "developer",
-        args: [{ name: "conversationId", type: "number", description: "gptConversations id (from a feedback row's context.conversationId)" }],
+        args: [{ name: "conversationId", type: "number", description: "gptConversations id (from `ib dev ai conversations` or a feedback row's context.conversationId)" }],
         flags: [],
-        outputShape: "{ conversationId, personId, ownerAsiakasId, messageCount, messages: [{ gptMessageId, role?, content?, raw?, ... }] }",
+        outputShape: "{ conversationId, personId, ownerAsiakasId, messageCount, messages: [{ gptMessageId, keikkaId, role?, content?, raw?, ... }] }",
         errors: [
             { exit: 4, meaning: "Validation", remedy: "conversationId must be a positive integer" },
             apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
@@ -5187,9 +5189,10 @@ const BASE_COMMAND_SPECS = [
             ...COMMON_AUTH_ERRORS,
         ],
         notes: [
-            "Deploy-gated: 404 until puminet5api ships the /api/cli/ai/conversation/:id route.",
+            "Cross-tenant by design: the transcript is readable whatever the caller's active company, because the AI fixer triages `ib feedback` rows from any tenant. Transcripts may contain PII — hence the developer gate.",
+            "Each message is { gptMessageId, keikkaId, ...JSON.parse(gptMessages.message) } — normally role/content, but a row whose stored message is NOT valid JSON falls back to { gptMessageId, keikkaId, raw }. Handle `raw` as well as `content`.",
         ],
-        seeAlso: ["ib dev feedback get", "ib dev feedback list"],
+        seeAlso: ["ib dev ai conversations", "ib dev feedback get", "ib dev feedback list"],
         examples: ["ib dev ai conversation 4321"],
     },
     // ─── cache (6) — Redis inspection and invalidation ───────────────────────
