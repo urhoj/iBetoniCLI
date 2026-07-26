@@ -2309,7 +2309,7 @@ EXAMPLES
   ib dev feedback create "schema table output should include row counts"
   ib dev feedback create --description "schema table output should include row counts"
   ib dev feedback create --body "gh-style --body works as a --description alias"
-  ib feedback add --title "Row counts missing" --description "schema table output should include row counts"
+  ib dev feedback add --title "Row counts missing" --description "schema table output should include row counts"
   ib dev feedback create "keikka list --pvm rejected my date" --kind bug --command "keikka list --pvm 1.6." --error "invalid date format"
   ib dev feedback create "ib customer search --email" --kind idea --dry-run
   ib dev feedback create "TOS 2.0 lacks a clause covering the AI assistant features; draft update suggested" --kind legal
