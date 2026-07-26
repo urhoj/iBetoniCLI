@@ -76,10 +76,14 @@ export function hintForError(
   // from inheriting the command's unrelated exit-4 remedy (e.g. legal save's
   // "pass --file OR --content").
   if (typeof err.hint === "string") return err.hint.length ? err.hint : null;
+  // Keyed on the row's DECLARED origin (`CommandError` forces every row to state
+  // one): an HTTP failure matches by status, a locally-raised one (statusCode 0)
+  // by exit code. Never fall back to exit-matching for HTTP errors — see the
+  // CommandError doc comment for why that mis-hints ~84 rows (feedback #289).
   const specRow = specErrors?.find(
     (r) =>
       (r.http !== undefined && r.http === err.statusCode) ||
-      (r.http === undefined && err.statusCode === 0 && r.exit === err.exitCode)
+      (r.origin === "client" && err.statusCode === 0 && r.exit === err.exitCode)
   );
   if (specRow?.remedy) return specRow.remedy;
   if (err.exitCode === 7) {

@@ -126,9 +126,9 @@ describe("JSON output", () => {
       expect(parsed.hint).toBe("switch to a provider company");
     });
 
-    test("statusCode-0 errors match spec rows by exit code", () => {
+    test("statusCode-0 errors match client-origin spec rows by exit code", () => {
       setActiveCommandErrors([
-        { exit: 4, meaning: "Missing --reason", remedy: "supply --reason" },
+        { origin: "client", exit: 4, meaning: "Missing --reason", remedy: "supply --reason" },
       ]);
       writeError(new CliError("Missing required flag: --reason", 0, null, 4));
       const parsed = JSON.parse(String(stderrSpy.mock.calls.at(-1)![0]));

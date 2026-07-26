@@ -103,7 +103,7 @@ const BASE_COMMAND_SPECS = [
             { name: "force", type: "boolean", description: "Overwrite an existing file" },
         ],
         outputShape: "{ ok: true, attachmentId, file (absolute path), bytes, fileType }",
-        errors: [apiErr(404, "Attachment not found", "verify attachmentId"), { exit: 4, meaning: "Output file exists", remedy: "pass --force or --out <other path>" }, ...COMMON_AUTH_ERRORS],
+        errors: [apiErr(404, "Attachment not found", "verify attachmentId"), { origin: "client", exit: 4, meaning: "Output file exists", remedy: "pass --force or --out <other path>" }, ...COMMON_AUTH_ERRORS],
         notes: ["Remote callers: use `ib attachment get` and fetch blobUrl yourselves.", DEPLOY_NOTE],
         seeAlso: ["ib attachment get"],
         examples: ["ib attachment download 4711", "ib attachment download 4711 --out C:\\temp\\site.jpg --force"],
@@ -122,7 +122,7 @@ const BASE_COMMAND_SPECS = [
         ],
         writeFlags: true,
         outputShape: "{ ok: true, attachmentId } | { dryRun: true, wouldUpload: {...} }",
-        errors: [{ exit: 4, meaning: "File unreadable / bad entity flags", remedy: "check the path and pass exactly one entity flag" }, { exit: 6, meaning: "Azure PUT failed", remedy: "re-run; SAS expires in 1h" }, apiErr(403, "Not a member of the target entity's company", "check active company"), ...COMMON_AUTH_ERRORS],
+        errors: [{ origin: "client", exit: 4, meaning: "File unreadable / bad entity flags", remedy: "check the path and pass exactly one entity flag" }, { origin: "client", exit: 6, meaning: "Azure PUT failed", remedy: "re-run; SAS expires in 1h" }, apiErr(403, "Not a member of the target entity's company", "check active company"), ...COMMON_AUTH_ERRORS],
         notes: [ENTITY_FLAG_NOTE, "No image compression — the file uploads as-is (the web UI compresses to ~1MB).", "Remote contexts: use upload-url + PUT yourself + register.", DEPLOY_NOTE],
         seeAlso: ["ib attachment upload-url", "ib attachment register", "ib attachment types"],
         examples: [
@@ -190,7 +190,7 @@ const BASE_COMMAND_SPECS = [
         flags: [...ATTACHMENT_ENTITY_FLAGS],
         writeFlags: true,
         outputShape: "{ ok: true, attachmentId, detached: entity } | { dryRun: true, wouldDetach: {...} }",
-        errors: [apiErr(403, "Not owner company or missing manager role", "switch to the owner company; need Admin/KeikkaHandler/AttachmentHandler/Owner"), apiErr(404, "Attachment not found", "verify attachmentId"), { exit: 4, meaning: "No entity given, or conflicting positional + flag", remedy: "name the entity once — positional word OR a --<entity> flag" }, ...COMMON_AUTH_ERRORS],
+        errors: [apiErr(403, "Not owner company or missing manager role", "switch to the owner company; need Admin/KeikkaHandler/AttachmentHandler/Owner"), apiErr(404, "Attachment not found", "verify attachmentId"), { origin: "client", exit: 4, meaning: "No entity given, or conflicting positional + flag", remedy: "name the entity once — positional word OR a --<entity> flag" }, ...COMMON_AUTH_ERRORS],
         notes: ["Name the entity as a positional word (`detach 4711 keikka`) OR an attach-style flag (`detach 4711 --keikka 9001`) — the flag's id is ignored since detach only needs the entity name.", "Audited via ChangeTracker on the previously-linked entity's timeline.", DEPLOY_NOTE],
         seeAlso: ["ib attachment attach", "ib attachment search"],
         examples: ["ib attachment detach 4711 keikka", "ib attachment detach 4711 --keikka 9001", "ib attachment detach 4711 bug-report --dry-run"],
@@ -222,7 +222,7 @@ const BASE_COMMAND_SPECS = [
         writeFlags: true,
         mutates: true,
         outputShape: "{ ok: true, attachmentId, deleted: true, blobDeleted } | { dryRun: true, wouldDelete: { attachmentId, blobName, origFileName } }",
-        errors: [{ exit: 4, meaning: "Missing --reason", remedy: "pass --reason 'why'" }, apiErr(400, "Missing X-Action-Reason header", "pass --reason"), apiErr(403, "Not owner company or missing manager role", "switch to the owner company"), apiErr(404, "Attachment not found or already deleted", "verify attachmentId"), ...COMMON_AUTH_ERRORS],
+        errors: [{ origin: "client", exit: 4, meaning: "Missing --reason", remedy: "pass --reason 'why'" }, apiErr(400, "Missing X-Action-Reason header", "pass --reason"), apiErr(403, "Not owner company or missing manager role", "switch to the owner company"), apiErr(404, "Attachment not found or already deleted", "verify attachmentId"), ...COMMON_AUTH_ERRORS],
         notes: ["ALWAYS preview with --dry-run first.", "Audited via ChangeTracker with your --reason.", DEPLOY_NOTE],
         seeAlso: ["ib attachment get", "ib attachment detach"],
         examples: ["ib attachment delete 4711 --dry-run --reason preview", "ib attachment delete 4711 --reason \"duplicate upload\""],
@@ -268,8 +268,9 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "stderr: the authorization URL + 'Waiting for the OAuth callback…' immediately, then 'Logged in as <email> at <company>.'; credentials file written",
         errors: [
-            { exit: 2, meaning: "OAuth flow failed", remedy: "retry; check network / browser" },
+            { origin: "client", exit: 2, meaning: "OAuth flow failed", remedy: "retry; check network / browser" },
             {
+                origin: "client",
                 exit: 2,
                 meaning: "Authorize preflight failed (4xx/5xx from /oauth/authorize, or endpoint unreachable)",
                 remedy: "the server's error is surfaced immediately without opening the browser (no 5-min callback hang) — fix the server-side cause (e.g. OAuth client registration / Redis) or the endpoint/network, then retry",
@@ -292,7 +293,7 @@ const BASE_COMMAND_SPECS = [
         flags: [],
         outputShape: "no stdout output; exit 0 on success",
         errors: [
-            { exit: 1, meaning: "I/O error", remedy: "check file permissions" },
+            { origin: "client", exit: 1, meaning: "I/O error", remedy: "check file permissions" },
         ],
         examples: ["ib auth logout"],
     },
@@ -303,18 +304,21 @@ const BASE_COMMAND_SPECS = [
         flags: [],
         outputShape: "{ personId, email?, activeCompany: { asiakasId, name, betoniJerryUmbrella? }, tier: 'developer'|'admin'|'standard', companies: { asiakasId, roles }[], endpoint, source: 'file'|'env', readOnly, tokenExpiresAt?, tokenExpired?, refreshed?, impersonating? } — `tier` is the discovery/capability gate; `companies` are the `company switch` targets (no name in the JWT — use `ib company list` for names); `source:'env'` = IB_TOKEN (non-refreshable); `refreshed: true` = the stored JWT had expired and whoami self-healed the session before reporting.",
         errors: [
-            { exit: 2, meaning: "Not logged in", remedy: "ib auth login first (or set IB_TOKEN)" },
+            { origin: "client", exit: 2, meaning: "Not logged in", remedy: "ib auth login first (or set IB_TOKEN)" },
             {
+                origin: "client",
                 exit: 2,
                 meaning: "Session expired and unrefreshable (both the JWT-bearer refresh and the OAuth refresh-token grant failed)",
                 remedy: "ib auth login to re-authenticate",
             },
             {
+                origin: "client",
                 exit: 2,
                 meaning: "IB_TOKEN expired (env sessions have no refresh path)",
                 remedy: "mint a fresh JWT and update IB_TOKEN",
             },
             {
+                origin: "client",
                 exit: 2,
                 meaning: "Impersonation session expired (never auto-refreshed — it would escalate)",
                 remedy: "ib auth impersonate --end to restore your own login, or re-impersonate",
@@ -342,9 +346,10 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ ok: true, activeCompany: { asiakasId, name } }",
         errors: [
-            { exit: 2, meaning: "Not logged in", remedy: "ib auth login" },
+            { origin: "client", exit: 2, meaning: "Not logged in", remedy: "ib auth login" },
             apiErr(403, "No access to target", "verify ownership via `ib company list`"),
             {
+                origin: "client",
                 exit: 3,
                 meaning: "Read-only mode active (--read-only / IB_READ_ONLY)",
                 remedy: "persisted switch is blocked under read-only; use the per-command global --company <id> ephemeral context",
@@ -364,11 +369,13 @@ const BASE_COMMAND_SPECS = [
         outputShape: "{ ok: true }",
         errors: [
             {
+                origin: "client",
                 exit: 2,
                 meaning: "Refresh failed on every path (JWT-bearer AND OAuth refresh-token grant)",
                 remedy: "ib auth login to re-authenticate",
             },
             {
+                origin: "client",
                 exit: 4,
                 meaning: "Refresh refused while impersonating (it would escalate to a permanent login as the target)",
                 remedy: "ib auth impersonate --extend (10 more minutes) or --end (restore your own login)",
@@ -395,11 +402,11 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "start: { ok:true, impersonating:{ personId, actorPersonId, expiresAt } }. --end: { ok:true, restored:{ personId } }. --extend: { ok:true, expiresAt }.",
         errors: [
-            { exit: 2, meaning: "Not logged in", remedy: "ib auth login" },
+            { origin: "client", exit: 2, meaning: "Not logged in", remedy: "ib auth login" },
             apiErr(403, "Impersonation not allowed for the target", "needs systemAdmin/roleManager, same-tenant admin, or a grant"),
             apiErr(404, "Target not found (or has no personEmail)", "no impersonatable person for that personId/email. NB: a personId that EXISTS but has no personEmail also 404s here (impersonation is email-keyed) — verify with `ib person get <id>`; an email-less person cannot be impersonated."),
-            { exit: 3, meaning: "Read-only mode active (--read-only / IB_READ_ONLY)", remedy: "impersonation persists a rotated JWT; drop read-only" },
-            { exit: 4, meaning: "No active session (--end/--extend), or neither personId nor --email given", remedy: "start with `ib auth impersonate <personId>`" },
+            { origin: "client", exit: 3, meaning: "Read-only mode active (--read-only / IB_READ_ONLY)", remedy: "impersonation persists a rotated JWT; drop read-only" },
+            { origin: "client", exit: 4, meaning: "No active session (--end/--extend), or neither personId nor --email given", remedy: "start with `ib auth impersonate <personId>`" },
         ],
         notes: [
             "Persists a 10-minute impersonation JWT as the active credential — blocked under read-only (exit 3).",
@@ -473,6 +480,7 @@ const BASE_COMMAND_SPECS = [
         errors: [
             apiErr(403, "No access to target", "verify via `ib company list`"),
             {
+                origin: "client",
                 exit: 3,
                 meaning: "Read-only mode active (--read-only / IB_READ_ONLY)",
                 remedy: "persisted switch is blocked under read-only; use the per-command global --company <id> ephemeral context",
@@ -506,7 +514,7 @@ const BASE_COMMAND_SPECS = [
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(403, "Not an admin/HR of the target company", "use an admin/HR token"),
             apiErr(404, "Unknown profile for that entity, or company/person not found", "run `ib validate list` to see profiles"),
-            { exit: 4, meaning: "Missing --profile for company validation, or a non-positive --asiakas/--person", remedy: "pass --profile (jerry|betoni) for a company, or a positive --asiakas/--person; run `ib validate list`" },
+            { origin: "client", exit: 4, meaning: "Missing --profile for company validation, or a non-positive --asiakas/--person", remedy: "pass --profile (jerry|betoni) for a company, or a positive --asiakas/--person; run `ib validate list`" },
         ],
         notes: [
             "ok = every applicable 'required' check passes; skipped checks (conditional, not applicable) and recommended/optional never flip it.",
@@ -531,7 +539,7 @@ const BASE_COMMAND_SPECS = [
         flags: [],
         outputShape: "(none — always an error envelope)",
         errors: [
-            { exit: 4, meaning: "'ib company validate' was renamed to 'ib validate'", remedy: "use `ib validate --asiakas <id> --profile <p>` (company) or `ib validate --asiakas <id> --person <id>` (employee)" },
+            { origin: "client", exit: 4, meaning: "'ib company validate' was renamed to 'ib validate'", remedy: "use `ib validate --asiakas <id> --profile <p>` (company) or `ib validate --asiakas <id> --person <id>` (employee)" },
         ],
         notes: [
             "Clean-break rename (mirrors the ib changes→ib log rename). The command is hidden and only emits the rename hint.",
@@ -683,7 +691,7 @@ const BASE_COMMAND_SPECS = [
         writeFlags: true,
         outputShape: "{ ok: true } or backend response",
         errors: [
-            { exit: 4, meaning: "--status not a numeric keikkaTilaId", remedy: "pass a number, e.g. --status 9" },
+            { origin: "client", exit: 4, meaning: "--status not a numeric keikkaTilaId", remedy: "pass a number, e.g. --status 9" },
             apiErr(404, "Keikka not found", "verify keikkaId"),
             ...permErrors("auth.page.grid.tilaus.edit"),
         ],
@@ -1353,7 +1361,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ point:{lat,lng}|null, address:string|null, weather, building, parcel, cameras, sijainti, deliveries, vehicles } — each section is { status:'ok'|'empty'|'forbidden'|'error', data?, error? }; a forbidden/error section never fails the whole command",
         errors: [
-            { exit: 4, meaning: "Missing or ambiguous point input", remedy: "pass exactly one of <tyomaaId> or --address" },
+            { origin: "client", exit: 4, meaning: "Missing or ambiguous point input", remedy: "pass exactly one of <tyomaaId> or --address" },
             ...COMMON_AUTH_ERRORS,
         ],
         notes: [
@@ -2504,7 +2512,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil, maxDeliveryDistance }> (+matchable:boolean on each row when --jerry is set; +truncated:true when the result hit the limit; +hint pointing at --all / --all --asiakas <id> when 0 rows came back without --all)",
         errors: [
-            { exit: 4, meaning: "Unknown or ambiguous --type name", remedy: "the error lists the valid types; or run `ib sijainti types`" },
+            { origin: "client", exit: 4, meaning: "Unknown or ambiguous --type name", remedy: "the error lists the valid types; or run `ib sijainti types`" },
             ...permErrors("auth.page.sijainnit.read"),
         ],
         notes: [
@@ -2538,7 +2546,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil }> (+truncated:true when the result hit the limit)",
         errors: [
-            { exit: 4, meaning: "--asiakas is not a positive integer", remedy: "pass a numeric asiakasId (see ownerAsiakasId in the output, or resolve the company via `ib search <name>`)" },
+            { origin: "client", exit: 4, meaning: "--asiakas is not a positive integer", remedy: "pass a numeric asiakasId (see ownerAsiakasId in the output, or resolve the company via `ib search <name>`)" },
             ...permErrors("auth.page.sijainnit.read"),
         ],
         notes: [
@@ -2589,7 +2597,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ point:{lat,lng}|null, address:string|null, weather, building, parcel, cameras, sijainti, deliveries, vehicles } — each section is { status:'ok'|'empty'|'forbidden'|'error', data?, error? }; a forbidden/error section never fails the whole command",
         errors: [
-            { exit: 4, meaning: "Missing or ambiguous point input", remedy: "pass exactly one of <sijaintiId> or --address" },
+            { origin: "client", exit: 4, meaning: "Missing or ambiguous point input", remedy: "pass exactly one of <sijaintiId> or --address" },
             ...COMMON_AUTH_ERRORS,
         ],
         notes: [
@@ -2626,7 +2634,7 @@ const BASE_COMMAND_SPECS = [
         errors: [
             apiErr(400, "Validation failed", "fix --body fields"),
             apiErr(400, 'Address could not be geocoded (--geocode, status ZERO_RESULTS)', "supply a fuller --address or pass --lat/--lng directly"),
-            { exit: 4, meaning: "--puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max", remedy: "pass metres 0–999.99 with min ≤ max" },
+            { origin: "client", exit: 4, meaning: "--puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max", remedy: "pass metres 0–999.99 with min ≤ max" },
             ...permErrors("auth.page.sijainnit.edit"),
         ],
         examples: [
@@ -2660,7 +2668,7 @@ const BASE_COMMAND_SPECS = [
             apiErr(400, "Validation failed", "fix --body fields"),
             apiErr(400, 'Address could not be geocoded (--geocode, status ZERO_RESULTS)', "supply a fuller --address or pass --lat/--lng directly"),
             apiErr(404, "Sijainti not found", "verify sijaintiId"),
-            { exit: 4, meaning: "--puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max — would otherwise clear the stored bound", remedy: "pass metres 0–999.99 with min ≤ max" },
+            { origin: "client", exit: 4, meaning: "--puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max — would otherwise clear the stored bound", remedy: "pass metres 0–999.99 with min ≤ max" },
             ...permErrors("auth.page.sijainnit.edit"),
         ],
         examples: [
@@ -2685,7 +2693,7 @@ const BASE_COMMAND_SPECS = [
         outputShape: "{ ok: true, ... } (raw backend response) or { dryRun: true, wouldUpdate: {...} }",
         errors: [
             apiErr(400, "Neither/both of --on/--off given, or --radius not a positive number", "pass exactly one of --on / --off; --radius is km > 0"),
-            { exit: 4, meaning: "--puomi-min/--puomi-max not a non-negative number or min > max", remedy: "pass metres 0–999.99 with min ≤ max" },
+            { origin: "client", exit: 4, meaning: "--puomi-min/--puomi-max not a non-negative number or min > max", remedy: "pass metres 0–999.99 with min ≤ max" },
             apiErr(404, "Sijainti not found", "verify sijaintiId"),
             ...permErrors("auth.page.sijainnit.edit"),
         ],
@@ -2803,7 +2811,7 @@ const BASE_COMMAND_SPECS = [
         flags: [],
         outputShape: "{ helpId, title, shorttext, htmltext, img } | null",
         errors: [
-            { exit: 4, meaning: "Invalid helpId", remedy: "helpId must be 1–250 characters" },
+            { origin: "client", exit: 4, meaning: "Invalid helpId", remedy: "helpId must be 1–250 characters" },
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
         examples: ["ib ohje get LaskupohjaTilaus", "ib ohje get LaskupohjaTilaus --pretty"],
@@ -2856,8 +2864,8 @@ const BASE_COMMAND_SPECS = [
         writeFlags: true,
         outputShape: "{ success: true, helpId, created, written: {helpId,title,shorttext,htmltext,img, aiConfidence?, needsHumanReview?}, htmltextLength, response } — `created` is true when no prior row existed (a parallel groomer can spot an unexpected insert); aiConfidence/needsHumanReview present in `written` only when those flags were passed; or { dryRun: true, helpId, created, current, proposed } | edit dry-run: {dryRun:true, helpId, field, matchCount?, addedLines, removedLines, sameContent, unified}",
         errors: [
-            { exit: 4, meaning: "Missing --reason / invalid helpId / --must-exist on a missing row", remedy: "pass --reason; helpId 1–250 chars; drop --must-exist to create" },
-            { exit: 5, meaning: "helpId has no existing row (edit mode only)", remedy: "create the entry first with a full --htmltext/--title/--shorttext" },
+            { origin: "client", exit: 4, meaning: "Missing --reason / invalid helpId / --must-exist on a missing row", remedy: "pass --reason; helpId 1–250 chars; drop --must-exist to create" },
+            { origin: "client", exit: 5, meaning: "helpId has no existing row (edit mode only)", remedy: "create the entry first with a full --htmltext/--title/--shorttext" },
             apiErr(400, "Validation failed", "title ≤500, htmltext ≤10000, helpId 1–250 chars"),
             apiErr(403, "Permission denied", "needs isHelperEditor or system-admin/developer"),
             ...COMMON_AUTH_ERRORS,
@@ -2878,7 +2886,7 @@ const BASE_COMMAND_SPECS = [
         writeFlags: true,
         outputShape: "{ success: true, helpId, deleted: boolean } — deleted is false when no row existed (idempotent); or { dryRun: true, helpId, wouldDelete: {helpId,title,shorttext,htmltext,img}|null } with --dry-run",
         errors: [
-            { exit: 4, meaning: "Missing --reason / invalid helpId", remedy: "pass --reason; helpId 1–250 chars" },
+            { origin: "client", exit: 4, meaning: "Missing --reason / invalid helpId", remedy: "pass --reason; helpId 1–250 chars" },
             apiErr(403, "Permission denied", "needs isHelperEditor or system-admin/developer"),
             ...COMMON_AUTH_ERRORS,
         ],
@@ -2988,7 +2996,7 @@ const BASE_COMMAND_SPECS = [
             "The document body is the `markdownContent` field — NOT `content` or `body`. Reading `.content` returns undefined (an empty body) with no error: a silent false-negative. `ib legal show` uses the same field name.",
         ],
         errors: [
-            { exit: 4, meaning: "Argument is neither a numeric documentId nor a typeName", remedy: "pass a documentId from ib legal list, or a typeName like PRIVACY" },
+            { origin: "client", exit: 4, meaning: "Argument is neither a numeric documentId nor a typeName", remedy: "pass a documentId from ib legal list, or a typeName like PRIVACY" },
             apiErr(404, "Document not found / type has no active document", "list ids via ib legal versions <typeName>"),
             ...COMMON_AUTH_ERRORS,
         ],
@@ -3009,7 +3017,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{a: {documentId, typeName, version, status, contentLength}, b: {...}, sameContent, addedLines, removedLines, unified}",
         errors: [
-            { exit: 4, meaning: "Neither two documentIds nor --type supplied (or both), or --owner without --type", remedy: "pass <a> <b> OR --type <name>" },
+            { origin: "client", exit: 4, meaning: "Neither two documentIds nor --type supplied (or both), or --owner without --type", remedy: "pass <a> <b> OR --type <name>" },
             apiErr(404, "documentId / type's draft or active not found", "check ib legal versions <typeName>"),
             ...COMMON_AUTH_ERRORS,
         ],
@@ -3042,7 +3050,7 @@ const BASE_COMMAND_SPECS = [
         mutates: true,
         outputShape: "{documentId, success} | dry-run: {dryRun: true, wouldCreate: {...}, validation} | edit dry-run: {dryRun:true, type, field:\"markdownContent\", matchCount?, addedLines, removedLines, sameContent, unified}",
         errors: [
-            { exit: 4, meaning: "Missing --reason / no content / --file unreadable or combined with --content", remedy: "pass --file OR --content, and --reason unless --dry-run" },
+            { origin: "client", exit: 4, meaning: "Missing --reason / no content / --file unreadable or combined with --content", remedy: "pass --file OR --content, and --reason unless --dry-run" },
             apiErr(400, "Required fields missing", "provide --type --doc-version --title and content"),
             ...LEGAL_DEV_ERRORS,
         ],
@@ -3068,7 +3076,7 @@ const BASE_COMMAND_SPECS = [
         mutates: true,
         outputShape: "{success} | dry-run: {dryRun: true, wouldActivate: {documentId}, validation}",
         errors: [
-            { exit: 4, meaning: "Missing --reason or invalid documentId", remedy: "pass --reason 'why' (not needed with --dry-run)" },
+            { origin: "client", exit: 4, meaning: "Missing --reason or invalid documentId", remedy: "pass --reason 'why' (not needed with --dry-run)" },
             ...LEGAL_DEV_ERRORS,
         ],
         seeAlso: ["ib legal save", "ib legal versions"],
@@ -3085,7 +3093,7 @@ const BASE_COMMAND_SPECS = [
         mutates: true,
         outputShape: "{success} | dry-run: {dryRun: true, wouldDelete: {documentId}, validation}",
         errors: [
-            { exit: 4, meaning: "Missing --reason or invalid documentId", remedy: "pass --reason 'why' (not needed with --dry-run)" },
+            { origin: "client", exit: 4, meaning: "Missing --reason or invalid documentId", remedy: "pass --reason 'why' (not needed with --dry-run)" },
             ...LEGAL_DEV_ERRORS,
         ],
         seeAlso: ["ib legal versions"],
@@ -3125,8 +3133,8 @@ const BASE_COMMAND_SPECS = [
         mutates: true,
         outputShape: "{success} | dry-run: {dryRun: true, wouldAccept: {...}, validation}",
         errors: [
-            { exit: 3, meaning: "Not a developer/sysadmin token (client-side gate)", remedy: "use a developer account" },
-            { exit: 4, meaning: "Missing typeName / missing --reason / type has no personSettingTypeId mapping", remedy: "pass <typeName> and --reason; check ib legal types" },
+            { origin: "client", exit: 3, meaning: "Not a developer/sysadmin token (client-side gate)", remedy: "use a developer account" },
+            { origin: "client", exit: 4, meaning: "Missing typeName / missing --reason / type has no personSettingTypeId mapping", remedy: "pass <typeName> and --reason; check ib legal types" },
             apiErr(404, "No active document of this type", "ib legal versions <typeName>"),
             ...COMMON_AUTH_ERRORS,
         ],
@@ -3155,7 +3163,7 @@ const BASE_COMMAND_SPECS = [
         mutates: true,
         outputShape: "the created legalDocumentTypes row | dry-run: {dryRun: true, wouldCreateType: {...}, validation}",
         errors: [
-            { exit: 4, meaning: "Missing --reason / invalid or duplicate typeName / settingTypeId unknown or already mapped", remedy: "check ib legal types; pass --reason unless --dry-run" },
+            { origin: "client", exit: 4, meaning: "Missing --reason / invalid or duplicate typeName / settingTypeId unknown or already mapped", remedy: "check ib legal types; pass --reason unless --dry-run" },
             ...LEGAL_DEV_ERRORS,
         ],
         notes: [
@@ -3184,7 +3192,7 @@ const BASE_COMMAND_SPECS = [
         mutates: true,
         outputShape: "the updated legalDocumentTypes row | dry-run: {dryRun: true, wouldUpdateType: {typeName, fields}, validation}",
         errors: [
-            { exit: 4, meaning: "Missing --reason / no field flags / settingTypeId unknown or already mapped to another type", remedy: "pass at least one field flag and --reason unless --dry-run" },
+            { origin: "client", exit: 4, meaning: "Missing --reason / no field flags / settingTypeId unknown or already mapped to another type", remedy: "pass at least one field flag and --reason unless --dry-run" },
             apiErr(404, "Unknown document type", "ib legal types"),
             ...LEGAL_DEV_ERRORS,
         ],
@@ -3491,7 +3499,7 @@ const BASE_COMMAND_SPECS = [
         errors: [
             apiErr(403, "Not allowed to change this person's owner", "see the authz rules above (developer/self/company-admin)"),
             apiErr(404, "Person not found", "verify personId"),
-            { exit: 4, meaning: "Bad flags", remedy: "provide exactly one of --global / --asiakas and a --reason" },
+            { origin: "client", exit: 4, meaning: "Bad flags", remedy: "provide exactly one of --global / --asiakas and a --reason" },
         ],
         examples: [
             "ib person owner 5351 --global --reason 'make self-managing'",
@@ -3825,8 +3833,8 @@ const BASE_COMMAND_SPECS = [
         outputShape: "{ geocoded: boolean, deliverable?: boolean, lat?, lng?, placeId?, formattedAddress?, providerCount?, nearestVarikkoKm?, providers?: [{ asiakasId, asiakasNimi, distanceKm }], considered?: [{ asiakasId, asiakasNimi, sijaintiId, excludedBy: 'no-coords'|'company-gate'|'not-enrolled'|'radius'|'boom', detail }] }",
         errors: [
             apiErr(400, "osoite missing", "pass --address"),
-            { exit: 4, meaning: "--boom not a non-negative number", remedy: "pass metres ≥ 0, or omit for no boom filter" },
-            { exit: 4, meaning: "--asiakas without --explain, or not a positive integer", remedy: "add --explain, or pass a positive asiakasId" },
+            { origin: "client", exit: 4, meaning: "--boom not a non-negative number", remedy: "pass metres ≥ 0, or omit for no boom filter" },
+            { origin: "client", exit: 4, meaning: "--asiakas without --explain, or not a positive integer", remedy: "add --explain, or pass a positive asiakasId" },
             apiErr(429, "Rate limit (20/min/IP)", "wait and retry"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
@@ -3850,7 +3858,8 @@ const BASE_COMMAND_SPECS = [
         flags: [],
         outputShape: "{ summary: { varikkoCount, providerCount, coveredAreas, coveredRegions: string[] }, coveredRegions: string[], areas: { key, listLocative, tailRegion, probeLat, probeLng, covered, providerCount }[], varikot: { asiakasId, asiakasNimi, sijaintiId, sijaintiNimi, lat, lng, maxDeliveryDistanceKm, puomiMin, puomiMax, jerryActiveUntil }[], computedAt } — `coveredRegions` (distinct tailRegions of covered areas) is the Google-Ads geo-targeting answer.",
         errors: [
-            { exit: 2, meaning: "Not logged in / token expired", remedy: "ib auth login (or set IB_TOKEN)" },
+            { origin: "client", exit: 2, meaning: "Not logged in", remedy: "ib auth login (or set IB_TOKEN)" },
+            apiErr(401, "Token expired or invalid", "ib auth refresh (IB_TOKEN sessions: mint a fresh JWT)"),
             apiErr(403, "Developer/sysadmin only (server-enforced)", "use a developer account token"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
@@ -3867,7 +3876,8 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ domain, days, checkedAt, key:{ readOnly, hasWhitelabel, hasSuppression, hasStats }, domainAuth:{ valid, records:{ mail_cname, dkim1, dkim2 } }, suppressions:{ bounces|blocks|spam_reports|invalid_emails: { count, forDomain, recent[] } }, stats:{ delivered, bounces, spam_reports, bounceRatePct, spamRatePct }, verdict:{ domainAuthValid, deliverabilityFlags[] } }",
         errors: [
-            { exit: 2, meaning: "Not logged in / token expired", remedy: "ib auth login (or set IB_TOKEN)" },
+            { origin: "client", exit: 2, meaning: "Not logged in", remedy: "ib auth login (or set IB_TOKEN)" },
+            apiErr(401, "Token expired or invalid", "ib auth refresh (IB_TOKEN sessions: mint a fresh JWT)"),
             apiErr(403, "Developer/sysadmin only (server-enforced)", "use a developer account token"),
             apiErr(503, "Diagnostic key not configured on this backend", "set KV secret sendgrid-diag-key (read-only SendGrid key)"),
         ],
@@ -4341,7 +4351,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ source:'sijainti'|'worksite'|'address'|'coords', input, coords:{lat,lng}, city|null, requestedCity|null, derivedCity|null, found:boolean, outOfArea:boolean, national:boolean, building:{ buildingId, nationalBuildingId, buildingType, floors, totalArea, completionYear, facadeMaterial, … common schema }|null }",
         errors: [
-            { exit: 4, meaning: "No source, multiple sources, or invalid city/coords", remedy: "pass exactly one of --sijainti / --worksite / --lat+--lng / --address; city must be Helsinki|Vantaa|Espoo|HSY|Ryhti" },
+            { origin: "client", exit: 4, meaning: "No source, multiple sources, or invalid city/coords", remedy: "pass exactly one of --sijainti / --worksite / --lat+--lng / --address; city must be Helsinki|Vantaa|Espoo|HSY|Ryhti" },
             apiErr(404, "Sijainti/worksite not found (or no coordinates), or address not geocodable", "verify the id/address; a worksite must be geocoded and in your tenant"),
             ...COMMON_AUTH_ERRORS,
         ],
@@ -4377,7 +4387,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ source:'kiinteistotunnus'|'sijainti'|'worksite'|'address'|'coords', input, coords:{lat,lng}|null, found:boolean, parcel:{ source:'MML', kiinteistotunnus, kiinteistotunnusFormatted, municipalityNumber, parcelCount, totalAreaM2, palstat:[{ palstaId, kiinteistotunnus, kiinteistotunnusFormatted, areaM2, representativePoint:{lat,lng}|null, geometry }], buildingCount?, buildings?:[{ nationalBuildingId, usagePurpose, completionYear, status }] (only with --with-buildings) } }",
         errors: [
-            { exit: 4, meaning: "No source, multiple sources, both kiinteistotunnus and a point, invalid kiinteistotunnus, or invalid coords", remedy: "pass exactly one of --kiinteistotunnus / --sijainti / --worksite / --lat+--lng / --address" },
+            { origin: "client", exit: 4, meaning: "No source, multiple sources, both kiinteistotunnus and a point, invalid kiinteistotunnus, or invalid coords", remedy: "pass exactly one of --kiinteistotunnus / --sijainti / --worksite / --lat+--lng / --address" },
             apiErr(404, "Sijainti/worksite not found (or no coordinates), or address not geocodable", "verify the id/address; a worksite must be geocoded and in your tenant"),
             ...COMMON_AUTH_ERRORS,
         ],
@@ -4566,7 +4576,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ success: boolean, enabled: boolean, ... }",
         errors: [
-            { exit: 4, meaning: "Neither --on nor --off passed, or both passed", remedy: "pass exactly one of --on / --off" },
+            { origin: "client", exit: 4, meaning: "Neither --on nor --off passed, or both passed", remedy: "pass exactly one of --on / --off" },
             apiErr(403, "Permission denied (admin required)", "requires admin role on the company"),
             apiErr(401, "Not authenticated", "run 'ib auth login'"),
             apiErr(500, "Backend error", "retry with --verbose"),
@@ -4626,8 +4636,8 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ version, generatedAt, commonErrors: CommandError[], notice?, overview, glossary, feedbackGuidance, topics, commands: { '<command>': CommandSpec } } — with --commands-only: { version, generatedAt, commonErrors, commands }; with --lean each spec drops notes/seeAlso (examples kept). `commonErrors` (401/500) applies to EVERY command and is omitted from each spec's `errors`. `notice` appears only on the full (no-domain) dump. `glossary` is the term+synonyms INDEX only and is EMPTY unless `--glossary` is passed; fetch a definition with `ib glossary lookup <term>` or all of them with `ib glossary list`.",
         errors: [
-            { exit: 4, meaning: "Unknown domain", remedy: "run `ib commands` (no arg) to see valid domains" },
-            { exit: 1, meaning: "I/O error", remedy: "retry; check stdout pipe" },
+            { origin: "client", exit: 4, meaning: "Unknown domain", remedy: "run `ib commands` (no arg) to see valid domains" },
+            { origin: "client", exit: 1, meaning: "I/O error", remedy: "retry; check stdout pipe" },
         ],
         examples: [
             "ib reference dump keikka",
@@ -4658,6 +4668,7 @@ const BASE_COMMAND_SPECS = [
             // 404 case falling through to the generic hint, which wrongly blamed the
             // active company — the catalog is global, not tenant-scoped (feedback #280).
             {
+                origin: "client",
                 exit: 5,
                 meaning: "Unknown command (client-side guard)",
                 remedy: "`ib commands` / `ib reference dump` for valid paths; or `<cmd> --help`",
@@ -4706,8 +4717,8 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ items: [{ command, summary, lastReviewed, runs, aiConfidence, needsHumanReview, detail? }], count } — `detail` present only with --with-detail. --search/--orphans filter client-side and recompute count.",
         errors: [
-            { exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" },
-            { exit: 4, meaning: "Unknown --domain", remedy: "`ib commands` for valid domains" },
+            { origin: "client", exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" },
+            { origin: "client", exit: 4, meaning: "Unknown --domain", remedy: "`ib commands` for valid domains" },
         ],
         notes: [
             "--search and --orphans are client-side post-filters (no backend deploy needed): the full catalog is fetched, then narrowed locally.",
@@ -4767,6 +4778,7 @@ const BASE_COMMAND_SPECS = [
         ],
         errors: [
             {
+                origin: "client",
                 exit: 5,
                 meaning: "Unknown command",
                 remedy: "`ib commands` for valid paths",
@@ -4802,8 +4814,8 @@ const BASE_COMMAND_SPECS = [
         flags: [],
         outputShape: "{ deleted } (rows removed, 0 or 1 — idempotent) | --dry-run: { dryRun:true, wouldDelete:{ command, exists }, validation }",
         errors: [
-            { exit: 3, meaning: "Not a developer", remedy: "Requires isDeveloper / isSystemAdmin" },
-            { exit: 4, meaning: "Missing --reason on a real delete, or empty command path", remedy: "Pass --reason (or --dry-run to preview) and a command path" },
+            apiErr(403, "Not a developer", "Requires isDeveloper / isSystemAdmin (server-enforced)"),
+            { origin: "client", exit: 4, meaning: "Missing --reason on a real delete, or empty command path", remedy: "Pass --reason (or --dry-run to preview) and a command path" },
         ],
         examples: [
             "ib reference detail delete ai conversation --dry-run",
@@ -4820,8 +4832,8 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ items: [{ command, severity:'warn', kind:'orphan', summary, hint }], count } — one finding per catalog key with no live command",
         errors: [
-            { exit: 1, meaning: "--strict and orphan rows found", remedy: "Prune each with `ib reference detail delete <key> --reason <r>`, or seed the re-homed command" },
-            { exit: 3, meaning: "Not a developer", remedy: "Requires isDeveloper / isSystemAdmin" },
+            { origin: "client", exit: 1, meaning: "--strict and orphan rows found", remedy: "Prune each with `ib reference detail delete <key> --reason <r>`, or seed the re-homed command" },
+            apiErr(403, "Not a developer", "Requires isDeveloper / isSystemAdmin (server-enforced)"),
         ],
         notes: [
             "Read-only: one GET of the whole catalog plus a local diff against the live command specs. The class behind fb#73 (`ib customer prh` re-homed to `ib opendata prh`).",
@@ -4865,8 +4877,8 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "no args: { hint, items:[{ domain, count, description|null, commands:[\"keikka list\", ...] }], nextCursor:null, count } (domain index) | with <domain> / --all / filters: { items: [{ command, description, permissions: string[], isWrite: boolean }], nextCursor: null, count }",
         errors: [
-            { exit: 4, meaning: "Bad flag combo", remedy: "--mutations and --reads are mutually exclusive" },
-            { exit: 4, meaning: "Unknown domain", remedy: "run `ib commands` (no arg) to see valid domains" },
+            { origin: "client", exit: 4, meaning: "Bad flag combo", remedy: "--mutations and --reads are mutually exclusive" },
+            { origin: "client", exit: 4, meaning: "Unknown domain", remedy: "run `ib commands` (no arg) to see valid domains" },
         ],
         examples: [
             "ib commands",
@@ -4893,7 +4905,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ cli, endpoint, reachable, server: { app, version, commit, release, slot } | null, error? }",
         errors: [
-            { exit: 7, meaning: "Endpoint unreachable", remedy: "check --endpoint / network; the report (cli version + error) still prints" },
+            { origin: "client", exit: 7, meaning: "Endpoint unreachable", remedy: "check --endpoint / network; the report (cli version + error) still prints" },
         ],
         examples: [
             "ib version",
@@ -4909,8 +4921,8 @@ const BASE_COMMAND_SPECS = [
         flags: [],
         outputShape: "{ ok:boolean, cli, endpoint, readOnly, auth:{ personId, email, tier:'developer'|'admin'|'standard', ownerAsiakasId, ownerAsiakasName, companies:{ asiakasId, roles }[], issuedFor, tokenExp, tokenExpired, impersonating?:{actorPersonId,sessionId} }, connectivity:VersionReport, authProbe:{ ok, status?, error? } } — `tier` = capability/discovery gate; `companies` = `company switch` targets; `impersonating` present only when the token acts as another person.",
         errors: [
-            { exit: 1, meaning: "Not healthy", remedy: "inspect connectivity / authProbe / tokenExpired in the report" },
-            { exit: 2, meaning: "Not logged in", remedy: "ib auth login (or set IB_TOKEN)" },
+            { origin: "client", exit: 1, meaning: "Not healthy", remedy: "inspect connectivity / authProbe / tokenExpired in the report" },
+            { origin: "client", exit: 2, meaning: "Not logged in", remedy: "ib auth login (or set IB_TOKEN)" },
         ],
         examples: ["ib doctor", "ib doctor --endpoint https://api-staging.ibetoni.fi"],
     },
@@ -5003,7 +5015,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (STRICT — unknown exits 4); --severity, when given, must be critical|major|minor|cosmetic; --complexity, when given, must be an integer 1-5" },
+            { origin: "client", exit: 4, meaning: "Validation", remedy: "description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (STRICT — unknown exits 4); --severity, when given, must be critical|major|minor|cosmetic; --complexity, when given, must be an integer 1-5" },
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
@@ -5047,7 +5059,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "use only one of --all / --unresolved / --status; --status values must be open|reviewed|applied|dismissed" },
+            { origin: "client", exit: 4, meaning: "Validation", remedy: "use only one of --all / --unresolved / --status; --status values must be open|reviewed|applied|dismissed" },
             apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(500, "Backend error", "retry with --verbose"),
@@ -5110,7 +5122,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "A compact ack { feedbackId, status, updatedAt, resolution } (resolution capped at 200 chars; the full row with --full). A note-only call that leaves the row open/reviewed adds hint naming the closing statuses. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "provide --status and/or --note; status must be a known value" },
+            { origin: "client", exit: 4, meaning: "Validation", remedy: "provide --status and/or --note; status must be a known value" },
             apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
             apiErr(404, "Not found", "check the id via `ib dev feedback list` — a bare id that is actually a changelog id 404s here and the error hint names the changelog command (feedback #230)"),
             apiErr(500, "Backend error", "retry with --verbose"),
@@ -5143,7 +5155,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "A compact ack { feedbackId, scope, kind, severity, complexity, updatedAt, description? } (description capped at 200 chars; the full row with --full). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "provide at least one of --scope/--kind/--severity/--complexity/--description; enum values must be valid; --complexity must be an integer 1-5" },
+            { origin: "client", exit: 4, meaning: "Validation", remedy: "provide at least one of --scope/--kind/--severity/--complexity/--description; enum values must be valid; --complexity must be an integer 1-5" },
             apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
             apiErr(404, "Not found", "check the id via `ib dev feedback list` — a bare id that is actually a changelog id 404s here and the error hint names the changelog command (feedback #230)"),
             apiErr(500, "Backend error", "retry with --verbose"),
@@ -5184,7 +5196,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "ListEnvelope<{ conversationId, personId, ownerAsiakasId, entryTime, messageCount }> (truncated:true when the page hit --limit)",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "--limit must be 1-100; --person must be a positive integer" },
+            { origin: "client", exit: 4, meaning: "Validation", remedy: "--limit must be 1-100; --person must be a positive integer" },
             apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
             ...COMMON_AUTH_ERRORS,
         ],
@@ -5209,7 +5221,7 @@ const BASE_COMMAND_SPECS = [
         flags: [],
         outputShape: "{ conversationId, personId, ownerAsiakasId, messageCount, messages: [{ gptMessageId, keikkaId, role?, content?, raw?, ... }] }",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "conversationId must be a positive integer" },
+            { origin: "client", exit: 4, meaning: "Validation", remedy: "conversationId must be a positive integer" },
             apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
             apiErr(404, "Not found", "no conversation with that id"),
             ...COMMON_AUTH_ERRORS,
@@ -5231,11 +5243,13 @@ const BASE_COMMAND_SPECS = [
             apiErr(500, "Backend error", "retry with --verbose"),
         ];
         const refusedRemote = {
+            origin: "client",
             exit: 3,
             meaning: "Refused: deployed endpoint without --force-prod",
             remedy: "prod and staging share Redis DB 3; add --force-prod or use a local endpoint",
         };
         const readOnlyErr = {
+            origin: "client",
             exit: 3,
             meaning: "Blocked by read-only mode",
             remedy: "executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)",
@@ -5326,7 +5340,7 @@ const BASE_COMMAND_SPECS = [
                 auth: "none",
                 flags: [],
                 outputShape: "{ items: [{ entityType, params[], cascade?, developerOnly?, example }], count }",
-                errors: [{ exit: 0, meaning: "Always succeeds (offline static list)", remedy: "n/a" }],
+                errors: [{ origin: "client", exit: 0, meaning: "Always succeeds (offline static list)", remedy: "n/a" }],
                 examples: ["ib dev cache entities"],
             },
         ];
@@ -5390,7 +5404,7 @@ const BASE_COMMAND_SPECS = [
                 outputShape: "execute: { cleared:true, environment, message } | --dry-run: { dryRun:true, wouldClear:{ method, path } }",
                 errors: [
                     ...devErrors,
-                    { exit: 3, meaning: "Blocked by read-only mode", remedy: "clearing needs a session without --read-only/IB_READ_ONLY" },
+                    { origin: "client", exit: 3, meaning: "Blocked by read-only mode", remedy: "clearing needs a session without --read-only/IB_READ_ONLY" },
                 ],
                 notes: ["The DELETE route honours no server-side X-Dry-Run — --dry-run is resolved CLIENT-SIDE (never sends)."],
                 seeAlso: ["ib dev perf stats"],
@@ -5416,7 +5430,7 @@ const BASE_COMMAND_SPECS = [
         errors: [
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(403, "Not a member of that company — or entityType personAvailability without an admin role", "ib company switch to that owner, or use an admin token"),
-            { exit: 4, meaning: "Unknown entityType (client-side validation)", remedy: "ib log types" },
+            { origin: "client", exit: 4, meaning: "Unknown entityType (client-side validation)", remedy: "ib log types" },
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
         notes: [
@@ -5464,7 +5478,7 @@ const BASE_COMMAND_SPECS = [
         errors: [
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(403, "Not an admin in the owner company", "use an admin token"),
-            { exit: 4, meaning: "Invalid --from/--to (client-side)", remedy: "use YYYY-MM-DD or ISO datetime; today/yesterday/tomorrow are also accepted" },
+            { origin: "client", exit: 4, meaning: "Invalid --from/--to (client-side)", remedy: "use YYYY-MM-DD or ISO datetime; today/yesterday/tomorrow are also accepted" },
             apiErr(400, "Backend rejected the dates", "use ISO date strings"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
@@ -5489,7 +5503,7 @@ const BASE_COMMAND_SPECS = [
         errors: [
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(403, "Not an admin in the owner company", "use an admin token"),
-            { exit: 4, meaning: "entityType not keikka|palkki, or bad dates (client-side)", remedy: "use --entity-type keikka|palkki and ISO dates or today/yesterday/tomorrow" },
+            { origin: "client", exit: 4, meaning: "entityType not keikka|palkki, or bad dates (client-side)", remedy: "use --entity-type keikka|palkki and ISO dates or today/yesterday/tomorrow" },
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
         seeAlso: ["ib log range"],
@@ -5520,7 +5534,7 @@ const BASE_COMMAND_SPECS = [
         auth: "none",
         flags: [],
         outputShape: "ListEnvelope<{ entityType, entityIdMeaning, gate: 'member'|'admin', notes, deprecated? }>",
-        errors: [{ exit: 0, meaning: "Always succeeds (offline static list)", remedy: "n/a" }],
+        errors: [{ origin: "client", exit: 0, meaning: "Always succeeds (offline static list)", remedy: "n/a" }],
         examples: ["ib log types"],
     },
     // ─── help (1) ────────────────────────────────────────────────────────────
@@ -5531,7 +5545,7 @@ const BASE_COMMAND_SPECS = [
         args: [{ name: "topic", type: "string", required: false, description: "topic id (roles, jerry-lifecycle, write-safety, exit-codes, multi-tenancy, log, attachments) or a vocabulary term resolved via the DB glossary" }],
         flags: [],
         outputShape: "no arg: { items:[{id,title}], nextCursor:null, count } | with topic: { id, title, body }",
-        errors: [{ exit: 5, meaning: "Unknown topic", remedy: "run `ib help` to list valid topic ids; or `ib glossary lookup <term>` for vocabulary" }],
+        errors: [{ origin: "client", exit: 5, meaning: "Unknown topic", remedy: "run `ib help` to list valid topic ids; or `ib glossary lookup <term>` for vocabulary" }],
         examples: ["ib help", "ib help write-safety", "ib help tila"],
     },
     // ─── search (1) ──────────────────────────────────────────────────────────
@@ -5815,7 +5829,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ items: SupportThreadRow[], nextCursor: null, count, truncated }",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "--status must be open|resolved|all" },
+            { origin: "client", exit: 4, meaning: "Validation", remedy: "--status must be open|resolved|all" },
             apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(500, "Backend error", "retry with --verbose"),
@@ -5838,7 +5852,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ items: SupportThreadRow[], nextCursor: null, count, truncated }",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "--status must be open|resolved|all" },
+            { origin: "client", exit: 4, meaning: "Validation", remedy: "--status must be open|resolved|all" },
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(404, "Route not deployed", "the /support/mine backend may not be deployed yet"),
             apiErr(500, "Backend error", "retry with --verbose"),
@@ -5865,7 +5879,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ threadId, message } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "Provide exactly one of --keikka / --tarjous (positive integer) and a non-empty --body" },
+            { origin: "client", exit: 4, meaning: "Validation", remedy: "Provide exactly one of --keikka / --tarjous (positive integer) and a non-empty --body" },
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
@@ -5892,7 +5906,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ threadId, status } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "threadId must be a positive number" },
+            { origin: "client", exit: 4, meaning: "Validation", remedy: "threadId must be a positive number" },
             apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
             apiErr(404, "Not found", "check the threadId via `ib message support inbox`"),
             apiErr(401, "Token expired", "ib auth refresh"),
@@ -6066,7 +6080,7 @@ const BASE_COMMAND_SPECS = [
         notes: ["Comma-separated terms (a,b,c) run a batch lookup returning a ListEnvelope of {term,found,entry}; a single term keeps the single-entry shape."],
         errors: [
             { http: 404, exit: 5, meaning: "No entry for the term", remedy: "Try `ib glossary list --search <term>`; the miss is queued for definition" },
-            { exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" },
+            { origin: "client", exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" },
         ],
         examples: ["ib glossary lookup pumppari", "ib glossary lookup betoniasema", "ib glossary lookup loma,saikku,pyhä"],
     },
@@ -6088,7 +6102,7 @@ const BASE_COMMAND_SPECS = [
         notes: [
             "--terms-only is client-side: it strips each row to {term, synonyms} after the server-side filters apply. Use it instead of a full list to discover terms cheaply (the full list returns every definition).",
         ],
-        errors: [{ exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" }],
+        errors: [{ origin: "client", exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" }],
         examples: ["ib glossary list", "ib glossary list --search puomi", "ib glossary list --stalest 10", "ib glossary list --domain vacation", "ib glossary list --terms-only", "ib glossary list --needs-review"],
     },
     {
@@ -6155,7 +6169,7 @@ const BASE_COMMAND_SPECS = [
             { http: 404, exit: 5, meaning: "Term not found (with --update-only)", remedy: "Omit --update-only to create the entry" },
             { http: 404, exit: 5, meaning: "append/add/remove on a non-existent term", remedy: "Create the term first (set --definition …); append requires an existing entry" },
             { http: 400, exit: 4, meaning: "definition >2000 chars", remedy: "Shorten the definition" },
-            { exit: 4, meaning: "--from-json file is not valid JSON or not readable", remedy: "Check the file path and contents" },
+            { origin: "client", exit: 4, meaning: "--from-json file is not valid JSON or not readable", remedy: "Check the file path and contents" },
         ],
         examples: ['ib glossary set valumassa --definition "Pumpattava betonimassa." --synonyms "massaa,valua" --related "ib keikka" --reason "groom"', 'ib glossary set puomi --synonyms "boom,nollakone,puomiton" --reason "add synonyms only"', 'ib glossary set pumppari --definition "Updated def." --update-only --reason "groom"', 'ib glossary set loma --from-json loma.json --reason "groom"', 'ib glossary set puomi --add-synonyms "nollakone" --reason "add one synonym"', 'ib glossary set tilaus --append-definition "Convention: UI says tilaus, code says keikka." --reason "append clause"'],
     },
@@ -6174,7 +6188,7 @@ const BASE_COMMAND_SPECS = [
         notes: ["Each entry must have a `term` field; entries missing it are counted as failed.", "Synonyms and relatedCommands may be arrays (arrays are accepted and converted to a comma list internally) or comma-separated strings.", "Avoids shell argv mangling of Finnish ä/ö — pass UTF-8 JSON instead of quoting on the command line."],
         errors: [
             { http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" },
-            { exit: 4, meaning: "File is not valid JSON or root is not an array", remedy: "Check the file path and JSON syntax" },
+            { origin: "client", exit: 4, meaning: "File is not valid JSON or root is not an array", remedy: "Check the file path and JSON syntax" },
         ],
         examples: ['ib glossary import terms.json --reason "bulk groom"', 'echo \'[{"term":"loma","definition":"Vapaapaiva"}]\' | ib glossary import - --reason "test"'],
     },
@@ -6236,7 +6250,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ items: TaskRow[], nextCursor: null, count, truncated? } — TaskRow = { taskId, title, instructions, skillRef, executor, recommendedAgent, assigneePersonId, asiakasId, cadenceUnit, cadenceCount, nextDueAt, lastDoneAt, active, feedbackId, ... }",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "--executor must be human|ai; --agent must be claude|hermes; --assignee/--asiakas/--limit/--offset must be integers" },
+            { origin: "client", exit: 4, meaning: "Validation", remedy: "--executor must be human|ai; --agent must be claude|hermes; --assignee/--asiakas/--limit/--offset must be integers" },
             apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
             apiErr(401, "Token expired", "ib auth refresh"),
             apiErr(500, "Backend error", "retry with --verbose"),
@@ -6285,7 +6299,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ taskId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldWrite:{...} } (server-side preview).",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "--title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month, count 1-120" },
+            { origin: "client", exit: 4, meaning: "Validation", remedy: "--title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month, count 1-120" },
             apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
             apiErr(500, "Backend error", "retry with --verbose"),
         ],
@@ -6311,7 +6325,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "{ logId, task } (task = the updated row; nextDueAt advanced unless --failed). With --dry-run: { dryRun:true, wouldComplete:{ taskId, outcome, advancesNextDue } }.",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "--skipped and --failed are mutually exclusive; --agent must be claude|hermes" },
+            { origin: "client", exit: 4, meaning: "Validation", remedy: "--skipped and --failed are mutually exclusive; --agent must be claude|hermes" },
             apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
             apiErr(404, "Not found", "check the id via `ib task list`"),
             apiErr(500, "Backend error", "retry with --verbose"),
@@ -6345,7 +6359,7 @@ const BASE_COMMAND_SPECS = [
         ],
         outputShape: "The full updated task row. With --dry-run: { dryRun:true, wouldWrite:{...} } (server-side preview).",
         errors: [
-            { exit: 4, meaning: "Validation", remedy: "provide at least one field; --activate/--deactivate and enum values as documented" },
+            { origin: "client", exit: 4, meaning: "Validation", remedy: "provide at least one field; --activate/--deactivate and enum values as documented" },
             apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
             apiErr(404, "Not found", "check the id via `ib task list --inactive`"),
             apiErr(500, "Backend error", "retry with --verbose"),

@@ -81,7 +81,7 @@ OUTPUT (JSON, stdout)
   { ok: true, attachmentId, deleted: true, blobDeleted } | { dryRun: true, wouldDelete: { attachmentId, blobName, origFileName } }
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Missing --reason       → pass --reason 'why'
+  exit 4 (client-side)  Missing --reason       → pass --reason 'why'
   exit 4 (HTTP 400)  Missing X-Action-Reason header → pass --reason
   exit 3 (HTTP 403)  Not owner company or missing manager role → switch to the owner company
   exit 5 (HTTP 404)  Attachment not found or already deleted → verify attachmentId
@@ -141,7 +141,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not owner company or missing manager role → switch to the owner company; need Admin/KeikkaHandler/AttachmentHandler/Owner
   exit 5 (HTTP 404)  Attachment not found   → verify attachmentId
-  exit 4  No entity given, or conflicting positional + flag → name the entity once — positional word OR a --<entity> flag
+  exit 4 (client-side)  No entity given, or conflicting positional + flag → name the entity once — positional word OR a --<entity> flag
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -183,7 +183,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Attachment not found   → verify attachmentId
-  exit 4  Output file exists     → pass --force or --out <other path>
+  exit 4 (client-side)  Output file exists     → pass --force or --out <other path>
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -510,8 +510,8 @@ OUTPUT (JSON, stdout)
   { ok: true, attachmentId } | { dryRun: true, wouldUpload: {...} }
 
 ERRORS (stderr, exit non-zero)
-  exit 4  File unreadable / bad entity flags → check the path and pass exactly one entity flag
-  exit 6  Azure PUT failed       → re-run; SAS expires in 1h
+  exit 4 (client-side)  File unreadable / bad entity flags → check the path and pass exactly one entity flag
+  exit 6 (client-side)  Azure PUT failed       → re-run; SAS expires in 1h
   exit 3 (HTTP 403)  Not a member of the target entity's company → check active company
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -590,11 +590,11 @@ OUTPUT (JSON, stdout)
   start: { ok:true, impersonating:{ personId, actorPersonId, expiresAt } }. --end: { ok:true, restored:{ personId } }. --extend: { ok:true, expiresAt }.
 
 ERRORS (stderr, exit non-zero)
-  exit 2  Not logged in          → ib auth login
+  exit 2 (client-side)  Not logged in          → ib auth login
   exit 3 (HTTP 403)  Impersonation not allowed for the target → needs systemAdmin/roleManager, same-tenant admin, or a grant
   exit 5 (HTTP 404)  Target not found (or has no personEmail) → no impersonatable person for that personId/email. NB: a personId that EXISTS but has no personEmail also 404s here (impersonation is email-keyed) — verify with \`ib person get <id>\`; an email-less person cannot be impersonated.
-  exit 3  Read-only mode active (--read-only / IB_READ_ONLY) → impersonation persists a rotated JWT; drop read-only
-  exit 4  No active session (--end/--extend), or neither personId nor --email given → start with \`ib auth impersonate <personId>\`
+  exit 3 (client-side)  Read-only mode active (--read-only / IB_READ_ONLY) → impersonation persists a rotated JWT; drop read-only
+  exit 4 (client-side)  No active session (--end/--extend), or neither personId nor --email given → start with \`ib auth impersonate <personId>\`
 
 NOTES
   - Persists a 10-minute impersonation JWT as the active credential — blocked under read-only (exit 3).
@@ -629,8 +629,8 @@ OUTPUT (JSON, stdout)
   stderr: the authorization URL + 'Waiting for the OAuth callback…' immediately, then 'Logged in as <email> at <company>.'; credentials file written
 
 ERRORS (stderr, exit non-zero)
-  exit 2  OAuth flow failed      → retry; check network / browser
-  exit 2  Authorize preflight failed (4xx/5xx from /oauth/authorize, or endpoint unreachable) → the server's error is surfaced immediately without opening the browser (no 5-min callback hang) — fix the server-side cause (e.g. OAuth client registration / Redis) or the endpoint/network, then retry
+  exit 2 (client-side)  OAuth flow failed      → retry; check network / browser
+  exit 2 (client-side)  Authorize preflight failed (4xx/5xx from /oauth/authorize, or endpoint unreachable) → the server's error is surfaced immediately without opening the browser (no 5-min callback hang) — fix the server-side cause (e.g. OAuth client registration / Redis) or the endpoint/network, then retry
   exit 6 (HTTP 500)  Backend error          → retry later
 
 NOTES
@@ -661,7 +661,7 @@ OUTPUT (JSON, stdout)
   no stdout output; exit 0 on success
 
 ERRORS (stderr, exit non-zero)
-  exit 1  I/O error              → check file permissions
+  exit 1 (client-side)  I/O error              → check file permissions
 
 EXAMPLES
   ib auth logout
@@ -686,8 +686,8 @@ OUTPUT (JSON, stdout)
   { ok: true }
 
 ERRORS (stderr, exit non-zero)
-  exit 2  Refresh failed on every path (JWT-bearer AND OAuth refresh-token grant) → ib auth login to re-authenticate
-  exit 4  Refresh refused while impersonating (it would escalate to a permanent login as the target) → ib auth impersonate --extend (10 more minutes) or --end (restore your own login)
+  exit 2 (client-side)  Refresh failed on every path (JWT-bearer AND OAuth refresh-token grant) → ib auth login to re-authenticate
+  exit 4 (client-side)  Refresh refused while impersonating (it would escalate to a permanent login as the target) → ib auth impersonate --extend (10 more minutes) or --end (restore your own login)
 
 NOTES
   - The OAuth grant rotates the stored refresh token (single-use, reuse-detected) and persists the successor immediately. It re-mints the LOGIN-time company; if you had \`auth switch\`ed since, the CLI switches the fresh JWT back to your persisted active company automatically.
@@ -715,9 +715,9 @@ OUTPUT (JSON, stdout)
   { ok: true, activeCompany: { asiakasId, name } }
 
 ERRORS (stderr, exit non-zero)
-  exit 2  Not logged in          → ib auth login
+  exit 2 (client-side)  Not logged in          → ib auth login
   exit 3 (HTTP 403)  No access to target    → verify ownership via \`ib company list\`
-  exit 3  Read-only mode active (--read-only / IB_READ_ONLY) → persisted switch is blocked under read-only; use the per-command global --company <id> ephemeral context
+  exit 3 (client-side)  Read-only mode active (--read-only / IB_READ_ONLY) → persisted switch is blocked under read-only; use the per-command global --company <id> ephemeral context
 
 NOTES
   - Persists a rotated JWT bound to the target company — blocked under read-only mode (exit 3).
@@ -746,10 +746,10 @@ OUTPUT (JSON, stdout)
   { personId, email?, activeCompany: { asiakasId, name, betoniJerryUmbrella? }, tier: 'developer'|'admin'|'standard', companies: { asiakasId, roles }[], endpoint, source: 'file'|'env', readOnly, tokenExpiresAt?, tokenExpired?, refreshed?, impersonating? } — \`tier\` is the discovery/capability gate; \`companies\` are the \`company switch\` targets (no name in the JWT — use \`ib company list\` for names); \`source:'env'\` = IB_TOKEN (non-refreshable); \`refreshed: true\` = the stored JWT had expired and whoami self-healed the session before reporting.
 
 ERRORS (stderr, exit non-zero)
-  exit 2  Not logged in          → ib auth login first (or set IB_TOKEN)
-  exit 2  Session expired and unrefreshable (both the JWT-bearer refresh and the OAuth refresh-token grant failed) → ib auth login to re-authenticate
-  exit 2  IB_TOKEN expired (env sessions have no refresh path) → mint a fresh JWT and update IB_TOKEN
-  exit 2  Impersonation session expired (never auto-refreshed — it would escalate) → ib auth impersonate --end to restore your own login, or re-impersonate
+  exit 2 (client-side)  Not logged in          → ib auth login first (or set IB_TOKEN)
+  exit 2 (client-side)  Session expired and unrefreshable (both the JWT-bearer refresh and the OAuth refresh-token grant failed) → ib auth login to re-authenticate
+  exit 2 (client-side)  IB_TOKEN expired (env sessions have no refresh path) → mint a fresh JWT and update IB_TOKEN
+  exit 2 (client-side)  Impersonation session expired (never auto-refreshed — it would escalate) → ib auth impersonate --end to restore your own login, or re-impersonate
 
 NOTES
   - Exit 0 means the session is USABLE: a non-expired token, or an expired file session that was just self-healed (\`refreshed: true\`; the rotated tokens are persisted). Exit 2 means re-auth is required — so \`ib auth whoami && <write>\` is a sound guard (fb#258).
@@ -784,8 +784,8 @@ OUTPUT (JSON, stdout)
   no args: { hint, items:[{ domain, count, description|null, commands:["keikka list", ...] }], nextCursor:null, count } (domain index) | with <domain> / --all / filters: { items: [{ command, description, permissions: string[], isWrite: boolean }], nextCursor: null, count }
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Bad flag combo         → --mutations and --reads are mutually exclusive
-  exit 4  Unknown domain         → run \`ib commands\` (no arg) to see valid domains
+  exit 4 (client-side)  Bad flag combo         → --mutations and --reads are mutually exclusive
+  exit 4 (client-side)  Unknown domain         → run \`ib commands\` (no arg) to see valid domains
 
 EXAMPLES
   ib commands
@@ -870,7 +870,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  No access to target    → verify via \`ib company list\`
-  exit 3  Read-only mode active (--read-only / IB_READ_ONLY) → persisted switch is blocked under read-only; use the per-command global --company <id> ephemeral context
+  exit 3 (client-side)  Read-only mode active (--read-only / IB_READ_ONLY) → persisted switch is blocked under read-only; use the per-command global --company <id> ephemeral context
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -901,7 +901,7 @@ OUTPUT (JSON, stdout)
   (none — always an error envelope)
 
 ERRORS (stderr, exit non-zero)
-  exit 4  'ib company validate' was renamed to 'ib validate' → use \`ib validate --asiakas <id> --profile <p>\` (company) or \`ib validate --asiakas <id> --person <id>\` (employee)
+  exit 4 (client-side)  'ib company validate' was renamed to 'ib validate' → use \`ib validate --asiakas <id> --profile <p>\` (company) or \`ib validate --asiakas <id> --person <id>\` (employee)
 
 NOTES
   - Clean-break rename (mirrors the ib changes→ib log rename). The command is hidden and only emits the rename hint.
@@ -1637,7 +1637,7 @@ OUTPUT (JSON, stdout)
   { conversationId, personId, ownerAsiakasId, messageCount, messages: [{ gptMessageId, keikkaId, role?, content?, raw?, ... }] }
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → conversationId must be a positive integer
+  exit 4 (client-side)  Validation             → conversationId must be a positive integer
   exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
   exit 5 (HTTP 404)  Not found              → no conversation with that id
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -1674,7 +1674,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ conversationId, personId, ownerAsiakasId, entryTime, messageCount }> (truncated:true when the page hit --limit)
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → --limit must be 1-100; --person must be a positive integer
+  exit 4 (client-side)  Validation             → --limit must be 1-100; --person must be a positive integer
   exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -1717,8 +1717,8 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
-  exit 3  Refused: deployed endpoint without --force-prod → prod and staging share Redis DB 3; add --force-prod or use a local endpoint
-  exit 3  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
+  exit 3 (client-side)  Refused: deployed endpoint without --force-prod → prod and staging share Redis DB 3; add --force-prod or use a local endpoint
+  exit 3 (client-side)  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
 
 EXAMPLES
   ib dev cache clear
@@ -1744,7 +1744,7 @@ OUTPUT (JSON, stdout)
   { items: [{ entityType, params[], cascade?, developerOnly?, example }], count }
 
 ERRORS (stderr, exit non-zero)
-  exit 0  Always succeeds (offline static list) → n/a
+  exit 0 (client-side)  Always succeeds (offline static list) → n/a
 
 EXAMPLES
   ib dev cache entities
@@ -1779,8 +1779,8 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Unknown entityType or cascade unsupported → run \`ib dev cache entities\` to list valid types
   exit 3 (HTTP 403)  Not an admin, or cross-tenant entity needs developer → cross-tenant entities (keikka, grid, stat, attachment) require isSystemAdmin/isDeveloper; others need an admin role
-  exit 3  Refused: deployed endpoint without --force-prod → prod and staging share Redis DB 3; add --force-prod or use a local endpoint
-  exit 3  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
+  exit 3 (client-side)  Refused: deployed endpoint without --force-prod → prod and staging share Redis DB 3; add --force-prod or use a local endpoint
+  exit 3 (client-side)  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -1852,8 +1852,8 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
-  exit 3  Refused: deployed endpoint without --force-prod → prod and staging share Redis DB 3; add --force-prod or use a local endpoint
-  exit 3  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
+  exit 3 (client-side)  Refused: deployed endpoint without --force-prod → prod and staging share Redis DB 3; add --force-prod or use a local endpoint
+  exit 3 (client-side)  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
 
 EXAMPLES
   ib dev cache pattern 'keikka:*'
@@ -2168,7 +2168,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
-  exit 4  Neither --month nor --unreleased given (or bad --month) → pass --month YYYY-MM for a released month, or --unreleased for the pending queue
+  exit 4 (client-side)  Neither --month nor --unreleased given (or bad --month) → pass --month YYYY-MM for a released month, or --unreleased for the pending queue
 
 NOTES
   - --month (YYYY-MM) renders a released monthly report; --unreleased/--pending instead returns the pending queue (\`changelog pending\`) staged for the next release. Exactly one is needed.
@@ -2295,7 +2295,7 @@ OUTPUT (JSON, stdout)
   { feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (STRICT — unknown exits 4); --severity, when given, must be critical|major|minor|cosmetic; --complexity, when given, must be an integer 1-5
+  exit 4 (client-side)  Validation             → description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (STRICT — unknown exits 4); --severity, when given, must be critical|major|minor|cosmetic; --complexity, when given, must be an integer 1-5
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -2385,7 +2385,7 @@ OUTPUT (JSON, stdout)
   { items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → use only one of --all / --unresolved / --status; --status values must be open|reviewed|applied|dismissed
+  exit 4 (client-side)  Validation             → use only one of --all / --unresolved / --status; --status values must be open|reviewed|applied|dismissed
   exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -2433,7 +2433,7 @@ OUTPUT (JSON, stdout)
   A compact ack { feedbackId, status, updatedAt, resolution } (resolution capped at 200 chars; the full row with --full). A note-only call that leaves the row open/reviewed adds hint naming the closing statuses. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → provide --status and/or --note; status must be a known value
+  exit 4 (client-side)  Validation             → provide --status and/or --note; status must be a known value
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\` — a bare id that is actually a changelog id 404s here and the error hint names the changelog command (feedback #230)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -2476,7 +2476,7 @@ OUTPUT (JSON, stdout)
   A compact ack { feedbackId, scope, kind, severity, complexity, updatedAt, description? } (description capped at 200 chars; the full row with --full). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → provide at least one of --scope/--kind/--severity/--complexity/--description; enum values must be valid; --complexity must be an integer 1-5
+  exit 4 (client-side)  Validation             → provide at least one of --scope/--kind/--severity/--complexity/--description; enum values must be valid; --complexity must be an integer 1-5
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\` — a bare id that is actually a changelog id 404s here and the error hint names the changelog command (feedback #230)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -2626,7 +2626,7 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
-  exit 3  Blocked by read-only mode → clearing needs a session without --read-only/IB_READ_ONLY
+  exit 3 (client-side)  Blocked by read-only mode → clearing needs a session without --read-only/IB_READ_ONLY
 
 NOTES
   - The DELETE route honours no server-side X-Dry-Run — --dry-run is resolved CLIENT-SIDE (never sends).
@@ -2970,8 +2970,8 @@ OUTPUT (JSON, stdout)
   { ok:boolean, cli, endpoint, readOnly, auth:{ personId, email, tier:'developer'|'admin'|'standard', ownerAsiakasId, ownerAsiakasName, companies:{ asiakasId, roles }[], issuedFor, tokenExp, tokenExpired, impersonating?:{actorPersonId,sessionId} }, connectivity:VersionReport, authProbe:{ ok, status?, error? } } — \`tier\` = capability/discovery gate; \`companies\` = \`company switch\` targets; \`impersonating\` present only when the token acts as another person.
 
 ERRORS (stderr, exit non-zero)
-  exit 1  Not healthy            → inspect connectivity / authProbe / tokenExpired in the report
-  exit 2  Not logged in          → ib auth login (or set IB_TOKEN)
+  exit 1 (client-side)  Not healthy            → inspect connectivity / authProbe / tokenExpired in the report
+  exit 2 (client-side)  Not logged in          → ib auth login (or set IB_TOKEN)
 
 EXAMPLES
   ib doctor
@@ -3114,7 +3114,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a developer        → Developer access required
-  exit 4  File is not valid JSON or root is not an array → Check the file path and JSON syntax
+  exit 4 (client-side)  File is not valid JSON or root is not an array → Check the file path and JSON syntax
 
 NOTES
   - Each entry must have a \`term\` field; entries missing it are counted as failed.
@@ -3181,7 +3181,7 @@ OUTPUT (JSON, stdout)
   { items:[{term,synonyms,definition,relatedCommands:[{command,summary}],relatedEntity,domain,lastReviewed,runs,aiConfidence,needsHumanReview}], count, truncated? }
 
 ERRORS (stderr, exit non-zero)
-  exit 2  Not authenticated      → Run \`ib auth login\`
+  exit 2 (client-side)  Not authenticated      → Run \`ib auth login\`
 
 NOTES
   - --terms-only is client-side: it strips each row to {term, synonyms} after the server-side filters apply. Use it instead of a full list to discover terms cheaply (the full list returns every definition).
@@ -3218,7 +3218,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  No entry for the term  → Try \`ib glossary list --search <term>\`; the miss is queued for definition
-  exit 2  Not authenticated      → Run \`ib auth login\`
+  exit 2 (client-side)  Not authenticated      → Run \`ib auth login\`
 
 NOTES
   - Comma-separated terms (a,b,c) run a batch lookup returning a ListEnvelope of {term,found,entry}; a single term keeps the single-entry shape.
@@ -3296,7 +3296,7 @@ ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Term not found (with --update-only) → Omit --update-only to create the entry
   exit 5 (HTTP 404)  append/add/remove on a non-existent term → Create the term first (set --definition …); append requires an existing entry
   exit 4 (HTTP 400)  definition >2000 chars → Shorten the definition
-  exit 4  --from-json file is not valid JSON or not readable → Check the file path and contents
+  exit 4 (client-side)  --from-json file is not valid JSON or not readable → Check the file path and contents
 
 NOTES
   - PARTIAL (PATCH) semantics: an omitted flag is NOT sent, so the backend preserves the existing value — you can update just one field (e.g. only --synonyms) without re-sending the definition. To CLEAR a field pass an empty value: \`--synonyms ""\` empties the list, \`--entity ""\` blanks it. To OVERWRITE, pass the new value.
@@ -3335,7 +3335,7 @@ OUTPUT (JSON, stdout)
   no arg: { items:[{id,title}], nextCursor:null, count } | with topic: { id, title, body }
 
 ERRORS (stderr, exit non-zero)
-  exit 5  Unknown topic          → run \`ib help\` to list valid topic ids; or \`ib glossary lookup <term>\` for vocabulary
+  exit 5 (client-side)  Unknown topic          → run \`ib help\` to list valid topic ids; or \`ib glossary lookup <term>\` for vocabulary
 
 EXAMPLES
   ib help
@@ -4035,8 +4035,8 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  osoite missing         → pass --address
-  exit 4  --boom not a non-negative number → pass metres ≥ 0, or omit for no boom filter
-  exit 4  --asiakas without --explain, or not a positive integer → add --explain, or pass a positive asiakasId
+  exit 4 (client-side)  --boom not a non-negative number → pass metres ≥ 0, or omit for no boom filter
+  exit 4 (client-side)  --asiakas without --explain, or not a positive integer → add --explain, or pass a positive asiakasId
   exit 4 (HTTP 429)  Rate limit (20/min/IP) → wait and retry
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -4100,7 +4100,8 @@ OUTPUT (JSON, stdout)
   { summary: { varikkoCount, providerCount, coveredAreas, coveredRegions: string[] }, coveredRegions: string[], areas: { key, listLocative, tailRegion, probeLat, probeLng, covered, providerCount }[], varikot: { asiakasId, asiakasNimi, sijaintiId, sijaintiNimi, lat, lng, maxDeliveryDistanceKm, puomiMin, puomiMax, jerryActiveUntil }[], computedAt } — \`coveredRegions\` (distinct tailRegions of covered areas) is the Google-Ads geo-targeting answer.
 
 ERRORS (stderr, exit non-zero)
-  exit 2  Not logged in / token expired → ib auth login (or set IB_TOKEN)
+  exit 2 (client-side)  Not logged in          → ib auth login (or set IB_TOKEN)
+  exit 2 (HTTP 401)  Token expired or invalid → ib auth refresh (IB_TOKEN sessions: mint a fresh JWT)
   exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -4128,7 +4129,8 @@ OUTPUT (JSON, stdout)
   { domain, days, checkedAt, key:{ readOnly, hasWhitelabel, hasSuppression, hasStats }, domainAuth:{ valid, records:{ mail_cname, dkim1, dkim2 } }, suppressions:{ bounces|blocks|spam_reports|invalid_emails: { count, forDomain, recent[] } }, stats:{ delivered, bounces, spam_reports, bounceRatePct, spamRatePct }, verdict:{ domainAuthValid, deliverabilityFlags[] } }
 
 ERRORS (stderr, exit non-zero)
-  exit 2  Not logged in / token expired → ib auth login (or set IB_TOKEN)
+  exit 2 (client-side)  Not logged in          → ib auth login (or set IB_TOKEN)
+  exit 2 (HTTP 401)  Token expired or invalid → ib auth refresh (IB_TOKEN sessions: mint a fresh JWT)
   exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
   exit 6 (HTTP 503)  Diagnostic key not configured on this backend → set KV secret sendgrid-diag-key (read-only SendGrid key)
 
@@ -5006,7 +5008,7 @@ OUTPUT (JSON, stdout)
   { ok: true } or backend response
 
 ERRORS (stderr, exit non-zero)
-  exit 4  --status not a numeric keikkaTilaId → pass a number, e.g. --status 9
+  exit 4 (client-side)  --status not a numeric keikkaTilaId → pass a number, e.g. --status 9
   exit 5 (HTTP 404)  Keikka not found       → verify keikkaId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.grid.tilaus.edit
@@ -5087,8 +5089,8 @@ OUTPUT (JSON, stdout)
   {success} | dry-run: {dryRun: true, wouldAccept: {...}, validation}
 
 ERRORS (stderr, exit non-zero)
-  exit 3  Not a developer/sysadmin token (client-side gate) → use a developer account
-  exit 4  Missing typeName / missing --reason / type has no personSettingTypeId mapping → pass <typeName> and --reason; check ib legal types
+  exit 3 (client-side)  Not a developer/sysadmin token (client-side gate) → use a developer account
+  exit 4 (client-side)  Missing typeName / missing --reason / type has no personSettingTypeId mapping → pass <typeName> and --reason; check ib legal types
   exit 5 (HTTP 404)  No active document of this type → ib legal versions <typeName>
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -5168,7 +5170,7 @@ OUTPUT (JSON, stdout)
   {success} | dry-run: {dryRun: true, wouldActivate: {documentId}, validation}
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Missing --reason or invalid documentId → pass --reason 'why' (not needed with --dry-run)
+  exit 4 (client-side)  Missing --reason or invalid documentId → pass --reason 'why' (not needed with --dry-run)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -5240,7 +5242,7 @@ OUTPUT (JSON, stdout)
   {success} | dry-run: {dryRun: true, wouldDelete: {documentId}, validation}
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Missing --reason or invalid documentId → pass --reason 'why' (not needed with --dry-run)
+  exit 4 (client-side)  Missing --reason or invalid documentId → pass --reason 'why' (not needed with --dry-run)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -5276,7 +5278,7 @@ OUTPUT (JSON, stdout)
   {a: {documentId, typeName, version, status, contentLength}, b: {...}, sameContent, addedLines, removedLines, unified}
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Neither two documentIds nor --type supplied (or both), or --owner without --type → pass <a> <b> OR --type <name>
+  exit 4 (client-side)  Neither two documentIds nor --type supplied (or both), or --owner without --type → pass <a> <b> OR --type <name>
   exit 5 (HTTP 404)  documentId / type's draft or active not found → check ib legal versions <typeName>
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -5341,7 +5343,7 @@ OUTPUT (JSON, stdout)
   {documentId, documentTypeId, typeName, version, title, status, markdownContent, isActive, ...}
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Argument is neither a numeric documentId nor a typeName → pass a documentId from ib legal list, or a typeName like PRIVACY
+  exit 4 (client-side)  Argument is neither a numeric documentId nor a typeName → pass a documentId from ib legal list, or a typeName like PRIVACY
   exit 5 (HTTP 404)  Document not found / type has no active document → list ids via ib legal versions <typeName>
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -5396,7 +5398,7 @@ OUTPUT (JSON, stdout)
   {documentId, success} | dry-run: {dryRun: true, wouldCreate: {...}, validation} | edit dry-run: {dryRun:true, type, field:"markdownContent", matchCount?, addedLines, removedLines, sameContent, unified}
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Missing --reason / no content / --file unreadable or combined with --content → pass --file OR --content, and --reason unless --dry-run
+  exit 4 (client-side)  Missing --reason / no content / --file unreadable or combined with --content → pass --file OR --content, and --reason unless --dry-run
   exit 4 (HTTP 400)  Required fields missing → provide --type --doc-version --title and content
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
@@ -5512,7 +5514,7 @@ OUTPUT (JSON, stdout)
   the created legalDocumentTypes row | dry-run: {dryRun: true, wouldCreateType: {...}, validation}
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Missing --reason / invalid or duplicate typeName / settingTypeId unknown or already mapped → check ib legal types; pass --reason unless --dry-run
+  exit 4 (client-side)  Missing --reason / invalid or duplicate typeName / settingTypeId unknown or already mapped → check ib legal types; pass --reason unless --dry-run
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -5559,7 +5561,7 @@ OUTPUT (JSON, stdout)
   the updated legalDocumentTypes row | dry-run: {dryRun: true, wouldUpdateType: {typeName, fields}, validation}
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Missing --reason / no field flags / settingTypeId unknown or already mapped to another type → pass at least one field flag and --reason unless --dry-run
+  exit 4 (client-side)  Missing --reason / no field flags / settingTypeId unknown or already mapped to another type → pass at least one field flag and --reason unless --dry-run
   exit 5 (HTTP 404)  Unknown document type  → ib legal types
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
@@ -5667,7 +5669,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not an admin in the owner company → use an admin token
-  exit 4  entityType not keikka|palkki, or bad dates (client-side) → use --entity-type keikka|palkki and ISO dates or today/yesterday/tomorrow
+  exit 4 (client-side)  entityType not keikka|palkki, or bad dates (client-side) → use --entity-type keikka|palkki and ISO dates or today/yesterday/tomorrow
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 SEE ALSO
@@ -5704,7 +5706,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a member of that company — or entityType personAvailability without an admin role → ib company switch to that owner, or use an admin token
-  exit 4  Unknown entityType (client-side validation) → ib log types
+  exit 4 (client-side)  Unknown entityType (client-side validation) → ib log types
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
@@ -5780,7 +5782,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not an admin in the owner company → use an admin token
-  exit 4  Invalid --from/--to (client-side) → use YYYY-MM-DD or ISO datetime; today/yesterday/tomorrow are also accepted
+  exit 4 (client-side)  Invalid --from/--to (client-side) → use YYYY-MM-DD or ISO datetime; today/yesterday/tomorrow are also accepted
   exit 4 (HTTP 400)  Backend rejected the dates → use ISO date strings
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -5811,7 +5813,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ entityType, entityIdMeaning, gate: 'member'|'admin', notes, deprecated? }>
 
 ERRORS (stderr, exit non-zero)
-  exit 0  Always succeeds (offline static list) → n/a
+  exit 0 (client-side)  Always succeeds (offline static list) → n/a
 
 EXAMPLES
   ib log types
@@ -6904,7 +6906,7 @@ OUTPUT (JSON, stdout)
   { threadId, message } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → Provide exactly one of --keikka / --tarjous (positive integer) and a non-empty --body
+  exit 4 (client-side)  Validation             → Provide exactly one of --keikka / --tarjous (positive integer) and a non-empty --body
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -6940,7 +6942,7 @@ OUTPUT (JSON, stdout)
   { items: SupportThreadRow[], nextCursor: null, count, truncated }
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → --status must be open|resolved|all
+  exit 4 (client-side)  Validation             → --status must be open|resolved|all
   exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -6975,7 +6977,7 @@ OUTPUT (JSON, stdout)
   { items: SupportThreadRow[], nextCursor: null, count, truncated }
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → --status must be open|resolved|all
+  exit 4 (client-side)  Validation             → --status must be open|resolved|all
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 5 (HTTP 404)  Route not deployed     → the /support/mine backend may not be deployed yet
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -7014,7 +7016,7 @@ OUTPUT (JSON, stdout)
   { threadId, status } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → threadId must be a positive number
+  exit 4 (client-side)  Validation             → threadId must be a positive number
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 5 (HTTP 404)  Not found              → check the threadId via \`ib message support inbox\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -7395,7 +7397,7 @@ OUTPUT (JSON, stdout)
   { success: true, helpId, deleted: boolean } — deleted is false when no row existed (idempotent); or { dryRun: true, helpId, wouldDelete: {helpId,title,shorttext,htmltext,img}|null } with --dry-run
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Missing --reason / invalid helpId → pass --reason; helpId 1–250 chars
+  exit 4 (client-side)  Missing --reason / invalid helpId → pass --reason; helpId 1–250 chars
   exit 3 (HTTP 403)  Permission denied      → needs isHelperEditor or system-admin/developer
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -7430,7 +7432,7 @@ OUTPUT (JSON, stdout)
   { helpId, title, shorttext, htmltext, img } | null
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Invalid helpId         → helpId must be 1–250 characters
+  exit 4 (client-side)  Invalid helpId         → helpId must be 1–250 characters
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 EXAMPLES
@@ -7510,8 +7512,8 @@ OUTPUT (JSON, stdout)
   { success: true, helpId, created, written: {helpId,title,shorttext,htmltext,img, aiConfidence?, needsHumanReview?}, htmltextLength, response } — \`created\` is true when no prior row existed (a parallel groomer can spot an unexpected insert); aiConfidence/needsHumanReview present in \`written\` only when those flags were passed; or { dryRun: true, helpId, created, current, proposed } | edit dry-run: {dryRun:true, helpId, field, matchCount?, addedLines, removedLines, sameContent, unified}
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Missing --reason / invalid helpId / --must-exist on a missing row → pass --reason; helpId 1–250 chars; drop --must-exist to create
-  exit 5  helpId has no existing row (edit mode only) → create the entry first with a full --htmltext/--title/--shorttext
+  exit 4 (client-side)  Missing --reason / invalid helpId / --must-exist on a missing row → pass --reason; helpId 1–250 chars; drop --must-exist to create
+  exit 5 (client-side)  helpId has no existing row (edit mode only) → create the entry first with a full --htmltext/--title/--shorttext
   exit 4 (HTTP 400)  Validation failed      → title ≤500, htmltext ≤10000, helpId 1–250 chars
   exit 3 (HTTP 403)  Permission denied      → needs isHelperEditor or system-admin/developer
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -7549,7 +7551,7 @@ OUTPUT (JSON, stdout)
   { source:'sijainti'|'worksite'|'address'|'coords', input, coords:{lat,lng}, city|null, requestedCity|null, derivedCity|null, found:boolean, outOfArea:boolean, national:boolean, building:{ buildingId, nationalBuildingId, buildingType, floors, totalArea, completionYear, facadeMaterial, … common schema }|null }
 
 ERRORS (stderr, exit non-zero)
-  exit 4  No source, multiple sources, or invalid city/coords → pass exactly one of --sijainti / --worksite / --lat+--lng / --address; city must be Helsinki|Vantaa|Espoo|HSY|Ryhti
+  exit 4 (client-side)  No source, multiple sources, or invalid city/coords → pass exactly one of --sijainti / --worksite / --lat+--lng / --address; city must be Helsinki|Vantaa|Espoo|HSY|Ryhti
   exit 5 (HTTP 404)  Sijainti/worksite not found (or no coordinates), or address not geocodable → verify the id/address; a worksite must be geocoded and in your tenant
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -7598,7 +7600,7 @@ OUTPUT (JSON, stdout)
   { source:'kiinteistotunnus'|'sijainti'|'worksite'|'address'|'coords', input, coords:{lat,lng}|null, found:boolean, parcel:{ source:'MML', kiinteistotunnus, kiinteistotunnusFormatted, municipalityNumber, parcelCount, totalAreaM2, palstat:[{ palstaId, kiinteistotunnus, kiinteistotunnusFormatted, areaM2, representativePoint:{lat,lng}|null, geometry }], buildingCount?, buildings?:[{ nationalBuildingId, usagePurpose, completionYear, status }] (only with --with-buildings) } }
 
 ERRORS (stderr, exit non-zero)
-  exit 4  No source, multiple sources, both kiinteistotunnus and a point, invalid kiinteistotunnus, or invalid coords → pass exactly one of --kiinteistotunnus / --sijainti / --worksite / --lat+--lng / --address
+  exit 4 (client-side)  No source, multiple sources, both kiinteistotunnus and a point, invalid kiinteistotunnus, or invalid coords → pass exactly one of --kiinteistotunnus / --sijainti / --worksite / --lat+--lng / --address
   exit 5 (HTTP 404)  Sijainti/worksite not found (or no coordinates), or address not geocodable → verify the id/address; a worksite must be geocoded and in your tenant
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -7900,7 +7902,7 @@ OUTPUT (JSON, stdout)
   { success: boolean, enabled: boolean, ... }
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Neither --on nor --off passed, or both passed → pass exactly one of --on / --off
+  exit 4 (client-side)  Neither --on nor --off passed, or both passed → pass exactly one of --on / --off
   exit 3 (HTTP 403)  Permission denied (admin required) → requires admin role on the company
   exit 2 (HTTP 401)  Not authenticated      → run 'ib auth login'
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -8735,7 +8737,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not allowed to change this person's owner → see the authz rules above (developer/self/company-admin)
   exit 5 (HTTP 404)  Person not found       → verify personId
-  exit 4  Bad flags              → provide exactly one of --global / --asiakas and a --reason
+  exit 4 (client-side)  Bad flags              → provide exactly one of --global / --asiakas and a --reason
 
 EXAMPLES
   ib person owner 5351 --global --reason 'make self-managing'
@@ -8994,8 +8996,8 @@ OUTPUT (JSON, stdout)
   { deleted } (rows removed, 0 or 1 — idempotent) | --dry-run: { dryRun:true, wouldDelete:{ command, exists }, validation }
 
 ERRORS (stderr, exit non-zero)
-  exit 3  Not a developer        → Requires isDeveloper / isSystemAdmin
-  exit 4  Missing --reason on a real delete, or empty command path → Pass --reason (or --dry-run to preview) and a command path
+  exit 3 (HTTP 403)  Not a developer        → Requires isDeveloper / isSystemAdmin (server-enforced)
+  exit 4 (client-side)  Missing --reason on a real delete, or empty command path → Pass --reason (or --dry-run to preview) and a command path
 
 EXAMPLES
   ib reference detail delete ai conversation --dry-run
@@ -9024,7 +9026,7 @@ OUTPUT (JSON, stdout)
   { command, summary, detail, hint }. exit 5 when unknown or no detail yet.
 
 ERRORS (stderr, exit non-zero)
-  exit 5  Unknown command (client-side guard) → \`ib commands\` / \`ib reference dump\` for valid paths; or \`<cmd> --help\`
+  exit 5 (client-side)  Unknown command (client-side guard) → \`ib commands\` / \`ib reference dump\` for valid paths; or \`<cmd> --help\`
   exit 5 (HTTP 404)  Known command, but no detail recorded yet → no business-context detail is recorded for this command yet — fall back to \`<cmd> --help\`, which is self-contained; a developer can fill the catalog entry
 
 EXAMPLES
@@ -9051,8 +9053,8 @@ OUTPUT (JSON, stdout)
   { items: [{ command, severity:'warn', kind:'orphan', summary, hint }], count } — one finding per catalog key with no live command
 
 ERRORS (stderr, exit non-zero)
-  exit 1  --strict and orphan rows found → Prune each with \`ib reference detail delete <key> --reason <r>\`, or seed the re-homed command
-  exit 3  Not a developer        → Requires isDeveloper / isSystemAdmin
+  exit 1 (client-side)  --strict and orphan rows found → Prune each with \`ib reference detail delete <key> --reason <r>\`, or seed the re-homed command
+  exit 3 (HTTP 403)  Not a developer        → Requires isDeveloper / isSystemAdmin (server-enforced)
 
 NOTES
   - Read-only: one GET of the whole catalog plus a local diff against the live command specs. The class behind fb#73 (\`ib customer prh\` re-homed to \`ib opendata prh\`).
@@ -9090,8 +9092,8 @@ OUTPUT (JSON, stdout)
   { items: [{ command, summary, lastReviewed, runs, aiConfidence, needsHumanReview, detail? }], count } — \`detail\` present only with --with-detail. --search/--orphans filter client-side and recompute count.
 
 ERRORS (stderr, exit non-zero)
-  exit 2  Not authenticated      → Run \`ib auth login\`
-  exit 4  Unknown --domain       → \`ib commands\` for valid domains
+  exit 2 (client-side)  Not authenticated      → Run \`ib auth login\`
+  exit 4 (client-side)  Unknown --domain       → \`ib commands\` for valid domains
 
 NOTES
   - --search and --orphans are client-side post-filters (no backend deploy needed): the full catalog is fetched, then narrowed locally.
@@ -9144,7 +9146,7 @@ OUTPUT (JSON, stdout)
   { command, runs, … } (backend response) | plain --dry-run: {dryRun:true, wouldSave:{command, exists, writes:{summaryChars?, detailChars?}, aiConfidence, needsHumanReview}, validation} | edit-mode --dry-run: {dryRun:true, command, field, matchCount?, addedLines, removedLines, sameContent, unified}
 
 ERRORS (stderr, exit non-zero)
-  exit 5  Unknown command        → \`ib commands\` for valid paths
+  exit 5 (client-side)  Unknown command        → \`ib commands\` for valid paths
   exit 4 (HTTP 400)  summary >160 or detail >2000 chars (the message names the submitted length) → Trim to the cap — cut any flag/exit-code recap first (it already renders in \`--help\`), keep the business context
 
 NOTES
@@ -9182,8 +9184,8 @@ OUTPUT (JSON, stdout)
   { version, generatedAt, commonErrors: CommandError[], notice?, overview, glossary, feedbackGuidance, topics, commands: { '<command>': CommandSpec } } — with --commands-only: { version, generatedAt, commonErrors, commands }; with --lean each spec drops notes/seeAlso (examples kept). \`commonErrors\` (401/500) applies to EVERY command and is omitted from each spec's \`errors\`. \`notice\` appears only on the full (no-domain) dump. \`glossary\` is the term+synonyms INDEX only and is EMPTY unless \`--glossary\` is passed; fetch a definition with \`ib glossary lookup <term>\` or all of them with \`ib glossary list\`.
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Unknown domain         → run \`ib commands\` (no arg) to see valid domains
-  exit 1  I/O error              → retry; check stdout pipe
+  exit 4 (client-side)  Unknown domain         → run \`ib commands\` (no arg) to see valid domains
+  exit 1 (client-side)  I/O error              → retry; check stdout pipe
 
 EXAMPLES
   ib reference dump keikka
@@ -9398,7 +9400,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed      → fix --body fields
   exit 4 (HTTP 400)  Address could not be geocoded (--geocode, status ZERO_RESULTS) → supply a fuller --address or pass --lat/--lng directly
-  exit 4  --puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max → pass metres 0–999.99 with min ≤ max
+  exit 4 (client-side)  --puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max → pass metres 0–999.99 with min ≤ max
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -9432,7 +9434,7 @@ OUTPUT (JSON, stdout)
   { point:{lat,lng}|null, address:string|null, weather, building, parcel, cameras, sijainti, deliveries, vehicles } — each section is { status:'ok'|'empty'|'forbidden'|'error', data?, error? }; a forbidden/error section never fails the whole command
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Missing or ambiguous point input → pass exactly one of <sijaintiId> or --address
+  exit 4 (client-side)  Missing or ambiguous point input → pass exactly one of <sijaintiId> or --address
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -9600,7 +9602,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil, maxDeliveryDistance }> (+matchable:boolean on each row when --jerry is set; +truncated:true when the result hit the limit; +hint pointing at --all / --all --asiakas <id> when 0 rows came back without --all)
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Unknown or ambiguous --type name → the error lists the valid types; or run \`ib sijainti types\`
+  exit 4 (client-side)  Unknown or ambiguous --type name → the error lists the valid types; or run \`ib sijainti types\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -9648,7 +9650,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil }> (+truncated:true when the result hit the limit)
 
 ERRORS (stderr, exit non-zero)
-  exit 4  --asiakas is not a positive integer → pass a numeric asiakasId (see ownerAsiakasId in the output, or resolve the company via \`ib search <name>\`)
+  exit 4 (client-side)  --asiakas is not a positive integer → pass a numeric asiakasId (see ownerAsiakasId in the output, or resolve the company via \`ib search <name>\`)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -9701,7 +9703,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Neither/both of --on/--off given, or --radius not a positive number → pass exactly one of --on / --off; --radius is km > 0
-  exit 4  --puomi-min/--puomi-max not a non-negative number or min > max → pass metres 0–999.99 with min ≤ max
+  exit 4 (client-side)  --puomi-min/--puomi-max not a non-negative number or min > max → pass metres 0–999.99 with min ≤ max
   exit 5 (HTTP 404)  Sijainti not found     → verify sijaintiId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.edit
@@ -9822,7 +9824,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed      → fix --body fields
   exit 4 (HTTP 400)  Address could not be geocoded (--geocode, status ZERO_RESULTS) → supply a fuller --address or pass --lat/--lng directly
   exit 5 (HTTP 404)  Sijainti not found     → verify sijaintiId
-  exit 4  --puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max — would otherwise clear the stored bound → pass metres 0–999.99 with min ≤ max
+  exit 4 (client-side)  --puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max — would otherwise clear the stored bound → pass metres 0–999.99 with min ≤ max
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -9907,7 +9909,7 @@ OUTPUT (JSON, stdout)
   { taskId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldWrite:{...} } (server-side preview).
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → --title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month, count 1-120
+  exit 4 (client-side)  Validation             → --title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month, count 1-120
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -9947,7 +9949,7 @@ OUTPUT (JSON, stdout)
   { logId, task } (task = the updated row; nextDueAt advanced unless --failed). With --dry-run: { dryRun:true, wouldComplete:{ taskId, outcome, advancesNextDue } }.
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → --skipped and --failed are mutually exclusive; --agent must be claude|hermes
+  exit 4 (client-side)  Validation             → --skipped and --failed are mutually exclusive; --agent must be claude|hermes
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 5 (HTTP 404)  Not found              → check the id via \`ib task list\`
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -10017,7 +10019,7 @@ OUTPUT (JSON, stdout)
   { items: TaskRow[], nextCursor: null, count, truncated? } — TaskRow = { taskId, title, instructions, skillRef, executor, recommendedAgent, assigneePersonId, asiakasId, cadenceUnit, cadenceCount, nextDueAt, lastDoneAt, active, feedbackId, ... }
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → --executor must be human|ai; --agent must be claude|hermes; --assignee/--asiakas/--limit/--offset must be integers
+  exit 4 (client-side)  Validation             → --executor must be human|ai; --agent must be claude|hermes; --assignee/--asiakas/--limit/--offset must be integers
   exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -10100,7 +10102,7 @@ OUTPUT (JSON, stdout)
   The full updated task row. With --dry-run: { dryRun:true, wouldWrite:{...} } (server-side preview).
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Validation             → provide at least one field; --activate/--deactivate and enum values as documented
+  exit 4 (client-side)  Validation             → provide at least one field; --activate/--deactivate and enum values as documented
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 5 (HTTP 404)  Not found              → check the id via \`ib task list --inactive\`
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -10139,7 +10141,7 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not an admin/HR of the target company → use an admin/HR token
   exit 5 (HTTP 404)  Unknown profile for that entity, or company/person not found → run \`ib validate list\` to see profiles
-  exit 4  Missing --profile for company validation, or a non-positive --asiakas/--person → pass --profile (jerry|betoni) for a company, or a positive --asiakas/--person; run \`ib validate list\`
+  exit 4 (client-side)  Missing --profile for company validation, or a non-positive --asiakas/--person → pass --profile (jerry|betoni) for a company, or a positive --asiakas/--person; run \`ib validate list\`
 
 NOTES
   - ok = every applicable 'required' check passes; skipped checks (conditional, not applicable) and recommended/optional never flip it.
@@ -11090,7 +11092,7 @@ OUTPUT (JSON, stdout)
   { cli, endpoint, reachable, server: { app, version, commit, release, slot } | null, error? }
 
 ERRORS (stderr, exit non-zero)
-  exit 7  Endpoint unreachable   → check --endpoint / network; the report (cli version + error) still prints
+  exit 7 (client-side)  Endpoint unreachable   → check --endpoint / network; the report (cli version + error) still prints
 
 EXAMPLES
   ib version
@@ -11153,7 +11155,7 @@ OUTPUT (JSON, stdout)
   { point:{lat,lng}|null, address:string|null, weather, building, parcel, cameras, sijainti, deliveries, vehicles } — each section is { status:'ok'|'empty'|'forbidden'|'error', data?, error? }; a forbidden/error section never fails the whole command
 
 ERRORS (stderr, exit non-zero)
-  exit 4  Missing or ambiguous point input → pass exactly one of <tyomaaId> or --address
+  exit 4 (client-side)  Missing or ambiguous point input → pass exactly one of <tyomaaId> or --address
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 

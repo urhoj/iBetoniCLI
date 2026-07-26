@@ -11,16 +11,18 @@ const base: CommandSpec = {
 };
 
 describe("formatHelp ERRORS", () => {
-  test("renders exit code, and HTTP status when present", () => {
+  test("renders exit code plus the row's origin — HTTP status, or client-side", () => {
     const out = formatHelp({
       ...base,
       errors: [
         { http: 404, exit: 5, meaning: "Not found", remedy: "verify id" },
-        { exit: 4, meaning: "Missing --reason", remedy: "pass --reason" },
+        { origin: "client", exit: 4, meaning: "Missing --reason", remedy: "pass --reason" },
       ],
     });
     expect(out).toContain("exit 5 (HTTP 404)  Not found");
-    expect(out).toContain("exit 4  Missing --reason");
+    // Client-side rows are labelled, not left bare: an AI reading ERRORS must be
+    // able to tell a backend status from a local guard (feedback #289).
+    expect(out).toContain("exit 4 (client-side)  Missing --reason");
     expect(out).not.toContain("404  Not found");
   });
 });

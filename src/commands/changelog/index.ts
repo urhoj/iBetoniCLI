@@ -1033,6 +1033,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         remedy: "dev token",
       },
       {
+        origin: "client",
         exit: 4,
         meaning: "Neither --month nor --unreleased given (or bad --month)",
         remedy: "pass --month YYYY-MM for a released month, or --unreleased for the pending queue",

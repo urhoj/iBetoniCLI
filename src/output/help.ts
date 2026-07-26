@@ -27,14 +27,41 @@ import type { Command } from "commander";
 import { domainBlurb } from "../reference/domain.js";
 import { type CallerTier, getCallerTier, isHiddenAtTier } from "../tier.js";
 
-export interface CommandError {
-  /** HTTP status when API-originated (401/403/404/409/429/400/500). */
-  http?: number;
+interface CommandErrorBase {
   /** Process exit code per the documented contract (0/2/3/4/5/6/7). Always present. */
   exit: number;
   meaning: string;
   remedy: string;
 }
+
+/**
+ * One documented failure mode of a command. Every row MUST declare where the
+ * error comes from — exactly one of `http` (the backend returned this status)
+ * or `origin: "client"` (the CLI threw it locally, `CliError.statusCode === 0`).
+ *
+ * The obligation is load-bearing, not cosmetic: `hintForError` matches a row to
+ * a real error by `http` for server-originated failures and by `exit` ONLY for
+ * client-side ones. A server-originated row written without `http` is therefore
+ * DEAD — it can never match, the command's own remedy is unreachable, and the
+ * caller silently gets the generic per-status hint instead (feedback #280, then
+ * #289, where an audit found four such rows and a manual sweep missed four
+ * more). Making the union discriminated turns that omission into a compile
+ * error. Do NOT "fix" a dead row by relaxing the matcher to fall back on exit
+ * codes for HTTP errors: that would newly reach ~84 explicitly client-side rows
+ * (e.g. `attachment download`'s "output file exists → pass --force" firing on
+ * any server 409), trading one wrong hint for dozens.
+ */
+export type CommandError =
+  | (CommandErrorBase & {
+      /** HTTP status when API-originated (401/403/404/409/429/400/500). */
+      http: number;
+      origin?: never;
+    })
+  | (CommandErrorBase & {
+      http?: never;
+      /** The CLI raised this locally (guard, parse, filesystem, read-only lock). */
+      origin: "client";
+    });
 
 export interface CommandArg {
   name: string;
@@ -217,8 +244,11 @@ export function formatHelp(spec: CommandSpec): string {
 
   lines.push("ERRORS (stderr, exit non-zero)");
   for (const e of spec.errors) {
-    const http = e.http ? ` (HTTP ${e.http})` : "";
-    lines.push(`  exit ${e.exit}${http}  ${e.meaning.padEnd(22)} → ${e.remedy}`);
+    // Name the origin explicitly: an AI reading this block otherwise cannot tell
+    // whether a row fires on a backend status or on a local guard, which is the
+    // same ambiguity that let dead rows accumulate in the specs (feedback #289).
+    const origin = e.http ? ` (HTTP ${e.http})` : " (client-side)";
+    lines.push(`  exit ${e.exit}${origin}  ${e.meaning.padEnd(22)} → ${e.remedy}`);
   }
   lines.push("");
 

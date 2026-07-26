@@ -49,27 +49,31 @@ describe("hintForError — 404 deploy-gate disambiguation", () => {
   });
 });
 
-// The matcher keys a spec row to an error by `http` (server-originated) or, for
-// client-side errors only (statusCode 0), by `exit`. A row written WITHOUT `http`
-// is therefore unreachable for a real HTTP failure — the trap behind feedback #280,
-// where `ib reference detail get`'s single http-less exit-5 row never matched the
-// catalog route's 404 and the caller got the generic tenancy hint instead.
-describe("hintForError — http-less spec rows only match client-side errors", () => {
-  const httpLess = [{ exit: 5, meaning: "Unknown command", remedy: "`ib commands` for valid paths" }];
+// The matcher keys a spec row to an error by its DECLARED origin: `http` for
+// server-originated failures, `origin: "client"` (matched on `exit`) for ones the
+// CLI raised locally. A server row that forgets `http` is unreachable for a real
+// HTTP failure — the trap behind feedback #280, where `ib reference detail get`'s
+// single http-less exit-5 row never matched the catalog route's 404 and the caller
+// got the generic tenancy hint instead. `CommandError` now makes that omission a
+// compile error (feedback #289); these tests pin the runtime half.
+describe("hintForError — spec rows match on their declared origin", () => {
+  const clientRow = [
+    { origin: "client" as const, exit: 5, meaning: "Unknown command", remedy: "`ib commands` for valid paths" },
+  ];
 
-  test("an http-less exit-5 row matches a client-side exit-5 error (statusCode 0)", () => {
+  test("a client row matches a locally-raised exit-5 error (statusCode 0)", () => {
     const err = new CliError("unknown command: ib bogus", 0, null, 5);
-    expect(hintForError(err, httpLess)).toBe("`ib commands` for valid paths");
+    expect(hintForError(err, clientRow)).toBe("`ib commands` for valid paths");
   });
 
-  test("an http-less exit-5 row does NOT match a real HTTP 404 — generic hint instead", () => {
+  test("a client row does NOT match a real HTTP 404 — generic hint instead", () => {
     const err = new CliError("no detail recorded", 404, { code: null }, 5);
-    expect(hintForError(err, httpLess)).toMatch(/no such resource/i);
+    expect(hintForError(err, clientRow)).toMatch(/no such resource/i);
   });
 
   test("pairing it with an http:404 row makes the server case match too", () => {
     const paired = [
-      ...httpLess,
+      ...clientRow,
       { http: 404, exit: 5, meaning: "No detail yet", remedy: "add it with `ib reference detail set`" },
     ];
     const clientSide = new CliError("unknown command: ib bogus", 0, null, 5);
@@ -77,11 +81,18 @@ describe("hintForError — http-less spec rows only match client-side errors", (
     expect(hintForError(clientSide, paired)).toBe("`ib commands` for valid paths");
     expect(hintForError(server, paired)).toBe("add it with `ib reference detail set`");
   });
+
+  test("a row declaring NEITHER origin is dead on both paths (why the type forbids it)", () => {
+    // Only reachable via a cast — kept as the executable record of the defect.
+    const undeclared = [{ exit: 3, meaning: "Not a developer", remedy: "use a developer token" }] as never;
+    expect(hintForError(new CliError("Forbidden", 403, null, 3), undeclared)).toMatch(/permission denied/i);
+    expect(hintForError(new CliError("local gate", 0, null, 3), undeclared)).toBeNull();
+  });
 });
 
 // The legal-save exit-4 spec remedy that used to mislead edit-mode errors.
 const exit4Spec = [
-  { exit: 4, meaning: "no content", remedy: "pass --file OR --content, and --reason unless --dry-run" },
+  { origin: "client" as const, exit: 4, meaning: "no content", remedy: "pass --file OR --content, and --reason unless --dry-run" },
 ];
 
 describe("hintForError — error-carried hint (failUsage)", () => {

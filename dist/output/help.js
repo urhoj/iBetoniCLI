@@ -100,8 +100,11 @@ export function formatHelp(spec) {
     lines.push("");
     lines.push("ERRORS (stderr, exit non-zero)");
     for (const e of spec.errors) {
-        const http = e.http ? ` (HTTP ${e.http})` : "";
-        lines.push(`  exit ${e.exit}${http}  ${e.meaning.padEnd(22)} → ${e.remedy}`);
+        // Name the origin explicitly: an AI reading this block otherwise cannot tell
+        // whether a row fires on a backend status or on a local guard, which is the
+        // same ambiguity that let dead rows accumulate in the specs (feedback #289).
+        const origin = e.http ? ` (HTTP ${e.http})` : " (client-side)";
+        lines.push(`  exit ${e.exit}${origin}  ${e.meaning.padEnd(22)} → ${e.remedy}`);
     }
     lines.push("");
     if (spec.notes?.length) {
