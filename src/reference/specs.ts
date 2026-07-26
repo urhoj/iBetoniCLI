@@ -5547,7 +5547,9 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       "--note/--reason/--resolution write the SAME stored note. Passing several with different values merges them (joined in note→resolution→reason order) instead of dropping any — so mixing up --reason with the audit header loses nothing.",
       "A note WITHOUT --status does NOT close the row — it stays open/reviewed and the ack carries a hint saying so; pass --status applied|dismissed to close (feedback #270).",
+      "The two ways to close a row have OPPOSITE defaults, so don't assume this one closes: `ib dev changelog add --feedback <id>` closes it for you (status=applied plus a `Shipped: changelog #N` resolution), while this command leaves the status alone unless you pass --status. Recording the fix in the changelog is the one-call path (feedback #293).",
     ],
+    seeAlso: ["ib dev changelog add", "ib dev feedback list"],
     examples: [
       'ib dev feedback resolve 42 --status applied --note "added row counts in CLI v1.3"',
       'ib dev feedback resolve 42 --status dismissed --note "by design"',

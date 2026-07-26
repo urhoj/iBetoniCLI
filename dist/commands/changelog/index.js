@@ -253,7 +253,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         // `add` where every other group uses `create`, so an agent primed on
         // `create` types `changelog create`; accept it (feedback #229).
         .alias("create")
-        .description("Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row.")
+        .description("Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row to status=applied.")
         .requiredOption("--type <t>", "feature|improvement|bugfix (accepts fix→bugfix, feat→feature)")
         .requiredOption("--area <a>", AREA_FLAG_DESC)
         .requiredOption("--title <s>", "Entry title")
@@ -532,7 +532,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
 export const CHANGELOG_SPECS = [
     {
         command: "ib dev changelog add",
-        description: "Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row.",
+        description: "Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row to status=applied.",
         auth: "any",
         tier: "developer",
         args: [{ name: "description", type: "string", description: "Kuvaus (or pass as --description) — free length, the column is nvarchar(max)" }],

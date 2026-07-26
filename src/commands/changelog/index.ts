@@ -379,7 +379,7 @@ export function registerChangelogCommands(
       // `create` types `changelog create`; accept it (feedback #229).
       .alias("create")
       .description(
-        "Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row."
+        "Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row to status=applied."
       )
       .requiredOption("--type <t>", "feature|improvement|bugfix (accepts fix→bugfix, feat→feature)")
       .requiredOption("--area <a>", AREA_FLAG_DESC)
@@ -678,7 +678,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
   {
     command: "ib dev changelog add",
     description:
-      "Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row.",
+      "Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row to status=applied.",
     auth: "any",
     tier: "developer",
     args: [{ name: "description", type: "string", description: "Kuvaus (or pass as --description) — free length, the column is nvarchar(max)" }],

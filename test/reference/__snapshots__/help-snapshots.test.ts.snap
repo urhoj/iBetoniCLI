@@ -1893,7 +1893,7 @@ exports[`Help snapshots — contract stability > help for ib dev changelog add m
   ib dev changelog add <description> --type <type> --area <area> --title <title> [flags]
 
 DESCRIPTION
-  Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row.
+  Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row to status=applied.
   Auth: requires login (any authenticated user).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -2441,6 +2441,10 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - --note/--reason/--resolution write the SAME stored note. Passing several with different values merges them (joined in note→resolution→reason order) instead of dropping any — so mixing up --reason with the audit header loses nothing.
   - A note WITHOUT --status does NOT close the row — it stays open/reviewed and the ack carries a hint saying so; pass --status applied|dismissed to close (feedback #270).
+  - The two ways to close a row have OPPOSITE defaults, so don't assume this one closes: \`ib dev changelog add --feedback <id>\` closes it for you (status=applied plus a \`Shipped: changelog #N\` resolution), while this command leaves the status alone unless you pass --status. Recording the fix in the changelog is the one-call path (feedback #293).
+
+SEE ALSO
+  ib dev changelog add, ib dev feedback list
 
 EXAMPLES
   ib dev feedback resolve 42 --status applied --note "added row counts in CLI v1.3"
