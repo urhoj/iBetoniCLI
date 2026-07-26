@@ -4674,9 +4674,6 @@ const BASE_COMMAND_SPECS = [
                 remedy: "`ib commands` / `ib reference dump` for valid paths; or `<cmd> --help`",
             },
             {
-                // NB: the remedy must not name `reference detail set` — that command is
-                // developer-only while THIS one is open to any caller, and the dump's
-                // hidden-path scrub does not reach error remedies (dump.test.ts fails on it).
                 http: 404,
                 exit: 5,
                 meaning: "Known command, but no detail recorded yet",

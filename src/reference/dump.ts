@@ -17,7 +17,12 @@ import {
 } from "./domain.js";
 import type { Topic } from "./domain.js";
 import type { CommandError, CommandSpec } from "../output/help.js";
-import { type CallerTier, visibleSpecs, isHiddenAtTier } from "../tier.js";
+import {
+  type CallerTier,
+  visibleSpecs,
+  hiddenCommandPaths,
+  scrubSpecForTier,
+} from "../tier.js";
 import { emitStdout } from "../output/json.js";
 import packageJson from "../../package.json" with { type: "json" };
 import type { ApiClient } from "../api/client.js";
@@ -55,32 +60,6 @@ export interface ReferenceDump {
   /** Offline concept guides for cross-cutting knowledge (`ib help <id>`). */
   topics: Topic[];
   commands: Record<string, CommandSpec>;
-}
-
-/**
- * For a non-developer tier, strip cross-references (seeAlso / notes / examples)
- * that name a command hidden at that tier — otherwise the dump's prose teaches a
- * standard caller that the hidden subtrees exist (the dump filters WHICH specs
- * appear, but emits each visible spec's prose verbatim, and ~10 of those strings
- * cross-reference hidden command paths). Developer tier: spec returned unchanged
- * (byte-for-byte parity). `hiddenCommands` are full paths (e.g. `ib ai
- * conversation`), matched as substrings of the backtick-quoted mentions.
- * Only the prose arrays (`seeAlso`/`notes`/`examples`) are scrubbed; `description`
- * and `flags` don't embed backtick command paths in practice.
- */
-function scrubSpecForTier(
-  spec: CommandSpec,
-  tier: CallerTier,
-  hiddenCommands: string[]
-): CommandSpec {
-  if (tier === "developer") return spec;
-  const mentionsHidden = (s: string): boolean =>
-    hiddenCommands.some((h) => s.includes(h));
-  const out: CommandSpec = { ...spec };
-  if (spec.seeAlso) out.seeAlso = spec.seeAlso.filter((r) => !mentionsHidden(r));
-  if (spec.notes) out.notes = spec.notes.filter((n) => !mentionsHidden(n));
-  if (spec.examples) out.examples = spec.examples.filter((e) => !mentionsHidden(e));
-  return out;
 }
 
 /**
@@ -150,9 +129,9 @@ function stripProse(spec: CommandSpec): CommandSpec {
  * top-level domain OR a bare nested-subgroup alias (`changelog` → `dev
  * changelog`), resolved via {@link specMatcherForToken} exactly like `ib
  * commands` (feedback #137). Unknown domain → exit-4 CliError. At a
- * non-developer tier each surviving
- * spec's prose is run through `scrubSpecForTier` so no cross-reference leaks a
- * hidden command path.
+ * non-developer tier each surviving spec's prose AND error remedies are run
+ * through `scrubSpecForTier` so no cross-reference leaks a hidden command path
+ * (feedback #288).
  */
 export function buildReference(
   domain?: string | string[],
@@ -170,9 +149,7 @@ export function buildReference(
     const matchers = domains.map((d) => specMatcherForToken(COMMAND_SPECS, d, tier));
     specs = specs.filter((s) => matchers.some((m) => m(s)));
   }
-  const hiddenCommands = COMMAND_SPECS.filter((s) => isHiddenAtTier(s, tier)).map(
-    (s) => s.command
-  );
+  const hiddenCommands = hiddenCommandPaths(COMMAND_SPECS, tier);
   // The `notice` steer rides only on the FULL surface (no domain filter) — a
   // filtered dump is already the cheap path, so it needs no nudge.
   const notice =
@@ -190,7 +167,10 @@ export function buildReference(
     topics: TOPICS,
     commands: Object.fromEntries(
       specs.map((spec) => {
-        let s = stripCommonErrors(scrubSpecForTier(spec, tier, hiddenCommands));
+        // Hoist FIRST, scrub second: `isCommonError` matches a hoisted row by
+        // remedy equality, so a scrubbed remedy would stop matching and the
+        // universal 401/500 would be re-emitted per spec.
+        let s = scrubSpecForTier(stripCommonErrors(spec), tier, hiddenCommands);
         if (lean) s = stripProse(s);
         return [spec.command, s];
       })

@@ -1,6 +1,8 @@
 import { describe, test, expect, vi } from "vitest";
 import { buildReference, runReferenceDump, projectGlossaryForPrimer } from "../../src/reference/dump.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
+import { isHiddenAtTier, scrubSpecForTier } from "../../src/tier.js";
+import type { CommandSpec } from "../../src/output/help.js";
 
 describe("ib reference dump", () => {
   test("returns a version string + non-empty commands map", () => {
@@ -239,16 +241,90 @@ describe("reference dump tier filtering", () => {
   });
 });
 
-describe("reference dump leaks no hidden command path (notes/seeAlso/examples)", () => {
-  test("standard dump JSON contains NO hidden command path anywhere", () => {
-    // inject a glossary that mentions no hidden commands (simulates DB fetch)
-    const std = JSON.stringify(buildReference(undefined, "standard", []));
-    const hidden = COMMAND_SPECS.filter((s) => s.tier === "developer").map((s) => s.command);
-    for (const h of hidden) expect(std).not.toContain(h);
-  });
+describe("reference dump leaks no hidden command path (prose + error remedies)", () => {
+  // Enumerate hidden paths with isHiddenAtTier, NOT `tier === "developer"`: at
+  // standard, `tier: "admin"` commands are hidden too, and the narrower check let
+  // `ib auth impersonate` (named in `auth whoami` / `auth refresh` remedies) leak
+  // into the standard dump for real (feedback #288).
+  for (const tier of ["standard", "admin"] as const) {
+    test(`${tier} dump JSON contains NO hidden command path anywhere`, () => {
+      // inject a glossary that mentions no hidden commands (simulates DB fetch)
+      const json = JSON.stringify(buildReference(undefined, tier, []));
+      const hidden = COMMAND_SPECS.filter((s) => isHiddenAtTier(s, tier)).map(
+        (s) => s.command
+      );
+      expect(hidden.length, `${tier} must hide something`).toBeGreaterThan(0);
+      for (const h of hidden) expect(json, `${tier} dump names ${h}`).not.toContain(h);
+    });
+  }
   test("developer dump still contains the cross-references (parity, not over-scrubbed)", () => {
     const dev = JSON.stringify(buildReference(undefined, "developer"));
     expect(dev).toContain("ib dev ai conversation"); // present for developers
+  });
+
+  test("an error row whose REMEDY names a hidden command keeps its contract, loses the prose", () => {
+    // `ib auth whoami` is auth:"any" (visible everywhere); its impersonation-expired
+    // remedy names `ib auth impersonate` (tier:"admin").
+    const std = buildReference("auth", "standard", []).commands["ib auth whoami"];
+    const row = std.errors.find((e) => /Impersonation session expired/.test(e.meaning));
+    expect(row, "the row must SURVIVE — exit 2 is still the contract").toBeTruthy();
+    expect(row?.exit).toBe(2);
+    expect(row?.remedy).toBe(
+      "not available at your access level — run `ib commands` to see what you can run"
+    );
+    // Developer tier keeps the real remedy (parity).
+    const dev = buildReference("auth", "developer", []).commands["ib auth whoami"];
+    expect(
+      dev.errors.find((e) => /Impersonation session expired/.test(e.meaning))?.remedy
+    ).toContain("ib auth impersonate");
+  });
+
+  test("an error row whose MEANING names a hidden command is dropped entirely", () => {
+    const spec: CommandSpec = {
+      command: "ib keikka list",
+      description: "d",
+      flags: [],
+      outputShape: "o",
+      errors: [
+        {
+          origin: "client",
+          exit: 4,
+          meaning: "Conflicts with `ib dev ai conversation`",
+          remedy: "drop it",
+        },
+        { http: 404, exit: 5, meaning: "Not found", remedy: "see `ib dev ai conversation`" },
+        {
+          http: 403,
+          exit: 3,
+          meaning: "Permission denied",
+          remedy: "check auth.page.grid.tilaus.read",
+        },
+      ],
+      examples: ["ib keikka list"],
+    };
+    const out = scrubSpecForTier(spec, "standard", ["ib dev ai conversation"]);
+    expect(out.errors.map((e) => e.exit)).toEqual([5, 3]); // exit-4 row dropped
+    expect(out.errors[0].remedy).toMatch(/^not available at your access level/);
+    // The rewrite must preserve the row's origin tag (fb#289): `http` still 404,
+    // or hintForError could never match the row again.
+    expect(out.errors[0].http).toBe(404);
+    expect(out.errors[1]).toEqual(spec.errors[2]); // clean row untouched
+    // Developer tier: byte-for-byte parity (same object identity).
+    expect(scrubSpecForTier(spec, "developer", ["ib dev ai conversation"])).toBe(spec);
+  });
+
+  test("the hoisted 401/500 rows are still stripped after the scrub reorder", () => {
+    // stripCommonErrors matches by remedy equality, so it must run BEFORE the
+    // scrub can rewrite a remedy — otherwise the globals reappear per spec.
+    const std = buildReference(undefined, "standard", []);
+    const hoisted = std.commonErrors.map((e) => `${e.http}:${e.remedy}`);
+    for (const [name, spec] of Object.entries(std.commands)) {
+      for (const e of spec.errors) {
+        expect(hoisted, `${name} repeats a hoisted row`).not.toContain(
+          `${e.http}:${e.remedy}`
+        );
+      }
+    }
   });
 });
 

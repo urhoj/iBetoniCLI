@@ -11,35 +11,11 @@
 import { COMMAND_SPECS, COMMON_AUTH_ERRORS } from "./specs.js";
 import { specMatcherForToken } from "./commandsList.js";
 import { DOMAIN_OVERVIEW, FEEDBACK_GUIDANCE, TOPICS, } from "./domain.js";
-import { visibleSpecs, isHiddenAtTier } from "../tier.js";
+import { visibleSpecs, hiddenCommandPaths, scrubSpecForTier, } from "../tier.js";
 import { emitStdout } from "../output/json.js";
 import packageJson from "../../package.json" with { type: "json" };
 import { runGlossaryList, projectGlossaryForPrimer } from "../commands/glossary/index.js";
 export { projectGlossaryForPrimer };
-/**
- * For a non-developer tier, strip cross-references (seeAlso / notes / examples)
- * that name a command hidden at that tier — otherwise the dump's prose teaches a
- * standard caller that the hidden subtrees exist (the dump filters WHICH specs
- * appear, but emits each visible spec's prose verbatim, and ~10 of those strings
- * cross-reference hidden command paths). Developer tier: spec returned unchanged
- * (byte-for-byte parity). `hiddenCommands` are full paths (e.g. `ib ai
- * conversation`), matched as substrings of the backtick-quoted mentions.
- * Only the prose arrays (`seeAlso`/`notes`/`examples`) are scrubbed; `description`
- * and `flags` don't embed backtick command paths in practice.
- */
-function scrubSpecForTier(spec, tier, hiddenCommands) {
-    if (tier === "developer")
-        return spec;
-    const mentionsHidden = (s) => hiddenCommands.some((h) => s.includes(h));
-    const out = { ...spec };
-    if (spec.seeAlso)
-        out.seeAlso = spec.seeAlso.filter((r) => !mentionsHidden(r));
-    if (spec.notes)
-        out.notes = spec.notes.filter((n) => !mentionsHidden(n));
-    if (spec.examples)
-        out.examples = spec.examples.filter((e) => !mentionsHidden(e));
-    return out;
-}
 /**
  * Best-effort fetch of the DB glossary projected to the primer shape
  * ({term,synonyms} only — strips definition and developer-tier-leaking fields).
@@ -101,9 +77,9 @@ function stripProse(spec) {
  * top-level domain OR a bare nested-subgroup alias (`changelog` → `dev
  * changelog`), resolved via {@link specMatcherForToken} exactly like `ib
  * commands` (feedback #137). Unknown domain → exit-4 CliError. At a
- * non-developer tier each surviving
- * spec's prose is run through `scrubSpecForTier` so no cross-reference leaks a
- * hidden command path.
+ * non-developer tier each surviving spec's prose AND error remedies are run
+ * through `scrubSpecForTier` so no cross-reference leaks a hidden command path
+ * (feedback #288).
  */
 export function buildReference(domain, tier = "developer", glossary = [], lean = false) {
     let specs = visibleSpecs(COMMAND_SPECS, tier);
@@ -116,7 +92,7 @@ export function buildReference(domain, tier = "developer", glossary = [], lean =
         const matchers = domains.map((d) => specMatcherForToken(COMMAND_SPECS, d, tier));
         specs = specs.filter((s) => matchers.some((m) => m(s)));
     }
-    const hiddenCommands = COMMAND_SPECS.filter((s) => isHiddenAtTier(s, tier)).map((s) => s.command);
+    const hiddenCommands = hiddenCommandPaths(COMMAND_SPECS, tier);
     // The `notice` steer rides only on the FULL surface (no domain filter) — a
     // filtered dump is already the cheap path, so it needs no nudge.
     const notice = domains.length === 0
@@ -132,7 +108,10 @@ export function buildReference(domain, tier = "developer", glossary = [], lean =
         feedbackGuidance: FEEDBACK_GUIDANCE,
         topics: TOPICS,
         commands: Object.fromEntries(specs.map((spec) => {
-            let s = stripCommonErrors(scrubSpecForTier(spec, tier, hiddenCommands));
+            // Hoist FIRST, scrub second: `isCommonError` matches a hoisted row by
+            // remedy equality, so a scrubbed remedy would stop matching and the
+            // universal 401/500 would be re-emitted per spec.
+            let s = scrubSpecForTier(stripCommonErrors(spec), tier, hiddenCommands);
             if (lean)
                 s = stripProse(s);
             return [spec.command, s];

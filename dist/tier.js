@@ -55,6 +55,67 @@ export function hiddenDomainsAtTier(specs, tier) {
     const visible = new Set(visibleSpecs(specs, tier).map((s) => domainOf(s.command)));
     return new Set(specs.map((s) => domainOf(s.command)).filter((d) => d && !visible.has(d)));
 }
+/**
+ * The full command paths hidden at `tier` — the needle list every cross-reference
+ * scrub matches against. Pass the WHOLE catalogue (not the visible subset): the
+ * paths being scrubbed are precisely the ones filtered out of it.
+ */
+export function hiddenCommandPaths(specs, tier) {
+    return specs.filter((s) => isHiddenAtTier(s, tier)).map((s) => s.command);
+}
+/**
+ * Stand-in for an error remedy that names a command the caller cannot see. The
+ * row itself is KEPT — `exit`/`http` are the documented error contract, and a
+ * caller who actually HITS the error still gets the real remedy at runtime
+ * (`hintForError` reads the raw specs; by then it is recovery, not discovery).
+ * Wording mirrors `hiddenAtTierMessage`.
+ */
+const REDACTED_REMEDY = "not available at your access level — run `ib commands` to see what you can run";
+/**
+ * Tier-scrub a spec's ERRORS rows. An error row cannot just be filtered out on
+ * any mention the way a note can, so the two fields are handled differently:
+ *
+ * - `meaning` names a hidden command → the row is ABOUT that command; drop it.
+ * - `remedy` names one → keep the row (its exit/HTTP contract still applies),
+ *   replace the prose with {@link REDACTED_REMEDY}.
+ *
+ * Substring-replacing the path in place is not an option: it strands whatever
+ * follows it (`"ib auth impersonate --end to restore…"` → `"… --end to restore…"`).
+ */
+function scrubErrorsForTier(errors, mentionsHidden) {
+    return errors
+        .filter((e) => !mentionsHidden(e.meaning))
+        .map((e) => mentionsHidden(e.remedy) ? { ...e, remedy: REDACTED_REMEDY } : e);
+}
+/**
+ * For a non-developer tier, strip cross-references that name a command hidden at
+ * that tier — otherwise a VISIBLE command's own text teaches a standard caller
+ * that the hidden subtrees exist (tier filtering decides WHICH specs render; this
+ * decides what each surviving spec may say). Applied by both discovery surfaces:
+ * `ib reference dump` and leaf `--help`. Developer tier: spec returned unchanged
+ * (byte-for-byte parity). `hiddenCommands` are full paths (e.g. `ib dev ai
+ * conversation`) from {@link hiddenCommandPaths}, matched as substrings.
+ *
+ * Prose arrays (`seeAlso`/`notes`/`examples`) lose the offending entry; `errors`
+ * are scrubbed per {@link scrubErrorsForTier}. `description`/`outputShape`/flag
+ * descriptions are NOT scrubbed — there is nothing to drop without destroying the
+ * spec, so that half of the invariant stays test-enforced (`dump.test.ts` asserts
+ * the whole dump JSON names no hidden path, at every tier).
+ */
+export function scrubSpecForTier(spec, tier, hiddenCommands) {
+    if (tier === "developer")
+        return spec;
+    const mentionsHidden = (s) => hiddenCommands.some((h) => s.includes(h));
+    const out = { ...spec };
+    if (spec.seeAlso)
+        out.seeAlso = spec.seeAlso.filter((r) => !mentionsHidden(r));
+    if (spec.notes)
+        out.notes = spec.notes.filter((n) => !mentionsHidden(n));
+    if (spec.examples)
+        out.examples = spec.examples.filter((e) => !mentionsHidden(e));
+    out.errors = scrubErrorsForTier(spec.errors, mentionsHidden);
+    return out;
+}
 // Ambient holder — see module docstring. Default "developer" = full surface.
 let ambientTier = "developer";
 export function setCallerTier(tier) {

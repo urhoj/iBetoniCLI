@@ -1,10 +1,17 @@
-import { describe, test, expect } from "vitest";
+import { describe, test, expect, afterEach } from "vitest";
+import type { Command } from "commander";
 import {
   formatHelp,
   formatGroupHelp,
   type CommandSpec,
 } from "../../src/output/help.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
+import { buildProgram } from "../../src/program.js";
+import {
+  isHiddenAtTier,
+  setCallerTier,
+  type CallerTier,
+} from "../../src/tier.js";
 
 const sampleSpec: CommandSpec = {
   command: "ib keikka list",
@@ -123,6 +130,57 @@ describe("formatGroupHelp tier filtering", () => {
     );
     expect(std).toContain("create");
     expect(std).not.toMatch(/^\s+list\b/m);
+  });
+});
+
+describe("leaf --help leaks no hidden command path", () => {
+  // The dump has scrubbed cross-references for a while; leaf `--help` did not,
+  // so a VISIBLE command's NOTES / SEE ALSO / ERRORS still named hidden commands
+  // (10 leaves at standard tier, incl. `ib auth whoami` → `ib auth impersonate`).
+  // Both surfaces now share `scrubSpecForTier` (feedback #288).
+  const leaves = (() => {
+    const map = new Map<string, Command>();
+    const walk = (cmd: Command, path: string[]): void => {
+      const full = [...path, cmd.name()].join(" ");
+      map.set(full, cmd);
+      for (const sub of cmd.commands) walk(sub, [...path, cmd.name()]);
+    };
+    walk(buildProgram(), []);
+    return map;
+  })();
+
+  // The ambient tier is process-global — always hand it back.
+  afterEach(() => setCallerTier("developer"));
+
+  for (const tier of ["standard", "admin"] as const satisfies readonly CallerTier[]) {
+    test(`no visible leaf's --help names a command hidden at ${tier}`, () => {
+      setCallerTier(tier);
+      const hidden = COMMAND_SPECS.filter((s) => isHiddenAtTier(s, tier)).map(
+        (s) => s.command
+      );
+      const offenders: string[] = [];
+      for (const spec of COMMAND_SPECS) {
+        if (isHiddenAtTier(spec, tier)) continue; // renders the fallback, not the spec
+        const help = leaves.get(spec.command)?.helpInformation() ?? "";
+        for (const h of hidden) if (help.includes(h)) offenders.push(`${spec.command} → ${h}`);
+      }
+      expect(offenders).toEqual([]);
+    });
+  }
+
+  test("the redacted remedy replaces the prose but keeps the ERRORS row", () => {
+    setCallerTier("standard");
+    const help = leaves.get("ib auth whoami")!.helpInformation();
+    expect(help).toContain("Impersonation session expired"); // row survives
+    expect(help).toContain("not available at your access level");
+    expect(help).not.toContain("ib auth impersonate");
+  });
+
+  test("developer tier renders the spec verbatim (no over-scrubbing)", () => {
+    setCallerTier("developer");
+    expect(leaves.get("ib auth whoami")!.helpInformation()).toBe(
+      formatHelp(COMMAND_SPECS.find((s) => s.command === "ib auth whoami")!)
+    );
   });
 });
 

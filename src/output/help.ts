@@ -25,7 +25,13 @@
 
 import type { Command } from "commander";
 import { domainBlurb } from "../reference/domain.js";
-import { type CallerTier, getCallerTier, isHiddenAtTier } from "../tier.js";
+import {
+  type CallerTier,
+  getCallerTier,
+  isHiddenAtTier,
+  hiddenCommandPaths,
+  scrubSpecForTier,
+} from "../tier.js";
 
 interface CommandErrorBase {
   /** Process exit code per the documented contract (0/2/3/4/5/6/7). Always present. */
@@ -389,10 +395,17 @@ export function attachRichHelp(root: Command, specs: CommandSpec[]): void {
       // Single source: the Commander listing description IS the spec description.
       cmd.description(spec.description);
       cmd.configureHelp({
-        formatHelp: () =>
-          isHiddenAtTier(spec, getCallerTier())
-            ? hiddenAtTierMessage(full)
-            : formatHelp(spec),
+        formatHelp: () => {
+          const tier = getCallerTier();
+          if (isHiddenAtTier(spec, tier)) return hiddenAtTierMessage(full);
+          // A VISIBLE command's own text must not name a command hidden at this
+          // tier either — same cross-reference scrub the dump applies, so both
+          // discovery surfaces share one invariant instead of one enforcing it
+          // and the other leaking (feedback #288). No-op at developer tier.
+          return formatHelp(
+            scrubSpecForTier(spec, tier, hiddenCommandPaths(specs, tier))
+          );
+        },
       });
     } else if (path.length > 0 && cmd.commands.length > 0) {
       // Non-root group: computed group help (root keeps the domain primer).

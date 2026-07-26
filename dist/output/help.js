@@ -23,7 +23,7 @@
  * spec without having to run `ib reference dump`.
  */
 import { domainBlurb } from "../reference/domain.js";
-import { getCallerTier, isHiddenAtTier } from "../tier.js";
+import { getCallerTier, isHiddenAtTier, hiddenCommandPaths, scrubSpecForTier, } from "../tier.js";
 /**
  * Render a {@link CommandSpec} as the AI-optimized `--help` text. Output is a
  * trailing-newline-terminated string suitable for `process.stdout.write`.
@@ -225,9 +225,16 @@ export function attachRichHelp(root, specs) {
             // Single source: the Commander listing description IS the spec description.
             cmd.description(spec.description);
             cmd.configureHelp({
-                formatHelp: () => isHiddenAtTier(spec, getCallerTier())
-                    ? hiddenAtTierMessage(full)
-                    : formatHelp(spec),
+                formatHelp: () => {
+                    const tier = getCallerTier();
+                    if (isHiddenAtTier(spec, tier))
+                        return hiddenAtTierMessage(full);
+                    // A VISIBLE command's own text must not name a command hidden at this
+                    // tier either — same cross-reference scrub the dump applies, so both
+                    // discovery surfaces share one invariant instead of one enforcing it
+                    // and the other leaking (feedback #288). No-op at developer tier.
+                    return formatHelp(scrubSpecForTier(spec, tier, hiddenCommandPaths(specs, tier)));
+                },
             });
         }
         else if (path.length > 0 && cmd.commands.length > 0) {
