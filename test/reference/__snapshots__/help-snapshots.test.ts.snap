@@ -3299,7 +3299,7 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a developer        → Developer access required
   exit 5 (HTTP 404)  Term not found (with --update-only) → Omit --update-only to create the entry
   exit 5 (HTTP 404)  append/add/remove on a non-existent term → Create the term first (set --definition …); append requires an existing entry
-  exit 4 (HTTP 400)  definition >2000 chars → Shorten the definition
+  exit 4 (HTTP 400)  definition >2000 chars (the message names the effective length; --append-definition reports the MERGED current+appended length) → Shorten the definition
   exit 4 (client-side)  --from-json file is not valid JSON or not readable → Check the file path and contents
 
 NOTES

@@ -6167,7 +6167,7 @@ const BASE_COMMAND_SPECS = [
             { http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" },
             { http: 404, exit: 5, meaning: "Term not found (with --update-only)", remedy: "Omit --update-only to create the entry" },
             { http: 404, exit: 5, meaning: "append/add/remove on a non-existent term", remedy: "Create the term first (set --definition …); append requires an existing entry" },
-            { http: 400, exit: 4, meaning: "definition >2000 chars", remedy: "Shorten the definition" },
+            { http: 400, exit: 4, meaning: "definition >2000 chars (the message names the effective length; --append-definition reports the MERGED current+appended length)", remedy: "Shorten the definition" },
             { origin: "client", exit: 4, meaning: "--from-json file is not valid JSON or not readable", remedy: "Check the file path and contents" },
         ],
         examples: ['ib glossary set valumassa --definition "Pumpattava betonimassa." --synonyms "massaa,valua" --related "ib keikka" --reason "groom"', 'ib glossary set puomi --synonyms "boom,nollakone,puomiton" --reason "add synonyms only"', 'ib glossary set pumppari --definition "Updated def." --update-only --reason "groom"', 'ib glossary set loma --from-json loma.json --reason "groom"', 'ib glossary set puomi --add-synonyms "nollakone" --reason "add one synonym"', 'ib glossary set tilaus --append-definition "Convention: UI says tilaus, code says keikka." --reason "append clause"'],
