@@ -15,7 +15,7 @@ jobs:
         with: { submodules: recursive }
       - uses: actions/setup-node@v6
         with:
-          node-version: "20.10.0"
+          node-version: "22.x"
           registry-url: "https://registry.npmjs.org/"
       - run: npm ci
       - run: npm run type-check
