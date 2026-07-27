@@ -9,6 +9,10 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
       "@typescript-eslint/no-explicit-any": "warn",
+      // New in eslint:recommended as of ESLint 10 — warn for now, fix incrementally.
+      "no-useless-assignment": "warn",
+      "preserve-caught-error": "warn",
+      "no-unassigned-vars": "warn",
     },
   },
 );
