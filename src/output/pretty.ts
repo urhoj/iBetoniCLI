@@ -3,9 +3,9 @@ import chalk from "chalk";
 import { ListEnvelope } from "../api/envelopes.js";
 
 // cli-table3 is CJS and the heavier of the two pretty-mode deps, so lazy-require
-// it (safe on every supported Node). chalk 5 is ESM-only — a lazy require()
-// would throw ERR_REQUIRE_ESM on Node <22.12 while the engines floor is 20.10,
-// so keep chalk a static import (it is tiny and dependency-free).
+// it (safe on every supported Node). chalk 6 is ESM-only and needs Node >=22 —
+// both satisfied by the engines floor (^22.18 || >=24.11) — and it is tiny and
+// dependency-free, so keep it a static import.
 const require = createRequire(import.meta.url);
 
 let _Table: typeof import("cli-table3") | null = null;

@@ -28,7 +28,7 @@
   "dependencies": {
     "@ibetoni/auth": "*",
     "@ibetoni/constants": "*",
-    "chalk": "^5.6.2",
+    "chalk": "^6.0.0",
     "cli-table3": "^0.6.5",
     "commander": "^15.0.0",
     "open": "^11.0.0"
