@@ -213,4 +213,10 @@ If verification fails with `invalid signature`: `puminet5api/app.js` loads `.env
 
 ## CI
 
-`.github/workflows/ci.yml` runs lint + type-check + tests; `publish.yml` publishes the package. Run `npm run lint && npm run type-check && npm test` locally before pushing.
+`.github/workflows/ci.yml` runs lint + type-check + tests + `check:dist`. Run `npm run lint && npm run type-check && npm test` locally before pushing.
+
+**There is deliberately no npm publish lane, and no committed `package-lock.json`** (both removed 2026-07-27, feedback #295 — do not recreate either):
+
+- **No lockfile.** npm workspaces ignore nested lockfiles, so this repo's copy was never read by any install; the authoritative lock is the workspace root's, and the committed copy had silently rotted ~7 majors out of date (`commander@12` vs `15`, `eslint@9` vs `10`, `typescript@5.9` vs `6`, plus a phantom `undici` and no `@ibetoni/*` entries at all). It is gitignored so an in-directory `npm install` can't resurrect it.
+- **No publishing.** `@ibetoni/auth` / `@ibetoni/constants` are private (404 on npmjs) and are declared `"*"`, resolved via workspace symlink. They are **hard** runtime requires — `src/roles.ts` and `src/commands/customer/index.ts` `require("@ibetoni/constants")` with no try/catch (unlike the guarded codec require in `src/auth/jwt.ts`) — so a published tarball would install broken and crash on role/customer-settings commands. The old `publish.yml` never succeeded once (zero versions on npm; the orphan `v1.0.3` tag predates the dependency).
+- **How it actually ships:** the committed `dist/` is vendored into `puminet5api` as a nested submodule (`ci.yml`'s `notify-vendored-bump` moves that pointer on green master), and the monorepo runs it from source. Neither path involves npm. If a public release is ever wanted, publishing the two `@ibetoni/*` packages (or bundling them) is a prerequisite, not an afterthought.

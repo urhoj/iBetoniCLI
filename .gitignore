@@ -1,4 +1,8 @@
 node_modules
+# Deliberately NOT committed: npm workspaces ignore nested lockfiles, so this
+# one is never read — the authoritative lock is the workspace root's. A
+# committed copy only rots (feedback #295).
+package-lock.json
 .env
 .env.local
 *.log

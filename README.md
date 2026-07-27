@@ -4,9 +4,17 @@ AI-driven command-line interface for [betoni.online](https://betoni.online).
 
 ## Install
 
+Not published to npm — `@ibetoni/auth` and `@ibetoni/constants` are private packages this CLI hard-requires, so an npm install could never resolve. `ib` is obtained from the [betoni-online workspace](https://github.com/urhoj/betoni-online-workspace), where it is a submodule:
+
 ```bash
-npm install -g @ibetoni/cli
+# from the workspace root — run from source (no build)
+npm run dev --workspace=betonicli -- <args>
+
+# or run the committed build directly (faster, no tsx)
+node betonicli/dist/bin/ib.js <args>
 ```
+
+`dist/` is committed, so no build step is needed; it is also what ships vendored into `puminet5api` for the server-side CLI surface.
 
 ## Quickstart
 
