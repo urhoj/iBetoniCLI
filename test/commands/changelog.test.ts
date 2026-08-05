@@ -212,7 +212,7 @@ describe("changelog add bumpLevel", () => {
   });
 });
 
-import { runChangelogPending, runChangelogRelease, runChangelogReleaseMap, registerChangelogCommands, payloadKeyMap, normalizeChangelogJson, mergeChangelogInput } from "../../src/commands/changelog/index.js";
+import { runChangelogPending, runChangelogRelease, runChangelogReleaseMap, registerChangelogCommands, payloadKeyMap, normalizeChangelogJson, mergeChangelogInput, warnIfPatchIgnored } from "../../src/commands/changelog/index.js";
 import { Command } from "commander";
 
 describe("changelog pending/release", () => {
@@ -645,7 +645,7 @@ describe("changelog add/update --from-json (fb#300)", () => {
     expect(mergeChangelogInput({ title: "t", type: "bugfix" }, {}, {})).toMatchObject({ title: "t", type: "bugfix" });
   });
 
-  test("the key map is derived from the command's own flags (add-only keys rejected on update)", () => {
+  test("the key map is derived from each command's own flags", () => {
     const program = new Command();
     registerChangelogCommands(program, async () => client);
     const group = program.commands.find((c) => c.name() === "changelog")!;
@@ -654,9 +654,14 @@ describe("changelog add/update --from-json (fb#300)", () => {
     // Both spellings of a hyphenated flag resolve to the camelCase attribute.
     expect(add.get("bumpLevel")).toBe("bumpLevel");
     expect(add.get("bump-level")).toBe("bumpLevel");
-    // update has no --bump-level/--feedback/--sentry, so those keys are unknown there.
-    expect(update.has("bumpLevel")).toBe(false);
-    expect(update.has("feedback")).toBe(false);
+    // fb#303: update carries them too now — they were unreachable there, which
+    // made a mis-set --bump-level (it drives the deploy version bump) permanent.
+    expect(update.get("bumpLevel")).toBe("bumpLevel");
+    expect(update.get("bump-level")).toBe("bumpLevel");
+    expect(update.get("feedback")).toBe("feedback");
+    expect(update.get("sentry")).toBe("sentry");
+    // `add` still has genuinely add-only keys the update command cannot apply.
+    expect(update.has("date")).toBe(true);
     // Write-safety flags and the JSON source itself are never payload fields.
     for (const k of ["dryRun", "reason", "idempotencyKey", "fromJson"]) expect(add.has(k)).toBe(false);
   });
@@ -774,13 +779,107 @@ describe("changelog add/update --from-json (fb#300)", () => {
     );
   });
 
-  test("an add-only key in an update payload exits 4 without PUTting", async () => {
-    await withJsonFile({ bumpLevel: "minor" }, async (p) => {
+  test("a genuinely add-only key in an update payload exits 4 without PUTting", async () => {
+    // `entryDate` is add-only spelling — update's flag is --date. The key map is
+    // derived per-command, so a key the update command has no flag for is still
+    // rejected rather than silently dropped (fb#298).
+    await withJsonFile({ entryDate: "2026-08-05" }, async (p) => {
       const program = new Command();
       registerChangelogCommands(program, async () => client);
       await expect(program.parseAsync(["changelog", "update", "386", "--from-json", p], { from: "user" }))
         .rejects.toMatchObject({ exitCode: 4 });
     });
     expect(asPut()).not.toHaveBeenCalled();
+  });
+
+  test("update accepts bumpLevel from --from-json (fb#303)", async () => {
+    asPut().mockResolvedValue({ changelogId: 386, bumpLevel: "none" });
+    await withJsonFile({ bumpLevel: "none" }, async (p) => {
+      const program = new Command();
+      registerChangelogCommands(program, async () => client);
+      await program.parseAsync(["changelog", "update", "386", "--from-json", p], { from: "user" });
+    });
+    expect(asPut()).toHaveBeenCalledWith("/api/changelog/386", { bumpLevel: "none" }, expect.any(Object));
+  });
+});
+
+describe("changelog update — bumpLevel/feedback/sentry (fb#303)", () => {
+  const parse = (argv: string[]) => {
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    return program.parseAsync(["changelog", "update", ...argv], { from: "user" });
+  };
+
+  test("--bump-level reaches the patch", async () => {
+    asPut().mockResolvedValue({ changelogId: 386, bumpLevel: "none" });
+    await parse(["386", "--bump-level", "none"]);
+    expect(asPut()).toHaveBeenCalledWith("/api/changelog/386", { bumpLevel: "none" }, expect.any(Object));
+  });
+
+  test("--bump-level has NO default — an unrelated patch leaves the level untouched", async () => {
+    // The trap this guards: `add`'s --bump-level defaults to "patch". Copying
+    // that default onto `update` would make every `update --status …` silently
+    // rewrite a deliberate `minor` and mis-drive the next deploy.
+    asPut().mockResolvedValue({ changelogId: 386 });
+    await parse(["386", "--status", "Deployed"]);
+    expect(asPut()).toHaveBeenCalledWith("/api/changelog/386", { status: "Deployed" }, expect.any(Object));
+  });
+
+  test("an invalid --bump-level exits 4 before any PUT", async () => {
+    await expect(parse(["386", "--bump-level", "huge"])).rejects.toMatchObject({ exitCode: 4 });
+    expect(asPut()).not.toHaveBeenCalled();
+  });
+
+  test("--feedback and --sentry reach the patch, the Sentry ref normalized", async () => {
+    asPut().mockResolvedValue({ changelogId: 386, feedbackId: 303 });
+    await parse(["386", "--feedback", "303", "--sentry", "https://x.sentry.io/issues/PUMINET5API-1A2/"]);
+    expect(asPut()).toHaveBeenCalledWith(
+      "/api/changelog/386",
+      { feedbackId: 303, sentryIssue: "PUMINET5API-1A2" },
+      expect.any(Object)
+    );
+  });
+});
+
+describe("warnIfPatchIgnored — deploy gate (fb#303)", () => {
+  test("warns when the backend echoes a deploy-gated field unchanged", () => {
+    // The old backend's PUT succeeds and returns the row with the OLD value —
+    // no error, no clue. That silent drop is what fb#303 was filed about.
+    const warn = vi.fn();
+    warnIfPatchIgnored({ bumpLevel: "none" }, { changelogId: 7, bumpLevel: "patch" }, warn);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toMatch(/--bump-level/);
+    expect(warn.mock.calls[0][0]).toMatch(/fb#303/);
+  });
+
+  test("stays silent when the echo matches", () => {
+    const warn = vi.fn();
+    warnIfPatchIgnored({ bumpLevel: "none" }, { changelogId: 7, bumpLevel: "none" }, warn);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test("stays silent under --dry-run and on a non-row result", () => {
+    const warn = vi.fn();
+    warnIfPatchIgnored({ bumpLevel: "none" }, { dryRun: true, wouldUpdate: {} }, warn);
+    warnIfPatchIgnored({ bumpLevel: "none" }, null, warn);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test("ignores fields absent from the echoed row rather than crying wolf", () => {
+    const warn = vi.fn();
+    warnIfPatchIgnored({ bumpLevel: "none" }, { changelogId: 7 }, warn);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test("names every ignored field at once", () => {
+    const warn = vi.fn();
+    warnIfPatchIgnored(
+      { bumpLevel: "none", feedbackId: 303, sentryIssue: "X-1" },
+      { changelogId: 7, bumpLevel: "patch", feedbackId: null, sentryIssue: null },
+      warn
+    );
+    expect(warn.mock.calls[0][0]).toMatch(/--bump-level/);
+    expect(warn.mock.calls[0][0]).toMatch(/--feedback/);
+    expect(warn.mock.calls[0][0]).toMatch(/--sentry/);
   });
 });

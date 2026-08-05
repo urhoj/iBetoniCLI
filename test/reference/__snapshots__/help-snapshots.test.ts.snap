@@ -2216,10 +2216,13 @@ FLAGS
   --sha STRING    Commit SHAs (CSV)
   --commit STRING    Alias for --sha — Commit SHAs (CSV); if both are given, they must match
   --vtag STRING    Version tag
+  --bump-level STRING    Correct the app version bump this entry implies: none|patch|minor|major. NO default — omitting it leaves the recorded level untouched. Refused once the entry is RELEASED (has a versionTag).
+  --feedback NUMBER    cliFeedback id this entry resolves — also marks that row applied and sets resolvedByChangelogId back to this entry
+  --sentry STRING    Sentry issue short id or URL this entry fixes (stored, not sent to Sentry)
   --source STRING    Source: human|routine
   --date DATE    Entry date (YYYY-MM-DD|today)
   --language STRING    Entry language (fi|en)
-  --from-json STRING    Read the patch from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase (description/summary/body, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, source, date, language); files/repo/sha/commit also accept an array of strings. An unknown or wrong-typed key exits 4 — note bumpLevel/feedback/sentry are add-only and rejected here.
+  --from-json STRING    Read the patch from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase (description/summary/body, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (\`bump-level\` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. An unknown or wrong-typed key exits 4 (never silently dropped).
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -2235,14 +2238,23 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
   exit 4 (HTTP 400)  Validation (bad enum/language) → language must be fi|en
+  exit 4 (HTTP 400)  --bump-level on an already-RELEASED entry (one carrying a versionTag) — that bump has already shipped → Leave it as recorded; every other field is still editable. Only UNRELEASED entries (ib dev changelog pending) still drive a deploy.
   exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → Check the path; the root must be an object and every key an accepted field name (the error lists them)
 
 NOTES
   - SHELL QUOTING (fb#300): this is the command used to CORRECT an entry, which is exactly the retry that hits the quoting hazard again — Windows PowerShell splits a native argument on inner double-quotes. Pass quote-bearing prose via --from-json <file|-> rather than stripping the quotes.
+  - THE CORRECTION PATH FOR --bump-level (fb#303). Deploy Step 0 bumps each coordinated repo from the MAX bump level across the UNRELEASED entries naming it, so a wrong level mis-drives a real release. Fix it here — do NOT delete + re-add, which mints a new changelogId and orphans the cliFeedback row pointing at the old one.
+  - --bump-level has NO default here (unlike \`add\`, where it defaults to patch): omitting it leaves the recorded level untouched, so an unrelated \`update --status …\` cannot silently downgrade a deliberate minor.
+  - --feedback also marks that cliFeedback row applied and sets resolvedByChangelogId back to this entry — the only way to re-establish a link lost to delete + re-add (\`ib dev feedback resolve\` sets status/resolution but not the link).
+  - DEPLOY-GATED: --bump-level/--feedback/--sentry became editable in a later puminet5api version. Against an older backend the PUT succeeds and echoes the row unchanged; the CLI compares the echo and warns on stderr rather than letting the edit vanish silently.
+
+SEE ALSO
+  ib dev changelog pending, ib dev changelog get
 
 EXAMPLES
   ib dev changelog update 7 --status "Deployed prod"
   ib dev changelog update 386 --language en
+  ib dev changelog update 386 --bump-level none --reason "docs-only, should not bump"
   ib dev changelog update 386 --from-json ./patch.json
 "
 `;

@@ -392,6 +392,28 @@ export function requireAddFields(description, o) {
             spec: CHANGELOG_SPECS.find((s) => s.command === "ib dev changelog add"),
         });
 }
+/**
+ * Fields the UPDATE route only learned to accept in a later backend version
+ * (feedback #303). Against an older deployment the PUT succeeds and echoes the
+ * row UNCHANGED — the exact silent-drop this feedback was filed about — so the
+ * absence of an error is not evidence the edit landed.
+ */
+const DEPLOY_GATED_PATCH_FIELDS = ["bumpLevel", "feedbackId", "sentryIssue"];
+/**
+ * Warn on stderr when the backend echoed back something other than what we sent
+ * for a deploy-gated field. The route returns the updated row, so a mismatch
+ * means that column is not in the deployed allowlist. stderr only — the stdout
+ * JSON contract is untouched. No-op under --dry-run (no row comes back).
+ */
+export function warnIfPatchIgnored(patch, result, warn = (m) => console.error(m)) {
+    if (!result || typeof result !== "object" || result.dryRun)
+        return;
+    const row = result;
+    const ignored = DEPLOY_GATED_PATCH_FIELDS.filter((f) => patch[f] !== undefined && f in row && row[f] !== patch[f]);
+    if (ignored.length)
+        warn(`[ib] ⚠ the backend did not apply ${ignored.map((f) => `--${f === "feedbackId" ? "feedback" : f === "sentryIssue" ? "sentry" : "bump-level"}`).join(", ")} — ` +
+            `these became editable in a later puminet5api version, so this endpoint is silently ignoring them (fb#303). The rest of the patch was applied.`);
+}
 export function registerChangelogCommands(parent, getClient, opts = {}) {
     const c = parent
         .command("changelog", { hidden: !!opts.hidden })
@@ -559,6 +581,13 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--sha <csv>", "Commit SHAs (CSV)")
         .option("--commit <csv>", "Alias for --sha — Commit SHAs (CSV); if both are given, they must match")
         .option("--vtag <s>", "Version tag")
+        // NO default, unlike `add`'s --bump-level (feedback #303). A Commander
+        // default here would ride along on every unrelated patch — `update 7
+        // --status Deployed` would silently rewrite a deliberate `minor` back to
+        // `patch` and mis-drive the next deploy. Absent flag = field untouched.
+        .option("--bump-level <l>", "Correct the app version bump this entry implies: none|patch|minor|major. Refused once the entry is RELEASED (has a versionTag) — that bump already shipped.")
+        .option("--feedback <id>", "cliFeedback id this entry resolves — also marks that row applied and points it back here (repairs a link orphaned by delete + re-add)", Number)
+        .option("--sentry <ref>", "Sentry issue short id or URL this entry fixes")
         .option("--source <s>", "Source: human|routine")
         .option("--date <d>", "Entry date (YYYY-MM-DD|today)")
         .option("--language <l>", "Entry language (fi|en)")
@@ -567,7 +596,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         applyFromJson(cmd, o);
         if (o.type !== undefined)
             o.type = normalizeType(o.type);
-        validateEnums(o.type, o.area, undefined, o.source, "ib dev changelog update");
+        validateEnums(o.type, o.area, o.bumpLevel, o.source, "ib dev changelog update");
         // --summary/--body are aliases for --description (feedback #205/#278); fold
         // them in before the patch build so the loop below picks them up. Several may
         // be given only when they agree.
@@ -609,12 +638,20 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
             patch.versionTag = o.vtag;
         if (o.date)
             patch.entryDate = resolveDate(o.date);
+        if (o.bumpLevel !== undefined)
+            patch.bumpLevel = o.bumpLevel;
+        if (o.feedback !== undefined)
+            patch.feedbackId = Number(o.feedback);
+        if (o.sentry)
+            patch.sentryIssue = normalizeSentryRef(o.sentry);
         const updLang = normalizeLanguage(o.language);
         if (updLang)
             patch.language = updLang;
         try {
             const client = await getClient();
-            writeJson(await runWithSiblingHint(client, id, "feedback", () => runChangelogUpdate(client, id, patch, o)));
+            const result = await runWithSiblingHint(client, id, "feedback", () => runChangelogUpdate(client, id, patch, o));
+            warnIfPatchIgnored(patch, result);
+            writeJson(result);
         }
         catch (e) {
             exitWithError(e);
@@ -972,6 +1009,22 @@ export const CHANGELOG_SPECS = [
             { name: "sha", type: "string", description: "Commit SHAs (CSV)" },
             { name: "commit", type: "string", description: "Alias for --sha — Commit SHAs (CSV); if both are given, they must match" },
             { name: "vtag", type: "string", description: "Version tag" },
+            {
+                name: "bump-level",
+                type: "string",
+                allowed: BUMP_LEVELS,
+                description: "Correct the app version bump this entry implies: none|patch|minor|major. NO default — omitting it leaves the recorded level untouched. Refused once the entry is RELEASED (has a versionTag).",
+            },
+            {
+                name: "feedback",
+                type: "number",
+                description: "cliFeedback id this entry resolves — also marks that row applied and sets resolvedByChangelogId back to this entry",
+            },
+            {
+                name: "sentry",
+                type: "string",
+                description: "Sentry issue short id or URL this entry fixes (stored, not sent to Sentry)",
+            },
             { name: "source", type: "string", description: "Source: human|routine" },
             {
                 name: "date",
@@ -982,7 +1035,7 @@ export const CHANGELOG_SPECS = [
             {
                 name: "from-json",
                 type: "string",
-                description: "Read the patch from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase (description/summary/body, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, source, date, language); files/repo/sha/commit also accept an array of strings. An unknown or wrong-typed key exits 4 — note bumpLevel/feedback/sentry are add-only and rejected here.",
+                description: "Read the patch from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase (description/summary/body, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. An unknown or wrong-typed key exits 4 (never silently dropped).",
             },
         ],
         writeFlags: true,
@@ -1002,6 +1055,12 @@ export const CHANGELOG_SPECS = [
                 remedy: "language must be fi|en",
             },
             {
+                http: 400,
+                exit: 4,
+                meaning: "--bump-level on an already-RELEASED entry (one carrying a versionTag) — that bump has already shipped",
+                remedy: "Leave it as recorded; every other field is still editable. Only UNRELEASED entries (ib dev changelog pending) still drive a deploy.",
+            },
+            {
                 origin: "client",
                 exit: 4,
                 meaning: "--from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key",
@@ -1010,10 +1069,16 @@ export const CHANGELOG_SPECS = [
         ],
         notes: [
             "SHELL QUOTING (fb#300): this is the command used to CORRECT an entry, which is exactly the retry that hits the quoting hazard again — Windows PowerShell splits a native argument on inner double-quotes. Pass quote-bearing prose via --from-json <file|-> rather than stripping the quotes.",
+            "THE CORRECTION PATH FOR --bump-level (fb#303). Deploy Step 0 bumps each coordinated repo from the MAX bump level across the UNRELEASED entries naming it, so a wrong level mis-drives a real release. Fix it here — do NOT delete + re-add, which mints a new changelogId and orphans the cliFeedback row pointing at the old one.",
+            "--bump-level has NO default here (unlike `add`, where it defaults to patch): omitting it leaves the recorded level untouched, so an unrelated `update --status …` cannot silently downgrade a deliberate minor.",
+            "--feedback also marks that cliFeedback row applied and sets resolvedByChangelogId back to this entry — the only way to re-establish a link lost to delete + re-add (`ib dev feedback resolve` sets status/resolution but not the link).",
+            "DEPLOY-GATED: --bump-level/--feedback/--sentry became editable in a later puminet5api version. Against an older backend the PUT succeeds and echoes the row unchanged; the CLI compares the echo and warns on stderr rather than letting the edit vanish silently.",
         ],
+        seeAlso: ["ib dev changelog pending", "ib dev changelog get"],
         examples: [
             'ib dev changelog update 7 --status "Deployed prod"',
             "ib dev changelog update 386 --language en",
+            'ib dev changelog update 386 --bump-level none --reason "docs-only, should not bump"',
             "ib dev changelog update 386 --from-json ./patch.json",
         ],
     },
