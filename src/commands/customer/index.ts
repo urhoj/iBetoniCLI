@@ -6,6 +6,7 @@ import {
   type WriteFlags,
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
+  requireReason,
 } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith, errorMessage, setExitCode } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
@@ -1401,9 +1402,7 @@ export function registerCustomerCommands(
     c
       .command("delete <asiakasId>")
   ).action(guarded(async (asiakasIdStr: string, opts: WriteFlags) => {
-    if (!opts.reason) {
-      failWith("Missing required flag: --reason", 4);
-    }
+    requireReason(opts);
     const client = await getClient();
     const ownerAsiakasId = await resolveCurrentOwnerAsiakasId(client);
     const result = await runCustomerDelete(client, parseId(asiakasIdStr, "asiakasId"), ownerAsiakasId, opts);
@@ -1425,9 +1424,7 @@ export function registerCustomerCommands(
       .requiredOption("--person <id>", "Target personId", Number)
       .option("--contact-type <id>", "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)", Number, 1)
   ).action(guarded(async (opts: WriteFlags & { asiakas: number; person: number; contactType: number }) => {
-    if (!opts.reason) {
-      failWith("Missing required flag: --reason", 4);
-    }
+    requireReason(opts);
     const client = await getClient();
     const result = await runCustomerPersonAdd(
       client,
@@ -1444,9 +1441,7 @@ export function registerCustomerCommands(
       .requiredOption("--person <id>", "Target personId", Number)
       .option("--contact-type <id>", "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)", Number, 1)
   ).action(guarded(async (opts: WriteFlags & { asiakas: number; person: number; contactType: number }) => {
-    if (!opts.reason) {
-      failWith("Missing required flag: --reason", 4);
-    }
+    requireReason(opts);
     const client = await getClient();
     const result = await runCustomerPersonRemove(
       client,

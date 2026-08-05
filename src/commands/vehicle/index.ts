@@ -8,7 +8,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { decodeJwtPayload } from "../../auth/jwt.js";
+import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { parseId, resolveSearchQuery, cappedInt } from "../../targets.js";
 import { diffFields } from "../../diff.js";
 import { registerVehicleDriverCommands } from "./driver.js";
@@ -323,9 +323,7 @@ export async function runVehicleCreate(
   fields: VehicleWriteFields,
   flags: WriteFlags
 ): Promise<unknown> {
-  const ownerAsiakasId =
-    decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId ??
-    failWith("could not resolve ownerAsiakasId from the active token", 4);
+  const ownerAsiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
   const targetAsiakasId = fields.asiakasId ?? ownerAsiakasId;
   if (flags.dryRun) {
     return client.post(

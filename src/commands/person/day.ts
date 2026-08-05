@@ -2,25 +2,17 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, failWith } from "../../output/json.js";
-import { decodeJwtPayload } from "../../auth/jwt.js";
+import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { resolveDate } from "../../dates.js";
 import { guarded } from "../_shared/action.js";
 import {
   type WriteFlags,
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
+  requireReason,
 } from "../../api/writeFlags.js";
 
 type Row = Record<string, unknown>;
-
-/** Active company id (personPvm `:asiakasId`) from the JWT — same pattern as `vehicle create`. */
-function ownerAsiakasIdOf(client: ApiClient): number {
-  const { ownerAsiakasId } = decodeJwtPayload(client.getCurrentToken()) as { ownerAsiakasId?: number };
-  if (typeof ownerAsiakasId !== "number" || ownerAsiakasId <= 0) {
-    throw new Error("could not resolve active company from token — run `ib auth switch`");
-  }
-  return ownerAsiakasId;
-}
 
 /** 20260610 → "2026-06-10". */
 function intToDate(n: number): string {
@@ -53,7 +45,7 @@ export async function runPersonDayStatuses(
   client: ApiClient,
   opts: { full?: boolean } = {}
 ): Promise<ListEnvelope<StatusRow | StatusRowFull>> {
-  const asiakasId = ownerAsiakasIdOf(client);
+  const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
   const rows = await client.get<Row[]>(`/api/personPvm/statusList/${asiakasId}`);
   const items = (rows || []).map((r) => {
     const base: StatusRow = {
@@ -83,7 +75,7 @@ export async function runPersonDayGet(
   from: string,
   to?: string
 ): Promise<ListEnvelope<Row>> {
-  const asiakasId = ownerAsiakasIdOf(client);
+  const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
   const startDate = resolveDate(from) ?? from;
   const endDate = resolveDate(to ?? from) ?? (to ?? from);
   const params = new URLSearchParams({ startDate, endDate, personId: String(personId) });
@@ -146,7 +138,7 @@ export async function runPersonDaySet(
   statusValue: string,
   flags: PersonDaySetFlags
 ): Promise<unknown> {
-  const asiakasId = ownerAsiakasIdOf(client);
+  const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
   const pvm = toYyyymmdd(date);
   const statusId = await resolveStatusId(client, statusValue);
 
@@ -188,7 +180,7 @@ export async function runPersonDayClear(
   date: string,
   flags: WriteFlags
 ): Promise<unknown> {
-  const asiakasId = ownerAsiakasIdOf(client);
+  const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
   const existing = await runPersonDayGet(client, personId, date, date);
   const current = existing.items[0] as Row | undefined;
 
@@ -252,9 +244,7 @@ export function registerPersonDayCommands(
     .option("--text <s>", "Free-text note on the day row");
   addWriteFlagsToCommand(setCmd).action(
     guarded(async (opts: WriteFlags & { person: number; date: string; status: string; text?: string }) => {
-      if (!opts.reason) {
-        failWith("Missing required flag: --reason", 4);
-      }
+      requireReason(opts);
       const result = await runPersonDaySet(await getClient(), opts.person, opts.date, opts.status, opts);
       writeJson(result);
     })
@@ -266,13 +256,10 @@ export function registerPersonDayCommands(
     .requiredOption("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)");
   addWriteFlagsToCommand(clearCmd).action(
     guarded(async (opts: WriteFlags & { person: number; date: string }) => {
-      if (!opts.reason) {
-        failWith("Missing required flag: --reason", 4);
-      }
+      requireReason(opts);
       const result = await runPersonDayClear(await getClient(), opts.person, opts.date, opts);
       writeJson(result);
     })
   );
 }
 
-export type { WriteFlags };

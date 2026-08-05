@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { listEnvelope } from "../../api/envelopes.js";
-import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
+import { writeFlagsToHeaders, addWriteFlagsToCommand, requireReason, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith, errorMessage, setExitCode } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
@@ -981,9 +981,7 @@ export function registerCustomerCommands(parent, getClient) {
     });
     addWriteFlagsToCommand(c
         .command("delete <asiakasId>")).action(guarded(async (asiakasIdStr, opts) => {
-        if (!opts.reason) {
-            failWith("Missing required flag: --reason", 4);
-        }
+        requireReason(opts);
         const client = await getClient();
         const ownerAsiakasId = await resolveCurrentOwnerAsiakasId(client);
         const result = await runCustomerDelete(client, parseId(asiakasIdStr, "asiakasId"), ownerAsiakasId, opts);
@@ -999,9 +997,7 @@ export function registerCustomerCommands(parent, getClient) {
         .requiredOption("--asiakas <id>", "Target asiakasId", Number)
         .requiredOption("--person <id>", "Target personId", Number)
         .option("--contact-type <id>", "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)", Number, 1)).action(guarded(async (opts) => {
-        if (!opts.reason) {
-            failWith("Missing required flag: --reason", 4);
-        }
+        requireReason(opts);
         const client = await getClient();
         const result = await runCustomerPersonAdd(client, { asiakasId: opts.asiakas, personId: opts.person, contactPersonTypeId: opts.contactType }, opts);
         writeJson(result);
@@ -1011,9 +1007,7 @@ export function registerCustomerCommands(parent, getClient) {
         .requiredOption("--asiakas <id>", "Target asiakasId", Number)
         .requiredOption("--person <id>", "Target personId", Number)
         .option("--contact-type <id>", "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)", Number, 1)).action(guarded(async (opts) => {
-        if (!opts.reason) {
-            failWith("Missing required flag: --reason", 4);
-        }
+        requireReason(opts);
         const client = await getClient();
         const result = await runCustomerPersonRemove(client, { asiakasId: opts.asiakas, personId: opts.person, contactPersonTypeId: opts.contactType }, opts);
         writeJson(result);

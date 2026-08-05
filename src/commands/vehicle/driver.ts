@@ -1,12 +1,13 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
-import { writeJson, failWith } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import {
   type WriteFlags,
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
+  requireReason,
 } from "../../api/writeFlags.js";
 import { parseId } from "../../targets.js";
 import { guarded } from "../_shared/action.js";
@@ -156,11 +157,6 @@ export async function runVehicleDefaultSet(
     { vehicleId, personId },
     { headers: writeFlagsToHeaders(flags) }
   );
-}
-
-/** Hard-require --reason at the CLI layer (exit 4), matching the other lifecycle writes. */
-function requireReason(opts: WriteFlags): void {
-  if (!opts.reason) failWith("Missing required flag: --reason", 4);
 }
 
 /**

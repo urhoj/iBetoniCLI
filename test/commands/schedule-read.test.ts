@@ -3,9 +3,8 @@ import {
   runScheduleToday,
   runScheduleDay,
   runScheduleWeek,
-  addDaysISO,
 } from "../../src/commands/schedule/index.js";
-import { todayHelsinki } from "../../src/dates.js";
+import { addDaysISO, todayHelsinki } from "../../src/dates.js";
 import type { ApiClient } from "../../src/api/client.js";
 
 const mockClient = {

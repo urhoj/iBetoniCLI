@@ -1,6 +1,6 @@
-import { writeJson, failWith } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
-import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
+import { writeFlagsToHeaders, addWriteFlagsToCommand, requireReason, } from "../../api/writeFlags.js";
 import { parseId } from "../../targets.js";
 import { guarded } from "../_shared/action.js";
 /** YYYY-MM-DD (or today/yesterday/tomorrow) → integer yyyymmdd. */
@@ -79,11 +79,6 @@ export async function runVehicleDefaultGet(client, vehicleId) {
  */
 export async function runVehicleDefaultSet(client, vehicleId, personId, flags) {
     return client.post("/api/vehicle/setDefaultPumppari", { vehicleId, personId }, { headers: writeFlagsToHeaders(flags) });
-}
-/** Hard-require --reason at the CLI layer (exit 4), matching the other lifecycle writes. */
-function requireReason(opts) {
-    if (!opts.reason)
-        failWith("Missing required flag: --reason", 4);
 }
 /**
  * Register the `ib vehicle driver` subgroup — the single home for ALL driver

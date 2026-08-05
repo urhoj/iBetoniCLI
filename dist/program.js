@@ -49,7 +49,7 @@ import { registerImpersonationCommands } from "./commands/dev/impersonation/inde
 import { runReferenceDump, fetchPrimerGlossary } from "./reference/dump.js";
 import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailEdit, runReferenceDetailDelete, runReferenceDetailLint } from "./reference/detail.js";
 import { addEditFlags, parseEditOp } from "./textEdit.js";
-import { addWriteFlagsToCommand } from "./api/writeFlags.js";
+import { addWriteFlagsToCommand, requireReason } from "./api/writeFlags.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "./assess.js";
 import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDomain } from "./reference/commandsList.js";
 import { renderDomainHelp } from "./reference/domain.js";
@@ -77,7 +77,7 @@ export function buildProgram() {
     // Domain primer (what betoni.online is + glossary) on the root `--help`, so an
     // AI inspecting top-level help gets the same context `ib reference dump`
     // embeds. Sourced from reference/domain.ts — one source of truth, no drift.
-    program.addHelpText("after", () => renderDomainHelp(getCallerTier()));
+    program.addHelpText("after", () => renderDomainHelp());
     // Root command list is a table of contents: first sentence only (same
     // truncation formatGroupHelp applies to group listings); the full
     // description stays in each command's `--help`.
@@ -260,7 +260,7 @@ export function buildProgram() {
     detail
         .command("get")
         .argument("<command...>", "Command path after `ib` (e.g. keikka latest)")
-        .action(jsonAction(getClient, (client, commandParts) => runReferenceDetail(client, commandParts, getCallerTier())));
+        .action(jsonAction(getClient, (client, commandParts) => runReferenceDetail(client, commandParts)));
     addNeedsReviewFlags(detail
         .command("list")
         .option("--stalest <n>", "Return up to N entries sorted by least-recently reviewed", (v) => Number(v))
@@ -271,7 +271,7 @@ export function buildProgram() {
         // Validate the domain offline (exit 4 on unknown) before any network call,
         // mirroring `ib commands <domain>`.
         if (opts.domain)
-            assertKnownDomain(COMMAND_SPECS, opts.domain, getCallerTier());
+            assertKnownDomain(COMMAND_SPECS, opts.domain);
         const client = await getClient();
         writeJson(await runReferenceDetailList(client, opts.stalest, opts.domain, opts.withDetail ?? false, opts.needsReview ?? false, opts.maxConfidence, opts.search, opts.orphans ?? false));
     }));
@@ -295,11 +295,10 @@ export function buildProgram() {
             if (field !== "summary" && field !== "detail") {
                 failUsage("--field must be one of: summary, detail");
             }
-            if (!opts.dryRun && !opts.reason)
-                failWith("Missing required flag: --reason", 4);
+            requireReason(opts, { allowDryRun: true });
             try {
                 const client = await getClient();
-                writeJson(await runReferenceDetailEdit(client, commandParts, field, editOp, opts, getCallerTier()));
+                writeJson(await runReferenceDetailEdit(client, commandParts, field, editOp, opts));
             }
             catch (e) {
                 exitWithError(e);
@@ -308,7 +307,7 @@ export function buildProgram() {
         }
         assertAiConfidence(opts.aiConfidence);
         const client = await getClient();
-        const result = await runReferenceDetailSet(client, commandParts, { summary: opts.summary, detail: opts.detail, aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }, opts, getCallerTier());
+        const result = await runReferenceDetailSet(client, commandParts, { summary: opts.summary, detail: opts.detail, aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }, opts);
         writeJson(result);
     }));
     // `delete` — prune one catalog row by its EXACT key. Deliberately NOT gated by
@@ -318,8 +317,7 @@ export function buildProgram() {
         .command("delete")
         .argument("<command...>", "The exact stored command key after `ib` (e.g. ai conversation)");
     addWriteFlagsToCommand(detailDelete).action(guarded(async (commandParts, opts) => {
-        if (!opts.dryRun && !opts.reason)
-            failWith("Missing required flag: --reason", 4);
+        requireReason(opts, { allowDryRun: true });
         const client = await getClient();
         writeJson(await runReferenceDetailDelete(client, commandParts, opts));
     }));
@@ -354,8 +352,8 @@ export function buildProgram() {
                 mutations: opts.mutations,
                 reads: opts.reads,
                 permission: opts.permission,
-            }, getCallerTier())
-            : buildDomainIndex(undefined, getCallerTier()));
+            })
+            : buildDomainIndex());
     }));
     // Replace each subcommand's `--help` with its rich CommandSpec rendering.
     attachRichHelp(program, COMMAND_SPECS);

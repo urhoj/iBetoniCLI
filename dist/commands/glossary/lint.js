@@ -11,17 +11,6 @@ export function isKnownCommandPath(path) {
         return false;
     return COMMAND_SPECS.some((s) => s.command === p || s.command.startsWith(p + " "));
 }
-/** Levenshtein edit distance between two strings. */
-export function levenshtein(a, b) {
-    const m = a.length, n = b.length;
-    const d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
-    for (let j = 0; j <= n; j++)
-        d[0][j] = j;
-    for (let i = 1; i <= m; i++)
-        for (let j = 1; j <= n; j++)
-            d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-    return d[m][n];
-}
 /**
  * True iff `levenshtein(a, b) === 1`, decided in O(len) with no allocation —
  * the near-duplicate pass compares every term pair (O(n²) pairs), where the

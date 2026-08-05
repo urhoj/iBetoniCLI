@@ -1,5 +1,6 @@
 import { createStore } from "./store.js";
 import { DEFAULT_ENDPOINT } from "../globals.js";
+import { decodeJwtPayload } from "./jwt.js";
 /**
  * Resolve auth for a CLI invocation, preferring the `IB_TOKEN` env var over
  * the on-disk credentials store. Returns `null` when neither is available —
@@ -11,7 +12,6 @@ import { DEFAULT_ENDPOINT } from "../globals.js";
  */
 export async function resolveAuth(opts) {
     if (process.env.IB_TOKEN) {
-        const { decodeJwtPayload } = await import("./jwt.js");
         let personId = null;
         let ownerAsiakasId = null;
         try {

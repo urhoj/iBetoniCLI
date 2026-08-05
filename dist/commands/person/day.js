@@ -1,17 +1,9 @@
 import { listEnvelope } from "../../api/envelopes.js";
 import { writeJson, failWith } from "../../output/json.js";
-import { decodeJwtPayload } from "../../auth/jwt.js";
+import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { resolveDate } from "../../dates.js";
 import { guarded } from "../_shared/action.js";
-import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
-/** Active company id (personPvm `:asiakasId`) from the JWT — same pattern as `vehicle create`. */
-function ownerAsiakasIdOf(client) {
-    const { ownerAsiakasId } = decodeJwtPayload(client.getCurrentToken());
-    if (typeof ownerAsiakasId !== "number" || ownerAsiakasId <= 0) {
-        throw new Error("could not resolve active company from token — run `ib auth switch`");
-    }
-    return ownerAsiakasId;
-}
+import { writeFlagsToHeaders, addWriteFlagsToCommand, requireReason, } from "../../api/writeFlags.js";
 /** 20260610 → "2026-06-10". */
 function intToDate(n) {
     const s = String(n);
@@ -23,7 +15,7 @@ function toYyyymmdd(date) {
 }
 /** GET /api/personPvm/statusList/:asiakasId — the day-status types for the active company. */
 export async function runPersonDayStatuses(client, opts = {}) {
-    const asiakasId = ownerAsiakasIdOf(client);
+    const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
     const rows = await client.get(`/api/personPvm/statusList/${asiakasId}`);
     const items = (rows || []).map((r) => {
         const base = {
@@ -48,7 +40,7 @@ export async function runPersonDayStatuses(client, opts = {}) {
 }
 /** GET /api/personPvm/list/:asiakasId — a person's day rows over [from, to] (to defaults to from). */
 export async function runPersonDayGet(client, personId, from, to) {
-    const asiakasId = ownerAsiakasIdOf(client);
+    const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
     const startDate = resolveDate(from) ?? from;
     const endDate = resolveDate(to ?? from) ?? (to ?? from);
     const params = new URLSearchParams({ startDate, endDate, personId: String(personId) });
@@ -96,7 +88,7 @@ export async function resolveStatusId(client, value) {
  * person from that day's pump keikkat.
  */
 export async function runPersonDaySet(client, personId, date, statusValue, flags) {
-    const asiakasId = ownerAsiakasIdOf(client);
+    const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
     const pvm = toYyyymmdd(date);
     const statusId = await resolveStatusId(client, statusValue);
     const existing = await runPersonDayGet(client, personId, date, date);
@@ -132,7 +124,7 @@ export async function runPersonDaySet(client, personId, date, statusValue, flags
  * (returns wouldDelete, no DELETE). No row → a clean "nothing to delete" result.
  */
 export async function runPersonDayClear(client, personId, date, flags) {
-    const asiakasId = ownerAsiakasIdOf(client);
+    const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
     const existing = await runPersonDayGet(client, personId, date, date);
     const current = existing.items[0];
     if (flags.dryRun) {
@@ -183,9 +175,7 @@ export function registerPersonDayCommands(person, getClient) {
         .requiredOption("--status <id|name>", "personPvmStatusId or status name (see `ib person day statuses`)")
         .option("--text <s>", "Free-text note on the day row");
     addWriteFlagsToCommand(setCmd).action(guarded(async (opts) => {
-        if (!opts.reason) {
-            failWith("Missing required flag: --reason", 4);
-        }
+        requireReason(opts);
         const result = await runPersonDaySet(await getClient(), opts.person, opts.date, opts.status, opts);
         writeJson(result);
     }));
@@ -194,9 +184,7 @@ export function registerPersonDayCommands(person, getClient) {
         .requiredOption("--person <id>", "personId", (s) => Number(s))
         .requiredOption("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)");
     addWriteFlagsToCommand(clearCmd).action(guarded(async (opts) => {
-        if (!opts.reason) {
-            failWith("Missing required flag: --reason", 4);
-        }
+        requireReason(opts);
         const result = await runPersonDayClear(await getClient(), opts.person, opts.date, opts);
         writeJson(result);
     }));

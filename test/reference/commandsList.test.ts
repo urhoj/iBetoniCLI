@@ -97,11 +97,6 @@ describe("buildCommandsList", () => {
     expect(env.items.every((c) => c.isWrite)).toBe(true);
   });
 
-  test("flat list never carries a hint (the domain index owns discovery)", () => {
-    expect(buildCommandsList({}).hint).toBeUndefined();
-    expect(buildCommandsList({ domain: "keikka" }).hint).toBeUndefined();
-  });
-
   test("nested dev subgroup token resolves to its canonical command list", () => {
     const env = buildCommandsList({ domain: "changelog" }, "developer");
     const commands = env.items.map((i) => i.command);

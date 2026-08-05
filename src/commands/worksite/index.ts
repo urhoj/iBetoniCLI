@@ -5,9 +5,10 @@ import {
   type WriteFlags,
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
+  requireReason,
 } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
-import { decodeJwtPayload } from "../../auth/jwt.js";
+import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { parseJsonBodyFlag, resolveJsonObjectBody } from "../../api/parseBody.js";
 import { registerLogAlias } from "../log/index.js";
 import { resolveTarget, parseId, resolveSearchQuery, cappedInt } from "../../targets.js";
@@ -342,21 +343,6 @@ export async function runWorksiteDelete(
 }
 
 /**
- * Derive the active company's ownerAsiakasId from the client's JWT. Used by
- * `worksite update` so the CLI no longer asks for --owner-asiakas-id. Throws a
- * clean Error when the token carries no usable owner claim; the command action
- * routes it through exitWithError (generic exit 1).
- */
-export function resolveOwnerAsiakasId(client: ApiClient): number {
-  const token = client.getCurrentToken();
-  const owner = token ? decodeJwtPayload(token).ownerAsiakasId : undefined;
-  if (owner === undefined || !Number.isFinite(owner) || owner < 1) {
-    throw new Error("Could not derive ownerAsiakasId from the active session token");
-  }
-  return owner;
-}
-
-/**
  * Shape of the request body for both `worksite person add` and
  * `worksite person remove`. `contactPersonTypeId` defaults to 1 on the CLI
  * surface (matches FE default for tyomaaPerson links).
@@ -477,7 +463,7 @@ export async function runWorksiteDashboard(
  *   - merge           merge two duplicate worksites (--dry-run = /validate; IRREVERSIBLE; requires --reason)
  *
  * The `update` action derives ownerAsiakasId from the session JWT via
- * `resolveOwnerAsiakasId` — no --owner-asiakas-id flag required.
+ * `ownerAsiakasIdFromToken` — no --owner-asiakas-id flag required.
  * `--yyyymmdd` defaults to today.
  *
  * Exit codes: 1 = generic API/runtime failure.
@@ -659,7 +645,7 @@ export function registerWorksiteCommands(
         );
       }
       const client = await getClient();
-      const ownerAsiakasId = resolveOwnerAsiakasId(client);
+      const ownerAsiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
       const result = await runWorksiteUpdate(
         client,
         { tyomaaId: parseId(idStr, "tyomaaId"), ownerAsiakasId, yyyymmdd: opts.yyyymmdd },
@@ -674,9 +660,7 @@ export function registerWorksiteCommands(
     w
       .command("delete <tyomaaId>")
   ).action(guarded(async (tyomaaIdStr: string, opts: WriteFlags) => {
-    if (!opts.reason) {
-      failWith("Missing required flag: --reason", 4);
-    }
+    requireReason(opts);
     const client = await getClient();
     const result = await runWorksiteDelete(client, parseId(tyomaaIdStr, "tyomaaId"), opts);
     writeJson(result);
@@ -718,9 +702,7 @@ export function registerWorksiteCommands(
       .requiredOption("--person <id>", "Target personId", Number)
       .option("--contact-type <id>", "contactPersonTypeId (default 1)", Number, 1)
   ).action(guarded(async (opts: WriteFlags & { worksite: number; person: number; contactType: number }) => {
-    if (!opts.reason) {
-      failWith("Missing required flag: --reason", 4);
-    }
+    requireReason(opts);
     const client = await getClient();
     const result = await runWorksitePersonAdd(
       client,
@@ -737,9 +719,7 @@ export function registerWorksiteCommands(
       .requiredOption("--person <id>", "Target personId", Number)
       .option("--contact-type <id>", "contactPersonTypeId (default 1)", Number, 1)
   ).action(guarded(async (opts: WriteFlags & { worksite: number; person: number; contactType: number }) => {
-    if (!opts.reason) {
-      failWith("Missing required flag: --reason", 4);
-    }
+    requireReason(opts);
     const client = await getClient();
     const result = await runWorksitePersonRemove(
       client,

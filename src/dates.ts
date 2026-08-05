@@ -27,7 +27,7 @@ export function todayHelsinki(now: Date = new Date()): string {
 }
 
 /** Shift an ISO `YYYY-MM-DD` by whole days, DST-safe (pure calendar math). */
-function shiftIsoDays(iso: string, days: number): string {
+export function addDaysISO(iso: string, days: number): string {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
@@ -36,14 +36,9 @@ function shiftIsoDays(iso: string, days: number): string {
 export function resolveDate(input: string | undefined): string | undefined {
   if (!input) return undefined;
   if (input === "today") return todayHelsinki();
-  if (input === "yesterday") return shiftIsoDays(todayHelsinki(), -1);
-  if (input === "tomorrow") return shiftIsoDays(todayHelsinki(), 1);
+  if (input === "yesterday") return addDaysISO(todayHelsinki(), -1);
+  if (input === "tomorrow") return addDaysISO(todayHelsinki(), 1);
   return input;
-}
-
-/** Shift an ISO YYYY-MM-DD by whole days (public alias of the internal shift). */
-export function addDaysISO(iso: string, days: number): string {
-  return shiftIsoDays(iso, days);
 }
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
@@ -60,5 +55,5 @@ export function monthRange(month: string): { from: string; to: string } {
 
 /** Expand a start date to the 7-day window [start, start+6]. */
 export function weekRange(start: string): { from: string; to: string } {
-  return { from: start, to: shiftIsoDays(start, 6) };
+  return { from: start, to: addDaysISO(start, 6) };
 }

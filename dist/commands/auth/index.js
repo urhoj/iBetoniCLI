@@ -11,7 +11,7 @@ import { resolveCallerTier } from "../../tier.js";
 import { CliError } from "../../api/errors.js";
 import { guarded } from "../_shared/action.js";
 import { performImpersonate, performImpersonateExtend, performImpersonateEnd, buildImpersonationProfile, IMPERSONATOR_PROFILE, } from "../../auth/impersonate.js";
-import { writeJson, writeError, failWith, errorMessage } from "../../output/json.js";
+import { writeJson, failWith, errorMessage } from "../../output/json.js";
 /**
  * Register `ib auth` subcommands on the parent commander instance:
  *   - login    OAuth 2.1 + PKCE flow with local 127.0.0.1 callback
@@ -34,7 +34,7 @@ export function registerAuthCommands(parent, isReadOnly) {
         // during parse (Commander recognises root options anywhere), so a local
         // duplicate silently fell back to its default — `auth login --endpoint
         // <staging>` authorized against PROD. Read the global instead.
-        .action(async () => {
+        .action(guarded(async () => {
         try {
             await performLogin({
                 endpoint: getGlobalOptions(parent).endpoint ?? DEFAULT_ENDPOINT,
@@ -42,15 +42,17 @@ export function registerAuthCommands(parent, isReadOnly) {
             });
         }
         catch (e) {
-            // exitCode + return, NOT process.exit(): forced exit after the OAuth
-            // fetches crashes Node on Windows (libuv assert → exit 127).
-            writeError(e);
-            process.exitCode = 2;
+            // Anything that goes wrong in the OAuth flow is an auth failure —
+            // re-raised as a CliError so `guarded` reports it, instead of the old
+            // bare `process.exitCode = 2` that an in-process (EmbeddedCtx) caller
+            // never saw. `guarded` also keeps the Windows-safe "never
+            // process.exit() post-fetch" rule.
+            failWith(errorMessage(e), 2);
         }
-    });
+    }));
     auth
         .command("logout")
-        .action(async () => {
+        .action(guarded(async () => {
         try {
             const store = createStore(defaultCredentialsPath());
             const creds = await store.load();
@@ -66,11 +68,11 @@ export function registerAuthCommands(parent, isReadOnly) {
             });
         }
         catch (e) {
-            // exitCode + return — see `auth login` (Windows libuv crash).
-            writeError(e);
-            process.exitCode = 1;
+            // Generic exit 1 — a best-effort revoke that fails is not an auth
+            // problem. Raised as a CliError so `guarded` records it (see login).
+            failWith(errorMessage(e), 1);
         }
-    });
+    }));
     auth
         .command("whoami")
         .action(guarded(async () => {
@@ -159,7 +161,7 @@ export function registerAuthCommands(parent, isReadOnly) {
     }));
     auth
         .command("refresh")
-        .action(async () => {
+        .action(guarded(async () => {
         try {
             const store = createStore(defaultCredentialsPath());
             const creds = await store.load();
@@ -183,11 +185,14 @@ export function registerAuthCommands(parent, isReadOnly) {
             writeJson({ ok: true });
         }
         catch (e) {
-            // exitCode + return — see `auth login` (Windows libuv crash).
-            writeError(e);
-            process.exitCode = e instanceof CliError ? e.exitCode : 2;
+            // The guards above already carry their own exit codes; anything else
+            // that fails a refresh is an auth failure (exit 2). Re-raised so
+            // `guarded` reports it — see `auth login`.
+            if (e instanceof CliError)
+                throw e;
+            failWith(errorMessage(e), 2);
         }
-    });
+    }));
     auth
         .command("impersonate")
         .argument("[personId]", "Target personId (or use --email)", (v) => Number(v))

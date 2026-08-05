@@ -10,7 +10,6 @@
  * on demand, not dumped into every help render). One source of truth → the
  * primer can never drift from the CLI it describes.
  */
-import type { CallerTier } from "../tier.js";
 
 /** One-paragraph description of the platform, tenancy model, and BetoniJerry. */
 export const DOMAIN_OVERVIEW =
@@ -155,11 +154,10 @@ export const TOPICS: Topic[] = [
  * NOT dumped into every help render, so help stays small (and needs no network
  * round-trip) as the self-improving glossary grows.
  *
- * The `tier` parameter is accepted for API compatibility (callers pass
- * `getCallerTier()`) but is unused — the glossary is DB-backed and tier-scoped
- * server-side.
+ * Tier-blind on purpose: the only tier-sensitive content this block ever had
+ * was the glossary, which is now a pointer resolved server-side per caller.
  */
-export function renderDomainHelp(_tier: CallerTier = "developer"): string {
+export function renderDomainHelp(): string {
   const lines: string[] = [];
   lines.push("");
   lines.push("ABOUT");

@@ -21,7 +21,7 @@ import {
   buildImpersonationProfile,
   IMPERSONATOR_PROFILE,
 } from "../../auth/impersonate.js";
-import { writeJson, writeError, failWith, errorMessage } from "../../output/json.js";
+import { writeJson, failWith, errorMessage } from "../../output/json.js";
 
 /**
  * Register `ib auth` subcommands on the parent commander instance:
@@ -49,42 +49,48 @@ export function registerAuthCommands(
     // during parse (Commander recognises root options anywhere), so a local
     // duplicate silently fell back to its default — `auth login --endpoint
     // <staging>` authorized against PROD. Read the global instead.
-    .action(async () => {
-      try {
-        await performLogin({
-          endpoint: getGlobalOptions(parent).endpoint ?? DEFAULT_ENDPOINT,
-          credentialsPath: defaultCredentialsPath(),
-        });
-      } catch (e) {
-        // exitCode + return, NOT process.exit(): forced exit after the OAuth
-        // fetches crashes Node on Windows (libuv assert → exit 127).
-        writeError(e);
-        process.exitCode = 2;
-      }
-    });
+    .action(
+      guarded(async () => {
+        try {
+          await performLogin({
+            endpoint: getGlobalOptions(parent).endpoint ?? DEFAULT_ENDPOINT,
+            credentialsPath: defaultCredentialsPath(),
+          });
+        } catch (e) {
+          // Anything that goes wrong in the OAuth flow is an auth failure —
+          // re-raised as a CliError so `guarded` reports it, instead of the old
+          // bare `process.exitCode = 2` that an in-process (EmbeddedCtx) caller
+          // never saw. `guarded` also keeps the Windows-safe "never
+          // process.exit() post-fetch" rule.
+          failWith(errorMessage(e), 2);
+        }
+      })
+    );
 
   auth
     .command("logout")
-    .action(async () => {
-      try {
-        const store = createStore(defaultCredentialsPath());
-        const creds = await store.load();
-        if (!creds) {
-          // Not logged in — no-op success.
-          return;
+    .action(
+      guarded(async () => {
+        try {
+          const store = createStore(defaultCredentialsPath());
+          const creds = await store.load();
+          if (!creds) {
+            // Not logged in — no-op success.
+            return;
+          }
+          await performLogout({
+            endpoint: creds.endpoint,
+            refreshToken: creds.refreshToken,
+            jwt: creds.jwt,
+            credentialsPath: defaultCredentialsPath(),
+          });
+        } catch (e) {
+          // Generic exit 1 — a best-effort revoke that fails is not an auth
+          // problem. Raised as a CliError so `guarded` records it (see login).
+          failWith(errorMessage(e), 1);
         }
-        await performLogout({
-          endpoint: creds.endpoint,
-          refreshToken: creds.refreshToken,
-          jwt: creds.jwt,
-          credentialsPath: defaultCredentialsPath(),
-        });
-      } catch (e) {
-        // exitCode + return — see `auth login` (Windows libuv crash).
-        writeError(e);
-        process.exitCode = 1;
-      }
-    });
+      })
+    );
 
   auth
     .command("whoami")
@@ -192,38 +198,42 @@ export function registerAuthCommands(
 
   auth
     .command("refresh")
-    .action(async () => {
-      try {
-        const store = createStore(defaultCredentialsPath());
-        const creds = await store.load();
-        if (!creds) {
-          failWith("Not logged in. Run `ib auth login` first.", 2);
+    .action(
+      guarded(async () => {
+        try {
+          const store = createStore(defaultCredentialsPath());
+          const creds = await store.load();
+          if (!creds) {
+            failWith("Not logged in. Run `ib auth login` first.", 2);
+          }
+          // The bearer refresh re-derives DB claims and would DROP imp/imp_sid +
+          // the 10-min cap — silently escalating an impersonation into a
+          // permanent login as the target. Same invariant as the disabled
+          // refresh-on-401 in cliContext.
+          if (creds.impersonation) {
+            failWith(
+              "refresh is disabled while impersonating (it would escalate to a permanent login as the target)",
+              4,
+              "use `ib auth impersonate --extend` for 10 more minutes, or `--end` to restore your own login"
+            );
+          }
+          // Bearer refresh first; OAuth refresh_token grant fallback when the
+          // JWT already lapsed (fb#258). Persists JWT + rotated refresh token.
+          await refreshAndPersistSession({
+            endpoint: creds.endpoint,
+            store,
+            currentJwt: creds.jwt,
+          });
+          writeJson({ ok: true });
+        } catch (e) {
+          // The guards above already carry their own exit codes; anything else
+          // that fails a refresh is an auth failure (exit 2). Re-raised so
+          // `guarded` reports it — see `auth login`.
+          if (e instanceof CliError) throw e;
+          failWith(errorMessage(e), 2);
         }
-        // The bearer refresh re-derives DB claims and would DROP imp/imp_sid +
-        // the 10-min cap — silently escalating an impersonation into a
-        // permanent login as the target. Same invariant as the disabled
-        // refresh-on-401 in cliContext.
-        if (creds.impersonation) {
-          failWith(
-            "refresh is disabled while impersonating (it would escalate to a permanent login as the target)",
-            4,
-            "use `ib auth impersonate --extend` for 10 more minutes, or `--end` to restore your own login"
-          );
-        }
-        // Bearer refresh first; OAuth refresh_token grant fallback when the
-        // JWT already lapsed (fb#258). Persists JWT + rotated refresh token.
-        await refreshAndPersistSession({
-          endpoint: creds.endpoint,
-          store,
-          currentJwt: creds.jwt,
-        });
-        writeJson({ ok: true });
-      } catch (e) {
-        // exitCode + return — see `auth login` (Windows libuv crash).
-        writeError(e);
-        process.exitCode = e instanceof CliError ? e.exitCode : 2;
-      }
-    });
+      })
+    );
 
   auth
     .command("impersonate")

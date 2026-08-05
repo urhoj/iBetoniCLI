@@ -9,14 +9,11 @@ import {
 import { writeJson, failWith } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveDate, todayHelsinki, addDaysISO } from "../../dates.js";
-import { decodeJwtPayload } from "../../auth/jwt.js";
+import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { registerLogAlias } from "../log/index.js";
 import { parseId, resolveSearchQuery, cappedInt } from "../../targets.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
-
-// Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
-export { resolveDate };
 
 export interface KeikkaListFilter {
   from?: string;
@@ -433,9 +430,7 @@ export function registerKeikkaCommands(
     .action(
       guarded(async (query: string | undefined, opts: { search?: string; limit?: number }) => {
         const client = await getClient();
-        const ownerAsiakasId =
-          decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId ??
-          failWith("could not resolve ownerAsiakasId from the active token", 4);
+        const ownerAsiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
         const result = await runKeikkaSearch(client, resolveSearchQuery(query, opts.search), ownerAsiakasId, opts.limit);
         writeJson(result);
       })

@@ -5,6 +5,7 @@ import {
   type WriteFlags,
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
+  requireReason,
 } from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
 import { resolveDate, todayHelsinki } from "../../../dates.js";
@@ -329,7 +330,7 @@ export function registerMessageBoardCommands(
       startDate?: string;
       expiresAt?: string;
     }) => {
-      if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
+      requireReason(opts, { allowDryRun: true });
       if (!opts.startDate) failWith("Missing required flag: --start-date", 4);
       assertPriority(opts.priority);
       const client = await getClient();
@@ -357,7 +358,7 @@ export function registerMessageBoardCommands(
       }
     ) => {
       const messageId = parseMessageId(raw);
-      if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
+      requireReason(opts, { allowDryRun: true });
       assertPriority(opts.priority);
       const client = await getClient();
       const fields = buildBoardFields(opts);
@@ -370,7 +371,7 @@ export function registerMessageBoardCommands(
   addWriteFlagsToCommand(deleteCmd).action(
     guarded(async (raw: string, opts: WriteFlags) => {
       const messageId = parseMessageId(raw);
-      if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
+      requireReason(opts, { allowDryRun: true });
       const client = await getClient();
       writeJson(await runBoardDelete(client, messageId, opts));
     })

@@ -1,5 +1,6 @@
 import { createStore } from "./store.js";
 import { DEFAULT_ENDPOINT } from "../globals.js";
+import { decodeJwtPayload } from "./jwt.js";
 
 /**
  * Resolved authentication for a CLI invocation.
@@ -33,7 +34,6 @@ export async function resolveAuth(opts: {
   defaultEndpoint?: string;
 }): Promise<ResolvedAuth | null> {
   if (process.env.IB_TOKEN) {
-    const { decodeJwtPayload } = await import("./jwt.js");
     let personId: number | null = null;
     let ownerAsiakasId: number | null = null;
     try {

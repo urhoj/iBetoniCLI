@@ -2,9 +2,8 @@ import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   runKeikkaList,
   runKeikkaGet,
-  resolveDate,
 } from "../../src/commands/keikka/index.js";
-import { todayHelsinki } from "../../src/dates.js";
+import { resolveDate, todayHelsinki } from "../../src/dates.js";
 import type { ApiClient } from "../../src/api/client.js";
 
 const mockClient = {

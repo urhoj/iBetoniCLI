@@ -74,10 +74,21 @@ describe("ib dev umbrella", () => {
   test("canonicalPath maps alias paths to their spec path and leaves others alone", () => {
     expect(canonicalPath("ib feedback create")).toBe("ib dev feedback create");
     expect(canonicalPath("ib changelog")).toBe("ib dev changelog");
+    // the `ib opendata` re-homing rides the same table
+    expect(canonicalPath("ib weather forecast")).toBe("ib opendata weather forecast");
+    expect(canonicalPath("ib customer prh")).toBe("ib opendata prh");
     // already canonical, unrelated, and too-short paths pass through untouched
     expect(canonicalPath("ib dev feedback create")).toBe("ib dev feedback create");
+    expect(canonicalPath("ib opendata weather forecast")).toBe("ib opendata weather forecast");
     expect(canonicalPath("ib keikka list")).toBe("ib keikka list");
     expect(canonicalPath("ib")).toBe("ib");
+  });
+
+  test("matching is word-boundary aware — a longer name sharing the prefix is untouched", () => {
+    expect(canonicalPath("ib weatherx")).toBe("ib weatherx");
+    expect(canonicalPath("ib aid list")).toBe("ib aid list");
+    expect(canonicalPath("ib customer prhx")).toBe("ib customer prhx");
+    expect(canonicalPath("ib customer list")).toBe("ib customer list");
   });
 
   test("an alias LEAF renders the same rich help as its canonical path", () => {
@@ -90,6 +101,8 @@ describe("ib dev umbrella", () => {
       ["ib feedback create", "ib dev feedback create"],
       ["ib changelog add", "ib dev changelog add"],
       ["ib schema tables", "ib dev schema tables"],
+      ["ib weather forecast", "ib opendata weather forecast"],
+      ["ib customer prh", "ib opendata prh"],
     ] as const) {
       expect(helpFor(root, alias)).toBe(helpFor(root, canonical));
       // and it really is the rich rendering, not two identical bare renders

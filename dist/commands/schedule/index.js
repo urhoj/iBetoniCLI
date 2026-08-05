@@ -2,7 +2,6 @@ import { writeJson } from "../../output/json.js";
 import { runKeikkaList } from "../keikka/index.js";
 import { todayHelsinki, resolveDate, addDaysISO } from "../../dates.js";
 import { jsonAction, guarded } from "../_shared/action.js";
-export { addDaysISO };
 /**
  * `ib schedule today` — thin wrapper around runKeikkaList with from=to=today.
  */

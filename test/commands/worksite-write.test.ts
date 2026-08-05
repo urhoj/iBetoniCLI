@@ -5,10 +5,11 @@ import {
   runWorksiteRefreshLocation,
   runWorksiteSetGeofence,
   runWorksiteHelsinkiFetch,
-  resolveOwnerAsiakasId,
   buildWorksiteUpdateBody,
 } from "../../src/commands/worksite/index.js";
+import { ownerAsiakasIdFromToken } from "../../src/owner.js";
 import type { ApiClient } from "../../src/api/client.js";
+import type { CliError } from "../../src/api/errors.js";
 import { decodeJwtPayload } from "../../src/auth/jwt.js";
 vi.mock("../../src/auth/jwt.js", () => ({
   decodeJwtPayload: vi.fn(),
@@ -116,16 +117,22 @@ describe("ib worksite create/update", () => {
     );
   });
 
-  test("resolveOwnerAsiakasId decodes the active token's ownerAsiakasId", () => {
+  test("ownerAsiakasIdFromToken decodes the active token's ownerAsiakasId", () => {
     (mockClient.getCurrentToken as ReturnType<typeof vi.fn>).mockReturnValue("jwt.token.sig");
     (decodeJwtPayload as ReturnType<typeof vi.fn>).mockReturnValue({ ownerAsiakasId: 1349 });
-    expect(resolveOwnerAsiakasId(mockClient)).toBe(1349);
+    expect(ownerAsiakasIdFromToken(mockClient)).toBe(1349);
   });
 
-  test("resolveOwnerAsiakasId throws when owner missing", () => {
+  test("ownerAsiakasIdFromToken exits 4 (not 1) when the owner claim is missing", () => {
     (mockClient.getCurrentToken as ReturnType<typeof vi.fn>).mockReturnValue("jwt.token.sig");
     (decodeJwtPayload as ReturnType<typeof vi.fn>).mockReturnValue({ ownerAsiakasId: NaN });
-    expect(() => resolveOwnerAsiakasId(mockClient)).toThrow();
+    try {
+      ownerAsiakasIdFromToken(mockClient);
+      throw new Error("expected a throw");
+    } catch (e) {
+      expect((e as CliError).exitCode).toBe(4);
+      expect((e as Error).message).toContain("could not resolve active company");
+    }
   });
 });
 

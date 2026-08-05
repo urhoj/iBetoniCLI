@@ -1,7 +1,7 @@
 import { COMMAND_SPECS } from "./specs.js";
 import { CliError } from "../api/errors.js";
 import { domainBlurb } from "./domain.js";
-import { visibleSpecs, domainOf, hiddenDomainsAtTier } from "../tier.js";
+import { visibleSpecs, domainOf, hiddenDomainsAtTier, getCallerTier, } from "../tier.js";
 /** Single source for the write classification used by `ib commands`. */
 const isWriteSpec = (s) => s.mutates ?? !!s.writeFlags;
 function commandRelativePath(command) {
@@ -42,7 +42,7 @@ function resolveDomainFilter(specs, domain, tier) {
  * and `ib reference dump` (`buildReference`) so the two discovery surfaces
  * resolve tokens identically and can never drift (feedback #137).
  */
-export function specMatcherForToken(specs, token, tier = "developer") {
+export function specMatcherForToken(specs, token, tier = getCallerTier()) {
     const filter = resolveDomainFilter(specs, token, tier);
     if (filter.kind === "subgroup") {
         const prefix = filter.relativePrefix;
@@ -78,7 +78,7 @@ export function fullyHiddenDomains(tier) {
  * it yields an empty list); `tier` narrows ONLY the "Valid:" suggestion list so
  * the error never leaks a developer-only domain to a standard caller.
  */
-export function assertKnownDomain(specs, domain, tier = "developer") {
+export function assertKnownDomain(specs, domain, tier = getCallerTier()) {
     const valid = commandDomains(specs); // FULL set — validation
     if (!valid.includes(domain)) {
         const visible = visibleSpecs(specs, tier); // visible-only — never leak a hidden subtree
@@ -102,7 +102,7 @@ export function assertKnownDomain(specs, domain, tier = "developer") {
  * passing both is a validation error (exit 4). `permission` matches a
  * case-insensitive substring against each spec's `permissions` entries.
  */
-export function filterCommandSpecs(specs, filter, tier = "developer") {
+export function filterCommandSpecs(specs, filter, tier = getCallerTier()) {
     if (filter.mutations && filter.reads) {
         throw new CliError("--mutations and --reads are mutually exclusive", 0, null, 4);
     }
@@ -139,7 +139,7 @@ export function filterCommandSpecs(specs, filter, tier = "developer") {
  * Build the `ib commands` envelope from the live {@link COMMAND_SPECS}. Pure —
  * callers (`program.ts`) handle stdout via `writeJson`.
  */
-export function buildCommandsList(filter, tier = "developer") {
+export function buildCommandsList(filter, tier = getCallerTier()) {
     const items = filterCommandSpecs(COMMAND_SPECS, filter, tier);
     return { items, nextCursor: null, count: items.length };
 }
@@ -151,7 +151,7 @@ export function buildCommandsList(filter, tier = "developer") {
  * {@link DOMAIN_BLURBS} map (via {@link domainBlurb}), so domains without an
  * entry get null.
  */
-export function buildDomainIndex(specs = COMMAND_SPECS, tier = "developer") {
+export function buildDomainIndex(specs = COMMAND_SPECS, tier = getCallerTier()) {
     const visible = visibleSpecs(specs, tier);
     const items = commandDomains(visible)
         .map((domain) => {

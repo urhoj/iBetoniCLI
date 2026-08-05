@@ -38,7 +38,7 @@ describe("root --help command listing is tier-filtered", () => {
 
 describe("root --help GLOSSARY is a pointer, not a term dump", () => {
   test("points to ib glossary list/lookup and is only a few lines", () => {
-    const primer = renderDomainHelp("developer");
+    const primer = renderDomainHelp();
     const lines = primer.split("\n");
     const gi = lines.findIndex((l) => l.startsWith("GLOSSARY"));
     const fi = lines.findIndex((l) => l.startsWith("FILING FEEDBACK"));

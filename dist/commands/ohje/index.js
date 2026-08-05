@@ -1,5 +1,5 @@
 import { listEnvelope } from "../../api/envelopes.js";
-import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
+import { writeFlagsToHeaders, addWriteFlagsToCommand, requireReason, } from "../../api/writeFlags.js";
 import { writeJson, failWith, failUsage } from "../../output/json.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
@@ -253,8 +253,7 @@ export function registerOhjeCommands(parent, getClient) {
                 failUsage(`--field must be one of: ${OHJE_EDITABLE_FIELDS.join(", ")}`);
             }
             const field = rawField;
-            if (!opts.dryRun && !opts.reason)
-                failWith("Missing required flag: --reason", 4);
+            requireReason(opts, { allowDryRun: true });
             assertAiConfidence(opts.aiConfidence);
             const client = await getClient();
             writeJson(await runOhjeEditField(client, helpId, field, editOp, opts, { aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }));
@@ -263,9 +262,7 @@ export function registerOhjeCommands(parent, getClient) {
         assertAiConfidence(opts.aiConfidence);
         // --reason is required for an actual write; a --dry-run preview is
         // read-only, so it does not need a justification.
-        if (!opts.dryRun && !opts.reason) {
-            failWith("Missing required flag: --reason", 4);
-        }
+        requireReason(opts, { allowDryRun: true });
         const client = await getClient();
         const fields = buildOhjeFields(opts);
         const result = await runOhjeUpdate(client, helpId, fields, opts, { mustExist: opts.mustExist }, { aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview });
@@ -277,8 +274,7 @@ export function registerOhjeCommands(parent, getClient) {
         if (!isValidHelpId(helpId)) {
             failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
         }
-        if (!opts.dryRun && !opts.reason)
-            failWith("Missing required flag: --reason", 4);
+        requireReason(opts, { allowDryRun: true });
         const client = await getClient();
         writeJson(await runOhjeDelete(client, helpId, opts));
     }));

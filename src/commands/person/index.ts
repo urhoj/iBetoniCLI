@@ -5,6 +5,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
   type WriteFlags,
+  requireReason,
 } from "../../api/writeFlags.js";
 import { writeJson, failWith, failUsage, errorMessage } from "../../output/json.js";
 import {
@@ -688,9 +689,7 @@ export function registerPersonCommands(
     guarded(async (
       opts: WriteFlags & PersonCreateFlags & { getOrCreate?: boolean; body?: string; fromJson?: string }
     ) => {
-      if (!opts.reason) {
-        failWith("Missing required flag: --reason", 4);
-      }
+      requireReason(opts);
       // --global and --asiakas are mutually exclusive owner directives.
       if (opts.global && opts.asiakas !== undefined) {
         failWith("--global and --asiakas are mutually exclusive", 4);
@@ -808,9 +807,7 @@ export function registerPersonCommands(
       personIdStr: string,
       opts: WriteFlags & PersonUpdateFlags & { body?: string; fromJson?: string }
     ) => {
-      if (!opts.reason) {
-        failWith("Missing required flag: --reason", 4);
-      }
+      requireReason(opts);
       const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
       const patch = buildPersonUpdateBody(parsed, {
         first: opts.first,
@@ -837,9 +834,7 @@ export function registerPersonCommands(
       .option("--global", "Make the person GLOBAL (ownerAsiakasId=null)")
       .option("--asiakas <id>", "Set owner to this asiakasId", Number)
   ).action(guarded(async (personIdStr: string, opts: WriteFlags & { global?: boolean; asiakas?: number }) => {
-    if (!opts.reason) {
-      failWith("Missing required flag: --reason", 4);
-    }
+    requireReason(opts);
     const hasGlobal = !!opts.global;
     const hasAsiakas = opts.asiakas !== undefined;
     if (hasGlobal === hasAsiakas) {
@@ -855,9 +850,7 @@ export function registerPersonCommands(
     p
       .command("delete <personId>")
   ).action(guarded(async (personIdStr: string, opts: WriteFlags) => {
-    if (!opts.reason) {
-      failWith("Missing required flag: --reason", 4);
-    }
+    requireReason(opts);
     const client = await getClient();
     const result = await runPersonDelete(client, parseId(personIdStr, "personId"), opts);
     writeJson(result);
@@ -885,9 +878,7 @@ export function registerPersonCommands(
       .requiredOption("--role <name>", "Role name (see ROLE_TYPEID_BY_NAME)")
       .requiredOption("--asiakas <id>", "Target asiakasId", (v: string) => Number(v))
   ).action(guarded(async (personIdStr: string, opts: WriteFlags & { role: string; asiakas: number }) => {
-    if (!opts.reason) {
-      failWith("Missing required flag: --reason", 4);
-    }
+    requireReason(opts);
     let roleTypeId: number;
     try {
       roleTypeId = resolveRoleTypeId(opts.role);
@@ -911,9 +902,7 @@ export function registerPersonCommands(
       .requiredOption("--role <name>", "Role name (see ROLE_TYPEID_BY_NAME)")
       .requiredOption("--asiakas <id>", "Target asiakasId", (v: string) => Number(v))
   ).action(guarded(async (personIdStr: string, opts: WriteFlags & { role: string; asiakas: number }) => {
-    if (!opts.reason) {
-      failWith("Missing required flag: --reason", 4);
-    }
+    requireReason(opts);
     let roleTypeId: number;
     try {
       roleTypeId = resolveRoleTypeId(opts.role);

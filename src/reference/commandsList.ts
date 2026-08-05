@@ -13,7 +13,13 @@ import type { CommandSpec } from "../output/help.js";
 import { COMMAND_SPECS } from "./specs.js";
 import { CliError } from "../api/errors.js";
 import { domainBlurb } from "./domain.js";
-import { type CallerTier, visibleSpecs, domainOf, hiddenDomainsAtTier } from "../tier.js";
+import {
+  type CallerTier,
+  visibleSpecs,
+  domainOf,
+  hiddenDomainsAtTier,
+  getCallerTier,
+} from "../tier.js";
 
 /** Single source for the write classification used by `ib commands`. */
 const isWriteSpec = (s: CommandSpec): boolean => s.mutates ?? !!s.writeFlags;
@@ -70,7 +76,7 @@ function resolveDomainFilter(
 export function specMatcherForToken(
   specs: CommandSpec[],
   token: string,
-  tier: CallerTier = "developer"
+  tier: CallerTier = getCallerTier()
 ): (spec: CommandSpec) => boolean {
   const filter = resolveDomainFilter(specs, token, tier);
   if (filter.kind === "subgroup") {
@@ -138,7 +144,7 @@ export function fullyHiddenDomains(tier: CallerTier): Set<string> {
 export function assertKnownDomain(
   specs: CommandSpec[],
   domain: string,
-  tier: CallerTier = "developer"
+  tier: CallerTier = getCallerTier()
 ): void {
   const valid = commandDomains(specs); // FULL set — validation
   if (!valid.includes(domain)) {
@@ -166,8 +172,6 @@ export function assertKnownDomain(
 
 /** List-envelope shape (matches the universal `{ items, nextCursor, count }`). */
 export interface CommandsListEnvelope {
-  /** Reserved for shape compatibility; `buildDomainIndex` owns discovery hints. */
-  hint?: string;
   items: CommandSummary[];
   nextCursor: null;
   count: number;
@@ -182,7 +186,7 @@ export interface CommandsListEnvelope {
 export function filterCommandSpecs(
   specs: CommandSpec[],
   filter: CommandsListFilter,
-  tier: CallerTier = "developer"
+  tier: CallerTier = getCallerTier()
 ): CommandSummary[] {
   if (filter.mutations && filter.reads) {
     throw new CliError(
@@ -225,7 +229,7 @@ export function filterCommandSpecs(
  */
 export function buildCommandsList(
   filter: CommandsListFilter,
-  tier: CallerTier = "developer"
+  tier: CallerTier = getCallerTier()
 ): CommandsListEnvelope {
   const items = filterCommandSpecs(COMMAND_SPECS, filter, tier);
   return { items, nextCursor: null, count: items.length };
@@ -261,7 +265,7 @@ export interface DomainIndexEnvelope {
  */
 export function buildDomainIndex(
   specs: CommandSpec[] = COMMAND_SPECS,
-  tier: CallerTier = "developer"
+  tier: CallerTier = getCallerTier()
 ): DomainIndexEnvelope {
   const visible = visibleSpecs(specs, tier);
   const items = commandDomains(visible)

@@ -1,5 +1,5 @@
 import { listEnvelope, toListEnvelope } from "../../api/envelopes.js";
-import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
+import { writeFlagsToHeaders, addWriteFlagsToCommand, requireReason, } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { resolveAsiakasTarget } from "../customer/index.js";
@@ -384,12 +384,6 @@ export async function runJerryAdminRequestExtend(client, id, opts) {
 /** Delete a draft request (admin; DELETE /api/admin/jerry-requests/:id). System-admin only. */
 export async function runJerryAdminRequestDelete(client, id, flags) {
     return client.delete(`/api/admin/jerry-requests/${id}`, { headers: writeFlagsToHeaders(flags) });
-}
-/** Enforce a required --reason at the CLI layer (exit 4), matching the lifecycle commands. */
-function requireReason(opts) {
-    if (!opts.reason) {
-        failWith("Missing required flag: --reason", 4);
-    }
 }
 /** Parse a tri-state boolean flag value ("true"/"1" → true, else false). */
 function parseBool(v) {

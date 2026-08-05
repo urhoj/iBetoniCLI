@@ -22,6 +22,7 @@ import {
   visibleSpecs,
   hiddenCommandPaths,
   scrubSpecForTier,
+  getCallerTier,
 } from "../tier.js";
 import { emitStdout } from "../output/json.js";
 import packageJson from "../../package.json" with { type: "json" };
@@ -135,7 +136,7 @@ function stripProse(spec: CommandSpec): CommandSpec {
  */
 export function buildReference(
   domain?: string | string[],
-  tier: CallerTier = "developer",
+  tier: CallerTier = getCallerTier(),
   glossary: Array<{ term: string; synonyms: string[] }> = [],
   lean = false
 ): ReferenceDump {
@@ -200,7 +201,7 @@ export function buildReference(
  */
 export function runReferenceDump(
   domain?: string | string[],
-  tier: CallerTier = "developer",
+  tier: CallerTier = getCallerTier(),
   glossary: Array<{ term: string; synonyms: string[] }> = [],
   commandsOnly = false,
   lean = false

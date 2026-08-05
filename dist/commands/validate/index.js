@@ -1,8 +1,11 @@
 import { listEnvelope } from "../../api/envelopes.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { guarded } from "../_shared/action.js";
-import { decodeJwtPayload } from "../../auth/jwt.js";
+import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { assertPositiveInt } from "../../targets.js";
+// Static: program.ts registers the keikka domain on every invocation anyway, so
+// the dynamic import bought nothing and hid the edge from the module graph.
+import { runKeikkaValidate } from "../keikka/index.js";
 /** GET /api/validation/profiles → ListEnvelope (each row carries `entity`). */
 export async function runValidateProfiles(client) {
     const items = await client.get("/api/validation/profiles");
@@ -38,7 +41,6 @@ export function registerValidateCommands(parent, getClient) {
         .action(guarded(async (action, opts) => {
         const client = await getClient();
         if (opts.keikka != null) {
-            const { runKeikkaValidate } = await import("../keikka/index.js");
             writeJson(await runKeikkaValidate(client, { keikkaId: opts.keikka }));
             return;
         }
@@ -47,8 +49,7 @@ export function registerValidateCommands(parent, getClient) {
             return;
         }
         const asiakasId = opts.asiakas ??
-            decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId ??
-            failWith("could not resolve asiakasId from the active token — pass --asiakas <id>", 4);
+            ownerAsiakasIdFromToken(client, "pass --asiakas <id>, or run `ib auth switch`");
         if (opts.person != null) {
             writeJson(await runValidatePerson(client, opts.profile ?? "onboarding", asiakasId, opts.person));
             return;

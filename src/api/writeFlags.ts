@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import { failWith } from "../output/json.js";
 
 /**
  * Universal write-flag set shared by every `ib` mutation command.
@@ -35,6 +36,30 @@ export function writeFlagsToHeaders(
   if (flags.idempotencyKey) headers["Idempotency-Key"] = flags.idempotencyKey;
   if (flags.reason) headers["X-Action-Reason"] = flags.reason;
   return headers;
+}
+
+/**
+ * Enforce the `--reason` audit string a lifecycle write requires, exiting 4
+ * with one wording across the whole CLI (it was hand-written at ~36 call sites,
+ * one of which had already grown its own private copy).
+ *
+ * Two variants, because the requirement genuinely differs per command:
+ * `allowDryRun: true` matches the sites that let `--dry-run` stand in for a
+ * reason (nothing is persisted, so there is nothing to audit); the default
+ * demands `--reason` unconditionally. `detail` appends a command-specific
+ * parenthetical (e.g. why the write is irreversible).
+ */
+export function requireReason(
+  flags: { reason?: string; dryRun?: boolean },
+  opts: { allowDryRun?: boolean; detail?: string } = {}
+): void {
+  if (opts.allowDryRun && flags.dryRun) return;
+  if (!flags.reason) {
+    failWith(
+      `Missing required flag: --reason${opts.detail ? ` ${opts.detail}` : ""}`,
+      4
+    );
+  }
 }
 
 /**

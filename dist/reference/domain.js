@@ -1,3 +1,15 @@
+/**
+ * Domain primer for betoni.online — the *what*, not the *how*.
+ *
+ * `specs.ts` teaches an AI how to call each command; this file teaches it what
+ * it is operating on (the business, the multi-tenant model, the Finnish entity
+ * vocabulary). Both ride along in the single artifact an AI ingests at session
+ * start: `ib reference dump` embeds {@link DOMAIN_OVERVIEW} and a DB-fetched
+ * glossary as top-level keys; `ib --help` renders the overview plus a pointer
+ * to `ib glossary` via {@link renderDomainHelp} (the full term index is fetched
+ * on demand, not dumped into every help render). One source of truth → the
+ * primer can never drift from the CLI it describes.
+ */
 /** One-paragraph description of the platform, tenancy model, and BetoniJerry. */
 export const DOMAIN_OVERVIEW = "betoni.online is a concrete-delivery management platform for Finnish " +
     "concrete pumping and delivery companies. Work centres on `keikka` records " +
@@ -119,11 +131,10 @@ export const TOPICS = [
  * NOT dumped into every help render, so help stays small (and needs no network
  * round-trip) as the self-improving glossary grows.
  *
- * The `tier` parameter is accepted for API compatibility (callers pass
- * `getCallerTier()`) but is unused — the glossary is DB-backed and tier-scoped
- * server-side.
+ * Tier-blind on purpose: the only tier-sensitive content this block ever had
+ * was the glossary, which is now a pointer resolved server-side per caller.
  */
-export function renderDomainHelp(_tier = "developer") {
+export function renderDomainHelp() {
     const lines = [];
     lines.push("");
     lines.push("ABOUT");

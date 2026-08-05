@@ -17,10 +17,7 @@ export function resolveStatsPeriod(opts) {
     if (groups > 1) {
         throw new CliError("Use only one of --today / --month / --week / (--from & --to)", 0, null, 4);
     }
-    if (opts.today) {
-        const t = todayHelsinki();
-        return { from: t, to: t };
-    }
+    // `--today` needs no branch: it is exactly the no-period default below.
     if (opts.month)
         return monthRange(opts.month);
     if (opts.week)

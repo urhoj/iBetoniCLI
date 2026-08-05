@@ -5,6 +5,7 @@ import {
   type WriteFlags,
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
+  requireReason,
 } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
@@ -721,13 +722,6 @@ export async function runJerryAdminRequestDelete(
 // ─── registration ────────────────────────────────────────────────────────────
 
 type WriteOpts = WriteFlags;
-
-/** Enforce a required --reason at the CLI layer (exit 4), matching the lifecycle commands. */
-function requireReason(opts: WriteOpts): void {
-  if (!opts.reason) {
-    failWith("Missing required flag: --reason", 4);
-  }
-}
 
 /** Parse a tri-state boolean flag value ("true"/"1" → true, else false). */
 function parseBool(v: string): boolean {

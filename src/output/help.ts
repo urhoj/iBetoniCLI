@@ -336,20 +336,20 @@ export function formatGroupHelp(
   groupPath: string,
   fallbackDescription: string,
   specs: CommandSpec[],
-  tier: CallerTier = "developer"
+  tier: CallerTier = getCallerTier()
 ): string {
   const prefix = groupPath + " ";
   const depth = groupPath.split(" ").length; // child = token at this index
   const domain = groupPath.split(" ")[1];
   const groupName = groupPath.split(" ").at(-1)!.toLowerCase();
 
-  // Re-homed back-compat alias: a top-level `ib <x>` whose specs now live at the
-  // canonical `ib dev <x>` path. The alias still executes, but no spec matches
-  // its old path, so render the canonical group's help instead of the misleading
-  // "not available at your access level" message. (Genuinely tier-hidden groups
-  // DO have specs at their path — filtered out below — and still get
-  // hiddenAtTierMessage.) The alias table is the single source; this used to
-  // hardcode the "ib dev " prefix here.
+  // Re-homed back-compat alias: a group whose specs now live at a canonical
+  // path elsewhere (`ib weather` → `ib opendata weather`, `ib cache` → `ib dev
+  // cache`). The alias still executes, but no spec matches its old path, so
+  // render the canonical group's help instead of the misleading "not available
+  // at your access level" message. (Genuinely tier-hidden groups DO have specs
+  // at their path — filtered out below — and still get hiddenAtTierMessage.)
+  // The alias table is the single source; this used to hardcode "ib dev ".
   const canonical = canonicalPath(groupPath);
   if (canonical !== groupPath && !specs.some((s) => s.command.startsWith(prefix))) {
     if (specs.some((s) => s.command.startsWith(canonical + " "))) {
@@ -439,7 +439,7 @@ export function attachRichHelp(root: Command, specs: CommandSpec[]): void {
       const fallback = cmd.description();
       cmd.configureHelp({
         formatHelp: () =>
-          formatGroupHelp(full, fallback, specs, getCallerTier()),
+          formatGroupHelp(full, fallback, specs),
       });
     }
     for (const sub of cmd.commands) walk(sub, [...path, cmd.name()]);

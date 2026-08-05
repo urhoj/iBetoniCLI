@@ -5,7 +5,7 @@ import { writeJson, failWith } from "../../output/json.js";
 import { readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { basename, resolve as resolvePath } from "node:path";
-import { type WriteFlags, writeFlagsToHeaders, addWriteFlagsToCommand } from "../../api/writeFlags.js";
+import { type WriteFlags, writeFlagsToHeaders, addWriteFlagsToCommand, requireReason } from "../../api/writeFlags.js";
 import { CliError } from "../../api/errors.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { assertPositiveInt, cappedInt } from "../../targets.js";
@@ -517,9 +517,7 @@ export function registerAttachmentCommands(
   const deleteCmd = a
     .command("delete <attachmentId>");
   addWriteFlagsToCommand(deleteCmd).action(guarded(async (id: string, opts: WriteFlags) => {
-    if (!opts.reason) {
-      failWith("Missing required flag: --reason (blob deletion is irreversible)", 4);
-    }
+    requireReason(opts, { detail: "(blob deletion is irreversible)" });
     writeJson(await runAttachmentDelete(await getClient(), Number(id), opts));
   }));
 }

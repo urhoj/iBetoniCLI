@@ -5,8 +5,9 @@ import {
   type WriteFlags,
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
+  requireReason,
 } from "../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith, errorMessage } from "../../output/json.js";
+import { writeJson, failWith, errorMessage } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
@@ -781,14 +782,14 @@ function parseCoordToken(token: string): { lat: number; lng: number } | null {
 /**
  * Synchronously validate a distance point token. Returns the coords if it is a
  * "lat,lng" string, returns the integer sijaintiId if it is a bare id, or
- * throws a validation error (caller exits 4) if it is neither.
+ * exits 4 if it is neither.
  */
 function parseDistanceToken(token: string): { lat: number; lng: number } | number {
   const coord = parseCoordToken(token);
   if (coord) return coord;
   const id = Number(token);
   if (!Number.isInteger(id) || id <= 0) {
-    throw new Error(`invalid point '${token}' — use 'lat,lng' or a sijaintiId`);
+    failWith(`invalid point '${token}' — use 'lat,lng' or a sijaintiId`, 4);
   }
   return id;
 }
@@ -807,7 +808,7 @@ async function resolveDistancePoint(
   if (typeof parsed === "object") return parsed;
   const row = (await runSijaintiGet(client, parsed)) as { lat?: number; lng?: number };
   if (typeof row.lat !== "number" || typeof row.lng !== "number") {
-    throw new Error(`sijainti ${parsed} has no coordinates`);
+    failWith(`sijainti ${parsed} has no coordinates`, 4);
   }
   return { lat: row.lat, lng: row.lng };
 }
@@ -1209,9 +1210,7 @@ export function registerSijaintiCommands(
   ] as const) {
     addWriteFlagsToCommand(s.command(`${name} <sijaintiId>`)).action(
       guarded(async (idStr: string, opts: WriteFlags) => {
-        if (!opts.reason) {
-          failWith("Missing required flag: --reason", 4);
-        }
+        requireReason(opts);
         const client = await getClient();
         writeJson(await run(client, parseId(idStr, "sijaintiId"), opts));
       })
@@ -1265,22 +1264,10 @@ export function registerSijaintiCommands(
   s.command("distance")
     .requiredOption("--from <point>", "Origin: 'lat,lng' or a sijaintiId")
     .requiredOption("--to <point>", "Destination: 'lat,lng' or a sijaintiId")
-    .action(async (opts: { from: string; to: string }) => {
-      try {
+    .action(
+      guarded(async (opts: { from: string; to: string }) => {
         const client = await getClient();
-        const result = await runSijaintiDistance(client, opts.from, opts.to);
-        writeJson(result);
-      } catch (e) {
-        // A bad point token is a validation error (exit 4); API/network errors
-        // keep their contract-mapped codes via exitWithError.
-        if (
-          e instanceof Error &&
-          (e.message.startsWith("invalid point") ||
-            e.message.includes("has no coordinates"))
-        ) {
-          failWith(errorMessage(e), 4);
-        }
-        exitWithError(e);
-      }
-    });
+        writeJson(await runSijaintiDistance(client, opts.from, opts.to));
+      })
+    );
 }

@@ -1,5 +1,7 @@
 import { describe, test, expect } from "vitest";
-import { lintEntries, isKnownCommandPath, suggestRelatedForEntry, isEditDistance1, levenshtein } from "../../src/commands/glossary/lint.js";
+import { lintEntries, isKnownCommandPath, suggestRelatedForEntry, isEditDistance1 } from "../../src/commands/glossary/lint.js";
+// Oracle for the O(len) fast path — the CLI's one Levenshtein implementation.
+import { levenshtein } from "../../src/output/unknownCommand.js";
 import type { CommandSpec } from "../../src/output/help.js";
 
 const spec = (command: string, extra: Partial<CommandSpec> = {}): CommandSpec => ({

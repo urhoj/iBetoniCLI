@@ -1,5 +1,5 @@
 import { toListEnvelope } from "../../../api/envelopes.js";
-import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../../api/writeFlags.js";
+import { writeFlagsToHeaders, addWriteFlagsToCommand, requireReason, } from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
 import { resolveDate, todayHelsinki } from "../../../dates.js";
 import { guarded } from "../../_shared/action.js";
@@ -204,8 +204,7 @@ export function registerMessageBoardCommands(parent, getClient) {
         .option("--start-date <d>", "Day the notice becomes visible: today|YYYY-MM-DD")
         .option("--expires-at <d>", "Last day visible: YYYY-MM-DD (omit = never expires)");
     addWriteFlagsToCommand(createCmd).action(guarded(async (opts) => {
-        if (!opts.dryRun && !opts.reason)
-            failWith("Missing required flag: --reason", 4);
+        requireReason(opts, { allowDryRun: true });
         if (!opts.startDate)
             failWith("Missing required flag: --start-date", 4);
         assertPriority(opts.priority);
@@ -222,8 +221,7 @@ export function registerMessageBoardCommands(parent, getClient) {
         .option("--expires-at <d>", 'Last day visible: YYYY-MM-DD (pass "" to clear the expiry)');
     addWriteFlagsToCommand(updateCmd).action(guarded(async (raw, opts) => {
         const messageId = parseMessageId(raw);
-        if (!opts.dryRun && !opts.reason)
-            failWith("Missing required flag: --reason", 4);
+        requireReason(opts, { allowDryRun: true });
         assertPriority(opts.priority);
         const client = await getClient();
         const fields = buildBoardFields(opts);
@@ -233,8 +231,7 @@ export function registerMessageBoardCommands(parent, getClient) {
         .command("delete <messageId>");
     addWriteFlagsToCommand(deleteCmd).action(guarded(async (raw, opts) => {
         const messageId = parseMessageId(raw);
-        if (!opts.dryRun && !opts.reason)
-            failWith("Missing required flag: --reason", 4);
+        requireReason(opts, { allowDryRun: true });
         const client = await getClient();
         writeJson(await runBoardDelete(client, messageId, opts));
     }));

@@ -11,7 +11,7 @@
 import { COMMAND_SPECS, COMMON_AUTH_ERRORS } from "./specs.js";
 import { specMatcherForToken } from "./commandsList.js";
 import { DOMAIN_OVERVIEW, FEEDBACK_GUIDANCE, TOPICS, } from "./domain.js";
-import { visibleSpecs, hiddenCommandPaths, scrubSpecForTier, } from "../tier.js";
+import { visibleSpecs, hiddenCommandPaths, scrubSpecForTier, getCallerTier, } from "../tier.js";
 import { emitStdout } from "../output/json.js";
 import packageJson from "../../package.json" with { type: "json" };
 import { runGlossaryList, projectGlossaryForPrimer } from "../commands/glossary/index.js";
@@ -81,7 +81,7 @@ function stripProse(spec) {
  * through `scrubSpecForTier` so no cross-reference leaks a hidden command path
  * (feedback #288).
  */
-export function buildReference(domain, tier = "developer", glossary = [], lean = false) {
+export function buildReference(domain, tier = getCallerTier(), glossary = [], lean = false) {
     let specs = visibleSpecs(COMMAND_SPECS, tier);
     const domains = domain == null ? [] : Array.isArray(domain) ? domain : [domain];
     if (domains.length) {
@@ -138,7 +138,7 @@ export function buildReference(domain, tier = "developer", glossary = [], lean =
  * `lean` drops each spec's `notes`/`seeAlso` (kept `examples`) — composes with
  * `commandsOnly` and domain filters; see {@link stripProse}.
  */
-export function runReferenceDump(domain, tier = "developer", glossary = [], commandsOnly = false, lean = false) {
+export function runReferenceDump(domain, tier = getCallerTier(), glossary = [], commandsOnly = false, lean = false) {
     const ref = buildReference(domain, tier, glossary, lean);
     const out = commandsOnly
         ? {
