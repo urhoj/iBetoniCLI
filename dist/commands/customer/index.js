@@ -8,7 +8,7 @@ import { resolveRoleTypeId } from "../../roles.js";
 import { assertEnum, resolveTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
 import { runPersonRoleList } from "../person/index.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction, guarded } from "../_shared/action.js";
 import { runCombinatorDuplicates, runCombinatorMerge, registerCombinatorCommands, } from "../_shared/combinator.js";
 // PRH lookups live in the shared module (also powers `ib opendata prh`). Aliased
 // to the historical names so internal `--from-prh` call sites and the hidden
@@ -488,22 +488,18 @@ export async function runCustomerHistory(client, asiakasId, limit) {
     const owner = await resolveCurrentOwnerAsiakasId(client);
     const rows = await client.get(`/api/changes/asiakas/${asiakasId}/${owner}?limit=${limit}`);
     const list = Array.isArray(rows) ? rows : [];
-    return {
-        items: list.map((r) => ({
-            changeId: r.changeId,
-            field: r.fieldName ?? null,
-            oldValue: r.oldValue ?? null,
-            newValue: r.newValue ?? null,
-            changeType: r.changeType ?? null,
-            personId: r.personId ?? null,
-            personName: r.personFullName ?? null,
-            at: r.timestamp ?? null,
-            description: r.description ?? null,
-            reason: r.reason ?? null,
-        })),
-        nextCursor: null,
-        count: list.length,
-    };
+    return listEnvelope(list.map((r) => ({
+        changeId: r.changeId,
+        field: r.fieldName ?? null,
+        oldValue: r.oldValue ?? null,
+        newValue: r.newValue ?? null,
+        changeType: r.changeType ?? null,
+        personId: r.personId ?? null,
+        personName: r.personFullName ?? null,
+        at: r.timestamp ?? null,
+        description: r.description ?? null,
+        reason: r.reason ?? null,
+    })));
 }
 /**
  * POST /api/asiakas/person/remove — detach a person from a customer.
@@ -763,21 +759,11 @@ export function registerCustomerCommands(parent, getClient) {
     }));
     c.command("dead-list")
         .option("--limit <n>", "Max rows", cappedInt(500))
-        .action(guarded(async (opts) => {
-        const client = await getClient();
-        writeJson(await runCustomerDeadList(client, { limit: opts.limit }));
-    }));
+        .action(jsonAction(getClient, (client, opts) => runCustomerDeadList(client, { limit: opts.limit })));
     c.command("get <asiakasId>")
-        .action(guarded(async (idStr) => {
-        const client = await getClient();
-        const result = await runCustomerGet(client, parseId(idStr, "asiakasId"));
-        writeJson(result);
-    }));
+        .action(jsonAction(getClient, (client, idStr) => runCustomerGet(client, parseId(idStr, "asiakasId"))));
     c.command("worksites <asiakasId>")
-        .action(guarded(async (idStr) => {
-        const client = await getClient();
-        writeJson(await runCustomerWorksites(client, parseId(idStr, "asiakasId")));
-    }));
+        .action(jsonAction(getClient, (client, idStr) => runCustomerWorksites(client, parseId(idStr, "asiakasId"))));
     const modulesCmd = addAsiakasTargetOption(c.command("modules [asiakasId]"))
         .option("--set <keys>", "Comma-separated field keys to turn ON (e.g. jerry,weather,pumppu)")
         .option("--unset <keys>", "Comma-separated field keys to turn OFF");
@@ -842,11 +828,7 @@ export function registerCustomerCommands(parent, getClient) {
         .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max results", cappedInt(500))
         .option("--my-companies", "Search across every company you belong to (rows tagged with ownerAsiakasId)")
-        .action(guarded(async (query, opts) => {
-        const client = await getClient();
-        const result = await runCustomerSearch(client, resolveSearchQuery(query, opts.search), opts.limit, !!opts.myCompanies);
-        writeJson(result);
-    }));
+        .action(jsonAction(getClient, (client, query, opts) => runCustomerSearch(client, resolveSearchQuery(query, opts.search), opts.limit, !!opts.myCompanies)));
     // Hidden back-compat alias — canonical command is now `ib opendata prh`.
     c.command("prh [ytunnus]", { hidden: true })
         .description("Deprecated alias for `ib opendata prh` (still works). Look up a company in the Finnish business registry (PRH) by <ytunnus> or --search <name>.")
@@ -865,10 +847,7 @@ export function registerCustomerCommands(parent, getClient) {
     }));
     c.command("log <asiakasId>")
         .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)
-        .action(guarded(async (idStr, opts) => {
-        const client = await getClient();
-        writeJson(await runCustomerHistory(client, parseId(idStr, "asiakasId"), opts.limit));
-    }));
+        .action(jsonAction(getClient, (client, idStr, opts) => runCustomerHistory(client, parseId(idStr, "asiakasId"), opts.limit)));
     const createCmd = c
         .command("create")
         .option("--name <s>", "Customer name (asiakasNimi)")
@@ -1016,11 +995,7 @@ export function registerCustomerCommands(parent, getClient) {
         .command("list [asiakasId]"))
         .option("--role <name>", "Filter by role name (e.g. keikkaHandler)")
         .option("--include-roles", "Add permissionRoles[] (full per-company role names) to each person — N extra GETs")
-        .action(guarded(async (asiakasIdStr, opts) => {
-        const client = await getClient();
-        const result = await runCustomerPersonList(client, resolveAsiakasTarget(asiakasIdStr, opts.asiakas), opts.role, opts.includeRoles);
-        writeJson(result);
-    }));
+        .action(jsonAction(getClient, (client, asiakasIdStr, opts) => runCustomerPersonList(client, resolveAsiakasTarget(asiakasIdStr, opts.asiakas), opts.role, opts.includeRoles)));
     registerCombinatorCommands(c, getClient, {
         base: "asiakas-combinator",
         idFields: ASIAKAS_MERGE_ID_FIELDS,

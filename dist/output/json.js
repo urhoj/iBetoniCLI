@@ -1,4 +1,4 @@
-import { CliError, exitCodeForError, hintForError } from "../api/errors.js";
+import { CliError, errorMessage, exitCodeForError, hintForError, } from "../api/errors.js";
 import { isListEnvelope } from "../api/envelopes.js";
 import { renderError, renderList, renderRecord } from "./pretty.js";
 import { buildValidationEnvelope } from "./validationEnvelope.js";
@@ -101,10 +101,9 @@ export function writeError(err) {
         return;
     }
     recordFriction(err);
-    const message = err instanceof Error ? err.message : String(err);
     writeErrorEnvelope({
         success: false,
-        error: message,
+        error: errorMessage(err),
         code: null,
         statusCode: 0,
     }, exitCodeForError(err));
@@ -143,6 +142,9 @@ export function setExitCode(code) {
         process.exitCode = code;
 }
 export { emitStdout, emitStderr };
+/** Re-export: `errorMessage` now lives in `api/errors.ts` (usable below the
+ * output layer); command modules keep importing it from here. */
+export { errorMessage };
 /**
  * Terminate a command from a validation/guard check WITHOUT `process.exit()`
  * (which aborts Node on Windows when called after a completed fetch — libuv
@@ -182,9 +184,5 @@ export function failUsage(message, hint = "") {
 export function failValidation(commandPath, problems, opts = {}) {
     const env = buildValidationEnvelope(commandPath, problems, opts);
     throw new CliError(env.error, 0, { code: env.code, problems: env.problems, ...(env.sample ? { sample: env.sample } : {}) }, 4, env.hint);
-}
-/** Message extraction for failWith when re-raising a caught unknown. */
-export function errorMessage(err) {
-    return err instanceof Error ? err.message : String(err);
 }
 //# sourceMappingURL=json.js.map

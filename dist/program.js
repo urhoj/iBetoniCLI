@@ -56,7 +56,7 @@ import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
 import { canonicalPath, DEV_ALIAS_DOMAINS } from "./reference/aliasPaths.js";
-import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, writeErrorEnvelope, setActiveCommandErrors, setExitCode as setExit } from "./output/json.js";
+import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, writeErrorEnvelope, setActiveCommandErrors, setExitCode as setExit, errorMessage } from "./output/json.js";
 import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { buildValidationEnvelope } from "./output/validationEnvelope.js";
 import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, commandPath } from "./output/unknownCommand.js";
@@ -524,7 +524,7 @@ export function handleParseRejection(err, parserText, erroringCommand) {
             hint: genericHint,
         });
     }
-    const message = err instanceof Error ? err.message : String(err);
+    const message = errorMessage(err);
     recordFriction(err, 1);
     emitStderr(`${message}\n`);
     setExit(1);

@@ -1,4 +1,4 @@
-import { CliError, exitCodeFromStatus } from "../api/errors.js";
+import { CliError, errorMessage, exitCodeFromStatus } from "../api/errors.js";
 import type { CredentialsProfile } from "./store.js";
 import type { DecodedClaims } from "./jwt.js";
 
@@ -20,7 +20,7 @@ async function postJson(
       body: JSON.stringify(body),
     });
   } catch (e) {
-    const detail = e instanceof Error ? e.message : String(e);
+    const detail = errorMessage(e);
     throw new CliError(`Network error: ${detail}`, 0, null, 7);
   }
   if (!res.ok) {

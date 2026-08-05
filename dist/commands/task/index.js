@@ -1,8 +1,10 @@
-import { failWith, writeJson } from "../../output/json.js";
+import { listEnvelope } from "../../api/envelopes.js";
+import { failWith } from "../../output/json.js";
 import { assertEnum, assertPositiveInt } from "../../targets.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
 import { resolveDate } from "../../dates.js";
-import { guarded, jsonAction } from "../_shared/action.js";
+import { jsonAction } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 const EXECUTORS = ["human", "ai"];
 const AGENTS = ["claude", "hermes"];
 const SERVER_LIST_CAP = 200;
@@ -40,11 +42,7 @@ export function intFlag(flag, min = 1) {
 function probedEnvelope(rows, requested) {
     const all = Array.isArray(rows) ? rows : [];
     const items = all.slice(0, requested);
-    const env = {
-        items,
-        nextCursor: null,
-        count: items.length,
-    };
+    const env = listEnvelope(items);
     if (all.length > requested || all.length >= SERVER_LIST_CAP)
         env.truncated = true;
     return env;
@@ -59,23 +57,18 @@ export async function runTaskList(client, opts) {
     assertEnum(opts.executor, EXECUTORS, "--executor");
     assertEnum(opts.agent, AGENTS, "--agent");
     const requested = Math.min(Math.max(opts.limit ?? 50, 1), SERVER_LIST_CAP);
-    const qs = new URLSearchParams();
-    if (opts.due)
-        qs.set("due", "1");
-    if (opts.executor)
-        qs.set("executor", opts.executor);
-    if (opts.agent)
-        qs.set("agent", opts.agent);
-    if (opts.assignee !== undefined)
-        qs.set("assignee", String(opts.assignee));
-    if (opts.asiakas !== undefined)
-        qs.set("asiakas", String(opts.asiakas));
-    if (opts.inactive)
-        qs.set("includeInactive", "1");
-    qs.set("limit", String(Math.min(requested + 1, SERVER_LIST_CAP)));
-    if (opts.offset !== undefined)
-        qs.set("offset", String(opts.offset));
-    const rows = await client.get(`/api/tasks?${qs.toString()}`);
+    // The boolean flags go out as `1`, not the raw boolean — `qs` would
+    // serialise `true` as the literal "true" and change the wire.
+    const rows = await client.get(`/api/tasks${qs({
+        due: opts.due ? 1 : undefined,
+        executor: opts.executor || undefined,
+        agent: opts.agent || undefined,
+        assignee: opts.assignee,
+        asiakas: opts.asiakas,
+        includeInactive: opts.inactive ? 1 : undefined,
+        limit: Math.min(requested + 1, SERVER_LIST_CAP),
+        offset: opts.offset,
+    })}`);
     return probedEnvelope(rows, requested);
 }
 /** GET /api/tasks/:id */
@@ -203,13 +196,9 @@ export function registerTaskCommands(parent, getClient, opts = {}) {
         .option("--inactive", "Include deactivated tasks (default: active only)")
         .option("--limit <n>", "Max rows (default 50, cap 200)", intFlag("--limit"))
         .option("--offset <n>", "Pagination offset", intFlag("--offset", 0))
-        .action(guarded(async (opts) => {
-        writeJson(await runTaskList(await getClient(), opts));
-    }));
+        .action(jsonAction(getClient, (client, opts) => runTaskList(client, opts)));
     t.command("get <id>")
-        .action(guarded(async (idStr) => {
-        writeJson(await runTaskGet(await getClient(), parseTaskId(idStr, "get")));
-    }));
+        .action(jsonAction(getClient, (client, idStr) => runTaskGet(client, parseTaskId(idStr, "get"))));
     addWriteFlagsToCommand(t.command("add")
         .requiredOption("--title <text>", "Task title (max 200 chars)")
         .option("--executor <executor>", "human | ai (required)")
@@ -240,8 +229,6 @@ export function registerTaskCommands(parent, getClient, opts = {}) {
         .option("--deactivate", "Deactivate (soft-retire) the task")).action(jsonAction(getClient, (client, idStr, opts) => runTaskSet(client, parseTaskId(idStr, "set"), opts, opts)));
     t.command("log <id>")
         .option("--limit <n>", "Max rows (default 50, cap 200)", intFlag("--limit"))
-        .action(guarded(async (idStr, opts) => {
-        writeJson(await runTaskLog(await getClient(), parseTaskId(idStr, "log"), opts));
-    }));
+        .action(jsonAction(getClient, (client, idStr, opts) => runTaskLog(client, parseTaskId(idStr, "log"), opts)));
 }
 //# sourceMappingURL=index.js.map

@@ -1,6 +1,7 @@
 import { failWith, writeJson } from "../../../output/json.js";
 import { assertEnum, parseId } from "../../../targets.js";
-import { guarded } from "../../_shared/action.js";
+import { jsonAction, guarded } from "../../_shared/action.js";
+import { qs } from "../../../api/query.js";
 const STATUSES = ["open", "resolved", "all"];
 const CONTEXT_TYPES = ["pumppuRequest", "keikka"];
 /**
@@ -10,11 +11,7 @@ const CONTEXT_TYPES = ["pumppuRequest", "keikka"];
 export async function runSupportInbox(client, opts) {
     const status = opts.status ?? "open";
     assertEnum(status, STATUSES, "--status");
-    const qs = new URLSearchParams();
-    qs.set("status", status);
-    if (opts.limit !== undefined)
-        qs.set("limit", String(opts.limit));
-    const res = await client.get(`/api/messages/support/inbox?${qs.toString()}`);
+    const res = await client.get(`/api/messages/support/inbox${qs({ status, limit: opts.limit })}`);
     const items = Array.isArray(res?.items) ? res.items : [];
     return {
         items,
@@ -32,11 +29,7 @@ export async function runSupportInbox(client, opts) {
 export async function runSupportMine(client, opts) {
     const status = opts.status ?? "open";
     assertEnum(status, STATUSES, "--status");
-    const qs = new URLSearchParams();
-    qs.set("status", status);
-    if (opts.limit !== undefined)
-        qs.set("limit", String(opts.limit));
-    const res = await client.get(`/api/messages/support/mine?${qs.toString()}`);
+    const res = await client.get(`/api/messages/support/mine${qs({ status, limit: opts.limit })}`);
     const items = Array.isArray(res?.items) ? res.items : [];
     return {
         items,
@@ -103,16 +96,12 @@ export function registerMessageSupportCommands(parent, getClient) {
         .command("inbox")
         .option("--status <status>", "open | resolved | all", "open")
         .option("--limit <n>", "Max rows", Number)
-        .action(guarded(async (opts) => {
-        writeJson(await runSupportInbox(await getClient(), opts));
-    }));
+        .action(jsonAction(getClient, (client, opts) => runSupportInbox(client, opts)));
     support
         .command("mine")
         .option("--status <status>", "open | resolved | all", "open")
         .option("--limit <n>", "Max rows", Number)
-        .action(guarded(async (opts) => {
-        writeJson(await runSupportMine(await getClient(), opts));
-    }));
+        .action(jsonAction(getClient, (client, opts) => runSupportMine(client, opts)));
     support
         .command("contact")
         .option("--tarjous <id>", "pumppuRequestId this escalation is about", Number)
@@ -143,8 +132,6 @@ export function registerMessageSupportCommands(parent, getClient) {
         // client-side --dry-run (the status PATCH has no server X-Dry-Run guard); no
         // audit headers — the status change persists no reason.
         .option("--dry-run", "Print the update body without sending (client-side)")
-        .action(guarded(async (threadIdStr, opts) => {
-        writeJson(await runSupportResolve(await getClient(), parseId(threadIdStr, "threadId"), opts));
-    }));
+        .action(jsonAction(getClient, (client, threadIdStr, opts) => runSupportResolve(client, parseId(threadIdStr, "threadId"), opts)));
 }
 //# sourceMappingURL=index.js.map

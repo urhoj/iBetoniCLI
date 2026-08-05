@@ -9,8 +9,8 @@
  */
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
-import { failWith, writeJson } from "../../output/json.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
+import { failWith } from "../../output/json.js";
 import { assertEnum, assertPositiveInt } from "../../targets.js";
 import {
   addWriteFlagsToCommand,
@@ -18,7 +18,8 @@ import {
   type WriteFlags,
 } from "../../api/writeFlags.js";
 import { resolveDate } from "../../dates.js";
-import { guarded, jsonAction } from "../_shared/action.js";
+import { jsonAction } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 
 const EXECUTORS = ["human", "ai"] as const;
 type Executor = (typeof EXECUTORS)[number];
@@ -68,11 +69,7 @@ function probedEnvelope(
 ): ListEnvelope<Record<string, unknown>> {
   const all = Array.isArray(rows) ? rows : [];
   const items = all.slice(0, requested);
-  const env: ListEnvelope<Record<string, unknown>> = {
-    items,
-    nextCursor: null,
-    count: items.length,
-  };
+  const env = listEnvelope(items);
   if (all.length > requested || all.length >= SERVER_LIST_CAP) env.truncated = true;
   return env;
 }
@@ -102,16 +99,20 @@ export async function runTaskList(
   assertEnum(opts.executor, EXECUTORS, "--executor");
   assertEnum(opts.agent, AGENTS, "--agent");
   const requested = Math.min(Math.max(opts.limit ?? 50, 1), SERVER_LIST_CAP);
-  const qs = new URLSearchParams();
-  if (opts.due) qs.set("due", "1");
-  if (opts.executor) qs.set("executor", opts.executor);
-  if (opts.agent) qs.set("agent", opts.agent);
-  if (opts.assignee !== undefined) qs.set("assignee", String(opts.assignee));
-  if (opts.asiakas !== undefined) qs.set("asiakas", String(opts.asiakas));
-  if (opts.inactive) qs.set("includeInactive", "1");
-  qs.set("limit", String(Math.min(requested + 1, SERVER_LIST_CAP)));
-  if (opts.offset !== undefined) qs.set("offset", String(opts.offset));
-  const rows = await client.get<Record<string, unknown>[]>(`/api/tasks?${qs.toString()}`);
+  // The boolean flags go out as `1`, not the raw boolean — `qs` would
+  // serialise `true` as the literal "true" and change the wire.
+  const rows = await client.get<Record<string, unknown>[]>(
+    `/api/tasks${qs({
+      due: opts.due ? 1 : undefined,
+      executor: opts.executor || undefined,
+      agent: opts.agent || undefined,
+      assignee: opts.assignee,
+      asiakas: opts.asiakas,
+      includeInactive: opts.inactive ? 1 : undefined,
+      limit: Math.min(requested + 1, SERVER_LIST_CAP),
+      offset: opts.offset,
+    })}`
+  );
   return probedEnvelope(rows, requested);
 }
 
@@ -283,17 +284,13 @@ export function registerTaskCommands(
     .option("--inactive", "Include deactivated tasks (default: active only)")
     .option("--limit <n>", "Max rows (default 50, cap 200)", intFlag("--limit"))
     .option("--offset <n>", "Pagination offset", intFlag("--offset", 0))
-    .action(
-      guarded(async (opts: TaskListOptions) => {
-        writeJson(await runTaskList(await getClient(), opts));
-      })
-    );
+    .action(jsonAction(getClient, (client, opts: TaskListOptions) => runTaskList(client, opts)));
 
   t.command("get <id>")
     .action(
-      guarded(async (idStr: string) => {
-        writeJson(await runTaskGet(await getClient(), parseTaskId(idStr, "get")));
-      })
+      jsonAction(getClient, (client, idStr: string) =>
+        runTaskGet(client, parseTaskId(idStr, "get"))
+      )
     );
 
   addWriteFlagsToCommand(
@@ -348,8 +345,8 @@ export function registerTaskCommands(
   t.command("log <id>")
     .option("--limit <n>", "Max rows (default 50, cap 200)", intFlag("--limit"))
     .action(
-      guarded(async (idStr: string, opts: { limit?: number }) => {
-        writeJson(await runTaskLog(await getClient(), parseTaskId(idStr, "log"), opts));
-      })
+      jsonAction(getClient, (client, idStr: string, opts: { limit?: number }) =>
+        runTaskLog(client, parseTaskId(idStr, "log"), opts)
+      )
     );
 }

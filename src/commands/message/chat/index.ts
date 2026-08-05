@@ -8,8 +8,8 @@ import {
 } from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
 import { resolveThreadId, type ThreadTarget } from "./resolveThread.js";
-import { parseOptionalId, resolveSearchQuery } from "../../../targets.js";
-import { guarded } from "../../_shared/action.js";
+import { parseId, parseOptionalId, resolveSearchQuery } from "../../../targets.js";
+import { jsonAction, guarded } from "../../_shared/action.js";
 import { qs } from "../../../api/query.js";
 
 type Row = Record<string, unknown>;
@@ -269,10 +269,9 @@ export function registerMessageChatCommands(
     .option("--unread", "Only threads with unread messages")
     .option("--tarjous <id>", "Only threads for this pumppuRequestId", Number)
     .action(
-      guarded(async (opts: { unread?: boolean; tarjous?: number }) => {
-        const client = await getClient();
-        writeJson(await runChatThreads(client, opts));
-      })
+      jsonAction(getClient, (client, opts: { unread?: boolean; tarjous?: number }) =>
+        runChatThreads(client, opts)
+      )
     );
 
   c.command("thread [threadId]")
@@ -305,10 +304,9 @@ export function registerMessageChatCommands(
     .option("--search <s>", "Search query (alias for the <query> positional)")
     .option("--limit <n>", "Max results (default 50, server max 200)", Number)
     .action(
-      guarded(async (query: string | undefined, opts: { search?: string; limit?: number }) => {
-        const client = await getClient();
-        writeJson(await runChatSearch(client, resolveSearchQuery(query, opts.search), opts));
-      })
+      jsonAction(getClient, (client, query: string | undefined, opts: { search?: string; limit?: number }) =>
+        runChatSearch(client, resolveSearchQuery(query, opts.search), opts)
+      )
     );
 
   const sendCmd = c
@@ -365,8 +363,7 @@ export function registerMessageChatCommands(
       messageIdStr: string,
       opts: WriteFlags & { thread?: number; tarjous?: number }
     ) => {
-      const messageId = parseOptionalId(messageIdStr, "messageId");
-      if (messageId === undefined) failWith("messageId is required", 4);
+      const messageId = parseId(messageIdStr, "messageId");
       const client = await getClient();
       const id = await resolveThreadId(client, {
         thread: opts.thread,
@@ -386,8 +383,7 @@ export function registerMessageChatCommands(
       messageIdStr: string,
       opts: WriteFlags & { thread?: number; tarjous?: number; body: string }
     ) => {
-      const messageId = parseOptionalId(messageIdStr, "messageId");
-      if (messageId === undefined) failWith("messageId is required", 4);
+      const messageId = parseId(messageIdStr, "messageId");
       const body = String(opts.body ?? "").trim();
       if (!body) failWith("Message body cannot be empty", 4);
       if (body.length > 4000) failWith("Message body too long (max 4000 chars)", 4);
@@ -408,8 +404,7 @@ export function registerMessageChatCommands(
       messageIdStr: string,
       opts: WriteFlags & { thread?: number; tarjous?: number }
     ) => {
-      const messageId = parseOptionalId(messageIdStr, "messageId");
-      if (messageId === undefined) failWith("messageId is required", 4);
+      const messageId = parseId(messageIdStr, "messageId");
       const client = await getClient();
       const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
       writeJson(await runChatRestore(client, id, messageId, opts));

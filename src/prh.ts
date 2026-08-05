@@ -10,7 +10,8 @@
  * client-side request/transform so both command surfaces share one source.
  */
 import type { ApiClient } from "./api/client.js";
-import type { ListEnvelope } from "./api/envelopes.js";
+import { listEnvelope, type ListEnvelope } from "./api/envelopes.js";
+import { qs } from "./api/query.js";
 
 /** Flat PRH company shape (mirrors backend formatCompanyData). */
 export interface PrhCompany {
@@ -48,18 +49,15 @@ export async function runPrhSearch(
   name: string,
   page = 1
 ): Promise<ListEnvelope<{ businessId: string | null; name: string | null; city: string | null }>> {
-  const qs = new URLSearchParams({ q: name, page: String(page) }).toString();
   const res = await client.get<{ data: { companies: PrhCompany[] } }>(
-    `/api/prh/search/name?${qs}`
+    `/api/prh/search/name${qs({ q: name, page })}`
   );
   const companies = res.data?.companies ?? [];
-  return {
-    items: companies.map((c) => ({
+  return listEnvelope(
+    companies.map((c) => ({
       businessId: c.businessId,
       name: c.name,
       city: c.address?.city ?? null,
-    })),
-    nextCursor: null,
-    count: companies.length,
-  };
+    }))
+  );
 }

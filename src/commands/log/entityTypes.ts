@@ -8,7 +8,7 @@
  * Inventory verified 2026-06-10 by grepping `new ChangeTracker(` across
  * puminet5api — see docs/superpowers/specs/2026-06-10-ib-changetracker-reading-design.md.
  */
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 
 export interface EntityTypeInfo {
   entityType: string;
@@ -122,9 +122,5 @@ export function isKnownEntityType(t: string): boolean {
 
 /** `ib log types` — offline, no network, no auth. */
 export function runLogTypes(): ListEnvelope<EntityTypeInfo> {
-  return {
-    items: [...CHANGE_ENTITY_TYPES],
-    nextCursor: null,
-    count: CHANGE_ENTITY_TYPES.length,
-  };
+  return listEnvelope([...CHANGE_ENTITY_TYPES]);
 }

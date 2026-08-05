@@ -211,10 +211,7 @@ export function registerMessageDailyCommands(parent, getClient) {
     d.command("get <boxId>")
         .requiredOption("--asiakas <id>", "Company that the box is listed for (asiakasId)", Number)
         .option("--date <date>", "Date for the message: YYYYMMDD | YYYY-MM-DD | today")
-        .action(guarded(async (boxIdStr, opts) => {
-        const client = await getClient();
-        writeJson(await runDailyGet(client, opts.asiakas, parseId(boxIdStr, "boxId"), opts.date ? toYyyymmdd(opts.date) : undefined));
-    }));
+        .action(jsonAction(getClient, (client, boxIdStr, opts) => runDailyGet(client, opts.asiakas, parseId(boxIdStr, "boxId"), opts.date ? toYyyymmdd(opts.date) : undefined)));
     // content + metadata writes ───────────────────────────────────────────────────
     addWriteFlagsToCommand(d
         .command("set <boxId>")
@@ -252,40 +249,25 @@ export function registerMessageDailyCommands(parent, getClient) {
             boxTitle: opts.title,
         }, opts));
     }));
-    addWriteFlagsToCommand(d.command("delete <boxId>")).action(guarded(async (boxIdStr, opts) => {
-        const client = await getClient();
-        writeJson(await runDailyDeleteBox(client, parseId(boxIdStr, "boxId"), opts));
-    }));
+    addWriteFlagsToCommand(d.command("delete <boxId>")).action(jsonAction(getClient, (client, boxIdStr, opts) => runDailyDeleteBox(client, parseId(boxIdStr, "boxId"), opts)));
     // sharing + per-role ACL ─────────────────────────────────────────────────────
     addWriteFlagsToCommand(d
         .command("share <boxId>")
-        .requiredOption("--to <asiakasId>", "Tenant to share the box with", Number)).action(guarded(async (boxIdStr, opts) => {
-        const client = await getClient();
-        writeJson(await runDailyShare(client, { boxId: parseId(boxIdStr, "boxId"), asiakasId: opts.to }, opts));
-    }));
+        .requiredOption("--to <asiakasId>", "Tenant to share the box with", Number)).action(jsonAction(getClient, (client, boxIdStr, opts) => runDailyShare(client, { boxId: parseId(boxIdStr, "boxId"), asiakasId: opts.to }, opts)));
     addWriteFlagsToCommand(d
-        .command("unshare <dailyMessageBoxAsiakasId>")).action(guarded(async (idStr, opts) => {
-        const client = await getClient();
-        writeJson(await runDailyUnshare(client, parseId(idStr, "permissionId"), opts));
-    }));
+        .command("unshare <dailyMessageBoxAsiakasId>")).action(jsonAction(getClient, (client, idStr, opts) => runDailyUnshare(client, parseId(idStr, "permissionId"), opts)));
     addWriteFlagsToCommand(d
         .command("grant <boxId>")
         .requiredOption("--to <asiakasId>", "Tenant the role belongs to", Number)
         .requiredOption("--role <typeId>", "asiakasPersonSettingTypeId the rule applies to", Number)
-        .requiredOption("--box-asiakas <id>", "dailyMessageBoxAsiakasId of the share row", Number)).action(guarded(async (boxIdStr, opts) => {
-        const client = await getClient();
-        writeJson(await runDailyGrant(client, {
-            boxId: parseId(boxIdStr, "boxId"),
-            asiakasId: opts.to,
-            asiakasPersonSettingTypeId: opts.role,
-            dailyMessageBoxAsiakasId: opts.boxAsiakas,
-        }, opts));
-    }));
+        .requiredOption("--box-asiakas <id>", "dailyMessageBoxAsiakasId of the share row", Number)).action(jsonAction(getClient, (client, boxIdStr, opts) => runDailyGrant(client, {
+        boxId: parseId(boxIdStr, "boxId"),
+        asiakasId: opts.to,
+        asiakasPersonSettingTypeId: opts.role,
+        dailyMessageBoxAsiakasId: opts.boxAsiakas,
+    }, opts)));
     addWriteFlagsToCommand(d
-        .command("revoke <dailyMessageBoxAsiakasPermissionsId>")).action(guarded(async (idStr, opts) => {
-        const client = await getClient();
-        writeJson(await runDailyRevoke(client, parseId(idStr, "permissionId"), opts));
-    }));
+        .command("revoke <dailyMessageBoxAsiakasPermissionsId>")).action(jsonAction(getClient, (client, idStr, opts) => runDailyRevoke(client, parseId(idStr, "permissionId"), opts)));
     addWriteFlagsToCommand(d
         .command("perm-set <dailyMessageBoxAsiakasPermissionsId>")
         .requiredOption("--role <typeId>", "asiakasPersonSettingTypeId", Number)

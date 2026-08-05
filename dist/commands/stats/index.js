@@ -1,8 +1,8 @@
-import { writeJson } from "../../output/json.js";
 import { resolveDate, monthRange, weekRange, todayHelsinki } from "../../dates.js";
 import { CliError } from "../../api/errors.js";
 import { assertEnum } from "../../targets.js";
-import { guarded } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
+import { jsonAction } from "../_shared/action.js";
 export const STATS_DIMS = ["customer", "vehicle", "driver", "worksite", "status", "day"];
 /**
  * Resolve the mutually-exclusive period flags to a concrete { from, to } range.
@@ -34,15 +34,14 @@ export function resolveStatsPeriod(opts) {
 /** GET /api/cli/stats. No --by → full bundle object; --by X → list envelope. */
 export async function runStats(client, opts) {
     const { from, to } = resolveStatsPeriod(opts);
-    const params = new URLSearchParams({ from, to });
-    if (opts.by) {
+    if (opts.by)
         assertEnum(opts.by, STATS_DIMS, "--by");
-        params.set("by", opts.by);
-    }
-    if (opts.all) {
-        params.set("all", "1");
-    }
-    return client.get(`/api/cli/stats?${params.toString()}`);
+    return client.get(`/api/cli/stats${qs({
+        from,
+        to,
+        by: opts.by || undefined,
+        all: opts.all ? 1 : undefined,
+    })}`);
 }
 /**
  * Register `ib stats` — one read-only aggregate command with period sugar and
@@ -58,10 +57,6 @@ export function registerStatsCommands(parent, getClient) {
         .option("--week <start>", "7-day window starting <start> (YYYY-MM-DD)")
         .option("--by <dim>", `Single breakdown: ${STATS_DIMS.join("|")} (omit for full bundle)`)
         .option("--all", "All tenants (requires developer/system-admin access; 403 otherwise)")
-        .action(guarded(async (opts) => {
-        const client = await getClient();
-        const result = await runStats(client, opts);
-        writeJson(result);
-    }));
+        .action(jsonAction(getClient, (client, opts) => runStats(client, opts)));
 }
 //# sourceMappingURL=index.js.map

@@ -15,7 +15,7 @@ import { resolveRoleTypeId } from "../../roles.js";
 import { assertEnum, resolveTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
 import { runPersonRoleList } from "../person/index.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction, guarded } from "../_shared/action.js";
 import {
   runCombinatorDuplicates,
   runCombinatorMerge,
@@ -799,8 +799,8 @@ export async function runCustomerHistory(
     `/api/changes/asiakas/${asiakasId}/${owner}?limit=${limit}`
   );
   const list = Array.isArray(rows) ? rows : [];
-  return {
-    items: list.map((r) => ({
+  return listEnvelope(
+    list.map((r) => ({
       changeId: r.changeId,
       field: r.fieldName ?? null,
       oldValue: r.oldValue ?? null,
@@ -811,10 +811,8 @@ export async function runCustomerHistory(
       at: r.timestamp ?? null,
       description: r.description ?? null,
       reason: r.reason ?? null,
-    })),
-    nextCursor: null,
-    count: list.length,
-  };
+    }))
+  );
 }
 
 /**
@@ -1124,27 +1122,23 @@ export function registerCustomerCommands(
   c.command("dead-list")
     .option("--limit <n>", "Max rows", cappedInt(500))
     .action(
-      guarded(async (opts: { limit?: number }) => {
-        const client = await getClient();
-        writeJson(await runCustomerDeadList(client, { limit: opts.limit }));
-      })
+      jsonAction(getClient, (client, opts: { limit?: number }) =>
+        runCustomerDeadList(client, { limit: opts.limit })
+      )
     );
 
   c.command("get <asiakasId>")
     .action(
-      guarded(async (idStr: string) => {
-        const client = await getClient();
-        const result = await runCustomerGet(client, parseId(idStr, "asiakasId"));
-        writeJson(result);
-      })
+      jsonAction(getClient, (client, idStr: string) =>
+        runCustomerGet(client, parseId(idStr, "asiakasId"))
+      )
     );
 
   c.command("worksites <asiakasId>")
     .action(
-      guarded(async (idStr: string) => {
-        const client = await getClient();
-        writeJson(await runCustomerWorksites(client, parseId(idStr, "asiakasId")));
-      })
+      jsonAction(getClient, (client, idStr: string) =>
+        runCustomerWorksites(client, parseId(idStr, "asiakasId"))
+      )
     );
 
   const modulesCmd = addAsiakasTargetOption(
@@ -1236,11 +1230,9 @@ export function registerCustomerCommands(
     .option("--limit <n>", "Max results", cappedInt(500))
     .option("--my-companies", "Search across every company you belong to (rows tagged with ownerAsiakasId)")
     .action(
-      guarded(async (query: string | undefined, opts: { search?: string; limit?: number; myCompanies?: boolean }) => {
-        const client = await getClient();
-        const result = await runCustomerSearch(client, resolveSearchQuery(query, opts.search), opts.limit, !!opts.myCompanies);
-        writeJson(result);
-      })
+      jsonAction(getClient, (client, query: string | undefined, opts: { search?: string; limit?: number; myCompanies?: boolean }) =>
+        runCustomerSearch(client, resolveSearchQuery(query, opts.search), opts.limit, !!opts.myCompanies)
+      )
     );
 
   // Hidden back-compat alias — canonical command is now `ib opendata prh`.
@@ -1267,10 +1259,9 @@ export function registerCustomerCommands(
   c.command("log <asiakasId>")
     .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)
     .action(
-      guarded(async (idStr: string, opts: { limit: number }) => {
-        const client = await getClient();
-        writeJson(await runCustomerHistory(client, parseId(idStr, "asiakasId"), opts.limit));
-      })
+      jsonAction(getClient, (client, idStr: string, opts: { limit: number }) =>
+        runCustomerHistory(client, parseId(idStr, "asiakasId"), opts.limit)
+      )
     );
 
   const createCmd = c
@@ -1458,11 +1449,9 @@ export function registerCustomerCommands(
     .option("--role <name>", "Filter by role name (e.g. keikkaHandler)")
     .option("--include-roles", "Add permissionRoles[] (full per-company role names) to each person — N extra GETs")
     .action(
-      guarded(async (asiakasIdStr: string | undefined, opts: { asiakas?: number; role?: string; includeRoles?: boolean }) => {
-        const client = await getClient();
-        const result = await runCustomerPersonList(client, resolveAsiakasTarget(asiakasIdStr, opts.asiakas), opts.role, opts.includeRoles);
-        writeJson(result);
-      })
+      jsonAction(getClient, (client, asiakasIdStr: string | undefined, opts: { asiakas?: number; role?: string; includeRoles?: boolean }) =>
+        runCustomerPersonList(client, resolveAsiakasTarget(asiakasIdStr, opts.asiakas), opts.role, opts.includeRoles)
+      )
     );
 
   registerCombinatorCommands(c, getClient, {

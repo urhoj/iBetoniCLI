@@ -6,7 +6,7 @@ import { resolveDate } from "../../dates.js";
 import { parseRefId } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { COORDINATED as COORDINATED_REPOS, normalizeRepoCsv } from "./repos.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 const TYPES = ["feature", "improvement", "bugfix"];
 const AREAS = ["frontend", "backend", "cli", "database", "cicd"];
@@ -653,9 +653,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         writeJson(await runChangelogReport(await getClient(), o.month, o.format));
     }));
     c.command("pending")
-        .action(guarded(async () => {
-        writeJson(await runChangelogPending(await getClient()));
-    }));
+        .action(jsonAction(getClient, runChangelogPending));
     addWriteFlagsToCommand(c
         .command("release")
         .option("--vtag <v>", "Single version tag to stamp on every pending entry (e.g. 1.0.8)")

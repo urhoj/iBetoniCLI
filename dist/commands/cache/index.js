@@ -1,7 +1,7 @@
 import { writeJson } from "../../output/json.js";
 import { assertWritableEndpoint } from "../../api/endpointGuard.js";
 import { CACHE_ENTITIES } from "./entities.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction, guarded } from "../_shared/action.js";
 // Shared request shaping for the three destructive verbs:
 // - preview (no --confirm): dry-run → X-Dry-Run header + { read: true } so it is
 //   allowed under --read-only and skips the endpoint guard.
@@ -55,14 +55,10 @@ export async function runCachePattern(client, pattern, opts) {
 export function registerCacheCommands(parent, getClient, opts = {}) {
     const c = parent.command("cache", { hidden: !!opts.hidden }).description("Redis cache inspection and invalidation (admin/developer)");
     c.command("stats")
-        .action(guarded(async () => {
-        writeJson(await runCacheStats(await getClient()));
-    }));
+        .action(jsonAction(getClient, runCacheStats));
     c.command("keys")
         .option("--pattern <glob>", "SCAN match pattern", "*")
-        .action(guarded(async (opts) => {
-        writeJson(await runCacheKeys(await getClient(), opts));
-    }));
+        .action(jsonAction(getClient, (client, opts) => runCacheKeys(client, opts)));
     c.command("invalidate <entityType>")
         .option("--id <n>", "Entity id (e.g. keikkaId)", (v) => Number(v))
         .option("--asiakas-id <n>", "Tenant scope (developers only; non-devs use their own)", (v) => Number(v))
@@ -70,23 +66,17 @@ export function registerCacheCommands(parent, getClient, opts = {}) {
         .option("--confirm", "Execute the invalidation (default is dry-run preview)")
         .option("--force-prod", "Allow execution against a deployed (shared-cache) endpoint")
         .option("--reason <text>", "Audit reason (X-Action-Reason)")
-        .action(guarded(async (entityType, opts) => {
-        writeJson(await runCacheInvalidate(await getClient(), { entityType, id: opts.id, asiakasId: opts.asiakasId, cascade: opts.cascade }, { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason }));
-    }));
+        .action(jsonAction(getClient, (client, entityType, opts) => runCacheInvalidate(client, { entityType, id: opts.id, asiakasId: opts.asiakasId, cascade: opts.cascade }, { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason })));
     c.command("clear")
         .option("--confirm", "Execute the full flush (default is dry-run preview)")
         .option("--force-prod", "Allow execution against a deployed (shared-cache) endpoint")
         .option("--reason <text>", "Audit reason (X-Action-Reason)")
-        .action(guarded(async (opts) => {
-        writeJson(await runCacheClear(await getClient(), { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason }));
-    }));
+        .action(jsonAction(getClient, (client, opts) => runCacheClear(client, { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason })));
     c.command("pattern <glob>")
         .option("--confirm", "Execute the invalidation (default is dry-run preview)")
         .option("--force-prod", "Allow execution against a deployed (shared-cache) endpoint")
         .option("--reason <text>", "Audit reason (X-Action-Reason)")
-        .action(guarded(async (glob, opts) => {
-        writeJson(await runCachePattern(await getClient(), glob, { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason }));
-    }));
+        .action(jsonAction(getClient, (client, glob, opts) => runCachePattern(client, glob, { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason })));
     c.command("entities")
         .action(guarded(() => {
         writeJson({ items: CACHE_ENTITIES, count: CACHE_ENTITIES.length });

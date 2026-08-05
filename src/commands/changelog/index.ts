@@ -32,7 +32,7 @@ import { resolveDate } from "../../dates.js";
 import { parseRefId } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { COORDINATED as COORDINATED_REPOS, normalizeRepoCsv } from "./repos.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 
 type Row = Record<string, unknown>;
@@ -823,11 +823,7 @@ export function registerChangelogCommands(
     );
 
   c.command("pending")
-    .action(
-      guarded(async () => {
-        writeJson(await runChangelogPending(await getClient()));
-      })
-    );
+    .action(jsonAction(getClient, runChangelogPending));
 
   addWriteFlagsToCommand(
     c

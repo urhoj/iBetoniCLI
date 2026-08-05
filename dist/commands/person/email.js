@@ -1,13 +1,14 @@
+import { listEnvelope } from "../../api/envelopes.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, requireReason, } from "../../api/writeFlags.js";
 import { writeJson } from "../../output/json.js";
 import { resolvePersonRef } from "../notification/index.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction, guarded } from "../_shared/action.js";
 /** GET /api/person/getPersonEmails/:personId → ListEnvelope of primary + alternatives. */
 export async function runPersonEmailList(client, person) {
     const personId = await resolvePersonRef(client, person);
     const rows = await client.get(`/api/person/getPersonEmails/${personId}`);
     const items = Array.isArray(rows) ? rows : [];
-    return { items, nextCursor: null, count: items.length, truncated: false };
+    return listEnvelope(items, { truncated: false });
 }
 /** POST /api/person/addPersonEmail { personId, personEmail }. */
 export async function runPersonEmailAdd(client, person, email, flags) {
@@ -30,9 +31,7 @@ export function registerPersonEmailCommands(person, getClient) {
         .description("Manage a person's alternative email addresses (personEmails)");
     email
         .command("list <person>")
-        .action(guarded(async (personRef) => {
-        writeJson(await runPersonEmailList(await getClient(), personRef));
-    }));
+        .action(jsonAction(getClient, (client, personRef) => runPersonEmailList(client, personRef)));
     const addCmd = email
         .command("add <person> <email>");
     addWriteFlagsToCommand(addCmd).action(guarded(async (personRef, emailAddr, opts) => {

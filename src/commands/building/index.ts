@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { guarded } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 
 export interface BuildingLookupOptions {
   sijainti?: number;
@@ -33,16 +34,15 @@ export async function runBuildingLookup(
   client: ApiClient,
   opts: BuildingLookupOptions
 ): Promise<Record<string, unknown>> {
-  const params = new URLSearchParams();
-  const worksite = opts.worksite ?? opts.tyomaa;
-  if (opts.sijainti !== undefined) params.set("sijainti", String(opts.sijainti));
-  if (worksite !== undefined) params.set("worksite", String(worksite));
-  if (opts.lat !== undefined) params.set("lat", String(opts.lat));
-  if (opts.lng !== undefined) params.set("lng", String(opts.lng));
-  if (opts.address !== undefined) params.set("address", opts.address);
-  if (opts.city !== undefined) params.set("city", opts.city);
   return client.get<Record<string, unknown>>(
-    `/api/cli/opendata/building/lookup?${params.toString()}`
+    `/api/cli/opendata/building/lookup${qs({
+      sijainti: opts.sijainti,
+      worksite: opts.worksite ?? opts.tyomaa,
+      lat: opts.lat,
+      lng: opts.lng,
+      address: opts.address,
+      city: opts.city,
+    })}`
   );
 }
 

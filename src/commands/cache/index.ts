@@ -3,7 +3,7 @@ import type { ApiClient } from "../../api/client.js";
 import { writeJson } from "../../output/json.js";
 import { assertWritableEndpoint } from "../../api/endpointGuard.js";
 import { CACHE_ENTITIES } from "./entities.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction, guarded } from "../_shared/action.js";
 export interface CacheWriteOpts {
   confirm: boolean;
   forceProd: boolean;
@@ -75,18 +75,12 @@ export function registerCacheCommands(parent: Command, getClient: () => Promise<
   const c = parent.command("cache", { hidden: !!opts.hidden }).description("Redis cache inspection and invalidation (admin/developer)");
 
   c.command("stats")
-    .action(
-      guarded(async () => {
-        writeJson(await runCacheStats(await getClient()));
-      })
-    );
+    .action(jsonAction(getClient, runCacheStats));
 
   c.command("keys")
     .option("--pattern <glob>", "SCAN match pattern", "*")
     .action(
-      guarded(async (opts: { pattern?: string }) => {
-        writeJson(await runCacheKeys(await getClient(), opts));
-      })
+      jsonAction(getClient, (client, opts: { pattern?: string }) => runCacheKeys(client, opts))
     );
 
   c.command("invalidate <entityType>")
@@ -97,15 +91,13 @@ export function registerCacheCommands(parent: Command, getClient: () => Promise<
     .option("--force-prod", "Allow execution against a deployed (shared-cache) endpoint")
     .option("--reason <text>", "Audit reason (X-Action-Reason)")
     .action(
-      guarded(async (entityType: string, opts: { id?: number; asiakasId?: number; cascade?: boolean; confirm?: boolean; forceProd?: boolean; reason?: string }) => {
-        writeJson(
-          await runCacheInvalidate(
-            await getClient(),
-            { entityType, id: opts.id, asiakasId: opts.asiakasId, cascade: opts.cascade },
-            { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason }
-          )
-        );
-      })
+      jsonAction(getClient, (client, entityType: string, opts: { id?: number; asiakasId?: number; cascade?: boolean; confirm?: boolean; forceProd?: boolean; reason?: string }) =>
+        runCacheInvalidate(
+          client,
+          { entityType, id: opts.id, asiakasId: opts.asiakasId, cascade: opts.cascade },
+          { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason }
+        )
+      )
     );
 
   c.command("clear")
@@ -113,9 +105,9 @@ export function registerCacheCommands(parent: Command, getClient: () => Promise<
     .option("--force-prod", "Allow execution against a deployed (shared-cache) endpoint")
     .option("--reason <text>", "Audit reason (X-Action-Reason)")
     .action(
-      guarded(async (opts: { confirm?: boolean; forceProd?: boolean; reason?: string }) => {
-        writeJson(await runCacheClear(await getClient(), { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason }));
-      })
+      jsonAction(getClient, (client, opts: { confirm?: boolean; forceProd?: boolean; reason?: string }) =>
+        runCacheClear(client, { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason })
+      )
     );
 
   c.command("pattern <glob>")
@@ -123,9 +115,9 @@ export function registerCacheCommands(parent: Command, getClient: () => Promise<
     .option("--force-prod", "Allow execution against a deployed (shared-cache) endpoint")
     .option("--reason <text>", "Audit reason (X-Action-Reason)")
     .action(
-      guarded(async (glob: string, opts: { confirm?: boolean; forceProd?: boolean; reason?: string }) => {
-        writeJson(await runCachePattern(await getClient(), glob, { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason }));
-      })
+      jsonAction(getClient, (client, glob: string, opts: { confirm?: boolean; forceProd?: boolean; reason?: string }) =>
+        runCachePattern(client, glob, { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason })
+      )
     );
 
   c.command("entities")

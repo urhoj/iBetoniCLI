@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import {
   addWriteFlagsToCommand,
   writeFlagsToHeaders,
@@ -9,6 +9,7 @@ import {
 import { writeJson, failWith } from "../../output/json.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { guarded } from "./action.js";
+import { addOwnerOption } from "../../targets.js";
 
 /**
  * One likely-duplicate entity pair from a combinator's /duplicates endpoint.
@@ -60,7 +61,7 @@ export async function runCombinatorDuplicates(
     `/api/admin/${base}/duplicates?ownerAsiakasId=${ownerAsiakasId}`
   );
   const items = Array.isArray(res?.pairs) ? res.pairs : [];
-  return { items, nextCursor: null, count: items.length, truncated: items.length >= 100 };
+  return listEnvelope(items, { truncated: items.length >= 100 });
 }
 
 /**
@@ -144,15 +145,16 @@ export function registerCombinatorCommands(
       })
     );
 
-  const mergeCmd = parent
-    .command("merge")
-    .requiredOption("--main <id>", `${cfg.idLabel} to KEEP (references merge into this)`, Number)
-    .requiredOption(
-      "--secondary <id>",
-      `${cfg.idLabel} to REMOVE (merged away, then deleted)`,
-      Number
-    )
-    .option("--owner <id>", "ownerAsiakasId (default: active company)", Number);
+  const mergeCmd = addOwnerOption(
+    parent
+      .command("merge")
+      .requiredOption("--main <id>", `${cfg.idLabel} to KEEP (references merge into this)`, Number)
+      .requiredOption(
+        "--secondary <id>",
+        `${cfg.idLabel} to REMOVE (merged away, then deleted)`,
+        Number
+      )
+  );
   if (cfg.allowBigMerge) {
     mergeCmd.option("--allow-big-merge", "System-admin: permit a merge above the safety row cap");
   }

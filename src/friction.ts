@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { CliError, exitCodeForError } from "./api/errors.js";
+import { CliError, errorMessage, exitCodeForError } from "./api/errors.js";
 import { getEmbeddedCtx } from "./embedded.js";
 
 /**
@@ -50,10 +50,7 @@ export function recordFriction(
     // never files "the error gave no pointer" for a hint that WAS shown
     // (feedback #275: the show→get did-you-mean existed, but the log recorded
     // Commander's bare `unknown command 'show'` and a groomer re-requested it).
-    const message = (displayed ?? (err instanceof Error ? err.message : String(err))).slice(
-      0,
-      400
-    );
+    const message = (displayed ?? errorMessage(err)).slice(0, 400);
     const code =
       err instanceof CliError && err.body && typeof err.body === "object"
         ? ((err.body as Record<string, unknown>).code ?? null)

@@ -1,7 +1,6 @@
-import { writeJson } from "../../output/json.js";
 import { runKeikkaList } from "../keikka/index.js";
 import { todayHelsinki, resolveDate, addDaysISO } from "../../dates.js";
-import { jsonAction, guarded } from "../_shared/action.js";
+import { jsonAction } from "../_shared/action.js";
 /**
  * `ib schedule today` — thin wrapper around runKeikkaList with from=to=today.
  */
@@ -40,16 +39,8 @@ export function registerScheduleCommands(parent, getClient) {
     s.command("today")
         .action(jsonAction(getClient, runScheduleToday));
     s.command("day <date>")
-        .action(guarded(async (date) => {
-        const client = await getClient();
-        const result = await runScheduleDay(client, date);
-        writeJson(result);
-    }));
+        .action(jsonAction(getClient, (client, date) => runScheduleDay(client, date)));
     s.command("week <start>")
-        .action(guarded(async (start) => {
-        const client = await getClient();
-        const result = await runScheduleWeek(client, start);
-        writeJson(result);
-    }));
+        .action(jsonAction(getClient, (client, start) => runScheduleWeek(client, start)));
 }
 //# sourceMappingURL=index.js.map

@@ -1,4 +1,4 @@
-import { CliError, exitCodeFromStatus } from "../api/errors.js";
+import { CliError, errorMessage, exitCodeFromStatus } from "../api/errors.js";
 /** Reserved profile name under which the admin login is stashed during impersonation. */
 export const IMPERSONATOR_PROFILE = "_impersonator";
 async function postJson(endpoint, path, jwt, body, label) {
@@ -11,7 +11,7 @@ async function postJson(endpoint, path, jwt, body, label) {
         });
     }
     catch (e) {
-        const detail = e instanceof Error ? e.message : String(e);
+        const detail = errorMessage(e);
         throw new CliError(`Network error: ${detail}`, 0, null, 7);
     }
     if (!res.ok) {

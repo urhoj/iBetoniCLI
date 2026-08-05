@@ -8,15 +8,14 @@
  */
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { qs } from "../../api/query.js";
 import {
   addWriteFlagsToCommand,
   writeFlagsToHeaders,
   type WriteFlags,
 } from "../../api/writeFlags.js";
-import { writeJson } from "../../output/json.js";
-import { guarded, jsonAction } from "../_shared/action.js";
+import { jsonAction } from "../_shared/action.js";
 
 interface RawSlow {
   procedure: string;
@@ -51,10 +50,7 @@ export async function runPerfSlow(
   }));
   const limit = opts.limit ?? 50;
   return {
-    items,
-    nextCursor: null,
-    count: items.length,
-    truncated: items.length >= limit,
+    ...listEnvelope(items, { truncated: items.length >= limit }),
     totalCount: d.totalCount,
     environment: d.environment,
   };
@@ -102,27 +98,19 @@ export function registerPerfCommands(parent: Command, getClient: () => Promise<A
     .option("--limit <n>", "Max rows (default 50)", (v: string) => Number(v))
     .option("--env <name>", "Environment buffer to read (default: backend's current env)")
     .action(
-      guarded(async (opts: { limit?: number; env?: string }) => {
-        writeJson(await runPerfSlow(await getClient(), opts));
-      })
+      jsonAction(getClient, (client, opts: { limit?: number; env?: string }) =>
+        runPerfSlow(client, opts)
+      )
     );
 
   perf
     .command("stats")
     .option("--env <name>", "Environment buffer to read (default: backend's current env)")
-    .action(
-      guarded(async (opts: { env?: string }) => {
-        writeJson(await runPerfStats(await getClient(), opts));
-      })
-    );
+    .action(jsonAction(getClient, runPerfStats));
 
   perf
     .command("config")
-    .action(
-      guarded(async () => {
-        writeJson(await runPerfConfig(await getClient()));
-      })
-    );
+    .action(jsonAction(getClient, runPerfConfig));
 
   const clear = perf
     .command("clear")

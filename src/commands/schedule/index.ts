@@ -1,10 +1,9 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
-import { writeJson } from "../../output/json.js";
 import { runKeikkaList } from "../keikka/index.js";
 import { todayHelsinki, resolveDate, addDaysISO } from "../../dates.js";
-import { jsonAction, guarded } from "../_shared/action.js";
+import { jsonAction } from "../_shared/action.js";
 
 /**
  * `ib schedule today` — thin wrapper around runKeikkaList with from=to=today.
@@ -60,20 +59,8 @@ export function registerScheduleCommands(
     .action(jsonAction(getClient, runScheduleToday));
 
   s.command("day <date>")
-    .action(
-      guarded(async (date: string) => {
-        const client = await getClient();
-        const result = await runScheduleDay(client, date);
-        writeJson(result);
-      })
-    );
+    .action(jsonAction(getClient, (client, date: string) => runScheduleDay(client, date)));
 
   s.command("week <start>")
-    .action(
-      guarded(async (start: string) => {
-        const client = await getClient();
-        const result = await runScheduleWeek(client, start);
-        writeJson(result);
-      })
-    );
+    .action(jsonAction(getClient, (client, start: string) => runScheduleWeek(client, start)));
 }

@@ -1,3 +1,4 @@
+import { listEnvelope } from "../../api/envelopes.js";
 import { COMMAND_SPECS } from "../../reference/specs.js";
 import { runGlossaryList } from "./index.js";
 /** Needles shorter than this are dropped — too generic to match usefully (e.g. `pvm`, `m3`). */
@@ -141,6 +142,6 @@ export function lintEntries(entries, opts = {}) {
 export async function runGlossaryLint(client, opts = {}) {
     const { items } = await runGlossaryList(client, {});
     const findings = lintEntries(items, opts);
-    return { items: findings, nextCursor: null, count: findings.length, truncated: false };
+    return listEnvelope(findings, { truncated: false });
 }
 //# sourceMappingURL=lint.js.map

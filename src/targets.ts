@@ -62,6 +62,19 @@ export function addAsiakasTargetOption(cmd: Command): Command {
 }
 
 /**
+ * Attach the shared `--owner <id>` tenant-SCOPE flag (ownerAsiakasId), the one
+ * every changeTracker/audit read and the combinator commands accept. Distinct
+ * from {@link addAsiakasTargetOption}: that one aliases a positional TARGET id,
+ * this one re-points which tenant's rows are read (default: the active company
+ * from the token). Wrap the command at the exact point the flag was registered
+ * — Commander renders options in registration order, so moving it would move
+ * the `--help` line.
+ */
+export function addOwnerOption(cmd: Command): Command {
+  return cmd.option("--owner <id>", "ownerAsiakasId (default: active company)", Number);
+}
+
+/**
  * Parse a required primary-key positional id (`<keikkaId>`, `<asiakasId>`, …).
  *
  * `Number(idStr)` alone is unsafe for ids: a typo yields `NaN` (which then

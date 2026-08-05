@@ -1,6 +1,6 @@
+import { listEnvelope } from "../../api/envelopes.js";
 import { qs } from "../../api/query.js";
-import { writeJson } from "../../output/json.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction } from "../_shared/action.js";
 /** GET open purchase invoices (payables) → ListEnvelope + summary. */
 export async function runFennoaPurchases(client, opts) {
     const res = await client.get(`/api/admin/fennoa/purchase-invoices${qs({
@@ -11,9 +11,7 @@ export async function runFennoaPurchases(client, opts) {
     })}`);
     const items = res.invoices ?? [];
     return {
-        items,
-        nextCursor: null,
-        count: items.length,
+        ...listEnvelope(items),
         summary: res.summary,
         fetchedAt: res.fetchedAt,
         asiakasId: res.asiakasId,
@@ -29,8 +27,6 @@ export function registerFennoaCommands(parent, getClient) {
         .option("--months <n>", "Created-after window in months (default 6, max 12)", (v) => Number(v))
         .option("--asiakas <id>", "Target company override (e.g. 8 = Kalle Urho Oy verification path)", (v) => Number(v))
         .option("--refresh", "Bypass the server's 15-minute cache")
-        .action(guarded(async (opts) => {
-        writeJson(await runFennoaPurchases(await getClient(), opts));
-    }));
+        .action(jsonAction(getClient, (client, opts) => runFennoaPurchases(client, opts)));
 }
 //# sourceMappingURL=index.js.map

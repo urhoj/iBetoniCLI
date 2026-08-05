@@ -6,7 +6,7 @@ import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { CliError } from "../../api/errors.js";
 import { parseId, cappedInt } from "../../targets.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction, guarded } from "../_shared/action.js";
 import { extractGeocodeLatLng } from "../_shared/geocode.js";
 import { runAddressDashboard, } from "../_shared/addressDashboard.js";
 import { qs } from "../../api/query.js";
@@ -472,11 +472,7 @@ export async function runSijaintiListJoined(client, opts) {
         truncated = truncated || matched.length > cap;
         items = matched.slice(0, cap);
     }
-    const out = {
-        items,
-        nextCursor: null,
-        count: items.length,
-    };
+    const out = listEnvelope(items);
     if (truncated)
         out.truncated = true;
     if (items.length === 0 && !opts.all) {
@@ -706,11 +702,7 @@ export function registerSijaintiCommands(parent, getClient) {
         writeJson(result);
     }));
     s.command("get <sijaintiId>")
-        .action(guarded(async (idStr) => {
-        const client = await getClient();
-        const result = await runSijaintiGet(client, parseId(idStr, "sijaintiId"));
-        writeJson(result);
-    }));
+        .action(jsonAction(getClient, (client, idStr) => runSijaintiGet(client, parseId(idStr, "sijaintiId"))));
     s.command("dashboard [sijaintiId]")
         .option("--address <address>", "Resolve the point from a street address instead of sijaintiId")
         .action(guarded(async (idStr, opts) => {
@@ -868,18 +860,10 @@ export function registerSijaintiCommands(parent, getClient) {
     }
     s.command("types")
         .option("--jerry", "Use the BetoniJerry sijainti type set")
-        .action(guarded(async (opts) => {
-        const client = await getClient();
-        const result = await runSijaintiTypes(client, opts.jerry);
-        writeJson(result);
-    }));
+        .action(jsonAction(getClient, (client, opts) => runSijaintiTypes(client, opts.jerry)));
     s.command("geocode")
         .requiredOption("--address <a>", "Free-form address to geocode")
-        .action(guarded(async (opts) => {
-        const client = await getClient();
-        const result = await runSijaintiGeocode(client, opts.address);
-        writeJson(result);
-    }));
+        .action(jsonAction(getClient, (client, opts) => runSijaintiGeocode(client, opts.address)));
     s.command("closest")
         .option("--worksite <id>", "Target tyomaaId (same flag as the rest of the CLI)", Number)
         .option("--tyomaa <id>", "Target tyomaaId (Finnish alias of --worksite)", Number)
@@ -904,9 +888,6 @@ export function registerSijaintiCommands(parent, getClient) {
     s.command("distance")
         .requiredOption("--from <point>", "Origin: 'lat,lng' or a sijaintiId")
         .requiredOption("--to <point>", "Destination: 'lat,lng' or a sijaintiId")
-        .action(guarded(async (opts) => {
-        const client = await getClient();
-        writeJson(await runSijaintiDistance(client, opts.from, opts.to));
-    }));
+        .action(jsonAction(getClient, (client, opts) => runSijaintiDistance(client, opts.from, opts.to)));
 }
 //# sourceMappingURL=index.js.map

@@ -10,7 +10,8 @@ import {
   requireReason,
 } from "../../api/writeFlags.js";
 import { parseId } from "../../targets.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction, guarded } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 
 type Row = Record<string, unknown>;
 
@@ -70,11 +71,11 @@ export async function runVehicleDriverHistory(
   vehicleId: number,
   opts: VehicleDriverHistoryFilter
 ): Promise<ListEnvelope<Row>> {
-  const params = new URLSearchParams();
-  params.set("from", resolveDate(opts.from) ?? opts.from);
-  params.set("to", resolveDate(opts.to) ?? opts.to);
   return client.get<ListEnvelope<Row>>(
-    `/api/cli/driver/history/${vehicleId}?${params.toString()}`
+    `/api/cli/driver/history/${vehicleId}${qs({
+      from: resolveDate(opts.from) ?? opts.from,
+      to: resolveDate(opts.to) ?? opts.to,
+    })}`
   );
 }
 
@@ -180,35 +181,25 @@ export function registerVehicleDriverCommands(
   // ── fleet / day planning reads (date-keyed) ──
   driver
     .command("board <date>")
-    .action(
-      guarded(async (date: string) => {
-        writeJson(await runVehicleDriverBoard(await getClient(), date));
-      })
-    );
+    .action(jsonAction(getClient, (client, date: string) => runVehicleDriverBoard(client, date)));
 
   driver
     .command("gaps <date>")
-    .action(
-      guarded(async (date: string) => {
-        writeJson(await runVehicleDriverGaps(await getClient(), date));
-      })
-    );
+    .action(jsonAction(getClient, (client, date: string) => runVehicleDriverGaps(client, date)));
 
   driver
     .command("available <date>")
     .action(
-      guarded(async (date: string) => {
-        writeJson(await runVehicleDriverAvailable(await getClient(), date));
-      })
+      jsonAction(getClient, (client, date: string) => runVehicleDriverAvailable(client, date))
     );
 
   // ── per-vehicle day-driver ──
   driver
     .command("who <vehicleId> <date>")
     .action(
-      guarded(async (vehicleIdStr: string, date: string) => {
-        writeJson(await runVehicleDriverWho(await getClient(), parseId(vehicleIdStr, "vehicleId"), date));
-      })
+      jsonAction(getClient, (client, vehicleIdStr: string, date: string) =>
+        runVehicleDriverWho(client, parseId(vehicleIdStr, "vehicleId"), date)
+      )
     );
 
   driver
@@ -216,11 +207,9 @@ export function registerVehicleDriverCommands(
     .requiredOption("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)")
     .requiredOption("--to <date>", "End date YYYY-MM-DD (or today/yesterday/tomorrow)")
     .action(
-      guarded(async (vehicleIdStr: string, opts: VehicleDriverHistoryFilter) => {
-        writeJson(
-          await runVehicleDriverHistory(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts)
-        );
-      })
+      jsonAction(getClient, (client, vehicleIdStr: string, opts: VehicleDriverHistoryFilter) =>
+        runVehicleDriverHistory(client, parseId(vehicleIdStr, "vehicleId"), opts)
+      )
     );
 
   addWriteFlagsToCommand(
@@ -252,9 +241,9 @@ export function registerVehicleDriverCommands(
   def
     .command("get <vehicleId>")
     .action(
-      guarded(async (vehicleIdStr: string) => {
-        writeJson(await runVehicleDefaultGet(await getClient(), parseId(vehicleIdStr, "vehicleId")));
-      })
+      jsonAction(getClient, (client, vehicleIdStr: string) =>
+        runVehicleDefaultGet(client, parseId(vehicleIdStr, "vehicleId"))
+      )
     );
 
   addWriteFlagsToCommand(

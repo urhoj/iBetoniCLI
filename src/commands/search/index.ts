@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { writeJson } from "../../output/json.js";
+import { writeJson, errorMessage } from "../../output/json.js";
 import { CliError } from "../../api/errors.js";
 import { resolveSearchQuery } from "../../targets.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
@@ -15,6 +15,8 @@ import {
   sijaintiRowMatches,
   SIJAINTI_SEARCH_SCAN_LIMIT,
 } from "../sijainti/index.js";
+import { qs } from "../../api/query.js";
+import { listEnvelope } from "../../api/envelopes.js";
 /** Canonical entity order — also the within-tier sort order of merged hits. */
 export const SEARCH_ENTITIES = ["customer", "worksite", "person", "vehicle", "keikka", "sijainti"] as const;
 export type SearchEntity = (typeof SEARCH_ENTITIES)[number];
@@ -29,7 +31,7 @@ export interface UnifiedHit extends Record<string, unknown> {
 
 export interface UnifiedSearchEnvelope {
   items: UnifiedHit[];
-  nextCursor: null;
+  nextCursor: string | null;
   count: number;
   errors: { entity: SearchEntity; message: string }[];
 }
@@ -197,7 +199,7 @@ export async function runUnifiedSearch(
       if (firstFailure === null) firstFailure = res.reason;
       errors.push({
         entity,
-        message: res.reason instanceof Error ? res.reason.message : String(res.reason),
+        message: errorMessage(res.reason),
       });
       return;
     }
@@ -213,7 +215,7 @@ export async function runUnifiedSearch(
   const order = (h: UnifiedHit) => SEARCH_ENTITIES.indexOf(h.entity);
   items.sort((a, b) => tier(a) - tier(b) || order(a) - order(b));
 
-  return { items, nextCursor: null, count: items.length, errors };
+  return { ...listEnvelope(items), errors };
 }
 
 /**
@@ -235,8 +237,7 @@ export function buildSearchSources(
     worksite: () => runWorksiteSearch(client, query, limit, myCompanies),
     person: () => {
       if (myCompanies) {
-        const qs = new URLSearchParams({ q: query, limit: String(limit) });
-        return client.get(`/api/cli/person/search?${qs.toString()}`);
+        return client.get(`/api/cli/person/search${qs({ q: query, limit })}`);
       }
       return runPersonSearch(client, query, limit);
     },

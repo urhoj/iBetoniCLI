@@ -1,9 +1,9 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
-import { writeJson } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 type Row = Record<string, unknown>;
 
 export interface PersonAbsencesFilter {
@@ -22,11 +22,13 @@ export async function runPersonAbsences(
   client: ApiClient,
   opts: PersonAbsencesFilter
 ): Promise<ListEnvelope<Row>> {
-  const params = new URLSearchParams();
-  params.set("from", resolveDate(opts.from) ?? opts.from);
-  params.set("to", resolveDate(opts.to) ?? opts.to);
-  if (opts.person !== undefined) params.set("personId", String(opts.person));
-  return client.get<ListEnvelope<Row>>(`/api/cli/driver/absences?${params.toString()}`);
+  return client.get<ListEnvelope<Row>>(
+    `/api/cli/driver/absences${qs({
+      from: resolveDate(opts.from) ?? opts.from,
+      to: resolveDate(opts.to) ?? opts.to,
+      personId: opts.person,
+    })}`
+  );
 }
 
 /** Register `ib person absences`. See `src/reference/specs.ts` for the spec. */
@@ -40,8 +42,6 @@ export function registerPersonAbsencesCommand(
     .requiredOption("--to <date>", "End date YYYY-MM-DD (or today/yesterday/tomorrow)")
     .option("--person <pid>", "Filter to one personId", (s: string) => Number(s))
     .action(
-      guarded(async (opts: PersonAbsencesFilter) => {
-        writeJson(await runPersonAbsences(await getClient(), opts));
-      })
+      jsonAction(getClient, (client, opts: PersonAbsencesFilter) => runPersonAbsences(client, opts))
     );
 }

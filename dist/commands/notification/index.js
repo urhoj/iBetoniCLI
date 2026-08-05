@@ -1,22 +1,9 @@
 import { readFileSync } from "node:fs";
 import { failWith, writeJson } from "../../output/json.js";
+import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { guarded } from "../_shared/action.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { runPersonSearch } from "../person/index.js";
-/** Parse a `--data <json>` flag into a plain object (arrays/scalars rejected → exit 4). */
-export function parseJsonObject(raw) {
-    let parsed;
-    try {
-        parsed = JSON.parse(raw);
-    }
-    catch {
-        failWith("--data must be valid JSON", 4);
-    }
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-        failWith("--data must be a JSON object", 4);
-    }
-    return parsed;
-}
 /**
  * Resolve a `--person`/positional value to a personId. A bare integer passes
  * through; anything else is treated as a name and resolved via the company-
@@ -126,7 +113,7 @@ export function registerNotificationCommands(parent, getClient) {
         .requiredOption("--person <idOrName>", "Recipient personId, or a name resolved within your company")
         .requiredOption("--title <text>", "Notification title")
         .requiredOption("--body <text>", "Notification body")
-        .option("--data <json>", "Extra FCM data payload as a JSON object", parseJsonObject);
+        .option("--data <json>", "Extra FCM data payload as a JSON object", (raw) => parseJsonBodyFlag(raw, "--data"));
     addWriteFlagsToCommand(sendCmd).action(guarded(async (opts) => {
         const result = await runNotificationFcmSend(await getClient(), {
             person: opts.person,

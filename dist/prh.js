@@ -1,3 +1,5 @@
+import { listEnvelope } from "./api/envelopes.js";
+import { qs } from "./api/query.js";
 /**
  * GET /api/prh/company/:businessId — single company from the Finnish business
  * registry. Backend wraps as { success, data, timestamp }; unwrap `.data`.
@@ -13,17 +15,12 @@ export async function runPrhById(client, ytunnus) {
  * companies into the universal list envelope.
  */
 export async function runPrhSearch(client, name, page = 1) {
-    const qs = new URLSearchParams({ q: name, page: String(page) }).toString();
-    const res = await client.get(`/api/prh/search/name?${qs}`);
+    const res = await client.get(`/api/prh/search/name${qs({ q: name, page })}`);
     const companies = res.data?.companies ?? [];
-    return {
-        items: companies.map((c) => ({
-            businessId: c.businessId,
-            name: c.name,
-            city: c.address?.city ?? null,
-        })),
-        nextCursor: null,
-        count: companies.length,
-    };
+    return listEnvelope(companies.map((c) => ({
+        businessId: c.businessId,
+        name: c.name,
+        city: c.address?.city ?? null,
+    })));
 }
 //# sourceMappingURL=prh.js.map

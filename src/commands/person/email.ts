@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import {
   addWriteFlagsToCommand,
   writeFlagsToHeaders,
@@ -9,7 +9,7 @@ import {
 } from "../../api/writeFlags.js";
 import { writeJson } from "../../output/json.js";
 import { resolvePersonRef } from "../notification/index.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction, guarded } from "../_shared/action.js";
 
 interface PersonEmailRow {
   email: string;
@@ -26,7 +26,7 @@ export async function runPersonEmailList(
     `/api/person/getPersonEmails/${personId}`
   );
   const items = Array.isArray(rows) ? rows : [];
-  return { items, nextCursor: null, count: items.length, truncated: false };
+  return listEnvelope(items, { truncated: false });
 }
 
 /** POST /api/person/addPersonEmail { personId, personEmail }. */
@@ -84,9 +84,7 @@ export function registerPersonEmailCommands(
   email
     .command("list <person>")
     .action(
-      guarded(async (personRef: string) => {
-        writeJson(await runPersonEmailList(await getClient(), personRef));
-      })
+      jsonAction(getClient, (client, personRef: string) => runPersonEmailList(client, personRef))
     );
 
   const addCmd = email

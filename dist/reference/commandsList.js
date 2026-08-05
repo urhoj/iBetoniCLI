@@ -2,6 +2,7 @@ import { COMMAND_SPECS } from "./specs.js";
 import { CliError } from "../api/errors.js";
 import { domainBlurb } from "./domain.js";
 import { visibleSpecs, domainOf, hiddenDomainsAtTier, getCallerTier, } from "../tier.js";
+import { listEnvelope } from "../api/envelopes.js";
 /** Single source for the write classification used by `ib commands`. */
 const isWriteSpec = (s) => s.mutates ?? !!s.writeFlags;
 function commandRelativePath(command) {
@@ -140,8 +141,7 @@ export function filterCommandSpecs(specs, filter, tier = getCallerTier()) {
  * callers (`program.ts`) handle stdout via `writeJson`.
  */
 export function buildCommandsList(filter, tier = getCallerTier()) {
-    const items = filterCommandSpecs(COMMAND_SPECS, filter, tier);
-    return { items, nextCursor: null, count: items.length };
+    return listEnvelope(filterCommandSpecs(COMMAND_SPECS, filter, tier));
 }
 /**
  * Bare `ib commands` — a ~5 KB domain INDEX instead of the full flat list
@@ -166,9 +166,7 @@ export function buildDomainIndex(specs = COMMAND_SPECS, tier = getCallerTier()) 
         .filter((d) => d.count > 0);
     return {
         hint: "domain index — one domain's commands: `ib commands <domain>` · full flat list: `ib commands --all` · one command's spec: `ib <command> --help`",
-        items,
-        nextCursor: null,
-        count: items.length,
+        ...listEnvelope(items),
     };
 }
 //# sourceMappingURL=commandsList.js.map

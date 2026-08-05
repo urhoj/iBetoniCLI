@@ -1,5 +1,6 @@
 import { writeJson, failWith } from "../../output/json.js";
 import { guarded } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 /** Distinct primary coordinate sources the caller supplied (exactly one allowed). */
 function selectedSources(opts) {
     const sources = [];
@@ -20,21 +21,14 @@ function selectedSources(opts) {
  * the city when --city is omitted.
  */
 export async function runBuildingLookup(client, opts) {
-    const params = new URLSearchParams();
-    const worksite = opts.worksite ?? opts.tyomaa;
-    if (opts.sijainti !== undefined)
-        params.set("sijainti", String(opts.sijainti));
-    if (worksite !== undefined)
-        params.set("worksite", String(worksite));
-    if (opts.lat !== undefined)
-        params.set("lat", String(opts.lat));
-    if (opts.lng !== undefined)
-        params.set("lng", String(opts.lng));
-    if (opts.address !== undefined)
-        params.set("address", opts.address);
-    if (opts.city !== undefined)
-        params.set("city", opts.city);
-    return client.get(`/api/cli/opendata/building/lookup?${params.toString()}`);
+    return client.get(`/api/cli/opendata/building/lookup${qs({
+        sijainti: opts.sijainti,
+        worksite: opts.worksite ?? opts.tyomaa,
+        lat: opts.lat,
+        lng: opts.lng,
+        address: opts.address,
+        city: opts.city,
+    })}`);
 }
 /** Register `ib opendata building`. */
 export function registerBuildingCommands(parent, getClient) {

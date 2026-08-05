@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { CliError, exitCodeFromStatus } from "./errors.js";
+import { CliError, errorMessage, exitCodeFromStatus } from "./errors.js";
 import { recordRequest, statsEnabled } from "../stats.js";
 import { getAmbientCommandPath } from "../commandContext.js";
 /**
@@ -120,7 +120,7 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
             return await doFetch(method, path, body, opts);
         }
         catch (e) {
-            const detail = e instanceof Error ? e.message : String(e);
+            const detail = errorMessage(e);
             throw new CliError(`Network error: ${detail}`, 0, null, 7);
         }
     }
@@ -155,7 +155,7 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
                 newToken = await onRefresh(currentToken);
             }
             catch (e) {
-                const detail = e instanceof Error ? e.message : String(e);
+                const detail = errorMessage(e);
                 // A FAILED refresh means the stored token is fully expired/invalid —
                 // `ib auth refresh` can't recover it (it 401s the same way), so the
                 // generic 401 remedy ("run ib auth refresh") is a dead end. Carry an

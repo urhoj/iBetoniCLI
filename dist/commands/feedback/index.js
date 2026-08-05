@@ -1,8 +1,10 @@
+import { listEnvelope } from "../../api/envelopes.js";
 import { readJsonObjectInput } from "../../api/parseBody.js";
 import { failWith, writeJson } from "../../output/json.js";
 import { assertEnum, parseRefId } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { guarded, jsonAction } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 const KINDS = ["improvement", "bug", "idea", "legal"];
 const SCOPES = ["cli", "app", "jerry", "bsg2", "workspace", "security", "ops", "impeccable", "other"];
 const STATUSES = ["open", "reviewed", "applied", "dismissed"];
@@ -50,30 +52,20 @@ function compactRow(row) {
 }
 /** Build the query string and GET a page of feedback rows (always an array). */
 async function fetchRows(client, params) {
-    const qs = new URLSearchParams();
-    if (params.status)
-        qs.set("status", params.status);
-    if (params.kind)
-        qs.set("kind", params.kind);
-    if (params.scope)
-        qs.set("scope", params.scope);
-    if (params.search)
-        qs.set("search", params.search);
-    if (params.complexity !== undefined)
-        qs.set("complexity", String(params.complexity));
-    if (params.maxComplexity !== undefined)
-        qs.set("maxComplexity", String(params.maxComplexity));
-    if (params.limit !== undefined)
-        qs.set("limit", String(params.limit));
-    if (params.offset !== undefined)
-        qs.set("offset", String(params.offset));
-    // Oldest-first (FIFO) — the draining-loop order. Default (no flag) stays the
-    // backend's newest-first, which suits human "what just broke" triage.
-    if (params.oldest) {
-        qs.set("orderBy", "createdAt");
-        qs.set("orderDirection", "ASC");
-    }
-    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    const suffix = qs({
+        status: params.status || undefined,
+        kind: params.kind || undefined,
+        scope: params.scope || undefined,
+        search: params.search || undefined,
+        complexity: params.complexity,
+        maxComplexity: params.maxComplexity,
+        limit: params.limit,
+        offset: params.offset,
+        // Oldest-first (FIFO) — the draining-loop order. Default (no flag) stays the
+        // backend's newest-first, which suits human "what just broke" triage.
+        orderBy: params.oldest ? "createdAt" : undefined,
+        orderDirection: params.oldest ? "ASC" : undefined,
+    });
     const rows = await client.get(`/api/feedback${suffix}`);
     return Array.isArray(rows) ? rows : [];
 }
@@ -261,11 +253,7 @@ export async function runFeedbackList(client, opts) {
             return c.row;
         });
     }
-    const env = {
-        items,
-        nextCursor: null,
-        count: items.length,
-    };
+    const env = listEnvelope(items);
     if (truncated)
         env.truncated = true;
     if (cut)
@@ -517,8 +505,6 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
     f.command("count")
         .option("--kind <kind>", "improvement | bug | idea | legal")
         .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other")
-        .action(guarded(async (opts) => {
-        writeJson(await runFeedbackCount(await getClient(), opts));
-    }));
+        .action(jsonAction(getClient, (client, opts) => runFeedbackCount(client, opts)));
 }
 //# sourceMappingURL=index.js.map

@@ -11,6 +11,7 @@ import { type CallerTier, visibleSpecs, getCallerTier } from "../tier.js";
 import { writeFlagsToHeaders, type WriteFlags } from "../api/writeFlags.js";
 import type { AssessFlags } from "../assess.js";
 import { applyTextEdit, textEditDryRunEnvelope, type TextEditOp } from "../textEdit.js";
+import { qs } from "../api/query.js";
 
 function resolveCommand(commandParts: string[], tier: CallerTier): string {
   // Be liberal in what we accept. Every discovery surface — including this
@@ -68,14 +69,16 @@ export async function runReferenceDetailList(
   search?: string,
   orphans = false
 ): Promise<ReferenceDetailListResult> {
-  const p = new URLSearchParams();
-  if (stalest) p.set("stalest", String(stalest));
-  if (domain) p.set("domain", domain);
-  if (withDetail) p.set("withDetail", "1");
-  if (needsReview) p.set("needsReview", "1");
-  if (needsReview && maxConfidence != null) p.set("maxConfidence", String(maxConfidence));
-  const q = p.toString();
-  const res = await client.get<ReferenceDetailListResult>(`/api/cli/command-catalog${q ? `?${q}` : ""}`);
+  const res = await client.get<ReferenceDetailListResult>(
+    `/api/cli/command-catalog${qs({
+      stalest: stalest || undefined,
+      domain: domain || undefined,
+      // `1`, not the raw boolean — `qs` would serialise `true` as "true".
+      withDetail: withDetail ? 1 : undefined,
+      needsReview: needsReview ? 1 : undefined,
+      maxConfidence: needsReview && maxConfidence != null ? maxConfidence : undefined,
+    })}`
+  );
   if (!search && !orphans) return res;
   // Compare orphans against the FULL spec set (NOT tier-filtered) — a
   // developer-tier command still has a spec, so its row is not an orphan.

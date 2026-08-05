@@ -1,3 +1,4 @@
+import { errorMessage } from "../api/errors.js";
 import { decodeJwtPayload } from "./jwt.js";
 import { performSwitch } from "./switch.js";
 /**
@@ -83,8 +84,8 @@ export async function refreshSession(opts) {
         });
     }
     catch (grantError) {
-        const bearer = bearerError instanceof Error ? bearerError.message : String(bearerError);
-        const grant = grantError instanceof Error ? grantError.message : String(grantError);
+        const bearer = errorMessage(bearerError);
+        const grant = errorMessage(grantError);
         throw new Error(`${bearer}; ${grant} — session unrecoverable, run \`ib auth login\``);
     }
 }

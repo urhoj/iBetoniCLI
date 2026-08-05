@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { failWith, writeJson } from "../../output/json.js";
+import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { guarded } from "../_shared/action.js";
 import {
   type WriteFlags,
@@ -9,20 +10,6 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { runPersonSearch } from "../person/index.js";
-
-/** Parse a `--data <json>` flag into a plain object (arrays/scalars rejected → exit 4). */
-export function parseJsonObject(raw: string): Record<string, unknown> {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    failWith("--data must be valid JSON", 4);
-  }
-  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-    failWith("--data must be a JSON object", 4);
-  }
-  return parsed as Record<string, unknown>;
-}
 
 /**
  * Resolve a `--person`/positional value to a personId. A bare integer passes
@@ -174,7 +161,7 @@ export function registerNotificationCommands(
     .option(
       "--data <json>",
       "Extra FCM data payload as a JSON object",
-      parseJsonObject
+      (raw: string) => parseJsonBodyFlag(raw, "--data")
     );
   addWriteFlagsToCommand(sendCmd).action(
     guarded(async (

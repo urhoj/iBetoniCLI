@@ -266,16 +266,9 @@ export function registerKeikkaCommands(parent, getClient) {
         .option("--vehicle <id>", "Filter by vehicleId", (v) => Number(v))
         .option("--worksite <id>", "Filter by worksite (tyomaaId)", (v) => Number(v))
         .option("--lookback <days>", "How far back from today to search (default 365, max 3650)", (v) => Number(v))
-        .action(guarded(async (opts) => {
-        const client = await getClient();
-        writeJson(await runKeikkaLatest(client, opts));
-    }));
+        .action(jsonAction(getClient, (client, opts) => runKeikkaLatest(client, opts)));
     k.command("get <keikkaId>")
-        .action(guarded(async (idStr) => {
-        const client = await getClient();
-        const result = await runKeikkaGet(client, parseId(idStr, "keikkaId"));
-        writeJson(result);
-    }));
+        .action(jsonAction(getClient, (client, idStr) => runKeikkaGet(client, parseId(idStr, "keikkaId"))));
     k.command("search [query]")
         .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max hits (client-side; backend caps at 100)", (v) => Number(v))

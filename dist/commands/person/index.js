@@ -6,11 +6,11 @@ import { resolveCallerTier } from "../../tier.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { runCombinatorDuplicates, runCombinatorMerge, registerCombinatorCommands, } from "../_shared/combinator.js";
 import { roleNameForTypeId, resolveRoleTypeId, explainRole } from "../../roles.js";
-import { parseId, parseOptionalId, resolveSearchQuery, cappedInt } from "../../targets.js";
+import { parseId, parseOptionalId, resolveSearchQuery, cappedInt, addOwnerOption, } from "../../targets.js";
 import { runCompanyList } from "../company/index.js";
-import { runNotificationFcmSend, parseJsonObject, } from "../notification/index.js";
+import { runNotificationFcmSend } from "../notification/index.js";
 import { CliError } from "../../api/errors.js";
-import { resolveJsonObjectBody } from "../../api/parseBody.js";
+import { parseJsonBodyFlag, resolveJsonObjectBody } from "../../api/parseBody.js";
 import { registerPersonDayCommands } from "./day.js";
 import { registerPersonEmailCommands } from "./email.js";
 import { registerPersonAbsencesCommand } from "./absences.js";
@@ -347,17 +347,9 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .option("--asiakas <id>", "Filter by asiakasId", (v) => Number(v))
         .option("--owned", "List persons the company OWNS instead of its members (the default)")
         .option("--limit <n>", "Max rows", cappedInt(500))
-        .action(guarded(async (opts) => {
-        const client = await getClient();
-        const result = await runPersonList(client, opts);
-        writeJson(result);
-    }));
+        .action(jsonAction(getClient, (client, opts) => runPersonList(client, opts)));
     p.command("get <personId>")
-        .action(guarded(async (idStr) => {
-        const client = await getClient();
-        const result = await runPersonGet(client, parseId(idStr, "personId"));
-        writeJson(result);
-    }));
+        .action(jsonAction(getClient, (client, idStr) => runPersonGet(client, parseId(idStr, "personId"))));
     p.command("search [query]")
         .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max results", cappedInt(500))
@@ -406,7 +398,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .command("notify <person>")
         .requiredOption("--title <text>", "Notification title")
         .requiredOption("--body <text>", "Notification body")
-        .option("--data <json>", "Extra FCM data payload as a JSON object", parseJsonObject);
+        .option("--data <json>", "Extra FCM data payload as a JSON object", (raw) => parseJsonBodyFlag(raw, "--data"));
     addWriteFlagsToCommand(notifyCmd).action(guarded(async (person, opts) => {
         const result = await runNotificationFcmSend(await getClient(), { person, title: opts.title, body: opts.body, data: opts.data }, opts);
         writeJson(result);
@@ -575,11 +567,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     personRole
         .command("list <personId>")
         .requiredOption("--asiakas <id>", "Target asiakasId", (v) => Number(v))
-        .action(guarded(async (personIdStr, opts) => {
-        const client = await getClient();
-        const result = await runPersonRoleList(client, parseId(personIdStr, "personId"), opts.asiakas);
-        writeJson(result);
-    }));
+        .action(jsonAction(getClient, (client, personIdStr, opts) => runPersonRoleList(client, parseId(personIdStr, "personId"), opts.asiakas)));
     addWriteFlagsToCommand(personRole
         .command("grant <personId>")
         .requiredOption("--role <name>", "Role name (see ROLE_TYPEID_BY_NAME)")
@@ -631,37 +619,25 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     // the role names accepted by `person role grant/revoke` (and `customer person list --role`).
     personRole
         .command("explain <name>")
-        .action(guarded(async (name) => {
-        const client = await getClient();
-        writeJson(await explainRole(client, name));
-    }));
+        .action(jsonAction(getClient, (client, name) => explainRole(client, name)));
     // ─── self-introspection ───────────────────────────────────────────────────
     p.command("me")
         .action(jsonAction(getClient, runPersonMe));
     p.command("companies [personId]")
-        .action(guarded(async (personIdStr) => {
-        const client = await getClient();
-        const result = await runPersonCompanies(client, parseOptionalId(personIdStr, "personId"));
-        writeJson(result);
-    }));
+        .action(jsonAction(getClient, (client, personIdStr) => runPersonCompanies(client, parseOptionalId(personIdStr, "personId"))));
     registerCombinatorCommands(p, getClient, {
         base: "person-combinator",
         idFields: PERSON_MERGE_ID_FIELDS,
         entityNoun: "person",
         idLabel: "personId",
     });
-    p.command("log <personId>")
-        .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
+    addOwnerOption(p.command("log <personId>"))
         .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)
         .option("--field <name>", "Filter by changeTracker fieldName (e.g. asiakasPersonSetting)")
-        .action(guarded(async (personIdStr, opts) => {
-        const client = await getClient();
-        const result = await runPersonHistory(client, parseId(personIdStr, "personId"), opts.limit, {
-            owner: opts.owner,
-            field: opts.field,
-        });
-        writeJson(result);
-    }));
+        .action(jsonAction(getClient, (client, personIdStr, opts) => runPersonHistory(client, parseId(personIdStr, "personId"), opts.limit, {
+        owner: opts.owner,
+        field: opts.field,
+    })));
 }
 /**
  * GET /api/changes/person/:personId/:ownerAsiakasId — the change-tracker audit
@@ -677,22 +653,18 @@ export async function runPersonHistory(client, personId, limit, opts = {}) {
     let list = Array.isArray(rows) ? rows : [];
     if (opts.field)
         list = list.filter((r) => r.fieldName === opts.field);
-    return {
-        items: list.map((r) => ({
-            changeId: r.changeId,
-            field: r.fieldName ?? null,
-            oldValue: r.oldValue ?? null,
-            newValue: r.newValue ?? null,
-            changeType: r.changeType ?? null,
-            personId: r.personId ?? null,
-            personName: r.personFullName ?? null,
-            at: r.timestamp ?? null,
-            description: r.description ?? null,
-            reason: r.reason ?? null,
-        })),
-        nextCursor: null,
-        count: list.length,
-    };
+    return listEnvelope(list.map((r) => ({
+        changeId: r.changeId,
+        field: r.fieldName ?? null,
+        oldValue: r.oldValue ?? null,
+        newValue: r.newValue ?? null,
+        changeType: r.changeType ?? null,
+        personId: r.personId ?? null,
+        personName: r.personFullName ?? null,
+        at: r.timestamp ?? null,
+        description: r.description ?? null,
+        reason: r.reason ?? null,
+    })));
 }
 /** Pull the new personId out of newPerson's response (tolerant of legacy shapes). */
 export function extractPersonId(res) {

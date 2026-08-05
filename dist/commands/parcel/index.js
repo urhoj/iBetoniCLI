@@ -1,5 +1,6 @@
 import { writeJson, failWith } from "../../output/json.js";
 import { guarded } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 /** Distinct primary sources the caller supplied (exactly one allowed). */
 function selectedSources(opts) {
     const sources = [];
@@ -22,23 +23,16 @@ function selectedSources(opts) {
  * polygon(s), MML presentation-form id and a computed area (m²).
  */
 export async function runParcelLookup(client, opts) {
-    const params = new URLSearchParams();
-    const worksite = opts.worksite ?? opts.tyomaa;
-    if (opts.kiinteistotunnus !== undefined)
-        params.set("kiinteistotunnus", opts.kiinteistotunnus);
-    if (opts.sijainti !== undefined)
-        params.set("sijainti", String(opts.sijainti));
-    if (worksite !== undefined)
-        params.set("worksite", String(worksite));
-    if (opts.lat !== undefined)
-        params.set("lat", String(opts.lat));
-    if (opts.lng !== undefined)
-        params.set("lng", String(opts.lng));
-    if (opts.address !== undefined)
-        params.set("address", opts.address);
-    if (opts.withBuildings)
-        params.set("withBuildings", "1");
-    return client.get(`/api/cli/opendata/parcel/lookup?${params.toString()}`);
+    return client.get(`/api/cli/opendata/parcel/lookup${qs({
+        kiinteistotunnus: opts.kiinteistotunnus,
+        sijainti: opts.sijainti,
+        worksite: opts.worksite ?? opts.tyomaa,
+        lat: opts.lat,
+        lng: opts.lng,
+        address: opts.address,
+        // `1`, not the raw boolean — `qs` would serialise `true` as "true".
+        withBuildings: opts.withBuildings ? 1 : undefined,
+    })}`);
 }
 /** Register `ib opendata parcel`. */
 export function registerParcelCommands(parent, getClient) {

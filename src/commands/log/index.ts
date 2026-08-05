@@ -16,7 +16,7 @@ import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
-import { parseId, parseOptionalId, cappedInt } from "../../targets.js";
+import { parseId, parseOptionalId, cappedInt, addOwnerOption } from "../../targets.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import {
   CHANGE_ENTITY_TYPES,
@@ -24,6 +24,7 @@ import {
   isKnownEntityType,
   runLogTypes,
 } from "./entityTypes.js";
+import { qs } from "../../api/query.js";
 
 /** Raw wire row from /api/changes/* (superset across the five routes). */
 interface RawChangeRow {
@@ -154,9 +155,9 @@ export async function runLogLatest(
 ): Promise<ListEnvelope<ChangeItem>> {
   if (opts.entityType) assertKnownEntityType(opts.entityType);
   const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
-  const qs = new URLSearchParams({ limit: String(limit) });
-  if (opts.entityType) qs.set("entityType", opts.entityType);
-  const rows = await client.get<RawChangeRow[]>(`/api/changes/latest/${owner}?${qs}`);
+  const rows = await client.get<RawChangeRow[]>(
+    `/api/changes/latest/${owner}${qs({ limit, entityType: opts.entityType || undefined })}`
+  );
   return envelope((Array.isArray(rows) ? rows : []).map(projectRow));
 }
 
@@ -176,10 +177,14 @@ export async function runLogRange(
   assertIsoDate(opts.to, "--to");
   if (opts.entityType) assertKnownEntityType(opts.entityType);
   const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
-  const qs = new URLSearchParams({ startDate: opts.from, endDate: opts.to });
-  if (opts.entityType) qs.set("entityType", opts.entityType);
-  if (opts.person != null) qs.set("personId", String(opts.person));
-  const rows = await client.get<RawChangeRow[]>(`/api/changes/range/${owner}?${qs}`);
+  const rows = await client.get<RawChangeRow[]>(
+    `/api/changes/range/${owner}${qs({
+      startDate: opts.from,
+      endDate: opts.to,
+      entityType: opts.entityType || undefined,
+      personId: opts.person ?? undefined,
+    })}`
+  );
   const list = Array.isArray(rows) ? rows : [];
   // The route/proc has NO row limit — slice client-side to protect AI context.
   const sliced = list.slice(0, opts.limit);
@@ -204,12 +209,13 @@ export async function runLogByEntityDate(
   assertIsoDate(opts.from, "--from");
   assertIsoDate(opts.to, "--to");
   const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
-  const qs = new URLSearchParams({
-    startDate: opts.from,
-    endDate: opts.to,
-    entityType: opts.entityType,
-  });
-  const rows = await client.get<RawChangeRow[]>(`/api/changes/by-entity-date/${owner}?${qs}`);
+  const rows = await client.get<RawChangeRow[]>(
+    `/api/changes/by-entity-date/${owner}${qs({
+      startDate: opts.from,
+      endDate: opts.to,
+      entityType: opts.entityType,
+    })}`
+  );
   const list = Array.isArray(rows) ? rows : [];
   const sliced = list.slice(0, opts.limit);
   return envelope(sliced.map(projectRow), sliced.length < list.length);
@@ -243,21 +249,16 @@ export function registerLogAlias(
   idArgName: string,
   fieldExample = "Filter by changeTracker fieldName"
 ): void {
-  group
-    .command(`log <${idArgName}>`)
-    .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))
+  addOwnerOption(group.command(`log <${idArgName}>`))
     .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)
     .option("--field <name>", fieldExample)
     .action(
-      guarded(async (idStr: string, opts: { owner?: number; limit: number; field?: string }) => {
-        const client = await getClient();
-        writeJson(
-          await runLogEntity(client, entityType, parseId(idStr, "entityId"), opts.limit, {
-            owner: opts.owner,
-            field: opts.field,
-          })
-        );
-      })
+      jsonAction(getClient, (client, idStr: string, opts: { owner?: number; limit: number; field?: string }) =>
+        runLogEntity(client, entityType, parseId(idStr, "entityId"), opts.limit, {
+          owner: opts.owner,
+          field: opts.field,
+        })
+      )
     );
 }
 
@@ -267,8 +268,7 @@ export function registerLogCommands(
 ): void {
   const c = parent.command("log").description("ChangeTracker (audit trail) reads");
 
-  c.command("entity <entityType> <entityId>")
-    .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))
+  addOwnerOption(c.command("entity <entityType> <entityId>"))
     .option(
       "--limit <n>",
       "Max rows (default 100, cap 500)",
@@ -282,9 +282,9 @@ export function registerLogCommands(
       )
     );
 
-  c.command("latest")
-    .option("--entity-type <type>", "Filter to one entityType")
-    .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))
+  addOwnerOption(
+    c.command("latest").option("--entity-type <type>", "Filter to one entityType")
+  )
     .option(
       "--limit <n>",
       "Max rows (default 100, server cap 500)",
@@ -292,29 +292,28 @@ export function registerLogCommands(
       100
     )
     .action(
-      guarded(async (opts: { entityType?: string; owner?: number; limit: number }) => {
-        const client = await getClient();
-        writeJson(
-          await runLogLatest(client, opts.limit, {
-            entityType: opts.entityType,
-            owner: opts.owner,
-          })
-        );
-      })
+      jsonAction(getClient, (client, opts: { entityType?: string; owner?: number; limit: number }) =>
+        runLogLatest(client, opts.limit, {
+          entityType: opts.entityType,
+          owner: opts.owner,
+        })
+      )
     );
 
-  c.command("range")
-    .requiredOption(
-      "--from <iso>",
-      "Window start YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)"
-    )
-    .requiredOption(
-      "--to <iso>",
-      "Window end YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)"
-    )
-    .option("--entity-type <type>", "Filter to one entityType")
-    .option("--person <personId>", "Filter to one actor", (v: string) => Number(v))
-    .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))
+  addOwnerOption(
+    c
+      .command("range")
+      .requiredOption(
+        "--from <iso>",
+        "Window start YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)"
+      )
+      .requiredOption(
+        "--to <iso>",
+        "Window end YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)"
+      )
+      .option("--entity-type <type>", "Filter to one entityType")
+      .option("--person <personId>", "Filter to one actor", (v: string) => Number(v))
+  )
     .option(
       "--limit <n>",
       "Max rows kept client-side (default 200, cap 2000)",
@@ -322,17 +321,20 @@ export function registerLogCommands(
       200
     )
     .action(
-      guarded(async (opts: {
-        from: string;
-        to: string;
-        entityType?: string;
-        person?: number;
-        owner?: number;
-        limit: number;
-      }) => {
-        const client = await getClient();
-        writeJson(
-          await runLogRange(client, {
+      jsonAction(
+        getClient,
+        (
+          client,
+          opts: {
+            from: string;
+            to: string;
+            entityType?: string;
+            person?: number;
+            owner?: number;
+            limit: number;
+          }
+        ) =>
+          runLogRange(client, {
             from: resolveDate(opts.from) ?? opts.from,
             to: resolveDate(opts.to) ?? opts.to,
             entityType: opts.entityType,
@@ -340,21 +342,22 @@ export function registerLogCommands(
             owner: opts.owner,
             limit: opts.limit,
           })
-        );
-      })
+      )
     );
 
-  c.command("by-entity-date")
-    .requiredOption("--entity-type <type>", "keikka or palkki")
-    .requiredOption(
-      "--from <iso>",
-      "Entity-date window start YYYY-MM-DD (or today/yesterday/tomorrow)"
-    )
-    .requiredOption(
-      "--to <iso>",
-      "Entity-date window end YYYY-MM-DD (or today/yesterday/tomorrow)"
-    )
-    .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))
+  addOwnerOption(
+    c
+      .command("by-entity-date")
+      .requiredOption("--entity-type <type>", "keikka or palkki")
+      .requiredOption(
+        "--from <iso>",
+        "Entity-date window start YYYY-MM-DD (or today/yesterday/tomorrow)"
+      )
+      .requiredOption(
+        "--to <iso>",
+        "Entity-date window end YYYY-MM-DD (or today/yesterday/tomorrow)"
+      )
+  )
     .option(
       "--limit <n>",
       "Max rows kept client-side (default 200, cap 2000)",
@@ -362,28 +365,29 @@ export function registerLogCommands(
       200
     )
     .action(
-      guarded(async (opts: {
-        entityType: string;
-        from: string;
-        to: string;
-        owner?: number;
-        limit: number;
-      }) => {
-        const client = await getClient();
-        writeJson(
-          await runLogByEntityDate(client, {
+      jsonAction(
+        getClient,
+        (
+          client,
+          opts: {
+            entityType: string;
+            from: string;
+            to: string;
+            owner?: number;
+            limit: number;
+          }
+        ) =>
+          runLogByEntityDate(client, {
             entityType: opts.entityType,
             from: resolveDate(opts.from) ?? opts.from,
             to: resolveDate(opts.to) ?? opts.to,
             owner: opts.owner,
             limit: opts.limit,
           })
-        );
-      })
+      )
     );
 
-  c.command("user [personId]")
-    .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))
+  addOwnerOption(c.command("user [personId]"))
     .option(
       "--limit <n>",
       "Max rows (default 100)",

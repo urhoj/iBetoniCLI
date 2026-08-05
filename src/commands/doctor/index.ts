@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { writeJson, setExitCode } from "../../output/json.js";
+import { writeJson, setExitCode, errorMessage } from "../../output/json.js";
 import { decodeJwtPayload, impersonationFromClaims, type ImpersonationInfo } from "../../auth/jwt.js";
 import { resolveCallerTier } from "../../tier.js";
 import type { CallerTier } from "../../tier.js";
@@ -78,7 +78,7 @@ export async function runDoctor(opts: {
       (e): DoctorReport["authProbe"] =>
         e instanceof CliError
           ? { ok: false, status: e.statusCode, error: e.message }
-          : { ok: false, error: e instanceof Error ? e.message : String(e) }
+          : { ok: false, error: errorMessage(e) }
     ),
   ]);
 

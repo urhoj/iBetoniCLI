@@ -4,13 +4,14 @@ import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { resolveDate } from "../../dates.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction, guarded } from "../_shared/action.js";
 import {
   type WriteFlags,
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
   requireReason,
 } from "../../api/writeFlags.js";
+import { qs } from "../../api/query.js";
 
 type Row = Record<string, unknown>;
 
@@ -78,9 +79,8 @@ export async function runPersonDayGet(
   const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
   const startDate = resolveDate(from) ?? from;
   const endDate = resolveDate(to ?? from) ?? (to ?? from);
-  const params = new URLSearchParams({ startDate, endDate, personId: String(personId) });
   const rows = await client.get<Row[]>(
-    `/api/personPvm/list/${asiakasId}?${params.toString()}`
+    `/api/personPvm/list/${asiakasId}${qs({ startDate, endDate, personId })}`
   );
   const items: Row[] = (rows || []).map((r) => ({
     personPvmId: Number(r.personPvmId),
@@ -220,9 +220,9 @@ export function registerPersonDayCommands(
     .command("statuses")
     .option("--full", "Include prefix/style/description/active/ownerAsiakasId")
     .action(
-      guarded(async (opts: { full?: boolean }) => {
-        writeJson(await runPersonDayStatuses(await getClient(), { full: opts.full }));
-      })
+      jsonAction(getClient, (client, opts: { full?: boolean }) =>
+        runPersonDayStatuses(client, { full: opts.full })
+      )
     );
 
   day
@@ -231,9 +231,9 @@ export function registerPersonDayCommands(
     .requiredOption("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)")
     .option("--to <date>", "End date YYYY-MM-DD (default: --from)")
     .action(
-      guarded(async (opts: { person: number; from: string; to?: string }) => {
-        writeJson(await runPersonDayGet(await getClient(), opts.person, opts.from, opts.to));
-      })
+      jsonAction(getClient, (client, opts: { person: number; from: string; to?: string }) =>
+        runPersonDayGet(client, opts.person, opts.from, opts.to)
+      )
     );
 
   const setCmd = day

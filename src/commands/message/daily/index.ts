@@ -310,12 +310,9 @@ export function registerMessageDailyCommands(
     .requiredOption("--asiakas <id>", "Company that the box is listed for (asiakasId)", Number)
     .option("--date <date>", "Date for the message: YYYYMMDD | YYYY-MM-DD | today")
     .action(
-      guarded(async (boxIdStr: string, opts: { asiakas: number; date?: string }) => {
-        const client = await getClient();
-        writeJson(
-          await runDailyGet(client, opts.asiakas, parseId(boxIdStr, "boxId"), opts.date ? toYyyymmdd(opts.date) : undefined)
-        );
-      })
+      jsonAction(getClient, (client, boxIdStr: string, opts: { asiakas: number; date?: string }) =>
+        runDailyGet(client, opts.asiakas, parseId(boxIdStr, "boxId"), opts.date ? toYyyymmdd(opts.date) : undefined)
+      )
     );
 
   // content + metadata writes ───────────────────────────────────────────────────
@@ -390,10 +387,9 @@ export function registerMessageDailyCommands(
   );
 
   addWriteFlagsToCommand(d.command("delete <boxId>")).action(
-    guarded(async (boxIdStr: string, opts: WriteFlags) => {
-      const client = await getClient();
-      writeJson(await runDailyDeleteBox(client, parseId(boxIdStr, "boxId"), opts));
-    })
+    jsonAction(getClient, (client, boxIdStr: string, opts: WriteFlags) =>
+      runDailyDeleteBox(client, parseId(boxIdStr, "boxId"), opts)
+    )
   );
 
   // sharing + per-role ACL ─────────────────────────────────────────────────────
@@ -402,20 +398,18 @@ export function registerMessageDailyCommands(
       .command("share <boxId>")
       .requiredOption("--to <asiakasId>", "Tenant to share the box with", Number)
   ).action(
-    guarded(async (boxIdStr: string, opts: { to: number } & WriteFlags) => {
-      const client = await getClient();
-      writeJson(await runDailyShare(client, { boxId: parseId(boxIdStr, "boxId"), asiakasId: opts.to }, opts));
-    })
+    jsonAction(getClient, (client, boxIdStr: string, opts: { to: number } & WriteFlags) =>
+      runDailyShare(client, { boxId: parseId(boxIdStr, "boxId"), asiakasId: opts.to }, opts)
+    )
   );
 
   addWriteFlagsToCommand(
     d
       .command("unshare <dailyMessageBoxAsiakasId>")
   ).action(
-    guarded(async (idStr: string, opts: WriteFlags) => {
-      const client = await getClient();
-      writeJson(await runDailyUnshare(client, parseId(idStr, "permissionId"), opts));
-    })
+    jsonAction(getClient, (client, idStr: string, opts: WriteFlags) =>
+      runDailyUnshare(client, parseId(idStr, "permissionId"), opts)
+    )
   );
 
   addWriteFlagsToCommand(
@@ -425,34 +419,27 @@ export function registerMessageDailyCommands(
       .requiredOption("--role <typeId>", "asiakasPersonSettingTypeId the rule applies to", Number)
       .requiredOption("--box-asiakas <id>", "dailyMessageBoxAsiakasId of the share row", Number)
   ).action(
-    guarded(async (
-      boxIdStr: string,
-      opts: { to: number; role: number; boxAsiakas: number } & WriteFlags
-    ) => {
-      const client = await getClient();
-      writeJson(
-        await runDailyGrant(
-          client,
-          {
-            boxId: parseId(boxIdStr, "boxId"),
-            asiakasId: opts.to,
-            asiakasPersonSettingTypeId: opts.role,
-            dailyMessageBoxAsiakasId: opts.boxAsiakas,
-          },
-          opts
-        )
-      );
-    })
+    jsonAction(getClient, (client, boxIdStr: string, opts: { to: number; role: number; boxAsiakas: number } & WriteFlags) =>
+      runDailyGrant(
+        client,
+        {
+          boxId: parseId(boxIdStr, "boxId"),
+          asiakasId: opts.to,
+          asiakasPersonSettingTypeId: opts.role,
+          dailyMessageBoxAsiakasId: opts.boxAsiakas,
+        },
+        opts
+      )
+    )
   );
 
   addWriteFlagsToCommand(
     d
       .command("revoke <dailyMessageBoxAsiakasPermissionsId>")
   ).action(
-    guarded(async (idStr: string, opts: WriteFlags) => {
-      const client = await getClient();
-      writeJson(await runDailyRevoke(client, parseId(idStr, "permissionId"), opts));
-    })
+    jsonAction(getClient, (client, idStr: string, opts: WriteFlags) =>
+      runDailyRevoke(client, parseId(idStr, "permissionId"), opts)
+    )
   );
 
   addWriteFlagsToCommand(

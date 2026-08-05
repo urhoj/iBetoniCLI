@@ -1,3 +1,14 @@
+/**
+ * Offline catalog of changeTracker entityTypes — single source for:
+ *  - `ib log types` output,
+ *  - client-side entityType validation (the backend returns [] for unknown
+ *    types, which an AI would misread as "no history"),
+ *  - the `ib help log` concept guide.
+ *
+ * Inventory verified 2026-06-10 by grepping `new ChangeTracker(` across
+ * puminet5api — see docs/superpowers/specs/2026-06-10-ib-changetracker-reading-design.md.
+ */
+import { listEnvelope } from "../../api/envelopes.js";
 export const CHANGE_ENTITY_TYPES = [
     {
         entityType: "asiakas",
@@ -93,10 +104,6 @@ export function isKnownEntityType(t) {
 }
 /** `ib log types` — offline, no network, no auth. */
 export function runLogTypes() {
-    return {
-        items: [...CHANGE_ENTITY_TYPES],
-        nextCursor: null,
-        count: CHANGE_ENTITY_TYPES.length,
-    };
+    return listEnvelope([...CHANGE_ENTITY_TYPES]);
 }
 //# sourceMappingURL=entityTypes.js.map

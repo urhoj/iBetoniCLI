@@ -10,7 +10,7 @@ import {
 import { writeJson, failWith } from "../../../output/json.js";
 import { resolveDate, todayHelsinki } from "../../../dates.js";
 import type { CommandSpec } from "../../../output/help.js";
-import { guarded } from "../../_shared/action.js";
+import { jsonAction, guarded } from "../../_shared/action.js";
 
 /**
  * `ib message board` (alias `ib message ilmoitustaulu`) — the company
@@ -299,12 +299,7 @@ export function registerMessageBoardCommands(
     }));
 
   b.command("all")
-    .action(
-      guarded(async () => {
-        const client = await getClient();
-        writeJson(await runBoardAll(client));
-      })
-    );
+    .action(jsonAction(getClient, runBoardAll));
 
   b.command("get <messageId>")
     .action(guarded(async (raw: string) => {

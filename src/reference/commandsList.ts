@@ -20,6 +20,7 @@ import {
   hiddenDomainsAtTier,
   getCallerTier,
 } from "../tier.js";
+import { listEnvelope } from "../api/envelopes.js";
 
 /** Single source for the write classification used by `ib commands`. */
 const isWriteSpec = (s: CommandSpec): boolean => s.mutates ?? !!s.writeFlags;
@@ -173,7 +174,7 @@ export function assertKnownDomain(
 /** List-envelope shape (matches the universal `{ items, nextCursor, count }`). */
 export interface CommandsListEnvelope {
   items: CommandSummary[];
-  nextCursor: null;
+  nextCursor: string | null;
   count: number;
 }
 
@@ -231,8 +232,7 @@ export function buildCommandsList(
   filter: CommandsListFilter,
   tier: CallerTier = getCallerTier()
 ): CommandsListEnvelope {
-  const items = filterCommandSpecs(COMMAND_SPECS, filter, tier);
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(filterCommandSpecs(COMMAND_SPECS, filter, tier));
 }
 
 /** One row of the `ib commands` (no-args) domain index. */
@@ -251,7 +251,7 @@ export interface DomainIndexEntry {
 export interface DomainIndexEnvelope {
   hint: string;
   items: DomainIndexEntry[];
-  nextCursor: null;
+  nextCursor: string | null;
   count: number;
 }
 
@@ -283,8 +283,6 @@ export function buildDomainIndex(
     .filter((d) => d.count > 0);
   return {
     hint: "domain index — one domain's commands: `ib commands <domain>` · full flat list: `ib commands --all` · one command's spec: `ib <command> --help`",
-    items,
-    nextCursor: null,
-    count: items.length,
+    ...listEnvelope(items),
   };
 }

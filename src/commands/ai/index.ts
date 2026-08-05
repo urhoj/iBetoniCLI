@@ -9,10 +9,11 @@
  */
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
-import { failWith, writeJson } from "../../output/json.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
+import { failWith } from "../../output/json.js";
 import { assertPositiveInt, parseId } from "../../targets.js";
-import { guarded } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
+import { jsonAction } from "../_shared/action.js";
 /** One row of the `ib dev ai conversations` browse list (no message bodies). */
 export interface AiConversationRow {
   conversationId: number;
@@ -44,16 +45,12 @@ export async function runAiConversationList(
   if (!Number.isInteger(limit) || limit <= 0 || limit > 100) {
     failWith("limit must be an integer between 1 and 100", 4);
   }
-  const params = new URLSearchParams({ limit: String(limit) });
-  if (opts.personId !== undefined) {
-    assertPositiveInt(opts.personId, "personId");
-    params.set("personId", String(opts.personId));
-  }
+  if (opts.personId !== undefined) assertPositiveInt(opts.personId, "personId");
   const res = await client.get<{ items?: AiConversationRow[] }>(
-    `/api/cli/ai/conversations?${params.toString()}`
+    `/api/cli/ai/conversations${qs({ limit, personId: opts.personId })}`
   );
   const items = res.items ?? [];
-  return { items, nextCursor: null, count: items.length, truncated: items.length >= limit };
+  return listEnvelope(items, { truncated: items.length >= limit });
 }
 
 /** Register `ib dev ai conversations` and `ib dev ai conversation <id>`. */
@@ -71,21 +68,19 @@ export function registerAiCommands(
     .option("--limit <n>", "Max rows to return (1-100, default 20)", (v) => Number(v))
     .option("--person <personId>", "Filter to one person's conversations", (v) => Number(v))
     .action(
-      guarded(async (opts: { limit?: number; person?: number }) => {
-        writeJson(
-          await runAiConversationList(await getClient(), {
-            limit: opts.limit,
-            personId: opts.person,
-          })
-        );
-      })
+      jsonAction(getClient, (client, opts: { limit?: number; person?: number }) =>
+        runAiConversationList(client, {
+          limit: opts.limit,
+          personId: opts.person,
+        })
+      )
     );
 
   ai
     .command("conversation <conversationId>")
     .action(
-      guarded(async (idStr: string) => {
-        writeJson(await runAiConversation(await getClient(), parseId(idStr, "conversationId")));
-      })
+      jsonAction(getClient, (client, idStr: string) =>
+        runAiConversation(client, parseId(idStr, "conversationId"))
+      )
     );
 }

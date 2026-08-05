@@ -1,7 +1,7 @@
+import { listEnvelope } from "../../api/envelopes.js";
 import { qs } from "../../api/query.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
-import { writeJson } from "../../output/json.js";
-import { guarded, jsonAction } from "../_shared/action.js";
+import { jsonAction } from "../_shared/action.js";
 /** GET recent slow queries → ListEnvelope. `truncated` when the page filled the limit. */
 export async function runPerfSlow(client, opts) {
     const res = await client.get(`/api/admin/slow-queries${qs({ limit: opts.limit, env: opts.env })}`);
@@ -15,10 +15,7 @@ export async function runPerfSlow(client, opts) {
     }));
     const limit = opts.limit ?? 50;
     return {
-        items,
-        nextCursor: null,
-        count: items.length,
-        truncated: items.length >= limit,
+        ...listEnvelope(items, { truncated: items.length >= limit }),
         totalCount: d.totalCount,
         environment: d.environment,
     };
@@ -55,20 +52,14 @@ export function registerPerfCommands(parent, getClient, opts = {}) {
         .command("slow")
         .option("--limit <n>", "Max rows (default 50)", (v) => Number(v))
         .option("--env <name>", "Environment buffer to read (default: backend's current env)")
-        .action(guarded(async (opts) => {
-        writeJson(await runPerfSlow(await getClient(), opts));
-    }));
+        .action(jsonAction(getClient, (client, opts) => runPerfSlow(client, opts)));
     perf
         .command("stats")
         .option("--env <name>", "Environment buffer to read (default: backend's current env)")
-        .action(guarded(async (opts) => {
-        writeJson(await runPerfStats(await getClient(), opts));
-    }));
+        .action(jsonAction(getClient, runPerfStats));
     perf
         .command("config")
-        .action(guarded(async () => {
-        writeJson(await runPerfConfig(await getClient()));
-    }));
+        .action(jsonAction(getClient, runPerfConfig));
     const clear = perf
         .command("clear")
         .option("--env <name>", "Environment buffer to clear (default: backend's current env)");

@@ -1,4 +1,4 @@
-import { writeJson } from "../../output/json.js";
+import { writeJson, errorMessage } from "../../output/json.js";
 import { CliError } from "../../api/errors.js";
 import { resolveSearchQuery } from "../../targets.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
@@ -9,6 +9,8 @@ import { runVehicleSearch } from "../vehicle/index.js";
 import { runKeikkaSearch } from "../keikka/index.js";
 import { guarded } from "../_shared/action.js";
 import { runSijaintiListJoined, sijaintiRowMatches, SIJAINTI_SEARCH_SCAN_LIMIT, } from "../sijainti/index.js";
+import { qs } from "../../api/query.js";
+import { listEnvelope } from "../../api/envelopes.js";
 /** Canonical entity order — also the within-tier sort order of merged hits. */
 export const SEARCH_ENTITIES = ["customer", "worksite", "person", "vehicle", "keikka", "sijainti"];
 const DEFAULT_LIMIT = 5;
@@ -135,7 +137,7 @@ export async function runUnifiedSearch(query, rawSources, entities = [...SEARCH_
                 firstFailure = res.reason;
             errors.push({
                 entity,
-                message: res.reason instanceof Error ? res.reason.message : String(res.reason),
+                message: errorMessage(res.reason),
             });
             return;
         }
@@ -148,7 +150,7 @@ export async function runUnifiedSearch(query, rawSources, entities = [...SEARCH_
     const tier = (h) => (h.label?.toLowerCase().startsWith(q) ? 0 : 1);
     const order = (h) => SEARCH_ENTITIES.indexOf(h.entity);
     items.sort((a, b) => tier(a) - tier(b) || order(a) - order(b));
-    return { items, nextCursor: null, count: items.length, errors };
+    return { ...listEnvelope(items), errors };
 }
 /**
  * Build the real per-entity sources for a client. Returns RAW results so
@@ -164,8 +166,7 @@ export function buildSearchSources(client, query, limit, myCompanies = false) {
         worksite: () => runWorksiteSearch(client, query, limit, myCompanies),
         person: () => {
             if (myCompanies) {
-                const qs = new URLSearchParams({ q: query, limit: String(limit) });
-                return client.get(`/api/cli/person/search?${qs.toString()}`);
+                return client.get(`/api/cli/person/search${qs({ q: query, limit })}`);
             }
             return runPersonSearch(client, query, limit);
         },

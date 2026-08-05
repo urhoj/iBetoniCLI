@@ -1,5 +1,4 @@
-import { writeJson } from "../../output/json.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction } from "../_shared/action.js";
 /**
  * `ib inbox` — one aggregated rollup of the six open/incomplete operator signals
  * (deploy-pending changelog, unresolved feedback, open support
@@ -16,9 +15,6 @@ export function registerInboxCommand(parent, getClient, opts = {}) {
     parent
         .command("inbox", { hidden: !!opts.hidden })
         .option("--details", "Include slimmed top-items per signal, not just counts")
-        .action(guarded(async (opts) => {
-        const client = await getClient();
-        writeJson(await runInbox(client, { details: opts.details }));
-    }));
+        .action(jsonAction(getClient, (client, opts) => runInbox(client, { details: opts.details })));
 }
 //# sourceMappingURL=index.js.map

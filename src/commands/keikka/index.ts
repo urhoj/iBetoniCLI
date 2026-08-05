@@ -409,19 +409,14 @@ export function registerKeikkaCommands(
       (v: string) => Number(v)
     )
     .action(
-      guarded(async (opts: KeikkaLatestFilter) => {
-        const client = await getClient();
-        writeJson(await runKeikkaLatest(client, opts));
-      })
+      jsonAction(getClient, (client, opts: KeikkaLatestFilter) => runKeikkaLatest(client, opts))
     );
 
   k.command("get <keikkaId>")
     .action(
-      guarded(async (idStr: string) => {
-        const client = await getClient();
-        const result = await runKeikkaGet(client, parseId(idStr, "keikkaId"));
-        writeJson(result);
-      })
+      jsonAction(getClient, (client, idStr: string) =>
+        runKeikkaGet(client, parseId(idStr, "keikkaId"))
+      )
     );
 
   k.command("search [query]")

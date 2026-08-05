@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { CliError } from "./errors.js";
+import { CliError, errorMessage } from "./errors.js";
 /** Truncate a raw body so error output stays readable. */
 function preview(raw) {
     return raw.length > 160 ? `${raw.slice(0, 160)}…` : raw;
@@ -28,18 +28,22 @@ function bodyParseHint(raw) {
  *
  * `statusCode` is **0** (client-origin), never a fabricated 400 — nothing was
  * sent. See {@link readJsonObjectInput} for why that matters (feedback #307).
+ *
+ * `flag` names the option in both messages, so the same parser serves the
+ * `--data <json>` flags (`ib person notify`, `ib notification fcm send`)
+ * without telling their caller to fix a `--body` they never passed.
  */
-export function parseJsonBodyFlag(raw) {
+export function parseJsonBodyFlag(raw, flag = "--body") {
     let parsed;
     try {
         parsed = JSON.parse(raw);
     }
     catch (e) {
-        const detail = e instanceof Error ? e.message : String(e);
-        throw new CliError(`Invalid --body JSON: ${detail}`, 0, null, 4, bodyParseHint(raw));
+        const detail = errorMessage(e);
+        throw new CliError(`Invalid ${flag} JSON: ${detail}`, 0, null, 4, bodyParseHint(raw));
     }
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-        throw new CliError("--body must be a JSON object", 0, null, 4, bodyParseHint(raw));
+        throw new CliError(`${flag} must be a JSON object`, 0, null, 4, bodyParseHint(raw));
     }
     return parsed;
 }
@@ -78,7 +82,7 @@ export function readJsonObjectInput(pathOrDash) {
         raw = readRawInput(pathOrDash);
     }
     catch (e) {
-        const detail = e instanceof Error ? e.message : String(e);
+        const detail = errorMessage(e);
         throw new CliError(`Could not read --from-json ${pathOrDash}: ${detail}`, 0, null, 4);
     }
     let parsed;
@@ -86,7 +90,7 @@ export function readJsonObjectInput(pathOrDash) {
         parsed = JSON.parse(raw);
     }
     catch (e) {
-        const detail = e instanceof Error ? e.message : String(e);
+        const detail = errorMessage(e);
         throw new CliError(`--from-json ${pathOrDash} is not valid JSON: ${detail}`, 0, null, 4);
     }
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {

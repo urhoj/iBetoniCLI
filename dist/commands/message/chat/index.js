@@ -2,8 +2,8 @@ import { listEnvelope, toListEnvelope } from "../../../api/envelopes.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
 import { resolveThreadId } from "./resolveThread.js";
-import { parseOptionalId, resolveSearchQuery } from "../../../targets.js";
-import { guarded } from "../../_shared/action.js";
+import { parseId, parseOptionalId, resolveSearchQuery } from "../../../targets.js";
+import { jsonAction, guarded } from "../../_shared/action.js";
 import { qs } from "../../../api/query.js";
 /**
  * GET /api/messages/threads/mine → your threads (inbox), newest first.
@@ -182,10 +182,7 @@ export function registerMessageChatCommands(parent, getClient) {
     c.command("threads")
         .option("--unread", "Only threads with unread messages")
         .option("--tarjous <id>", "Only threads for this pumppuRequestId", Number)
-        .action(guarded(async (opts) => {
-        const client = await getClient();
-        writeJson(await runChatThreads(client, opts));
-    }));
+        .action(jsonAction(getClient, (client, opts) => runChatThreads(client, opts)));
     c.command("thread [threadId]")
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
         .action(guarded(async (threadIdStr, opts) => {
@@ -206,10 +203,7 @@ export function registerMessageChatCommands(parent, getClient) {
     c.command("search [query]")
         .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max results (default 50, server max 200)", Number)
-        .action(guarded(async (query, opts) => {
-        const client = await getClient();
-        writeJson(await runChatSearch(client, resolveSearchQuery(query, opts.search), opts));
-    }));
+        .action(jsonAction(getClient, (client, query, opts) => runChatSearch(client, resolveSearchQuery(query, opts.search), opts)));
     const sendCmd = c
         .command("send [threadId]")
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
@@ -247,9 +241,7 @@ export function registerMessageChatCommands(parent, getClient) {
         .option("--thread <id>", "Thread id the message belongs to", Number)
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
     addWriteFlagsToCommand(deleteCmd).action(guarded(async (messageIdStr, opts) => {
-        const messageId = parseOptionalId(messageIdStr, "messageId");
-        if (messageId === undefined)
-            failWith("messageId is required", 4);
+        const messageId = parseId(messageIdStr, "messageId");
         const client = await getClient();
         const id = await resolveThreadId(client, {
             thread: opts.thread,
@@ -263,9 +255,7 @@ export function registerMessageChatCommands(parent, getClient) {
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
         .requiredOption("--body <text>", "New message text (max 4000 chars)");
     addWriteFlagsToCommand(editCmd).action(guarded(async (messageIdStr, opts) => {
-        const messageId = parseOptionalId(messageIdStr, "messageId");
-        if (messageId === undefined)
-            failWith("messageId is required", 4);
+        const messageId = parseId(messageIdStr, "messageId");
         const body = String(opts.body ?? "").trim();
         if (!body)
             failWith("Message body cannot be empty", 4);
@@ -282,9 +272,7 @@ export function registerMessageChatCommands(parent, getClient) {
         .option("--thread <id>", "Thread id the message belongs to", Number)
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
     addWriteFlagsToCommand(restoreCmd).action(guarded(async (messageIdStr, opts) => {
-        const messageId = parseOptionalId(messageIdStr, "messageId");
-        if (messageId === undefined)
-            failWith("messageId is required", 4);
+        const messageId = parseId(messageIdStr, "messageId");
         const client = await getClient();
         const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
         writeJson(await runChatRestore(client, id, messageId, opts));

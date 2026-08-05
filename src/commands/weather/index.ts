@@ -232,10 +232,9 @@ export function registerWeatherCommands(
     .requiredOption("--lng <n>", "Longitude (Finland: 19.0–31.6)", Number)
     .requiredOption("--time <iso>", "Forecast time (ISO 8601, or 'now')")
     .action(
-      guarded(async (opts: { lat: number; lng: number; time: string }) => {
-        const client = await getClient();
-        writeJson(await runWeatherForecast(client, opts));
-      })
+      jsonAction(getClient, (client, opts: { lat: number; lng: number; time: string }) =>
+        runWeatherForecast(client, opts)
+      )
     );
 
   w.command("day")
@@ -244,10 +243,9 @@ export function registerWeatherCommands(
     .requiredOption("--lng <n>", "Longitude", Number)
     .requiredOption("--date <d>", "Date (YYYY-MM-DD, or today/tomorrow)")
     .action(
-      guarded(async (opts: { lat: number; lng: number; date: string }) => {
-        const client = await getClient();
-        writeJson(await runWeatherDay(client, opts));
-      })
+      jsonAction(getClient, (client, opts: { lat: number; lng: number; date: string }) =>
+        runWeatherDay(client, opts)
+      )
     );
 
   w.command("pumping")
@@ -267,30 +265,27 @@ export function registerWeatherCommands(
     .description("Forecast for a worksite (resolves coordinates from the tyomaa)")
     .option("--force-refresh", "Bypass the cache and refetch from FMI")
     .action(
-      guarded(async (idStr: string, opts: { forceRefresh?: boolean }) => {
-        const client = await getClient();
-        writeJson(await runWeatherWorksite(client, parseId(idStr, "tyomaaId"), !!opts.forceRefresh));
-      })
+      jsonAction(getClient, (client, idStr: string, opts: { forceRefresh?: boolean }) =>
+        runWeatherWorksite(client, parseId(idStr, "tyomaaId"), !!opts.forceRefresh)
+      )
     );
 
   w.command("sijainti <sijaintiId>")
     .description("Point forecast for a sijainti (resolves coordinates from the location)")
     .option("--time <iso>", "Forecast time (ISO 8601, or 'now')", "now")
     .action(
-      guarded(async (idStr: string, opts: { time: string }) => {
-        const client = await getClient();
-        writeJson(await runWeatherSijainti(client, parseId(idStr, "sijaintiId"), opts.time));
-      })
+      jsonAction(getClient, (client, idStr: string, opts: { time: string }) =>
+        runWeatherSijainti(client, parseId(idStr, "sijaintiId"), opts.time)
+      )
     );
 
   w.command("keikka <keikkaId>")
     .description("Forecast for a keikka (resolves coordinates from its worksite)")
     .option("--force-refresh", "Bypass the cache and refetch from FMI")
     .action(
-      guarded(async (idStr: string, opts: { forceRefresh?: boolean }) => {
-        const client = await getClient();
-        writeJson(await runWeatherKeikka(client, parseId(idStr, "keikkaId"), !!opts.forceRefresh));
-      })
+      jsonAction(getClient, (client, idStr: string, opts: { forceRefresh?: boolean }) =>
+        runWeatherKeikka(client, parseId(idStr, "keikkaId"), !!opts.forceRefresh)
+      )
     );
 
   w.command("address")
@@ -298,19 +293,14 @@ export function registerWeatherCommands(
     .requiredOption("--address <s>", "Street address (min 5 chars)")
     .requiredOption("--time <iso>", "Forecast time (ISO 8601, or 'now')")
     .action(
-      guarded(async (opts: { address: string; time: string }) => {
-        const client = await getClient();
-        writeJson(await runWeatherAddress(client, opts));
-      })
+      jsonAction(getClient, (client, opts: { address: string; time: string }) =>
+        runWeatherAddress(client, opts)
+      )
     );
 
   w.command("status")
     .description("Whether the weather module is enabled for the active company")
-    .action(
-      guarded(async () => {
-        writeJson(await runWeatherStatus(await getClient()));
-      })
-    );
+    .action(jsonAction(getClient, runWeatherStatus));
 
   const toggleCmd = w
     .command("toggle")

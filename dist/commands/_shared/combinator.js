@@ -1,7 +1,9 @@
+import { listEnvelope } from "../../api/envelopes.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { guarded } from "./action.js";
+import { addOwnerOption } from "../../targets.js";
 /**
  * GET /api/admin/<base>/duplicates?ownerAsiakasId=<id> — likely-duplicate pairs
  * for one tenant. Admin gated server-side. The backend returns `{ pairs }` (top
@@ -11,7 +13,7 @@ import { guarded } from "./action.js";
 export async function runCombinatorDuplicates(client, base, ownerAsiakasId) {
     const res = await client.get(`/api/admin/${base}/duplicates?ownerAsiakasId=${ownerAsiakasId}`);
     const items = Array.isArray(res?.pairs) ? res.pairs : [];
-    return { items, nextCursor: null, count: items.length, truncated: items.length >= 100 };
+    return listEnvelope(items, { truncated: items.length >= 100 });
 }
 /**
  * Merge two duplicate entities — the secondary's references move onto the main,
@@ -61,11 +63,10 @@ export function registerCombinatorCommands(parent, getClient, cfg) {
         const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
         writeJson(await runCombinatorDuplicates(client, cfg.base, owner));
     }));
-    const mergeCmd = parent
+    const mergeCmd = addOwnerOption(parent
         .command("merge")
         .requiredOption("--main <id>", `${cfg.idLabel} to KEEP (references merge into this)`, Number)
-        .requiredOption("--secondary <id>", `${cfg.idLabel} to REMOVE (merged away, then deleted)`, Number)
-        .option("--owner <id>", "ownerAsiakasId (default: active company)", Number);
+        .requiredOption("--secondary <id>", `${cfg.idLabel} to REMOVE (merged away, then deleted)`, Number));
     if (cfg.allowBigMerge) {
         mergeCmd.option("--allow-big-merge", "System-admin: permit a merge above the safety row cap");
     }

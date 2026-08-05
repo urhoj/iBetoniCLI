@@ -12,7 +12,7 @@ import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { resolveAsiakasTarget } from "../customer/index.js";
 import { parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 
 type Row = Record<string, unknown>;
@@ -604,7 +604,7 @@ export async function runJerryAdminRequests(
     })}`
   );
   const items = Array.isArray(data?.requests) ? (data.requests as Row[]) : [];
-  return { items, nextCursor: null, count: items.length, truncated: !!data?.truncated };
+  return listEnvelope(items, { truncated: !!data?.truncated });
 }
 
 /** One request's full detail, admin view (GET /api/admin/jerry-requests/:id). System-admin only. */
@@ -657,7 +657,7 @@ export async function runJerryAdminSearches(
     })}`
   );
   const items = Array.isArray(data?.rows) ? (data.rows as Row[]) : [];
-  return { items, nextCursor: null, count: items.length, truncated: !!data?.truncated };
+  return listEnvelope(items, { truncated: !!data?.truncated });
 }
 
 /**
@@ -779,29 +779,26 @@ export function registerJerryCommands(
     .option("--provider", "Provider lifecycle view via /provider-list (incl. your sent offers)")
     .option("--tab <tab>", "With --provider: avoimet|tarjotut|voitetut|paattyneet (default avoimet)")
     .action(
-      guarded(async (opts: JerryRequestListOpts) => {
-        const client = await getClient();
-        writeJson(await runJerryRequestList(client, opts));
-      })
+      jsonAction(getClient, (client, opts: JerryRequestListOpts) =>
+        runJerryRequestList(client, opts)
+      )
     );
 
   request
     .command("get <requestId>")
     .option("--provider", "Use the provider-facing detail view (requires provider role)")
     .action(
-      guarded(async (idStr: string, opts: { provider?: boolean }) => {
-        const client = await getClient();
-        writeJson(await runJerryRequestGet(client, parseId(idStr, "requestId"), !!opts.provider));
-      })
+      jsonAction(getClient, (client, idStr: string, opts: { provider?: boolean }) =>
+        runJerryRequestGet(client, parseId(idStr, "requestId"), !!opts.provider)
+      )
     );
 
   request
     .command("offers <requestId>")
     .action(
-      guarded(async (idStr: string) => {
-        const client = await getClient();
-        writeJson(await runJerryRequestOffers(client, parseId(idStr, "requestId")));
-      })
+      jsonAction(getClient, (client, idStr: string) =>
+        runJerryRequestOffers(client, parseId(idStr, "requestId"))
+      )
     );
 
   addWriteFlagsToCommand(
@@ -969,10 +966,9 @@ export function registerJerryCommands(
     .option("--provider", "Provider badge counts (requires provider role)")
     .option("--mine", "Customer counts (default)")
     .action(
-      guarded(async (opts: { provider?: boolean }) => {
-        const client = await getClient();
-        writeJson(await runJerryCounts(client, !!opts.provider));
-      })
+      jsonAction(getClient, (client, opts: { provider?: boolean }) =>
+        runJerryCounts(client, !!opts.provider)
+      )
     );
 
   // check-address ────────────────────────────────────────────────────────────
@@ -1020,22 +1016,16 @@ export function registerJerryCommands(
 
   // coverage ─────────────────────────────────────────────────────────────────
   j.command("coverage")
-    .action(
-      guarded(async () => {
-        const client = await getClient();
-        writeJson(await runJerryCoverage(client));
-      })
-    );
+    .action(jsonAction(getClient, runJerryCoverage));
 
   // email-activity ─────────────────────────────────────────────────────────────
   j.command("email-activity")
     .option("--days <n>", "Window in days (1..90, default 7)", (v: string) => Math.min(90, Math.max(1, Number(v))))
     .option("--domain <d>", "Sending domain (default betonijerry.fi)")
     .action(
-      guarded(async (opts: JerryEmailActivityOpts) => {
-        const client = await getClient();
-        writeJson(await runJerryEmailActivity(client, opts));
-      })
+      jsonAction(getClient, (client, opts: JerryEmailActivityOpts) =>
+        runJerryEmailActivity(client, opts)
+      )
     );
 
   // provider-settings ──────────────────────────────────────────────────────────
@@ -1046,10 +1036,9 @@ export function registerJerryCommands(
   ps.command("get")
     .option("--asiakas <id>", "Target company asiakasId", Number)
     .action(
-      guarded(async (opts: { asiakas?: number }) => {
-        const client = await getClient();
-        writeJson(await runJerryProviderSettingsGet(client, opts.asiakas));
-      })
+      jsonAction(getClient, (client, opts: { asiakas?: number }) =>
+        runJerryProviderSettingsGet(client, opts.asiakas)
+      )
     );
 
   addWriteFlagsToCommand(
@@ -1083,28 +1072,21 @@ export function registerJerryCommands(
 
   admin
     .command("list")
-    .action(
-      guarded(async () => {
-        const client = await getClient();
-        writeJson(await runJerryAdminList(client));
-      })
-    );
+    .action(jsonAction(getClient, runJerryAdminList));
 
   admin
     .command("search [query]")
     .option("--search <s>", "Search query (alias for the <query> positional)")
     .action(
-      guarded(async (query: string | undefined, opts: { search?: string }) => {
-        const client = await getClient();
-        writeJson(await runJerryAdminSearch(client, resolveSearchQuery(query, opts.search)));
-      })
+      jsonAction(getClient, (client, query: string | undefined, opts: { search?: string }) =>
+        runJerryAdminSearch(client, resolveSearchQuery(query, opts.search))
+      )
     );
 
   addAsiakasTargetOption(admin.command("detail [asiakasId]")).action(
-    guarded(async (idStr: string | undefined, opts: { asiakas?: number }) => {
-      const client = await getClient();
-      writeJson(await runJerryAdminDetail(client, resolveAsiakasTarget(idStr, opts.asiakas)));
-    })
+    jsonAction(getClient, (client, idStr: string | undefined, opts: { asiakas?: number }) =>
+      runJerryAdminDetail(client, resolveAsiakasTarget(idStr, opts.asiakas))
+    )
   );
 
   for (const [name, enable] of [
@@ -1136,10 +1118,9 @@ export function registerJerryCommands(
     .option("--due", "Only rows where the email1b reminder is due")
     .option("--search <text>", "Case-insensitive substring on company name / outreach / contact fields")
     .action(
-      guarded(async (opts: JerryOnboardingListOpts) => {
-        const client = await getClient();
-        writeJson(await runJerryOnboardingList(client, opts));
-      })
+      jsonAction(getClient, (client, opts: JerryOnboardingListOpts) =>
+        runJerryOnboardingList(client, opts)
+      )
     );
 
   const pickProspectFields = (o: Record<string, unknown>): Row => {
@@ -1167,17 +1148,14 @@ export function registerJerryCommands(
       .option("--company-type <t>", "pumppu | betoni | all | owner")
       .option("--source <s>", "manual|import|scheduled (default manual)")
   ).action(
-    guarded(async (idStr: string, opts: WriteOpts & Record<string, unknown>) => {
-      const client = await getClient();
-      writeJson(
-        await runJerryOnboardingAdd(
-          client,
-          resolveAsiakasTarget(idStr, undefined),
-          { ...pickProspectFields(opts), ...(opts.source !== undefined ? { source: opts.source } : {}) },
-          opts
-        )
-      );
-    })
+    jsonAction(getClient, (client, idStr: string, opts: WriteOpts & Record<string, unknown>) =>
+      runJerryOnboardingAdd(
+        client,
+        resolveAsiakasTarget(idStr, undefined),
+        { ...pickProspectFields(opts), ...(opts.source !== undefined ? { source: opts.source } : {}) },
+        opts
+      )
+    )
   );
 
   addWriteFlagsToCommand(
@@ -1194,12 +1172,9 @@ export function registerJerryCommands(
       .option("--outreach-email <email>", "Contact override email")
       .option("--outreach-phone <phone>", "Contact override phone")
   ).action(
-    guarded(async (idStr: string, opts: WriteOpts & Record<string, unknown>) => {
-      const client = await getClient();
-      writeJson(
-        await runJerryOnboardingSet(client, resolveAsiakasTarget(idStr, undefined), pickProspectFields(opts), opts)
-      );
-    })
+    jsonAction(getClient, (client, idStr: string, opts: WriteOpts & Record<string, unknown>) =>
+      runJerryOnboardingSet(client, resolveAsiakasTarget(idStr, undefined), pickProspectFields(opts), opts)
+    )
   );
 
   addWriteFlagsToCommand(
@@ -1233,28 +1208,25 @@ export function registerJerryCommands(
     .option("--provider <id>", "Filter by provider asiakasId", Number)
     .option("--limit <n>", "Max rows (max 300)", cappedInt(300))
     .action(
-      guarded(async (opts: JerryAdminRequestsOpts) => {
-        const client = await getClient();
-        writeJson(await runJerryAdminRequests(client, opts));
-      })
+      jsonAction(getClient, (client, opts: JerryAdminRequestsOpts) =>
+        runJerryAdminRequests(client, opts)
+      )
     );
 
   adminRequest
     .command("get <requestId>")
     .action(
-      guarded(async (idStr: string) => {
-        const client = await getClient();
-        writeJson(await runJerryAdminRequestGet(client, parseId(idStr, "requestId")));
-      })
+      jsonAction(getClient, (client, idStr: string) =>
+        runJerryAdminRequestGet(client, parseId(idStr, "requestId"))
+      )
     );
 
   adminRequest
     .command("offers <requestId>")
     .action(
-      guarded(async (idStr: string) => {
-        const client = await getClient();
-        writeJson(await runJerryAdminRequestOffers(client, parseId(idStr, "requestId")));
-      })
+      jsonAction(getClient, (client, idStr: string) =>
+        runJerryAdminRequestOffers(client, parseId(idStr, "requestId"))
+      )
     );
 
   const adminReqAction = (name: string, run: (c: ApiClient, id: number, f: WriteOpts) => Promise<unknown>) =>
@@ -1296,10 +1268,9 @@ export function registerJerryCommands(
     .option("--q <text>", "Address substring filter")
     .option("--limit <n>", "Max rows (max 500)", cappedInt(500))
     .action(
-      guarded(async (opts: JerryAdminSearchesOpts) => {
-        const client = await getClient();
-        writeJson(await runJerryAdminSearches(client, opts));
-      })
+      jsonAction(getClient, (client, opts: JerryAdminSearchesOpts) =>
+        runJerryAdminSearches(client, opts)
+      )
     );
 
   adminSearches
@@ -1307,9 +1278,8 @@ export function registerJerryCommands(
     .option("--from <date>", "createdAt from (YYYY-MM-DD / today / yesterday)", resolveDate)
     .option("--to <date>", "createdAt to (inclusive)", resolveDate)
     .action(
-      guarded(async (opts: JerryAdminFunnelOpts) => {
-        const client = await getClient();
-        writeJson(await runJerryAdminFunnel(client, opts));
-      })
+      jsonAction(getClient, (client, opts: JerryAdminFunnelOpts) =>
+        runJerryAdminFunnel(client, opts)
+      )
     );
 }

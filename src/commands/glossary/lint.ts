@@ -4,7 +4,7 @@
  * action in index.ts calls runGlossaryLint(client).
  */
 import type { ApiClient } from "../../api/client.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import type { CommandSpec } from "../../output/help.js";
 import { COMMAND_SPECS } from "../../reference/specs.js";
 import { runGlossaryList } from "./index.js";
@@ -192,5 +192,5 @@ export function lintEntries(entries: RawEntry[], opts: LintOptions = {}): LintFi
 export async function runGlossaryLint(client: ApiClient, opts: LintOptions = {}): Promise<ListEnvelope<LintFinding>> {
   const { items } = await runGlossaryList(client, {});
   const findings = lintEntries(items as unknown as RawEntry[], opts);
-  return { items: findings, nextCursor: null, count: findings.length, truncated: false };
+  return listEnvelope(findings, { truncated: false });
 }

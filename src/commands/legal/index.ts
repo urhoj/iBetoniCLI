@@ -27,7 +27,7 @@ import { decodeJwtPayload, type DecodedClaims } from "../../auth/jwt.js";
 import { lineDiff } from "../../textDiff.js";
 import { addEditFlags, applyTextEdit, parseEditOp, textEditDryRunEnvelope, type TextEditOp } from "../../textEdit.js";
 import { validateStructuredJson } from "./validateJson.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 
 /** Lifecycle status values on legalDocuments.status (see backend migration). */
@@ -535,32 +535,21 @@ export function registerLegalCommands(
 
   legal
     .command("types")
-    .action(
-      guarded(async () => {
-        const client = await getClient();
-        writeJson(await runLegalTypes(client));
-      })
-    );
+    .action(jsonAction(getClient, runLegalTypes));
 
   legal
     .command("show <typeName>")
     .option("--meta", "Omit markdownContent (returns contentLength instead)")
     .action(
-      guarded(async (typeName: string, opts: { meta?: boolean }) => {
-        const client = await getClient();
-        writeJson(await runLegalShow(client, typeName, !!opts.meta));
-      })
+      jsonAction(getClient, (client, typeName: string, opts: { meta?: boolean }) =>
+        runLegalShow(client, typeName, !!opts.meta)
+      )
     );
 
   legal
     .command("active")
     .alias("list")
-    .action(
-      guarded(async () => {
-        const client = await getClient();
-        writeJson(await runLegalActive(client));
-      })
-    );
+    .action(jsonAction(getClient, runLegalActive));
 
   legal
     .command("status")
@@ -595,12 +584,7 @@ export function registerLegalCommands(
 
   legal
     .command("drafts")
-    .action(
-      guarded(async () => {
-        const client = await getClient();
-        writeJson(await runLegalDrafts(client));
-      })
-    );
+    .action(jsonAction(getClient, runLegalDrafts));
 
   legal
     .command("diff [a] [b]")
@@ -762,15 +746,12 @@ export function registerLegalCommands(
     .option("--doc-version <v>", "Only acceptances of this version string")
     .option("--limit <n>", "Max rows (default 500, cap 500)", cappedInt(500))
     .action(
-      guarded(async (typeName: string, opts: { docVersion?: string; limit?: number }) => {
-        const client = await getClient();
-        writeJson(
-          await runLegalAcceptances(client, typeName, {
-            version: opts.docVersion,
-            limit: opts.limit,
-          })
-        );
-      })
+      jsonAction(getClient, (client, typeName: string, opts: { docVersion?: string; limit?: number }) =>
+        runLegalAcceptances(client, typeName, {
+          version: opts.docVersion,
+          limit: opts.limit,
+        })
+      )
     );
 
   const acceptCmd = legal

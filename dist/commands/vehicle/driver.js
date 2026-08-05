@@ -2,7 +2,8 @@ import { writeJson } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, requireReason, } from "../../api/writeFlags.js";
 import { parseId } from "../../targets.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction, guarded } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 /** YYYY-MM-DD (or today/yesterday/tomorrow) → integer yyyymmdd. */
 function toYyyymmdd(date) {
     return Number(resolveDate(date).replace(/-/g, ""));
@@ -31,10 +32,10 @@ export async function runVehicleDriverWho(client, vehicleId, date) {
  * had a driver. Date aliases resolved before the call.
  */
 export async function runVehicleDriverHistory(client, vehicleId, opts) {
-    const params = new URLSearchParams();
-    params.set("from", resolveDate(opts.from) ?? opts.from);
-    params.set("to", resolveDate(opts.to) ?? opts.to);
-    return client.get(`/api/cli/driver/history/${vehicleId}?${params.toString()}`);
+    return client.get(`/api/cli/driver/history/${vehicleId}${qs({
+        from: resolveDate(opts.from) ?? opts.from,
+        to: resolveDate(opts.to) ?? opts.to,
+    })}`);
 }
 // ─── day-driver writes (atomic cascade: personPvm + keikkaPerson + palkkiPerson) ──
 /**
@@ -97,32 +98,22 @@ export function registerVehicleDriverCommands(parent, getClient) {
     // ── fleet / day planning reads (date-keyed) ──
     driver
         .command("board <date>")
-        .action(guarded(async (date) => {
-        writeJson(await runVehicleDriverBoard(await getClient(), date));
-    }));
+        .action(jsonAction(getClient, (client, date) => runVehicleDriverBoard(client, date)));
     driver
         .command("gaps <date>")
-        .action(guarded(async (date) => {
-        writeJson(await runVehicleDriverGaps(await getClient(), date));
-    }));
+        .action(jsonAction(getClient, (client, date) => runVehicleDriverGaps(client, date)));
     driver
         .command("available <date>")
-        .action(guarded(async (date) => {
-        writeJson(await runVehicleDriverAvailable(await getClient(), date));
-    }));
+        .action(jsonAction(getClient, (client, date) => runVehicleDriverAvailable(client, date)));
     // ── per-vehicle day-driver ──
     driver
         .command("who <vehicleId> <date>")
-        .action(guarded(async (vehicleIdStr, date) => {
-        writeJson(await runVehicleDriverWho(await getClient(), parseId(vehicleIdStr, "vehicleId"), date));
-    }));
+        .action(jsonAction(getClient, (client, vehicleIdStr, date) => runVehicleDriverWho(client, parseId(vehicleIdStr, "vehicleId"), date)));
     driver
         .command("history <vehicleId>")
         .requiredOption("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)")
         .requiredOption("--to <date>", "End date YYYY-MM-DD (or today/yesterday/tomorrow)")
-        .action(guarded(async (vehicleIdStr, opts) => {
-        writeJson(await runVehicleDriverHistory(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts));
-    }));
+        .action(jsonAction(getClient, (client, vehicleIdStr, opts) => runVehicleDriverHistory(client, parseId(vehicleIdStr, "vehicleId"), opts)));
     addWriteFlagsToCommand(driver
         .command("assign <vehicleId> <date>")
         .requiredOption("--person <pid>", "Driver personId", (s) => Number(s))).action(guarded(async (vehicleIdStr, date, opts) => {
@@ -140,9 +131,7 @@ export function registerVehicleDriverCommands(parent, getClient) {
         .description("The vehicle's STANDING default driver (vehicle.defaultKuski_personId)");
     def
         .command("get <vehicleId>")
-        .action(guarded(async (vehicleIdStr) => {
-        writeJson(await runVehicleDefaultGet(await getClient(), parseId(vehicleIdStr, "vehicleId")));
-    }));
+        .action(jsonAction(getClient, (client, vehicleIdStr) => runVehicleDefaultGet(client, parseId(vehicleIdStr, "vehicleId"))));
     addWriteFlagsToCommand(def
         .command("set <vehicleId>")
         .requiredOption("--person <pid>", "Default driver personId", (s) => Number(s))).action(guarded(async (vehicleIdStr, opts) => {

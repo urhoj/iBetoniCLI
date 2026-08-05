@@ -1,11 +1,11 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import {
-  parseJsonObject,
   resolvePersonRef,
   runNotificationFcmSend,
   runNotificationEmailSend,
   resolveEmailHtml,
 } from "../../src/commands/notification/index.js";
+import { parseJsonBodyFlag } from "../../src/api/parseBody.js";
 import type { ApiClient } from "../../src/api/client.js";
 
 const c = {
@@ -20,23 +20,28 @@ const post = () => c.post as ReturnType<typeof vi.fn>;
 
 beforeEach(() => vi.clearAllMocks());
 
-describe("parseJsonObject", () => {
+// `--data <json>` is parsed by the shared parseJsonBodyFlag (the local
+// parseJsonObject twin is gone); these cover the `--data`-named variant, since
+// naming the wrong flag in the error is what a shared parser risks getting wrong.
+describe("--data JSON parsing", () => {
+  const parseData = (raw: string) => parseJsonBodyFlag(raw, "--data");
   test("parses a JSON object", () => {
-    expect(parseJsonObject('{"url":"/grid"}')).toEqual({ url: "/grid" });
+    expect(parseData('{"url":"/grid"}')).toEqual({ url: "/grid" });
   });
-  test("rejects invalid JSON with exit 4", () => {
-    expect(() => parseJsonObject("{nope")).toThrow();
+  test("rejects invalid JSON with exit 4, naming --data", () => {
+    expect(() => parseData("{nope")).toThrow(/--data/);
     try {
-      parseJsonObject("{nope");
+      parseData("{nope");
     } catch (e) {
       expect((e as { exitCode: number }).exitCode).toBe(4);
+      expect((e as { statusCode: number }).statusCode).toBe(0);
     }
   });
   test("rejects a JSON array", () => {
-    expect(() => parseJsonObject("[1,2]")).toThrow(/object/);
+    expect(() => parseData("[1,2]")).toThrow(/--data must be a JSON object/);
   });
   test("rejects a scalar", () => {
-    expect(() => parseJsonObject('"hi"')).toThrow(/object/);
+    expect(() => parseData('"hi"')).toThrow(/--data must be a JSON object/);
   });
 });
 

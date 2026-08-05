@@ -1,4 +1,4 @@
-import { writeJson, setExitCode } from "../../output/json.js";
+import { writeJson, setExitCode, errorMessage } from "../../output/json.js";
 import { guarded } from "../_shared/action.js";
 /** Coerce an unknown JSON value to a string field, preserving null/absent as null. */
 function asStr(v) {
@@ -44,7 +44,7 @@ export async function runVersion(opts) {
         };
     }
     catch (e) {
-        const detail = e instanceof Error ? e.message : String(e);
+        const detail = errorMessage(e);
         return { cli: cliVersion, endpoint, reachable: false, server: null, error: detail };
     }
 }

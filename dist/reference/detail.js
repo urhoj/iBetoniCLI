@@ -3,6 +3,7 @@ import { CliError } from "../api/errors.js";
 import { visibleSpecs, getCallerTier } from "../tier.js";
 import { writeFlagsToHeaders } from "../api/writeFlags.js";
 import { applyTextEdit, textEditDryRunEnvelope } from "../textEdit.js";
+import { qs } from "../api/query.js";
 function resolveCommand(commandParts, tier) {
     // Be liberal in what we accept. Every discovery surface — including this
     // command's sibling `reference detail list` — emits `command` WITH the leading
@@ -30,19 +31,14 @@ export async function runReferenceDetailList(client, stalest, domain, withDetail
 // caller can't run); `orphans` keeps only rows whose command no longer exists
 // in the live spec catalogue (the discover half of the discover→delete flow).
 search, orphans = false) {
-    const p = new URLSearchParams();
-    if (stalest)
-        p.set("stalest", String(stalest));
-    if (domain)
-        p.set("domain", domain);
-    if (withDetail)
-        p.set("withDetail", "1");
-    if (needsReview)
-        p.set("needsReview", "1");
-    if (needsReview && maxConfidence != null)
-        p.set("maxConfidence", String(maxConfidence));
-    const q = p.toString();
-    const res = await client.get(`/api/cli/command-catalog${q ? `?${q}` : ""}`);
+    const res = await client.get(`/api/cli/command-catalog${qs({
+        stalest: stalest || undefined,
+        domain: domain || undefined,
+        // `1`, not the raw boolean — `qs` would serialise `true` as "true".
+        withDetail: withDetail ? 1 : undefined,
+        needsReview: needsReview ? 1 : undefined,
+        maxConfidence: needsReview && maxConfidence != null ? maxConfidence : undefined,
+    })}`);
     if (!search && !orphans)
         return res;
     // Compare orphans against the FULL spec set (NOT tier-filtered) — a

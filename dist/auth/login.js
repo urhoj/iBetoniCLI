@@ -1,3 +1,4 @@
+import { errorMessage } from "../api/errors.js";
 import { generatePkcePair, generateState } from "./pkce.js";
 import { startCallbackServer } from "./callbackServer.js";
 import { createStore } from "./store.js";
@@ -58,7 +59,7 @@ export async function performLogin(opts) {
         }
         else {
             server.close();
-            const msg = e instanceof Error ? e.message : String(e);
+            const msg = errorMessage(e);
             const cause = e instanceof Error && e.cause instanceof Error ? `: ${e.cause.message}` : "";
             throw new Error(`Cannot reach ${opts.endpoint} (${msg}${cause}) — login cannot succeed from this machine, so the browser was not opened. Check the endpoint/network, or set IB_TOKEN=<jwt> instead.`);
         }

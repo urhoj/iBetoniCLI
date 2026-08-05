@@ -19,6 +19,15 @@ export class CliError extends Error {
         this.name = "CliError";
     }
 }
+/**
+ * Message extraction for a caught `unknown` — an `Error`'s `message`, anything
+ * else `String()`-coerced. Lives here (not in `output/json.ts`) so `src/api/`
+ * and `src/auth/` can use it without depending on the output layer; `json.ts`
+ * re-exports it for the command modules that already import it from there.
+ */
+export function errorMessage(err) {
+    return err instanceof Error ? err.message : String(err);
+}
 export function exitCodeFromStatus(status) {
     if (status === 401)
         return 2;

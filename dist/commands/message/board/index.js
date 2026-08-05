@@ -2,7 +2,7 @@ import { toListEnvelope } from "../../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, requireReason, } from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
 import { resolveDate, todayHelsinki } from "../../../dates.js";
-import { guarded } from "../../_shared/action.js";
+import { jsonAction, guarded } from "../../_shared/action.js";
 /** Priority levels the board UI renders (info=primary, warning=warning, urgent=error). */
 const PRIORITIES = ["info", "warning", "urgent"];
 /**
@@ -183,10 +183,7 @@ export function registerMessageBoardCommands(parent, getClient) {
         writeJson(await runBoardList(client, date));
     }));
     b.command("all")
-        .action(guarded(async () => {
-        const client = await getClient();
-        writeJson(await runBoardAll(client));
-    }));
+        .action(jsonAction(getClient, runBoardAll));
     b.command("get <messageId>")
         .action(guarded(async (raw) => {
         const messageId = parseMessageId(raw);

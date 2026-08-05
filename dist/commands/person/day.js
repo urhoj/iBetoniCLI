@@ -2,8 +2,9 @@ import { listEnvelope } from "../../api/envelopes.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { resolveDate } from "../../dates.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction, guarded } from "../_shared/action.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, requireReason, } from "../../api/writeFlags.js";
+import { qs } from "../../api/query.js";
 /** 20260610 → "2026-06-10". */
 function intToDate(n) {
     const s = String(n);
@@ -43,8 +44,7 @@ export async function runPersonDayGet(client, personId, from, to) {
     const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
     const startDate = resolveDate(from) ?? from;
     const endDate = resolveDate(to ?? from) ?? (to ?? from);
-    const params = new URLSearchParams({ startDate, endDate, personId: String(personId) });
-    const rows = await client.get(`/api/personPvm/list/${asiakasId}?${params.toString()}`);
+    const rows = await client.get(`/api/personPvm/list/${asiakasId}${qs({ startDate, endDate, personId })}`);
     const items = (rows || []).map((r) => ({
         personPvmId: Number(r.personPvmId),
         date: intToDate(Number(r.pvm)),
@@ -157,17 +157,13 @@ export function registerPersonDayCommands(person, getClient) {
     day
         .command("statuses")
         .option("--full", "Include prefix/style/description/active/ownerAsiakasId")
-        .action(guarded(async (opts) => {
-        writeJson(await runPersonDayStatuses(await getClient(), { full: opts.full }));
-    }));
+        .action(jsonAction(getClient, (client, opts) => runPersonDayStatuses(client, { full: opts.full })));
     day
         .command("get")
         .requiredOption("--person <id>", "personId", (s) => Number(s))
         .requiredOption("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)")
         .option("--to <date>", "End date YYYY-MM-DD (default: --from)")
-        .action(guarded(async (opts) => {
-        writeJson(await runPersonDayGet(await getClient(), opts.person, opts.from, opts.to));
-    }));
+        .action(jsonAction(getClient, (client, opts) => runPersonDayGet(client, opts.person, opts.from, opts.to)));
     const setCmd = day
         .command("set")
         .requiredOption("--person <id>", "personId", (s) => Number(s))

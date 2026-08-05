@@ -6,6 +6,7 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, requireReason } from "../.
 import { CliError } from "../../api/errors.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { assertPositiveInt, cappedInt } from "../../targets.js";
+import { qs } from "../../api/query.js";
 /** Wire entity names ↔ commander option keys. Mirrors backend ENTITY_COLUMNS. */
 const ENTITY_OPTS = [
     { optKey: "keikka", flag: "--keikka <id>", entity: "keikka", blurb: "keikkaId" },
@@ -106,14 +107,13 @@ export async function resolveGroupAndType(client, opts) {
 // ── Pure run functions ───────────────────────────────────────────────────────
 /** GET /api/cli/attachment/list — generic list-by-entity. */
 export async function runAttachmentList(client, target, opts) {
-    const params = new URLSearchParams({ entity: target.entity, id: String(target.entityId) });
-    if (opts.groupId !== undefined)
-        params.set("group", String(opts.groupId));
-    if (opts.typeId !== undefined)
-        params.set("type", String(opts.typeId));
-    if (opts.limit !== undefined)
-        params.set("limit", String(opts.limit));
-    return client.get(`/api/cli/attachment/list?${params.toString()}`);
+    return client.get(`/api/cli/attachment/list${qs({
+        entity: target.entity,
+        id: target.entityId,
+        group: opts.groupId,
+        type: opts.typeId,
+        limit: opts.limit,
+    })}`);
 }
 /** GET /api/cli/attachment/get/:id — metadata + names + 1h blobUrl. */
 export async function runAttachmentGet(client, attachmentId) {
@@ -134,8 +134,8 @@ export async function runAttachmentSearch(client, opts) {
         parts.push("missing=1");
     if (opts.limit !== undefined)
         parts.push(`limit=${opts.limit}`);
-    const qs = parts.length > 0 ? `?${parts.join("&")}` : "";
-    return client.get(`/api/cli/attachment/search${qs}`);
+    const suffix = parts.length > 0 ? `?${parts.join("&")}` : "";
+    return client.get(`/api/cli/attachment/search${suffix}`);
 }
 // ── Upload / download run functions ──────────────────────────────────────────
 /** POST /api/cli/attachment/upload-url — authenticated SAS mint (server picks blob path). */
@@ -270,25 +270,17 @@ export function registerAttachmentCommands(parent, getClient) {
         writeJson(await runAttachmentList(client, target, { groupId, typeId, limit: opts.limit }));
     }));
     a.command("get <attachmentId>")
-        .action(guarded(async (id) => {
-        writeJson(await runAttachmentGet(await getClient(), Number(id)));
-    }));
+        .action(jsonAction(getClient, (client, id) => runAttachmentGet(client, Number(id))));
     a.command("types")
-        .action(guarded(async () => {
-        writeJson(await runAttachmentTypes(await getClient()));
-    }));
+        .action(jsonAction(getClient, runAttachmentTypes));
     a.command("search [text]")
         .option("--missing", "Only attachments with NO linked entity (orphans)")
         .option("--limit <n>", "Max rows (capped at 500)", cappedInt(500))
-        .action(guarded(async (text, opts) => {
-        writeJson(await runAttachmentSearch(await getClient(), { q: text, missing: opts.missing, limit: opts.limit }));
-    }));
+        .action(jsonAction(getClient, (client, text, opts) => runAttachmentSearch(client, { q: text, missing: opts.missing, limit: opts.limit })));
     a.command("download <attachmentId>")
         .option("--out <path>", "Output path (default: original file name in cwd)")
         .option("--force", "Overwrite an existing file")
-        .action(guarded(async (id, opts) => {
-        writeJson(await runAttachmentDownload(await getClient(), Number(id), opts.out, !!opts.force));
-    }));
+        .action(jsonAction(getClient, (client, id, opts) => runAttachmentDownload(client, Number(id), opts.out, !!opts.force)));
     const uploadCmd = a
         .command("upload <file>")
         .option("--comment <text>", "fileComment shown in the UI")
@@ -310,9 +302,7 @@ export function registerAttachmentCommands(parent, getClient) {
     }));
     a.command("upload-url")
         .requiredOption("--name <fileName>", "Original file name WITH extension (server derives the blob name)")
-        .action(guarded(async (opts) => {
-        writeJson(await runAttachmentUploadUrl(await getClient(), opts.name));
-    }));
+        .action(jsonAction(getClient, (client, opts) => runAttachmentUploadUrl(client, opts.name)));
     const registerCmd = a
         .command("register")
         .requiredOption("--name <fileName>", "fileName returned by upload-url")

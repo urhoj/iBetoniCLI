@@ -9,6 +9,7 @@ import { type WriteFlags, writeFlagsToHeaders, addWriteFlagsToCommand, requireRe
 import { CliError } from "../../api/errors.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { assertPositiveInt, cappedInt } from "../../targets.js";
+import { qs } from "../../api/query.js";
 
 type Row = Record<string, unknown>;
 
@@ -146,11 +147,15 @@ export async function runAttachmentList(
   target: { entity: string; entityId: number },
   opts: { groupId?: number; typeId?: number; limit?: number }
 ): Promise<ListEnvelope<Row>> {
-  const params = new URLSearchParams({ entity: target.entity, id: String(target.entityId) });
-  if (opts.groupId !== undefined) params.set("group", String(opts.groupId));
-  if (opts.typeId !== undefined) params.set("type", String(opts.typeId));
-  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
-  return client.get<ListEnvelope<Row>>(`/api/cli/attachment/list?${params.toString()}`);
+  return client.get<ListEnvelope<Row>>(
+    `/api/cli/attachment/list${qs({
+      entity: target.entity,
+      id: target.entityId,
+      group: opts.groupId,
+      type: opts.typeId,
+      limit: opts.limit,
+    })}`
+  );
 }
 
 /** GET /api/cli/attachment/get/:id — metadata + names + 1h blobUrl. */
@@ -176,8 +181,8 @@ export async function runAttachmentSearch(
   if (opts.q) parts.push(`q=${encodeURIComponent(opts.q)}`);
   if (opts.missing) parts.push("missing=1");
   if (opts.limit !== undefined) parts.push(`limit=${opts.limit}`);
-  const qs = parts.length > 0 ? `?${parts.join("&")}` : "";
-  return client.get<ListEnvelope<Row>>(`/api/cli/attachment/search${qs}`);
+  const suffix = parts.length > 0 ? `?${parts.join("&")}` : "";
+  return client.get<ListEnvelope<Row>>(`/api/cli/attachment/search${suffix}`);
 }
 
 // ── Upload / download run functions ──────────────────────────────────────────
@@ -376,35 +381,27 @@ export function registerAttachmentCommands(
   }));
 
   a.command("get <attachmentId>")
-    .action(
-      guarded(async (id: string) => {
-        writeJson(await runAttachmentGet(await getClient(), Number(id)));
-      })
-    );
+    .action(jsonAction(getClient, (client, id: string) => runAttachmentGet(client, Number(id))));
 
   a.command("types")
-    .action(
-      guarded(async () => {
-        writeJson(await runAttachmentTypes(await getClient()));
-      })
-    );
+    .action(jsonAction(getClient, runAttachmentTypes));
 
   a.command("search [text]")
     .option("--missing", "Only attachments with NO linked entity (orphans)")
     .option("--limit <n>", "Max rows (capped at 500)", cappedInt(500))
     .action(
-      guarded(async (text: string | undefined, opts: { missing?: boolean; limit?: number }) => {
-        writeJson(await runAttachmentSearch(await getClient(), { q: text, missing: opts.missing, limit: opts.limit }));
-      })
+      jsonAction(getClient, (client, text: string | undefined, opts: { missing?: boolean; limit?: number }) =>
+        runAttachmentSearch(client, { q: text, missing: opts.missing, limit: opts.limit })
+      )
     );
 
   a.command("download <attachmentId>")
     .option("--out <path>", "Output path (default: original file name in cwd)")
     .option("--force", "Overwrite an existing file")
     .action(
-      guarded(async (id: string, opts: { out?: string; force?: boolean }) => {
-        writeJson(await runAttachmentDownload(await getClient(), Number(id), opts.out, !!opts.force));
-      })
+      jsonAction(getClient, (client, id: string, opts: { out?: string; force?: boolean }) =>
+        runAttachmentDownload(client, Number(id), opts.out, !!opts.force)
+      )
     );
 
   const uploadCmd = a
@@ -434,9 +431,9 @@ export function registerAttachmentCommands(
   a.command("upload-url")
     .requiredOption("--name <fileName>", "Original file name WITH extension (server derives the blob name)")
     .action(
-      guarded(async (opts: { name: string }) => {
-        writeJson(await runAttachmentUploadUrl(await getClient(), opts.name));
-      })
+      jsonAction(getClient, (client, opts: { name: string }) =>
+        runAttachmentUploadUrl(client, opts.name)
+      )
     );
 
   const registerCmd = a

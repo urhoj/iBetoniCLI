@@ -1,4 +1,9 @@
-import { CliError, exitCodeForError, hintForError } from "../api/errors.js";
+import {
+  CliError,
+  errorMessage,
+  exitCodeForError,
+  hintForError,
+} from "../api/errors.js";
 import { isListEnvelope, type ListEnvelope } from "../api/envelopes.js";
 import { renderError, renderList, renderRecord } from "./pretty.js";
 import type { CommandError, CommandSpec } from "./help.js";
@@ -112,11 +117,10 @@ export function writeError(err: unknown): void {
     return;
   }
   recordFriction(err);
-  const message = err instanceof Error ? err.message : String(err);
   writeErrorEnvelope(
     {
       success: false,
-      error: message,
+      error: errorMessage(err),
       code: null,
       statusCode: 0,
     },
@@ -156,6 +160,10 @@ export function setExitCode(code: number): void {
 }
 
 export { emitStdout, emitStderr };
+
+/** Re-export: `errorMessage` now lives in `api/errors.ts` (usable below the
+ * output layer); command modules keep importing it from here. */
+export { errorMessage };
 
 /**
  * Terminate a command from a validation/guard check WITHOUT `process.exit()`
@@ -210,7 +218,3 @@ export function failValidation(
   );
 }
 
-/** Message extraction for failWith when re-raising a caught unknown. */
-export function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}

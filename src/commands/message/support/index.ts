@@ -22,7 +22,8 @@ import type { ApiClient } from "../../../api/client.js";
 import type { ListEnvelope } from "../../../api/envelopes.js";
 import { failWith, writeJson } from "../../../output/json.js";
 import { assertEnum, parseId } from "../../../targets.js";
-import { guarded } from "../../_shared/action.js";
+import { jsonAction, guarded } from "../../_shared/action.js";
+import { qs } from "../../../api/query.js";
 
 const STATUSES = ["open", "resolved", "all"] as const;
 
@@ -40,11 +41,8 @@ export async function runSupportInbox(
 ): Promise<ListEnvelope<Row>> {
   const status = opts.status ?? "open";
   assertEnum(status, STATUSES, "--status");
-  const qs = new URLSearchParams();
-  qs.set("status", status);
-  if (opts.limit !== undefined) qs.set("limit", String(opts.limit));
   const res = await client.get<{ items?: Row[]; count?: number; truncated?: boolean }>(
-    `/api/messages/support/inbox?${qs.toString()}`
+    `/api/messages/support/inbox${qs({ status, limit: opts.limit })}`
   );
   const items = Array.isArray(res?.items) ? res.items : [];
   return {
@@ -67,11 +65,8 @@ export async function runSupportMine(
 ): Promise<ListEnvelope<Row>> {
   const status = opts.status ?? "open";
   assertEnum(status, STATUSES, "--status");
-  const qs = new URLSearchParams();
-  qs.set("status", status);
-  if (opts.limit !== undefined) qs.set("limit", String(opts.limit));
   const res = await client.get<{ items?: Row[]; count?: number; truncated?: boolean }>(
-    `/api/messages/support/mine?${qs.toString()}`
+    `/api/messages/support/mine${qs({ status, limit: opts.limit })}`
   );
   const items = Array.isArray(res?.items) ? res.items : [];
   return {
@@ -169,9 +164,9 @@ export function registerMessageSupportCommands(
     .option("--status <status>", "open | resolved | all", "open")
     .option("--limit <n>", "Max rows", Number)
     .action(
-      guarded(async (opts: { status?: string; limit?: number }) => {
-        writeJson(await runSupportInbox(await getClient(), opts));
-      })
+      jsonAction(getClient, (client, opts: { status?: string; limit?: number }) =>
+        runSupportInbox(client, opts)
+      )
     );
 
   support
@@ -179,9 +174,9 @@ export function registerMessageSupportCommands(
     .option("--status <status>", "open | resolved | all", "open")
     .option("--limit <n>", "Max rows", Number)
     .action(
-      guarded(async (opts: { status?: string; limit?: number }) => {
-        writeJson(await runSupportMine(await getClient(), opts));
-      })
+      jsonAction(getClient, (client, opts: { status?: string; limit?: number }) =>
+        runSupportMine(client, opts)
+      )
     );
 
   support
@@ -220,8 +215,8 @@ export function registerMessageSupportCommands(
     // audit headers — the status change persists no reason.
     .option("--dry-run", "Print the update body without sending (client-side)")
     .action(
-      guarded(async (threadIdStr: string, opts: { reopen?: boolean; dryRun?: boolean }) => {
-        writeJson(await runSupportResolve(await getClient(), parseId(threadIdStr, "threadId"), opts));
-      })
+      jsonAction(getClient, (client, threadIdStr: string, opts: { reopen?: boolean; dryRun?: boolean }) =>
+        runSupportResolve(client, parseId(threadIdStr, "threadId"), opts)
+      )
     );
 }

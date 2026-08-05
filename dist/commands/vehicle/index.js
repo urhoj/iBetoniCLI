@@ -6,7 +6,8 @@ import { parseId, resolveSearchQuery, cappedInt } from "../../targets.js";
 import { diffFields } from "../../diff.js";
 import { registerVehicleDriverCommands } from "./driver.js";
 import { registerLogAlias } from "../log/index.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction, guarded } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 /**
  * Parse a CLI boolean flag value. Accepts true/1/yes/on (case-insensitive) as
  * true; everything else is false. Used by `--show-in-grid <bool>`.
@@ -27,23 +28,16 @@ const VISIT_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  * `deleted` / `gridOnly` / `validOn` / `type` opt into narrowing.
  */
 export async function runVehicleList(client, opts) {
-    const params = new URLSearchParams();
-    if (opts.limit !== undefined)
-        params.set("limit", String(opts.limit));
-    if (opts.cursor)
-        params.set("cursor", opts.cursor);
-    if (opts.deleted)
-        params.set("deleted", "1");
-    if (opts.gridOnly)
-        params.set("gridOnly", "1");
-    if (opts.validOn)
-        params.set("validOn", opts.validOn);
-    if (opts.type !== undefined)
-        params.set("type", String(opts.type));
-    if (opts.asiakas !== undefined)
-        params.set("asiakas", String(opts.asiakas));
-    const qs = params.toString();
-    return client.get(`/api/cli/vehicle/list${qs ? `?${qs}` : ""}`);
+    return client.get(`/api/cli/vehicle/list${qs({
+        limit: opts.limit,
+        cursor: opts.cursor || undefined,
+        // `1`, not the raw boolean — `qs` would serialise `true` as "true".
+        deleted: opts.deleted ? 1 : undefined,
+        gridOnly: opts.gridOnly ? 1 : undefined,
+        validOn: opts.validOn || undefined,
+        type: opts.type,
+        asiakas: opts.asiakas,
+    })}`);
 }
 /**
  * GET /api/cli/vehicle/get/:vehicleId. Returns the full flat "Perustiedot"
@@ -57,8 +51,7 @@ export async function runVehicleList(client, opts) {
  * returns 403. Default = the active company from the JWT.
  */
 export async function runVehicleGet(client, vehicleId, asiakas) {
-    const qs = asiakas !== undefined ? `?asiakas=${asiakas}` : "";
-    return client.get(`/api/cli/vehicle/get/${vehicleId}${qs}`);
+    return client.get(`/api/cli/vehicle/get/${vehicleId}${qs({ asiakas })}`);
 }
 /**
  * GET /api/cli/vehicle/status/:vehicleId. Returns the flat status record:
@@ -73,13 +66,11 @@ export async function runVehicleLocations(client) {
 }
 /** GET /api/cli/vehicle/timeline/:vehicleId?date= — per-day stop/travel segments. */
 export async function runVehicleTimeline(client, vehicleId, opts) {
-    const qs = opts.date ? `?date=${opts.date}` : "";
-    return client.get(`/api/cli/vehicle/timeline/${vehicleId}${qs}`);
+    return client.get(`/api/cli/vehicle/timeline/${vehicleId}${qs({ date: opts.date || undefined })}`);
 }
 /** GET /api/cli/vehicle/route/:vehicleId?date= — per-day ordered GPS polyline. */
 export async function runVehicleRoute(client, vehicleId, opts) {
-    const qs = opts.date ? `?date=${opts.date}` : "";
-    return client.get(`/api/cli/vehicle/route/${vehicleId}${qs}`);
+    return client.get(`/api/cli/vehicle/route/${vehicleId}${qs({ date: opts.date || undefined })}`);
 }
 /**
  * GET /api/cli/vehicle/visits/:filterType/:filterId?days= — vehicles that
@@ -102,8 +93,7 @@ export async function runVehicleVisits(client, filterType, filterId, opts) {
             days = Math.max(1, Math.ceil((Date.now() - Date.parse(opts.date)) / 86_400_000) + 2);
         }
     }
-    const qs = days !== undefined ? `?days=${days}` : "";
-    const env = await client.get(`/api/cli/vehicle/visits/${filterType}/${filterId}${qs}`);
+    const env = await client.get(`/api/cli/vehicle/visits/${filterType}/${filterId}${qs({ days })}`);
     if (opts.date === undefined)
         return env;
     const items = (env.items || []).filter((v) => {
@@ -124,8 +114,7 @@ export async function runVehicleVisits(client, filterType, filterId, opts) {
  * company from the JWT.
  */
 export async function runVehicleTypes(client, asiakas) {
-    const qs = asiakas !== undefined ? `?asiakas=${asiakas}` : "";
-    return client.get(`/api/cli/vehicle/types${qs}`);
+    return client.get(`/api/cli/vehicle/types${qs({ asiakas })}`);
 }
 /**
  * GET /api/cli/vehicle/list?search=…&limit=… — substring search over the
@@ -133,12 +122,7 @@ export async function runVehicleTypes(client, asiakas) {
  * `search` query param; `limit` is appended only when supplied.
  */
 export async function runVehicleSearch(client, query, limit, asiakas) {
-    const params = new URLSearchParams({ search: query });
-    if (limit !== undefined)
-        params.set("limit", String(limit));
-    if (asiakas !== undefined)
-        params.set("asiakas", String(asiakas));
-    return client.get(`/api/cli/vehicle/list?${params.toString()}`);
+    return client.get(`/api/cli/vehicle/list${qs({ search: query, limit, asiakas })}`);
 }
 /**
  * GET /api/cli/vehicle/dates/:vehicleId — a vehicle's inspection/cert dates
@@ -153,8 +137,7 @@ export async function runVehicleDatesList(client, vehicleId) {
  * param only when supplied (backend default applies otherwise, typically 30).
  */
 export async function runVehicleDatesExpiring(client, days) {
-    const qs = days !== undefined ? `?days=${days}` : "";
-    return client.get(`/api/cli/vehicle/dates/expiring${qs}`);
+    return client.get(`/api/cli/vehicle/dates/expiring${qs({ days })}`);
 }
 /**
  * Writable columns compared for the `vehicle update --dry-run` field-level diff.
@@ -304,55 +287,33 @@ export function registerVehicleCommands(parent, getClient) {
         .option("--valid-on <date>", "Only vehicles valid on this day YYYY-MM-DD (or today/yesterday/tomorrow)")
         .option("--type <id>", "Only this vehicleTypeId", (val) => Number(val))
         .option("--asiakas <id>", "Read another company's fleet (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant). Default: active company.", (val) => Number(val))
-        .action(guarded(async (opts) => {
-        const client = await getClient();
-        const result = await runVehicleList(client, {
-            limit: opts.limit,
-            cursor: opts.cursor,
-            deleted: opts.deleted,
-            gridOnly: opts.gridOnly,
-            validOn: resolveDate(opts.validOn),
-            type: opts.type,
-            asiakas: opts.asiakas,
-        });
-        writeJson(result);
-    }));
+        .action(jsonAction(getClient, (client, opts) => runVehicleList(client, {
+        limit: opts.limit,
+        cursor: opts.cursor,
+        deleted: opts.deleted,
+        gridOnly: opts.gridOnly,
+        validOn: resolveDate(opts.validOn),
+        type: opts.type,
+        asiakas: opts.asiakas,
+    })));
     v.command("get <vehicleId>")
         .option("--asiakas <id>", "Read a vehicle owned by another company (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant)", (val) => Number(val))
-        .action(guarded(async (idStr, opts) => {
-        const client = await getClient();
-        const result = await runVehicleGet(client, parseId(idStr, "vehicleId"), opts.asiakas);
-        writeJson(result);
-    }));
+        .action(jsonAction(getClient, (client, idStr, opts) => runVehicleGet(client, parseId(idStr, "vehicleId"), opts.asiakas)));
     v.command("status <vehicleId>")
-        .action(guarded(async (idStr) => {
-        const client = await getClient();
-        const result = await runVehicleStatus(client, parseId(idStr, "vehicleId"));
-        writeJson(result);
-    }));
+        .action(jsonAction(getClient, (client, idStr) => runVehicleStatus(client, parseId(idStr, "vehicleId"))));
     v.command("types")
         .option("--asiakas <id>", "List another company's vehicle types (cross-tenant; needed for `vehicle create --asiakas` since types are tenant-defined)", (val) => Number(val))
-        .action(guarded(async (opts) => {
-        writeJson(await runVehicleTypes(await getClient(), opts.asiakas));
-    }));
+        .action(jsonAction(getClient, (client, opts) => runVehicleTypes(client, opts.asiakas)));
     v.command("locations")
-        .action(guarded(async () => {
-        const client = await getClient();
-        writeJson(await runVehicleLocations(client));
-    }));
+        .action(jsonAction(getClient, runVehicleLocations));
     v.command("search [query]")
         .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max rows", cappedInt(500))
         .option("--asiakas <id>", "Search another company's fleet (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant)", (val) => Number(val))
-        .action(guarded(async (query, opts) => {
-        writeJson(await runVehicleSearch(await getClient(), resolveSearchQuery(query, opts.search), opts.limit, opts.asiakas));
-    }));
+        .action(jsonAction(getClient, (client, query, opts) => runVehicleSearch(client, resolveSearchQuery(query, opts.search), opts.limit, opts.asiakas)));
     v.command("timeline <vehicleId>")
         .option("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
-        .action(guarded(async (idStr, opts) => {
-        const client = await getClient();
-        writeJson(await runVehicleTimeline(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) }));
-    }));
+        .action(jsonAction(getClient, (client, idStr, opts) => runVehicleTimeline(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) })));
     const createCmd = v
         .command("create")
         .option("--reg <s>", "Registration number (vehicleRegNo)")
@@ -412,31 +373,21 @@ export function registerVehicleCommands(parent, getClient) {
         .description("Vehicle inspection/cert date reads");
     dates
         .command("list <vehicleId>")
-        .action(guarded(async (idStr) => {
-        writeJson(await runVehicleDatesList(await getClient(), parseId(idStr, "vehicleId")));
-    }));
+        .action(jsonAction(getClient, (client, idStr) => runVehicleDatesList(client, parseId(idStr, "vehicleId"))));
     dates
         .command("expiring")
         .option("--days <n>", "Days-ahead window (default 30)", (s) => Number(s))
-        .action(guarded(async (opts) => {
-        writeJson(await runVehicleDatesExpiring(await getClient(), opts.days));
-    }));
+        .action(jsonAction(getClient, (client, opts) => runVehicleDatesExpiring(client, opts.days)));
     v.command("route <vehicleId>")
         .option("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
-        .action(guarded(async (idStr, opts) => {
-        const client = await getClient();
-        writeJson(await runVehicleRoute(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) }));
-    }));
+        .action(jsonAction(getClient, (client, idStr, opts) => runVehicleRoute(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) })));
     v.command("visits <filterType> <id>")
         .option("--days <n>", "Look-back window in days (omit for all-time)", (val) => Number(val))
         .option("--date <d>", "Only visits on this day (YYYY-MM-DD or today/yesterday/tomorrow; Europe/Helsinki)")
-        .action(guarded(async (filterType, idStr, opts) => {
-        const client = await getClient();
-        writeJson(await runVehicleVisits(client, filterType, parseId(idStr, "vehicleId"), {
-            days: opts.days,
-            date: opts.date ? resolveDate(opts.date) : undefined,
-        }));
-    }));
+        .action(jsonAction(getClient, (client, filterType, idStr, opts) => runVehicleVisits(client, filterType, parseId(idStr, "vehicleId"), {
+        days: opts.days,
+        date: opts.date ? resolveDate(opts.date) : undefined,
+    })));
     registerLogAlias(v, getClient, "vehicle", "vehicleId");
     // The vehicle-driver subgroup: day-driver dispatch + standing default driver.
     registerVehicleDriverCommands(v, getClient);

@@ -5,10 +5,9 @@
  */
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { qs } from "../../api/query.js";
-import { writeJson } from "../../output/json.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction } from "../_shared/action.js";
 interface PurchaseInvoiceRow {
   id: number;
   supplierName: string | null;
@@ -58,9 +57,7 @@ export async function runFennoaPurchases(
   );
   const items = res.invoices ?? [];
   return {
-    items,
-    nextCursor: null,
-    count: items.length,
+    ...listEnvelope(items),
     summary: res.summary,
     fetchedAt: res.fetchedAt,
     asiakasId: res.asiakasId,
@@ -79,8 +76,8 @@ export function registerFennoaCommands(parent: Command, getClient: () => Promise
     .option("--asiakas <id>", "Target company override (e.g. 8 = Kalle Urho Oy verification path)", (v: string) => Number(v))
     .option("--refresh", "Bypass the server's 15-minute cache")
     .action(
-      guarded(async (opts: { all?: boolean; months?: number; asiakas?: number; refresh?: boolean }) => {
-        writeJson(await runFennoaPurchases(await getClient(), opts));
-      })
+      jsonAction(getClient, (client, opts: { all?: boolean; months?: number; asiakas?: number; refresh?: boolean }) =>
+        runFennoaPurchases(client, opts)
+      )
     );
 }

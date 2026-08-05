@@ -13,7 +13,8 @@ import { parseId, resolveSearchQuery, cappedInt } from "../../targets.js";
 import { diffFields } from "../../diff.js";
 import { registerVehicleDriverCommands } from "./driver.js";
 import { registerLogAlias } from "../log/index.js";
-import { guarded } from "../_shared/action.js";
+import { jsonAction, guarded } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 
 /**
  * Parse a CLI boolean flag value. Accepts true/1/yes/on (case-insensitive) as
@@ -73,17 +74,17 @@ export async function runVehicleList(
   client: ApiClient,
   opts: VehicleListFilter
 ): Promise<ListEnvelope<Record<string, unknown>>> {
-  const params = new URLSearchParams();
-  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
-  if (opts.cursor) params.set("cursor", opts.cursor);
-  if (opts.deleted) params.set("deleted", "1");
-  if (opts.gridOnly) params.set("gridOnly", "1");
-  if (opts.validOn) params.set("validOn", opts.validOn);
-  if (opts.type !== undefined) params.set("type", String(opts.type));
-  if (opts.asiakas !== undefined) params.set("asiakas", String(opts.asiakas));
-  const qs = params.toString();
   return client.get<ListEnvelope<Record<string, unknown>>>(
-    `/api/cli/vehicle/list${qs ? `?${qs}` : ""}`
+    `/api/cli/vehicle/list${qs({
+      limit: opts.limit,
+      cursor: opts.cursor || undefined,
+      // `1`, not the raw boolean — `qs` would serialise `true` as "true".
+      deleted: opts.deleted ? 1 : undefined,
+      gridOnly: opts.gridOnly ? 1 : undefined,
+      validOn: opts.validOn || undefined,
+      type: opts.type,
+      asiakas: opts.asiakas,
+    })}`
   );
 }
 
@@ -103,9 +104,8 @@ export async function runVehicleGet(
   vehicleId: number,
   asiakas?: number
 ): Promise<Record<string, unknown>> {
-  const qs = asiakas !== undefined ? `?asiakas=${asiakas}` : "";
   return client.get<Record<string, unknown>>(
-    `/api/cli/vehicle/get/${vehicleId}${qs}`
+    `/api/cli/vehicle/get/${vehicleId}${qs({ asiakas })}`
   );
 }
 
@@ -137,9 +137,8 @@ export async function runVehicleTimeline(
   vehicleId: number,
   opts: VehicleDayFilter
 ): Promise<GpsListEnvelope> {
-  const qs = opts.date ? `?date=${opts.date}` : "";
   return client.get<GpsListEnvelope>(
-    `/api/cli/vehicle/timeline/${vehicleId}${qs}`
+    `/api/cli/vehicle/timeline/${vehicleId}${qs({ date: opts.date || undefined })}`
   );
 }
 
@@ -149,9 +148,8 @@ export async function runVehicleRoute(
   vehicleId: number,
   opts: VehicleDayFilter
 ): Promise<GpsListEnvelope> {
-  const qs = opts.date ? `?date=${opts.date}` : "";
   return client.get<GpsListEnvelope>(
-    `/api/cli/vehicle/route/${vehicleId}${qs}`
+    `/api/cli/vehicle/route/${vehicleId}${qs({ date: opts.date || undefined })}`
   );
 }
 
@@ -181,9 +179,8 @@ export async function runVehicleVisits(
       days = Math.max(1, Math.ceil((Date.now() - Date.parse(opts.date)) / 86_400_000) + 2);
     }
   }
-  const qs = days !== undefined ? `?days=${days}` : "";
   const env = await client.get<GpsListEnvelope>(
-    `/api/cli/vehicle/visits/${filterType}/${filterId}${qs}`
+    `/api/cli/vehicle/visits/${filterType}/${filterId}${qs({ days })}`
   );
   if (opts.date === undefined) return env;
   const items = (env.items || []).filter((v) => {
@@ -208,9 +205,8 @@ export async function runVehicleTypes(
   client: ApiClient,
   asiakas?: number
 ): Promise<ListEnvelope<Record<string, unknown>>> {
-  const qs = asiakas !== undefined ? `?asiakas=${asiakas}` : "";
   return client.get<ListEnvelope<Record<string, unknown>>>(
-    `/api/cli/vehicle/types${qs}`
+    `/api/cli/vehicle/types${qs({ asiakas })}`
   );
 }
 
@@ -225,11 +221,8 @@ export async function runVehicleSearch(
   limit?: number,
   asiakas?: number
 ): Promise<ListEnvelope<Record<string, unknown>>> {
-  const params = new URLSearchParams({ search: query });
-  if (limit !== undefined) params.set("limit", String(limit));
-  if (asiakas !== undefined) params.set("asiakas", String(asiakas));
   return client.get<ListEnvelope<Record<string, unknown>>>(
-    `/api/cli/vehicle/list?${params.toString()}`
+    `/api/cli/vehicle/list${qs({ search: query, limit, asiakas })}`
   );
 }
 
@@ -255,9 +248,8 @@ export async function runVehicleDatesExpiring(
   client: ApiClient,
   days?: number
 ): Promise<ListEnvelope<Record<string, unknown>>> {
-  const qs = days !== undefined ? `?days=${days}` : "";
   return client.get<ListEnvelope<Record<string, unknown>>>(
-    `/api/cli/vehicle/dates/expiring${qs}`
+    `/api/cli/vehicle/dates/expiring${qs({ days })}`
   );
 }
 
@@ -466,29 +458,30 @@ export function registerVehicleCommands(
       (val: string) => Number(val)
     )
     .action(
-      guarded(async (
-        opts: {
-          limit?: number;
-          cursor?: string;
-          deleted?: boolean;
-          gridOnly?: boolean;
-          validOn?: string;
-          type?: number;
-          asiakas?: number;
-        }
-      ) => {
-        const client = await getClient();
-        const result = await runVehicleList(client, {
-          limit: opts.limit,
-          cursor: opts.cursor,
-          deleted: opts.deleted,
-          gridOnly: opts.gridOnly,
-          validOn: resolveDate(opts.validOn),
-          type: opts.type,
-          asiakas: opts.asiakas,
-        });
-        writeJson(result);
-      })
+      jsonAction(
+        getClient,
+        (
+          client,
+          opts: {
+            limit?: number;
+            cursor?: string;
+            deleted?: boolean;
+            gridOnly?: boolean;
+            validOn?: string;
+            type?: number;
+            asiakas?: number;
+          }
+        ) =>
+          runVehicleList(client, {
+            limit: opts.limit,
+            cursor: opts.cursor,
+            deleted: opts.deleted,
+            gridOnly: opts.gridOnly,
+            validOn: resolveDate(opts.validOn),
+            type: opts.type,
+            asiakas: opts.asiakas,
+          })
+      )
     );
 
   v.command("get <vehicleId>")
@@ -498,20 +491,16 @@ export function registerVehicleCommands(
       (val: string) => Number(val)
     )
     .action(
-      guarded(async (idStr: string, opts: { asiakas?: number }) => {
-        const client = await getClient();
-        const result = await runVehicleGet(client, parseId(idStr, "vehicleId"), opts.asiakas);
-        writeJson(result);
-      })
+      jsonAction(getClient, (client, idStr: string, opts: { asiakas?: number }) =>
+        runVehicleGet(client, parseId(idStr, "vehicleId"), opts.asiakas)
+      )
     );
 
   v.command("status <vehicleId>")
     .action(
-      guarded(async (idStr: string) => {
-        const client = await getClient();
-        const result = await runVehicleStatus(client, parseId(idStr, "vehicleId"));
-        writeJson(result);
-      })
+      jsonAction(getClient, (client, idStr: string) =>
+        runVehicleStatus(client, parseId(idStr, "vehicleId"))
+      )
     );
 
 
@@ -522,18 +511,13 @@ export function registerVehicleCommands(
       (val: string) => Number(val)
     )
     .action(
-      guarded(async (opts: { asiakas?: number }) => {
-        writeJson(await runVehicleTypes(await getClient(), opts.asiakas));
-      })
+      jsonAction(getClient, (client, opts: { asiakas?: number }) =>
+        runVehicleTypes(client, opts.asiakas)
+      )
     );
 
   v.command("locations")
-    .action(
-      guarded(async () => {
-        const client = await getClient();
-        writeJson(await runVehicleLocations(client));
-      })
-    );
+    .action(jsonAction(getClient, runVehicleLocations));
 
   v.command("search [query]")
     .option("--search <s>", "Search query (alias for the <query> positional)")
@@ -544,18 +528,17 @@ export function registerVehicleCommands(
       (val: string) => Number(val)
     )
     .action(
-      guarded(async (query: string | undefined, opts: { search?: string; limit?: number; asiakas?: number }) => {
-        writeJson(await runVehicleSearch(await getClient(), resolveSearchQuery(query, opts.search), opts.limit, opts.asiakas));
-      })
+      jsonAction(getClient, (client, query: string | undefined, opts: { search?: string; limit?: number; asiakas?: number }) =>
+        runVehicleSearch(client, resolveSearchQuery(query, opts.search), opts.limit, opts.asiakas)
+      )
     );
 
   v.command("timeline <vehicleId>")
     .option("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
     .action(
-      guarded(async (idStr: string, opts: VehicleDayFilter) => {
-        const client = await getClient();
-        writeJson(await runVehicleTimeline(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) }));
-      })
+      jsonAction(getClient, (client, idStr: string, opts: VehicleDayFilter) =>
+        runVehicleTimeline(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) })
+      )
     );
 
   const createCmd = v
@@ -694,9 +677,9 @@ export function registerVehicleCommands(
   dates
     .command("list <vehicleId>")
     .action(
-      guarded(async (idStr: string) => {
-        writeJson(await runVehicleDatesList(await getClient(), parseId(idStr, "vehicleId")));
-      })
+      jsonAction(getClient, (client, idStr: string) =>
+        runVehicleDatesList(client, parseId(idStr, "vehicleId"))
+      )
     );
   dates
     .command("expiring")
@@ -704,18 +687,17 @@ export function registerVehicleCommands(
       Number(s)
     )
     .action(
-      guarded(async (opts: { days?: number }) => {
-        writeJson(await runVehicleDatesExpiring(await getClient(), opts.days));
-      })
+      jsonAction(getClient, (client, opts: { days?: number }) =>
+        runVehicleDatesExpiring(client, opts.days)
+      )
     );
 
   v.command("route <vehicleId>")
     .option("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
     .action(
-      guarded(async (idStr: string, opts: VehicleDayFilter) => {
-        const client = await getClient();
-        writeJson(await runVehicleRoute(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) }));
-      })
+      jsonAction(getClient, (client, idStr: string, opts: VehicleDayFilter) =>
+        runVehicleRoute(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) })
+      )
     );
 
   v.command("visits <filterType> <id>")
@@ -725,15 +707,12 @@ export function registerVehicleCommands(
       "Only visits on this day (YYYY-MM-DD or today/yesterday/tomorrow; Europe/Helsinki)"
     )
     .action(
-      guarded(async (filterType: string, idStr: string, opts: VehicleVisitsFilter) => {
-        const client = await getClient();
-        writeJson(
-          await runVehicleVisits(client, filterType, parseId(idStr, "vehicleId"), {
-            days: opts.days,
-            date: opts.date ? resolveDate(opts.date) : undefined,
-          })
-        );
-      })
+      jsonAction(getClient, (client, filterType: string, idStr: string, opts: VehicleVisitsFilter) =>
+        runVehicleVisits(client, filterType, parseId(idStr, "vehicleId"), {
+          days: opts.days,
+          date: opts.date ? resolveDate(opts.date) : undefined,
+        })
+      )
     );
 
   registerLogAlias(v, getClient, "vehicle", "vehicleId");

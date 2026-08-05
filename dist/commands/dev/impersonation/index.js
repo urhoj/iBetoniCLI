@@ -37,7 +37,7 @@ export function registerImpersonationCommands(parent, getClient) {
         .option("--end-reason <r>", "Filter by endReason (manual|timeout|error|logout)")
         .option("--active", "Only still-open sessions (no end row)")
         .option("--limit <n>", "Max sessions (default 100, max 1000)", (s) => Number(s))
-        .action(jsonAction(getClient, (client, opts) => runImpersonationSessions(client, opts)));
+        .action(jsonAction(getClient, runImpersonationSessions));
     imp
         .command("grants <personId>")
         .action(guarded(async (personIdStr) => {

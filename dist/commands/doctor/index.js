@@ -1,4 +1,4 @@
-import { writeJson, setExitCode } from "../../output/json.js";
+import { writeJson, setExitCode, errorMessage } from "../../output/json.js";
 import { decodeJwtPayload, impersonationFromClaims } from "../../auth/jwt.js";
 import { resolveCallerTier } from "../../tier.js";
 import { runVersion } from "../version/index.js";
@@ -29,7 +29,7 @@ export async function runDoctor(opts) {
         runVersion({ endpoint, cliVersion, fetchImpl: opts.fetchImpl }),
         runCompanyList(client).then(() => ({ ok: true }), (e) => e instanceof CliError
             ? { ok: false, status: e.statusCode, error: e.message }
-            : { ok: false, error: e instanceof Error ? e.message : String(e) }),
+            : { ok: false, error: errorMessage(e) }),
     ]);
     const ok = connectivity.reachable && authProbe.ok && tokenExpired !== true;
     return {

@@ -5,18 +5,14 @@ import { runGlossaryLookup } from "../glossary/index.js";
 import { writeJson } from "../../output/json.js";
 import { CliError } from "../../api/errors.js";
 import { guarded } from "../_shared/action.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 /**
  * `ib help` (no arg) — list every concept-guide topic id+title. Offline, no
  * auth, no network (reads {@link TOPICS} only). Returns the universal list
  * envelope `{ items, nextCursor, count }` so the pretty renderer formats it.
  */
-export function runHelpList(): {
-  items: { id: string; title: string }[];
-  nextCursor: null;
-  count: number;
-} {
-  const items = TOPICS.map((t) => ({ id: t.id, title: t.title }));
-  return { items, nextCursor: null, count: items.length };
+export function runHelpList(): ListEnvelope<{ id: string; title: string }> {
+  return listEnvelope(TOPICS.map((t) => ({ id: t.id, title: t.title })));
 }
 
 /**

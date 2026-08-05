@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { guarded } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 
 export interface ParcelLookupOptions {
   kiinteistotunnus?: string;
@@ -35,17 +36,17 @@ export async function runParcelLookup(
   client: ApiClient,
   opts: ParcelLookupOptions
 ): Promise<Record<string, unknown>> {
-  const params = new URLSearchParams();
-  const worksite = opts.worksite ?? opts.tyomaa;
-  if (opts.kiinteistotunnus !== undefined) params.set("kiinteistotunnus", opts.kiinteistotunnus);
-  if (opts.sijainti !== undefined) params.set("sijainti", String(opts.sijainti));
-  if (worksite !== undefined) params.set("worksite", String(worksite));
-  if (opts.lat !== undefined) params.set("lat", String(opts.lat));
-  if (opts.lng !== undefined) params.set("lng", String(opts.lng));
-  if (opts.address !== undefined) params.set("address", opts.address);
-  if (opts.withBuildings) params.set("withBuildings", "1");
   return client.get<Record<string, unknown>>(
-    `/api/cli/opendata/parcel/lookup?${params.toString()}`
+    `/api/cli/opendata/parcel/lookup${qs({
+      kiinteistotunnus: opts.kiinteistotunnus,
+      sijainti: opts.sijainti,
+      worksite: opts.worksite ?? opts.tyomaa,
+      lat: opts.lat,
+      lng: opts.lng,
+      address: opts.address,
+      // `1`, not the raw boolean — `qs` would serialise `true` as "true".
+      withBuildings: opts.withBuildings ? 1 : undefined,
+    })}`
   );
 }
 
