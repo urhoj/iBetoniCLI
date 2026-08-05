@@ -47,6 +47,13 @@ try {
     cwd: root,
     stdio: "inherit",
   });
+  // `npm run build` packs reference/specs.js into JSON.parse'd data after tsc
+  // (see scripts/pack-specs.mjs); apply the same transform to the temp build so
+  // the byte-compare stays valid.
+  execSync("node scripts/pack-specs.mjs .distcheck", {
+    cwd: root,
+    stdio: "inherit",
+  });
 
   const fresh = walk(freshDir);
   const dist = fs.existsSync(distDir) ? walk(distDir) : [];

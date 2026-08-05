@@ -15,7 +15,7 @@
   },
   "scripts": {
     "prebuild": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\"",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/pack-specs.mjs dist",
     "check:dist": "node scripts/check-dist-fresh.js",
     "dev": "tsx src/bin/ib.ts",
     "test": "vitest run",

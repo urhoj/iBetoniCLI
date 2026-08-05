@@ -1,5 +1,25 @@
 import { createRequire } from "node:module";
 import { Buffer } from "node:buffer";
+let expandPayloadFn;
+function resolveExpandPayload() {
+    if (expandPayloadFn === undefined) {
+        try {
+            const require = createRequire(import.meta.url);
+            const codec = require("@ibetoni/auth/codec");
+            expandPayloadFn =
+                typeof codec.expandPayload === "function" ? codec.expandPayload : null;
+        }
+        catch {
+            expandPayloadFn = null;
+        }
+    }
+    return expandPayloadFn;
+}
+// One invocation decodes the SAME token several times (tier resolution in
+// bin/ib.ts, the acting-as diagnostic and impersonation check in cliContext) —
+// cache the last decode. Callers treat DecodedClaims as read-only.
+let lastToken;
+let lastClaims;
 /**
  * Decode a JWT payload into typed claims.
  *
@@ -10,21 +30,22 @@ import { Buffer } from "node:buffer";
  * fixtures and don't depend on the workspace package being symlinked).
  */
 export function decodeJwtPayload(jwt) {
+    if (jwt === lastToken && lastClaims)
+        return lastClaims;
     const parts = jwt.split(".");
     if (parts.length !== 3)
         throw new Error("Malformed JWT");
     const json = Buffer.from(parts[1], "base64url").toString("utf8");
     const raw = JSON.parse(json);
     let expanded = raw;
-    try {
-        const require = createRequire(import.meta.url);
-        const codec = require("@ibetoni/auth/codec");
-        if (typeof codec.expandPayload === "function") {
-            expanded = codec.expandPayload(raw);
+    if (raw.v !== undefined) {
+        try {
+            expanded = resolveExpandPayload()?.(raw) ?? raw;
         }
-    }
-    catch {
-        // Codec unavailable (e.g., during unit tests that mock JWTs). Use raw shape.
+        catch {
+            // Codec rejected the payload (e.g. unknown role) — use raw shape, as the
+            // old always-wrapped try/catch did.
+        }
     }
     const globalRoles = (expanded.globalRoles ?? {});
     // A missing claim must surface as `undefined`, not `Number(undefined)` → NaN
@@ -51,7 +72,7 @@ export function decodeJwtPayload(jwt) {
         roles: Array.isArray(c?.roles) ? c.roles : [],
     }))
         .filter((c) => c.asiakasId !== undefined);
-    return {
+    const claims = {
         personId: finite(expanded.personId ?? expanded.sub),
         ownerAsiakasId: finite(expanded.ownerAsiakasId ?? expanded.o),
         ownerAsiakasName: expanded.ownerAsiakasName,
@@ -65,6 +86,9 @@ export function decodeJwtPayload(jwt) {
         imp_sid: (expanded.imp_sid ?? expanded.s),
         companies: companyList,
     };
+    lastToken = jwt;
+    lastClaims = claims;
+    return claims;
 }
 /**
  * Project the impersonation claims (`imp`/`imp_sid`) into the orientation shape

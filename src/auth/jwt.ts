@@ -36,6 +36,38 @@ export interface DecodedClaims {
 }
 
 /**
+ * Lazily-resolved `@ibetoni/auth/codec` `expandPayload`. Loading the codec
+ * costs ~20 ms, so it is resolved at most ONCE per process — and only when a
+ * payload actually looks short-shape: v2 short tokens carry a `v` version
+ * field (`isShortShape` in the codec checks exactly that), and `expandPayload`
+ * returns long-shape payloads unchanged, so skipping it for them is a no-op.
+ * `null` caches the "unavailable" verdict (e.g. unit tests without the
+ * workspace symlink).
+ */
+type ExpandPayload = (p: Record<string, unknown>) => Record<string, unknown>;
+let expandPayloadFn: ExpandPayload | null | undefined;
+
+function resolveExpandPayload(): ExpandPayload | null {
+  if (expandPayloadFn === undefined) {
+    try {
+      const require = createRequire(import.meta.url);
+      const codec = require("@ibetoni/auth/codec") as { expandPayload?: ExpandPayload };
+      expandPayloadFn =
+        typeof codec.expandPayload === "function" ? codec.expandPayload : null;
+    } catch {
+      expandPayloadFn = null;
+    }
+  }
+  return expandPayloadFn;
+}
+
+// One invocation decodes the SAME token several times (tier resolution in
+// bin/ib.ts, the acting-as diagnostic and impersonation check in cliContext) —
+// cache the last decode. Callers treat DecodedClaims as read-only.
+let lastToken: string | undefined;
+let lastClaims: DecodedClaims | undefined;
+
+/**
  * Decode a JWT payload into typed claims.
  *
  * Uses `@ibetoni/auth/codec` `expandPayload` when reachable so we transparently
@@ -45,22 +77,20 @@ export interface DecodedClaims {
  * fixtures and don't depend on the workspace package being symlinked).
  */
 export function decodeJwtPayload(jwt: string): DecodedClaims {
+  if (jwt === lastToken && lastClaims) return lastClaims;
   const parts = jwt.split(".");
   if (parts.length !== 3) throw new Error("Malformed JWT");
   const json = Buffer.from(parts[1], "base64url").toString("utf8");
   const raw = JSON.parse(json) as Record<string, unknown>;
 
   let expanded: Record<string, unknown> = raw;
-  try {
-    const require = createRequire(import.meta.url);
-    const codec = require("@ibetoni/auth/codec") as {
-      expandPayload?: (p: Record<string, unknown>) => Record<string, unknown>;
-    };
-    if (typeof codec.expandPayload === "function") {
-      expanded = codec.expandPayload(raw);
+  if (raw.v !== undefined) {
+    try {
+      expanded = resolveExpandPayload()?.(raw) ?? raw;
+    } catch {
+      // Codec rejected the payload (e.g. unknown role) — use raw shape, as the
+      // old always-wrapped try/catch did.
     }
-  } catch {
-    // Codec unavailable (e.g., during unit tests that mock JWTs). Use raw shape.
   }
 
   const globalRoles = (expanded.globalRoles ?? {}) as Record<string, unknown>;
@@ -93,7 +123,7 @@ export function decodeJwtPayload(jwt: string): DecodedClaims {
     }))
     .filter((c): c is { asiakasId: number; roles: string[] } => c.asiakasId !== undefined);
 
-  return {
+  const claims: DecodedClaims = {
     personId: finite(expanded.personId ?? expanded.sub),
     ownerAsiakasId: finite(expanded.ownerAsiakasId ?? expanded.o),
     ownerAsiakasName: expanded.ownerAsiakasName as string | undefined,
@@ -107,6 +137,9 @@ export function decodeJwtPayload(jwt: string): DecodedClaims {
     imp_sid: (expanded.imp_sid ?? expanded.s) as string | undefined,
     companies: companyList,
   };
+  lastToken = jwt;
+  lastClaims = claims;
+  return claims;
 }
 
 /** The orientation shape for an active impersonation session. */
