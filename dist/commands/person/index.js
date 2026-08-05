@@ -156,13 +156,19 @@ export async function runPersonSearchMyCompanies(client, query, opts) {
  */
 export async function runPersonSearchMyCompaniesFanout(listCompanies, searchIn) {
     const companies = await listCompanies();
-    const items = [];
-    for (const c of companies) {
-        const env = await searchIn(c.asiakasId);
-        for (const hit of env.items) {
-            items.push({ ...hit, asiakasId: c.asiakasId, asiakasName: c.name });
+    // Each per-company search is independent (its own ephemeral client), so run
+    // them concurrently with a small cap — a many-company account should not
+    // open a socket per company. Hits keep the companies' input order.
+    const CONCURRENCY = 5;
+    const perCompany = new Array(companies.length);
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, companies.length) }, async () => {
+        while (next < companies.length) {
+            const i = next++;
+            perCompany[i] = await searchIn(companies[i].asiakasId);
         }
-    }
+    }));
+    const items = companies.flatMap((c, i) => perCompany[i].items.map((hit) => ({ ...hit, asiakasId: c.asiakasId, asiakasName: c.name })));
     return listEnvelope(items);
 }
 /**

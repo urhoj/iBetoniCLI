@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { lintEntries, isKnownCommandPath, suggestRelatedForEntry } from "../../src/commands/glossary/lint.js";
+import { lintEntries, isKnownCommandPath, suggestRelatedForEntry, isEditDistance1, levenshtein } from "../../src/commands/glossary/lint.js";
 import type { CommandSpec } from "../../src/output/help.js";
 
 const spec = (command: string, extra: Partial<CommandSpec> = {}): CommandSpec => ({
@@ -86,5 +86,21 @@ describe("glossary lint --suggest-related (fb#110)", () => {
     // Uses the real COMMAND_SPECS (default arg) — off by default, on when requested.
     expect(lintEntries(entries).some((f) => f.issue === "stale-related")).toBe(false);
     expect(lintEntries(entries, { suggestRelated: true }).some((f) => f.issue === "stale-related")).toBe(true);
+  });
+});
+
+describe("isEditDistance1", () => {
+  test("agrees with levenshtein === 1 across representative pairs", () => {
+    const pairs: Array<[string, string]> = [
+      ["puomi", "puomi"], ["puomi", "puomit"], ["puomi", "puom"], ["puomi", "suomi"],
+      ["puomi", "pumi"], ["keikka", "keikat"], ["a", ""], ["", ""], ["ab", "ba"],
+      ["betoni", "betonit"], ["betoni", "betoni "], ["valu", "valut"], ["valu", "velu"],
+      ["abc", "abcd"], ["abc", "xabc"], ["abc", "axc"], ["abc", "cba"], ["ää", "äö"],
+    ];
+    for (const [a, b] of pairs) {
+      expect(isEditDistance1(a, b), `${JSON.stringify(a)} vs ${JSON.stringify(b)}`).toBe(
+        levenshtein(a, b) === 1
+      );
+    }
   });
 });

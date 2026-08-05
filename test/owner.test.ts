@@ -12,7 +12,22 @@ function clientReturning(value: unknown): ApiClient {
   } as unknown as ApiClient;
 }
 
+/** Unsigned long-shape JWT whose payload carries the given claims. */
+function fakeJwt(claims: Record<string, unknown>): string {
+  const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  return `${b64({ alg: "none" })}.${b64(claims)}.sig`;
+}
+
 describe("resolveActiveOwnerAsiakasId", () => {
+  test("decodes the JWT's ownerAsiakasId claim without any network call", async () => {
+    const client = clientReturning({ currentCompanyId: 999 });
+    (client.getCurrentToken as ReturnType<typeof vi.fn>).mockReturnValue(
+      fakeJwt({ ownerAsiakasId: 42 })
+    );
+    await expect(resolveActiveOwnerAsiakasId(client)).resolves.toBe(42);
+    expect(client.get).not.toHaveBeenCalled();
+  });
+
   test("returns currentCompanyId from /api/company-selection/available", async () => {
     const client = clientReturning({ currentCompanyId: 27 });
     await expect(resolveActiveOwnerAsiakasId(client)).resolves.toBe(27);

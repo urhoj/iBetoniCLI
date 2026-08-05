@@ -21,26 +21,16 @@ export async function runDoctor(opts) {
     const tokenExp = claims.exp ? new Date(claims.exp * 1000).toISOString() : null;
     const tokenExpired = claims.exp != null ? claims.exp * 1000 < now : null;
     const impersonating = impersonationFromClaims(claims);
-    // Connectivity (public, no auth) — reuse the version probe.
-    const connectivity = await runVersion({
-        endpoint,
-        cliVersion,
-        fetchImpl: opts.fetchImpl,
-    });
-    // Authenticated probe: does this token actually work against this endpoint?
-    let authProbe;
-    try {
-        await runCompanyList(client);
-        authProbe = { ok: true };
-    }
-    catch (e) {
-        if (e instanceof CliError) {
-            authProbe = { ok: false, status: e.statusCode, error: e.message };
-        }
-        else {
-            authProbe = { ok: false, error: e instanceof Error ? e.message : String(e) };
-        }
-    }
+    // Two independent probes, run concurrently: connectivity (public, no auth —
+    // reuses the version probe) and the authenticated read proving the token
+    // works against this endpoint. The auth probe never throws — failures fold
+    // into the report.
+    const [connectivity, authProbe] = await Promise.all([
+        runVersion({ endpoint, cliVersion, fetchImpl: opts.fetchImpl }),
+        runCompanyList(client).then(() => ({ ok: true }), (e) => e instanceof CliError
+            ? { ok: false, status: e.statusCode, error: e.message }
+            : { ok: false, error: e instanceof Error ? e.message : String(e) }),
+    ]);
     const ok = connectivity.reachable && authProbe.ok && tokenExpired !== true;
     return {
         ok,
