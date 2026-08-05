@@ -1,7 +1,8 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../../api/client.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, type WriteFlags } from "../../../api/writeFlags.js";
-import { writeJson, exitWithError } from "../../../output/json.js";
+import { writeJson } from "../../../output/json.js";
+import { guarded } from "../../_shared/action.js";
 import { resolveThreadId } from "../chat/resolveThread.js";
 import { parseOptionalId } from "../../../targets.js";
 
@@ -63,13 +64,11 @@ export function registerMessageThreadCommands(
     .description("Archive a thread (becomes read-only; send/edit/restore then 409)")
     .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
   addWriteFlagsToCommand(archiveCmd).action(
-    async (idStr: string | undefined, opts: WriteFlags & { tarjous?: number }) => {
-      try {
-        const client = await getClient();
-        const id = await resolveThreadId(client, { thread: parseOptionalId(idStr, "threadId"), tarjous: opts.tarjous });
-        writeJson(await runThreadArchive(client, id, opts));
-      } catch (e) { exitWithError(e); }
-    }
+    guarded(async (idStr: string | undefined, opts: WriteFlags & { tarjous?: number }) => {
+      const client = await getClient();
+      const id = await resolveThreadId(client, { thread: parseOptionalId(idStr, "threadId"), tarjous: opts.tarjous });
+      writeJson(await runThreadArchive(client, id, opts));
+    })
   );
 
   const reopenCmd = t
@@ -77,13 +76,11 @@ export function registerMessageThreadCommands(
     .description("Reopen an archived thread (clears archivedAt)")
     .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
   addWriteFlagsToCommand(reopenCmd).action(
-    async (idStr: string | undefined, opts: WriteFlags & { tarjous?: number }) => {
-      try {
-        const client = await getClient();
-        const id = await resolveThreadId(client, { thread: parseOptionalId(idStr, "threadId"), tarjous: opts.tarjous });
-        writeJson(await runThreadReopen(client, id, opts));
-      } catch (e) { exitWithError(e); }
-    }
+    guarded(async (idStr: string | undefined, opts: WriteFlags & { tarjous?: number }) => {
+      const client = await getClient();
+      const id = await resolveThreadId(client, { thread: parseOptionalId(idStr, "threadId"), tarjous: opts.tarjous });
+      writeJson(await runThreadReopen(client, id, opts));
+    })
   );
 
   const renameCmd = t
@@ -92,13 +89,11 @@ export function registerMessageThreadCommands(
     .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
     .requiredOption("--title <text>", 'New thread title (max 200 chars; "" clears)');
   addWriteFlagsToCommand(renameCmd).action(
-    async (idStr: string | undefined, opts: WriteFlags & { tarjous?: number; title: string }) => {
-      try {
-        const client = await getClient();
-        const id = await resolveThreadId(client, { thread: parseOptionalId(idStr, "threadId"), tarjous: opts.tarjous });
-        writeJson(await runThreadRename(client, id, String(opts.title ?? "").trim(), opts));
-      } catch (e) { exitWithError(e); }
-    }
+    guarded(async (idStr: string | undefined, opts: WriteFlags & { tarjous?: number; title: string }) => {
+      const client = await getClient();
+      const id = await resolveThreadId(client, { thread: parseOptionalId(idStr, "threadId"), tarjous: opts.tarjous });
+      writeJson(await runThreadRename(client, id, String(opts.title ?? "").trim(), opts));
+    })
   );
 
   const p = t
@@ -112,13 +107,11 @@ export function registerMessageThreadCommands(
     .requiredOption("--person <id>", "personId to add", Number)
     .option("--role <role>", "Participant role (customer|pumppu|betoni|lattia|support|provider; default pumppu)");
   addWriteFlagsToCommand(addCmd).action(
-    async (idStr: string | undefined, opts: WriteFlags & { tarjous?: number; person: number; role?: string }) => {
-      try {
-        const client = await getClient();
-        const id = await resolveThreadId(client, { thread: parseOptionalId(idStr, "threadId"), tarjous: opts.tarjous });
-        writeJson(await runThreadParticipantAdd(client, id, Number(opts.person), opts));
-      } catch (e) { exitWithError(e); }
-    }
+    guarded(async (idStr: string | undefined, opts: WriteFlags & { tarjous?: number; person: number; role?: string }) => {
+      const client = await getClient();
+      const id = await resolveThreadId(client, { thread: parseOptionalId(idStr, "threadId"), tarjous: opts.tarjous });
+      writeJson(await runThreadParticipantAdd(client, id, Number(opts.person), opts));
+    })
   );
 
   const remCmd = p
@@ -127,12 +120,10 @@ export function registerMessageThreadCommands(
     .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
     .requiredOption("--person <id>", "personId to remove", Number);
   addWriteFlagsToCommand(remCmd).action(
-    async (idStr: string | undefined, opts: WriteFlags & { tarjous?: number; person: number }) => {
-      try {
-        const client = await getClient();
-        const id = await resolveThreadId(client, { thread: parseOptionalId(idStr, "threadId"), tarjous: opts.tarjous });
-        writeJson(await runThreadParticipantRemove(client, id, Number(opts.person), opts));
-      } catch (e) { exitWithError(e); }
-    }
+    guarded(async (idStr: string | undefined, opts: WriteFlags & { tarjous?: number; person: number }) => {
+      const client = await getClient();
+      const id = await resolveThreadId(client, { thread: parseOptionalId(idStr, "threadId"), tarjous: opts.tarjous });
+      writeJson(await runThreadParticipantRemove(client, id, Number(opts.person), opts));
+    })
   );
 }

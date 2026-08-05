@@ -17,10 +17,10 @@ import type { ApiClient } from "../../api/client.js";
 import { CliError } from "../../api/errors.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { readJsonObjectInput } from "../../api/parseBody.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
 import { parseRefId } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
-import { guarded } from "../_shared/action.js";
+import { guarded, jsonAction } from "../_shared/action.js";
 
 const KINDS = ["improvement", "bug", "idea", "legal"] as const;
 type Kind = (typeof KINDS)[number];
@@ -610,7 +610,7 @@ export function registerFeedbackCommands(
     )
     .option("--dry-run", "Print the payload without sending (client-side)")
     .action(
-      async (
+      guarded(async (
         description: string | undefined,
         opts: {
           description?: string;
@@ -627,40 +627,36 @@ export function registerFeedbackCommands(
         },
         cmd: Command
       ) => {
-        try {
-          // Only the flags the caller ACTUALLY typed outrank the JSON object —
-          // see mergeFeedbackCreateInput (--kind/--scope carry defaults).
-          const explicit: Record<string, unknown> = {};
-          for (const k of FROM_JSON_FIELDS) {
-            if (cmd.getOptionValueSource(k) === "cli") explicit[k] = (opts as Record<string, unknown>)[k];
-          }
-          const merged = mergeFeedbackCreateInput(
-            opts.fromJson ? readJsonObjectInput(opts.fromJson) : {},
-            explicit as FeedbackCreateFields,
-            { kind: opts.kind, scope: opts.scope }
-          );
-          const client = await getClient();
-          writeJson(
-            await runFeedbackCreate(client, {
-              description: resolveFeedbackCreateDescription({
-                description,
-                descriptionFlag: merged.description,
-                bodyFlag: merged.body,
-                title: merged.title,
-              }),
-              kind: merged.kind,
-              scope: merged.scope,
-              command: merged.command,
-              error: merged.error,
-              severity: merged.severity,
-              complexity: merged.complexity,
-              dryRun: opts.dryRun,
-            })
-          );
-        } catch (e) {
-          exitWithError(e);
+        // Only the flags the caller ACTUALLY typed outrank the JSON object —
+        // see mergeFeedbackCreateInput (--kind/--scope carry defaults).
+        const explicit: Record<string, unknown> = {};
+        for (const k of FROM_JSON_FIELDS) {
+          if (cmd.getOptionValueSource(k) === "cli") explicit[k] = (opts as Record<string, unknown>)[k];
         }
-      }
+        const merged = mergeFeedbackCreateInput(
+          opts.fromJson ? readJsonObjectInput(opts.fromJson) : {},
+          explicit as FeedbackCreateFields,
+          { kind: opts.kind, scope: opts.scope }
+        );
+        const client = await getClient();
+        writeJson(
+          await runFeedbackCreate(client, {
+            description: resolveFeedbackCreateDescription({
+              description,
+              descriptionFlag: merged.description,
+              bodyFlag: merged.body,
+              title: merged.title,
+            }),
+            kind: merged.kind,
+            scope: merged.scope,
+            command: merged.command,
+            error: merged.error,
+            severity: merged.severity,
+            complexity: merged.complexity,
+            dryRun: opts.dryRun,
+          })
+        );
+      })
     );
 
   f.command("list")
@@ -678,26 +674,9 @@ export function registerFeedbackCommands(
     .option("--limit <n>", "Max rows (default 50, cap 200)", Number)
     .option("--offset <n>", "Pagination offset", Number)
     .action(
-      async (opts: {
-        status?: string;
-        kind?: string;
-        scope?: string;
-        search?: string;
-        complexity?: number;
-        maxComplexity?: number;
-        limit?: number;
-        offset?: number;
-        unresolved?: boolean;
-        all?: boolean;
-        full?: boolean;
-        oldest?: boolean;
-      }) => {
-        try {
-          writeJson(await runFeedbackList(await getClient(), opts));
-        } catch (e) {
-          exitWithError(e);
-        }
-      }
+      jsonAction(getClient, (client, opts: { status?: string; kind?: string; scope?: string; search?: string; complexity?: number; maxComplexity?: number; limit?: number; offset?: number; unresolved?: boolean; all?: boolean; full?: boolean; oldest?: boolean; }) =>
+        runFeedbackList(client, opts)
+      )
     );
 
   f.command("get <id>")
@@ -722,27 +701,23 @@ export function registerFeedbackCommands(
     .option("--dry-run", "Print the update body without sending (client-side)")
     .option("--full", "Return the full updated row (default: a compact ack)")
     .action(
-      async (
+      guarded(async (
         idStr: string,
         opts: { status?: string; note?: string; reason?: string; resolution?: string; dryRun?: boolean; full?: boolean }
       ) => {
-        try {
-          const id = parseRefId(idStr, "feedback", "resolve");
-          const client = await getClient();
-          writeJson(
-            await runWithSiblingHint(client, id, "changelog", () =>
-              runFeedbackResolve(client, id, {
-                status: opts.status,
-                note: mergeNoteFlags(opts.note, opts.resolution, opts.reason),
-                dryRun: opts.dryRun,
-                full: opts.full,
-              })
-            )
-          );
-        } catch (e) {
-          exitWithError(e);
-        }
-      }
+        const id = parseRefId(idStr, "feedback", "resolve");
+        const client = await getClient();
+        writeJson(
+          await runWithSiblingHint(client, id, "changelog", () =>
+            runFeedbackResolve(client, id, {
+              status: opts.status,
+              note: mergeNoteFlags(opts.note, opts.resolution, opts.reason),
+              dryRun: opts.dryRun,
+              full: opts.full,
+            })
+          )
+        );
+      })
     );
 
   f.command("update <id>")
@@ -758,7 +733,7 @@ export function registerFeedbackCommands(
     .option("--dry-run", "Print the update body without sending (client-side)")
     .option("--full", "Return the full updated row (default: a compact ack)")
     .action(
-      async (
+      guarded(async (
         idStr: string,
         opts: {
           scope?: string;
@@ -771,28 +746,24 @@ export function registerFeedbackCommands(
           full?: boolean;
         }
       ) => {
-        try {
-          const id = parseRefId(idStr, "feedback", "update");
-          // --body is an alias for --description (feedback #278); fold it in so
-          // runFeedbackUpdate sees one field. Both only when they agree.
-          if (opts.body !== undefined) {
-            if (opts.description !== undefined && opts.description.trim() !== opts.body.trim())
-              throw new CliError(
-                "Provide the description via --description or --body, not both with different values",
-                400,
-                null,
-                4
-              );
-            if (opts.description === undefined) opts.description = opts.body;
-          }
-          const client = await getClient();
-          writeJson(
-            await runWithSiblingHint(client, id, "changelog", () => runFeedbackUpdate(client, id, opts))
-          );
-        } catch (e) {
-          exitWithError(e);
+        const id = parseRefId(idStr, "feedback", "update");
+        // --body is an alias for --description (feedback #278); fold it in so
+        // runFeedbackUpdate sees one field. Both only when they agree.
+        if (opts.body !== undefined) {
+          if (opts.description !== undefined && opts.description.trim() !== opts.body.trim())
+            throw new CliError(
+              "Provide the description via --description or --body, not both with different values",
+              400,
+              null,
+              4
+            );
+          if (opts.description === undefined) opts.description = opts.body;
         }
-      }
+        const client = await getClient();
+        writeJson(
+          await runWithSiblingHint(client, id, "changelog", () => runFeedbackUpdate(client, id, opts))
+        );
+      })
     );
 
   f.command("count")

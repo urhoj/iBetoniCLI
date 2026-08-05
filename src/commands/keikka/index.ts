@@ -6,13 +6,13 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveDate, todayHelsinki, addDaysISO } from "../../dates.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { registerLogAlias } from "../log/index.js";
 import { parseId, resolveSearchQuery, cappedInt } from "../../targets.js";
-import { guarded } from "../_shared/action.js";
+import { guarded, jsonAction } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 
 // Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
@@ -472,25 +472,21 @@ export function registerKeikkaCommands(
       "JSON object forwarded verbatim as the request body"
     );
   addWriteFlagsToCommand(createCmd).action(
-    async (opts: {
+    guarded(async (opts: {
       body: string;
       dryRun?: boolean;
       idempotencyKey?: string;
       reason?: string;
     }) => {
-      try {
-        const client = await getClient();
-        const parsed = parseJsonBodyFlag(opts.body);
-        const result = await runKeikkaCreate(client, parsed, {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        });
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      const parsed = parseJsonBodyFlag(opts.body);
+      const result = await runKeikkaCreate(client, parsed, {
+        dryRun: opts.dryRun,
+        idempotencyKey: opts.idempotencyKey,
+        reason: opts.reason,
+      });
+      writeJson(result);
+    })
   );
 
   const updateCmd = k
@@ -498,7 +494,7 @@ export function registerKeikkaCommands(
     .description("Update a keikka (v1.0: --status only)")
     .option("--status <s>", "New keikkaTilaId (numeric, e.g. 9 = Toimitettu)");
   addWriteFlagsToCommand(updateCmd).action(
-    async (
+    guarded(async (
       idStr: string,
       opts: {
         status?: string;
@@ -510,23 +506,19 @@ export function registerKeikkaCommands(
       if (opts.status === undefined) {
         failWith("Nothing to update: pass --status (v1.0 supports --status only)", 4);
       }
-      try {
-        const client = await getClient();
-        const result = await runKeikkaUpdate(
-          client,
-          parseId(idStr, "keikkaId"),
-          { status: opts.status },
-          {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          }
-        );
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      const result = await runKeikkaUpdate(
+        client,
+        parseId(idStr, "keikkaId"),
+        { status: opts.status },
+        {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        }
+      );
+      writeJson(result);
+    })
   );
 
   const drivers = k.command("drivers").description("Driver assignment commands");
@@ -534,26 +526,9 @@ export function registerKeikkaCommands(
     .command("assign <keikkaId>")
     .description("Assign the default driver to a keikka");
   addWriteFlagsToCommand(assignCmd).action(
-    async (
-      idStr: string,
-      opts: {
-        dryRun?: boolean;
-        idempotencyKey?: string;
-        reason?: string;
-      }
-    ) => {
-      try {
-        const client = await getClient();
-        const result = await runKeikkaDriversAssign(client, parseId(idStr, "keikkaId"), {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        });
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+    jsonAction(getClient, (client, idStr: string, opts: { dryRun?: boolean; idempotencyKey?: string; reason?: string; }) =>
+      runKeikkaDriversAssign(client, parseId(idStr, "keikkaId"), { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })
+    )
   );
 
   registerLogAlias(

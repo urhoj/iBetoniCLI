@@ -1,5 +1,5 @@
 import { CliError } from "../../../api/errors.js";
-import { writeJson, exitWithError } from "../../../output/json.js";
+import { writeJson } from "../../../output/json.js";
 import { parseId } from "../../../targets.js";
 import { guarded } from "../../_shared/action.js";
 const STATUSES = ["open", "resolved", "all"];
@@ -129,27 +129,22 @@ export function registerMessageSupportCommands(parent, getClient) {
         // client-side --dry-run (the /support routes have no server X-Dry-Run guard); no
         // audit headers — contact persists no reason and ensureSupportThread is idempotent.
         .option("--dry-run", "Print the payload without sending (client-side)")
-        .action(async (opts) => {
-        try {
-            // Number-coerced flags turn "abc" into NaN (which is !== undefined), so a
-            // bare presence check would skip this guard and fire a misleading downstream
-            // error. Gate on finiteness instead. (run* keeps its own guard as defence.)
-            const contextId = Number.isFinite(opts.keikka) ? opts.keikka : opts.tarjous;
-            if (!Number.isFinite(contextId)) {
-                throw new CliError("Provide --keikka or --tarjous (positive integer)", 400, null, 4);
-            }
-            const contextType = Number.isFinite(opts.keikka) ? "keikka" : "pumppuRequest";
-            writeJson(await runSupportContact(await getClient(), {
-                contextType,
-                contextId: contextId,
-                body: opts.body,
-                dryRun: opts.dryRun,
-            }));
+        .action(guarded(async (opts) => {
+        // Number-coerced flags turn "abc" into NaN (which is !== undefined), so a
+        // bare presence check would skip this guard and fire a misleading downstream
+        // error. Gate on finiteness instead. (run* keeps its own guard as defence.)
+        const contextId = Number.isFinite(opts.keikka) ? opts.keikka : opts.tarjous;
+        if (!Number.isFinite(contextId)) {
+            throw new CliError("Provide --keikka or --tarjous (positive integer)", 400, null, 4);
         }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const contextType = Number.isFinite(opts.keikka) ? "keikka" : "pumppuRequest";
+        writeJson(await runSupportContact(await getClient(), {
+            contextType,
+            contextId: contextId,
+            body: opts.body,
+            dryRun: opts.dryRun,
+        }));
+    }));
     support
         .command("resolve <threadId>")
         .description("Mark a support thread resolved, or --reopen it (developer-only; a write). --dry-run previews the body client-side.")

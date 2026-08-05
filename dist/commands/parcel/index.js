@@ -1,4 +1,5 @@
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
+import { guarded } from "../_shared/action.js";
 /** Distinct primary sources the caller supplied (exactly one allowed). */
 function selectedSources(opts) {
     const sources = [];
@@ -52,7 +53,7 @@ export function registerParcelCommands(parent, getClient) {
         .option("--lng <n>", "Longitude (WGS84) — pair with --lat", Number)
         .option("--address <s>", "Street address to geocode")
         .option("--with-buildings", "Also count buildings on the parcel (national Ryhti; permit-based, best-effort)")
-        .action(async (opts) => {
+        .action(guarded(async (opts) => {
         const sources = selectedSources(opts);
         if (sources.length === 0) {
             failWith("provide exactly one of: --kiinteistotunnus, --sijainti, --worksite, --lat+--lng, or --address", 4);
@@ -68,13 +69,8 @@ export function registerParcelCommands(parent, getClient) {
             opts.worksite !== opts.tyomaa) {
             failWith("--worksite and --tyomaa disagree; pass only one", 4);
         }
-        try {
-            const client = await getClient();
-            writeJson(await runParcelLookup(client, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        writeJson(await runParcelLookup(client, opts));
+    }));
 }
 //# sourceMappingURL=index.js.map

@@ -1,7 +1,8 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
+import { guarded } from "../_shared/action.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { CliError } from "../../api/errors.js";
 
@@ -73,40 +74,36 @@ export function registerValidateCommands(
     .option("--profile <p>", "Profile id (company: jerry|betoni; person: onboarding [default])")
     .option("--keikka <id>", "Validate this keikka against the reminders-drawer rules (alias of ib keikka validate <id>)", Number)
     .action(
-      async (action: string | undefined, opts: { asiakas?: number; person?: number; profile?: string; keikka?: number }) => {
-        try {
-          const client = await getClient();
-          if (opts.keikka != null) {
-            const { runKeikkaValidate } = await import("../keikka/index.js");
-            writeJson(await runKeikkaValidate(client, { keikkaId: opts.keikka }));
-            return;
-          }
-          if (action === "list") {
-            writeJson(await runValidateProfiles(client));
-            return;
-          }
-          const asiakasId =
-            opts.asiakas ??
-            decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId ??
-            failWith("could not resolve asiakasId from the active token — pass --asiakas <id>", 4);
-          if (opts.person != null) {
-            writeJson(
-              await runValidatePerson(client, opts.profile ?? "onboarding", asiakasId, opts.person)
-            );
-            return;
-          }
-          if (!opts.profile) {
-            throw new CliError(
-              "Company validation needs --profile (jerry | betoni). Run `ib validate list` to see profiles.",
-              0,
-              null,
-              4
-            );
-          }
-          writeJson(await runValidateCompany(client, opts.profile, asiakasId));
-        } catch (e) {
-          exitWithError(e);
+      guarded(async (action: string | undefined, opts: { asiakas?: number; person?: number; profile?: string; keikka?: number }) => {
+        const client = await getClient();
+        if (opts.keikka != null) {
+          const { runKeikkaValidate } = await import("../keikka/index.js");
+          writeJson(await runKeikkaValidate(client, { keikkaId: opts.keikka }));
+          return;
         }
-      }
+        if (action === "list") {
+          writeJson(await runValidateProfiles(client));
+          return;
+        }
+        const asiakasId =
+          opts.asiakas ??
+          decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId ??
+          failWith("could not resolve asiakasId from the active token — pass --asiakas <id>", 4);
+        if (opts.person != null) {
+          writeJson(
+            await runValidatePerson(client, opts.profile ?? "onboarding", asiakasId, opts.person)
+          );
+          return;
+        }
+        if (!opts.profile) {
+          throw new CliError(
+            "Company validation needs --profile (jerry | betoni). Run `ib validate list` to see profiles.",
+            0,
+            null,
+            4
+          );
+        }
+        writeJson(await runValidateCompany(client, opts.profile, asiakasId));
+      })
     );
 }

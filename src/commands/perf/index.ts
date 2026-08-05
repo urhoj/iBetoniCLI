@@ -11,8 +11,8 @@ import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { qs } from "../../api/query.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../api/writeFlags.js";
-import { writeJson, exitWithError } from "../../output/json.js";
-import { guarded } from "../_shared/action.js";
+import { writeJson } from "../../output/json.js";
+import { guarded, jsonAction } from "../_shared/action.js";
 
 interface RawSlow {
   procedure: string;
@@ -128,12 +128,8 @@ export function registerPerfCommands(parent: Command, getClient: () => Promise<A
     .description("Clear the slow-query buffer for one environment (developer write)")
     .option("--env <name>", "Environment buffer to clear (default: backend's current env)");
   addWriteFlagsToCommand(clear).action(
-    async (opts: { env?: string; reason?: string; idempotencyKey?: string; dryRun?: boolean }) => {
-      try {
-        writeJson(await runPerfClear(await getClient(), opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+    jsonAction(getClient, (client, opts: { env?: string; reason?: string; idempotencyKey?: string; dryRun?: boolean }) =>
+      runPerfClear(client, opts)
+    )
   );
 }

@@ -1,4 +1,5 @@
-import { writeJson, exitWithError, failWith, errorMessage } from "../../output/json.js";
+import { writeJson, failWith, errorMessage } from "../../output/json.js";
+import { guarded, jsonAction } from "../_shared/action.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../api/writeFlags.js";
 import { listEnvelope } from "../../api/envelopes.js";
 import { CliError } from "../../api/errors.js";
@@ -239,25 +240,20 @@ export function registerGlossaryCommands(program, getClient) {
     glossary
         .command("lookup [term]", { isDefault: true })
         .description("Resolve a term or synonym to its definition + related commands (exit 5 if undefined; the miss is recorded)")
-        .action(async (term) => {
+        .action(guarded(async (term) => {
         if (!term) {
             // Bare `ib glossary` with no subcommand and no term — show group help.
             glossary.outputHelp();
             return;
         }
-        try {
-            if (term.includes(",")) {
-                const terms = [...new Set(term.split(",").map((t) => t.trim()).filter(Boolean))];
-                writeJson(await runGlossaryLookupBatch(await getClient(), terms));
-            }
-            else {
-                writeJson(await runGlossaryLookup(await getClient(), term));
-            }
+        if (term.includes(",")) {
+            const terms = [...new Set(term.split(",").map((t) => t.trim()).filter(Boolean))];
+            writeJson(await runGlossaryLookupBatch(await getClient(), terms));
         }
-        catch (e) {
-            exitWithError(e);
+        else {
+            writeJson(await runGlossaryLookup(await getClient(), term));
         }
-    });
+    }));
     addNeedsReviewFlags(glossary
         .command("list")
         .description("List glossary entries; --search filters, --stalest orders least-recently-reviewed first")
@@ -265,54 +261,28 @@ export function registerGlossaryCommands(program, getClient) {
         .option("--stalest <n>", "Return up to N entries, stalest first", (v) => Number(v))
         .option("--domain <d>", "Filter to a domain (exact match)")
         .option("--related <substr>", "Filter to terms whose relatedCommands contain this substring")
-        .option("--terms-only", "Return only {term, synonyms} per entry (cheap index view; strips definitions)")).action(async (opts) => {
-        try {
-            writeJson(await runGlossaryList(await getClient(), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .option("--terms-only", "Return only {term, synonyms} per entry (cheap index view; strips definitions)")).action(jsonAction(getClient, (client, opts) => runGlossaryList(client, opts)));
     glossary
         .command("misses")
         .description("Open lookup misses ranked by frequency — the groomer's queue (developer only)")
         .option("--top <n>", "Return up to N", (v) => Number(v))
-        .action(async (opts) => {
-        try {
-            writeJson(await runGlossaryMisses(await getClient(), opts.top));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(jsonAction(getClient, (client, opts) => runGlossaryMisses(client, opts.top)));
     const dismiss = glossary
         .command("dismiss")
         .description("Dismiss an open lookup miss without defining it — junk/test terms (developer only)")
         .argument("<term>", "Missed term to dismiss (as listed by `ib glossary misses`)");
-    addWriteFlagsToCommand(dismiss).action(async (term, opts) => {
-        try {
-            writeJson(await runGlossaryDismiss(await getClient(), term, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+    addWriteFlagsToCommand(dismiss).action(jsonAction(getClient, (client, term, opts) => runGlossaryDismiss(client, term, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })));
     glossary
         .command("lint")
         .description("Audit entries: dead relatedCommands, near-duplicate terms, empty fields (developer only)")
         .option("--strict", "Exit 1 if any warn-level finding exists (for CI)")
         .option("--suggest-related", "Also suggest candidate relatedCommands: specs mentioning a term/synonym/entity but not yet linked (info-level, fb#110)")
-        .action(async (opts) => {
-        try {
-            const res = await runGlossaryLint(await getClient(), { suggestRelated: opts.suggestRelated });
-            writeJson(res);
-            if (opts.strict && res.items.some((f) => f.severity === "warn"))
-                process.exitCode = 1;
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const res = await runGlossaryLint(await getClient(), { suggestRelated: opts.suggestRelated });
+        writeJson(res);
+        if (opts.strict && res.items.some((f) => f.severity === "warn"))
+            process.exitCode = 1;
+    }));
     const set = glossary
         .command("set")
         .description("Create/update a glossary entry — creates the term if absent (upsert), pass --update-only to require it exists. PARTIAL: only fields you pass change; omit to keep, \"\" to clear (developer only)")
@@ -327,7 +297,7 @@ export function registerGlossaryCommands(program, getClient) {
         .option("--add-synonyms <list>", "Comma-separated synonyms to ADD (no full resend; excl. --synonyms)")
         .option("--remove-synonyms <list>", "Comma-separated synonyms to REMOVE by name (excl. --synonyms)")
         .option("--append-definition <text>", "Append a clause to the current definition (excl. --definition)");
-    addWriteFlagsToCommand(addAssessWriteFlags(set)).action(async (term, opts) => {
+    addWriteFlagsToCommand(addAssessWriteFlags(set)).action(guarded(async (term, opts) => {
         const flagFields = {
             definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity, domain: opts.domain,
             aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview,
@@ -347,22 +317,17 @@ export function registerGlossaryCommands(program, getClient) {
         // now supply aiConfidence, and an out-of-range value there deserves the
         // same client-side exit 4 as a bad flag (fb#298).
         assertAiConfidence(merged.aiConfidence);
-        try {
-            writeJson(await runGlossarySet(await getClient(), term, { definition: merged.definition, synonyms: merged.synonyms, related: merged.related, entity: merged.entity, domain: merged.domain,
-                addSynonyms: opts.addSynonyms, removeSynonyms: opts.removeSynonyms, appendDefinition: opts.appendDefinition,
-                updateOnly: opts.updateOnly, aiConfidence: merged.aiConfidence, needsHumanReview: merged.needsHumanReview }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        writeJson(await runGlossarySet(await getClient(), term, { definition: merged.definition, synonyms: merged.synonyms, related: merged.related, entity: merged.entity, domain: merged.domain,
+            addSynonyms: opts.addSynonyms, removeSynonyms: opts.removeSynonyms, appendDefinition: opts.appendDefinition,
+            updateOnly: opts.updateOnly, aiConfidence: merged.aiConfidence, needsHumanReview: merged.needsHumanReview }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
+    }));
     const imp = glossary
         .command("import")
         .description("Bulk create/update entries from a JSON array file (developer only). Avoids shell argv mangling of Finnish ä/ö.")
         .argument("<file>", "JSON array file of {term, definition, synonyms?, related?, entity?} (or - for stdin)");
     addWriteFlagsToCommand(imp)
         .option("--update-only", "Only update existing terms; never insert")
-        .action(async (file, opts) => {
+        .action(guarded(async (file, opts) => {
         let arr;
         try {
             arr = readJsonInput(file);
@@ -373,24 +338,12 @@ export function registerGlossaryCommands(program, getClient) {
         if (!Array.isArray(arr)) {
             failWith("import: JSON root must be an array", 4);
         }
-        try {
-            writeJson(await runGlossaryImport(await getClient(), arr, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason, updateOnly: opts.updateOnly }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        writeJson(await runGlossaryImport(await getClient(), arr, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason, updateOnly: opts.updateOnly }));
+    }));
     const del = glossary
         .command("delete")
         .description("Delete a glossary entry (developer only)")
         .argument("<term>", "Canonical term");
-    addWriteFlagsToCommand(del).action(async (term, opts) => {
-        try {
-            writeJson(await runGlossaryDelete(await getClient(), term, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+    addWriteFlagsToCommand(del).action(jsonAction(getClient, (client, term, opts) => runGlossaryDelete(client, term, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })));
 }
 //# sourceMappingURL=index.js.map

@@ -1,7 +1,7 @@
 import { qs } from "../../api/query.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../api/writeFlags.js";
-import { writeJson, exitWithError } from "../../output/json.js";
-import { guarded } from "../_shared/action.js";
+import { writeJson } from "../../output/json.js";
+import { guarded, jsonAction } from "../_shared/action.js";
 /** GET recent slow queries → ListEnvelope. `truncated` when the page filled the limit. */
 export async function runPerfSlow(client, opts) {
     const res = await client.get(`/api/admin/slow-queries${qs({ limit: opts.limit, env: opts.env })}`);
@@ -76,13 +76,6 @@ export function registerPerfCommands(parent, getClient, opts = {}) {
         .command("clear")
         .description("Clear the slow-query buffer for one environment (developer write)")
         .option("--env <name>", "Environment buffer to clear (default: backend's current env)");
-    addWriteFlagsToCommand(clear).action(async (opts) => {
-        try {
-            writeJson(await runPerfClear(await getClient(), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+    addWriteFlagsToCommand(clear).action(jsonAction(getClient, (client, opts) => runPerfClear(client, opts)));
 }
 //# sourceMappingURL=index.js.map

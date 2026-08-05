@@ -1,6 +1,7 @@
 import { listEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith, failUsage } from "../../output/json.js";
+import { writeJson, failWith, failUsage } from "../../output/json.js";
+import { guarded, jsonAction } from "../_shared/action.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "../../assess.js";
 import { lineDiff } from "../../textDiff.js";
@@ -220,19 +221,14 @@ export function registerOhjeCommands(parent, getClient) {
         .description("UI help-text content (the helps table behind HelperIcon) — end-user help, NOT `ib --help`");
     o.command("get <helpId>")
         .description("Get one UI help entry by helpId (GET /api/helps/get/:helpId)")
-        .action(async (helpId) => {
+        .action(guarded(async (helpId) => {
         if (!isValidHelpId(helpId)) {
             failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
         }
-        try {
-            const client = await getClient();
-            const result = await runOhjeGet(client, helpId);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        const result = await runOhjeGet(client, helpId);
+        writeJson(result);
+    }));
     addNeedsReviewFlags(o.command("list")
         .description("List every UI help entry (GET /api/helps/getAll). Reads are public. The full " +
         "table is large (~115 KB), so use the client-side shapers to keep output small: " +
@@ -242,16 +238,7 @@ export function registerOhjeCommands(parent, getClient) {
         .option("--empty-shorttext", "Only rows whose shorttext is blank (grooming backfill targets)")
         .option("--fields <cols>", "Comma-separated columns to keep, e.g. helpId,title,shorttext,accessCount (drops the large htmltext)", (v) => v.split(",").map((s) => s.trim()).filter(Boolean))
         .option("--sort <field:dir>", "Sort by a column, e.g. accessCount:desc (numeric fields compare numerically)"))
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            const result = await runOhjeList(client, opts);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(jsonAction(getClient, (client, opts) => runOhjeList(client, opts)));
     const updateCmd = o
         .command("update <helpId>")
         .description("Update a UI help entry (PUT /api/helps/update). GET-merges the current row " +
@@ -272,7 +259,7 @@ export function registerOhjeCommands(parent, getClient) {
         .option("--append <text>", "Edit mode: append text to the target field (verbatim)")
         .option("--prepend <text>", "Edit mode: prepend text to the target field (verbatim)")
         .option("--all", "With --replace: substitute every occurrence");
-    addWriteFlagsToCommand(addAssessWriteFlags(updateCmd)).action(async (helpId, opts) => {
+    addWriteFlagsToCommand(addAssessWriteFlags(updateCmd)).action(guarded(async (helpId, opts) => {
         if (!isValidHelpId(helpId)) {
             failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
         }
@@ -297,13 +284,8 @@ export function registerOhjeCommands(parent, getClient) {
             if (!opts.dryRun && !opts.reason)
                 failWith("Missing required flag: --reason", 4);
             assertAiConfidence(opts.aiConfidence);
-            try {
-                const client = await getClient();
-                writeJson(await runOhjeEditField(client, helpId, field, editOp, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }, { aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }));
-            }
-            catch (e) {
-                exitWithError(e);
-            }
+            const client = await getClient();
+            writeJson(await runOhjeEditField(client, helpId, field, editOp, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }, { aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }));
             return;
         }
         assertAiConfidence(opts.aiConfidence);
@@ -312,20 +294,15 @@ export function registerOhjeCommands(parent, getClient) {
         if (!opts.dryRun && !opts.reason) {
             failWith("Missing required flag: --reason", 4);
         }
-        try {
-            const client = await getClient();
-            const fields = buildOhjeFields(opts);
-            const result = await runOhjeUpdate(client, helpId, fields, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            }, { mustExist: opts.mustExist }, { aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview });
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        const fields = buildOhjeFields(opts);
+        const result = await runOhjeUpdate(client, helpId, fields, {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+        }, { mustExist: opts.mustExist }, { aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview });
+        writeJson(result);
+    }));
     const deleteCmd = o
         .command("delete <helpId>")
         .description("Delete a UI help entry (DELETE /api/helps/delete/:helpId). Removes orphan " +
@@ -334,23 +311,18 @@ export function registerOhjeCommands(parent, getClient) {
         "--dry-run previews the row that WOULD be deleted CLIENT-SIDE without issuing the " +
         "DELETE (works before the backend route deploys). Idempotent: a missing row " +
         "returns deleted:false. Requires isHelperEditor or system-admin/developer.");
-    addWriteFlagsToCommand(deleteCmd).action(async (helpId, opts) => {
+    addWriteFlagsToCommand(deleteCmd).action(guarded(async (helpId, opts) => {
         if (!isValidHelpId(helpId)) {
             failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
         }
         if (!opts.dryRun && !opts.reason)
             failWith("Missing required flag: --reason", 4);
-        try {
-            const client = await getClient();
-            writeJson(await runOhjeDelete(client, helpId, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        writeJson(await runOhjeDelete(client, helpId, {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+        }));
+    }));
 }
 //# sourceMappingURL=index.js.map

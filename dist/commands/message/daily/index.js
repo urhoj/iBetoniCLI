@@ -1,9 +1,9 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith } from "../../../output/json.js";
+import { writeJson, failWith } from "../../../output/json.js";
 import { resolveDate } from "../../../dates.js";
 import { resolveAsiakasTarget } from "../../customer/index.js";
 import { parseId, addAsiakasTargetOption } from "../../../targets.js";
-import { guarded } from "../../_shared/action.js";
+import { guarded, jsonAction } from "../../_shared/action.js";
 /**
  * Normalise a date flag to the backend's `YYYYMMDD` shape. Accepts
  * `today`/`yesterday`/`tomorrow` and `YYYY-MM-DD` (via {@link resolveDate}),
@@ -223,34 +223,21 @@ export function registerMessageDailyCommands(parent, getClient) {
         .description("Write or clear a box's message for a date (the core daily-message write)")
         .requiredOption("--date <date>", "Date the message applies to (YYYYMMDD | YYYY-MM-DD | today)")
         .option("--message <text>", "Message text to store")
-        .option("--clear", "Clear the message for the date (mutually exclusive with --message)")).action(async (boxIdStr, opts) => {
+        .option("--clear", "Clear the message for the date (mutually exclusive with --message)")).action(guarded(async (boxIdStr, opts) => {
         if (opts.clear && opts.message !== undefined) {
             failWith("Pass either --message or --clear, not both", 4);
         }
         if (!opts.clear && opts.message === undefined) {
             failWith("Provide --message <text> (or --clear to empty the day)", 4);
         }
-        try {
-            const client = await getClient();
-            writeJson(await runDailySetMessage(client, { boxId: parseId(boxIdStr, "boxId"), message: opts.clear ? null : opts.message ?? null, yyyymmdd: toYyyymmdd(opts.date) }, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        writeJson(await runDailySetMessage(client, { boxId: parseId(boxIdStr, "boxId"), message: opts.clear ? null : opts.message ?? null, yyyymmdd: toYyyymmdd(opts.date) }, opts));
+    }));
     addWriteFlagsToCommand(d
         .command("save <boxId>")
         .description("Rename a box / edit its lisätieto (box metadata, not message content)")
         .requiredOption("--title <text>", "New box title")
-        .option("--lisatieto <text>", "Optional sub-text shown under the title")).action(async (boxIdStr, opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runDailySaveBox(client, { boxId: parseId(boxIdStr, "boxId"), boxTitle: opts.title, boxLisatieto: opts.lisatieto ?? null }, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .option("--lisatieto <text>", "Optional sub-text shown under the title")).action(jsonAction(getClient, (client, boxIdStr, opts) => runDailySaveBox(client, { boxId: parseId(boxIdStr, "boxId"), boxTitle: opts.title, boxLisatieto: opts.lisatieto ?? null }, opts)));
     // box lifecycle ────────────────────────────────────────────────────────────────
     addWriteFlagsToCommand(d
         .command("add [asiakasId]")
@@ -258,23 +245,18 @@ export function registerMessageDailyCommands(parent, getClient) {
         .option("--asiakas <id>", "Owner asiakasId (alias for the positional)", Number)
         .option("--date <date>", "Date the box is for (default 00000000 = undated default box)")
         .option("--title <text>", "Box title")
-        .option("--init", "Use /box/initialize: the caller's OWN company's first box (no asiakasId)")).action(async (idStr, opts) => {
-        try {
-            const client = await getClient();
-            let ownerAsiakasId;
-            if (!opts.init)
-                ownerAsiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
-            writeJson(await runDailyAddBox(client, {
-                init: !!opts.init,
-                ownerAsiakasId,
-                yyyymmdd: opts.date ? toYyyymmdd(opts.date) : undefined,
-                boxTitle: opts.title,
-            }, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .option("--init", "Use /box/initialize: the caller's OWN company's first box (no asiakasId)")).action(guarded(async (idStr, opts) => {
+        const client = await getClient();
+        let ownerAsiakasId;
+        if (!opts.init)
+            ownerAsiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
+        writeJson(await runDailyAddBox(client, {
+            init: !!opts.init,
+            ownerAsiakasId,
+            yyyymmdd: opts.date ? toYyyymmdd(opts.date) : undefined,
+            boxTitle: opts.title,
+        }, opts));
+    }));
     addWriteFlagsToCommand(d.command("delete <boxId>").description("Delete a daily box (and its messages) for all companies")).action(guarded(async (boxIdStr, opts) => {
         const client = await getClient();
         writeJson(await runDailyDeleteBox(client, parseId(boxIdStr, "boxId"), opts));
@@ -298,20 +280,15 @@ export function registerMessageDailyCommands(parent, getClient) {
         .description("Add a per-role ACL row on a shared box (defaults read-only; set access via perm-set)")
         .requiredOption("--to <asiakasId>", "Tenant the role belongs to", Number)
         .requiredOption("--role <typeId>", "asiakasPersonSettingTypeId the rule applies to", Number)
-        .requiredOption("--box-asiakas <id>", "dailyMessageBoxAsiakasId of the share row", Number)).action(async (boxIdStr, opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runDailyGrant(client, {
-                boxId: parseId(boxIdStr, "boxId"),
-                asiakasId: opts.to,
-                asiakasPersonSettingTypeId: opts.role,
-                dailyMessageBoxAsiakasId: opts.boxAsiakas,
-            }, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .requiredOption("--box-asiakas <id>", "dailyMessageBoxAsiakasId of the share row", Number)).action(guarded(async (boxIdStr, opts) => {
+        const client = await getClient();
+        writeJson(await runDailyGrant(client, {
+            boxId: parseId(boxIdStr, "boxId"),
+            asiakasId: opts.to,
+            asiakasPersonSettingTypeId: opts.role,
+            dailyMessageBoxAsiakasId: opts.boxAsiakas,
+        }, opts));
+    }));
     addWriteFlagsToCommand(d
         .command("revoke <dailyMessageBoxAsiakasPermissionsId>")
         .description("Remove a per-role ACL row (by dailyMessageBoxAsiakasPermissionsId)")).action(guarded(async (idStr, opts) => {
@@ -322,22 +299,17 @@ export function registerMessageDailyCommands(parent, getClient) {
         .command("perm-set <dailyMessageBoxAsiakasPermissionsId>")
         .description("Set a permission row's role + access (read|edit)")
         .requiredOption("--role <typeId>", "asiakasPersonSettingTypeId", Number)
-        .requiredOption("--access <mode>", "read = read-only, edit = read/write")).action(async (idStr, opts) => {
+        .requiredOption("--access <mode>", "read = read-only, edit = read/write")).action(guarded(async (idStr, opts) => {
         if (opts.access !== "read" && opts.access !== "edit") {
             failWith('--access must be "read" or "edit"', 4);
         }
-        try {
-            const client = await getClient();
-            writeJson(await runDailyPermSet(client, {
-                dailyMessageBoxAsiakasPermissionsId: parseId(idStr, "permissionId"),
-                asiakasPersonSettingTypeId: opts.role,
-                readOnly: opts.access === "read",
-            }, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        writeJson(await runDailyPermSet(client, {
+            dailyMessageBoxAsiakasPermissionsId: parseId(idStr, "permissionId"),
+            asiakasPersonSettingTypeId: opts.role,
+            readOnly: opts.access === "read",
+        }, opts));
+    }));
 }
 // ─── CommandSpecs (co-located: one source of truth for this sub-group). ───────
 // Spread into COMMAND_SPECS in reference/specs.ts; `registerMessageDailyCommands`

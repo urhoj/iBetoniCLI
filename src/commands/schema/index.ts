@@ -1,7 +1,8 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
+import { guarded, jsonAction } from "../_shared/action.js";
 import { CliError } from "../../api/errors.js";
 import { qs } from "../../api/query.js";
 import { cappedInt } from "../../targets.js";
@@ -83,46 +84,23 @@ export function registerSchemaCommands(
       .option("--search <substr>", "Filter object names by substring")
       .option("--limit <n>", "Max rows (default 200, max 1000)", cappedInt(1000));
 
-  const runList =
-    (fn: (c: ApiClient, o: SchemaListFilter) => Promise<Envelope>) =>
-    async (opts: SchemaListFilter) => {
-      try {
-        writeJson(await fn(await getClient(), opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    };
-
   // Single object by default; a comma in <name> switches to batch mode
   // (`ib dev schema proc a,b,c`) — parallel fan-out, deduped, 404-tolerant.
-  const runOneOrBatch =
-    (fn: (c: ApiClient, name: string) => Promise<Record_>) => async (name: string) => {
-      try {
-        const client = await getClient();
-        if (name.includes(",")) {
-          const names = [...new Set(name.split(",").map((n) => n.trim()).filter(Boolean))];
-          writeJson(await runSchemaBatch(client, fn, names));
-        } else {
-          writeJson(await fn(client, name));
-        }
-      } catch (e) {
-        exitWithError(e);
+  const runOneOrBatch = (fn: (c: ApiClient, name: string) => Promise<Record_>) =>
+    guarded(async (name: string) => {
+      const client = await getClient();
+      if (name.includes(",")) {
+        const names = [...new Set(name.split(",").map((n) => n.trim()).filter(Boolean))];
+        writeJson(await runSchemaBatch(client, fn, names));
+      } else {
+        writeJson(await fn(client, name));
       }
-    };
+    });
 
-  const runZero =
-    (fn: (c: ApiClient) => Promise<Record_>) => async () => {
-      try {
-        writeJson(await fn(await getClient()));
-      } catch (e) {
-        exitWithError(e);
-      }
-    };
-
-  listOpt(s.command("tables").description("List dbo tables")).action(runList(runSchemaTables));
-  listOpt(s.command("views").description("List dbo views")).action(runList(runSchemaViews));
+  listOpt(s.command("tables").description("List dbo tables")).action(jsonAction(getClient, runSchemaTables));
+  listOpt(s.command("views").description("List dbo views")).action(jsonAction(getClient, runSchemaViews));
   listOpt(s.command("procs").description("List dbo stored procedures and functions")).action(
-    runList(runSchemaProcs)
+    jsonAction(getClient, runSchemaProcs)
   );
 
   s.command("table <name>")
@@ -137,5 +115,5 @@ export function registerSchemaCommands(
 
   s.command("dump")
     .description("Structural map of the whole schema (no proc/view bodies)")
-    .action(runZero(runSchemaDump));
+    .action(jsonAction(getClient, runSchemaDump));
 }

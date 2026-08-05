@@ -1,6 +1,6 @@
 import { toListEnvelope } from "../../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith } from "../../../output/json.js";
+import { writeJson, failWith } from "../../../output/json.js";
 import { resolveDate, todayHelsinki } from "../../../dates.js";
 import { guarded } from "../../_shared/action.js";
 /** Priority levels the board UI renders (info=primary, warning=warning, urgent=error). */
@@ -176,19 +176,14 @@ export function registerMessageBoardCommands(parent, getClient) {
         .description("List notices ACTIVE on a day (GET /api/ilmoitustaulu). Any company member. " +
         "--date takes today|yesterday|tomorrow or YYYYMMDD (defaults to today).")
         .option("--date <d>", "Day to query: today|yesterday|tomorrow|YYYYMMDD (default today)")
-        .action(async (opts) => {
+        .action(guarded(async (opts) => {
         const date = toBoardQueryDate(opts.date);
         if (!date) {
             failWith(`Invalid --date "${opts.date}" — use today|yesterday|tomorrow or YYYYMMDD`, 4);
         }
-        try {
-            const client = await getClient();
-            writeJson(await runBoardList(client, date));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        writeJson(await runBoardList(client, date));
+    }));
     b.command("all")
         .description("List EVERY notice incl. expired/scheduled (GET /api/ilmoitustaulu/all). " +
         "Requires isAsiakasAdmin/isAsiakasEditor or isIlmoitustauluEditor.")
@@ -199,19 +194,14 @@ export function registerMessageBoardCommands(parent, getClient) {
     b.command("get <messageId>")
         .description("Get one notice by id (no single-GET route — filtered client-side over /all, " +
         "so it needs the same admin/editor access). Unknown id → exit 5.")
-        .action(async (raw) => {
+        .action(guarded(async (raw) => {
         const messageId = parseMessageId(raw);
-        try {
-            const client = await getClient();
-            const row = await runBoardGet(client, messageId);
-            if (!row)
-                failWith(`No board message with id ${messageId}`, 5);
-            writeJson(row);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        const row = await runBoardGet(client, messageId);
+        if (!row)
+            failWith(`No board message with id ${messageId}`, 5);
+        writeJson(row);
+    }));
     const createCmd = b
         .command("create")
         .description("Create a notice (POST /api/ilmoitustaulu). --title, --text and --start-date " +
@@ -223,25 +213,20 @@ export function registerMessageBoardCommands(parent, getClient) {
         .option("--priority <p>", `Priority: ${PRIORITIES.join("|")} (default info)`)
         .option("--start-date <d>", "Day the notice becomes visible: today|YYYY-MM-DD")
         .option("--expires-at <d>", "Last day visible: YYYY-MM-DD (omit = never expires)");
-    addWriteFlagsToCommand(createCmd).action(async (opts) => {
+    addWriteFlagsToCommand(createCmd).action(guarded(async (opts) => {
         if (!opts.dryRun && !opts.reason)
             failWith("Missing required flag: --reason", 4);
         if (!opts.startDate)
             failWith("Missing required flag: --start-date", 4);
         assertPriority(opts.priority);
-        try {
-            const client = await getClient();
-            const fields = buildBoardFields(opts);
-            writeJson(await runBoardCreate(client, fields, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        const fields = buildBoardFields(opts);
+        writeJson(await runBoardCreate(client, fields, {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+        }));
+    }));
     const updateCmd = b
         .command("update <messageId>")
         .description("Update a notice (PUT /api/ilmoitustaulu/:messageId). GET-merges the current " +
@@ -253,45 +238,35 @@ export function registerMessageBoardCommands(parent, getClient) {
         .option("--priority <p>", `Priority: ${PRIORITIES.join("|")}`)
         .option("--start-date <d>", "Day the notice becomes visible: today|YYYY-MM-DD")
         .option("--expires-at <d>", 'Last day visible: YYYY-MM-DD (pass "" to clear the expiry)');
-    addWriteFlagsToCommand(updateCmd).action(async (raw, opts) => {
+    addWriteFlagsToCommand(updateCmd).action(guarded(async (raw, opts) => {
         const messageId = parseMessageId(raw);
         if (!opts.dryRun && !opts.reason)
             failWith("Missing required flag: --reason", 4);
         assertPriority(opts.priority);
-        try {
-            const client = await getClient();
-            const fields = buildBoardFields(opts);
-            writeJson(await runBoardUpdate(client, messageId, fields, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        const fields = buildBoardFields(opts);
+        writeJson(await runBoardUpdate(client, messageId, fields, {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+        }));
+    }));
     const deleteCmd = b
         .command("delete <messageId>")
         .description("Delete a notice (DELETE /api/ilmoitustaulu/:messageId). --reason required. " +
         "--dry-run previews what would be deleted CLIENT-SIDE without writing. " +
         "Admins delete any row; editors only their own.");
-    addWriteFlagsToCommand(deleteCmd).action(async (raw, opts) => {
+    addWriteFlagsToCommand(deleteCmd).action(guarded(async (raw, opts) => {
         const messageId = parseMessageId(raw);
         if (!opts.dryRun && !opts.reason)
             failWith("Missing required flag: --reason", 4);
-        try {
-            const client = await getClient();
-            writeJson(await runBoardDelete(client, messageId, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        writeJson(await runBoardDelete(client, messageId, {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+        }));
+    }));
 }
 // ─── CommandSpecs (co-located: one source of truth for this sub-group). ───────
 // Spread into COMMAND_SPECS in reference/specs.ts; `registerMessageBoardCommands`

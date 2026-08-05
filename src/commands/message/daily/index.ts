@@ -6,11 +6,11 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith } from "../../../output/json.js";
+import { writeJson, failWith } from "../../../output/json.js";
 import { resolveDate } from "../../../dates.js";
 import { resolveAsiakasTarget } from "../../customer/index.js";
 import { parseId, addAsiakasTargetOption } from "../../../targets.js";
-import { guarded } from "../../_shared/action.js";
+import { guarded, jsonAction } from "../../_shared/action.js";
 
 type Row = Record<string, unknown>;
 
@@ -329,7 +329,7 @@ export function registerMessageDailyCommands(
       .option("--message <text>", "Message text to store")
       .option("--clear", "Clear the message for the date (mutually exclusive with --message)")
   ).action(
-    async (
+    guarded(async (
       boxIdStr: string,
       opts: { date: string; message?: string; clear?: boolean } & WriteFlags
     ) => {
@@ -339,19 +339,15 @@ export function registerMessageDailyCommands(
       if (!opts.clear && opts.message === undefined) {
         failWith("Provide --message <text> (or --clear to empty the day)", 4);
       }
-      try {
-        const client = await getClient();
-        writeJson(
-          await runDailySetMessage(
-            client,
-            { boxId: parseId(boxIdStr, "boxId"), message: opts.clear ? null : opts.message ?? null, yyyymmdd: toYyyymmdd(opts.date) },
-            opts
-          )
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      writeJson(
+        await runDailySetMessage(
+          client,
+          { boxId: parseId(boxIdStr, "boxId"), message: opts.clear ? null : opts.message ?? null, yyyymmdd: toYyyymmdd(opts.date) },
+          opts
+        )
+      );
+    })
   );
 
   addWriteFlagsToCommand(
@@ -361,20 +357,9 @@ export function registerMessageDailyCommands(
       .requiredOption("--title <text>", "New box title")
       .option("--lisatieto <text>", "Optional sub-text shown under the title")
   ).action(
-    async (boxIdStr: string, opts: { title: string; lisatieto?: string } & WriteFlags) => {
-      try {
-        const client = await getClient();
-        writeJson(
-          await runDailySaveBox(
-            client,
-            { boxId: parseId(boxIdStr, "boxId"), boxTitle: opts.title, boxLisatieto: opts.lisatieto ?? null },
-            opts
-          )
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+    jsonAction(getClient, (client, boxIdStr: string, opts: { title: string; lisatieto?: string } & WriteFlags) =>
+      runDailySaveBox(client, { boxId: parseId(boxIdStr, "boxId"), boxTitle: opts.title, boxLisatieto: opts.lisatieto ?? null }, opts)
+    )
   );
 
   // box lifecycle ────────────────────────────────────────────────────────────────
@@ -387,30 +372,26 @@ export function registerMessageDailyCommands(
       .option("--title <text>", "Box title")
       .option("--init", "Use /box/initialize: the caller's OWN company's first box (no asiakasId)")
   ).action(
-    async (
+    guarded(async (
       idStr: string | undefined,
       opts: { asiakas?: number; date?: string; title?: string; init?: boolean } & WriteFlags
     ) => {
-      try {
-        const client = await getClient();
-        let ownerAsiakasId: number | undefined;
-        if (!opts.init) ownerAsiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
-        writeJson(
-          await runDailyAddBox(
-            client,
-            {
-              init: !!opts.init,
-              ownerAsiakasId,
-              yyyymmdd: opts.date ? toYyyymmdd(opts.date) : undefined,
-              boxTitle: opts.title,
-            },
-            opts
-          )
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      let ownerAsiakasId: number | undefined;
+      if (!opts.init) ownerAsiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
+      writeJson(
+        await runDailyAddBox(
+          client,
+          {
+            init: !!opts.init,
+            ownerAsiakasId,
+            yyyymmdd: opts.date ? toYyyymmdd(opts.date) : undefined,
+            boxTitle: opts.title,
+          },
+          opts
+        )
+      );
+    })
   );
 
   addWriteFlagsToCommand(
@@ -454,28 +435,24 @@ export function registerMessageDailyCommands(
       .requiredOption("--role <typeId>", "asiakasPersonSettingTypeId the rule applies to", Number)
       .requiredOption("--box-asiakas <id>", "dailyMessageBoxAsiakasId of the share row", Number)
   ).action(
-    async (
+    guarded(async (
       boxIdStr: string,
       opts: { to: number; role: number; boxAsiakas: number } & WriteFlags
     ) => {
-      try {
-        const client = await getClient();
-        writeJson(
-          await runDailyGrant(
-            client,
-            {
-              boxId: parseId(boxIdStr, "boxId"),
-              asiakasId: opts.to,
-              asiakasPersonSettingTypeId: opts.role,
-              dailyMessageBoxAsiakasId: opts.boxAsiakas,
-            },
-            opts
-          )
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      writeJson(
+        await runDailyGrant(
+          client,
+          {
+            boxId: parseId(boxIdStr, "boxId"),
+            asiakasId: opts.to,
+            asiakasPersonSettingTypeId: opts.role,
+            dailyMessageBoxAsiakasId: opts.boxAsiakas,
+          },
+          opts
+        )
+      );
+    })
   );
 
   addWriteFlagsToCommand(
@@ -496,27 +473,23 @@ export function registerMessageDailyCommands(
       .requiredOption("--role <typeId>", "asiakasPersonSettingTypeId", Number)
       .requiredOption("--access <mode>", "read = read-only, edit = read/write")
   ).action(
-    async (idStr: string, opts: { role: number; access: string } & WriteFlags) => {
+    guarded(async (idStr: string, opts: { role: number; access: string } & WriteFlags) => {
       if (opts.access !== "read" && opts.access !== "edit") {
         failWith('--access must be "read" or "edit"', 4);
       }
-      try {
-        const client = await getClient();
-        writeJson(
-          await runDailyPermSet(
-            client,
-            {
-              dailyMessageBoxAsiakasPermissionsId: parseId(idStr, "permissionId"),
-              asiakasPersonSettingTypeId: opts.role,
-              readOnly: opts.access === "read",
-            },
-            opts
-          )
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      writeJson(
+        await runDailyPermSet(
+          client,
+          {
+            dailyMessageBoxAsiakasPermissionsId: parseId(idStr, "permissionId"),
+            asiakasPersonSettingTypeId: opts.role,
+            readOnly: opts.access === "read",
+          },
+          opts
+        )
+      );
+    })
   );
 }
 

@@ -1,7 +1,7 @@
 import { listEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { readJsonInput, readJsonObjectInput } from "../../api/parseBody.js";
-import { writeJson, exitWithError, failWith, failUsage, failValidation } from "../../output/json.js";
+import { writeJson, failWith, failUsage, failValidation } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { parseRefId } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
@@ -454,7 +454,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--source <s>", "Source: human|routine (default: human)")
         .option("--date <d>", "Entry date (YYYY-MM-DD|today), default today")
         .option("--language <l>", "Entry language (fi|en), default en")
-        .option("--from-json <file>", "Read the whole entry from a JSON object file (or - for stdin); explicitly-typed flags override. Shell-safe: the only way to pass prose containing double quotes on Windows PowerShell.")).action(async (description, o, cmd) => {
+        .option("--from-json <file>", "Read the whole entry from a JSON object file (or - for stdin); explicitly-typed flags override. Shell-safe: the only way to pass prose containing double quotes on Windows PowerShell.")).action(guarded(async (description, o, cmd) => {
         applyFromJson(cmd, o);
         o.type = normalizeType(o.type);
         requireAddFields(description, o);
@@ -506,13 +506,8 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         if (addLang)
             body.language = addLang;
         body.bumpLevel = o.bumpLevel || "patch";
-        try {
-            writeJson(await runChangelogAdd(await getClient(), body, o));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        writeJson(await runChangelogAdd(await getClient(), body, o));
+    }));
     c.command("list")
         .description("List change entries (filters: --month --type --area --repo --feedback --sentry --source --search --status --has-feedback --has-sentry --limit)")
         .option("--month <YYYY-MM>", "Filter to a month")
@@ -581,7 +576,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--source <s>", "Source: human|routine")
         .option("--date <d>", "Entry date (YYYY-MM-DD|today)")
         .option("--language <l>", "Entry language (fi|en)")
-        .option("--from-json <file>", "Read the patch from a JSON object file (or - for stdin); explicitly-typed flags override. Shell-safe: the only way to pass prose containing double quotes on Windows PowerShell.")).action(async (idStr, o, cmd) => {
+        .option("--from-json <file>", "Read the patch from a JSON object file (or - for stdin); explicitly-typed flags override. Shell-safe: the only way to pass prose containing double quotes on Windows PowerShell.")).action(guarded(async (idStr, o, cmd) => {
         const id = parseRefId(idStr, "changelog", "update");
         applyFromJson(cmd, o);
         if (o.type !== undefined)
@@ -637,16 +632,11 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         const updLang = normalizeLanguage(o.language);
         if (updLang)
             patch.language = updLang;
-        try {
-            const client = await getClient();
-            const result = await runWithSiblingHint(client, id, "feedback", () => runChangelogUpdate(client, id, patch, o));
-            warnIfPatchIgnored(patch, result);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        const result = await runWithSiblingHint(client, id, "feedback", () => runChangelogUpdate(client, id, patch, o));
+        warnIfPatchIgnored(patch, result);
+        writeJson(result);
+    }));
     c.command("report")
         .description("Generate the monthly report from entries (markdown or json)")
         .option("--month <YYYY-MM>", "Month to render")
@@ -677,31 +667,26 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .command("release")
         .description("Stamp unreleased entries with a version tag (marks them released). Called by scripts/apply-release-version.ps1. Use --vtag to stamp them all with one tag, or --map for precise per-entry repo@version tags.")
         .option("--vtag <v>", "Single version tag to stamp on every pending entry (e.g. 1.0.8)")
-        .option("--map <file>", "JSON file (or - for stdin): [{changelogId, versionTag}] for precise per-entry stamping")).action(async (o) => {
+        .option("--map <file>", "JSON file (or - for stdin): [{changelogId, versionTag}] for precise per-entry stamping")).action(guarded(async (o) => {
         if ((o.vtag ? 1 : 0) + (o.map ? 1 : 0) !== 1) {
             failWith("provide exactly one of --vtag or --map", 4);
         }
-        try {
-            if (o.map) {
-                let arr;
-                try {
-                    arr = readJsonInput(o.map);
-                }
-                catch {
-                    failWith("--map: not valid JSON", 4);
-                }
-                if (!Array.isArray(arr))
-                    failWith("--map: JSON root must be an array of {changelogId, versionTag}", 4);
-                writeJson(await runChangelogReleaseMap(await getClient(), arr, o));
+        if (o.map) {
+            let arr;
+            try {
+                arr = readJsonInput(o.map);
             }
-            else {
-                writeJson(await runChangelogRelease(await getClient(), o.vtag, o));
+            catch {
+                failWith("--map: not valid JSON", 4);
             }
+            if (!Array.isArray(arr))
+                failWith("--map: JSON root must be an array of {changelogId, versionTag}", 4);
+            writeJson(await runChangelogReleaseMap(await getClient(), arr, o));
         }
-        catch (e) {
-            exitWithError(e);
+        else {
+            writeJson(await runChangelogRelease(await getClient(), o.vtag, o));
         }
-    });
+    }));
 }
 export const CHANGELOG_SPECS = [
     {

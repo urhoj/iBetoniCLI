@@ -1,5 +1,5 @@
 import { listEnvelope } from "../../api/envelopes.js";
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { resolveDate } from "../../dates.js";
 import { CliError } from "../../api/errors.js";
@@ -186,43 +186,33 @@ export function registerPersonDayCommands(person, getClient) {
         .requiredOption("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)")
         .requiredOption("--status <id|name>", "personPvmStatusId or status name (see `ib person day statuses`)")
         .option("--text <s>", "Free-text note on the day row");
-    addWriteFlagsToCommand(setCmd).action(async (opts) => {
+    addWriteFlagsToCommand(setCmd).action(guarded(async (opts) => {
         if (!opts.reason) {
             failWith("Missing required flag: --reason", 4);
         }
-        try {
-            const result = await runPersonDaySet(await getClient(), opts.person, opts.date, opts.status, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-                text: opts.text,
-            });
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const result = await runPersonDaySet(await getClient(), opts.person, opts.date, opts.status, {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+            text: opts.text,
+        });
+        writeJson(result);
+    }));
     const clearCmd = day
         .command("clear")
         .description("Delete a person's day row for a date (remove status entry). Requires --reason.")
         .requiredOption("--person <id>", "personId", (s) => Number(s))
         .requiredOption("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)");
-    addWriteFlagsToCommand(clearCmd).action(async (opts) => {
+    addWriteFlagsToCommand(clearCmd).action(guarded(async (opts) => {
         if (!opts.reason) {
             failWith("Missing required flag: --reason", 4);
         }
-        try {
-            const result = await runPersonDayClear(await getClient(), opts.person, opts.date, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            });
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const result = await runPersonDayClear(await getClient(), opts.person, opts.date, {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+        });
+        writeJson(result);
+    }));
 }
 //# sourceMappingURL=day.js.map

@@ -6,7 +6,8 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith, failUsage } from "../../output/json.js";
+import { writeJson, failWith, failUsage } from "../../output/json.js";
+import { guarded, jsonAction } from "../_shared/action.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { type AssessFlags, assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "../../assess.js";
 import { lineDiff } from "../../textDiff.js";
@@ -334,18 +335,14 @@ export function registerOhjeCommands(
 
   o.command("get <helpId>")
     .description("Get one UI help entry by helpId (GET /api/helps/get/:helpId)")
-    .action(async (helpId: string) => {
+    .action(guarded(async (helpId: string) => {
       if (!isValidHelpId(helpId)) {
         failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
       }
-      try {
-        const client = await getClient();
-        const result = await runOhjeGet(client, helpId);
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      const client = await getClient();
+      const result = await runOhjeGet(client, helpId);
+      writeJson(result);
+    }));
 
   addNeedsReviewFlags(
     o.command("list")
@@ -365,22 +362,9 @@ export function registerOhjeCommands(
       .option("--sort <field:dir>", "Sort by a column, e.g. accessCount:desc (numeric fields compare numerically)")
   )
     .action(
-      async (opts: {
-        limit?: number;
-        emptyShorttext?: boolean;
-        fields?: string[];
-        sort?: string;
-        needsReview?: boolean;
-        maxConfidence?: number;
-      }) => {
-        try {
-          const client = await getClient();
-          const result = await runOhjeList(client, opts);
-          writeJson(result);
-        } catch (e) {
-          exitWithError(e);
-        }
-      }
+      jsonAction(getClient, (client, opts: { limit?: number; emptyShorttext?: boolean; fields?: string[]; sort?: string; needsReview?: boolean; maxConfidence?: number; }) =>
+        runOhjeList(client, opts)
+      )
     );
 
   const updateCmd = o
@@ -412,7 +396,7 @@ export function registerOhjeCommands(
     .option("--prepend <text>", "Edit mode: prepend text to the target field (verbatim)")
     .option("--all", "With --replace: substitute every occurrence");
   addWriteFlagsToCommand(addAssessWriteFlags(updateCmd)).action(
-    async (
+    guarded(async (
       helpId: string,
       opts: {
         body?: string;
@@ -459,18 +443,14 @@ export function registerOhjeCommands(
         const field = rawField as OhjeEditableField;
         if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
         assertAiConfidence(opts.aiConfidence);
-        try {
-          const client = await getClient();
-          writeJson(
-            await runOhjeEditField(
-              client, helpId, field, editOp,
-              { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason },
-              { aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }
-            )
-          );
-        } catch (e) {
-          exitWithError(e);
-        }
+        const client = await getClient();
+        writeJson(
+          await runOhjeEditField(
+            client, helpId, field, editOp,
+            { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason },
+            { aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }
+          )
+        );
         return;
       }
       assertAiConfidence(opts.aiConfidence);
@@ -479,26 +459,22 @@ export function registerOhjeCommands(
       if (!opts.dryRun && !opts.reason) {
         failWith("Missing required flag: --reason", 4);
       }
-      try {
-        const client = await getClient();
-        const fields = buildOhjeFields(opts);
-        const result = await runOhjeUpdate(
-          client,
-          helpId,
-          fields,
-          {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          },
-          { mustExist: opts.mustExist },
-          { aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }
-        );
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      const fields = buildOhjeFields(opts);
+      const result = await runOhjeUpdate(
+        client,
+        helpId,
+        fields,
+        {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        },
+        { mustExist: opts.mustExist },
+        { aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }
+      );
+      writeJson(result);
+    })
   );
 
   const deleteCmd = o
@@ -512,7 +488,7 @@ export function registerOhjeCommands(
         "returns deleted:false. Requires isHelperEditor or system-admin/developer."
     );
   addWriteFlagsToCommand(deleteCmd).action(
-    async (
+    guarded(async (
       helpId: string,
       opts: { dryRun?: boolean; idempotencyKey?: string; reason?: string }
     ) => {
@@ -520,18 +496,14 @@ export function registerOhjeCommands(
         failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
       }
       if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
-      try {
-        const client = await getClient();
-        writeJson(
-          await runOhjeDelete(client, helpId, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          })
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      writeJson(
+        await runOhjeDelete(client, helpId, {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        })
+      );
+    })
   );
 }

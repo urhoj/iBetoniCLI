@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { CliError, exitCodeFromStatus } from "../../api/errors.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
+import { guarded } from "../_shared/action.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { runPersonSearch } from "../person/index.js";
 /** Parse a `--data <json>` flag into a plain object (arrays/scalars rejected → exit 4). */
@@ -128,24 +129,19 @@ export function registerNotificationCommands(parent, getClient) {
         .requiredOption("--title <text>", "Notification title")
         .requiredOption("--body <text>", "Notification body")
         .option("--data <json>", "Extra FCM data payload as a JSON object", parseJsonObject);
-    addWriteFlagsToCommand(sendCmd).action(async (opts) => {
-        try {
-            const result = await runNotificationFcmSend(await getClient(), {
-                person: opts.person,
-                title: opts.title,
-                body: opts.body,
-                data: opts.data,
-            }, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            });
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+    addWriteFlagsToCommand(sendCmd).action(guarded(async (opts) => {
+        const result = await runNotificationFcmSend(await getClient(), {
+            person: opts.person,
+            title: opts.title,
+            body: opts.body,
+            data: opts.data,
+        }, {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+        });
+        writeJson(result);
+    }));
     const email = n
         .command("email")
         .description("Email channel — send an email to a person or address");
@@ -157,26 +153,21 @@ export function registerNotificationCommands(parent, getClient) {
         .option("--html <file>", "Path to an HTML file to send as the HTML body")
         .option("--html-body <html>", "Inline raw HTML body — use instead of --html for MCP/remote callers (argv-safe, no local file read)")
         .option("--from-brand <brand>", "Sender identity: betoni (default, noreply@ibetoni.fi) or betonijerry (noreply@betonijerry.fi)", "betoni");
-    addWriteFlagsToCommand(emailSend).action(async (recipient, opts) => {
-        try {
-            if (!opts.body && !opts.html && !opts.htmlBody) {
-                throw new CliError("one of --body, --html, or --html-body is required", 400, null, exitCodeFromStatus(400));
-            }
-            const brand = opts.fromBrand ?? "betoni";
-            if (brand !== "betoni" && brand !== "betonijerry") {
-                throw new CliError("--from-brand must be 'betoni' or 'betonijerry'", 400, null, exitCodeFromStatus(400));
-            }
-            const html = resolveEmailHtml({ html: opts.html, htmlBody: opts.htmlBody });
-            const result = await runNotificationEmailSend(await getClient(), { recipient, subject: opts.subject, text: opts.body, html, fromBrand: brand }, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            });
-            writeJson(result);
+    addWriteFlagsToCommand(emailSend).action(guarded(async (recipient, opts) => {
+        if (!opts.body && !opts.html && !opts.htmlBody) {
+            throw new CliError("one of --body, --html, or --html-body is required", 400, null, exitCodeFromStatus(400));
         }
-        catch (e) {
-            exitWithError(e);
+        const brand = opts.fromBrand ?? "betoni";
+        if (brand !== "betoni" && brand !== "betonijerry") {
+            throw new CliError("--from-brand must be 'betoni' or 'betonijerry'", 400, null, exitCodeFromStatus(400));
         }
-    });
+        const html = resolveEmailHtml({ html: opts.html, htmlBody: opts.htmlBody });
+        const result = await runNotificationEmailSend(await getClient(), { recipient, subject: opts.subject, text: opts.body, html, fromBrand: brand }, {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+        });
+        writeJson(result);
+    }));
 }
 //# sourceMappingURL=index.js.map

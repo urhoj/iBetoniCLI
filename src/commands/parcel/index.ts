@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
+import { guarded } from "../_shared/action.js";
 
 export interface ParcelLookupOptions {
   kiinteistotunnus?: string;
@@ -72,7 +73,7 @@ export function registerParcelCommands(
       "--with-buildings",
       "Also count buildings on the parcel (national Ryhti; permit-based, best-effort)"
     )
-    .action(async (opts: ParcelLookupOptions) => {
+    .action(guarded(async (opts: ParcelLookupOptions) => {
       const sources = selectedSources(opts);
       if (sources.length === 0) {
         failWith(
@@ -93,11 +94,7 @@ export function registerParcelCommands(
       ) {
         failWith("--worksite and --tyomaa disagree; pass only one", 4);
       }
-      try {
-        const client = await getClient();
-        writeJson(await runParcelLookup(client, opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      const client = await getClient();
+      writeJson(await runParcelLookup(client, opts));
+    }));
 }

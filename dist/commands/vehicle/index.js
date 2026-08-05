@@ -1,4 +1,4 @@
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
 import { resolveDate, todayHelsinki } from "../../dates.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
@@ -306,24 +306,19 @@ export function registerVehicleCommands(parent, getClient) {
         .option("--valid-on <date>", "Only vehicles valid on this day YYYY-MM-DD (or today/yesterday/tomorrow)")
         .option("--type <id>", "Only this vehicleTypeId", (val) => Number(val))
         .option("--asiakas <id>", "Read another company's fleet (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant). Default: active company.", (val) => Number(val))
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            const result = await runVehicleList(client, {
-                limit: opts.limit,
-                cursor: opts.cursor,
-                deleted: opts.deleted,
-                gridOnly: opts.gridOnly,
-                validOn: resolveDate(opts.validOn),
-                type: opts.type,
-                asiakas: opts.asiakas,
-            });
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        const result = await runVehicleList(client, {
+            limit: opts.limit,
+            cursor: opts.cursor,
+            deleted: opts.deleted,
+            gridOnly: opts.gridOnly,
+            validOn: resolveDate(opts.validOn),
+            type: opts.type,
+            asiakas: opts.asiakas,
+        });
+        writeJson(result);
+    }));
     v.command("get <vehicleId>")
         .description("Get a single vehicle by vehicleId")
         .option("--asiakas <id>", "Read a vehicle owned by another company (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant)", (val) => Number(val))
@@ -380,29 +375,24 @@ export function registerVehicleCommands(parent, getClient) {
         .option("--capacity <m3>", "Concrete capacity in m3 (vehicleM3)", (s) => Number(s))
         .option("--puomi <m>", "Boom length in metres (vehiclePuomi — BetoniJerry matching field)", (s) => Number(s))
         .option("--asiakas <id>", "Owning asiakasId (defaults to active company; needs a vehicle-manage role on that tenant)", (s) => Number(s));
-    addWriteFlagsToCommand(createCmd).action(async (opts) => {
-        try {
-            const result = await runVehicleCreate(await getClient(), {
-                vehicleRegNo: opts.reg,
-                vehicleNimi: opts.name,
-                vehicleNo: opts.no,
-                vehicleTypeId: opts.type,
-                memo: opts.memo,
-                defaultKuski_personId: opts.defaultDriver,
-                vehicleM3: opts.capacity,
-                vehiclePuomi: opts.puomi,
-                asiakasId: opts.asiakas,
-            }, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            });
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+    addWriteFlagsToCommand(createCmd).action(guarded(async (opts) => {
+        const result = await runVehicleCreate(await getClient(), {
+            vehicleRegNo: opts.reg,
+            vehicleNimi: opts.name,
+            vehicleNo: opts.no,
+            vehicleTypeId: opts.type,
+            memo: opts.memo,
+            defaultKuski_personId: opts.defaultDriver,
+            vehicleM3: opts.capacity,
+            vehiclePuomi: opts.puomi,
+            asiakasId: opts.asiakas,
+        }, {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+        });
+        writeJson(result);
+    }));
     const updateCmd = v
         .command("update <vehicleId>")
         .description("Update a vehicle (read-merge-write; only provided flags change).")
@@ -417,31 +407,26 @@ export function registerVehicleCommands(parent, getClient) {
         .option("--show-in-grid <bool>", "Whether the vehicle appears in the grid (true/false)", parseBoolFlag)
         .option("--first-date <date>", "Start of validity window YYYY-MM-DD (firstDate; or today/yesterday/tomorrow)")
         .option("--last-date <date>", "End of validity window YYYY-MM-DD (lastDate; or today/yesterday/tomorrow)");
-    addWriteFlagsToCommand(updateCmd).action(async (idStr, opts) => {
-        try {
-            const result = await runVehicleUpdate(await getClient(), parseId(idStr, "vehicleId"), {
-                vehicleRegNo: opts.reg,
-                vehicleNimi: opts.name,
-                vehicleNo: opts.no,
-                vehicleTypeId: opts.type,
-                memo: opts.memo,
-                vehicleM3: opts.capacity,
-                vehiclePuomi: opts.puomi,
-                asiakasId: opts.asiakas,
-                showInGrid: opts.showInGrid,
-                firstDate: resolveDate(opts.firstDate),
-                lastDate: resolveDate(opts.lastDate),
-            }, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            });
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+    addWriteFlagsToCommand(updateCmd).action(guarded(async (idStr, opts) => {
+        const result = await runVehicleUpdate(await getClient(), parseId(idStr, "vehicleId"), {
+            vehicleRegNo: opts.reg,
+            vehicleNimi: opts.name,
+            vehicleNo: opts.no,
+            vehicleTypeId: opts.type,
+            memo: opts.memo,
+            vehicleM3: opts.capacity,
+            vehiclePuomi: opts.puomi,
+            asiakasId: opts.asiakas,
+            showInGrid: opts.showInGrid,
+            firstDate: resolveDate(opts.firstDate),
+            lastDate: resolveDate(opts.lastDate),
+        }, {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+        });
+        writeJson(result);
+    }));
     const dates = v
         .command("dates")
         .description("Vehicle inspection/cert date reads");

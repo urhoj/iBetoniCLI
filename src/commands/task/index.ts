@@ -11,14 +11,14 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { CliError } from "../../api/errors.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
 import {
   addWriteFlagsToCommand,
   writeFlagsToHeaders,
   type WriteFlags,
 } from "../../api/writeFlags.js";
 import { resolveDate } from "../../dates.js";
-import { guarded } from "../_shared/action.js";
+import { guarded, jsonAction } from "../_shared/action.js";
 
 const EXECUTORS = ["human", "ai"] as const;
 type Executor = (typeof EXECUTORS)[number];
@@ -322,19 +322,9 @@ export function registerTaskCommands(
       .option("--first-due <date>", "First due date (YYYY-MM-DD or today/tomorrow); default: due immediately")
       .option("--feedback <id>", "cliFeedback id this task graduated from (provenance)", intFlag("--feedback"))
   ).action(
-    async (opts: TaskAddInput & { dryRun?: boolean; idempotencyKey?: string; reason?: string }) => {
-      try {
-        writeJson(
-          await runTaskAdd(await getClient(), opts, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          })
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+    jsonAction(getClient, (client, opts: TaskAddInput & { dryRun?: boolean; idempotencyKey?: string; reason?: string }) =>
+      runTaskAdd(client, opts, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })
+    )
   );
 
   addWriteFlagsToCommand(
@@ -345,22 +335,9 @@ export function registerTaskCommands(
       .option("--failed", "Log outcome=failed (task STAYS due)")
       .option("--agent <agent>", "claude | hermes — set when an AI completes the task")
   ).action(
-    async (
-      idStr: string,
-      opts: TaskCompleteInput & { dryRun?: boolean; idempotencyKey?: string; reason?: string }
-    ) => {
-      try {
-        writeJson(
-          await runTaskComplete(await getClient(), parseTaskId(idStr, "complete"), opts, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          })
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+    jsonAction(getClient, (client, idStr: string, opts: TaskCompleteInput & { dryRun?: boolean; idempotencyKey?: string; reason?: string }) =>
+      runTaskComplete(client, parseTaskId(idStr, "complete"), opts, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })
+    )
   );
 
   addWriteFlagsToCommand(
@@ -378,22 +355,9 @@ export function registerTaskCommands(
       .option("--activate", "Reactivate the task")
       .option("--deactivate", "Deactivate (soft-retire) the task")
   ).action(
-    async (
-      idStr: string,
-      opts: TaskSetInput & { dryRun?: boolean; idempotencyKey?: string; reason?: string }
-    ) => {
-      try {
-        writeJson(
-          await runTaskSet(await getClient(), parseTaskId(idStr, "set"), opts, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          })
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+    jsonAction(getClient, (client, idStr: string, opts: TaskSetInput & { dryRun?: boolean; idempotencyKey?: string; reason?: string }) =>
+      runTaskSet(client, parseTaskId(idStr, "set"), opts, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })
+    )
   );
 
   t.command("log <id>")

@@ -58,6 +58,7 @@ import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
 import { canonicalPath, DEV_ALIAS_DOMAINS } from "./reference/aliasPaths.js";
 import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, setActiveCommandErrors, setExitCode as setExit } from "./output/json.js";
+import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { buildValidationEnvelope, type FlagProblem } from "./output/validationEnvelope.js";
 import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, commandPath } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
@@ -272,30 +273,26 @@ export function buildProgram(): Command {
       "Drop each command's notes/seeAlso prose (keeps examples) — ~7.6k fewer tokens on the full surface; fetch the dropped prose per-command via `ib <command> --help`"
     )
     .action(
-      async (
+      guarded(async (
         domains: string[],
         opts: { glossary?: boolean; commandsOnly?: boolean; lean?: boolean }
       ) => {
-        try {
-          let glossary: Array<{ term: string; synonyms: string[] }> = [];
-          // The glossary is now OPT-IN: only fetch it when --glossary is asked
-          // for (and never under --commands-only, which has no primer). The
-          // fetch is this command's only network call, so the default dump is
-          // also offline + token-free.
-          if (opts.glossary && !opts.commandsOnly) {
-            try { glossary = await fetchPrimerGlossary(await getClient()); } catch { glossary = []; }
-          }
-          runReferenceDump(
-            domains,
-            getCallerTier(),
-            glossary,
-            opts.commandsOnly ?? false,
-            opts.lean ?? false
-          );
-        } catch (e) {
-          exitWithError(e);
+        let glossary: Array<{ term: string; synonyms: string[] }> = [];
+        // The glossary is now OPT-IN: only fetch it when --glossary is asked
+        // for (and never under --commands-only, which has no primer). The
+        // fetch is this command's only network call, so the default dump is
+        // also offline + token-free.
+        if (opts.glossary && !opts.commandsOnly) {
+          try { glossary = await fetchPrimerGlossary(await getClient()); } catch { glossary = []; }
         }
-      }
+        runReferenceDump(
+          domains,
+          getCallerTier(),
+          glossary,
+          opts.commandsOnly ?? false,
+          opts.lean ?? false
+        );
+      })
     );
   // `detail` is a PURE GROUP (no action of its own) with three explicit leaves.
   // A variadic action on the group AND `list`/`set` subcommands would make
@@ -313,14 +310,7 @@ export function buildProgram(): Command {
       "On-demand business/AI context for one command (DB-backed via /api/cli/command-catalog); exit 5 if none"
     )
     .argument("<command...>", "Command path after `ib` (e.g. keikka latest)")
-    .action(async (commandParts: string[]) => {
-      try {
-        const client = await getClient();
-        writeJson(await runReferenceDetail(client, commandParts, getCallerTier()));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+    .action(jsonAction(getClient, (client, commandParts: string[]) => runReferenceDetail(client, commandParts, getCallerTier())));
 
   addNeedsReviewFlags(
     detail
@@ -333,17 +323,13 @@ export function buildProgram(): Command {
       .option("--with-detail", "Include each entry's full detail text, folding the per-command `reference detail get` into one call (needs the backend deployed)")
       .option("--search <substr>", "Only rows whose command PATH contains this substring (case-insensitive; client-side)")
       .option("--orphans", "Only orphan rows — keys whose command no longer exists in the live catalogue (the discover half of discover→`reference detail delete`)")
-  ).action(async (opts: { stalest?: number; domain?: string; withDetail?: boolean; needsReview?: boolean; maxConfidence?: number; search?: string; orphans?: boolean }) => {
-    try {
-      // Validate the domain offline (exit 4 on unknown) before any network call,
-      // mirroring `ib commands <domain>`.
-      if (opts.domain) assertKnownDomain(COMMAND_SPECS, opts.domain, getCallerTier());
-      const client = await getClient();
-      writeJson(await runReferenceDetailList(client, opts.stalest, opts.domain, opts.withDetail ?? false, opts.needsReview ?? false, opts.maxConfidence, opts.search, opts.orphans ?? false));
-    } catch (e) {
-      exitWithError(e);
-    }
-  });
+  ).action(guarded(async (opts: { stalest?: number; domain?: string; withDetail?: boolean; needsReview?: boolean; maxConfidence?: number; search?: string; orphans?: boolean }) => {
+    // Validate the domain offline (exit 4 on unknown) before any network call,
+    // mirroring `ib commands <domain>`.
+    if (opts.domain) assertKnownDomain(COMMAND_SPECS, opts.domain, getCallerTier());
+    const client = await getClient();
+    writeJson(await runReferenceDetailList(client, opts.stalest, opts.domain, opts.withDetail ?? false, opts.needsReview ?? false, opts.maxConfidence, opts.search, opts.orphans ?? false));
+  }));
 
   const detailSet = detail
     .command("set")
@@ -360,7 +346,7 @@ export function buildProgram(): Command {
     .option("--prepend <text>", "Edit mode: prepend text to the target field (verbatim)")
     .option("--all", "With --replace: substitute every occurrence");
   addWriteFlagsToCommand(addAssessWriteFlags(detailSet)).action(
-    async (
+    guarded(async (
       commandParts: string[],
       opts: {
         summary?: string;
@@ -407,24 +393,20 @@ export function buildProgram(): Command {
         return;
       }
       assertAiConfidence(opts.aiConfidence);
-      try {
-        const client = await getClient();
-        const result = await runReferenceDetailSet(
-          client,
-          commandParts,
-          { summary: opts.summary, detail: opts.detail, aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview },
-          {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          },
-          getCallerTier()
-        );
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      const result = await runReferenceDetailSet(
+        client,
+        commandParts,
+        { summary: opts.summary, detail: opts.detail, aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview },
+        {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        },
+        getCallerTier()
+      );
+      writeJson(result);
+    })
   );
 
   // `delete` — prune one catalog row by its EXACT key. Deliberately NOT gated by
@@ -437,22 +419,18 @@ export function buildProgram(): Command {
     )
     .argument("<command...>", "The exact stored command key after `ib` (e.g. ai conversation)");
   addWriteFlagsToCommand(detailDelete).action(
-    async (
+    guarded(async (
       commandParts: string[],
       opts: { dryRun?: boolean; idempotencyKey?: string; reason?: string }
     ) => {
       if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
-      try {
-        const client = await getClient();
-        writeJson(
-          await runReferenceDetailDelete(client, commandParts, {
-            dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
-          })
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      writeJson(
+        await runReferenceDetailDelete(client, commandParts, {
+          dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
+        })
+      );
+    })
   );
 
   // `lint` — audit the catalog for orphan rows (keys with no live command left
@@ -463,15 +441,11 @@ export function buildProgram(): Command {
       "Audit the command-catalog for orphan rows — keys with no live command (re-homed/renamed leftovers); --strict for CI (developer only)"
     )
     .option("--strict", "Exit 1 if any orphan row exists (for CI)")
-    .action(async (opts: { strict?: boolean }) => {
-      try {
-        const res = await runReferenceDetailLint(await getClient());
-        writeJson(res);
-        if (opts.strict && res.items.length > 0) process.exitCode = 1;
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+    .action(guarded(async (opts: { strict?: boolean }) => {
+      const res = await runReferenceDetailLint(await getClient());
+      writeJson(res);
+      if (opts.strict && res.items.length > 0) process.exitCode = 1;
+    }));
 
   // `ib commands` — filtered, offline discovery over the same spec catalogue.
   // Note: the filter is `--reads` (not `--read-only`) because `--read-only` is
@@ -491,32 +465,28 @@ export function buildProgram(): Command {
     )
     .option("--all", "Full flat list of every command (default is the domain index)")
     .action(
-      (
+      guarded((
         domain: string | undefined,
         opts: { mutations?: boolean; reads?: boolean; permission?: string; all?: boolean }
       ) => {
-        try {
-          // Bare `ib commands` = cheap domain index; any narrowing argument
-          // (domain, filter flag, or explicit --all) = flat leaf list.
-          const wantsFlatList =
-            opts.all || domain || opts.mutations || opts.reads || opts.permission !== undefined;
-          writeJson(
-            wantsFlatList
-              ? buildCommandsList(
-                  {
-                    domain,
-                    mutations: opts.mutations,
-                    reads: opts.reads,
-                    permission: opts.permission,
-                  },
-                  getCallerTier()
-                )
-              : buildDomainIndex(undefined, getCallerTier())
-          );
-        } catch (e) {
-          exitWithError(e);
-        }
-      }
+        // Bare `ib commands` = cheap domain index; any narrowing argument
+        // (domain, filter flag, or explicit --all) = flat leaf list.
+        const wantsFlatList =
+          opts.all || domain || opts.mutations || opts.reads || opts.permission !== undefined;
+        writeJson(
+          wantsFlatList
+            ? buildCommandsList(
+                {
+                  domain,
+                  mutations: opts.mutations,
+                  reads: opts.reads,
+                  permission: opts.permission,
+                },
+                getCallerTier()
+              )
+            : buildDomainIndex(undefined, getCallerTier())
+        );
+      })
     );
 
   // Replace each subcommand's `--help` with its rich CommandSpec rendering.

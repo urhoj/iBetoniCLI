@@ -1,5 +1,5 @@
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
-import { writeJson, failWith, exitWithError } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
 import { resolvePersonRef } from "../notification/index.js";
 import { guarded } from "../_shared/action.js";
 /** GET /api/person/getPersonEmails/:personId → ListEnvelope of primary + alternatives. */
@@ -37,53 +37,38 @@ export function registerPersonEmailCommands(person, getClient) {
     const addCmd = email
         .command("add <person> <email>")
         .description("Add an alternative email to a person. Requires --reason.");
-    addWriteFlagsToCommand(addCmd).action(async (personRef, emailAddr, opts) => {
+    addWriteFlagsToCommand(addCmd).action(guarded(async (personRef, emailAddr, opts) => {
         if (!opts.reason)
             failWith("Missing required flag: --reason", 4);
-        try {
-            writeJson(await runPersonEmailAdd(await getClient(), personRef, emailAddr, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        writeJson(await runPersonEmailAdd(await getClient(), personRef, emailAddr, {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+        }));
+    }));
     const setMainCmd = email
         .command("set-main <person> <email>")
         .description("Promote one of a person's emails to primary (demotes the old primary to an alternative). Requires --reason.");
-    addWriteFlagsToCommand(setMainCmd).action(async (personRef, emailAddr, opts) => {
+    addWriteFlagsToCommand(setMainCmd).action(guarded(async (personRef, emailAddr, opts) => {
         if (!opts.reason)
             failWith("Missing required flag: --reason", 4);
-        try {
-            writeJson(await runPersonEmailSetMain(await getClient(), personRef, emailAddr, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        writeJson(await runPersonEmailSetMain(await getClient(), personRef, emailAddr, {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+        }));
+    }));
     const removeCmd = email
         .command("remove <person> <email>")
         .description("Remove an alternative email from a person. Requires --reason.");
-    addWriteFlagsToCommand(removeCmd).action(async (personRef, emailAddr, opts) => {
+    addWriteFlagsToCommand(removeCmd).action(guarded(async (personRef, emailAddr, opts) => {
         if (!opts.reason)
             failWith("Missing required flag: --reason", 4);
-        try {
-            writeJson(await runPersonEmailRemove(await getClient(), personRef, emailAddr, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        writeJson(await runPersonEmailRemove(await getClient(), personRef, emailAddr, {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+        }));
+    }));
 }
 //# sourceMappingURL=email.js.map

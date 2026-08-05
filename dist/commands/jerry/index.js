@@ -1,6 +1,6 @@
 import { listEnvelope, toListEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { resolveAsiakasTarget } from "../customer/index.js";
 import { parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption } from "../../targets.js";
@@ -471,7 +471,7 @@ export function registerJerryCommands(parent, getClient) {
         .option("--duration <h>", "Pump duration hours (kesto)", Number)
         .option("--line-length <m>", "Hose line length m (linjanPituus)", Number)
         .option("--notes <s>", "Free-text description shown to providers (kuvaus)")
-        .option("--asiakas <id>", "Customer asiakasId (omit → your private BetoniJerry account)", Number)).action(async (addressPositional, opts) => {
+        .option("--asiakas <id>", "Customer asiakasId (omit → your private BetoniJerry account)", Number)).action(guarded(async (addressPositional, opts) => {
         requireReason(opts);
         const osoite = resolveAddress(addressPositional, opts.address);
         const maaraM3 = Number(opts.m3);
@@ -489,27 +489,17 @@ export function registerJerryCommands(parent, getClient) {
             body.kuvaus = opts.notes;
         if (opts.asiakas !== undefined)
             body.asiakasId = opts.asiakas;
-        try {
-            const client = await getClient();
-            writeJson(await runJerryRequestCreate(client, body, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        writeJson(await runJerryRequestCreate(client, body, opts));
+    }));
     // cancel / decline / undecline are the same registration: one <requestId>,
     // write flags, --reason required. Only the run fn differs.
     const registerRequestLifecycle = (name, description, run) => {
-        addWriteFlagsToCommand(request.command(`${name} <requestId>`).description(description)).action(async (idStr, opts) => {
+        addWriteFlagsToCommand(request.command(`${name} <requestId>`).description(description)).action(guarded(async (idStr, opts) => {
             requireReason(opts);
-            try {
-                const client = await getClient();
-                writeJson(await run(client, parseId(idStr, "requestId"), opts));
-            }
-            catch (e) {
-                exitWithError(e);
-            }
-        });
+            const client = await getClient();
+            writeJson(await run(client, parseId(idStr, "requestId"), opts));
+        }));
     };
     registerRequestLifecycle("cancel", "Cancel your OWN request (customer) — only while no offers received. Requires --reason.", runJerryRequestCancel);
     registerRequestLifecycle("decline", "Decline a request WITHOUT offering (provider); --reason is stored + shown to the customer. Requires --reason.", 
@@ -528,7 +518,7 @@ export function registerJerryCommands(parent, getClient) {
         .option("--available-from <iso>", "Earliest availability (ISO datetime; stored, not shown on the BetoniJerry customer card)")
         .option("--extra-notes <s>", "Free-text notes shown to the customer")
         .option("--cancellation-terms <s>", "Per-offer cancellation terms (stored; BetoniJerry shows a platform-standard peruutusehdot, so this is NOT rendered on the customer card)")
-        .option("--maintains-order-info <bool>", "Override provider default (true|false)", parseBool)).action(async (idStr, opts) => {
+        .option("--maintains-order-info <bool>", "Override provider default (true|false)", parseBool)).action(guarded(async (idStr, opts) => {
         requireReason(opts);
         const priceCents = Number(opts.priceCents);
         if (!Number.isInteger(priceCents) || priceCents < 1 || priceCents > 99_999_900) {
@@ -549,29 +539,19 @@ export function registerJerryCommands(parent, getClient) {
             body.cancellationTerms = opts.cancellationTerms;
         if (opts.maintainsOrderInfo !== undefined)
             body.maintainsOrderInfo = opts.maintainsOrderInfo;
-        try {
-            const client = await getClient();
-            writeJson(await runJerryOfferCreate(client, parseId(idStr, "requestId"), body, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        writeJson(await runJerryOfferCreate(client, parseId(idStr, "requestId"), body, opts));
+    }));
     // send / accept / withdraw / delete are the same registration: two ids, write
     // flags, --reason required. Only the run fn differs. `confirm` is NOT part of
     // the family (extra required options) and keeps its own block, between accept
     // and withdraw so the registration order is unchanged.
     const registerOfferLifecycle = (name, description, run) => {
-        addWriteFlagsToCommand(offer.command(`${name} <requestId> <offerId>`).description(description)).action(async (idStr, offerIdStr, opts) => {
+        addWriteFlagsToCommand(offer.command(`${name} <requestId> <offerId>`).description(description)).action(guarded(async (idStr, offerIdStr, opts) => {
             requireReason(opts);
-            try {
-                const client = await getClient();
-                writeJson(await run(client, parseId(idStr, "requestId"), parseId(offerIdStr, "offerId"), opts));
-            }
-            catch (e) {
-                exitWithError(e);
-            }
-        });
+            const client = await getClient();
+            writeJson(await run(client, parseId(idStr, "requestId"), parseId(offerIdStr, "offerId"), opts));
+        }));
     };
     registerOfferLifecycle("send", "Send a draft offer to the customer (draft → pending; provider). Requires --reason.", runJerryOfferSend);
     registerOfferLifecycle("accept", "Accept an offer (customer-side). Rejects siblings + closes the request. Requires --reason.", runJerryOfferAccept);
@@ -579,19 +559,14 @@ export function registerJerryCommands(parent, getClient) {
         .command("confirm <requestId> <offerId>")
         .description("Confirm an accepted offer → builds a keikka (provider). Requires --scheduled-at + --reason.")
         .requiredOption("--scheduled-at <iso>", "Scheduled keikka start (future ISO datetime)")
-        .option("--pumppu <vehicleId>", "Pin one of your vehicles to the keikka", Number)).action(async (idStr, offerIdStr, opts) => {
+        .option("--pumppu <vehicleId>", "Pin one of your vehicles to the keikka", Number)).action(guarded(async (idStr, offerIdStr, opts) => {
         requireReason(opts);
         const body = { scheduledAt: opts.scheduledAt };
         if (opts.pumppu !== undefined)
             body.pumppuId = opts.pumppu;
-        try {
-            const client = await getClient();
-            writeJson(await runJerryOfferConfirm(client, parseId(idStr, "requestId"), parseId(offerIdStr, "offerId"), body, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        writeJson(await runJerryOfferConfirm(client, parseId(idStr, "requestId"), parseId(offerIdStr, "offerId"), body, opts));
+    }));
     registerOfferLifecycle("withdraw", "Withdraw your sent offer before the customer accepts (pending → withdrawn; provider). Requires --reason.", runJerryOfferWithdraw);
     registerOfferLifecycle("delete", "Hard-delete your OWN DRAFT offer (provider; draft only — sent offers 409, use withdraw). Requires --reason.", runJerryOfferDelete);
     // counts ─────────────────────────────────────────────────────────────────────
@@ -614,7 +589,7 @@ export function registerJerryCommands(parent, getClient) {
         .option("--boom <m>", "Required boom (m) — filters varikot by their puomiMin/puomiMax range (absent/0 = no boom filter)", Number)
         .option("--explain", "Add considered[] — per-varikko exclusion reasons for non-matching depots (developer/admin only)")
         .option("--asiakas <id>", "With --explain: force-include this company's varikot even if not yet Jerry-enabled (surfaces company-gate)", Number)
-        .action(async (opts) => {
+        .action(guarded(async (opts) => {
         // Reject a NaN --boom (e.g. Commander coercing "abc" → NaN) so the probe
         // fails loudly instead of silently dropping the boom filter the operator
         // asked for — misleading during onboarding verification.
@@ -632,14 +607,9 @@ export function registerJerryCommands(parent, getClient) {
                 failWith("--asiakas only applies with --explain", 4);
             }
         }
-        try {
-            const client = await getClient();
-            writeJson(await runJerryCheckAddress(client, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        writeJson(await runJerryCheckAddress(client, opts));
+    }));
     // coverage ─────────────────────────────────────────────────────────────────
     j.command("coverage")
         .description("Developer view of BetoniJerry supply coverage — covered areas + enrolled depot circles")
@@ -672,20 +642,15 @@ export function registerJerryCommands(parent, getClient) {
         .description("Upsert a provider's Jerry settings. Requires --reason.")
         .option("--body <json>", "JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo? }")
         .option("--from-json <file>", "Read the JSON body from a file (or - for stdin) — shell-safe alternative to --body")
-        .option("--asiakas <id>", "Target company asiakasId", Number)).action(async (opts) => {
+        .option("--asiakas <id>", "Target company asiakasId", Number)).action(guarded(async (opts) => {
         requireReason(opts);
-        try {
-            const client = await getClient();
-            const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson });
-            if (!parsed) {
-                failWith("provider-settings set requires a body via --body or --from-json", 4);
-            }
-            writeJson(await runJerryProviderSettingsSet(client, parsed, opts.asiakas, opts));
+        const client = await getClient();
+        const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson });
+        if (!parsed) {
+            failWith("provider-settings set requires a body via --body or --from-json", 4);
         }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        writeJson(await runJerryProviderSettingsSet(client, parsed, opts.asiakas, opts));
+    }));
     // admin ──────────────────────────────────────────────────────────────────────
     const admin = j
         .command("admin")
@@ -717,16 +682,11 @@ export function registerJerryCommands(parent, getClient) {
     ]) {
         addWriteFlagsToCommand(addAsiakasTargetOption(admin
             .command(`${name} [asiakasId]`)
-            .description(`${verb} the Jerry module for a company (audited). Requires --reason.`))).action(async (idStr, opts) => {
+            .description(`${verb} the Jerry module for a company (audited). Requires --reason.`))).action(guarded(async (idStr, opts) => {
             requireReason(opts);
-            try {
-                const client = await getClient();
-                writeJson(await runJerryAdminToggle(client, resolveAsiakasTarget(idStr, opts.asiakas), enable, opts));
-            }
-            catch (e) {
-                exitWithError(e);
-            }
-        });
+            const client = await getClient();
+            writeJson(await runJerryAdminToggle(client, resolveAsiakasTarget(idStr, opts.asiakas), enable, opts));
+        }));
     }
     // admin onboarding — provider-acquisition pipeline ──────────────────────────
     const onboarding = admin
@@ -842,16 +802,11 @@ export function registerJerryCommands(parent, getClient) {
         writeJson(await runJerryAdminRequestOffers(client, parseId(idStr, "requestId")));
     }));
     const adminReqAction = (name, desc, run) => addWriteFlagsToCommand(adminRequest.command(`${name} <requestId>`).description(desc))
-        .action(async (idStr, opts) => {
+        .action(guarded(async (idStr, opts) => {
         requireReason(opts);
-        try {
-            const client = await getClient();
-            writeJson(await run(client, parseId(idStr, "requestId"), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        writeJson(await run(client, parseId(idStr, "requestId"), opts));
+    }));
     adminReqAction("expire", "Force-expire a request (admin). Requires --reason.", runJerryAdminRequestExpire);
     adminReqAction("cancel", "Cancel any request (admin). Requires --reason.", runJerryAdminRequestCancel);
     adminReqAction("resend", "Re-run provider fan-out for a request (admin). Requires --reason.", runJerryAdminRequestResend);
@@ -861,18 +816,13 @@ export function registerJerryCommands(parent, getClient) {
         .command("extend <requestId>")
         .description("Extend a request's validity / reactivate it (admin). Requires --reason.")
         .option("--days <n>", "Make it valid for N more days from now (default 14)", Number)
-        .option("--until <date>", "Absolute new expiry (ISO date/datetime)")).action(async (idStr, opts) => {
+        .option("--until <date>", "Absolute new expiry (ISO date/datetime)")).action(guarded(async (idStr, opts) => {
         requireReason(opts);
         if (opts.days != null && opts.until)
             failWith("Pass either --days or --until, not both", 4);
-        try {
-            const client = await getClient();
-            writeJson(await runJerryAdminRequestExtend(client, parseId(idStr, "requestId"), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        writeJson(await runJerryAdminRequestExtend(client, parseId(idStr, "requestId"), opts));
+    }));
     // admin searches — Osoitehaut: address demand + conversion funnel ─────────────
     const adminSearches = admin
         .command("searches")

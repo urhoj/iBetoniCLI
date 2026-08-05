@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../../api/client.js";
 import { listEnvelope, toListEnvelope, type ListEnvelope } from "../../../api/envelopes.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith } from "../../../output/json.js";
+import { writeJson, failWith } from "../../../output/json.js";
 import { resolveThreadId, type ThreadTarget } from "./resolveThread.js";
 import { parseOptionalId, resolveSearchQuery } from "../../../targets.js";
 import { guarded } from "../../_shared/action.js";
@@ -304,18 +304,14 @@ export function registerMessageChatCommands(
     .option("--limit <n>", "Max messages (default 100, server max 500)", Number)
     .option("--deleted", "Include soft-deleted messages (your own; all for developers)")
     .action(
-      async (
+      guarded(async (
         threadIdStr: string | undefined,
         opts: { tarjous?: number; since?: string; limit?: number; deleted?: boolean }
       ) => {
-        try {
-          const client = await getClient();
-          const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
-          writeJson(await runChatList(client, id, opts));
-        } catch (e) {
-          exitWithError(e);
-        }
-      }
+        const client = await getClient();
+        const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
+        writeJson(await runChatList(client, id, opts));
+      })
     );
 
   c.command("search [query]")
@@ -338,7 +334,7 @@ export function registerMessageChatCommands(
     .requiredOption("--body <text>", "Message text (max 4000 chars)")
     .option("--source <src>", "Provenance: web|cli|ai (default: IB_SOURCE env or cli)");
   addWriteFlagsToCommand(sendCmd).action(
-    async (
+    guarded(async (
       threadIdStr: string | undefined,
       opts: {
         tarjous?: number;
@@ -356,22 +352,18 @@ export function registerMessageChatCommands(
       if (!["web", "cli", "ai"].includes(source)) {
         failWith(`Invalid --source "${source}" — use web|cli|ai`, 4);
       }
-      try {
-        const client = await getClient();
-        const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
-        writeJson(
-          await runChatSend(client, id, {
-            body,
-            source,
-            reason: opts.reason,
-            idempotencyKey: opts.idempotencyKey,
-            dryRun: opts.dryRun,
-          })
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
+      writeJson(
+        await runChatSend(client, id, {
+          body,
+          source,
+          reason: opts.reason,
+          idempotencyKey: opts.idempotencyKey,
+          dryRun: opts.dryRun,
+        })
+      );
+    })
   );
 
   c.command("mark-read [threadId]")
@@ -393,7 +385,7 @@ export function registerMessageChatCommands(
     .option("--thread <id>", "Thread id the message belongs to", Number)
     .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
   addWriteFlagsToCommand(deleteCmd).action(
-    async (
+    guarded(async (
       messageIdStr: string,
       opts: {
         thread?: number;
@@ -405,23 +397,19 @@ export function registerMessageChatCommands(
     ) => {
       const messageId = parseOptionalId(messageIdStr, "messageId");
       if (messageId === undefined) failWith("messageId is required", 4);
-      try {
-        const client = await getClient();
-        const id = await resolveThreadId(client, {
-          thread: opts.thread,
-          tarjous: opts.tarjous,
-        });
-        writeJson(
-          await runChatDelete(client, id, messageId, {
-            reason: opts.reason,
-            idempotencyKey: opts.idempotencyKey,
-            dryRun: opts.dryRun,
-          })
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      const id = await resolveThreadId(client, {
+        thread: opts.thread,
+        tarjous: opts.tarjous,
+      });
+      writeJson(
+        await runChatDelete(client, id, messageId, {
+          reason: opts.reason,
+          idempotencyKey: opts.idempotencyKey,
+          dryRun: opts.dryRun,
+        })
+      );
+    })
   );
 
   const editCmd = c
@@ -433,7 +421,7 @@ export function registerMessageChatCommands(
     .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
     .requiredOption("--body <text>", "New message text (max 4000 chars)");
   addWriteFlagsToCommand(editCmd).action(
-    async (
+    guarded(async (
       messageIdStr: string,
       opts: { thread?: number; tarjous?: number; body: string; dryRun?: boolean; idempotencyKey?: string; reason?: string }
     ) => {
@@ -442,16 +430,12 @@ export function registerMessageChatCommands(
       const body = String(opts.body ?? "").trim();
       if (!body) failWith("Message body cannot be empty", 4);
       if (body.length > 4000) failWith("Message body too long (max 4000 chars)", 4);
-      try {
-        const client = await getClient();
-        const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
-        writeJson(await runChatEdit(client, id, messageId, {
-          body, reason: opts.reason, idempotencyKey: opts.idempotencyKey, dryRun: opts.dryRun,
-        }));
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
+      writeJson(await runChatEdit(client, id, messageId, {
+        body, reason: opts.reason, idempotencyKey: opts.idempotencyKey, dryRun: opts.dryRun,
+      }));
+    })
   );
 
   const restoreCmd = c
@@ -462,21 +446,17 @@ export function registerMessageChatCommands(
     .option("--thread <id>", "Thread id the message belongs to", Number)
     .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
   addWriteFlagsToCommand(restoreCmd).action(
-    async (
+    guarded(async (
       messageIdStr: string,
       opts: { thread?: number; tarjous?: number; dryRun?: boolean; idempotencyKey?: string; reason?: string }
     ) => {
       const messageId = parseOptionalId(messageIdStr, "messageId");
       if (messageId === undefined) failWith("messageId is required", 4);
-      try {
-        const client = await getClient();
-        const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
-        writeJson(await runChatRestore(client, id, messageId, {
-          reason: opts.reason, idempotencyKey: opts.idempotencyKey, dryRun: opts.dryRun,
-        }));
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
+      writeJson(await runChatRestore(client, id, messageId, {
+        reason: opts.reason, idempotencyKey: opts.idempotencyKey, dryRun: opts.dryRun,
+      }));
+    })
   );
 }

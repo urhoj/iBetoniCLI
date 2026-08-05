@@ -57,6 +57,7 @@ import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
 import { canonicalPath, DEV_ALIAS_DOMAINS } from "./reference/aliasPaths.js";
 import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, setActiveCommandErrors, setExitCode as setExit } from "./output/json.js";
+import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { buildValidationEnvelope } from "./output/validationEnvelope.js";
 import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, commandPath } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
@@ -234,27 +235,22 @@ export function buildProgram() {
         .option("--glossary", "Include the term+synonyms vocabulary index (DB fetch). Off by default to keep the dump small; look up definitions on demand with `ib glossary lookup`/`list`")
         .option("--commands-only", "Emit only { version, generatedAt, commonErrors, commands } — drop the overview/topics/feedbackGuidance primer (and skip the glossary fetch)")
         .option("--lean", "Drop each command's notes/seeAlso prose (keeps examples) — ~7.6k fewer tokens on the full surface; fetch the dropped prose per-command via `ib <command> --help`")
-        .action(async (domains, opts) => {
-        try {
-            let glossary = [];
-            // The glossary is now OPT-IN: only fetch it when --glossary is asked
-            // for (and never under --commands-only, which has no primer). The
-            // fetch is this command's only network call, so the default dump is
-            // also offline + token-free.
-            if (opts.glossary && !opts.commandsOnly) {
-                try {
-                    glossary = await fetchPrimerGlossary(await getClient());
-                }
-                catch {
-                    glossary = [];
-                }
+        .action(guarded(async (domains, opts) => {
+        let glossary = [];
+        // The glossary is now OPT-IN: only fetch it when --glossary is asked
+        // for (and never under --commands-only, which has no primer). The
+        // fetch is this command's only network call, so the default dump is
+        // also offline + token-free.
+        if (opts.glossary && !opts.commandsOnly) {
+            try {
+                glossary = await fetchPrimerGlossary(await getClient());
             }
-            runReferenceDump(domains, getCallerTier(), glossary, opts.commandsOnly ?? false, opts.lean ?? false);
+            catch {
+                glossary = [];
+            }
         }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        runReferenceDump(domains, getCallerTier(), glossary, opts.commandsOnly ?? false, opts.lean ?? false);
+    }));
     // `detail` is a PURE GROUP (no action of its own) with three explicit leaves.
     // A variadic action on the group AND `list`/`set` subcommands would make
     // commander mis-route `ib reference detail keikka list` to the `list` leaf —
@@ -266,15 +262,7 @@ export function buildProgram() {
         .command("get")
         .description("On-demand business/AI context for one command (DB-backed via /api/cli/command-catalog); exit 5 if none")
         .argument("<command...>", "Command path after `ib` (e.g. keikka latest)")
-        .action(async (commandParts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runReferenceDetail(client, commandParts, getCallerTier()));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(jsonAction(getClient, (client, commandParts) => runReferenceDetail(client, commandParts, getCallerTier())));
     addNeedsReviewFlags(detail
         .command("list")
         .description("List command-catalog entries, optionally ordered by stalest (DB-backed)")
@@ -282,19 +270,14 @@ export function buildProgram() {
         .option("--domain <d>", "Only commands in this ib domain (e.g. attachment) — narrows BEFORE --stalest")
         .option("--with-detail", "Include each entry's full detail text, folding the per-command `reference detail get` into one call (needs the backend deployed)")
         .option("--search <substr>", "Only rows whose command PATH contains this substring (case-insensitive; client-side)")
-        .option("--orphans", "Only orphan rows — keys whose command no longer exists in the live catalogue (the discover half of discover→`reference detail delete`)")).action(async (opts) => {
-        try {
-            // Validate the domain offline (exit 4 on unknown) before any network call,
-            // mirroring `ib commands <domain>`.
-            if (opts.domain)
-                assertKnownDomain(COMMAND_SPECS, opts.domain, getCallerTier());
-            const client = await getClient();
-            writeJson(await runReferenceDetailList(client, opts.stalest, opts.domain, opts.withDetail ?? false, opts.needsReview ?? false, opts.maxConfidence, opts.search, opts.orphans ?? false));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .option("--orphans", "Only orphan rows — keys whose command no longer exists in the live catalogue (the discover half of discover→`reference detail delete`)")).action(guarded(async (opts) => {
+        // Validate the domain offline (exit 4 on unknown) before any network call,
+        // mirroring `ib commands <domain>`.
+        if (opts.domain)
+            assertKnownDomain(COMMAND_SPECS, opts.domain, getCallerTier());
+        const client = await getClient();
+        writeJson(await runReferenceDetailList(client, opts.stalest, opts.domain, opts.withDetail ?? false, opts.needsReview ?? false, opts.maxConfidence, opts.search, opts.orphans ?? false));
+    }));
     const detailSet = detail
         .command("set")
         .description("Write summary and/or detail for one command in the command-catalog (developer only)")
@@ -307,7 +290,7 @@ export function buildProgram() {
         .option("--append <text>", "Edit mode: append text to the target field (verbatim)")
         .option("--prepend <text>", "Edit mode: prepend text to the target field (verbatim)")
         .option("--all", "With --replace: substitute every occurrence");
-    addWriteFlagsToCommand(addAssessWriteFlags(detailSet)).action(async (commandParts, opts) => {
+    addWriteFlagsToCommand(addAssessWriteFlags(detailSet)).action(guarded(async (commandParts, opts) => {
         const editOp = parseEditOp({
             replace: opts.replace, with: opts.with,
             append: opts.append, prepend: opts.prepend, all: opts.all,
@@ -337,19 +320,14 @@ export function buildProgram() {
             return;
         }
         assertAiConfidence(opts.aiConfidence);
-        try {
-            const client = await getClient();
-            const result = await runReferenceDetailSet(client, commandParts, { summary: opts.summary, detail: opts.detail, aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            }, getCallerTier());
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        const result = await runReferenceDetailSet(client, commandParts, { summary: opts.summary, detail: opts.detail, aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }, {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+        }, getCallerTier());
+        writeJson(result);
+    }));
     // `delete` — prune one catalog row by its EXACT key. Deliberately NOT gated by
     // the command registry (unlike get/set): its purpose is removing orphans whose
     // command path no longer resolves. --reason required for a real delete.
@@ -357,36 +335,26 @@ export function buildProgram() {
         .command("delete")
         .description("Delete one command-catalog row by its exact key — prunes orphans of re-homed/removed commands (developer only)")
         .argument("<command...>", "The exact stored command key after `ib` (e.g. ai conversation)");
-    addWriteFlagsToCommand(detailDelete).action(async (commandParts, opts) => {
+    addWriteFlagsToCommand(detailDelete).action(guarded(async (commandParts, opts) => {
         if (!opts.dryRun && !opts.reason)
             failWith("Missing required flag: --reason", 4);
-        try {
-            const client = await getClient();
-            writeJson(await runReferenceDetailDelete(client, commandParts, {
-                dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        writeJson(await runReferenceDetailDelete(client, commandParts, {
+            dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
+        }));
+    }));
     // `lint` — audit the catalog for orphan rows (keys with no live command left
     // by a rename/re-home). Read-only (one GET + local diff); --strict is a CI gate.
     detail
         .command("lint")
         .description("Audit the command-catalog for orphan rows — keys with no live command (re-homed/renamed leftovers); --strict for CI (developer only)")
         .option("--strict", "Exit 1 if any orphan row exists (for CI)")
-        .action(async (opts) => {
-        try {
-            const res = await runReferenceDetailLint(await getClient());
-            writeJson(res);
-            if (opts.strict && res.items.length > 0)
-                process.exitCode = 1;
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const res = await runReferenceDetailLint(await getClient());
+        writeJson(res);
+        if (opts.strict && res.items.length > 0)
+            process.exitCode = 1;
+    }));
     // `ib commands` — filtered, offline discovery over the same spec catalogue.
     // Note: the filter is `--reads` (not `--read-only`) because `--read-only` is
     // a GLOBAL write-lock flag; reusing the name here would be ambiguous.
@@ -398,24 +366,19 @@ export function buildProgram() {
         .option("--reads", "Only read-only commands (no writes)")
         .option("--permission <substr>", "Only commands whose required permissions contain this substring")
         .option("--all", "Full flat list of every command (default is the domain index)")
-        .action((domain, opts) => {
-        try {
-            // Bare `ib commands` = cheap domain index; any narrowing argument
-            // (domain, filter flag, or explicit --all) = flat leaf list.
-            const wantsFlatList = opts.all || domain || opts.mutations || opts.reads || opts.permission !== undefined;
-            writeJson(wantsFlatList
-                ? buildCommandsList({
-                    domain,
-                    mutations: opts.mutations,
-                    reads: opts.reads,
-                    permission: opts.permission,
-                }, getCallerTier())
-                : buildDomainIndex(undefined, getCallerTier()));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded((domain, opts) => {
+        // Bare `ib commands` = cheap domain index; any narrowing argument
+        // (domain, filter flag, or explicit --all) = flat leaf list.
+        const wantsFlatList = opts.all || domain || opts.mutations || opts.reads || opts.permission !== undefined;
+        writeJson(wantsFlatList
+            ? buildCommandsList({
+                domain,
+                mutations: opts.mutations,
+                reads: opts.reads,
+                permission: opts.permission,
+            }, getCallerTier())
+            : buildDomainIndex(undefined, getCallerTier()));
+    }));
     // Replace each subcommand's `--help` with its rich CommandSpec rendering.
     attachRichHelp(program, COMMAND_SPECS);
     return program;

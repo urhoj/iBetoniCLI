@@ -7,13 +7,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import {
-  writeJson,
-  exitWithError,
-  failWith,
-  errorMessage,
-  setExitCode,
-} from "../../output/json.js";
+import { writeJson, exitWithError, failWith, errorMessage, setExitCode } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveRoleTypeId } from "../../roles.js";
@@ -1176,33 +1170,29 @@ export function registerCustomerCommands(
     )
     .option("--unset <keys>", "Comma-separated field keys to turn OFF");
   addWriteFlagsToCommand(modulesCmd).action(
-    async (
+    guarded(async (
       idStr: string | undefined,
       opts: WriteFlags & { set?: string; unset?: string; asiakas?: number }
     ) => {
-      try {
-        const client = await getClient();
-        const asiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
-        if (!opts.set && !opts.unset) {
-          writeJson(await runCustomerModulesReport(client, asiakasId));
-          return;
-        }
-        let changes: Map<string, boolean>;
-        try {
-          changes = parseModuleChanges(opts.set, opts.unset);
-        } catch (validationErr) {
-          failWith(errorMessage(validationErr), 4);
-        }
-        const result = await runCustomerModulesApply(client, asiakasId, changes, {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        });
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
+      const client = await getClient();
+      const asiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
+      if (!opts.set && !opts.unset) {
+        writeJson(await runCustomerModulesReport(client, asiakasId));
+        return;
       }
-    }
+      let changes: Map<string, boolean>;
+      try {
+        changes = parseModuleChanges(opts.set, opts.unset);
+      } catch (validationErr) {
+        failWith(errorMessage(validationErr), 4);
+      }
+      const result = await runCustomerModulesApply(client, asiakasId, changes, {
+        dryRun: opts.dryRun,
+        idempotencyKey: opts.idempotencyKey,
+        reason: opts.reason,
+      });
+      writeJson(result);
+    })
   );
 
   const operatorCmd = addAsiakasTargetOption(
@@ -1213,34 +1203,30 @@ export function registerCustomerCommands(
     .option("--set", "Turn ALL 9 operator flags ON")
     .option("--reset", "Turn ALL 9 operator flags OFF");
   addWriteFlagsToCommand(operatorCmd).action(
-    async (
+    guarded(async (
       idStr: string | undefined,
       opts: WriteFlags & { set?: boolean; reset?: boolean; asiakas?: number }
     ) => {
-      try {
-        const client = await getClient();
-        const asiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
-        if (opts.set && opts.reset) {
-          failWith("--set and --reset are mutually exclusive", 4);
-        }
-        if (opts.set || opts.reset) {
-          const changes = operatorPresetChanges(!!opts.set);
-          const result = await runCustomerModulesApply(client, asiakasId, changes, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          });
-          writeJson(result);
-          return;
-        }
-        // Verify (default): report state and gate the exit code on it.
-        const result = await runCustomerOperatorVerify(client, asiakasId);
-        writeJson(result);
-        if (!result.allSet) setExitCode(1);
-      } catch (e) {
-        exitWithError(e);
+      const client = await getClient();
+      const asiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
+      if (opts.set && opts.reset) {
+        failWith("--set and --reset are mutually exclusive", 4);
       }
-    }
+      if (opts.set || opts.reset) {
+        const changes = operatorPresetChanges(!!opts.set);
+        const result = await runCustomerModulesApply(client, asiakasId, changes, {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        });
+        writeJson(result);
+        return;
+      }
+      // Verify (default): report state and gate the exit code on it.
+      const result = await runCustomerOperatorVerify(client, asiakasId);
+      writeJson(result);
+      if (!result.allSet) setExitCode(1);
+    })
   );
 
   const settingsCmd = addAsiakasTargetOption(
@@ -1251,32 +1237,28 @@ export function registerCustomerCommands(
     .option("--set <keys>", "Comma-separated setting names to turn ON")
     .option("--unset <keys>", "Comma-separated setting names to turn OFF");
   addWriteFlagsToCommand(settingsCmd).action(
-    async (
+    guarded(async (
       idStr: string | undefined,
       opts: WriteFlags & { set?: string; unset?: string; asiakas?: number }
     ) => {
-      try {
-        const client = await getClient();
-        const asiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
-        if (!opts.set && !opts.unset) {
-          writeJson(await runCustomerSettingsReport(client, asiakasId));
-          return;
-        }
-        let changes: Map<string, boolean>;
-        try {
-          changes = parseSettingChanges(opts.set, opts.unset);
-        } catch (validationErr) {
-          failWith(errorMessage(validationErr), 4);
-        }
-        writeJson(await runCustomerSettingsApply(client, asiakasId, changes, {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        }));
-      } catch (e) {
-        exitWithError(e);
+      const client = await getClient();
+      const asiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
+      if (!opts.set && !opts.unset) {
+        writeJson(await runCustomerSettingsReport(client, asiakasId));
+        return;
       }
-    }
+      let changes: Map<string, boolean>;
+      try {
+        changes = parseSettingChanges(opts.set, opts.unset);
+      } catch (validationErr) {
+        failWith(errorMessage(validationErr), 4);
+      }
+      writeJson(await runCustomerSettingsApply(client, asiakasId, changes, {
+        dryRun: opts.dryRun,
+        idempotencyKey: opts.idempotencyKey,
+        reason: opts.reason,
+      }));
+    })
   );
 
   c.command("search [query]")
@@ -1342,49 +1324,45 @@ export function registerCustomerCommands(
     )
     .option("--body <json>", "Raw JSON body forwarded verbatim (overrides typed flags)");
   addWriteFlagsToCommand(createCmd).action(
-    async (opts: CustomerCreateFlags & WriteFlags & { getOrCreate?: boolean }) => {
-      try {
-        const client = await getClient();
-        const ownerAsiakasId = await resolveCurrentOwnerAsiakasId(client);
-        const prh = opts.fromPrh
-          ? await runCustomerPrhById(client, opts.fromPrh)
-          : undefined;
-        const body = buildAsiakasCreateBody(opts, ownerAsiakasId, prh);
-        if (body.yTunnus === undefined || body.yTunnus === null || body.yTunnus === "") {
-          failWith("create requires --ytunnus (or --from-prh / --body with yTunnus)", 4);
+    guarded(async (opts: CustomerCreateFlags & WriteFlags & { getOrCreate?: boolean }) => {
+      const client = await getClient();
+      const ownerAsiakasId = await resolveCurrentOwnerAsiakasId(client);
+      const prh = opts.fromPrh
+        ? await runCustomerPrhById(client, opts.fromPrh)
+        : undefined;
+      const body = buildAsiakasCreateBody(opts, ownerAsiakasId, prh);
+      if (body.yTunnus === undefined || body.yTunnus === null || body.yTunnus === "") {
+        failWith("create requires --ytunnus (or --from-prh / --body with yTunnus)", 4);
+      }
+      // --get-or-create: an existing yTunnus isn't a duplicate to recreate —
+      // return it (so onboarding is idempotent). >1 match is ambiguous.
+      if (opts.getOrCreate) {
+        const existing = await runCustomerByYtunnus(client, String(body.yTunnus));
+        if (existing.length > 1) {
+          failWith(`ambiguous: ${existing.length} customers share ytunnus ${body.yTunnus} (ids: ${existing
+                .map((m) => m.asiakasId)
+                .join(", ")}). Use \`ib customer get <id>\`.`, 4);
         }
-        // --get-or-create: an existing yTunnus isn't a duplicate to recreate —
-        // return it (so onboarding is idempotent). >1 match is ambiguous.
-        if (opts.getOrCreate) {
-          const existing = await runCustomerByYtunnus(client, String(body.yTunnus));
-          if (existing.length > 1) {
-            failWith(`ambiguous: ${existing.length} customers share ytunnus ${body.yTunnus} (ids: ${existing
-                  .map((m) => m.asiakasId)
-                  .join(", ")}). Use \`ib customer get <id>\`.`, 4);
-          }
-          if (existing.length === 1) {
-            writeJson({ ...existing[0], reused: true });
-            return;
-          }
-        }
-        const res = await runCustomerCreate(client, body, opts);
-        if (opts.dryRun) {
-          writeJson(res);
+        if (existing.length === 1) {
+          writeJson({ ...existing[0], reused: true });
           return;
         }
-        const newId = extractAsiakasId(res);
-        // createY ignores email pre-059 — reconcile it via a follow-up update so
-        // `customer create --email` actually persists (create has no --comment).
-        const created = newId
-          ? await reconcileCreatedExtras(client, await runCustomerGet(client, newId), { email: opts.email }, opts)
-          : res;
-        writeJson(
-          opts.getOrCreate ? { ...(created as Record<string, unknown>), reused: false } : created
-        );
-      } catch (e) {
-        exitWithError(e);
       }
-    }
+      const res = await runCustomerCreate(client, body, opts);
+      if (opts.dryRun) {
+        writeJson(res);
+        return;
+      }
+      const newId = extractAsiakasId(res);
+      // createY ignores email pre-059 — reconcile it via a follow-up update so
+      // `customer create --email` actually persists (create has no --comment).
+      const created = newId
+        ? await reconcileCreatedExtras(client, await runCustomerGet(client, newId), { email: opts.email }, opts)
+        : res;
+      writeJson(
+        opts.getOrCreate ? { ...(created as Record<string, unknown>), reused: false } : created
+      );
+    })
   );
 
   const updateCmd = c
@@ -1405,26 +1383,22 @@ export function registerCustomerCommands(
     .option("--from-prh <ytunnus>", "Refresh name + yTunnus + billing address from PRH (explicit flags still win)")
     .option("--body <json>", "Raw JSON body forwarded verbatim (overrides typed flags)");
   addWriteFlagsToCommand(updateCmd).action(
-    async (idStr: string, opts: CustomerUpdateFlags & WriteFlags & { fromPrh?: string }) => {
-      try {
-        const client = await getClient();
-        const asiakasId = parseId(idStr, "asiakasId");
-        const current = await runCustomerGet(client, asiakasId);
-        const prh = opts.fromPrh ? await runCustomerPrhById(client, opts.fromPrh) : undefined;
-        const body = buildAsiakasUpdateBody(current, opts, prh);
-        const res = await runCustomerUpdate(client, asiakasId, body, opts);
-        if (opts.dryRun) {
-          writeJson(res);
-          return;
-        }
-        // Surface whether the write actually changed anything (vs an idempotent
-        // no-op) alongside the re-fetched record.
-        const changed = (res as { changed?: boolean | null } | null)?.changed ?? null;
-        writeJson({ ...(await runCustomerGet(client, asiakasId)), changed });
-      } catch (e) {
-        exitWithError(e);
+    guarded(async (idStr: string, opts: CustomerUpdateFlags & WriteFlags & { fromPrh?: string }) => {
+      const client = await getClient();
+      const asiakasId = parseId(idStr, "asiakasId");
+      const current = await runCustomerGet(client, asiakasId);
+      const prh = opts.fromPrh ? await runCustomerPrhById(client, opts.fromPrh) : undefined;
+      const body = buildAsiakasUpdateBody(current, opts, prh);
+      const res = await runCustomerUpdate(client, asiakasId, body, opts);
+      if (opts.dryRun) {
+        writeJson(res);
+        return;
       }
-    }
+      // Surface whether the write actually changed anything (vs an idempotent
+      // no-op) alongside the re-fetched record.
+      const changed = (res as { changed?: boolean | null } | null)?.changed ?? null;
+      writeJson({ ...(await runCustomerGet(client, asiakasId)), changed });
+    })
   );
 
   const upsertCmd = c
@@ -1476,19 +1450,15 @@ export function registerCustomerCommands(
     c
       .command("delete <asiakasId>")
       .description("Delete a customer (asiakas). Requires --reason.")
-  ).action(async (asiakasIdStr: string, opts: WriteFlags) => {
+  ).action(guarded(async (asiakasIdStr: string, opts: WriteFlags) => {
     if (!opts.reason) {
       failWith("Missing required flag: --reason", 4);
     }
-    try {
-      const client = await getClient();
-      const ownerAsiakasId = await resolveCurrentOwnerAsiakasId(client);
-      const result = await runCustomerDelete(client, parseId(asiakasIdStr, "asiakasId"), ownerAsiakasId, opts);
-      writeJson(result);
-    } catch (e) {
-      exitWithError(e);
-    }
-  });
+    const client = await getClient();
+    const ownerAsiakasId = await resolveCurrentOwnerAsiakasId(client);
+    const result = await runCustomerDelete(client, parseId(asiakasIdStr, "asiakasId"), ownerAsiakasId, opts);
+    writeJson(result);
+  }));
 
   const customerPerson = c
     .command("person")
@@ -1505,22 +1475,18 @@ export function registerCustomerCommands(
       .requiredOption("--asiakas <id>", "Target asiakasId", Number)
       .requiredOption("--person <id>", "Target personId", Number)
       .option("--contact-type <id>", "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)", Number, 1)
-  ).action(async (opts: WriteFlags & { asiakas: number; person: number; contactType: number }) => {
+  ).action(guarded(async (opts: WriteFlags & { asiakas: number; person: number; contactType: number }) => {
     if (!opts.reason) {
       failWith("Missing required flag: --reason", 4);
     }
-    try {
-      const client = await getClient();
-      const result = await runCustomerPersonAdd(
-        client,
-        { asiakasId: opts.asiakas, personId: opts.person, contactPersonTypeId: opts.contactType },
-        opts
-      );
-      writeJson(result);
-    } catch (e) {
-      exitWithError(e);
-    }
-  });
+    const client = await getClient();
+    const result = await runCustomerPersonAdd(
+      client,
+      { asiakasId: opts.asiakas, personId: opts.person, contactPersonTypeId: opts.contactType },
+      opts
+    );
+    writeJson(result);
+  }));
 
   addWriteFlagsToCommand(
     customerPerson
@@ -1529,22 +1495,18 @@ export function registerCustomerCommands(
       .requiredOption("--asiakas <id>", "Target asiakasId", Number)
       .requiredOption("--person <id>", "Target personId", Number)
       .option("--contact-type <id>", "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)", Number, 1)
-  ).action(async (opts: WriteFlags & { asiakas: number; person: number; contactType: number }) => {
+  ).action(guarded(async (opts: WriteFlags & { asiakas: number; person: number; contactType: number }) => {
     if (!opts.reason) {
       failWith("Missing required flag: --reason", 4);
     }
-    try {
-      const client = await getClient();
-      const result = await runCustomerPersonRemove(
-        client,
-        { asiakasId: opts.asiakas, personId: opts.person, contactPersonTypeId: opts.contactType },
-        opts
-      );
-      writeJson(result);
-    } catch (e) {
-      exitWithError(e);
-    }
-  });
+    const client = await getClient();
+    const result = await runCustomerPersonRemove(
+      client,
+      { asiakasId: opts.asiakas, personId: opts.person, contactPersonTypeId: opts.contactType },
+      opts
+    );
+    writeJson(result);
+  }));
 
   addAsiakasTargetOption(
     customerPerson
@@ -1589,7 +1551,7 @@ export function registerCustomerCommands(
     .option("--owner <id>", "ownerAsiakasId (default: active company)", Number)
     .option("--allow-big-merge", "System-admin: permit a merge above the safety row cap");
   addWriteFlagsToCommand(mergeCmd).action(
-    async (
+    guarded(async (
       opts: WriteFlags & {
         main: number;
         secondary: number;
@@ -1612,26 +1574,22 @@ export function registerCustomerCommands(
           4
         );
       }
-      try {
-        const client = await getClient();
-        const owner =
-          opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
-        writeJson(
-          await runCustomerMerge(
-            client,
-            {
-              mainId: opts.main,
-              secondaryId: opts.secondary,
-              ownerAsiakasId: owner,
-              allowBigMerge: opts.allowBigMerge,
-            },
-            { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }
-          )
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      const owner =
+        opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
+      writeJson(
+        await runCustomerMerge(
+          client,
+          {
+            mainId: opts.main,
+            secondaryId: opts.secondary,
+            ownerAsiakasId: owner,
+            allowBigMerge: opts.allowBigMerge,
+          },
+          { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }
+        )
+      );
+    })
   );
 }
 

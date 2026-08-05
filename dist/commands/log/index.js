@@ -1,9 +1,9 @@
 import { listEnvelope } from "../../api/envelopes.js";
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseId, parseOptionalId, cappedInt } from "../../targets.js";
-import { guarded } from "../_shared/action.js";
+import { guarded, jsonAction } from "../_shared/action.js";
 import { CHANGE_ENTITY_TYPES, findEntityType, isKnownEntityType, runLogTypes, } from "./entityTypes.js";
 function projectRow(r) {
     const item = {
@@ -154,18 +154,7 @@ export function registerLogCommands(parent, getClient) {
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
         .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)
         .option("--field <name>", "Filter by changeTracker fieldName (client-side)")
-        .action(async (entityType, entityIdStr, opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runLogEntity(client, entityType, parseId(entityIdStr, "entityId"), opts.limit, {
-                owner: opts.owner,
-                field: opts.field,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(jsonAction(getClient, (client, entityType, entityIdStr, opts) => runLogEntity(client, entityType, parseId(entityIdStr, "entityId"), opts.limit, { owner: opts.owner, field: opts.field })));
     c.command("latest")
         .description("Newest changes across the whole company (admin), optionally one entityType.")
         .option("--entity-type <type>", "Filter to one entityType")
@@ -186,22 +175,17 @@ export function registerLogCommands(parent, getClient) {
         .option("--person <personId>", "Filter to one actor", (v) => Number(v))
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
         .option("--limit <n>", "Max rows kept client-side (default 200, cap 2000)", cappedInt(2000), 200)
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runLogRange(client, {
-                from: resolveDate(opts.from) ?? opts.from,
-                to: resolveDate(opts.to) ?? opts.to,
-                entityType: opts.entityType,
-                person: opts.person,
-                owner: opts.owner,
-                limit: opts.limit,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        writeJson(await runLogRange(client, {
+            from: resolveDate(opts.from) ?? opts.from,
+            to: resolveDate(opts.to) ?? opts.to,
+            entityType: opts.entityType,
+            person: opts.person,
+            owner: opts.owner,
+            limit: opts.limit,
+        }));
+    }));
     c.command("by-entity-date")
         .description("Changes affecting deliveries DATED in the window (admin) — filters by " +
         "keikka.pumppuAika / palkki starttime, not change time.")
@@ -210,45 +194,25 @@ export function registerLogCommands(parent, getClient) {
         .requiredOption("--to <iso>", "Entity-date window end YYYY-MM-DD (or today/yesterday/tomorrow)")
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
         .option("--limit <n>", "Max rows kept client-side (default 200, cap 2000)", cappedInt(2000), 200)
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runLogByEntityDate(client, {
-                entityType: opts.entityType,
-                from: resolveDate(opts.from) ?? opts.from,
-                to: resolveDate(opts.to) ?? opts.to,
-                owner: opts.owner,
-                limit: opts.limit,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        writeJson(await runLogByEntityDate(client, {
+            entityType: opts.entityType,
+            from: resolveDate(opts.from) ?? opts.from,
+            to: resolveDate(opts.to) ?? opts.to,
+            owner: opts.owner,
+            limit: opts.limit,
+        }));
+    }));
     c.command("user [personId]")
         .description("Changes MADE BY a person (no arg = yourself; another personId needs admin).")
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
         .option("--limit <n>", "Max rows (default 100)", cappedInt(500), 100)
-        .action(async (personIdStr, opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runLogUser(client, parseOptionalId(personIdStr, "personId") ?? null, opts.limit, {
-                owner: opts.owner,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(jsonAction(getClient, (client, personIdStr, opts) => runLogUser(client, parseOptionalId(personIdStr, "personId") ?? null, opts.limit, { owner: opts.owner })));
     c.command("types")
         .description("Offline catalog of changeTracker entityTypes (id meaning, read gate, notes).")
-        .action(() => {
-        try {
-            writeJson(runLogTypes());
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(() => {
+        writeJson(runLogTypes());
+    }));
 }
 //# sourceMappingURL=index.js.map

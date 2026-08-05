@@ -1,8 +1,8 @@
 import { CliError } from "../../api/errors.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
 import { resolveDate } from "../../dates.js";
-import { guarded } from "../_shared/action.js";
+import { guarded, jsonAction } from "../_shared/action.js";
 const EXECUTORS = ["human", "ai"];
 const AGENTS = ["claude", "hermes"];
 const SERVER_LIST_CAP = 200;
@@ -230,35 +230,13 @@ export function registerTaskCommands(parent, getClient, opts = {}) {
         .option("--asiakas <id>", "Company (asiakas) the task is scoped to; omit = internal/global", intFlag("--asiakas"))
         .option("--cadence <spec>", "<count>/<unit>, unit day|week|month, count 1-120 (e.g. 1/month, 2/week) — required")
         .option("--first-due <date>", "First due date (YYYY-MM-DD or today/tomorrow); default: due immediately")
-        .option("--feedback <id>", "cliFeedback id this task graduated from (provenance)", intFlag("--feedback"))).action(async (opts) => {
-        try {
-            writeJson(await runTaskAdd(await getClient(), opts, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .option("--feedback <id>", "cliFeedback id this task graduated from (provenance)", intFlag("--feedback"))).action(jsonAction(getClient, (client, opts) => runTaskAdd(client, opts, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })));
     addWriteFlagsToCommand(t.command("complete <id>")
         .description("Complete a due task: log done (default) / --skipped / --failed; done+skipped advance nextDueAt (developer-only; a write)")
         .option("--notes <text>", "Result summary stored on the log row")
         .option("--skipped", "Log outcome=skipped (advances nextDueAt)")
         .option("--failed", "Log outcome=failed (task STAYS due)")
-        .option("--agent <agent>", "claude | hermes — set when an AI completes the task")).action(async (idStr, opts) => {
-        try {
-            writeJson(await runTaskComplete(await getClient(), parseTaskId(idStr, "complete"), opts, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .option("--agent <agent>", "claude | hermes — set when an AI completes the task")).action(jsonAction(getClient, (client, idStr, opts) => runTaskComplete(client, parseTaskId(idStr, "complete"), opts, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })));
     addWriteFlagsToCommand(t.command("set <id>")
         .description("Partial update — omit a flag to keep the current value; \"\" clears text fields (developer-only; a write)")
         .option("--title <text>", "New title")
@@ -271,18 +249,7 @@ export function registerTaskCommands(parent, getClient, opts = {}) {
         .option("--cadence <spec>", "<count>/<unit>, unit day|week|month, count 1-120")
         .option("--next-due <date>", "Override nextDueAt (YYYY-MM-DD or today/tomorrow)")
         .option("--activate", "Reactivate the task")
-        .option("--deactivate", "Deactivate (soft-retire) the task")).action(async (idStr, opts) => {
-        try {
-            writeJson(await runTaskSet(await getClient(), parseTaskId(idStr, "set"), opts, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .option("--deactivate", "Deactivate (soft-retire) the task")).action(jsonAction(getClient, (client, idStr, opts) => runTaskSet(client, parseTaskId(idStr, "set"), opts, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })));
     t.command("log <id>")
         .description("Completion history for one task, newest first (developer-only)")
         .option("--limit <n>", "Max rows (default 50, cap 200)", intFlag("--limit"))

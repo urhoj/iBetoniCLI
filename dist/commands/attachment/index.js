@@ -1,10 +1,10 @@
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
 import { readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { basename, resolve as resolvePath } from "node:path";
 import { writeFlagsToHeaders, addWriteFlagsToCommand } from "../../api/writeFlags.js";
 import { CliError } from "../../api/errors.js";
-import { guarded } from "../_shared/action.js";
+import { guarded, jsonAction } from "../_shared/action.js";
 import { cappedInt } from "../../targets.js";
 /** Wire entity names ↔ commander option keys. Mirrors backend ENTITY_COLUMNS. */
 const ENTITY_OPTS = [
@@ -263,20 +263,15 @@ export function registerAttachmentCommands(parent, getClient) {
         .option("--group <g>", "Filter by attachment group (name or id — see `ib attachment types`)")
         .option("--type <t>", "Filter by attachment type (name or id — see `ib attachment types`)")
         .option("--limit <n>", "Max rows (capped at 500)", cappedInt(500));
-    addEntityFlags(listCmd).action(async (opts) => {
-        try {
-            const client = await getClient();
-            const target = resolveEntityTarget(opts);
-            const { groupId, typeId } = await resolveGroupAndType(client, {
-                group: opts.group,
-                type: opts.type,
-            });
-            writeJson(await runAttachmentList(client, target, { groupId, typeId, limit: opts.limit }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+    addEntityFlags(listCmd).action(guarded(async (opts) => {
+        const client = await getClient();
+        const target = resolveEntityTarget(opts);
+        const { groupId, typeId } = await resolveGroupAndType(client, {
+            group: opts.group,
+            type: opts.type,
+        });
+        writeJson(await runAttachmentList(client, target, { groupId, typeId, limit: opts.limit }));
+    }));
     a.command("get <attachmentId>")
         .description("One attachment: metadata, group/type names, 1h read-SAS blobUrl")
         .action(guarded(async (id) => {
@@ -309,23 +304,18 @@ export function registerAttachmentCommands(parent, getClient) {
         .option("--type <t>", "Attachment type (name or id — see `ib attachment types`)")
         .option("--mime <mime>", "Override the auto-detected MIME type");
     addEntityFlags(uploadCmd);
-    addWriteFlagsToCommand(uploadCmd).action(async (file, opts) => {
-        try {
-            const client = await getClient();
-            const { groupId, typeId } = await resolveGroupAndType(client, {
-                group: opts.group,
-                type: opts.type,
-            });
-            writeJson(await runAttachmentUpload(client, file, opts, {
-                dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
-                comment: opts.comment, mime: opts.mime,
-                groupId, typeId,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+    addWriteFlagsToCommand(uploadCmd).action(guarded(async (file, opts) => {
+        const client = await getClient();
+        const { groupId, typeId } = await resolveGroupAndType(client, {
+            group: opts.group,
+            type: opts.type,
+        });
+        writeJson(await runAttachmentUpload(client, file, opts, {
+            dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
+            comment: opts.comment, mime: opts.mime,
+            groupId, typeId,
+        }));
+    }));
     a.command("upload-url")
         .description("Mint a 1h write-SAS upload URL (remote-safe primitive; server picks the blob path)")
         .requiredOption("--name <fileName>", "Original file name WITH extension (server derives the blob name)")
@@ -345,56 +335,37 @@ export function registerAttachmentCommands(parent, getClient) {
         .option("--type <t>", "Attachment type (name or id)")
         .option("--etag <etag>", "Azure ETag (optional; defaults to FE-parity sentinel)");
     addEntityFlags(registerCmd);
-    addWriteFlagsToCommand(registerCmd).action(async (opts) => {
-        try {
-            const client = await getClient();
-            const target = resolveEntityTarget(opts);
-            const { groupId, typeId } = await resolveGroupAndType(client, {
-                group: opts.group,
-                type: opts.type,
-            });
-            writeJson(await runAttachmentRegister(client, {
-                fileName: opts.name, origFileName: opts.origName,
-                fileFolder: opts.folder, fileType: opts.mime,
-                fileSize: opts.size, entity: target.entity, entityId: target.entityId,
-                fileComment: opts.comment,
-                attachmentGroupId: groupId, attachmentTypeId: typeId,
-                fileETag: opts.etag,
-            }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+    addWriteFlagsToCommand(registerCmd).action(guarded(async (opts) => {
+        const client = await getClient();
+        const target = resolveEntityTarget(opts);
+        const { groupId, typeId } = await resolveGroupAndType(client, {
+            group: opts.group,
+            type: opts.type,
+        });
+        writeJson(await runAttachmentRegister(client, {
+            fileName: opts.name, origFileName: opts.origName,
+            fileFolder: opts.folder, fileType: opts.mime,
+            fileSize: opts.size, entity: target.entity, entityId: target.entityId,
+            fileComment: opts.comment,
+            attachmentGroupId: groupId, attachmentTypeId: typeId,
+            fileETag: opts.etag,
+        }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
+    }));
     const attachCmd = a
         .command("attach <attachmentId>")
         .description("Link an existing attachment to ONE entity (sets that FK; others untouched)");
     addEntityFlags(attachCmd);
-    addWriteFlagsToCommand(attachCmd).action(async (id, opts) => {
-        try {
-            writeJson(await runAttachmentAttach(await getClient(), Number(id), opts, {
-                dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+    addWriteFlagsToCommand(attachCmd).action(jsonAction(getClient, (client, id, opts) => runAttachmentAttach(client, Number(id), opts, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })));
     const detachCmd = a
         .command("detach <attachmentId> [entity]")
         .description("Unlink an attachment from one entity. Name the entity as a positional word OR an attach-style flag (--keikka 9001 — the id is ignored). Requires a manager role on the owner company.");
     addEntityFlags(detachCmd);
-    addWriteFlagsToCommand(detachCmd).action(async (id, entity, opts) => {
-        try {
-            const entityWord = resolveDetachEntity(entity, opts);
-            writeJson(await runAttachmentDetach(await getClient(), Number(id), entityWord, {
-                dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+    addWriteFlagsToCommand(detachCmd).action(guarded(async (id, entity, opts) => {
+        const entityWord = resolveDetachEntity(entity, opts);
+        writeJson(await runAttachmentDetach(await getClient(), Number(id), entityWord, {
+            dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
+        }));
+    }));
     const updateCmd = a
         .command("update <attachmentId>")
         .description("Update comment / group / type / invoice-flag (server read-merges unchanged fields)")
@@ -402,38 +373,28 @@ export function registerAttachmentCommands(parent, getClient) {
         .option("--liita-laskuun <0|1>", "Invoice-attachment flag (lasku/asiakas admin only)", (s) => Number(s))
         .option("--group <g>", "Attachment group (name or id — see `ib attachment types`)")
         .option("--type <t>", "Attachment type (name or id — see `ib attachment types`)");
-    addWriteFlagsToCommand(updateCmd).action(async (id, opts) => {
-        try {
-            const client = await getClient();
-            const { groupId, typeId } = await resolveGroupAndType(client, {
-                group: opts.group,
-                type: opts.type,
-            });
-            writeJson(await runAttachmentUpdate(client, Number(id), {
-                fileComment: opts.comment,
-                liitaLaskuun: opts.liitaLaskuun,
-                attachmentGroupId: groupId, attachmentTypeId: typeId,
-            }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+    addWriteFlagsToCommand(updateCmd).action(guarded(async (id, opts) => {
+        const client = await getClient();
+        const { groupId, typeId } = await resolveGroupAndType(client, {
+            group: opts.group,
+            type: opts.type,
+        });
+        writeJson(await runAttachmentUpdate(client, Number(id), {
+            fileComment: opts.comment,
+            liitaLaskuun: opts.liitaLaskuun,
+            attachmentGroupId: groupId, attachmentTypeId: typeId,
+        }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
+    }));
     const deleteCmd = a
         .command("delete <attachmentId>")
         .description("Soft-delete the row AND hard-delete the Azure blob (IRREVERSIBLE). Requires --reason.");
-    addWriteFlagsToCommand(deleteCmd).action(async (id, opts) => {
+    addWriteFlagsToCommand(deleteCmd).action(guarded(async (id, opts) => {
         if (!opts.reason) {
             failWith("Missing required flag: --reason (blob deletion is irreversible)", 4);
         }
-        try {
-            writeJson(await runAttachmentDelete(await getClient(), Number(id), {
-                dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        writeJson(await runAttachmentDelete(await getClient(), Number(id), {
+            dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
+        }));
+    }));
 }
 //# sourceMappingURL=index.js.map

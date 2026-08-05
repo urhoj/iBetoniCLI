@@ -20,7 +20,7 @@ import {
   writeFlagsToHeaders,
   type WriteFlags,
 } from "../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith, failUsage } from "../../output/json.js";
+import { writeJson, failWith, failUsage } from "../../output/json.js";
 import { parseId, cappedInt } from "../../targets.js";
 import { decodeJwtPayload, type DecodedClaims } from "../../auth/jwt.js";
 import { lineDiff } from "../../textDiff.js";
@@ -680,7 +680,7 @@ export function registerLegalCommands(
     .option("--prepend <text>", "Edit mode: prepend this text to the start of the current markdown (verbatim)")
     .option("--all", "With --replace: substitute every occurrence instead of erroring on multiple matches");
   addWriteFlagsToCommand(saveCmd).action(
-    async (opts: {
+    guarded(async (opts: {
       type: string;
       docVersion: string;
       title?: string;
@@ -709,27 +709,23 @@ export function registerLegalCommands(
           failUsage("edit mode (--replace/--append/--prepend) is mutually exclusive with --file/--content");
         }
         if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
-        try {
-          const client = await getClient();
-          writeJson(
-            await runLegalSaveWithEdit(
-              client,
-              opts.type,
-              editOp,
-              {
-                version: opts.docVersion,
-                title: opts.title,
-                ownerAsiakasId: opts.owner,
-                notes: opts.notes,
-                effectiveDate: opts.effectiveDate,
-                activate: !!opts.activate,
-              },
-              { dryRun: opts.dryRun, reason: opts.reason, idempotencyKey: opts.idempotencyKey }
-            )
-          );
-        } catch (e) {
-          exitWithError(e);
-        }
+        const client = await getClient();
+        writeJson(
+          await runLegalSaveWithEdit(
+            client,
+            opts.type,
+            editOp,
+            {
+              version: opts.docVersion,
+              title: opts.title,
+              ownerAsiakasId: opts.owner,
+              notes: opts.notes,
+              effectiveDate: opts.effectiveDate,
+              activate: !!opts.activate,
+            },
+            { dryRun: opts.dryRun, reason: opts.reason, idempotencyKey: opts.idempotencyKey }
+          )
+        );
         return;
       }
       if (!opts.file && !opts.content) failWith("Provide --file <path> or --content <markdown>", 4);
@@ -748,60 +744,48 @@ export function registerLegalCommands(
         const v = validateStructuredJson(markdownContent);
         if (!v.ok) failWith(`--validate-json failed: ${v.error}`, 4);
       }
-      try {
-        const client = await getClient();
-        writeJson(
-          await runLegalSave(
-            client,
-            {
-              typeName: opts.type,
-              version: opts.docVersion,
-              title: opts.title!, // guarded above: failWith exits if undefined
-              markdownContent,
-              ownerAsiakasId: opts.owner,
-              notes: opts.notes,
-              effectiveDate: opts.effectiveDate,
-              activate: !!opts.activate,
-            },
-            { dryRun: opts.dryRun, reason: opts.reason, idempotencyKey: opts.idempotencyKey }
-          )
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      writeJson(
+        await runLegalSave(
+          client,
+          {
+            typeName: opts.type,
+            version: opts.docVersion,
+            title: opts.title!, // guarded above: failWith exits if undefined
+            markdownContent,
+            ownerAsiakasId: opts.owner,
+            notes: opts.notes,
+            effectiveDate: opts.effectiveDate,
+            activate: !!opts.activate,
+          },
+          { dryRun: opts.dryRun, reason: opts.reason, idempotencyKey: opts.idempotencyKey }
+        )
+      );
+    })
   );
 
   const activateCmd = legal
     .command("activate <documentId>")
     .description("Publish a version: atomically archives the current active, activates this one");
   addWriteFlagsToCommand(activateCmd).action(
-    async (documentIdStr: string, opts: { dryRun?: boolean; reason?: string; idempotencyKey?: string }) => {
+    guarded(async (documentIdStr: string, opts: { dryRun?: boolean; reason?: string; idempotencyKey?: string }) => {
       const documentId = parseId(documentIdStr, "documentId");
       if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
-      try {
-        const client = await getClient();
-        writeJson(await runLegalActivate(client, documentId, opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      writeJson(await runLegalActivate(client, documentId, opts));
+    })
   );
 
   const deleteCmd = legal
     .command("delete <documentId>")
     .description("Soft-delete (deactivate) a document version");
   addWriteFlagsToCommand(deleteCmd).action(
-    async (documentIdStr: string, opts: { dryRun?: boolean; reason?: string; idempotencyKey?: string }) => {
+    guarded(async (documentIdStr: string, opts: { dryRun?: boolean; reason?: string; idempotencyKey?: string }) => {
       const documentId = parseId(documentIdStr, "documentId");
       if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
-      try {
-        const client = await getClient();
-        writeJson(await runLegalDelete(client, documentId, opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      writeJson(await runLegalDelete(client, documentId, opts));
+    })
   );
 
   legal
@@ -828,24 +812,20 @@ export function registerLegalCommands(
     .description("Record YOUR OWN acceptance of the current active version (developer testing aid)")
     .option("--type <typeName>", "Document type name (alias for the positional)");
   addWriteFlagsToCommand(acceptCmd).action(
-    async (
+    guarded(async (
       typeNameArg: string | undefined,
       opts: { type?: string; dryRun?: boolean; reason?: string; idempotencyKey?: string }
     ) => {
-      try {
-        const typeName = resolveTypeNameTarget(typeNameArg, opts.type);
-        if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
-        const client = await getClient();
-        const claims = decodeJwtPayload(client.getCurrentToken());
-        assertDeveloperClaims(claims);
-        const personId =
-          claims.personId ??
-          failWith("could not resolve personId from the active token", 4);
-        writeJson(await runLegalAccept(client, typeName, personId, opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const typeName = resolveTypeNameTarget(typeNameArg, opts.type);
+      if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
+      const client = await getClient();
+      const claims = decodeJwtPayload(client.getCurrentToken());
+      assertDeveloperClaims(claims);
+      const personId =
+        claims.personId ??
+        failWith("could not resolve personId from the active token", 4);
+      writeJson(await runLegalAccept(client, typeName, personId, opts));
+    })
   );
 
   const typeGroup = legal
@@ -861,7 +841,7 @@ export function registerLegalCommands(
     .option("--sort-order <n>", "List position (default 0)", Number)
     .option("--setting-type-id <n>", "personSettingTypeId for acceptance tracking (must exist and be unmapped)", Number);
   addWriteFlagsToCommand(typeCreateCmd).action(
-    async (opts: {
+    guarded(async (opts: {
       name: string;
       displayName: string;
       description?: string;
@@ -871,14 +851,10 @@ export function registerLegalCommands(
       reason?: string;
       idempotencyKey?: string;
     }) => {
-      try {
-        if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
-        const client = await getClient();
-        writeJson(await runLegalTypeCreate(client, opts.name, pickTypeFields(opts), opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
+      const client = await getClient();
+      writeJson(await runLegalTypeCreate(client, opts.name, pickTypeFields(opts), opts));
+    })
   );
 
   const typeUpdateCmd = typeGroup
@@ -889,7 +865,7 @@ export function registerLegalCommands(
     .option("--sort-order <n>", "List position", Number)
     .option("--setting-type-id <n>", "personSettingTypeId for acceptance tracking (must exist and be unmapped)", Number);
   addWriteFlagsToCommand(typeUpdateCmd).action(
-    async (
+    guarded(async (
       typeName: string,
       opts: {
         displayName?: string;
@@ -901,13 +877,9 @@ export function registerLegalCommands(
         idempotencyKey?: string;
       }
     ) => {
-      try {
-        if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
-        const client = await getClient();
-        writeJson(await runLegalTypeUpdate(client, typeName, pickTypeFields(opts), opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
+      const client = await getClient();
+      writeJson(await runLegalTypeUpdate(client, typeName, pickTypeFields(opts), opts));
+    })
   );
 }

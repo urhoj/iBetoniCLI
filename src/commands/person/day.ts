@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { resolveDate } from "../../dates.js";
 import { CliError } from "../../api/errors.js";
@@ -255,22 +255,18 @@ export function registerPersonDayCommands(
     .requiredOption("--status <id|name>", "personPvmStatusId or status name (see `ib person day statuses`)")
     .option("--text <s>", "Free-text note on the day row");
   addWriteFlagsToCommand(setCmd).action(
-    async (opts: WriteFlags & { person: number; date: string; status: string; text?: string }) => {
+    guarded(async (opts: WriteFlags & { person: number; date: string; status: string; text?: string }) => {
       if (!opts.reason) {
         failWith("Missing required flag: --reason", 4);
       }
-      try {
-        const result = await runPersonDaySet(await getClient(), opts.person, opts.date, opts.status, {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-          text: opts.text,
-        });
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const result = await runPersonDaySet(await getClient(), opts.person, opts.date, opts.status, {
+        dryRun: opts.dryRun,
+        idempotencyKey: opts.idempotencyKey,
+        reason: opts.reason,
+        text: opts.text,
+      });
+      writeJson(result);
+    })
   );
 
   const clearCmd = day
@@ -279,21 +275,17 @@ export function registerPersonDayCommands(
     .requiredOption("--person <id>", "personId", (s: string) => Number(s))
     .requiredOption("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)");
   addWriteFlagsToCommand(clearCmd).action(
-    async (opts: WriteFlags & { person: number; date: string }) => {
+    guarded(async (opts: WriteFlags & { person: number; date: string }) => {
       if (!opts.reason) {
         failWith("Missing required flag: --reason", 4);
       }
-      try {
-        const result = await runPersonDayClear(await getClient(), opts.person, opts.date, {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        });
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const result = await runPersonDayClear(await getClient(), opts.person, opts.date, {
+        dryRun: opts.dryRun,
+        idempotencyKey: opts.idempotencyKey,
+        reason: opts.reason,
+      });
+      writeJson(result);
+    })
   );
 }
 

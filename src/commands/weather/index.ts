@@ -6,11 +6,11 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { parseId } from "../../targets.js";
 import { runKeikkaGet } from "../keikka/index.js";
-import { guarded } from "../_shared/action.js";
+import { guarded, jsonAction } from "../_shared/action.js";
 
 /** Expand `now` to the current ISO timestamp; pass any other value through. */
 function resolveTime(input: string): string {
@@ -254,20 +254,9 @@ export function registerWeatherCommands(
     .requiredOption("--duration <min>", "Pumping duration in minutes", Number)
     .option("--keikka <id>", "Keikka id (for backend error correlation only)", Number)
     .action(
-      async (opts: {
-        lat: number;
-        lng: number;
-        start: string;
-        duration: number;
-        keikka?: number;
-      }) => {
-        try {
-          const client = await getClient();
-          writeJson(await runWeatherPumping(client, opts));
-        } catch (e) {
-          exitWithError(e);
-        }
-      }
+      jsonAction(getClient, (client, opts: { lat: number; lng: number; start: string; duration: number; keikka?: number; }) =>
+        runWeatherPumping(client, opts)
+      )
     );
 
   w.command("worksite <tyomaaId>")
@@ -325,7 +314,7 @@ export function registerWeatherCommands(
     .option("--on", "Enable the module")
     .option("--off", "Disable the module");
   addWriteFlagsToCommand(toggleCmd).action(
-    async (opts: {
+    guarded(async (opts: {
       on?: boolean;
       off?: boolean;
       dryRun?: boolean;
@@ -338,18 +327,14 @@ export function registerWeatherCommands(
       if (!!opts.on === !!opts.off) {
         failWith("Pass exactly one of --on / --off", 4);
       }
-      try {
-        const client = await getClient();
-        writeJson(
-          await runWeatherToggle(client, !!opts.on, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          })
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      writeJson(
+        await runWeatherToggle(client, !!opts.on, {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        })
+      );
+    })
   );
 }

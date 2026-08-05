@@ -1,6 +1,6 @@
 import { listEnvelope, toListEnvelope } from "../../../api/envelopes.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith } from "../../../output/json.js";
+import { writeJson, failWith } from "../../../output/json.js";
 import { resolveThreadId } from "./resolveThread.js";
 import { parseOptionalId, resolveSearchQuery } from "../../../targets.js";
 import { guarded } from "../../_shared/action.js";
@@ -201,16 +201,11 @@ export function registerMessageChatCommands(parent, getClient) {
         .option("--since <iso>", "Only messages created after this ISO timestamp")
         .option("--limit <n>", "Max messages (default 100, server max 500)", Number)
         .option("--deleted", "Include soft-deleted messages (your own; all for developers)")
-        .action(async (threadIdStr, opts) => {
-        try {
-            const client = await getClient();
-            const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
-            writeJson(await runChatList(client, id, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (threadIdStr, opts) => {
+        const client = await getClient();
+        const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
+        writeJson(await runChatList(client, id, opts));
+    }));
     c.command("search [query]")
         .description("Search your own messages by body text across all your threads (newest first)")
         .option("--search <s>", "Search query (alias for the <query> positional)")
@@ -225,7 +220,7 @@ export function registerMessageChatCommands(parent, getClient) {
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
         .requiredOption("--body <text>", "Message text (max 4000 chars)")
         .option("--source <src>", "Provenance: web|cli|ai (default: IB_SOURCE env or cli)");
-    addWriteFlagsToCommand(sendCmd).action(async (threadIdStr, opts) => {
+    addWriteFlagsToCommand(sendCmd).action(guarded(async (threadIdStr, opts) => {
         const body = String(opts.body ?? "").trim();
         if (!body)
             failWith("Message body cannot be empty", 4);
@@ -235,21 +230,16 @@ export function registerMessageChatCommands(parent, getClient) {
         if (!["web", "cli", "ai"].includes(source)) {
             failWith(`Invalid --source "${source}" — use web|cli|ai`, 4);
         }
-        try {
-            const client = await getClient();
-            const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
-            writeJson(await runChatSend(client, id, {
-                body,
-                source,
-                reason: opts.reason,
-                idempotencyKey: opts.idempotencyKey,
-                dryRun: opts.dryRun,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
+        writeJson(await runChatSend(client, id, {
+            body,
+            source,
+            reason: opts.reason,
+            idempotencyKey: opts.idempotencyKey,
+            dryRun: opts.dryRun,
+        }));
+    }));
     c.command("mark-read [threadId]")
         .description("Mark a thread read (stamp lastReadAt)")
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
@@ -263,33 +253,28 @@ export function registerMessageChatCommands(parent, getClient) {
         .description("Soft-delete a chat message. Author may delete own only while unanswered; a developer may moderate. --dry-run previews CLIENT-SIDE (no delete).")
         .option("--thread <id>", "Thread id the message belongs to", Number)
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
-    addWriteFlagsToCommand(deleteCmd).action(async (messageIdStr, opts) => {
+    addWriteFlagsToCommand(deleteCmd).action(guarded(async (messageIdStr, opts) => {
         const messageId = parseOptionalId(messageIdStr, "messageId");
         if (messageId === undefined)
             failWith("messageId is required", 4);
-        try {
-            const client = await getClient();
-            const id = await resolveThreadId(client, {
-                thread: opts.thread,
-                tarjous: opts.tarjous,
-            });
-            writeJson(await runChatDelete(client, id, messageId, {
-                reason: opts.reason,
-                idempotencyKey: opts.idempotencyKey,
-                dryRun: opts.dryRun,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        const id = await resolveThreadId(client, {
+            thread: opts.thread,
+            tarjous: opts.tarjous,
+        });
+        writeJson(await runChatDelete(client, id, messageId, {
+            reason: opts.reason,
+            idempotencyKey: opts.idempotencyKey,
+            dryRun: opts.dryRun,
+        }));
+    }));
     const editCmd = c
         .command("edit <messageId>")
         .description("Edit a chat message's body. Author-only and only while unanswered. --dry-run previews the from→to diff CLIENT-SIDE (no edit).")
         .option("--thread <id>", "Thread id the message belongs to", Number)
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
         .requiredOption("--body <text>", "New message text (max 4000 chars)");
-    addWriteFlagsToCommand(editCmd).action(async (messageIdStr, opts) => {
+    addWriteFlagsToCommand(editCmd).action(guarded(async (messageIdStr, opts) => {
         const messageId = parseOptionalId(messageIdStr, "messageId");
         if (messageId === undefined)
             failWith("messageId is required", 4);
@@ -298,36 +283,26 @@ export function registerMessageChatCommands(parent, getClient) {
             failWith("Message body cannot be empty", 4);
         if (body.length > 4000)
             failWith("Message body too long (max 4000 chars)", 4);
-        try {
-            const client = await getClient();
-            const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
-            writeJson(await runChatEdit(client, id, messageId, {
-                body, reason: opts.reason, idempotencyKey: opts.idempotencyKey, dryRun: opts.dryRun,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
+        writeJson(await runChatEdit(client, id, messageId, {
+            body, reason: opts.reason, idempotencyKey: opts.idempotencyKey, dryRun: opts.dryRun,
+        }));
+    }));
     const restoreCmd = c
         .command("restore <messageId>")
         .description("Restore (un-delete) a soft-deleted chat message. Author or developer. --dry-run previews via the deleted list (no restore).")
         .option("--thread <id>", "Thread id the message belongs to", Number)
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
-    addWriteFlagsToCommand(restoreCmd).action(async (messageIdStr, opts) => {
+    addWriteFlagsToCommand(restoreCmd).action(guarded(async (messageIdStr, opts) => {
         const messageId = parseOptionalId(messageIdStr, "messageId");
         if (messageId === undefined)
             failWith("messageId is required", 4);
-        try {
-            const client = await getClient();
-            const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
-            writeJson(await runChatRestore(client, id, messageId, {
-                reason: opts.reason, idempotencyKey: opts.idempotencyKey, dryRun: opts.dryRun,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
+        writeJson(await runChatRestore(client, id, messageId, {
+            reason: opts.reason, idempotencyKey: opts.idempotencyKey, dryRun: opts.dryRun,
+        }));
+    }));
 }
 //# sourceMappingURL=index.js.map

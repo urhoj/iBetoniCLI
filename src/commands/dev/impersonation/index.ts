@@ -13,7 +13,8 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../../api/client.js";
 import type { ListEnvelope } from "../../../api/envelopes.js";
 import { qs } from "../../../api/query.js";
-import { writeJson, exitWithError } from "../../../output/json.js";
+import { writeJson } from "../../../output/json.js";
+import { guarded, jsonAction } from "../../_shared/action.js";
 import { parseId } from "../../../targets.js";
 
 export interface ImpersonationSession {
@@ -90,23 +91,13 @@ export function registerImpersonationCommands(
     .option("--end-reason <r>", "Filter by endReason (manual|timeout|error|logout)")
     .option("--active", "Only still-open sessions (no end row)")
     .option("--limit <n>", "Max sessions (default 100, max 1000)", (s: string) => Number(s))
-    .action(async (opts: ImpersonationSessionsOpts) => {
-      try {
-        writeJson(await runImpersonationSessions(await getClient(), opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+    .action(jsonAction(getClient, (client, opts: ImpersonationSessionsOpts) => runImpersonationSessions(client, opts)));
 
   imp
     .command("grants <personId>")
     .description("Who may impersonate whom for one person (outbound/inbound grants)")
-    .action(async (personIdStr: string) => {
-      try {
-        const personId = parseId(personIdStr, "personId");
-        writeJson(await runImpersonationGrants(await getClient(), personId));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+    .action(guarded(async (personIdStr: string) => {
+      const personId = parseId(personIdStr, "personId");
+      writeJson(await runImpersonationGrants(await getClient(), personId));
+    }));
 }

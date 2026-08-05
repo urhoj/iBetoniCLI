@@ -26,7 +26,7 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { readJsonInput, readJsonObjectInput } from "../../api/parseBody.js";
-import { writeJson, exitWithError, failWith, failUsage, failValidation } from "../../output/json.js";
+import { writeJson, failWith, failUsage, failValidation } from "../../output/json.js";
 import type { FlagProblem } from "../../output/validationEnvelope.js";
 import { resolveDate } from "../../dates.js";
 import { parseRefId } from "../../targets.js";
@@ -606,7 +606,7 @@ export function registerChangelogCommands(
         "Read the whole entry from a JSON object file (or - for stdin); explicitly-typed flags override. Shell-safe: the only way to pass prose containing double quotes on Windows PowerShell."
       )
   ).action(
-    async (
+    guarded(async (
       description: string | undefined,
       o: Record<string, string> & WriteFlags & { feedback?: number; vtag?: string; bumpLevel?: string; fromJson?: string },
       cmd: Command
@@ -657,12 +657,8 @@ export function registerChangelogCommands(
       const addLang = normalizeLanguage(o.language);
       if (addLang) body.language = addLang;
       body.bumpLevel = o.bumpLevel || "patch";
-      try {
-        writeJson(await runChangelogAdd(await getClient(), body, o));
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      writeJson(await runChangelogAdd(await getClient(), body, o));
+    })
   );
 
   c.command("list")
@@ -753,7 +749,7 @@ export function registerChangelogCommands(
         "--from-json <file>",
         "Read the patch from a JSON object file (or - for stdin); explicitly-typed flags override. Shell-safe: the only way to pass prose containing double quotes on Windows PowerShell."
       )
-  ).action(async (idStr: string, o: Record<string, string> & WriteFlags & { vtag?: string; bumpLevel?: string; feedback?: number; fromJson?: string }, cmd: Command) => {
+  ).action(guarded(async (idStr: string, o: Record<string, string> & WriteFlags & { vtag?: string; bumpLevel?: string; feedback?: number; fromJson?: string }, cmd: Command) => {
     const id = parseRefId(idStr, "changelog", "update");
     applyFromJson(cmd, o as Record<string, unknown>);
     if (o.type !== undefined) o.type = normalizeType(o.type)!;
@@ -801,17 +797,13 @@ export function registerChangelogCommands(
     if (o.sentry) patch.sentryIssue = normalizeSentryRef(o.sentry);
     const updLang = normalizeLanguage(o.language);
     if (updLang) patch.language = updLang;
-    try {
-      const client = await getClient();
-      const result = await runWithSiblingHint(client, id, "feedback", () =>
-        runChangelogUpdate(client, id, patch, o)
-      );
-      warnIfPatchIgnored(patch, result);
-      writeJson(result);
-    } catch (e) {
-      exitWithError(e);
-    }
-  });
+    const client = await getClient();
+    const result = await runWithSiblingHint(client, id, "feedback", () =>
+      runChangelogUpdate(client, id, patch, o)
+    );
+    warnIfPatchIgnored(patch, result);
+    writeJson(result);
+  }));
 
   c.command("report")
     .description(
@@ -862,27 +854,23 @@ export function registerChangelogCommands(
       )
       .option("--vtag <v>", "Single version tag to stamp on every pending entry (e.g. 1.0.8)")
       .option("--map <file>", "JSON file (or - for stdin): [{changelogId, versionTag}] for precise per-entry stamping")
-  ).action(async (o: WriteFlags & { vtag?: string; map?: string }) => {
+  ).action(guarded(async (o: WriteFlags & { vtag?: string; map?: string }) => {
     if ((o.vtag ? 1 : 0) + (o.map ? 1 : 0) !== 1) {
       failWith("provide exactly one of --vtag or --map", 4);
     }
-    try {
-      if (o.map) {
-        let arr: unknown;
-        try { arr = readJsonInput(o.map); } catch { failWith("--map: not valid JSON", 4); }
-        if (!Array.isArray(arr)) failWith("--map: JSON root must be an array of {changelogId, versionTag}", 4);
-        writeJson(await runChangelogReleaseMap(
-          await getClient(),
-          arr as Array<{ changelogId: number; versionTag: string }>,
-          o
-        ));
-      } else {
-        writeJson(await runChangelogRelease(await getClient(), o.vtag as string, o));
-      }
-    } catch (e) {
-      exitWithError(e);
+    if (o.map) {
+      let arr: unknown;
+      try { arr = readJsonInput(o.map); } catch { failWith("--map: not valid JSON", 4); }
+      if (!Array.isArray(arr)) failWith("--map: JSON root must be an array of {changelogId, versionTag}", 4);
+      writeJson(await runChangelogReleaseMap(
+        await getClient(),
+        arr as Array<{ changelogId: number; versionTag: string }>,
+        o
+      ));
+    } else {
+      writeJson(await runChangelogRelease(await getClient(), o.vtag as string, o));
     }
-  });
+  }));
 }
 
 export const CHANGELOG_SPECS: CommandSpec[] = [

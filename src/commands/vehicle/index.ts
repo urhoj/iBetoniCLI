@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
 import { resolveDate, todayHelsinki } from "../../dates.js";
 import {
   type WriteFlags,
@@ -469,7 +469,7 @@ export function registerVehicleCommands(
       (val: string) => Number(val)
     )
     .action(
-      async (
+      guarded(async (
         opts: {
           limit?: number;
           cursor?: string;
@@ -480,22 +480,18 @@ export function registerVehicleCommands(
           asiakas?: number;
         }
       ) => {
-        try {
-          const client = await getClient();
-          const result = await runVehicleList(client, {
-            limit: opts.limit,
-            cursor: opts.cursor,
-            deleted: opts.deleted,
-            gridOnly: opts.gridOnly,
-            validOn: resolveDate(opts.validOn),
-            type: opts.type,
-            asiakas: opts.asiakas,
-          });
-          writeJson(result);
-        } catch (e) {
-          exitWithError(e);
-        }
-      }
+        const client = await getClient();
+        const result = await runVehicleList(client, {
+          limit: opts.limit,
+          cursor: opts.cursor,
+          deleted: opts.deleted,
+          gridOnly: opts.gridOnly,
+          validOn: resolveDate(opts.validOn),
+          type: opts.type,
+          asiakas: opts.asiakas,
+        });
+        writeJson(result);
+      })
     );
 
   v.command("get <vehicleId>")
@@ -604,7 +600,7 @@ export function registerVehicleCommands(
       (s: string) => Number(s)
     );
   addWriteFlagsToCommand(createCmd).action(
-    async (
+    guarded(async (
       opts: WriteFlags & {
         reg?: string;
         name?: string;
@@ -617,31 +613,27 @@ export function registerVehicleCommands(
         asiakas?: number;
       }
     ) => {
-      try {
-        const result = await runVehicleCreate(
-          await getClient(),
-          {
-            vehicleRegNo: opts.reg,
-            vehicleNimi: opts.name,
-            vehicleNo: opts.no,
-            vehicleTypeId: opts.type,
-            memo: opts.memo,
-            defaultKuski_personId: opts.defaultDriver,
-            vehicleM3: opts.capacity,
-            vehiclePuomi: opts.puomi,
-            asiakasId: opts.asiakas,
-          },
-          {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          }
-        );
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const result = await runVehicleCreate(
+        await getClient(),
+        {
+          vehicleRegNo: opts.reg,
+          vehicleNimi: opts.name,
+          vehicleNo: opts.no,
+          vehicleTypeId: opts.type,
+          memo: opts.memo,
+          defaultKuski_personId: opts.defaultDriver,
+          vehicleM3: opts.capacity,
+          vehiclePuomi: opts.puomi,
+          asiakasId: opts.asiakas,
+        },
+        {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        }
+      );
+      writeJson(result);
+    })
   );
 
   const updateCmd = v
@@ -677,7 +669,7 @@ export function registerVehicleCommands(
       "End of validity window YYYY-MM-DD (lastDate; or today/yesterday/tomorrow)"
     );
   addWriteFlagsToCommand(updateCmd).action(
-    async (
+    guarded(async (
       idStr: string,
       opts: WriteFlags & {
         reg?: string;
@@ -693,34 +685,30 @@ export function registerVehicleCommands(
         lastDate?: string;
       }
     ) => {
-      try {
-        const result = await runVehicleUpdate(
-          await getClient(),
-          parseId(idStr, "vehicleId"),
-          {
-            vehicleRegNo: opts.reg,
-            vehicleNimi: opts.name,
-            vehicleNo: opts.no,
-            vehicleTypeId: opts.type,
-            memo: opts.memo,
-            vehicleM3: opts.capacity,
-            vehiclePuomi: opts.puomi,
-            asiakasId: opts.asiakas,
-            showInGrid: opts.showInGrid,
-            firstDate: resolveDate(opts.firstDate),
-            lastDate: resolveDate(opts.lastDate),
-          },
-          {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          }
-        );
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const result = await runVehicleUpdate(
+        await getClient(),
+        parseId(idStr, "vehicleId"),
+        {
+          vehicleRegNo: opts.reg,
+          vehicleNimi: opts.name,
+          vehicleNo: opts.no,
+          vehicleTypeId: opts.type,
+          memo: opts.memo,
+          vehicleM3: opts.capacity,
+          vehiclePuomi: opts.puomi,
+          asiakasId: opts.asiakas,
+          showInGrid: opts.showInGrid,
+          firstDate: resolveDate(opts.firstDate),
+          lastDate: resolveDate(opts.lastDate),
+        },
+        {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        }
+      );
+      writeJson(result);
+    })
   );
 
   const dates = v

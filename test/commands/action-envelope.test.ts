@@ -90,12 +90,16 @@ function routesErrors(arg: ts.Node, sf: ts.SourceFile): boolean {
   if (ts.isArrowFunction(arg) || ts.isFunctionExpression(arg)) {
     return hasCatch(arg) || /\bexitWithError\s*\(/.test(arg.getText());
   }
-  // 3. a local action factory, e.g. schema's `runList(runSchemaTables)` — resolve
-  //    the callee in this file and check the factory itself contains the catch.
+  // 3. a local action factory, e.g. schema's `runOneOrBatch(runSchemaTable)` —
+  //    resolve the callee in this file and check the factory itself contains the
+  //    routing (its own catch, or one of the shared wrappers).
   const callee = ts.isCallExpression(arg) ? arg.expression : arg;
   if (ts.isIdentifier(callee)) {
     const decl = declarationText(sf, callee.text);
-    return decl !== null && /\bcatch\s*\(|\bexitWithError\s*\(/.test(decl);
+    return (
+      decl !== null &&
+      /\bcatch\s*\(|\bexitWithError\s*\(|\bguarded\s*\(|\bjsonAction\s*\(/.test(decl)
+    );
   }
   return false;
 }

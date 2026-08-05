@@ -1,6 +1,6 @@
 import { listEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { parseJsonBodyFlag, resolveJsonObjectBody } from "../../api/parseBody.js";
 import { registerLogAlias } from "../log/index.js";
@@ -373,7 +373,7 @@ export function registerWorksiteCommands(parent, getClient) {
     w.command("dashboard [tyomaaId]")
         .description("One-shot Address Information Dashboard report for a worksite (tyomaa) — merges weather, building, cadastral parcel, nearby traffic cameras, nearby sijainnit, worksite deliveries, and nearby vehicles into a single JSON, with each section independently degrading to forbidden/error instead of failing the whole report. Resolve the point from EXACTLY ONE of the positional tyomaaId or --address.")
         .option("--address <address>", "Resolve the point from a street address instead of tyomaaId")
-        .action(async (idStr, opts) => {
+        .action(guarded(async (idStr, opts) => {
         if (idStr !== undefined && opts.address !== undefined) {
             failWith("pass exactly one of <tyomaaId> or --address, not both", 4);
         }
@@ -381,34 +381,24 @@ export function registerWorksiteCommands(parent, getClient) {
             failWith("pass exactly one of <tyomaaId> or --address", 4);
         }
         const tyomaaId = idStr !== undefined ? parseId(idStr, "tyomaaId") : undefined;
-        try {
-            const client = await getClient();
-            const result = await runWorksiteDashboard(client, { tyomaaId, address: opts.address });
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        const result = await runWorksiteDashboard(client, { tyomaaId, address: opts.address });
+        writeJson(result);
+    }));
     const createCmd = w
         .command("create")
         .description("Create a new worksite (POST /api/tyomaa/new)")
         .requiredOption("--body <json>", "JSON object forwarded verbatim as the request body");
-    addWriteFlagsToCommand(createCmd).action(async (opts) => {
-        try {
-            const client = await getClient();
-            const parsed = parseJsonBodyFlag(opts.body);
-            const result = await runWorksiteCreate(client, parsed, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            });
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+    addWriteFlagsToCommand(createCmd).action(guarded(async (opts) => {
+        const client = await getClient();
+        const parsed = parseJsonBodyFlag(opts.body);
+        const result = await runWorksiteCreate(client, parsed, {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+        });
+        writeJson(result);
+    }));
     const updateCmd = w
         .command("update <tyomaaId>")
         .description("Update a worksite (owner auto-derived from the session). Set fields with typed flags " +
@@ -429,15 +419,8 @@ export function registerWorksiteCommands(parent, getClient) {
         .option("--body <json>", "Patch body (JSON), merged under the typed flags")
         .option("--from-json <file>", "Read the patch body from a file (or - for stdin) — shell-safe alternative to --body")
         .option("--yyyymmdd <date>", "Date segment YYYYMMDD (defaults to today)");
-    addWriteFlagsToCommand(updateCmd).action(async (idStr, opts) => {
-        let parsed;
-        try {
-            parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
-        }
-        catch (e) {
-            exitWithError(e);
-            return;
-        }
+    addWriteFlagsToCommand(updateCmd).action(guarded(async (idStr, opts) => {
+        const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
         const patch = buildWorksiteUpdateBody(parsed, {
             name: opts.name,
             num: opts.num,
@@ -453,31 +436,21 @@ export function registerWorksiteCommands(parent, getClient) {
         if (Object.keys(patch).length === 0) {
             failWith("update requires at least one field: typed flags (--name/--num/--address/--address2/--postal-code/--city/--driving-instructions/--comment/--invoice-ref/--contact-person) or a --body/--from-json JSON patch", 4);
         }
-        try {
-            const client = await getClient();
-            const ownerAsiakasId = resolveOwnerAsiakasId(client);
-            const result = await runWorksiteUpdate(client, { tyomaaId: parseId(idStr, "tyomaaId"), ownerAsiakasId, yyyymmdd: opts.yyyymmdd }, patch, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason });
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        const ownerAsiakasId = resolveOwnerAsiakasId(client);
+        const result = await runWorksiteUpdate(client, { tyomaaId: parseId(idStr, "tyomaaId"), ownerAsiakasId, yyyymmdd: opts.yyyymmdd }, patch, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason });
+        writeJson(result);
+    }));
     addWriteFlagsToCommand(w
         .command("delete <tyomaaId>")
-        .description("Delete a worksite (tyomaa). Requires --reason.")).action(async (tyomaaIdStr, opts) => {
+        .description("Delete a worksite (tyomaa). Requires --reason.")).action(guarded(async (tyomaaIdStr, opts) => {
         if (!opts.reason) {
             failWith("Missing required flag: --reason", 4);
         }
-        try {
-            const client = await getClient();
-            const result = await runWorksiteDelete(client, parseId(tyomaaIdStr, "tyomaaId"), opts);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        const result = await runWorksiteDelete(client, parseId(tyomaaIdStr, "tyomaaId"), opts);
+        writeJson(result);
+    }));
     addWriteFlagsToCommand(w.command("refresh-location <tyomaaId>")
         .description("Re-geocode a worksite from Google Maps")).action(guarded(async (idStr, opts) => {
         const client = await getClient();
@@ -485,18 +458,13 @@ export function registerWorksiteCommands(parent, getClient) {
     }));
     addWriteFlagsToCommand(w.command("set-geofence <tyomaaId>")
         .description("Set a worksite geofence radius in metres (1-10000)")
-        .requiredOption("--radius <m>", "Geofence radius in metres", Number)).action(async (idStr, opts) => {
+        .requiredOption("--radius <m>", "Geofence radius in metres", Number)).action(guarded(async (idStr, opts) => {
         if (!Number.isInteger(opts.radius) || opts.radius < 1 || opts.radius > 10000) {
             failWith("--radius must be an integer between 1 and 10000", 4);
         }
-        try {
-            const client = await getClient();
-            writeJson(await runWorksiteSetGeofence(client, parseId(idStr, "tyomaaId"), opts.radius, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        writeJson(await runWorksiteSetGeofence(client, parseId(idStr, "tyomaaId"), opts.radius, opts));
+    }));
     addWriteFlagsToCommand(w.command("helsinki-fetch <tyomaaId>")
         .description("Refresh Helsinki building data for a worksite")).action(guarded(async (idStr, opts) => {
         const client = await getClient();
@@ -510,37 +478,27 @@ export function registerWorksiteCommands(parent, getClient) {
         .description("Attach a person to a worksite (tyomaaPerson). Requires --reason.")
         .requiredOption("--worksite <id>", "Target tyomaaId", Number)
         .requiredOption("--person <id>", "Target personId", Number)
-        .option("--contact-type <id>", "contactPersonTypeId (default 1)", Number, 1)).action(async (opts) => {
+        .option("--contact-type <id>", "contactPersonTypeId (default 1)", Number, 1)).action(guarded(async (opts) => {
         if (!opts.reason) {
             failWith("Missing required flag: --reason", 4);
         }
-        try {
-            const client = await getClient();
-            const result = await runWorksitePersonAdd(client, { tyomaaId: opts.worksite, personId: opts.person, contactPersonTypeId: opts.contactType }, opts);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        const result = await runWorksitePersonAdd(client, { tyomaaId: opts.worksite, personId: opts.person, contactPersonTypeId: opts.contactType }, opts);
+        writeJson(result);
+    }));
     addWriteFlagsToCommand(worksitePerson
         .command("remove")
         .description("Detach a person from a worksite. Requires --reason.")
         .requiredOption("--worksite <id>", "Target tyomaaId", Number)
         .requiredOption("--person <id>", "Target personId", Number)
-        .option("--contact-type <id>", "contactPersonTypeId (default 1)", Number, 1)).action(async (opts) => {
+        .option("--contact-type <id>", "contactPersonTypeId (default 1)", Number, 1)).action(guarded(async (opts) => {
         if (!opts.reason) {
             failWith("Missing required flag: --reason", 4);
         }
-        try {
-            const client = await getClient();
-            const result = await runWorksitePersonRemove(client, { tyomaaId: opts.worksite, personId: opts.person, contactPersonTypeId: opts.contactType }, opts);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        const result = await runWorksitePersonRemove(client, { tyomaaId: opts.worksite, personId: opts.person, contactPersonTypeId: opts.contactType }, opts);
+        writeJson(result);
+    }));
     worksitePerson
         .command("list [tyomaaId]")
         .description("List persons attached to a worksite.")
@@ -569,7 +527,7 @@ export function registerWorksiteCommands(parent, getClient) {
         .requiredOption("--main <id>", "tyomaaId to KEEP (references merge into this)", Number)
         .requiredOption("--secondary <id>", "tyomaaId to REMOVE (merged away, then deleted)", Number)
         .option("--owner <id>", "ownerAsiakasId (default: active company)", Number);
-    addWriteFlagsToCommand(worksiteMergeCmd).action(async (opts) => {
+    addWriteFlagsToCommand(worksiteMergeCmd).action(guarded(async (opts) => {
         if (!Number.isInteger(opts.main) || opts.main <= 0 ||
             !Number.isInteger(opts.secondary) || opts.secondary <= 0) {
             failWith("--main and --secondary must be positive integer tyomaaIds", 4);
@@ -580,14 +538,9 @@ export function registerWorksiteCommands(parent, getClient) {
         if (!opts.dryRun && !opts.reason) {
             failWith("worksite merge is irreversible — pass --reason (or --dry-run to preview via /validate)", 4);
         }
-        try {
-            const client = await getClient();
-            const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
-            writeJson(await runWorksiteMerge(client, { mainId: opts.main, secondaryId: opts.secondary, ownerAsiakasId: owner }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
+        writeJson(await runWorksiteMerge(client, { mainId: opts.main, secondaryId: opts.secondary, ownerAsiakasId: owner }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
+    }));
 }
 //# sourceMappingURL=index.js.map

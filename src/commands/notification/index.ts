@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { CliError, exitCodeFromStatus } from "../../api/errors.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
+import { guarded } from "../_shared/action.js";
 import {
   type WriteFlags,
   writeFlagsToHeaders,
@@ -207,7 +208,7 @@ export function registerNotificationCommands(
       parseJsonObject
     );
   addWriteFlagsToCommand(sendCmd).action(
-    async (
+    guarded(async (
       opts: WriteFlags & {
         person: string;
         title: string;
@@ -215,26 +216,22 @@ export function registerNotificationCommands(
         data?: Record<string, unknown>;
       }
     ) => {
-      try {
-        const result = await runNotificationFcmSend(
-          await getClient(),
-          {
-            person: opts.person,
-            title: opts.title,
-            body: opts.body,
-            data: opts.data,
-          },
-          {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          }
-        );
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const result = await runNotificationFcmSend(
+        await getClient(),
+        {
+          person: opts.person,
+          title: opts.title,
+          body: opts.body,
+          data: opts.data,
+        },
+        {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        }
+      );
+      writeJson(result);
+    })
   );
 
   const email = n
@@ -259,7 +256,7 @@ export function registerNotificationCommands(
       "betoni"
     );
   addWriteFlagsToCommand(emailSend).action(
-    async (
+    guarded(async (
       recipient: string,
       opts: WriteFlags & {
         subject: string;
@@ -269,38 +266,34 @@ export function registerNotificationCommands(
         fromBrand?: string;
       }
     ) => {
-      try {
-        if (!opts.body && !opts.html && !opts.htmlBody) {
-          throw new CliError(
-            "one of --body, --html, or --html-body is required",
-            400,
-            null,
-            exitCodeFromStatus(400)
-          );
-        }
-        const brand = opts.fromBrand ?? "betoni";
-        if (brand !== "betoni" && brand !== "betonijerry") {
-          throw new CliError(
-            "--from-brand must be 'betoni' or 'betonijerry'",
-            400,
-            null,
-            exitCodeFromStatus(400)
-          );
-        }
-        const html = resolveEmailHtml({ html: opts.html, htmlBody: opts.htmlBody });
-        const result = await runNotificationEmailSend(
-          await getClient(),
-          { recipient, subject: opts.subject, text: opts.body, html, fromBrand: brand },
-          {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          }
+      if (!opts.body && !opts.html && !opts.htmlBody) {
+        throw new CliError(
+          "one of --body, --html, or --html-body is required",
+          400,
+          null,
+          exitCodeFromStatus(400)
         );
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
       }
-    }
+      const brand = opts.fromBrand ?? "betoni";
+      if (brand !== "betoni" && brand !== "betonijerry") {
+        throw new CliError(
+          "--from-brand must be 'betoni' or 'betonijerry'",
+          400,
+          null,
+          exitCodeFromStatus(400)
+        );
+      }
+      const html = resolveEmailHtml({ html: opts.html, htmlBody: opts.htmlBody });
+      const result = await runNotificationEmailSend(
+        await getClient(),
+        { recipient, subject: opts.subject, text: opts.body, html, fromBrand: brand },
+        {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        }
+      );
+      writeJson(result);
+    })
   );
 }

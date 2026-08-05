@@ -1,5 +1,6 @@
 import { listEnvelope } from "../../api/envelopes.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
+import { guarded, jsonAction } from "../_shared/action.js";
 import { CliError } from "../../api/errors.js";
 import { qs } from "../../api/query.js";
 import { cappedInt } from "../../targets.js";
@@ -58,42 +59,21 @@ export function registerSchemaCommands(parent, getClient, opts = {}) {
     const listOpt = (cmd) => cmd
         .option("--search <substr>", "Filter object names by substring")
         .option("--limit <n>", "Max rows (default 200, max 1000)", cappedInt(1000));
-    const runList = (fn) => async (opts) => {
-        try {
-            writeJson(await fn(await getClient(), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    };
     // Single object by default; a comma in <name> switches to batch mode
     // (`ib dev schema proc a,b,c`) — parallel fan-out, deduped, 404-tolerant.
-    const runOneOrBatch = (fn) => async (name) => {
-        try {
-            const client = await getClient();
-            if (name.includes(",")) {
-                const names = [...new Set(name.split(",").map((n) => n.trim()).filter(Boolean))];
-                writeJson(await runSchemaBatch(client, fn, names));
-            }
-            else {
-                writeJson(await fn(client, name));
-            }
+    const runOneOrBatch = (fn) => guarded(async (name) => {
+        const client = await getClient();
+        if (name.includes(",")) {
+            const names = [...new Set(name.split(",").map((n) => n.trim()).filter(Boolean))];
+            writeJson(await runSchemaBatch(client, fn, names));
         }
-        catch (e) {
-            exitWithError(e);
+        else {
+            writeJson(await fn(client, name));
         }
-    };
-    const runZero = (fn) => async () => {
-        try {
-            writeJson(await fn(await getClient()));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    };
-    listOpt(s.command("tables").description("List dbo tables")).action(runList(runSchemaTables));
-    listOpt(s.command("views").description("List dbo views")).action(runList(runSchemaViews));
-    listOpt(s.command("procs").description("List dbo stored procedures and functions")).action(runList(runSchemaProcs));
+    });
+    listOpt(s.command("tables").description("List dbo tables")).action(jsonAction(getClient, runSchemaTables));
+    listOpt(s.command("views").description("List dbo views")).action(jsonAction(getClient, runSchemaViews));
+    listOpt(s.command("procs").description("List dbo stored procedures and functions")).action(jsonAction(getClient, runSchemaProcs));
     s.command("table <name>")
         .description("Columns, keys, FKs, and indexes for a table (comma-separated names → batch)")
         .action(runOneOrBatch(runSchemaTable));
@@ -105,6 +85,6 @@ export function registerSchemaCommands(parent, getClient, opts = {}) {
         .action(runOneOrBatch(runSchemaProc));
     s.command("dump")
         .description("Structural map of the whole schema (no proc/view bodies)")
-        .action(runZero(runSchemaDump));
+        .action(jsonAction(getClient, runSchemaDump));
 }
 //# sourceMappingURL=index.js.map

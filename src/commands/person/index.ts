@@ -6,12 +6,7 @@ import {
   addWriteFlagsToCommand,
   type WriteFlags,
 } from "../../api/writeFlags.js";
-import {
-  writeJson,
-  exitWithError,
-  failWith,
-  errorMessage,
-} from "../../output/json.js";
+import { writeJson, failWith, errorMessage } from "../../output/json.js";
 import {
   decodeJwtPayload,
   impersonationFromClaims,
@@ -37,7 +32,7 @@ import { registerPersonDayCommands } from "./day.js";
 import { registerPersonEmailCommands } from "./email.js";
 import { registerPersonAbsencesCommand } from "./absences.js";
 import { registerPersonActivityCommand } from "./activity.js";
-import { jsonAction, guarded } from "../_shared/action.js";
+import { guarded, jsonAction } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 
 export interface PersonListFilter {
@@ -533,38 +528,34 @@ export function registerPersonCommands(
       "Search across every company you belong to (each hit tagged with its asiakasId)"
     )
     .action(
-      async (query: string | undefined, opts: { search?: string; limit?: number; myCompanies?: boolean }) => {
-        try {
-          const client = await getClient();
-          const q = resolveSearchQuery(query, opts.search);
-          if (opts.myCompanies) {
-            const result = await runPersonSearchMyCompanies(client, q, {
-              limit: opts.limit,
-              // Fallback used only if the server endpoint isn't deployed yet.
-              fallback: () =>
-                runPersonSearchMyCompaniesFanout(
-                  async () =>
-                    (await runCompanyList(client)).items.map((c) => ({
-                      asiakasId: c.asiakasId,
-                      name: c.name,
-                    })),
-                  async (asiakasId) =>
-                    runPersonSearch(
-                      await getClientForAsiakas(asiakasId),
-                      q,
-                      opts.limit
-                    )
-                ),
-            });
-            writeJson(result);
-            return;
-          }
-          const result = await runPersonSearch(client, q, opts.limit);
+      guarded(async (query: string | undefined, opts: { search?: string; limit?: number; myCompanies?: boolean }) => {
+        const client = await getClient();
+        const q = resolveSearchQuery(query, opts.search);
+        if (opts.myCompanies) {
+          const result = await runPersonSearchMyCompanies(client, q, {
+            limit: opts.limit,
+            // Fallback used only if the server endpoint isn't deployed yet.
+            fallback: () =>
+              runPersonSearchMyCompaniesFanout(
+                async () =>
+                  (await runCompanyList(client)).items.map((c) => ({
+                    asiakasId: c.asiakasId,
+                    name: c.name,
+                  })),
+                async (asiakasId) =>
+                  runPersonSearch(
+                    await getClientForAsiakas(asiakasId),
+                    q,
+                    opts.limit
+                  )
+              ),
+          });
           writeJson(result);
-        } catch (e) {
-          exitWithError(e);
+          return;
         }
-      }
+        const result = await runPersonSearch(client, q, opts.limit);
+        writeJson(result);
+      })
     );
 
   const notifyCmd = p
@@ -582,7 +573,7 @@ export function registerPersonCommands(
       parseJsonObject
     );
   addWriteFlagsToCommand(notifyCmd).action(
-    async (
+    guarded(async (
       person: string,
       opts: WriteFlags & {
         title: string;
@@ -590,21 +581,17 @@ export function registerPersonCommands(
         data?: Record<string, unknown>;
       }
     ) => {
-      try {
-        const result = await runNotificationFcmSend(
-          await getClient(),
-          { person, title: opts.title, body: opts.body, data: opts.data },
-          {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          }
-        );
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const result = await runNotificationFcmSend(
+        await getClient(),
+        { person, title: opts.title, body: opts.body, data: opts.data },
+        {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        }
+      );
+      writeJson(result);
+    })
   );
 
   const createCmd = p
@@ -638,7 +625,7 @@ export function registerPersonCommands(
       "Read the JSON body from a file (or - for stdin) — shell-safe alternative to --body"
     );
   addWriteFlagsToCommand(createCmd).action(
-    async (
+    guarded(async (
       opts: WriteFlags & PersonCreateFlags & { getOrCreate?: boolean; body?: string; fromJson?: string }
     ) => {
       if (!opts.reason) {
@@ -648,13 +635,7 @@ export function registerPersonCommands(
       if (opts.global && opts.asiakas !== undefined) {
         failWith("--global and --asiakas are mutually exclusive", 4);
       }
-      let parsed: Record<string, unknown>;
-      try {
-        parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
-      } catch (e) {
-        exitWithError(e);
-        return;
-      }
+      const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
       const body = buildPersonCreateBody(parsed, {
         first: opts.first,
         last: opts.last,
@@ -668,89 +649,85 @@ export function registerPersonCommands(
       if (missing.length > 0) {
         failWith(`create requires: ${missing.join(", ")}`, 4);
       }
+      const client = await getClient();
+      // ownerAsiakasId is needed by person_add; default it to the active company
+      // when neither --asiakas nor --body supplied one — but NOT for --global,
+      // whose null owner is intentional.
+      if (!opts.global && (body.ownerAsiakasId === undefined || body.ownerAsiakasId === null)) {
+        body.ownerAsiakasId = await resolveActiveOwnerAsiakasId(
+          client,
+          "run `ib auth switch` or pass --asiakas / ownerAsiakasId in --body"
+        );
+      }
+      let res: unknown;
       try {
-        const client = await getClient();
-        // ownerAsiakasId is needed by person_add; default it to the active company
-        // when neither --asiakas nor --body supplied one — but NOT for --global,
-        // whose null owner is intentional.
-        if (!opts.global && (body.ownerAsiakasId === undefined || body.ownerAsiakasId === null)) {
-          body.ownerAsiakasId = await resolveActiveOwnerAsiakasId(
-            client,
-            "run `ib auth switch` or pass --asiakas / ownerAsiakasId in --body"
+        res = await runPersonCreate(client, body, opts);
+      } catch (e) {
+        // --get-or-create: a duplicate email isn't a failure — return the
+        // person that already owns it (so bulk onboarding is idempotent).
+        if (opts.getOrCreate && body.personEmail && isDuplicateEmailError(e)) {
+          let existing: Awaited<ReturnType<typeof runPersonByEmail>> = null;
+          try {
+            existing = await runPersonByEmail(client, String(body.personEmail));
+          } catch (lookupErr) {
+            // The recovery lookup itself can 404 (the email's owner is in a
+            // company you can't see, or the route isn't deployed). Don't surface
+            // that as a misleading "person not found" — fall through to the clear
+            // guidance below.
+            if (!(lookupErr instanceof CliError && lookupErr.statusCode === 404)) throw lookupErr;
+          }
+          if (existing) {
+            writeJson({ ...existing, reused: true });
+            return;
+          }
+          // The email collides globally (the dedup is not tenant-scoped) but its
+          // owner is not visible to you — --get-or-create can only hand back a
+          // person you can access. Give an actionable error, not a bare 400/404.
+          failWith(
+            `email ${body.personEmail} is already in use by a person you cannot access ` +
+              `(likely owned by another company). --get-or-create only returns persons ` +
+              `visible to you — locate them with \`ib person search --my-companies\` or use a different email.`,
+            4
           );
         }
-        let res: unknown;
-        try {
-          res = await runPersonCreate(client, body, opts);
-        } catch (e) {
-          // --get-or-create: a duplicate email isn't a failure — return the
-          // person that already owns it (so bulk onboarding is idempotent).
-          if (opts.getOrCreate && body.personEmail && isDuplicateEmailError(e)) {
-            let existing: Awaited<ReturnType<typeof runPersonByEmail>> = null;
-            try {
-              existing = await runPersonByEmail(client, String(body.personEmail));
-            } catch (lookupErr) {
-              // The recovery lookup itself can 404 (the email's owner is in a
-              // company you can't see, or the route isn't deployed). Don't surface
-              // that as a misleading "person not found" — fall through to the clear
-              // guidance below.
-              if (!(lookupErr instanceof CliError && lookupErr.statusCode === 404)) throw lookupErr;
-            }
-            if (existing) {
-              writeJson({ ...existing, reused: true });
-              return;
-            }
-            // The email collides globally (the dedup is not tenant-scoped) but its
-            // owner is not visible to you — --get-or-create can only hand back a
-            // person you can access. Give an actionable error, not a bare 400/404.
-            failWith(
-              `email ${body.personEmail} is already in use by a person you cannot access ` +
-                `(likely owned by another company). --get-or-create only returns persons ` +
-                `visible to you — locate them with \`ib person search --my-companies\` or use a different email.`,
-              4
-            );
-          }
+        throw e;
+      }
+      // Dry-run returns the backend's wouldCreate echo verbatim.
+      if (opts.dryRun) {
+        writeJson(res);
+        return;
+      }
+      // Return a clean person record (re-fetched) instead of the raw SQL
+      // recordset (returnValue:N) the create proc emits.
+      const newId = extractPersonId(res);
+      if (!newId) {
+        writeJson(res);
+        return;
+      }
+      let created: Record<string, unknown>;
+      try {
+        created = await runPersonGet(client, newId);
+      } catch (e) {
+        // GET /api/cli/person/get is scoped to your ACTIVE company, so a person
+        // created under a non-active owned company (--asiakas <other>) 404s on
+        // read-back even though the create COMMITTED. Synthesize the record from
+        // the inputs instead of surfacing a misleading "person not found" that
+        // implies the write failed.
+        if (e instanceof CliError && e.statusCode === 404) {
+          created = {
+            personId: newId,
+            name: `${body.personFirstName || ""} ${body.personLastName || ""}`.trim() || null,
+            email: (body.personEmail as string | null | undefined) ?? null,
+            phone: (body.personPhone as string | null | undefined) ?? null,
+            ownerAsiakasId: body.ownerAsiakasId ?? null,
+            note: "created under a non-active company; record synthesized from inputs (the read-back is scoped to your active company)",
+          };
+        } else {
           throw e;
         }
-        // Dry-run returns the backend's wouldCreate echo verbatim.
-        if (opts.dryRun) {
-          writeJson(res);
-          return;
-        }
-        // Return a clean person record (re-fetched) instead of the raw SQL
-        // recordset (returnValue:N) the create proc emits.
-        const newId = extractPersonId(res);
-        if (!newId) {
-          writeJson(res);
-          return;
-        }
-        let created: Record<string, unknown>;
-        try {
-          created = await runPersonGet(client, newId);
-        } catch (e) {
-          // GET /api/cli/person/get is scoped to your ACTIVE company, so a person
-          // created under a non-active owned company (--asiakas <other>) 404s on
-          // read-back even though the create COMMITTED. Synthesize the record from
-          // the inputs instead of surfacing a misleading "person not found" that
-          // implies the write failed.
-          if (e instanceof CliError && e.statusCode === 404) {
-            created = {
-              personId: newId,
-              name: `${body.personFirstName || ""} ${body.personLastName || ""}`.trim() || null,
-              email: (body.personEmail as string | null | undefined) ?? null,
-              phone: (body.personPhone as string | null | undefined) ?? null,
-              ownerAsiakasId: body.ownerAsiakasId ?? null,
-              note: "created under a non-active company; record synthesized from inputs (the read-back is scoped to your active company)",
-            };
-          } else {
-            throw e;
-          }
-        }
-        writeJson(opts.getOrCreate ? { ...created, reused: false } : created);
-      } catch (e) {
-        exitWithError(e);
       }
-    }
+      writeJson(opts.getOrCreate ? { ...created, reused: false } : created);
+    })
   );
 
   addWriteFlagsToCommand(
@@ -773,20 +750,14 @@ export function registerPersonCommands(
         "Read the patch body from a file (or - for stdin) — shell-safe alternative to --body"
       )
   ).action(
-    async (
+    guarded(async (
       personIdStr: string,
       opts: WriteFlags & PersonUpdateFlags & { body?: string; fromJson?: string }
     ) => {
       if (!opts.reason) {
         failWith("Missing required flag: --reason", 4);
       }
-      let parsed: Record<string, unknown>;
-      try {
-        parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
-      } catch (e) {
-        exitWithError(e);
-        return;
-      }
+      const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
       const patch = buildPersonUpdateBody(parsed, {
         first: opts.first,
         last: opts.last,
@@ -800,14 +771,10 @@ export function registerPersonCommands(
           4
         );
       }
-      try {
-        const client = await getClient();
-        const result = await runPersonUpdate(client, parseId(personIdStr, "personId"), patch, opts);
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      const result = await runPersonUpdate(client, parseId(personIdStr, "personId"), patch, opts);
+      writeJson(result);
+    })
   );
 
   addWriteFlagsToCommand(
@@ -822,7 +789,7 @@ export function registerPersonCommands(
       )
       .option("--global", "Make the person GLOBAL (ownerAsiakasId=null)")
       .option("--asiakas <id>", "Set owner to this asiakasId", Number)
-  ).action(async (personIdStr: string, opts: WriteFlags & { global?: boolean; asiakas?: number }) => {
+  ).action(guarded(async (personIdStr: string, opts: WriteFlags & { global?: boolean; asiakas?: number }) => {
     if (!opts.reason) {
       failWith("Missing required flag: --reason", 4);
     }
@@ -832,31 +799,23 @@ export function registerPersonCommands(
       failWith("provide exactly one of --global or --asiakas <id>", 4);
     }
     const ownerAsiakasId = hasGlobal ? null : (opts.asiakas as number);
-    try {
-      const client = await getClient();
-      const result = await runPersonSetOwner(client, parseId(personIdStr, "personId"), ownerAsiakasId, opts);
-      writeJson(result);
-    } catch (e) {
-      exitWithError(e);
-    }
-  });
+    const client = await getClient();
+    const result = await runPersonSetOwner(client, parseId(personIdStr, "personId"), ownerAsiakasId, opts);
+    writeJson(result);
+  }));
 
   addWriteFlagsToCommand(
     p
       .command("delete <personId>")
       .description("Delete a person. Requires --reason.")
-  ).action(async (personIdStr: string, opts: WriteFlags) => {
+  ).action(guarded(async (personIdStr: string, opts: WriteFlags) => {
     if (!opts.reason) {
       failWith("Missing required flag: --reason", 4);
     }
-    try {
-      const client = await getClient();
-      const result = await runPersonDelete(client, parseId(personIdStr, "personId"), opts);
-      writeJson(result);
-    } catch (e) {
-      exitWithError(e);
-    }
-  });
+    const client = await getClient();
+    const result = await runPersonDelete(client, parseId(personIdStr, "personId"), opts);
+    writeJson(result);
+  }));
 
   // ─── person role subgroup ────────────────────────────────────────────────
   const personRole = p
@@ -881,7 +840,7 @@ export function registerPersonCommands(
       .description("Grant a role to a person in a company. Requires --role, --asiakas, --reason.")
       .requiredOption("--role <name>", "Role name (see ROLE_TYPEID_BY_NAME)")
       .requiredOption("--asiakas <id>", "Target asiakasId", (v: string) => Number(v))
-  ).action(async (personIdStr: string, opts: WriteFlags & { role: string; asiakas: number }) => {
+  ).action(guarded(async (personIdStr: string, opts: WriteFlags & { role: string; asiakas: number }) => {
     if (!opts.reason) {
       failWith("Missing required flag: --reason", 4);
     }
@@ -897,14 +856,10 @@ export function registerPersonCommands(
     if (!roleTypeId) {
       failWith("--role must not be empty", 4);
     }
-    try {
-      const client = await getClient();
-      const result = await runPersonRoleGrant(client, parseId(personIdStr, "personId"), opts.asiakas, roleTypeId, opts);
-      writeJson(result);
-    } catch (e) {
-      exitWithError(e);
-    }
-  });
+    const client = await getClient();
+    const result = await runPersonRoleGrant(client, parseId(personIdStr, "personId"), opts.asiakas, roleTypeId, opts);
+    writeJson(result);
+  }));
 
   addWriteFlagsToCommand(
     personRole
@@ -912,7 +867,7 @@ export function registerPersonCommands(
       .description("Revoke a role from a person in a company (idempotent). Requires --role, --asiakas, --reason.")
       .requiredOption("--role <name>", "Role name (see ROLE_TYPEID_BY_NAME)")
       .requiredOption("--asiakas <id>", "Target asiakasId", (v: string) => Number(v))
-  ).action(async (personIdStr: string, opts: WriteFlags & { role: string; asiakas: number }) => {
+  ).action(guarded(async (personIdStr: string, opts: WriteFlags & { role: string; asiakas: number }) => {
     if (!opts.reason) {
       failWith("Missing required flag: --reason", 4);
     }
@@ -928,14 +883,10 @@ export function registerPersonCommands(
     if (!roleTypeId) {
       failWith("--role must not be empty", 4);
     }
-    try {
-      const client = await getClient();
-      const result = await runPersonRoleRevoke(client, parseId(personIdStr, "personId"), opts.asiakas, roleTypeId, opts);
-      writeJson(result);
-    } catch (e) {
-      exitWithError(e);
-    }
-  });
+    const client = await getClient();
+    const result = await runPersonRoleRevoke(client, parseId(personIdStr, "personId"), opts.asiakas, roleTypeId, opts);
+    writeJson(result);
+  }));
 
   // `explain` resolves typeId/tiers/deprecation OFFLINE from @ibetoni/constants,
   // then enriches with the LIVE DB description/comment via an authenticated GET
@@ -999,7 +950,7 @@ export function registerPersonCommands(
     .requiredOption("--secondary <id>", "personId to REMOVE (merged away, then deleted)", Number)
     .option("--owner <id>", "ownerAsiakasId (default: active company)", Number);
   addWriteFlagsToCommand(personMergeCmd).action(
-    async (opts: WriteFlags & { main: number; secondary: number; owner?: number }) => {
+    guarded(async (opts: WriteFlags & { main: number; secondary: number; owner?: number }) => {
       if (
         !Number.isInteger(opts.main) || opts.main <= 0 ||
         !Number.isInteger(opts.secondary) || opts.secondary <= 0
@@ -1015,21 +966,17 @@ export function registerPersonCommands(
           4
         );
       }
-      try {
-        const client = await getClient();
-        const owner =
-          opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
-        writeJson(
-          await runPersonMerge(
-            client,
-            { mainId: opts.main, secondaryId: opts.secondary, ownerAsiakasId: owner },
-            { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }
-          )
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      const owner =
+        opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
+      writeJson(
+        await runPersonMerge(
+          client,
+          { mainId: opts.main, secondaryId: opts.secondary, ownerAsiakasId: owner },
+          { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }
+        )
+      );
+    })
   );
 
   p.command("log <personId>")

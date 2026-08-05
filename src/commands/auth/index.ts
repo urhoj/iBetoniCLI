@@ -21,13 +21,7 @@ import {
   buildImpersonationProfile,
   IMPERSONATOR_PROFILE,
 } from "../../auth/impersonate.js";
-import {
-  writeJson,
-  writeError,
-  exitWithError,
-  failWith,
-  errorMessage,
-} from "../../output/json.js";
+import { writeJson, writeError, failWith, errorMessage } from "../../output/json.js";
 
 /**
  * Register `ib auth` subcommands on the parent commander instance:
@@ -243,105 +237,101 @@ export function registerAuthCommands(
     .option("--email <email>", "Target email (alternative to the personId positional)")
     .option("--end", "End the active impersonation session and restore your own login")
     .option("--extend", "Extend the active impersonation session by 10 minutes")
-    .action(async (
+    .action(guarded(async (
       personId: number | undefined,
       opts: { email?: string; end?: boolean; extend?: boolean },
     ) => {
-      try {
-        const store = createStore(defaultCredentialsPath());
+      const store = createStore(defaultCredentialsPath());
 
-        // --- end: restore the stashed admin login ---
-        if (opts.end) {
-          const current = await store.load();
-          const admin = await store.load(IMPERSONATOR_PROFILE);
-          if (!admin) {
-            failWith("No active impersonation session to end.", 4);
-          }
-          // Best-effort audit end (non-fatal).
-          try {
-            const expired =
-              !!current?.expiresAt && new Date(current.expiresAt).getTime() < Date.now();
-            if (current && !expired) {
-              await performImpersonateEnd({ endpoint: current.endpoint, jwt: current.jwt });
-            } else if (current?.impersonation) {
-              await performImpersonateEnd({
-                endpoint: admin.endpoint,
-                jwt: admin.jwt,
-                sessionId: current.impersonation.sessionId,
-                targetPersonId: current.personId,
-              });
-            }
-          } catch {
-            // Audit end is best-effort — restoring the admin session must proceed.
-          }
-          await store.save(admin, "default");
-          await store.remove(IMPERSONATOR_PROFILE);
-          writeJson({ ok: true, restored: { personId: admin.personId } });
-          return;
-        }
-
-        // --- extend: renew the active session ---
-        if (opts.extend) {
-          assertPersistedSwitchAllowed(isReadOnly()); // persists a rotated JWT
-          const current = await store.load();
-          if (!current?.impersonation) {
-            failWith("No active impersonation session to extend.", 4);
-          }
-          const { token } = await performImpersonateExtend({
-            endpoint: current.endpoint,
-            jwt: current.jwt,
-          });
-          const decoded = decodeJwtPayload(token);
-          await store.save(
-            buildImpersonationProfile(token, current.endpoint, decoded, new Date().toISOString()),
-            "default",
-          );
-          writeJson({
-            ok: true,
-            expiresAt: decoded.exp ? new Date(decoded.exp * 1000).toISOString() : null,
-          });
-          return;
-        }
-
-        // --- start: mint + stash admin + persist imp session ---
-        assertPersistedSwitchAllowed(isReadOnly()); // persists a rotated JWT
-        if (personId === undefined && !opts.email) {
-          failWith("Provide a target personId or --email.", 4);
-        }
-        const admin = await store.load();
+      // --- end: restore the stashed admin login ---
+      if (opts.end) {
+        const current = await store.load();
+        const admin = await store.load(IMPERSONATOR_PROFILE);
         if (!admin) {
-          failWith("Not logged in. Run `ib auth login` first.", 2);
+          failWith("No active impersonation session to end.", 4);
         }
-        if (admin.impersonation) {
-          failWith("Already impersonating. Run `ib auth impersonate --end` first.", 4);
+        // Best-effort audit end (non-fatal).
+        try {
+          const expired =
+            !!current?.expiresAt && new Date(current.expiresAt).getTime() < Date.now();
+          if (current && !expired) {
+            await performImpersonateEnd({ endpoint: current.endpoint, jwt: current.jwt });
+          } else if (current?.impersonation) {
+            await performImpersonateEnd({
+              endpoint: admin.endpoint,
+              jwt: admin.jwt,
+              sessionId: current.impersonation.sessionId,
+              targetPersonId: current.personId,
+            });
+          }
+        } catch {
+          // Audit end is best-effort — restoring the admin session must proceed.
         }
-        // Honor the global --endpoint (like `auth login`) so impersonation can be
-        // minted against a specific backend (e.g. staging) instead of always the
-        // stored credential endpoint. The stashed admin login keeps its OWN
-        // endpoint, so `--end` restores cleanly. Absent --endpoint → prior behavior.
-        const impEndpoint = getGlobalOptions(parent).endpoint ?? admin.endpoint;
-        const { token } = await performImpersonate({
-          endpoint: impEndpoint,
-          jwt: admin.jwt,
-          personId,
-          email: opts.email,
+        await store.save(admin, "default");
+        await store.remove(IMPERSONATOR_PROFILE);
+        writeJson({ ok: true, restored: { personId: admin.personId } });
+        return;
+      }
+
+      // --- extend: renew the active session ---
+      if (opts.extend) {
+        assertPersistedSwitchAllowed(isReadOnly()); // persists a rotated JWT
+        const current = await store.load();
+        if (!current?.impersonation) {
+          failWith("No active impersonation session to extend.", 4);
+        }
+        const { token } = await performImpersonateExtend({
+          endpoint: current.endpoint,
+          jwt: current.jwt,
         });
         const decoded = decodeJwtPayload(token);
-        await store.save(admin, IMPERSONATOR_PROFILE); // stash the admin login
         await store.save(
-          buildImpersonationProfile(token, impEndpoint, decoded, new Date().toISOString()),
+          buildImpersonationProfile(token, current.endpoint, decoded, new Date().toISOString()),
           "default",
         );
         writeJson({
           ok: true,
-          impersonating: {
-            personId: decoded.personId,
-            actorPersonId: decoded.imp,
-            expiresAt: decoded.exp ? new Date(decoded.exp * 1000).toISOString() : null,
-          },
+          expiresAt: decoded.exp ? new Date(decoded.exp * 1000).toISOString() : null,
         });
-      } catch (e) {
-        exitWithError(e);
+        return;
       }
-    });
+
+      // --- start: mint + stash admin + persist imp session ---
+      assertPersistedSwitchAllowed(isReadOnly()); // persists a rotated JWT
+      if (personId === undefined && !opts.email) {
+        failWith("Provide a target personId or --email.", 4);
+      }
+      const admin = await store.load();
+      if (!admin) {
+        failWith("Not logged in. Run `ib auth login` first.", 2);
+      }
+      if (admin.impersonation) {
+        failWith("Already impersonating. Run `ib auth impersonate --end` first.", 4);
+      }
+      // Honor the global --endpoint (like `auth login`) so impersonation can be
+      // minted against a specific backend (e.g. staging) instead of always the
+      // stored credential endpoint. The stashed admin login keeps its OWN
+      // endpoint, so `--end` restores cleanly. Absent --endpoint → prior behavior.
+      const impEndpoint = getGlobalOptions(parent).endpoint ?? admin.endpoint;
+      const { token } = await performImpersonate({
+        endpoint: impEndpoint,
+        jwt: admin.jwt,
+        personId,
+        email: opts.email,
+      });
+      const decoded = decodeJwtPayload(token);
+      await store.save(admin, IMPERSONATOR_PROFILE); // stash the admin login
+      await store.save(
+        buildImpersonationProfile(token, impEndpoint, decoded, new Date().toISOString()),
+        "default",
+      );
+      writeJson({
+        ok: true,
+        impersonating: {
+          personId: decoded.personId,
+          actorPersonId: decoded.imp,
+          expiresAt: decoded.exp ? new Date(decoded.exp * 1000).toISOString() : null,
+        },
+      });
+    }));
 }

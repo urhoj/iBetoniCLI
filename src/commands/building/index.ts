@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
+import { guarded } from "../_shared/action.js";
 
 export interface BuildingLookupOptions {
   sijainti?: number;
@@ -65,7 +66,7 @@ export function registerBuildingCommands(
       "--city <name>",
       "Helsinki | Vantaa | Espoo | HSY | Ryhti (override; otherwise derived/auto-tried then national Ryhti fallback)"
     )
-    .action(async (opts: BuildingLookupOptions) => {
+    .action(guarded(async (opts: BuildingLookupOptions) => {
       const sources = selectedSources(opts);
       if (sources.length === 0) {
         failWith("provide exactly one of: --sijainti, --worksite, --lat+--lng, or --address", 4);
@@ -83,11 +84,7 @@ export function registerBuildingCommands(
       ) {
         failWith("--worksite and --tyomaa disagree; pass only one", 4);
       }
-      try {
-        const client = await getClient();
-        writeJson(await runBuildingLookup(client, opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      const client = await getClient();
+      writeJson(await runBuildingLookup(client, opts));
+    }));
 }

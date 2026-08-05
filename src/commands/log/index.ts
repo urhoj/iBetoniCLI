@@ -13,11 +13,11 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseId, parseOptionalId, cappedInt } from "../../targets.js";
-import { guarded } from "../_shared/action.js";
+import { guarded, jsonAction } from "../_shared/action.js";
 import {
   CHANGE_ENTITY_TYPES,
   findEntityType,
@@ -283,23 +283,9 @@ export function registerLogCommands(
     )
     .option("--field <name>", "Filter by changeTracker fieldName (client-side)")
     .action(
-      async (
-        entityType: string,
-        entityIdStr: string,
-        opts: { owner?: number; limit: number; field?: string }
-      ) => {
-        try {
-          const client = await getClient();
-          writeJson(
-            await runLogEntity(client, entityType, parseId(entityIdStr, "entityId"), opts.limit, {
-              owner: opts.owner,
-              field: opts.field,
-            })
-          );
-        } catch (e) {
-          exitWithError(e);
-        }
-      }
+      jsonAction(getClient, (client, entityType: string, entityIdStr: string, opts: { owner?: number; limit: number; field?: string }) =>
+        runLogEntity(client, entityType, parseId(entityIdStr, "entityId"), opts.limit, { owner: opts.owner, field: opts.field })
+      )
     );
 
   c.command("latest")
@@ -346,7 +332,7 @@ export function registerLogCommands(
       200
     )
     .action(
-      async (opts: {
+      guarded(async (opts: {
         from: string;
         to: string;
         entityType?: string;
@@ -354,22 +340,18 @@ export function registerLogCommands(
         owner?: number;
         limit: number;
       }) => {
-        try {
-          const client = await getClient();
-          writeJson(
-            await runLogRange(client, {
-              from: resolveDate(opts.from) ?? opts.from,
-              to: resolveDate(opts.to) ?? opts.to,
-              entityType: opts.entityType,
-              person: opts.person,
-              owner: opts.owner,
-              limit: opts.limit,
-            })
-          );
-        } catch (e) {
-          exitWithError(e);
-        }
-      }
+        const client = await getClient();
+        writeJson(
+          await runLogRange(client, {
+            from: resolveDate(opts.from) ?? opts.from,
+            to: resolveDate(opts.to) ?? opts.to,
+            entityType: opts.entityType,
+            person: opts.person,
+            owner: opts.owner,
+            limit: opts.limit,
+          })
+        );
+      })
     );
 
   c.command("by-entity-date")
@@ -394,28 +376,24 @@ export function registerLogCommands(
       200
     )
     .action(
-      async (opts: {
+      guarded(async (opts: {
         entityType: string;
         from: string;
         to: string;
         owner?: number;
         limit: number;
       }) => {
-        try {
-          const client = await getClient();
-          writeJson(
-            await runLogByEntityDate(client, {
-              entityType: opts.entityType,
-              from: resolveDate(opts.from) ?? opts.from,
-              to: resolveDate(opts.to) ?? opts.to,
-              owner: opts.owner,
-              limit: opts.limit,
-            })
-          );
-        } catch (e) {
-          exitWithError(e);
-        }
-      }
+        const client = await getClient();
+        writeJson(
+          await runLogByEntityDate(client, {
+            entityType: opts.entityType,
+            from: resolveDate(opts.from) ?? opts.from,
+            to: resolveDate(opts.to) ?? opts.to,
+            owner: opts.owner,
+            limit: opts.limit,
+          })
+        );
+      })
     );
 
   c.command("user [personId]")
@@ -430,29 +408,16 @@ export function registerLogCommands(
       100
     )
     .action(
-      async (personIdStr: string | undefined, opts: { owner?: number; limit: number }) => {
-        try {
-          const client = await getClient();
-          writeJson(
-            await runLogUser(client, parseOptionalId(personIdStr, "personId") ?? null, opts.limit, {
-              owner: opts.owner,
-            })
-          );
-        } catch (e) {
-          exitWithError(e);
-        }
-      }
+      jsonAction(getClient, (client, personIdStr: string | undefined, opts: { owner?: number; limit: number }) =>
+        runLogUser(client, parseOptionalId(personIdStr, "personId") ?? null, opts.limit, { owner: opts.owner })
+      )
     );
 
   c.command("types")
     .description(
       "Offline catalog of changeTracker entityTypes (id meaning, read gate, notes)."
     )
-    .action(() => {
-      try {
-        writeJson(runLogTypes());
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+    .action(guarded(() => {
+      writeJson(runLogTypes());
+    }));
 }

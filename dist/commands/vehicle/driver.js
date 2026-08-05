@@ -1,4 +1,4 @@
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { parseId } from "../../targets.js";
@@ -136,26 +136,16 @@ export function registerVehicleDriverCommands(parent, getClient) {
     addWriteFlagsToCommand(driver
         .command("assign <vehicleId> <date>")
         .description("Set the day driver of a vehicle (atomic cascade: personPvm + keikkat + palkit). Requires --reason.")
-        .requiredOption("--person <pid>", "Driver personId", (s) => Number(s))).action(async (vehicleIdStr, date, opts) => {
+        .requiredOption("--person <pid>", "Driver personId", (s) => Number(s))).action(guarded(async (vehicleIdStr, date, opts) => {
         requireReason(opts);
-        try {
-            writeJson(await runVehicleDriverAssign(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts.person, date, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        writeJson(await runVehicleDriverAssign(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts.person, date, opts));
+    }));
     addWriteFlagsToCommand(driver
         .command("clear <vehicleId> <date>")
-        .description("Remove the day driver from a vehicle (atomic; frees the driver). Requires --reason.")).action(async (vehicleIdStr, date, opts) => {
+        .description("Remove the day driver from a vehicle (atomic; frees the driver). Requires --reason.")).action(guarded(async (vehicleIdStr, date, opts) => {
         requireReason(opts);
-        try {
-            writeJson(await runVehicleDriverClear(await getClient(), parseId(vehicleIdStr, "vehicleId"), date, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        writeJson(await runVehicleDriverClear(await getClient(), parseId(vehicleIdStr, "vehicleId"), date, opts));
+    }));
     // ── standing default driver ──
     const def = driver
         .command("default")
@@ -169,25 +159,15 @@ export function registerVehicleDriverCommands(parent, getClient) {
     addWriteFlagsToCommand(def
         .command("set <vehicleId>")
         .description("Set the standing default driver (cascades to future dates). Requires --reason.")
-        .requiredOption("--person <pid>", "Default driver personId", (s) => Number(s))).action(async (vehicleIdStr, opts) => {
+        .requiredOption("--person <pid>", "Default driver personId", (s) => Number(s))).action(guarded(async (vehicleIdStr, opts) => {
         requireReason(opts);
-        try {
-            writeJson(await runVehicleDefaultSet(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts.person, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        writeJson(await runVehicleDefaultSet(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts.person, opts));
+    }));
     addWriteFlagsToCommand(def
         .command("clear <vehicleId>")
-        .description("Clear the standing default driver (cascades to future dates). Requires --reason.")).action(async (vehicleIdStr, opts) => {
+        .description("Clear the standing default driver (cascades to future dates). Requires --reason.")).action(guarded(async (vehicleIdStr, opts) => {
         requireReason(opts);
-        try {
-            writeJson(await runVehicleDefaultSet(await getClient(), parseId(vehicleIdStr, "vehicleId"), null, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        writeJson(await runVehicleDefaultSet(await getClient(), parseId(vehicleIdStr, "vehicleId"), null, opts));
+    }));
 }
 //# sourceMappingURL=driver.js.map

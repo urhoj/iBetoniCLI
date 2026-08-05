@@ -1,10 +1,10 @@
 import { CliError } from "../../api/errors.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { parseId } from "../../targets.js";
 import { runKeikkaGet } from "../keikka/index.js";
-import { guarded } from "../_shared/action.js";
+import { guarded, jsonAction } from "../_shared/action.js";
 /** Expand `now` to the current ISO timestamp; pass any other value through. */
 function resolveTime(input) {
     return input === "now" ? new Date().toISOString() : input;
@@ -163,15 +163,7 @@ export function registerWeatherCommands(parent, getClient, opts = {}) {
         .requiredOption("--start <iso>", "Pumping start (ISO 8601, or 'now')")
         .requiredOption("--duration <min>", "Pumping duration in minutes", Number)
         .option("--keikka <id>", "Keikka id (for backend error correlation only)", Number)
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runWeatherPumping(client, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(jsonAction(getClient, (client, opts) => runWeatherPumping(client, opts)));
     w.command("worksite <tyomaaId>")
         .description("Forecast for a worksite (resolves coordinates from the tyomaa)")
         .option("--force-refresh", "Bypass the cache and refetch from FMI")
@@ -211,24 +203,19 @@ export function registerWeatherCommands(parent, getClient, opts = {}) {
         .description("Enable/disable the weather module (admin)")
         .option("--on", "Enable the module")
         .option("--off", "Disable the module");
-    addWriteFlagsToCommand(toggleCmd).action(async (opts) => {
+    addWriteFlagsToCommand(toggleCmd).action(guarded(async (opts) => {
         // Covers both "neither" and "both" — failWith keeps the envelope honest
         // (statusCode 0: no HTTP request happened) and matches the spec's exit-4
         // row so the remedy surfaces as the envelope hint.
         if (!!opts.on === !!opts.off) {
             failWith("Pass exactly one of --on / --off", 4);
         }
-        try {
-            const client = await getClient();
-            writeJson(await runWeatherToggle(client, !!opts.on, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        writeJson(await runWeatherToggle(client, !!opts.on, {
+            dryRun: opts.dryRun,
+            idempotencyKey: opts.idempotencyKey,
+            reason: opts.reason,
+        }));
+    }));
 }
 //# sourceMappingURL=index.js.map

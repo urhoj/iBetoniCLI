@@ -269,9 +269,18 @@ describe("glossary assessment fields from --from-json (fb#298)", () => {
     await withJsonFile({ definition: "d", aiConfidence: 150 }, async (p) => {
       const program = new Command();
       registerGlossaryCommands(program, async () => mkClient({ put }));
-      await expect(
-        program.parseAsync(["glossary", "set", "x", "--from-json", p], { from: "user" })
-      ).rejects.toMatchObject({ exitCode: 4 });
+      // The guard's CliError is caught by the action's `guarded` tail, so the
+      // failure surfaces as the exit-4 envelope rather than a parse rejection.
+      const prevExit = process.exitCode;
+      process.exitCode = undefined;
+      const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+      try {
+        await program.parseAsync(["glossary", "set", "x", "--from-json", p], { from: "user" });
+        expect(process.exitCode).toBe(4);
+      } finally {
+        stderr.mockRestore();
+        process.exitCode = prevExit;
+      }
     });
     expect(put).not.toHaveBeenCalled();
   });

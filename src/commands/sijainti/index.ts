@@ -6,12 +6,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import {
-  writeJson,
-  exitWithError,
-  failWith,
-  errorMessage,
-} from "../../output/json.js";
+import { writeJson, exitWithError, failWith, errorMessage } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
@@ -940,7 +935,7 @@ export function registerSijaintiCommands(
       "Only BetoniJerry-enrolled varikot; adds a derived `matchable` boolean (enrolment active + coords + delivery radius > 0)"
     )
     .action(
-      async (opts: {
+      guarded(async (opts: {
         type?: string;
         search?: string;
         limit?: number;
@@ -951,23 +946,19 @@ export function registerSijaintiCommands(
         jerry?: boolean;
       }) => {
         assertValidAsiakasFlag(opts.asiakas);
-        try {
-          const client = await getClient();
-          const result = await runSijaintiListJoined(client, {
-            type: opts.type,
-            search: opts.search,
-            limit: opts.limit,
-            validAt: opts.validAt ? resolveDate(opts.validAt) : undefined,
-            includeDeleted: opts.includeDeleted,
-            all: opts.all,
-            owner: opts.asiakas,
-            jerry: opts.jerry,
-          });
-          writeJson(result);
-        } catch (e) {
-          exitWithError(e);
-        }
-      }
+        const client = await getClient();
+        const result = await runSijaintiListJoined(client, {
+          type: opts.type,
+          search: opts.search,
+          limit: opts.limit,
+          validAt: opts.validAt ? resolveDate(opts.validAt) : undefined,
+          includeDeleted: opts.includeDeleted,
+          all: opts.all,
+          owner: opts.asiakas,
+          jerry: opts.jerry,
+        });
+        writeJson(result);
+      })
     );
 
   s.command("plants")
@@ -981,20 +972,16 @@ export function registerSijaintiCommands(
       "Case-insensitive substring over name/address (same semantics as `list --search`)"
     )
     .option("--limit <n>", "Max rows", cappedInt(500))
-    .action(async (opts: { asiakas?: number; search?: string; limit?: number }) => {
+    .action(guarded(async (opts: { asiakas?: number; search?: string; limit?: number }) => {
       assertValidAsiakasFlag(opts.asiakas);
-      try {
-        const client = await getClient();
-        const result = await runSijaintiPlants(client, {
-          asiakas: opts.asiakas,
-          search: opts.search,
-          limit: opts.limit,
-        });
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      const client = await getClient();
+      const result = await runSijaintiPlants(client, {
+        asiakas: opts.asiakas,
+        search: opts.search,
+        limit: opts.limit,
+      });
+      writeJson(result);
+    }));
 
   s.command("get <sijaintiId>")
     .description("Get a single sijainti by sijaintiId")
@@ -1011,7 +998,7 @@ export function registerSijaintiCommands(
       "One-shot Address Information Dashboard report for a sijainti (location) — merges weather, building, cadastral parcel, nearby traffic cameras, nearby sijainnit, worksite deliveries, and nearby vehicles into a single JSON, with each section independently degrading to forbidden/error instead of failing the whole report. Resolve the point from EXACTLY ONE of the positional sijaintiId or --address."
     )
     .option("--address <address>", "Resolve the point from a street address instead of sijaintiId")
-    .action(async (idStr: string | undefined, opts: { address?: string }) => {
+    .action(guarded(async (idStr: string | undefined, opts: { address?: string }) => {
       if (idStr !== undefined && opts.address !== undefined) {
         failWith("pass exactly one of <sijaintiId> or --address, not both", 4);
       }
@@ -1019,14 +1006,10 @@ export function registerSijaintiCommands(
         failWith("pass exactly one of <sijaintiId> or --address", 4);
       }
       const sijaintiId = idStr !== undefined ? parseId(idStr, "sijaintiId") : undefined;
-      try {
-        const client = await getClient();
-        const result = await runSijaintiDashboard(client, { sijaintiId, address: opts.address });
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      const client = await getClient();
+      const result = await runSijaintiDashboard(client, { sijaintiId, address: opts.address });
+      writeJson(result);
+    }));
 
   const createCmd = s
     .command("create")
@@ -1054,7 +1037,7 @@ export function registerSijaintiCommands(
       "Resolve lat/lng from the address via Google Maps when coordinates are not given (then persisted + echoed)"
     );
   addWriteFlagsToCommand(createCmd).action(
-    async (opts: {
+    guarded(async (opts: {
       body?: string;
       name?: string;
       address?: string;
@@ -1072,57 +1055,53 @@ export function registerSijaintiCommands(
       reason?: string;
     }) => {
       assertPuomiFlags(opts.puomiMin, opts.puomiMax);
-      try {
-        const client = await getClient();
-        const parsed = opts.body
-          ? parseJsonBodyFlag(opts.body)
-          : {};
-        const body = buildSijaintiBody(parsed, {
-          name: opts.name,
-          address: opts.address,
-          type: opts.type,
-          lat: opts.lat,
-          lng: opts.lng,
-          lyh: opts.lyh,
-          maxDeliveryDistance: opts.maxDistance,
-          asiakasId: opts.asiakas,
-          puomiMin: opts.puomiMin,
-          puomiMax: opts.puomiMax,
-        });
-        // asiakasId is a NOT NULL FK the add proc inserts directly — default it
-        // to the caller's active company when neither --asiakas nor --body gave one.
-        if (body.asiakasId === undefined || body.asiakasId === null) {
-          body.asiakasId = await resolveOwnerAsiakasId(client);
-        }
-        // Fill sijaintiLyh / maxDeliveryDistance defaults and check the required
-        // fields the add proc inserts without a fallback (so we fail fast with a
-        // clear message instead of a NOT NULL 500 that --dry-run used to miss).
-        const { missing } = applySijaintiCreateDefaults(body);
-        if (missing.length > 0) {
-          failWith(`create requires: ${missing.join(", ")}`, 4);
-        }
-        // --geocode: resolve lat/lng from the address up front so the coords can
-        // be persisted (the add proc itself binds no lat/lng — see
-        // persistSijaintiCoords) and a ZERO_RESULTS address fails fast here.
-        if (opts.geocode) await applyGeocodeToBody(client, body);
-        const flags = {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        };
-        const result = await runSijaintiCreate(client, body, flags);
-        // The add proc drops lat/lng; persist them via the dedicated updateLatLng
-        // route (the FE's create→saveLatLng flow) and echo { lat, lng, coordsPersisted }.
-        const newId = !opts.dryRun
-          ? (result as { sijaintiId?: number } | null)?.sijaintiId
-          : undefined;
-        writeJson(
-          await persistSijaintiCoords(client, result, newId, { lat: body.lat, lng: body.lng }, flags)
-        );
-      } catch (e) {
-        exitWithError(e);
+      const client = await getClient();
+      const parsed = opts.body
+        ? parseJsonBodyFlag(opts.body)
+        : {};
+      const body = buildSijaintiBody(parsed, {
+        name: opts.name,
+        address: opts.address,
+        type: opts.type,
+        lat: opts.lat,
+        lng: opts.lng,
+        lyh: opts.lyh,
+        maxDeliveryDistance: opts.maxDistance,
+        asiakasId: opts.asiakas,
+        puomiMin: opts.puomiMin,
+        puomiMax: opts.puomiMax,
+      });
+      // asiakasId is a NOT NULL FK the add proc inserts directly — default it
+      // to the caller's active company when neither --asiakas nor --body gave one.
+      if (body.asiakasId === undefined || body.asiakasId === null) {
+        body.asiakasId = await resolveOwnerAsiakasId(client);
       }
-    }
+      // Fill sijaintiLyh / maxDeliveryDistance defaults and check the required
+      // fields the add proc inserts without a fallback (so we fail fast with a
+      // clear message instead of a NOT NULL 500 that --dry-run used to miss).
+      const { missing } = applySijaintiCreateDefaults(body);
+      if (missing.length > 0) {
+        failWith(`create requires: ${missing.join(", ")}`, 4);
+      }
+      // --geocode: resolve lat/lng from the address up front so the coords can
+      // be persisted (the add proc itself binds no lat/lng — see
+      // persistSijaintiCoords) and a ZERO_RESULTS address fails fast here.
+      if (opts.geocode) await applyGeocodeToBody(client, body);
+      const flags = {
+        dryRun: opts.dryRun,
+        idempotencyKey: opts.idempotencyKey,
+        reason: opts.reason,
+      };
+      const result = await runSijaintiCreate(client, body, flags);
+      // The add proc drops lat/lng; persist them via the dedicated updateLatLng
+      // route (the FE's create→saveLatLng flow) and echo { lat, lng, coordsPersisted }.
+      const newId = !opts.dryRun
+        ? (result as { sijaintiId?: number } | null)?.sijaintiId
+        : undefined;
+      writeJson(
+        await persistSijaintiCoords(client, result, newId, { lat: body.lat, lng: body.lng }, flags)
+      );
+    })
   );
 
   const updateCmd = s
@@ -1150,7 +1129,7 @@ export function registerSijaintiCommands(
       "Re-resolve lat/lng from the (changed) address via Google Maps when coordinates are not given (then persisted + echoed)"
     );
   addWriteFlagsToCommand(updateCmd).action(
-    async (opts: {
+    guarded(async (opts: {
       body?: string;
       id?: number;
       name?: string;
@@ -1168,60 +1147,56 @@ export function registerSijaintiCommands(
       reason?: string;
     }) => {
       assertPuomiFlags(opts.puomiMin, opts.puomiMax);
-      try {
-        const client = await getClient();
-        const parsed = opts.body
-          ? parseJsonBodyFlag(opts.body)
-          : {};
-        const body = buildSijaintiBody(parsed, {
-          id: opts.id,
-          name: opts.name,
-          address: opts.address,
-          type: opts.type,
-          lat: opts.lat,
-          lng: opts.lng,
-          lyh: opts.lyh,
-          maxDeliveryDistance: opts.maxDistance,
-          puomiMin: opts.puomiMin,
-          puomiMax: opts.puomiMax,
-        });
-        if (body.sijaintiId === undefined) {
-          failWith("update requires sijaintiId — pass --id or include it in --body", 4);
-        }
-        const flags = {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        };
-        const { result, merged, geocodeFailed } = await runSijaintiUpdate(
-          client,
-          body,
-          flags,
-          !!opts.geocode
-        );
-        // The save proc drops lat/lng; persist them via the dedicated updateLatLng
-        // route (the FE's update→saveLatLng flow) and echo { lat, lng, coordsPersisted }.
-        const sijaintiId = !opts.dryRun ? Number(body.sijaintiId) : undefined;
-        const echo = await persistSijaintiCoords(
-          client,
-          result,
-          sijaintiId,
-          { lat: merged.lat, lng: merged.lng },
-          flags
-        );
-        if (geocodeFailed) {
-          const base =
-            echo && typeof echo === "object"
-              ? (echo as Record<string, unknown>)
-              : { result: echo };
-          writeJson({ ...base, coordsPersisted: false, geocodeFailed });
-        } else {
-          writeJson(echo);
-        }
-      } catch (e) {
-        exitWithError(e);
+      const client = await getClient();
+      const parsed = opts.body
+        ? parseJsonBodyFlag(opts.body)
+        : {};
+      const body = buildSijaintiBody(parsed, {
+        id: opts.id,
+        name: opts.name,
+        address: opts.address,
+        type: opts.type,
+        lat: opts.lat,
+        lng: opts.lng,
+        lyh: opts.lyh,
+        maxDeliveryDistance: opts.maxDistance,
+        puomiMin: opts.puomiMin,
+        puomiMax: opts.puomiMax,
+      });
+      if (body.sijaintiId === undefined) {
+        failWith("update requires sijaintiId — pass --id or include it in --body", 4);
       }
-    }
+      const flags = {
+        dryRun: opts.dryRun,
+        idempotencyKey: opts.idempotencyKey,
+        reason: opts.reason,
+      };
+      const { result, merged, geocodeFailed } = await runSijaintiUpdate(
+        client,
+        body,
+        flags,
+        !!opts.geocode
+      );
+      // The save proc drops lat/lng; persist them via the dedicated updateLatLng
+      // route (the FE's update→saveLatLng flow) and echo { lat, lng, coordsPersisted }.
+      const sijaintiId = !opts.dryRun ? Number(body.sijaintiId) : undefined;
+      const echo = await persistSijaintiCoords(
+        client,
+        result,
+        sijaintiId,
+        { lat: merged.lat, lng: merged.lng },
+        flags
+      );
+      if (geocodeFailed) {
+        const base =
+          echo && typeof echo === "object"
+            ? (echo as Record<string, unknown>)
+            : { result: echo };
+        writeJson({ ...base, coordsPersisted: false, geocodeFailed });
+      } else {
+        writeJson(echo);
+      }
+    })
   );
 
   const setJerryCmd = s
@@ -1240,7 +1215,7 @@ export function registerSijaintiCommands(
     .option("--puomi-min <m>", "puomiMin (m) to set while enrolling (BetoniJerry boom-range matching)", Number)
     .option("--puomi-max <m>", "puomiMax (m) to set while enrolling (BetoniJerry boom-range matching)", Number);
   addWriteFlagsToCommand(setJerryCmd).action(
-    async (
+    guarded(async (
       idStr: string,
       opts: {
         on?: boolean;
@@ -1261,27 +1236,23 @@ export function registerSijaintiCommands(
         failWith("--radius must be a positive number of km", 4);
       }
       assertPuomiFlags(opts.puomiMin, opts.puomiMax);
-      try {
-        const client = await getClient();
-        const result = await runSijaintiSetJerry(
-          client,
-          parseId(idStr, "sijaintiId"),
-          !!opts.on,
-          {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          },
-          opts.radius,
-          opts.puomiMin !== undefined || opts.puomiMax !== undefined
-            ? { min: opts.puomiMin, max: opts.puomiMax }
-            : undefined
-        );
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      const result = await runSijaintiSetJerry(
+        client,
+        parseId(idStr, "sijaintiId"),
+        !!opts.on,
+        {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        },
+        opts.radius,
+        opts.puomiMin !== undefined || opts.puomiMax !== undefined
+          ? { min: opts.puomiMin, max: opts.puomiMax }
+          : undefined
+      );
+      writeJson(result);
+    })
   );
 
   // delete / undelete are the same registration — one <sijaintiId>, write flags,
@@ -1300,17 +1271,13 @@ export function registerSijaintiCommands(
   ] as const) {
     addWriteFlagsToCommand(
       s.command(`${name} <sijaintiId>`).description(description)
-    ).action(async (idStr: string, opts: WriteFlags) => {
+    ).action(guarded(async (idStr: string, opts: WriteFlags) => {
       if (!opts.reason) {
         failWith("Missing required flag: --reason", 4);
       }
-      try {
-        const client = await getClient();
-        writeJson(await run(client, parseId(idStr, "sijaintiId"), opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      const client = await getClient();
+      writeJson(await run(client, parseId(idStr, "sijaintiId"), opts));
+    }));
   }
 
   s.command("types")

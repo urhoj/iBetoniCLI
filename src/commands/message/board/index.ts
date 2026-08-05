@@ -6,7 +6,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../../api/writeFlags.js";
-import { writeJson, exitWithError, failWith } from "../../../output/json.js";
+import { writeJson, failWith } from "../../../output/json.js";
 import { resolveDate, todayHelsinki } from "../../../dates.js";
 import type { CommandSpec } from "../../../output/help.js";
 import { guarded } from "../../_shared/action.js";
@@ -289,7 +289,7 @@ export function registerMessageBoardCommands(
         "--date takes today|yesterday|tomorrow or YYYYMMDD (defaults to today)."
     )
     .option("--date <d>", "Day to query: today|yesterday|tomorrow|YYYYMMDD (default today)")
-    .action(async (opts: { date?: string }) => {
+    .action(guarded(async (opts: { date?: string }) => {
       const date = toBoardQueryDate(opts.date);
       if (!date) {
         failWith(
@@ -297,13 +297,9 @@ export function registerMessageBoardCommands(
           4
         );
       }
-      try {
-        const client = await getClient();
-        writeJson(await runBoardList(client, date));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      const client = await getClient();
+      writeJson(await runBoardList(client, date));
+    }));
 
   b.command("all")
     .description(
@@ -322,17 +318,13 @@ export function registerMessageBoardCommands(
       "Get one notice by id (no single-GET route — filtered client-side over /all, " +
         "so it needs the same admin/editor access). Unknown id → exit 5."
     )
-    .action(async (raw: string) => {
+    .action(guarded(async (raw: string) => {
       const messageId = parseMessageId(raw);
-      try {
-        const client = await getClient();
-        const row = await runBoardGet(client, messageId);
-        if (!row) failWith(`No board message with id ${messageId}`, 5);
-        writeJson(row);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      const client = await getClient();
+      const row = await runBoardGet(client, messageId);
+      if (!row) failWith(`No board message with id ${messageId}`, 5);
+      writeJson(row);
+    }));
 
   const createCmd = b
     .command("create")
@@ -348,7 +340,7 @@ export function registerMessageBoardCommands(
     .option("--start-date <d>", "Day the notice becomes visible: today|YYYY-MM-DD")
     .option("--expires-at <d>", "Last day visible: YYYY-MM-DD (omit = never expires)");
   addWriteFlagsToCommand(createCmd).action(
-    async (opts: {
+    guarded(async (opts: {
       title: string;
       text: string;
       priority?: string;
@@ -361,20 +353,16 @@ export function registerMessageBoardCommands(
       if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
       if (!opts.startDate) failWith("Missing required flag: --start-date", 4);
       assertPriority(opts.priority);
-      try {
-        const client = await getClient();
-        const fields = buildBoardFields(opts);
-        writeJson(
-          await runBoardCreate(client, fields, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          })
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      const fields = buildBoardFields(opts);
+      writeJson(
+        await runBoardCreate(client, fields, {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        })
+      );
+    })
   );
 
   const updateCmd = b
@@ -391,7 +379,7 @@ export function registerMessageBoardCommands(
     .option("--start-date <d>", "Day the notice becomes visible: today|YYYY-MM-DD")
     .option("--expires-at <d>", 'Last day visible: YYYY-MM-DD (pass "" to clear the expiry)');
   addWriteFlagsToCommand(updateCmd).action(
-    async (
+    guarded(async (
       raw: string,
       opts: {
         title?: string;
@@ -407,20 +395,16 @@ export function registerMessageBoardCommands(
       const messageId = parseMessageId(raw);
       if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
       assertPriority(opts.priority);
-      try {
-        const client = await getClient();
-        const fields = buildBoardFields(opts);
-        writeJson(
-          await runBoardUpdate(client, messageId, fields, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          })
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      const fields = buildBoardFields(opts);
+      writeJson(
+        await runBoardUpdate(client, messageId, fields, {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        })
+      );
+    })
   );
 
   const deleteCmd = b
@@ -431,25 +415,21 @@ export function registerMessageBoardCommands(
         "Admins delete any row; editors only their own."
     );
   addWriteFlagsToCommand(deleteCmd).action(
-    async (
+    guarded(async (
       raw: string,
       opts: { dryRun?: boolean; idempotencyKey?: string; reason?: string }
     ) => {
       const messageId = parseMessageId(raw);
       if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
-      try {
-        const client = await getClient();
-        writeJson(
-          await runBoardDelete(client, messageId, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-          })
-        );
-      } catch (e) {
-        exitWithError(e);
-      }
-    }
+      const client = await getClient();
+      writeJson(
+        await runBoardDelete(client, messageId, {
+          dryRun: opts.dryRun,
+          idempotencyKey: opts.idempotencyKey,
+          reason: opts.reason,
+        })
+      );
+    })
   );
 }
 

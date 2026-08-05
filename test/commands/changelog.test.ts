@@ -21,6 +21,36 @@ function captureThrow(fn: () => void): { exitCode?: number; body?: { problems?: 
   throw new Error("expected fn to throw");
 }
 
+/**
+ * Run a parse whose in-action guard fails, and return what the CALLER sees: the
+ * JSON error envelope on stderr plus the mapped exit code. The guard's CliError
+ * is caught by the action's `guarded` tail (same envelope/code `handleParse-
+ * Rejection` would have produced for a throw outside it), so `parseAsync`
+ * resolves instead of rejecting. `process.exitCode` is restored so a guard
+ * assertion never leaks into the runner's own exit code.
+ */
+async function captureActionError(
+  run: () => Promise<unknown>
+): Promise<{ exitCode: number | undefined; envelope: Record<string, unknown> }> {
+  const prevExit = process.exitCode;
+  process.exitCode = undefined;
+  const chunks: string[] = [];
+  const spy = vi.spyOn(process.stderr, "write").mockImplementation((s: unknown) => {
+    chunks.push(String(s));
+    return true;
+  });
+  try {
+    await run();
+    return {
+      exitCode: process.exitCode as number | undefined,
+      envelope: JSON.parse(chunks.join("")) as Record<string, unknown>,
+    };
+  } finally {
+    spy.mockRestore();
+    process.exitCode = prevExit;
+  }
+}
+
 const asPost = () => client.post as ReturnType<typeof vi.fn>;
 const asGet = () => client.get as ReturnType<typeof vi.fn>;
 const asPut = () => client.put as ReturnType<typeof vi.fn>;
@@ -366,17 +396,18 @@ describe("validateFieldLengths — bounded free-text caps (fb#206)", () => {
   });
 
   test("add with an over-length --status exits 4 without POSTing (fb#206)", async () => {
-    // validateFieldLengths runs (like validateEnums) outside the action try, so
-    // the CliError propagates out of parseAsync to the bin's CliError-aware catch
-    // (exit 4) — the POST is never reached.
+    // validateFieldLengths runs (like validateEnums) before the request is
+    // built, so the CliError surfaces as the exit-4 envelope — the POST is
+    // never reached.
     asPost().mockResolvedValue({ changelogId: 1 });
     const program = new Command();
     registerChangelogCommands(program, async () => client);
-    await expect(program.parseAsync(
+    const { exitCode } = await captureActionError(() => program.parseAsync(
       ["changelog", "add", "--type", "bugfix", "--area", "cli", "--title", "t",
         "--description", "d", "--status", "x".repeat(40)],
       { from: "user" }
-    )).rejects.toMatchObject({ exitCode: 4 });
+    ));
+    expect(exitCode).toBe(4);
     expect(asPost()).not.toHaveBeenCalled();
   });
 });
@@ -576,11 +607,12 @@ describe("changelog --commit alias for --sha (fb#210)", () => {
     asPost().mockResolvedValue({ changelogId: 1 });
     const program = new Command();
     registerChangelogCommands(program, async () => client);
-    await expect(program.parseAsync(
+    const { exitCode } = await captureActionError(() => program.parseAsync(
       ["changelog", "add", "--type", "bugfix", "--area", "cli", "--title", "t",
         "--description", "d", "--commit", "x".repeat(501)],
       { from: "user" }
-    )).rejects.toMatchObject({ exitCode: 4 });
+    ));
+    expect(exitCode).toBe(4);
     expect(asPost()).not.toHaveBeenCalled();
   });
 });
@@ -764,10 +796,11 @@ describe("changelog add/update --from-json (fb#300)", () => {
   test("a missing --from-json file exits 4 without POSTing", async () => {
     const program = new Command();
     registerChangelogCommands(program, async () => client);
-    await expect(program.parseAsync(
+    const { exitCode } = await captureActionError(() => program.parseAsync(
       ["changelog", "add", "--from-json", join(tmpdir(), "ib-does-not-exist-300.json")],
       { from: "user" }
-    )).rejects.toMatchObject({ exitCode: 4 });
+    ));
+    expect(exitCode).toBe(4);
     expect(asPost()).not.toHaveBeenCalled();
   });
 
@@ -777,13 +810,14 @@ describe("changelog add/update --from-json (fb#300)", () => {
     // the action and must keep the fb#204 prescriptive envelope.
     const program = new Command();
     registerChangelogCommands(program, async () => client);
-    const err = await program.parseAsync(["changelog", "add", "--repo", "betonicli"], { from: "user" })
-      .then(() => null, (e) => e);
-    expect(err.exitCode).toBe(4);
-    const problems = err.body.problems as Array<{ flag: string; allowed?: string[] }>;
+    const { exitCode, envelope } = await captureActionError(() =>
+      program.parseAsync(["changelog", "add", "--repo", "betonicli"], { from: "user" })
+    );
+    expect(exitCode).toBe(4);
+    const problems = envelope.problems as Array<{ flag: string; allowed?: string[] }>;
     expect(problems.map((p) => p.flag)).toEqual(["--type", "--area", "--title", "--description"]);
     expect(problems[0].allowed).toEqual(["feature", "improvement", "bugfix"]);
-    expect(String(err.body.sample)).toContain("ib dev changelog add");
+    expect(String(envelope.sample)).toContain("ib dev changelog add");
     expect(asPost()).not.toHaveBeenCalled();
   });
 
@@ -808,8 +842,10 @@ describe("changelog add/update --from-json (fb#300)", () => {
     await withJsonFile({ entryDate: "2026-08-05" }, async (p) => {
       const program = new Command();
       registerChangelogCommands(program, async () => client);
-      await expect(program.parseAsync(["changelog", "update", "386", "--from-json", p], { from: "user" }))
-        .rejects.toMatchObject({ exitCode: 4 });
+      const { exitCode } = await captureActionError(() =>
+        program.parseAsync(["changelog", "update", "386", "--from-json", p], { from: "user" })
+      );
+      expect(exitCode).toBe(4);
     });
     expect(asPut()).not.toHaveBeenCalled();
   });
@@ -848,7 +884,8 @@ describe("changelog update — bumpLevel/feedback/sentry (fb#303)", () => {
   });
 
   test("an invalid --bump-level exits 4 before any PUT", async () => {
-    await expect(parse(["386", "--bump-level", "huge"])).rejects.toMatchObject({ exitCode: 4 });
+    const { exitCode } = await captureActionError(() => parse(["386", "--bump-level", "huge"]));
+    expect(exitCode).toBe(4);
     expect(asPut()).not.toHaveBeenCalled();
   });
 
