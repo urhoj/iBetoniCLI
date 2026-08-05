@@ -1922,6 +1922,7 @@ FLAGS
   --source STRING    Source: human (default) | routine (automated AI-routine entry)
   --date DATE    Entry date (YYYY-MM-DD|today)
   --language STRING    Entry language (fi|en), default en
+  --from-json STRING    Read the whole entry from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase: description (or summary/body), title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (\`bump-level\` also accepted), feedback, sentry, source, date, language. files/repo/sha/commit also accept an array of strings. An unknown or wrong-typed key exits 4 (never silently dropped).
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -1938,9 +1939,12 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer access required → use a developer token
   exit 4 (HTTP 400)  Validation (bad enum/date) → check --type/--area/--date
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 4 (client-side)  too many arguments — the shell split a quoted flag value on its inner double-quotes (typical on Windows PowerShell) → Pass the whole entry via --from-json <file|-> instead of argv
+  exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → Check the path; the root must be an object and every key an accepted field name (the error lists them)
 
 NOTES
   - You can pass the description positionally, as --description, or as its --summary/--body aliases — if you pass more than one they must match (mirrors \`ib dev feedback create\`). Here --body is FREE TEXT, unlike the raw-JSON --body on the entity update commands.
+  - SHELL QUOTING (fb#300): an entry description is long-form prose ABOUT code, so it is the text most likely to contain double quotes (quoted identifiers, JSON fragments, error strings) — and Windows PowerShell splits a native argument on those inner quotes, so the CLI sees many positionals and exits 4 with "too many arguments". --from-json <file|-> sidesteps argv entirely and is the recommended path for any quote-bearing entry; stripping the quotes instead silently degrades the permanent record. --type/--area/--title are required but may come from the JSON.
   - A description starting with "-" is parsed as an option (exit 4) — put a bare \`--\` terminator before it: ib dev changelog add --type bugfix --area cli --title "x" -- "-5% render time". Everything after \`--\` is taken as positional text.
   - --dry-run is SERVER-side (X-Dry-Run): the backend validates the payload then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s under --dry-run.
   - Bounded free-text flags are length-checked client-side (exit 4) before POSTing: --status ≤30, --severity ≤20, --title ≤300, --impact ≤500, --repo/--vtag ≤200, --sha ≤500. (--description/--benefits/--files are unbounded.)
@@ -1954,6 +1958,8 @@ EXAMPLES
   ib dev changelog add "positional description works too" --type bugfix --area cli --title "x"
   ib dev changelog add --type feature --area backend --title "x" --body "gh-style --body works as a --description alias"
   ib dev changelog add --type bugfix --area backend --title "fix npe" --description "y" --sentry PUMINET5API-1A2
+  ib dev changelog add --from-json ./entry.json
+  ib dev changelog add --from-json ./entry.json --bump-level minor
 "
 `;
 
@@ -2213,6 +2219,7 @@ FLAGS
   --source STRING    Source: human|routine
   --date DATE    Entry date (YYYY-MM-DD|today)
   --language STRING    Entry language (fi|en)
+  --from-json STRING    Read the patch from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase (description/summary/body, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, source, date, language); files/repo/sha/commit also accept an array of strings. An unknown or wrong-typed key exits 4 — note bumpLevel/feedback/sentry are add-only and rejected here.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -2228,10 +2235,15 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
   exit 4 (HTTP 400)  Validation (bad enum/language) → language must be fi|en
+  exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → Check the path; the root must be an object and every key an accepted field name (the error lists them)
+
+NOTES
+  - SHELL QUOTING (fb#300): this is the command used to CORRECT an entry, which is exactly the retry that hits the quoting hazard again — Windows PowerShell splits a native argument on inner double-quotes. Pass quote-bearing prose via --from-json <file|-> rather than stripping the quotes.
 
 EXAMPLES
   ib dev changelog update 7 --status "Deployed prod"
   ib dev changelog update 386 --language en
+  ib dev changelog update 386 --from-json ./patch.json
 "
 `;
 

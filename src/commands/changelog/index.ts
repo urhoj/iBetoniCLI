@@ -26,7 +26,8 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { readFileSync } from "node:fs";
-import { writeJson, exitWithError, failWith, failValidation } from "../../output/json.js";
+import { readJsonObjectInput } from "../../api/parseBody.js";
+import { writeJson, exitWithError, failWith, failUsage, failValidation } from "../../output/json.js";
 import type { FlagProblem } from "../../output/validationEnvelope.js";
 import { resolveDate } from "../../dates.js";
 import { parseRefId } from "../../targets.js";
@@ -360,6 +361,167 @@ export function normalizeLanguage(lang?: string): string | undefined {
   return v;
 }
 
+// ─── --from-json (fb#300) ────────────────────────────────────────────────────
+// A changelog description is long-form prose ABOUT code, so it is the text most
+// likely to contain double quotes (quoted identifiers, JSON fragments, error
+// strings) — and Windows PowerShell splits a native argument on those inner
+// quotes, so the CLI saw N positionals and exited 4 ("too many arguments for
+// 'add'"). The entry documenting fb#298/#299 hit exactly that and only filed
+// after every quote was stripped from the prose, silently degrading the
+// permanent record the monthly report is generated from. --from-json <file|->
+// sidesteps argv entirely, mirroring `ib dev feedback create` (fb#299).
+
+/**
+ * Option attribute names that are NOT part of the entry payload: the JSON source
+ * itself, the write-safety trio, and help. Everything else a command registers is
+ * a payload field (see {@link payloadKeyMap}).
+ */
+const NON_PAYLOAD_OPTS = new Set(["fromJson", "dryRun", "idempotencyKey", "reason", "help"]);
+
+/** Payload fields whose flag takes a CSV — a --from-json array is joined for these. */
+const CSV_FIELDS = new Set(["files", "repo", "sha", "commit"]);
+
+/** Payload fields Commander parses with Number. */
+const NUMERIC_FIELDS = new Set(["feedback"]);
+
+/**
+ * JSON key → canonical option attribute name, for every payload flag registered
+ * on `cmd`. Derived from the command itself instead of a hand-kept list, so `add`
+ * and `update` (different flag sets) each accept exactly the keys they can apply,
+ * and a flag added later cannot drift out of --from-json. Both spellings resolve:
+ * the camelCase attribute (`bumpLevel`) and the literal flag (`bump-level`).
+ */
+export function payloadKeyMap(cmd: Command): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const opt of cmd.options) {
+    const attr = opt.attributeName();
+    if (!opt.long || NON_PAYLOAD_OPTS.has(attr)) continue;
+    m.set(attr, attr);
+    m.set(opt.long.replace(/^--/, ""), attr);
+  }
+  return m;
+}
+
+/**
+ * Normalize a --from-json object into flag-shaped fields.
+ *
+ * Unknown keys are REJECTED (exit 4), not ignored: the entry is a permanent
+ * record, and fb#298 was precisely a silently-dropped JSON key destroying a
+ * stored value. Wrong-typed values are rejected by name too — `files: [...]`
+ * would otherwise reach `.split(",")` and surface as a raw TypeError (exit 1);
+ * the CSV fields therefore also ACCEPT an array, which is what a JSON author
+ * naturally writes. Every problem is reported together so one re-run fixes all.
+ */
+export function normalizeChangelogJson(
+  json: Record<string, unknown>,
+  keys: Map<string, string>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const unknown: string[] = [];
+  const problems: string[] = [];
+  for (const [rawKey, value] of Object.entries(json)) {
+    const key = keys.get(rawKey);
+    if (!key) {
+      unknown.push(rawKey);
+      continue;
+    }
+    if (value === null || value === undefined) continue;
+    if (NUMERIC_FIELDS.has(key)) {
+      const n = typeof value === "number" ? value : Number(value);
+      if (!Number.isFinite(n)) problems.push(`"${rawKey}" must be a number`);
+      else out[key] = n;
+      continue;
+    }
+    if (CSV_FIELDS.has(key) && Array.isArray(value)) {
+      if (!value.every((v) => typeof v === "string")) problems.push(`"${rawKey}" array must contain only strings`);
+      else out[key] = value.map((v) => v.trim()).filter(Boolean).join(",");
+      continue;
+    }
+    if (typeof value !== "string") {
+      problems.push(
+        `"${rawKey}" must be a string${CSV_FIELDS.has(key) ? " or an array of strings" : ""} (got ${Array.isArray(value) ? "array" : typeof value})`
+      );
+      continue;
+    }
+    out[key] = value;
+  }
+  if (unknown.length)
+    problems.push(
+      `unknown key${unknown.length > 1 ? "s" : ""} ${unknown.join(", ")} — accepted: ${[...new Set(keys.values())].sort().join(", ")}`
+    );
+  if (problems.length) failUsage(`--from-json: ${problems.join("; ")}`);
+  return out;
+}
+
+/** The subset of `o` the caller ACTUALLY typed (as opposed to a Commander default). */
+export function explicitFlags(
+  cmd: Command,
+  o: Record<string, unknown>,
+  keys: Iterable<string>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of keys) if (cmd.getOptionValueSource(k) === "cli") out[k] = o[k];
+  return out;
+}
+
+/**
+ * Merge a --from-json object with the CLI flags. Precedence: an EXPLICITLY-typed
+ * flag wins, then the JSON object, then whatever the option already holds (its
+ * Commander default). That middle rung is why `explicit` is passed separately
+ * from the raw opts — `--bump-level` declares a default ("patch"), so a naive
+ * flags-win merge would let a default the caller never typed outrank a
+ * JSON-supplied value (the precedence trap fb#299 hit on --kind/--scope).
+ */
+export function mergeChangelogInput(
+  json: Record<string, unknown>,
+  explicit: Record<string, unknown>,
+  defaults: Record<string, unknown> = {}
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of new Set([...Object.keys(defaults), ...Object.keys(json), ...Object.keys(explicit)])) {
+    const v = explicit[k] ?? json[k] ?? defaults[k];
+    if (v !== undefined) out[k] = v;
+  }
+  return out;
+}
+
+/**
+ * Apply a `--from-json <file|->` payload onto the action's options object, in
+ * place. No-op without the flag. Reads the file (or stdin) via the shared
+ * shell-safe reader, validates the object against the command's OWN flags, and
+ * merges it UNDER the explicitly-typed flags.
+ */
+export function applyFromJson(cmd: Command, o: Record<string, unknown>): void {
+  if (o.fromJson === undefined) return;
+  const keys = payloadKeyMap(cmd);
+  const json = normalizeChangelogJson(readJsonObjectInput(String(o.fromJson)), keys);
+  Object.assign(o, mergeChangelogInput(json, explicitFlags(cmd, o, new Set(keys.values())), o));
+}
+
+/**
+ * Enforce `add`'s required fields AFTER the --from-json merge.
+ *
+ * --type/--area/--title are declared as plain options rather than
+ * `.requiredOption` because Commander enforces a required option BEFORE any
+ * action runs — which would make `add --from-json entry.json` fail no matter what
+ * the file contains. They are enforced here instead, aggregated with the
+ * description into ONE prescriptive envelope: the same shape the parser layer
+ * emits (fb#204), carrying every missing flag, its allowed values, and a
+ * copy-paste sample from the spec.
+ */
+export function requireAddFields(description: string | undefined, o: Record<string, unknown>): void {
+  const has = (v: unknown): boolean => typeof v === "string" && v.trim() !== "";
+  const problems: FlagProblem[] = [];
+  for (const f of ["type", "area", "title"] as const)
+    if (!has(o[f])) problems.push({ flag: `--${f}`, issue: "missing" });
+  if (![description, o.description, o.summary, o.body].some(has))
+    problems.push({ flag: "--description", issue: "missing" });
+  if (problems.length)
+    failValidation("ib dev changelog add", problems, {
+      spec: CHANGELOG_SPECS.find((s) => s.command === "ib dev changelog add"),
+    });
+}
+
 export function registerChangelogCommands(
   parent: Command,
   getClient: () => Promise<ApiClient>,
@@ -381,9 +543,12 @@ export function registerChangelogCommands(
       .description(
         "Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row to status=applied."
       )
-      .requiredOption("--type <t>", "feature|improvement|bugfix (accepts fix→bugfix, feat→feature)")
-      .requiredOption("--area <a>", AREA_FLAG_DESC)
-      .requiredOption("--title <s>", "Entry title")
+      // Required, but declared as plain options so --from-json can supply them:
+      // Commander enforces a .requiredOption before the action runs. Enforced
+      // post-merge by requireAddFields (fb#300).
+      .option("--type <t>", "feature|improvement|bugfix (accepts fix→bugfix, feat→feature) — required, via flag or --from-json")
+      .option("--area <a>", AREA_FLAG_DESC)
+      .option("--title <s>", "Entry title — required, via flag or --from-json")
       .option("--description <s>", "Kuvaus — alias for the positional; if both are given, they must match")
       .option("--summary <s>", "Alias for --description (the entry body); if both are given, they must match")
       .option("--body <s>", "Alias for --description (free text, not JSON); if both are given, they must match")
@@ -402,12 +567,19 @@ export function registerChangelogCommands(
       .option("--source <s>", "Source: human|routine (default: human)")
       .option("--date <d>", "Entry date (YYYY-MM-DD|today), default today")
       .option("--language <l>", "Entry language (fi|en), default en")
+      .option(
+        "--from-json <file>",
+        "Read the whole entry from a JSON object file (or - for stdin); explicitly-typed flags override. Shell-safe: the only way to pass prose containing double quotes on Windows PowerShell."
+      )
   ).action(
     async (
       description: string | undefined,
-      o: Record<string, string> & WriteFlags & { feedback?: number; vtag?: string; bumpLevel?: string }
+      o: Record<string, string> & WriteFlags & { feedback?: number; vtag?: string; bumpLevel?: string; fromJson?: string },
+      cmd: Command
     ) => {
+      applyFromJson(cmd, o as Record<string, unknown>);
       o.type = normalizeType(o.type)!;
+      requireAddFields(description, o as Record<string, unknown>);
       validateEnums(o.type, o.area, o.bumpLevel, o.source);
       o.sha = resolveShaAlias(o.sha, o.commit)!;
       validateFieldLengths(o);
@@ -542,8 +714,13 @@ export function registerChangelogCommands(
       .option("--source <s>", "Source: human|routine")
       .option("--date <d>", "Entry date (YYYY-MM-DD|today)")
       .option("--language <l>", "Entry language (fi|en)")
-  ).action(async (idStr: string, o: Record<string, string> & WriteFlags & { vtag?: string }) => {
+      .option(
+        "--from-json <file>",
+        "Read the patch from a JSON object file (or - for stdin); explicitly-typed flags override. Shell-safe: the only way to pass prose containing double quotes on Windows PowerShell."
+      )
+  ).action(async (idStr: string, o: Record<string, string> & WriteFlags & { vtag?: string; fromJson?: string }, cmd: Command) => {
     const id = parseRefId(idStr, "changelog", "update");
+    applyFromJson(cmd, o as Record<string, unknown>);
     if (o.type !== undefined) o.type = normalizeType(o.type)!;
     validateEnums(o.type, o.area, undefined, o.source, "ib dev changelog update");
     // --summary/--body are aliases for --description (feedback #205/#278); fold
@@ -755,6 +932,12 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         description: "Entry date (YYYY-MM-DD|today)",
       },
       { name: "language", type: "string", allowed: LANGUAGES, description: "Entry language (fi|en), default en" },
+      {
+        name: "from-json",
+        type: "string",
+        description:
+          "Read the whole entry from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase: description (or summary/body), title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language. files/repo/sha/commit also accept an array of strings. An unknown or wrong-typed key exits 4 (never silently dropped).",
+      },
     ],
     writeFlags: true,
     mutates: true,
@@ -778,9 +961,22 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         meaning: "Token expired",
         remedy: "ib auth refresh",
       },
+      {
+        origin: "client",
+        exit: 4,
+        meaning: "too many arguments — the shell split a quoted flag value on its inner double-quotes (typical on Windows PowerShell)",
+        remedy: "Pass the whole entry via --from-json <file|-> instead of argv",
+      },
+      {
+        origin: "client",
+        exit: 4,
+        meaning: "--from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key",
+        remedy: "Check the path; the root must be an object and every key an accepted field name (the error lists them)",
+      },
     ],
     notes: [
       "You can pass the description positionally, as --description, or as its --summary/--body aliases — if you pass more than one they must match (mirrors `ib dev feedback create`). Here --body is FREE TEXT, unlike the raw-JSON --body on the entity update commands.",
+      'SHELL QUOTING (fb#300): an entry description is long-form prose ABOUT code, so it is the text most likely to contain double quotes (quoted identifiers, JSON fragments, error strings) — and Windows PowerShell splits a native argument on those inner quotes, so the CLI sees many positionals and exits 4 with "too many arguments". --from-json <file|-> sidesteps argv entirely and is the recommended path for any quote-bearing entry; stripping the quotes instead silently degrades the permanent record. --type/--area/--title are required but may come from the JSON.',
       'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib dev changelog add --type bugfix --area cli --title "x" -- "-5% render time". Everything after `--` is taken as positional text.',
       "--dry-run is SERVER-side (X-Dry-Run): the backend validates the payload then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s under --dry-run.",
       "Bounded free-text flags are length-checked client-side (exit 4) before POSTing: --status ≤30, --severity ≤20, --title ≤300, --impact ≤500, --repo/--vtag ≤200, --sha ≤500. (--description/--benefits/--files are unbounded.)",
@@ -792,6 +988,8 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       'ib dev changelog add "positional description works too" --type bugfix --area cli --title "x"',
       'ib dev changelog add --type feature --area backend --title "x" --body "gh-style --body works as a --description alias"',
       'ib dev changelog add --type bugfix --area backend --title "fix npe" --description "y" --sentry PUMINET5API-1A2',
+      "ib dev changelog add --from-json ./entry.json",
+      "ib dev changelog add --from-json ./entry.json --bump-level minor",
     ],
   },
   {
@@ -948,6 +1146,12 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         description: "Entry date (YYYY-MM-DD|today)",
       },
       { name: "language", type: "string", description: "Entry language (fi|en)" },
+      {
+        name: "from-json",
+        type: "string",
+        description:
+          "Read the patch from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase (description/summary/body, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, source, date, language); files/repo/sha/commit also accept an array of strings. An unknown or wrong-typed key exits 4 — note bumpLevel/feedback/sentry are add-only and rejected here.",
+      },
     ],
     writeFlags: true,
     mutates: true,
@@ -965,10 +1169,20 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         meaning: "Validation (bad enum/language)",
         remedy: "language must be fi|en",
       },
+      {
+        origin: "client",
+        exit: 4,
+        meaning: "--from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key",
+        remedy: "Check the path; the root must be an object and every key an accepted field name (the error lists them)",
+      },
+    ],
+    notes: [
+      "SHELL QUOTING (fb#300): this is the command used to CORRECT an entry, which is exactly the retry that hits the quoting hazard again — Windows PowerShell splits a native argument on inner double-quotes. Pass quote-bearing prose via --from-json <file|-> rather than stripping the quotes.",
     ],
     examples: [
       'ib dev changelog update 7 --status "Deployed prod"',
       "ib dev changelog update 386 --language en",
+      "ib dev changelog update 386 --from-json ./patch.json",
     ],
   },
   {

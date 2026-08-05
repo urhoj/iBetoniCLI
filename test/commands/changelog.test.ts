@@ -212,7 +212,7 @@ describe("changelog add bumpLevel", () => {
   });
 });
 
-import { runChangelogPending, runChangelogRelease, runChangelogReleaseMap, registerChangelogCommands } from "../../src/commands/changelog/index.js";
+import { runChangelogPending, runChangelogRelease, runChangelogReleaseMap, registerChangelogCommands, payloadKeyMap, normalizeChangelogJson, mergeChangelogInput } from "../../src/commands/changelog/index.js";
 import { Command } from "commander";
 
 describe("changelog pending/release", () => {
@@ -611,5 +611,176 @@ describe("readJsonInput BOM handling", () => {
     } finally {
       unlinkSync(p);
     }
+  });
+});
+
+// ─── fb#300: argv-safe entry input ──────────────────────────────────────────
+// A changelog description is long-form prose ABOUT code, so it is the text most
+// likely to contain double quotes — and PowerShell splits a native arg on those,
+// so the CLI saw N positionals and exited 4. --from-json bypasses argv entirely.
+describe("changelog add/update --from-json (fb#300)", () => {
+  const withJsonFile = async (payload: unknown, fn: (path: string) => Promise<void>) => {
+    const p = join(tmpdir(), `ib-changelog-fromjson-${process.pid}.json`);
+    writeFileSync(p, JSON.stringify(payload), "utf8");
+    try { await fn(p); } finally { unlinkSync(p); }
+  };
+
+  /** The payload key set `add` accepts, derived from its own registered flags. */
+  const addKeyMap = (): Map<string, string> => {
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    const add = program.commands
+      .find((c) => c.name() === "changelog")!
+      .commands.find((c) => c.name() === "add")!;
+    return payloadKeyMap(add);
+  };
+
+  test("precedence is explicit flag > JSON > Commander default", () => {
+    // The middle rung is the trap: --bump-level declares a default ("patch"), so
+    // a naive "flags win" merge would let a default the caller never typed beat
+    // the JSON value.
+    expect(mergeChangelogInput({ bumpLevel: "minor" }, {}, { bumpLevel: "patch" }).bumpLevel).toBe("minor");
+    expect(mergeChangelogInput({ bumpLevel: "minor" }, { bumpLevel: "major" }, { bumpLevel: "patch" }).bumpLevel).toBe("major");
+    expect(mergeChangelogInput({}, {}, { bumpLevel: "patch" }).bumpLevel).toBe("patch");
+    expect(mergeChangelogInput({ title: "t", type: "bugfix" }, {}, {})).toMatchObject({ title: "t", type: "bugfix" });
+  });
+
+  test("the key map is derived from the command's own flags (add-only keys rejected on update)", () => {
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    const group = program.commands.find((c) => c.name() === "changelog")!;
+    const add = payloadKeyMap(group.commands.find((c) => c.name() === "add")!);
+    const update = payloadKeyMap(group.commands.find((c) => c.name() === "update")!);
+    // Both spellings of a hyphenated flag resolve to the camelCase attribute.
+    expect(add.get("bumpLevel")).toBe("bumpLevel");
+    expect(add.get("bump-level")).toBe("bumpLevel");
+    // update has no --bump-level/--feedback/--sentry, so those keys are unknown there.
+    expect(update.has("bumpLevel")).toBe(false);
+    expect(update.has("feedback")).toBe(false);
+    // Write-safety flags and the JSON source itself are never payload fields.
+    for (const k of ["dryRun", "reason", "idempotencyKey", "fromJson"]) expect(add.has(k)).toBe(false);
+  });
+
+  test("an unknown key exits 4 and lists the accepted keys (never silently dropped)", () => {
+    // fb#298 was exactly a silently-ignored JSON key destroying a stored value;
+    // a changelog entry is the permanent record the monthly report is built from.
+    const err = captureThrow(() => normalizeChangelogJson({ versionTag: "1.2.3" }, addKeyMap()));
+    expect(err.exitCode).toBe(4);
+    expect((err as unknown as Error).message).toMatch(/unknown key versionTag/);
+    expect((err as unknown as Error).message).toMatch(/vtag/);
+  });
+
+  test("wrong-typed values are rejected by name instead of crashing downstream", () => {
+    // `files: {...}` would otherwise reach o.files.split(",") as a raw TypeError.
+    const err = captureThrow(() => normalizeChangelogJson({ title: 5, files: { a: 1 } }, addKeyMap()));
+    expect(err.exitCode).toBe(4);
+    expect((err as unknown as Error).message).toMatch(/"title" must be a string/);
+    expect((err as unknown as Error).message).toMatch(/"files" must be a string or an array of strings/);
+  });
+
+  test("CSV fields accept an array (what a JSON author naturally writes)", () => {
+    expect(normalizeChangelogJson({ files: ["a.ts", " b.ts "], repo: ["betonicli"] }, addKeyMap()))
+      .toEqual({ files: "a.ts,b.ts", repo: "betonicli" });
+  });
+
+  test("a quote-bearing entry round-trips, and JSON supplies the required trio", async () => {
+    asPost().mockResolvedValue({ changelogId: 300 });
+    const description =
+      'the entry failed with "too many arguments for \'add\'. Expected 1 argument but got 3: many, arguments."';
+    await withJsonFile(
+      {
+        type: "improvement", area: "cli", title: 'argv-safe "changelog add"',
+        description, repo: "betonicli", bumpLevel: "none", feedback: 300,
+        files: ["src/commands/changelog/index.ts"], date: "2026-08-05",
+      },
+      async (p) => {
+        const program = new Command();
+        registerChangelogCommands(program, async () => client);
+        await program.parseAsync(["changelog", "add", "--from-json", p], { from: "user" });
+      }
+    );
+    expect(asPost()).toHaveBeenCalledWith(
+      "/api/changelog",
+      {
+        type: "improvement", area: "cli", title: 'argv-safe "changelog add"',
+        description, entryDate: "2026-08-05", repo: "betonicli",
+        files: JSON.stringify(["src/commands/changelog/index.ts"]),
+        feedbackId: 300, bumpLevel: "none",
+      },
+      { headers: {} }
+    );
+  });
+
+  test("an explicit flag overrides the JSON key", async () => {
+    asPost().mockResolvedValue({ changelogId: 301 });
+    await withJsonFile({ type: "bugfix", area: "cli", title: "t", description: "d", bumpLevel: "none" }, async (p) => {
+      const program = new Command();
+      registerChangelogCommands(program, async () => client);
+      await program.parseAsync(
+        ["changelog", "add", "--from-json", p, "--bump-level", "minor", "--title", "flag wins"],
+        { from: "user" }
+      );
+    });
+    expect(asPost().mock.calls[0][1]).toMatchObject({ bumpLevel: "minor", title: "flag wins", description: "d" });
+  });
+
+  test("a --from-json title/summary still feeds the description resolver", async () => {
+    asPost().mockResolvedValue({ changelogId: 302 });
+    await withJsonFile({ type: "feature", area: "cli", title: "t", summary: "body via summary" }, async (p) => {
+      const program = new Command();
+      registerChangelogCommands(program, async () => client);
+      await program.parseAsync(["changelog", "add", "--from-json", p], { from: "user" });
+    });
+    expect(asPost().mock.calls[0][1]).toMatchObject({ description: "body via summary" });
+  });
+
+  test("a missing --from-json file exits 4 without POSTing", async () => {
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    await expect(program.parseAsync(
+      ["changelog", "add", "--from-json", join(tmpdir(), "ib-does-not-exist-300.json")],
+      { from: "user" }
+    )).rejects.toMatchObject({ exitCode: 4 });
+    expect(asPost()).not.toHaveBeenCalled();
+  });
+
+  test("the required trio is enforced post-merge, aggregated with the description", async () => {
+    // --type/--area/--title are plain options now (a .requiredOption fires before
+    // any action, which would make --from-json unusable) — the guard moved into
+    // the action and must keep the fb#204 prescriptive envelope.
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    const err = await program.parseAsync(["changelog", "add", "--repo", "betonicli"], { from: "user" })
+      .then(() => null, (e) => e);
+    expect(err.exitCode).toBe(4);
+    const problems = err.body.problems as Array<{ flag: string; allowed?: string[] }>;
+    expect(problems.map((p) => p.flag)).toEqual(["--type", "--area", "--title", "--description"]);
+    expect(problems[0].allowed).toEqual(["feature", "improvement", "bugfix"]);
+    expect(String(err.body.sample)).toContain("ib dev changelog add");
+    expect(asPost()).not.toHaveBeenCalled();
+  });
+
+  test("update takes a --from-json patch under its explicit flags", async () => {
+    asPut().mockResolvedValue({ changelogId: 386 });
+    await withJsonFile({ status: 'Deployed "prod"', description: "corrected prose" }, async (p) => {
+      const program = new Command();
+      registerChangelogCommands(program, async () => client);
+      await program.parseAsync(["changelog", "update", "386", "--from-json", p, "--status", "Deployed"], { from: "user" });
+    });
+    expect(asPut()).toHaveBeenCalledWith(
+      "/api/changelog/386",
+      { description: "corrected prose", status: "Deployed" },
+      expect.any(Object)
+    );
+  });
+
+  test("an add-only key in an update payload exits 4 without PUTting", async () => {
+    await withJsonFile({ bumpLevel: "minor" }, async (p) => {
+      const program = new Command();
+      registerChangelogCommands(program, async () => client);
+      await expect(program.parseAsync(["changelog", "update", "386", "--from-json", p], { from: "user" }))
+        .rejects.toMatchObject({ exitCode: 4 });
+    });
+    expect(asPut()).not.toHaveBeenCalled();
   });
 });
