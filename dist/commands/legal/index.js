@@ -167,12 +167,17 @@ export async function runLegalDiff(client, input) {
         if (!draft) {
             throw new CliError(`Type "${input.type}" has no draft version to diff`, 404, null, 5);
         }
-        docA = await runLegalGet(client, Number(active.documentId));
-        docB = await runLegalGet(client, Number(draft.documentId));
+        // Independent fetches — issue them together (saves one full round-trip).
+        [docA, docB] = await Promise.all([
+            runLegalGet(client, Number(active.documentId)),
+            runLegalGet(client, Number(draft.documentId)),
+        ]);
     }
     else {
-        docA = await runLegalGet(client, input.a);
-        docB = await runLegalGet(client, input.b);
+        [docA, docB] = await Promise.all([
+            runLegalGet(client, input.a),
+            runLegalGet(client, input.b),
+        ]);
     }
     const contentA = typeof docA.markdownContent === "string" ? docA.markdownContent : "";
     const contentB = typeof docB.markdownContent === "string" ? docB.markdownContent : "";

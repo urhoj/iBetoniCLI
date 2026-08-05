@@ -1,13 +1,24 @@
 import { createRequire } from "node:module";
-import chalk from "chalk";
-// cli-table3 is CJS and the heavier of the two pretty-mode deps, so lazy-require
-// it (safe on every supported Node). chalk 6 is ESM-only and needs Node >=22 —
-// both satisfied by the engines floor (^22.18 || >=24.11) — and it is tiny and
-// dependency-free, so keep it a static import.
+// BOTH pretty-mode deps are lazy-required: they are only reachable via --pretty,
+// but output/json.ts imports this module, so a static import would load them on
+// 100% of invocations. Measured cost of loading them eagerly: cli-table3 ~14 ms,
+// chalk ~11 ms — chalk is NOT negligible (an earlier comment here claimed it was
+// and kept it static). chalk 6 is ESM-only, which `require()` handles from Node
+// 22.12 on; the engines floor (^22.18 || >=24.11) clears that, so both stay
+// synchronous and the render functions below need not become async.
 const require = createRequire(import.meta.url);
 let _Table = null;
 function tableCtor() {
     return (_Table ??= require("cli-table3"));
+}
+let _chalk = null;
+/** Lazily-resolved chalk instance. `require()` of an ESM module yields a
+ *  namespace object, so unwrap `.default`. */
+function chalk() {
+    if (_chalk)
+        return _chalk;
+    const mod = require("chalk");
+    return (_chalk = mod.default ?? mod);
 }
 /** cli-table3 colWidth includes the 2 padding spaces; 6 leaves 4 visible chars. */
 const MIN_COL_WIDTH = 6;
@@ -79,7 +90,7 @@ export function renderList(envelope) {
     // while `items` is empty — trusting `count` here would deref items[0] and
     // crash pretty mode with a raw TypeError.
     if (envelope.items.length === 0)
-        return chalk.dim("(no results)");
+        return chalk().dim("(no results)");
     const headers = Object.keys(envelope.items[0]);
     const rows = envelope.items.map((item) => headers.map((h) => formatCell(item[h])));
     const natural = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => visibleWidth(r[i]))));
@@ -90,12 +101,12 @@ export function renderList(envelope) {
         // Too many columns to cap into the terminal readably — render each item as
         // its own key:value block instead (feedback #34).
         out = envelope.items
-            .map((item, i) => chalk.dim(`# ${i + 1}`) + "\n" + renderRecord(item))
+            .map((item, i) => chalk().dim(`# ${i + 1}`) + "\n" + renderRecord(item))
             .join("\n");
     }
     else {
         const table = new (tableCtor())({
-            head: headers.map((h) => chalk.bold(h)),
+            head: headers.map((h) => chalk().bold(h)),
             ...fittedOptions(natural),
         });
         for (const row of rows)
@@ -103,21 +114,21 @@ export function renderList(envelope) {
         out = table.toString();
     }
     if (envelope.nextCursor) {
-        out += `\n${chalk.dim(`(more — pass --cursor ${envelope.nextCursor})`)}`;
+        out += `\n${chalk().dim(`(more — pass --cursor ${envelope.nextCursor})`)}`;
     }
     return out;
 }
 export function renderRecord(record) {
     const entries = Object.entries(record).map(([k, v]) => [k, formatCell(v)]);
     if (entries.length === 0)
-        return chalk.dim("(empty)");
+        return chalk().dim("(empty)");
     const natural = [
         Math.max(...entries.map(([k]) => k.length)),
         Math.max(...entries.map(([, v]) => visibleWidth(v))),
     ];
     const table = new (tableCtor())(fittedOptions(natural));
     for (const [k, v] of entries) {
-        table.push({ [chalk.bold(k)]: v });
+        table.push({ [chalk().bold(k)]: v });
     }
     return table.toString();
 }
@@ -126,7 +137,7 @@ function isPlainObject(v) {
 }
 function formatCell(value) {
     if (value === null || value === undefined)
-        return chalk.dim("—");
+        return chalk().dim("—");
     if (Array.isArray(value) && value.length > 0 && value.every(isPlainObject)) {
         // feedback #34: JSON.stringify on an array of objects made the cell (and
         // the whole table) as wide as the JSON — render one "key: value" line per

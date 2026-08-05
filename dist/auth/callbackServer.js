@@ -1,4 +1,3 @@
-import { createServer } from "node:http";
 import { URL } from "node:url";
 /**
  * Self-contained branded HTML for the local OAuth return tab.
@@ -47,6 +46,7 @@ export async function startCallbackServer(opts) {
         resolveCode = res;
         rejectCode = rej;
     });
+    const { createServer } = await import("node:http");
     const server = createServer((req, res) => {
         if (!req.url) {
             res.statusCode = 404;

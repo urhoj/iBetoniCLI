@@ -100,16 +100,34 @@ export function buildProgram(): Command {
   });
   addGlobalOptions(program);
 
+  // One CLI context per distinct company lens, memoized for the invocation.
+  // Building it reads+parses the credentials file and decodes the JWT, and under
+  // `--company <id>` it mints an ephemeral switch JWT via a NETWORK POST — so a
+  // command needing both a client and the endpoint (e.g. `ib doctor`) otherwise
+  // paid for all of that twice, including a redundant round-trip. Keyed by
+  // `asiakas` because `getClientForAsiakas` deliberately wants a different
+  // context per target company.
+  const ctxCache = new Map<number | null, ReturnType<typeof createCliContext>>();
+  function contextFor(global: GlobalOptions): ReturnType<typeof createCliContext> {
+    const key = global.asiakas ?? null;
+    let pending = ctxCache.get(key);
+    if (!pending) {
+      pending = createCliContext({
+        credentialsPath: defaultCredentialsPath(),
+        version: packageJson.version,
+        global,
+      });
+      ctxCache.set(key, pending);
+    }
+    return pending;
+  }
+
   // Build an authenticated client from a resolved set of global options. Exits 2
   // with "Not logged in" when no auth resolves — so command actions never deal
   // with the unauthenticated case. The two factories below differ only in the
   // global options they pass in.
   async function clientFrom(global: GlobalOptions): Promise<ApiClient> {
-    const ctx = await createCliContext({
-      credentialsPath: defaultCredentialsPath(),
-      version: packageJson.version,
-      global,
-    });
+    const ctx = await contextFor(global);
     if (!ctx.client) {
       // throw (not process.exit) — safe post-fetch on Windows; lands in the
       // action's exitWithError catch (or the bin catch) as envelope + exit 2.
@@ -137,12 +155,7 @@ export function buildProgram(): Command {
   // when no credentials resolve. Powers `ib version`, which queries the public
   // `/api/version` and so must work logged out.
   async function getEndpoint(): Promise<string> {
-    const ctx = await createCliContext({
-      credentialsPath: defaultCredentialsPath(),
-      version: packageJson.version,
-      global: getGlobalOptions(program),
-    });
-    return ctx.endpoint;
+    return (await contextFor(getGlobalOptions(program))).endpoint;
   }
 
   // Disable Commander's built-in `help` command so `ib help [topic]` can

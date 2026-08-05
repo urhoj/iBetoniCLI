@@ -1,4 +1,9 @@
-import { createServer, type Server } from "node:http";
+// `node:http` is needed ONLY by `ib auth login`, but this module sits on the
+// eager import chain from program.ts, so a static import loaded it (~17 ms) on
+// every invocation. The value import is deferred into the async function below;
+// `type Server` is erased at compile time and costs nothing. Same lazy pattern
+// login.ts already uses for `open`.
+import type { Server } from "node:http";
 import { URL } from "node:url";
 
 /**
@@ -66,6 +71,7 @@ export async function startCallbackServer(opts: CallbackServerOptions): Promise<
     rejectCode = rej;
   });
 
+  const { createServer } = await import("node:http");
   const server: Server = createServer((req, res) => {
     if (!req.url) {
       res.statusCode = 404;
