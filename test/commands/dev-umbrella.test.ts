@@ -4,6 +4,18 @@ import { buildProgram } from "../../src/program.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
 import { buildCommandsList, buildDomainIndex, assertKnownDomain } from "../../src/reference/commandsList.js";
 import { buildReference } from "../../src/reference/dump.js";
+import { canonicalPath, DEV_ALIAS_DOMAINS } from "../../src/reference/aliasPaths.js";
+
+/** Render a command's --help from the real wired tree, as Commander would. */
+function helpFor(root: Command, path: string): string {
+  const parts = path.split(" ").slice(1); // drop "ib"
+  let cmd: Command | undefined = root;
+  for (const name of parts) {
+    cmd = cmd?.commands.find((c) => c.name() === name);
+    if (!cmd) throw new Error(`not in tree: ${path}`);
+  }
+  return cmd!.helpInformation();
+}
 
 function paths(root: Command): Set<string> {
   const set = new Set<string>();
@@ -16,7 +28,10 @@ function paths(root: Command): Set<string> {
   return set;
 }
 
-const MOVED = ["feedback", "changelog", "perf", "cache", "schema", "ai", "inbox"];
+// The alias set has ONE definition (src/reference/aliasPaths.ts) — the same
+// table that drives the hidden registrations and resolves alias paths back to
+// their specs. This test used to keep its own copy.
+const MOVED: readonly string[] = DEV_ALIAS_DOMAINS;
 
 describe("ib dev umbrella", () => {
   const tree = paths(buildProgram());
@@ -54,6 +69,32 @@ describe("ib dev umbrella", () => {
     expect(cmds.every((c) => c.startsWith("ib dev changelog "))).toBe(true);
     // A genuinely unknown token still throws exit-4.
     expect(() => buildReference("bug", "developer")).toThrowError(/unknown domain/);
+  });
+
+  test("canonicalPath maps alias paths to their spec path and leaves others alone", () => {
+    expect(canonicalPath("ib feedback create")).toBe("ib dev feedback create");
+    expect(canonicalPath("ib changelog")).toBe("ib dev changelog");
+    // already canonical, unrelated, and too-short paths pass through untouched
+    expect(canonicalPath("ib dev feedback create")).toBe("ib dev feedback create");
+    expect(canonicalPath("ib keikka list")).toBe("ib keikka list");
+    expect(canonicalPath("ib")).toBe("ib");
+  });
+
+  test("an alias LEAF renders the same rich help as its canonical path", () => {
+    // Regression: attachRichHelp matched specs by literal path, so alias leaves
+    // fell through to bare Commander help — losing PERMISSIONS / OUTPUT /
+    // ERRORS / EXAMPLES, i.e. the whole "help is self-contained for an AI"
+    // contract. Group help was patched for this; leaves were not.
+    const root = buildProgram();
+    for (const [alias, canonical] of [
+      ["ib feedback create", "ib dev feedback create"],
+      ["ib changelog add", "ib dev changelog add"],
+      ["ib schema tables", "ib dev schema tables"],
+    ] as const) {
+      expect(helpFor(root, alias)).toBe(helpFor(root, canonical));
+      // and it really is the rich rendering, not two identical bare renders
+      expect(helpFor(root, alias)).toMatch(/^USAGE\n/);
+    }
   });
 
   test("`dev` is visible at standard tier but shows fewer leaves than at developer", () => {

@@ -14,6 +14,7 @@
  */
 import type { Command } from "commander";
 import { COMMAND_SPECS } from "../reference/specs.js";
+import { canonicalPath } from "../reference/aliasPaths.js";
 import type { CommandSpec } from "./help.js";
 import { fullyHiddenDomains } from "../reference/commandsList.js";
 import { isHiddenAtTier, type CallerTier } from "../tier.js";
@@ -228,7 +229,7 @@ export function buildUnknownOptionEnvelope(
   unknownOption: string
 ): UnknownOptionEnvelope {
   const command = commandPath(cmd);
-  const spec = COMMAND_SPECS.find((s) => s.command === command);
+  const spec = COMMAND_SPECS.find((s) => s.command === canonicalPath(command));
   const availableOptions = spec ? specOptionLongs(spec) : commanderOptionLongs(cmd);
   const positionals = spec ? specPositionals(spec) : [];
 

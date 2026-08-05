@@ -1,4 +1,5 @@
 import { COMMAND_SPECS } from "../reference/specs.js";
+import { canonicalPath } from "../reference/aliasPaths.js";
 import { fullyHiddenDomains } from "../reference/commandsList.js";
 import { isHiddenAtTier } from "../tier.js";
 /** Classic Levenshtein edit distance (two-row). */
@@ -174,7 +175,7 @@ function specPositionals(spec) {
  */
 export function buildUnknownOptionEnvelope(cmd, unknownOption) {
     const command = commandPath(cmd);
-    const spec = COMMAND_SPECS.find((s) => s.command === command);
+    const spec = COMMAND_SPECS.find((s) => s.command === canonicalPath(command));
     const availableOptions = spec ? specOptionLongs(spec) : commanderOptionLongs(cmd);
     const positionals = spec ? specPositionals(spec) : [];
     const bare = unknownOption.replace(/^-+/, "");

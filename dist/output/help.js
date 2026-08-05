@@ -23,6 +23,7 @@
  * spec without having to run `ib reference dump`.
  */
 import { domainBlurb } from "../reference/domain.js";
+import { canonicalPath } from "../reference/aliasPaths.js";
 import { getCallerTier, isHiddenAtTier, hiddenCommandPaths, scrubSpecForTier, } from "../tier.js";
 /**
  * Render a {@link CommandSpec} as the AI-optimized `--help` text. Output is a
@@ -155,14 +156,14 @@ export function formatGroupHelp(groupPath, fallbackDescription, specs, tier = "d
     const domain = groupPath.split(" ")[1];
     const groupName = groupPath.split(" ").at(-1).toLowerCase();
     // Re-homed back-compat alias: a top-level `ib <x>` whose specs now live at the
-    // canonical `ib dev <x>` path (feedback/changelog/perf/cache/schema/ai). The
-    // alias command still executes, but no spec matches its old path, so render
-    // the canonical group's help instead of the misleading "not available at your
-    // access level" message. (Genuinely tier-hidden groups DO have specs at their
-    // path — all filtered out below — and still get hiddenAtTierMessage.)
-    if (!groupPath.startsWith("ib dev ") &&
-        !specs.some((s) => s.command.startsWith(prefix))) {
-        const canonical = "ib dev " + groupPath.slice("ib ".length);
+    // canonical `ib dev <x>` path. The alias still executes, but no spec matches
+    // its old path, so render the canonical group's help instead of the misleading
+    // "not available at your access level" message. (Genuinely tier-hidden groups
+    // DO have specs at their path — filtered out below — and still get
+    // hiddenAtTierMessage.) The alias table is the single source; this used to
+    // hardcode the "ib dev " prefix here.
+    const canonical = canonicalPath(groupPath);
+    if (canonical !== groupPath && !specs.some((s) => s.command.startsWith(prefix))) {
         if (specs.some((s) => s.command.startsWith(canonical + " "))) {
             return formatGroupHelp(canonical, fallbackDescription, specs, tier);
         }
@@ -220,7 +221,10 @@ export function attachRichHelp(root, specs) {
     const byCommand = new Map(specs.map((s) => [s.command, s]));
     const walk = (cmd, path) => {
         const full = [...path, cmd.name()].join(" ");
-        const spec = byCommand.get(full);
+        // Resolve back-compat aliases to their canonical spec, so an alias leaf
+        // (`ib feedback create`) renders the SAME rich help as `ib dev feedback
+        // create` instead of falling through to bare Commander output.
+        const spec = byCommand.get(canonicalPath(full));
         if (spec) {
             // Single source: the Commander listing description IS the spec description.
             cmd.description(spec.description);

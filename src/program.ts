@@ -56,6 +56,7 @@ import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDom
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
+import { canonicalPath, DEV_ALIAS_DOMAINS } from "./reference/aliasPaths.js";
 import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, setActiveCommandErrors, setExitCode as setExit } from "./output/json.js";
 import { buildValidationEnvelope, type FlagProblem } from "./output/validationEnvelope.js";
 import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, commandPath } from "./output/unknownCommand.js";
@@ -229,13 +230,24 @@ export function buildProgram(): Command {
   registerInboxCommand(dev, getClient);
   registerImpersonationCommands(dev, getClient);
   // Hidden back-compat aliases at the old top-level paths (still executable).
-  registerFeedbackCommands(program, getClient, { hidden: true });
-  registerChangelogCommands(program, getClient, { hidden: true });
-  registerPerfCommands(program, getClient, { hidden: true });
-  registerCacheCommands(program, getClient, { hidden: true });
-  registerSchemaCommands(program, getClient, { hidden: true });
-  registerAiCommands(program, getClient, { hidden: true });
-  registerInboxCommand(program, getClient, { hidden: true });
+  // Driven by DEV_ALIAS_DOMAINS so the alias set has ONE definition — the same
+  // table `canonicalPath` uses to resolve those paths back to their specs.
+  // (`dev impersonation` is deliberately absent: it never had a top-level path.)
+  const DEV_ALIAS_REGISTRARS: Record<
+    (typeof DEV_ALIAS_DOMAINS)[number],
+    (parent: Command, gc: typeof getClient, opts?: { hidden?: boolean }) => void
+  > = {
+    feedback: registerFeedbackCommands,
+    changelog: registerChangelogCommands,
+    perf: registerPerfCommands,
+    cache: registerCacheCommands,
+    schema: registerSchemaCommands,
+    ai: registerAiCommands,
+    inbox: registerInboxCommand,
+  };
+  for (const domain of DEV_ALIAS_DOMAINS) {
+    DEV_ALIAS_REGISTRARS[domain](program, getClient, { hidden: true });
+  }
 
   const reference = program
     .command("reference")
@@ -524,7 +536,11 @@ export function buildProgram(): Command {
  * path-join logic must NOT drift between the two entry points.
  */
 export function applySpecErrors(actionCommand: Command): void {
-  const spec = COMMAND_SPECS.find((s) => s.command === commandPath(actionCommand));
+  // canonicalPath so invoking a back-compat alias still resolves the command's
+  // OWN documented remedies; without it hintForError fell back to the generic
+  // per-status hint on every aliased path.
+  const path = canonicalPath(commandPath(actionCommand));
+  const spec = COMMAND_SPECS.find((s) => s.command === path);
   setActiveCommandErrors(spec?.errors ?? null);
 }
 
@@ -675,7 +691,10 @@ export function handleParseRejection(
       // no `--help` round-trip, even for a single omitted flag (feedback #204).
       if (cmd && missing.length) {
         const path = commandPath(cmd);
-        const spec = COMMAND_SPECS.find((s) => s.command === path);
+        // Look the spec up by canonical path (so an alias still gets its allowed
+        // values + sample), but keep `path` as INVOKED for the envelope — the
+        // caller should see back the command they actually ran.
+        const spec = COMMAND_SPECS.find((s) => s.command === canonicalPath(path));
         const problems: FlagProblem[] = missing.map((f) => ({
           flag: longFlag(f),
           issue: "missing",
