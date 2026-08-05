@@ -464,7 +464,7 @@ export function registerWorksiteCommands(parent, getClient) {
         .option("--from-json <file>", "Read the patch body from a file (or - for stdin) — shell-safe alternative to --body")
         .option("--yyyymmdd <date>", "Date segment YYYYMMDD (defaults to today)");
     addWriteFlagsToCommand(updateCmd).action(async (idStr, opts) => {
-        let parsed = {};
+        let parsed;
         try {
             parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
         }

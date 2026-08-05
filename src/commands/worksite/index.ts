@@ -688,7 +688,7 @@ export function registerWorksiteCommands(
         reason?: string;
       }
     ) => {
-      let parsed: Record<string, unknown> = {};
+      let parsed: Record<string, unknown>;
       try {
         parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
       } catch (e) {

@@ -105,9 +105,5 @@ export function getGlobalOptions(cmd: Command): GlobalOptions {
   };
 }
 
-export function resolveEndpoint(
-  g: GlobalOptions,
-  profileEndpoint: string | null
-): string {
-  return g.endpoint || profileEndpoint || "https://api.ibetoni.fi";
-}
+/** Fallback API endpoint when neither --endpoint nor the active profile sets one. */
+export const DEFAULT_ENDPOINT = "https://api.ibetoni.fi";

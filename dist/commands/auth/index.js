@@ -1,4 +1,4 @@
-import { getGlobalOptions } from "../../globals.js";
+import { getGlobalOptions, DEFAULT_ENDPOINT } from "../../globals.js";
 import { createStore, defaultCredentialsPath } from "../../auth/store.js";
 import { performLogin } from "../../auth/login.js";
 import { performLogout } from "../../auth/logout.js";
@@ -37,7 +37,7 @@ export function registerAuthCommands(parent, isReadOnly) {
         .action(async () => {
         try {
             await performLogin({
-                endpoint: getGlobalOptions(parent).endpoint ?? "https://api.ibetoni.fi",
+                endpoint: getGlobalOptions(parent).endpoint ?? DEFAULT_ENDPOINT,
                 credentialsPath: defaultCredentialsPath(),
             });
         }

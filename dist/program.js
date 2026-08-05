@@ -55,9 +55,9 @@ import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDom
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
-import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, setActiveCommandErrors } from "./output/json.js";
+import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, setActiveCommandErrors, setExitCode as setExit } from "./output/json.js";
 import { buildValidationEnvelope } from "./output/validationEnvelope.js";
-import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope } from "./output/unknownCommand.js";
+import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, commandPath } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { createApiClient } from "./api/client.js";
 import { CliError } from "./api/errors.js";
@@ -410,10 +410,7 @@ export function buildProgram() {
  * path-join logic must NOT drift between the two entry points.
  */
 export function applySpecErrors(actionCommand) {
-    const parts = [];
-    for (let c = actionCommand; c; c = c.parent)
-        parts.unshift(c.name());
-    const spec = COMMAND_SPECS.find((s) => s.command === parts.join(" "));
+    const spec = COMMAND_SPECS.find((s) => s.command === commandPath(actionCommand));
     setActiveCommandErrors(spec?.errors ?? null);
 }
 export function enableParserThrow(program) {
@@ -449,19 +446,6 @@ function isCommanderError(err) {
         err !== null &&
         typeof err.code === "string" &&
         err.code.startsWith("commander."));
-}
-function setExit(code) {
-    const ctx = getEmbeddedCtx();
-    if (ctx)
-        ctx.exitCode = code;
-    else
-        process.exitCode = code;
-}
-function commandPath(cmd) {
-    const parts = [];
-    for (let c = cmd; c; c = c.parent)
-        parts.unshift(c.name());
-    return parts.join(" ");
 }
 function missingMandatoryOptions(cmd) {
     const missing = [];

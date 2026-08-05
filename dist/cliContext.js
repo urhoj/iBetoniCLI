@@ -5,6 +5,7 @@ import { refreshAndPersistSession } from "./auth/refresh.js";
 import { performSwitch } from "./auth/switch.js";
 import { decodeJwtPayload } from "./auth/jwt.js";
 import { CliError } from "./api/errors.js";
+import { DEFAULT_ENDPOINT } from "./globals.js";
 /**
  * Decide which token a single invocation should act with, given an optional
  * global `--company <id>` target. When the target is absent or already the active
@@ -44,7 +45,7 @@ export async function createCliContext(opts) {
     if (!auth) {
         return {
             client: null,
-            endpoint: opts.global.endpoint ?? "https://api.ibetoni.fi",
+            endpoint: opts.global.endpoint ?? DEFAULT_ENDPOINT,
             personId: null,
             ownerAsiakasId: null,
         };

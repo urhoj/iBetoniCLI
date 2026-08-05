@@ -1,4 +1,5 @@
 import { createStore } from "./store.js";
+import { DEFAULT_ENDPOINT } from "../globals.js";
 /**
  * Resolve auth for a CLI invocation, preferring the `IB_TOKEN` env var over
  * the on-disk credentials store. Returns `null` when neither is available —
@@ -23,7 +24,7 @@ export async function resolveAuth(opts) {
         }
         return {
             token: process.env.IB_TOKEN,
-            endpoint: opts.defaultEndpoint ?? "https://api.ibetoni.fi",
+            endpoint: opts.defaultEndpoint ?? DEFAULT_ENDPOINT,
             personId,
             ownerAsiakasId,
             source: "env",

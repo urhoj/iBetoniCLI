@@ -5,7 +5,7 @@ import { refreshAndPersistSession } from "./auth/refresh.js";
 import { performSwitch } from "./auth/switch.js";
 import { decodeJwtPayload } from "./auth/jwt.js";
 import { CliError } from "./api/errors.js";
-import type { GlobalOptions } from "./globals.js";
+import { DEFAULT_ENDPOINT, type GlobalOptions } from "./globals.js";
 
 /** Outcome of {@link resolveEphemeralSwitch}: the token to act with + identity. */
 export interface EphemeralSwitchResult {
@@ -82,7 +82,7 @@ export async function createCliContext(opts: {
   if (!auth) {
     return {
       client: null,
-      endpoint: opts.global.endpoint ?? "https://api.ibetoni.fi",
+      endpoint: opts.global.endpoint ?? DEFAULT_ENDPOINT,
       personId: null,
       ownerAsiakasId: null,
     };

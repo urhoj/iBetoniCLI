@@ -34,9 +34,8 @@ program.hook("preAction", (_thisCommand, actionCommand) => {
 // discovery (`ib commands`, `ib reference dump`, root primer) renders at the
 // caller's tier. Fail-closed: any resolution failure → "standard" (privileged
 // subtrees hidden).
-let resolvedAuth: Awaited<ReturnType<typeof resolveAuth>> = null;
 try {
-  resolvedAuth = await resolveAuth({ credentialsPath: defaultCredentialsPath() });
+  const resolvedAuth = await resolveAuth({ credentialsPath: defaultCredentialsPath() });
   setCallerTier(resolveCallerTier(resolvedAuth?.token ?? null));
 } catch {
   setCallerTier("standard");

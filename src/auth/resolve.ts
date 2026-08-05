@@ -1,4 +1,5 @@
 import { createStore } from "./store.js";
+import { DEFAULT_ENDPOINT } from "../globals.js";
 
 /**
  * Resolved authentication for a CLI invocation.
@@ -44,7 +45,7 @@ export async function resolveAuth(opts: {
     }
     return {
       token: process.env.IB_TOKEN,
-      endpoint: opts.defaultEndpoint ?? "https://api.ibetoni.fi",
+      endpoint: opts.defaultEndpoint ?? DEFAULT_ENDPOINT,
       personId,
       ownerAsiakasId,
       source: "env",

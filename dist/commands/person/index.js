@@ -425,7 +425,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         if (opts.global && opts.asiakas !== undefined) {
             failWith("--global and --asiakas are mutually exclusive", 4);
         }
-        let parsed = {};
+        let parsed;
         try {
             parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
         }
@@ -545,7 +545,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         if (!opts.reason) {
             failWith("Missing required flag: --reason", 4);
         }
-        let parsed = {};
+        let parsed;
         try {
             parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
         }

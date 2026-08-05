@@ -10,7 +10,7 @@ import { CliError } from "./errors.js";
  * Throws a CliError mapped to exit 3 (permission/refused) otherwise.
  */
 export function assertWritableEndpoint(endpoint: string, forceProd: boolean): void {
-  let host = "";
+  let host: string;
   try {
     host = new URL(endpoint).hostname;
   } catch {
