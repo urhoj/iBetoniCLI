@@ -68,9 +68,11 @@ describe("runCustomerMerge", () => {
     asPost().mockResolvedValueOnce({ success: true });
     const result = await runCustomerMerge(
       mockClient,
-      { mainAsiakasId: 8001, secondaryAsiakasId: 8002, ownerAsiakasId: 8 },
+      { mainId: 8001, secondaryId: 8002, ownerAsiakasId: 8 },
       { reason: "dedupe" }
     );
+    // The WIRE body keeps the asiakas-specific field names — that is the point
+    // of CombinatorIdFields, and the proof this migration changed no payload.
     expect(mockClient.post).toHaveBeenCalledWith(
       "/api/admin/asiakas-combinator/merge",
       { mainAsiakasId: 8001, secondaryAsiakasId: 8002, ownerAsiakasId: 8 },
@@ -83,7 +85,7 @@ describe("runCustomerMerge", () => {
     asPost().mockResolvedValueOnce({ success: true, referencesToMove: 3 });
     const result = await runCustomerMerge(
       mockClient,
-      { mainAsiakasId: 8001, secondaryAsiakasId: 8002, ownerAsiakasId: 8 },
+      { mainId: 8001, secondaryId: 8002, ownerAsiakasId: 8 },
       { dryRun: true, reason: "ignored on validate" }
     );
     expect(mockClient.post).toHaveBeenCalledTimes(1);
@@ -97,7 +99,7 @@ describe("runCustomerMerge", () => {
     asPost().mockResolvedValueOnce({ success: true });
     await runCustomerMerge(
       mockClient,
-      { mainAsiakasId: 1, secondaryAsiakasId: 2, ownerAsiakasId: 8, allowBigMerge: true },
+      { mainId: 1, secondaryId: 2, ownerAsiakasId: 8, allowBigMerge: true },
       { reason: "big" }
     );
     expect(asPost().mock.calls[0][1]).toMatchObject({ allowBigMerge: true });

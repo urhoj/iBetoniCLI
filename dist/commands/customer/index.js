@@ -8,6 +8,7 @@ import { resolveTarget, parseId, resolveSearchQuery } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
 import { runPersonRoleList } from "../person/index.js";
 import { guarded } from "../_shared/action.js";
+import { runCombinatorDuplicates, runCombinatorMerge, } from "../_shared/combinator.js";
 // PRH lookups live in the shared module (also powers `ib opendata prh`). Aliased
 // to the historical names so internal `--from-prh` call sites and the hidden
 // `ib customer prh` alias are unchanged; re-exported for importers/tests.
@@ -690,47 +691,28 @@ async function reconcileCreatedExtras(client, current, desired, flags) {
     await runCustomerUpdate(client, current.asiakasId, body, { reason: flags.reason });
     return runCustomerGet(client, current.asiakasId);
 }
+/** Request-body id fields for the asiakas combinator. */
+const ASIAKAS_MERGE_ID_FIELDS = {
+    mainField: "mainAsiakasId",
+    secondaryField: "secondaryAsiakasId",
+};
 /**
  * GET /api/admin/asiakas-combinator/duplicates?ownerAsiakasId=<id> — likely-
  * duplicate customer pairs for one tenant (y-tunnus / exact-name / email /
- * name-prefix matches). System-admin gated server-side. The backend returns
- * `{ pairs }` (top 100, each pair once with id1 < id2); projected into the list
- * envelope. `truncated` is set when the 100-pair cap was hit (there is no cursor).
+ * name-prefix matches). System-admin gated server-side. See
+ * runCombinatorDuplicates for the envelope shape.
  */
-export async function runCustomerDuplicates(client, ownerAsiakasId) {
-    const res = await client.get(`/api/admin/asiakas-combinator/duplicates?ownerAsiakasId=${ownerAsiakasId}`);
-    const items = Array.isArray(res?.pairs) ? res.pairs : [];
-    return { items, nextCursor: null, count: items.length, truncated: items.length >= 100 };
+export function runCustomerDuplicates(client, ownerAsiakasId) {
+    return runCombinatorDuplicates(client, "asiakas-combinator", ownerAsiakasId);
 }
 /**
  * Merge two duplicate customers — the secondary's references move onto the main,
  * then the secondary is deleted. IRREVERSIBLE, system-admin gated server-side.
- *
- * `--dry-run` calls POST /validate (the read-only safety check reporting what
- * WOULD move + any blocking conflicts) and NEVER merges — the /merge route has
- * no `X-Dry-Run` guard, so a server-side dry-run there would still merge. The
- * validate call is tagged `read`, so `merge --dry-run` runs even under
- * `--read-only` / `IB_READ_ONLY`. The real path POSTs /merge with the universal
- * write-flag headers.
+ * `--dry-run` runs the read-only /validate safety check (works under
+ * --read-only). See runCombinatorMerge.
  */
-export async function runCustomerMerge(client, opts, flags) {
-    const body = {
-        mainAsiakasId: opts.mainAsiakasId,
-        secondaryAsiakasId: opts.secondaryAsiakasId,
-        ownerAsiakasId: opts.ownerAsiakasId,
-    };
-    if (opts.allowBigMerge)
-        body.allowBigMerge = true;
-    if (flags.dryRun) {
-        // /validate is a tenant-scoped READ that happens to use POST — mark it `read`
-        // so the --read-only / IB_READ_ONLY write-lock and the acting-as "write"
-        // diagnostic both skip it (it never mutates).
-        const validation = await client.post("/api/admin/asiakas-combinator/validate", body, { read: true });
-        return { dryRun: true, validation };
-    }
-    return client.post("/api/admin/asiakas-combinator/merge", body, {
-        headers: writeFlagsToHeaders(flags),
-    });
+export function runCustomerMerge(client, opts, flags) {
+    return runCombinatorMerge(client, "asiakas-combinator", ASIAKAS_MERGE_ID_FIELDS, opts, flags);
 }
 /**
  * Register `ib customer` subcommands on the parent commander instance:
@@ -1184,8 +1166,8 @@ export function registerCustomerCommands(parent, getClient) {
             const client = await getClient();
             const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
             writeJson(await runCustomerMerge(client, {
-                mainAsiakasId: opts.main,
-                secondaryAsiakasId: opts.secondary,
+                mainId: opts.main,
+                secondaryId: opts.secondary,
                 ownerAsiakasId: owner,
                 allowBigMerge: opts.allowBigMerge,
             }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));

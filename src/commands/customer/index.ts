@@ -21,6 +21,11 @@ import { resolveTarget, parseId, resolveSearchQuery } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
 import { runPersonRoleList } from "../person/index.js";
 import { guarded } from "../_shared/action.js";
+import {
+  runCombinatorDuplicates,
+  runCombinatorMerge,
+  type CombinatorMergeOptions,
+} from "../_shared/combinator.js";
 // PRH lookups live in the shared module (also powers `ib opendata prh`). Aliased
 // to the historical names so internal `--from-prh` call sites and the hidden
 // `ib customer prh` alias are unchanged; re-exported for importers/tests.
@@ -1018,82 +1023,34 @@ async function reconcileCreatedExtras(
   return runCustomerGet(client, current.asiakasId);
 }
 
-/** One likely-duplicate customer pair from the asiakas-combinator. */
-export interface DuplicatePair {
-  id1: number;
-  name1: string | null;
-  id2: number;
-  name2: string | null;
-  /** ytunnus | exact_name | email | name_prefix */
-  matchCode: string;
-  matchValue: string | null;
-  /** high | low */
-  confidence: string;
-}
+/** Request-body id fields for the asiakas combinator. */
+const ASIAKAS_MERGE_ID_FIELDS = {
+  mainField: "mainAsiakasId",
+  secondaryField: "secondaryAsiakasId",
+} as const;
 
 /**
  * GET /api/admin/asiakas-combinator/duplicates?ownerAsiakasId=<id> — likely-
  * duplicate customer pairs for one tenant (y-tunnus / exact-name / email /
- * name-prefix matches). System-admin gated server-side. The backend returns
- * `{ pairs }` (top 100, each pair once with id1 < id2); projected into the list
- * envelope. `truncated` is set when the 100-pair cap was hit (there is no cursor).
+ * name-prefix matches). System-admin gated server-side. See
+ * runCombinatorDuplicates for the envelope shape.
  */
-export async function runCustomerDuplicates(
-  client: ApiClient,
-  ownerAsiakasId: number
-): Promise<ListEnvelope<DuplicatePair>> {
-  const res = await client.get<{ pairs?: DuplicatePair[] }>(
-    `/api/admin/asiakas-combinator/duplicates?ownerAsiakasId=${ownerAsiakasId}`
-  );
-  const items = Array.isArray(res?.pairs) ? res.pairs : [];
-  return { items, nextCursor: null, count: items.length, truncated: items.length >= 100 };
-}
-
-/** Typed inputs for `customer merge`. */
-export interface CustomerMergeOptions {
-  mainAsiakasId: number;
-  secondaryAsiakasId: number;
-  ownerAsiakasId: number;
-  /** System-admin only: permit a merge above the safety row cap. */
-  allowBigMerge?: boolean;
+export function runCustomerDuplicates(client: ApiClient, ownerAsiakasId: number) {
+  return runCombinatorDuplicates(client, "asiakas-combinator", ownerAsiakasId);
 }
 
 /**
  * Merge two duplicate customers — the secondary's references move onto the main,
  * then the secondary is deleted. IRREVERSIBLE, system-admin gated server-side.
- *
- * `--dry-run` calls POST /validate (the read-only safety check reporting what
- * WOULD move + any blocking conflicts) and NEVER merges — the /merge route has
- * no `X-Dry-Run` guard, so a server-side dry-run there would still merge. The
- * validate call is tagged `read`, so `merge --dry-run` runs even under
- * `--read-only` / `IB_READ_ONLY`. The real path POSTs /merge with the universal
- * write-flag headers.
+ * `--dry-run` runs the read-only /validate safety check (works under
+ * --read-only). See runCombinatorMerge.
  */
-export async function runCustomerMerge(
+export function runCustomerMerge(
   client: ApiClient,
-  opts: CustomerMergeOptions,
+  opts: CombinatorMergeOptions,
   flags: WriteFlags
-): Promise<unknown> {
-  const body: Record<string, unknown> = {
-    mainAsiakasId: opts.mainAsiakasId,
-    secondaryAsiakasId: opts.secondaryAsiakasId,
-    ownerAsiakasId: opts.ownerAsiakasId,
-  };
-  if (opts.allowBigMerge) body.allowBigMerge = true;
-  if (flags.dryRun) {
-    // /validate is a tenant-scoped READ that happens to use POST — mark it `read`
-    // so the --read-only / IB_READ_ONLY write-lock and the acting-as "write"
-    // diagnostic both skip it (it never mutates).
-    const validation = await client.post<unknown>(
-      "/api/admin/asiakas-combinator/validate",
-      body,
-      { read: true }
-    );
-    return { dryRun: true, validation };
-  }
-  return client.post<unknown>("/api/admin/asiakas-combinator/merge", body, {
-    headers: writeFlagsToHeaders(flags),
-  });
+) {
+  return runCombinatorMerge(client, "asiakas-combinator", ASIAKAS_MERGE_ID_FIELDS, opts, flags);
 }
 
 /**
@@ -1668,8 +1625,8 @@ export function registerCustomerCommands(
           await runCustomerMerge(
             client,
             {
-              mainAsiakasId: opts.main,
-              secondaryAsiakasId: opts.secondary,
+              mainId: opts.main,
+              secondaryId: opts.secondary,
               ownerAsiakasId: owner,
               allowBigMerge: opts.allowBigMerge,
             },
