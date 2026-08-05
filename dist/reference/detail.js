@@ -2,8 +2,7 @@ import { COMMAND_SPECS } from "./specs.js";
 import { CliError } from "../api/errors.js";
 import { visibleSpecs, getCallerTier } from "../tier.js";
 import { writeFlagsToHeaders } from "../api/writeFlags.js";
-import { lineDiff } from "../textDiff.js";
-import { applyTextEdit } from "../textEdit.js";
+import { applyTextEdit, textEditDryRunEnvelope } from "../textEdit.js";
 function resolveCommand(commandParts, tier) {
     // Be liberal in what we accept. Every discovery surface — including this
     // command's sibling `reference detail list` — emits `command` WITH the leading
@@ -160,17 +159,7 @@ export async function runReferenceDetailEdit(client, commandParts, field, op, fl
     // 400 on write reports it here instead of returning a clean-looking diff.
     assertWithinCap(field, next, "would be");
     if (flags.dryRun) {
-        const diff = lineDiff(before, next);
-        return {
-            dryRun: true,
-            command: current.command,
-            field,
-            ...(matchCount !== undefined ? { matchCount } : {}),
-            addedLines: diff.addedLines,
-            removedLines: diff.removedLines,
-            sameContent: diff.sameContent,
-            unified: diff.unified,
-        };
+        return textEditDryRunEnvelope(before, next, matchCount, { command: current.command }, field);
     }
     return runReferenceDetailSet(client, commandParts, { [field]: next }, flags, tier);
 }

@@ -5,7 +5,9 @@
  * Generalises the glossary append/replace idea to markdown/HTML bodies.
  * Spec: docs/superpowers/specs/2026-06-24-ib-in-field-partial-edits-design.md
  */
+import type { Command } from "commander";
 import { failUsage } from "./output/json.js";
+import { lineDiff } from "./textDiff.js";
 
 export type TextEditOp =
   | { kind: "replace"; find: string; replacement: string; all?: boolean }
@@ -25,6 +27,21 @@ export interface EditFlags {
   append?: string;
   prepend?: string;
   all?: boolean;
+}
+
+/**
+ * Register the five in-field edit flags on an edit-capable command. The flag
+ * NAMES are the contract (`parseEditOp`, `unknownCommand.ts`, the help-wiring
+ * tests); these descriptions never reach a leaf `--help`, which renders from the
+ * CommandSpec — so one canonical wording serves all three commands.
+ */
+export function addEditFlags(cmd: Command): Command {
+  return cmd
+    .option("--replace <text>", "Edit mode: replace this literal text in the target field (exactly once unless --all)")
+    .option("--with <text>", 'Replacement for --replace ("" deletes the matched text)')
+    .option("--append <text>", "Edit mode: append text to the target field (verbatim)")
+    .option("--prepend <text>", "Edit mode: prepend text to the target field (verbatim)")
+    .option("--all", "With --replace: substitute every occurrence");
 }
 
 /** Count non-overlapping occurrences of a literal `needle` in `haystack`. */
@@ -97,4 +114,30 @@ export function parseEditOp(flags: EditFlags): TextEditOp | undefined {
   if (flags.all) failUsage("--all only applies with --replace");
   if (flags.append !== undefined) return { kind: "append", text: flags.append };
   return { kind: "prepend", text: flags.prepend! };
+}
+
+/**
+ * The client-side `--dry-run` result every edit-capable command returns: the
+ * caller's identity keys naming the edited row (`{ command }` / `{ helpId }` /
+ * `{ type }`), the field, the replace match count, and the line diff. Nothing is
+ * written, so this works under `--read-only`.
+ */
+export function textEditDryRunEnvelope(
+  before: string,
+  next: string,
+  matchCount: number | undefined,
+  identity: Record<string, unknown>,
+  field: string
+): Record<string, unknown> {
+  const diff = lineDiff(before, next);
+  return {
+    dryRun: true,
+    ...identity,
+    field,
+    ...(matchCount !== undefined ? { matchCount } : {}),
+    addedLines: diff.addedLines,
+    removedLines: diff.removedLines,
+    sameContent: diff.sameContent,
+    unified: diff.unified,
+  };
 }

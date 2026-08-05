@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { applyTextEdit, parseEditOp } from "../src/textEdit.js";
+import { applyTextEdit, parseEditOp, textEditDryRunEnvelope } from "../src/textEdit.js";
 
 describe("applyTextEdit — replace (strict match)", () => {
   test("exactly one match → substitutes and reports matchCount", () => {
@@ -75,5 +75,40 @@ describe("parseEditOp", () => {
   });
   test("empty-string edit value is still an op (not undefined)", () => {
     expect(parseEditOp({ append: "" })).toEqual({ kind: "append", text: "" });
+  });
+});
+
+describe("textEditDryRunEnvelope", () => {
+  test("emits the identity keys between dryRun and field, in insertion order", () => {
+    const env = textEditDryRunEnvelope("a\nb", "a\nc", 1, { helpId: "X" }, "htmltext");
+    expect(Object.keys(env)).toEqual([
+      "dryRun",
+      "helpId",
+      "field",
+      "matchCount",
+      "addedLines",
+      "removedLines",
+      "sameContent",
+      "unified",
+    ]);
+    expect(env).toMatchObject({ dryRun: true, helpId: "X", field: "htmltext", matchCount: 1, sameContent: false });
+  });
+
+  test("omits matchCount entirely for append/prepend (undefined count)", () => {
+    const env = textEditDryRunEnvelope("a", "a b", undefined, { type: "TOS" }, "markdownContent");
+    expect(Object.keys(env)).toEqual([
+      "dryRun",
+      "type",
+      "field",
+      "addedLines",
+      "removedLines",
+      "sameContent",
+      "unified",
+    ]);
+  });
+
+  test("an unchanged edit still reports sameContent", () => {
+    expect(textEditDryRunEnvelope("same", "same", 0, { command: "ib keikka list" }, "detail"))
+      .toMatchObject({ command: "ib keikka list", sameContent: true });
   });
 });

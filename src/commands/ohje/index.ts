@@ -10,8 +10,7 @@ import { writeJson, failWith, failUsage } from "../../output/json.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { type AssessFlags, assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "../../assess.js";
-import { lineDiff } from "../../textDiff.js";
-import { applyTextEdit, parseEditOp, type TextEditOp } from "../../textEdit.js";
+import { addEditFlags, applyTextEdit, parseEditOp, textEditDryRunEnvelope, type TextEditOp } from "../../textEdit.js";
 
 /**
  * `ib ohje` — read/write the **UI help-text content** stored in the `helps`
@@ -270,17 +269,7 @@ export async function runOhjeEditField(
   const before = String(current[field] ?? "");
   const { next, matchCount } = applyTextEdit(before, op);
   if (flags.dryRun) {
-    const diff = lineDiff(before, next);
-    return {
-      dryRun: true,
-      helpId,
-      field,
-      ...(matchCount !== undefined ? { matchCount } : {}),
-      addedLines: diff.addedLines,
-      removedLines: diff.removedLines,
-      sameContent: diff.sameContent,
-      unified: diff.unified,
-    };
+    return textEditDryRunEnvelope(before, next, matchCount, { helpId }, field);
   }
   return runOhjeUpdate(client, helpId, { [field]: next } as OhjeFields, flags, {}, assess);
 }
@@ -375,12 +364,8 @@ export function registerOhjeCommands(
       "Fail (exit 4) if no row exists for this helpId instead of upserting a new one " +
         "(guards against a typo'd helpId silently creating a junk row)"
     )
-    .option("--field <name>", "Edit-mode target field: title | shorttext | htmltext (default htmltext)")
-    .option("--replace <text>", "Edit mode: replace this literal text in the target field (exactly once unless --all)")
-    .option("--with <text>", 'Replacement for --replace ("" deletes the matched text)')
-    .option("--append <text>", "Edit mode: append text to the target field (verbatim)")
-    .option("--prepend <text>", "Edit mode: prepend text to the target field (verbatim)")
-    .option("--all", "With --replace: substitute every occurrence");
+    .option("--field <name>", "Edit-mode target field: title | shorttext | htmltext (default htmltext)");
+  addEditFlags(updateCmd);
   addWriteFlagsToCommand(addAssessWriteFlags(updateCmd)).action(
     guarded(async (
       helpId: string,
@@ -404,10 +389,7 @@ export function registerOhjeCommands(
       if (!isValidHelpId(helpId)) {
         failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
       }
-      const editOp = parseEditOp({
-        replace: opts.replace, with: opts.with,
-        append: opts.append, prepend: opts.prepend, all: opts.all,
-      });
+      const editOp = parseEditOp(opts);
       if (opts.field !== undefined && !editOp) {
         failUsage("--field only applies in edit mode (--replace / --append / --prepend)");
       }

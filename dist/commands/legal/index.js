@@ -6,7 +6,7 @@ import { writeJson, failWith, failUsage } from "../../output/json.js";
 import { parseId, cappedInt } from "../../targets.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { lineDiff } from "../../textDiff.js";
-import { applyTextEdit, parseEditOp } from "../../textEdit.js";
+import { addEditFlags, applyTextEdit, parseEditOp, textEditDryRunEnvelope } from "../../textEdit.js";
 import { validateStructuredJson } from "./validateJson.js";
 import { guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
@@ -232,17 +232,7 @@ export async function runLegalSaveWithEdit(client, type, op, fields, flags) {
     const before = typeof current.markdownContent === "string" ? current.markdownContent : "";
     const { next, matchCount } = applyTextEdit(before, op);
     if (flags.dryRun) {
-        const diff = lineDiff(before, next);
-        return {
-            dryRun: true,
-            type,
-            field: "markdownContent",
-            ...(matchCount !== undefined ? { matchCount } : {}),
-            addedLines: diff.addedLines,
-            removedLines: diff.removedLines,
-            sameContent: diff.sameContent,
-            unified: diff.unified,
-        };
+        return textEditDryRunEnvelope(before, next, matchCount, { type }, "markdownContent");
     }
     const title = fields.title ?? (typeof current.title === "string" ? current.title : "");
     return runLegalSave(client, {
@@ -439,17 +429,9 @@ export function registerLegalCommands(parent, getClient) {
         .option("--effective-date <date>", "Effective date YYYY-MM-DD (default: now)")
         .option("--activate", "Publish immediately (deactivates prior versions). Default: inactive draft")
         .option("--validate-json", "Validate the embedded ```json block parses to an object before saving (recommended for BETONIJERRY_* structured types)");
-    saveCmd
-        .option("--replace <text>", "Edit mode: replace this literal text in the current ACTIVE version's markdown (must match exactly once unless --all)")
-        .option("--with <text>", "Replacement text for --replace (use \"\" to delete the matched text)")
-        .option("--append <text>", "Edit mode: append this text to the end of the current markdown (verbatim — include your own newline)")
-        .option("--prepend <text>", "Edit mode: prepend this text to the start of the current markdown (verbatim)")
-        .option("--all", "With --replace: substitute every occurrence instead of erroring on multiple matches");
+    addEditFlags(saveCmd);
     addWriteFlagsToCommand(saveCmd).action(guarded(async (opts) => {
-        const editOp = parseEditOp({
-            replace: opts.replace, with: opts.with,
-            append: opts.append, prepend: opts.prepend, all: opts.all,
-        });
+        const editOp = parseEditOp(opts);
         if (editOp) {
             if (opts.file !== undefined || opts.content !== undefined) {
                 failUsage("edit mode (--replace/--append/--prepend) is mutually exclusive with --file/--content");

@@ -14,22 +14,25 @@ const apiErr = (http, meaning, remedy) => ({
     remedy,
 });
 /**
+ * Sandwich the command-specific rows between the universal 401 and 500 rows,
+ * preserving their order. Most specs' custom rows (403/404/…) belong BETWEEN
+ * the two, which `...COMMON_AUTH_ERRORS` (a trailing spread) cannot express.
+ */
+const authErrors = (...rows) => [
+    apiErr(401, "Token expired", "ib auth refresh"),
+    ...rows,
+    apiErr(500, "Backend error", "retry with --verbose"),
+];
+/**
  * Errors that apply to every authenticated command. Exported so
  * `ib reference dump` can hoist them into a single top-level `commonErrors`
  * block and strip the (identical) per-spec copies — they otherwise repeat
  * verbatim in ~240 specs and are the single largest field in the dump.
  */
-export const COMMON_AUTH_ERRORS = [
-    apiErr(401, "Token expired", "ib auth refresh"),
-    apiErr(500, "Backend error", "retry with --verbose"),
-];
+export const COMMON_AUTH_ERRORS = authErrors();
 /** Errors that apply to every authenticated command with permission gating. */
 function permErrors(page) {
-    return [
-        apiErr(401, "Token expired", "ib auth refresh"),
-        apiErr(403, "Permission denied", `check ${page}`),
-        apiErr(500, "Backend error", "retry with --verbose"),
-    ];
+    return authErrors(apiErr(403, "Permission denied", `check ${page}`));
 }
 // ─── attachment shared fragments ─────────────────────────────────────────────
 const ATTACHMENT_ENTITY_FLAGS = [
@@ -763,11 +766,7 @@ const BASE_COMMAND_SPECS = [
             { name: "field", type: "string", description: "Filter by fieldName (e.g. kuskit, laskuMemo, keikkaTilaId)" },
         ],
         outputShape: "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>",
-        errors: [
-            apiErr(401, "Token expired", "ib auth refresh"),
-            apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token"),
-            apiErr(500, "Backend error", "retry with --verbose"),
-        ],
+        errors: authErrors(apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")),
         seeAlso: ["ib log entity", "ib log by-entity-date"],
         examples: ["ib keikka log 12345", "ib keikka log 12345 --field kuskit"],
     },
@@ -1397,11 +1396,7 @@ const BASE_COMMAND_SPECS = [
             { name: "field", type: "string", description: "Filter by fieldName" },
         ],
         outputShape: "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }>",
-        errors: [
-            apiErr(401, "Token expired", "ib auth refresh"),
-            apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token"),
-            apiErr(500, "Backend error", "retry with --verbose"),
-        ],
+        errors: authErrors(apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")),
         seeAlso: ["ib log entity"],
         examples: ["ib worksite log 7"],
     },
@@ -1636,11 +1631,7 @@ const BASE_COMMAND_SPECS = [
             { name: "field", type: "string", description: "Filter by changeTracker fieldName (e.g. asiakasPersonSetting for role changes)" },
         ],
         outputShape: "ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>",
-        errors: [
-            apiErr(401, "Token expired", "ib auth refresh"),
-            apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token"),
-            apiErr(500, "Backend error", "retry with --verbose"),
-        ],
+        errors: authErrors(apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")),
         examples: ["ib person log 63", "ib person log 63 --field asiakasPersonSetting", "ib person log 63 --owner 27 --limit 50"],
     },
     {
@@ -2107,11 +2098,7 @@ const BASE_COMMAND_SPECS = [
             { name: "field", type: "string", description: "Filter by fieldName (e.g. vehicleRegNo)" },
         ],
         outputShape: "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }>",
-        errors: [
-            apiErr(401, "Token expired", "ib auth refresh"),
-            apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token"),
-            apiErr(500, "Backend error", "retry with --verbose"),
-        ],
+        errors: authErrors(apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")),
         seeAlso: ["ib log entity", "ib vehicle driver history"],
         examples: ["ib vehicle log 53"],
     },
@@ -4945,11 +4932,7 @@ const BASE_COMMAND_SPECS = [
             { name: "details", type: "boolean", description: "Include slimmed top-items per signal, not just counts" },
         ],
         outputShape: "{ generatedAt, needsYou, changelog:{ pending, deployPending, maxBumpLevel }, feedback:{ open, reviewed, byKind:{ open, reviewed } }, support:{ open, truncated }, legal:{ drafts }, glossary:{ misses }, jerry:{ noSupplyLive, noSupplyExpired } } — with --details each signal also carries an `items` array (feedback.items splits into { open, reviewed }; each reviewed item also carries { readyToClose, activeVersion, activatedAt }; jerry.items carry an `expired` flag).",
-        errors: [
-            apiErr(401, "Token expired", "ib auth refresh"),
-            apiErr(403, "Developer access required", "inbox is developer-gated; use a developer/sysadmin token"),
-            apiErr(500, "Backend error", "retry with --verbose"),
-        ],
+        errors: authErrors(apiErr(403, "Developer access required", "inbox is developer-gated; use a developer/sysadmin token")),
         notes: ["Deploy-gated: 404 until the backend ships GET /api/cli/inbox."],
         examples: ["ib dev inbox", "ib dev inbox --details"],
     },
@@ -5446,12 +5429,7 @@ const BASE_COMMAND_SPECS = [
             { name: "field", type: "string", description: "Filter by changeTracker fieldName (client-side)" },
         ],
         outputShape: "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>",
-        errors: [
-            apiErr(401, "Token expired", "ib auth refresh"),
-            apiErr(403, "Not a member of that company — or entityType personAvailability without an admin role", "ib company switch to that owner, or use an admin token"),
-            { origin: "client", exit: 4, meaning: "Unknown entityType (client-side validation)", remedy: "ib log types" },
-            apiErr(500, "Backend error", "retry with --verbose"),
-        ],
+        errors: authErrors(apiErr(403, "Not a member of that company — or entityType personAvailability without an admin role", "ib company switch to that owner, or use an admin token"), { origin: "client", exit: 4, meaning: "Unknown entityType (client-side validation)", remedy: "ib log types" }),
         notes: [
             "personAvailability is admin-gated server-side; every other type needs company membership only.",
             "Shortcuts: ib keikka|vehicle|worksite log (same row shape) and ib person|customer log (slimmer rows without entityType/entityId).",
@@ -5473,11 +5451,7 @@ const BASE_COMMAND_SPECS = [
             { name: "limit", type: "number", default: "100", description: "Max rows (server cap 500)" },
         ],
         outputShape: "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>",
-        errors: [
-            apiErr(401, "Token expired", "ib auth refresh"),
-            apiErr(403, "Not an admin in the owner company", "use an admin token, or per-entity `ib log entity`"),
-            apiErr(500, "Backend error", "retry with --verbose"),
-        ],
+        errors: authErrors(apiErr(403, "Not an admin in the owner company", "use an admin token, or per-entity `ib log entity`")),
         seeAlso: ["ib log range", "ib log by-entity-date"],
         examples: ["ib log latest", "ib log latest --entity-type keikka --limit 50"],
     },
@@ -5494,13 +5468,7 @@ const BASE_COMMAND_SPECS = [
             { name: "limit", type: "number", default: "200", description: "Max rows kept client-side (cap 2000)" },
         ],
         outputShape: "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }> (+truncated when --limit cut rows)",
-        errors: [
-            apiErr(401, "Token expired", "ib auth refresh"),
-            apiErr(403, "Not an admin in the owner company", "use an admin token"),
-            { origin: "client", exit: 4, meaning: "Invalid --from/--to (client-side)", remedy: "use YYYY-MM-DD or ISO datetime; today/yesterday/tomorrow are also accepted" },
-            apiErr(400, "Backend rejected the dates", "use ISO date strings"),
-            apiErr(500, "Backend error", "retry with --verbose"),
-        ],
+        errors: authErrors(apiErr(403, "Not an admin in the owner company", "use an admin token"), { origin: "client", exit: 4, meaning: "Invalid --from/--to (client-side)", remedy: "use YYYY-MM-DD or ISO datetime; today/yesterday/tomorrow are also accepted" }, apiErr(400, "Backend rejected the dates", "use ISO date strings")),
         seeAlso: ["ib log by-entity-date"],
         examples: [
             "ib log range --from 2026-06-01 --to 2026-06-10",
@@ -5519,12 +5487,7 @@ const BASE_COMMAND_SPECS = [
             { name: "limit", type: "number", default: "200", description: "Max rows kept client-side (cap 2000)" },
         ],
         outputShape: "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personName, at, description, keikkaTilaContext, deviceType, palkkiText, palkkiVehicleRegNo, reason, impersonatedByPersonName }>",
-        errors: [
-            apiErr(401, "Token expired", "ib auth refresh"),
-            apiErr(403, "Not an admin in the owner company", "use an admin token"),
-            { origin: "client", exit: 4, meaning: "entityType not keikka|palkki, or bad dates (client-side)", remedy: "use --entity-type keikka|palkki and ISO dates or today/yesterday/tomorrow" },
-            apiErr(500, "Backend error", "retry with --verbose"),
-        ],
+        errors: authErrors(apiErr(403, "Not an admin in the owner company", "use an admin token"), { origin: "client", exit: 4, meaning: "entityType not keikka|palkki, or bad dates (client-side)", remedy: "use --entity-type keikka|palkki and ISO dates or today/yesterday/tomorrow" }),
         seeAlso: ["ib log range"],
         examples: ["ib log by-entity-date --entity-type keikka --from today --to today"],
     },
@@ -5540,11 +5503,7 @@ const BASE_COMMAND_SPECS = [
             { name: "limit", type: "number", default: "100", description: "Max rows (cap 500)" },
         ],
         outputShape: "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, at, description, deviceType, entityDisplayName, reason, impersonatedByPersonName }>",
-        errors: [
-            apiErr(401, "Token expired", "ib auth refresh"),
-            apiErr(403, "Another person's history without an admin role", "omit personId, or use an admin token"),
-            apiErr(500, "Backend error", "retry with --verbose"),
-        ],
+        errors: authErrors(apiErr(403, "Another person's history without an admin role", "omit personId, or use an admin token")),
         examples: ["ib log user", "ib log user 63 --limit 50"],
     },
     {

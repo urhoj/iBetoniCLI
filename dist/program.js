@@ -48,7 +48,7 @@ import { registerInboxCommand } from "./commands/inbox/index.js";
 import { registerImpersonationCommands } from "./commands/dev/impersonation/index.js";
 import { runReferenceDump, fetchPrimerGlossary } from "./reference/dump.js";
 import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailEdit, runReferenceDetailDelete, runReferenceDetailLint } from "./reference/detail.js";
-import { parseEditOp } from "./textEdit.js";
+import { addEditFlags, parseEditOp } from "./textEdit.js";
 import { addWriteFlagsToCommand } from "./api/writeFlags.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "./assess.js";
 import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDomain } from "./reference/commandsList.js";
@@ -280,17 +280,10 @@ export function buildProgram() {
         .argument("<command...>", "Command path after `ib` (e.g. keikka latest)")
         .option("--summary <text>", "Short one-line summary stored in the catalog")
         .option("--detail <text>", "Full markdown business-context detail")
-        .option("--field <name>", "Edit-mode target field: summary | detail (default detail)")
-        .option("--replace <text>", "Edit mode: replace this literal text in the target field (exactly once unless --all)")
-        .option("--with <text>", 'Replacement for --replace ("" deletes the matched text)')
-        .option("--append <text>", "Edit mode: append text to the target field (verbatim)")
-        .option("--prepend <text>", "Edit mode: prepend text to the target field (verbatim)")
-        .option("--all", "With --replace: substitute every occurrence");
+        .option("--field <name>", "Edit-mode target field: summary | detail (default detail)");
+    addEditFlags(detailSet);
     addWriteFlagsToCommand(addAssessWriteFlags(detailSet)).action(guarded(async (commandParts, opts) => {
-        const editOp = parseEditOp({
-            replace: opts.replace, with: opts.with,
-            append: opts.append, prepend: opts.prepend, all: opts.all,
-        });
+        const editOp = parseEditOp(opts);
         if (opts.field !== undefined && !editOp) {
             failUsage("--field only applies in edit mode (--replace / --append / --prepend)");
         }

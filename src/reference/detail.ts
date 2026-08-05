@@ -10,8 +10,7 @@ import { CliError } from "../api/errors.js";
 import { type CallerTier, visibleSpecs, getCallerTier } from "../tier.js";
 import { writeFlagsToHeaders, type WriteFlags } from "../api/writeFlags.js";
 import type { AssessFlags } from "../assess.js";
-import { lineDiff } from "../textDiff.js";
-import { applyTextEdit, type TextEditOp } from "../textEdit.js";
+import { applyTextEdit, textEditDryRunEnvelope, type TextEditOp } from "../textEdit.js";
 
 function resolveCommand(commandParts: string[], tier: CallerTier): string {
   // Be liberal in what we accept. Every discovery surface — including this
@@ -220,17 +219,7 @@ export async function runReferenceDetailEdit(
   // 400 on write reports it here instead of returning a clean-looking diff.
   assertWithinCap(field, next, "would be");
   if (flags.dryRun) {
-    const diff = lineDiff(before, next);
-    return {
-      dryRun: true,
-      command: current.command,
-      field,
-      ...(matchCount !== undefined ? { matchCount } : {}),
-      addedLines: diff.addedLines,
-      removedLines: diff.removedLines,
-      sameContent: diff.sameContent,
-      unified: diff.unified,
-    };
+    return textEditDryRunEnvelope(before, next, matchCount, { command: current.command }, field);
   }
   return runReferenceDetailSet(client, commandParts, { [field]: next }, flags, tier);
 }
