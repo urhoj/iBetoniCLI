@@ -85,7 +85,6 @@ export function registerImpersonationCommands(
 
   imp
     .command("sessions")
-    .description("Reconstructed impersonation sessions (personLog 30/31/32) with endReason")
     .option("--actor <id>", "Filter to sessions run BY this actor personId", (s: string) => Number(s))
     .option("--target <id>", "Filter to sessions run AS this target personId", (s: string) => Number(s))
     .option("--end-reason <r>", "Filter by endReason (manual|timeout|error|logout)")
@@ -95,7 +94,6 @@ export function registerImpersonationCommands(
 
   imp
     .command("grants <personId>")
-    .description("Who may impersonate whom for one person (outbound/inbound grants)")
     .action(guarded(async (personIdStr: string) => {
       const personId = parseId(personIdStr, "personId");
       writeJson(await runImpersonationGrants(await getClient(), personId));

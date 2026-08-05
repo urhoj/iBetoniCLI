@@ -574,9 +574,6 @@ export function registerChangelogCommands(
       // `add` where every other group uses `create`, so an agent primed on
       // `create` types `changelog create`; accept it (feedback #229).
       .alias("create")
-      .description(
-        "Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row to status=applied."
-      )
       // Required, but declared as plain options so --from-json can supply them:
       // Commander enforces a .requiredOption before the action runs. Enforced
       // post-merge by requireAddFields (fb#300).
@@ -662,9 +659,6 @@ export function registerChangelogCommands(
   );
 
   c.command("list")
-    .description(
-      "List change entries (filters: --month --type --area --repo --feedback --sentry --source --search --status --has-feedback --has-sentry --limit)"
-    )
     .option("--month <YYYY-MM>", "Filter to a month")
     .option("--type <t>", "feature|improvement|bugfix")
     .option("--area <a>", AREA_FLAG_DESC)
@@ -693,7 +687,6 @@ export function registerChangelogCommands(
     );
 
   c.command("get <changelogId>")
-    .description("Get one entry")
     .action(
       guarded(async (idStr: string) => {
         const id = parseRefId(idStr, "changelog", "get");
@@ -705,9 +698,6 @@ export function registerChangelogCommands(
   addWriteFlagsToCommand(
     c
       .command("delete <changelogId>")
-      .description(
-        "Soft-delete an entry (sets isDeleted=1; retained for audit but hidden from all reads, no CLI undelete). Use to retract a mistaken/test entry."
-      )
   ).action(
     guarded(async (idStr: string, o: WriteFlags) => {
       const id = parseRefId(idStr, "changelog", "delete");
@@ -719,7 +709,6 @@ export function registerChangelogCommands(
   addWriteFlagsToCommand(
     c
       .command("update <changelogId>")
-      .description("Edit an entry")
       .option("--type <t>", "feature|improvement|bugfix (accepts fix→bugfix, feat→feature)")
       .option("--area <a>", AREA_FLAG_DESC)
       .option("--title <s>", "New title")
@@ -806,9 +795,6 @@ export function registerChangelogCommands(
   }));
 
   c.command("report")
-    .description(
-      "Generate the monthly report from entries (markdown or json)"
-    )
     .option("--month <YYYY-MM>", "Month to render")
     .option("--unreleased", "Report UNRELEASED/pending entries staged for the next release instead of a month — routes to `changelog pending`")
     .option("--pending", "Alias for --unreleased")
@@ -837,9 +823,6 @@ export function registerChangelogCommands(
     );
 
   c.command("pending")
-    .description(
-      "List PENDING/unreleased changelog entries (versionTag IS NULL) staged for the next release, + the max bump level they imply. Drives the deploy-time app version bump."
-    )
     .action(
       guarded(async () => {
         writeJson(await runChangelogPending(await getClient()));
@@ -849,9 +832,6 @@ export function registerChangelogCommands(
   addWriteFlagsToCommand(
     c
       .command("release")
-      .description(
-        "Stamp unreleased entries with a version tag (marks them released). Called by scripts/apply-release-version.ps1. Use --vtag to stamp them all with one tag, or --map for precise per-entry repo@version tags."
-      )
       .option("--vtag <v>", "Single version tag to stamp on every pending entry (e.g. 1.0.8)")
       .option("--map <file>", "JSON file (or - for stdin): [{changelogId, versionTag}] for precise per-entry stamping")
   ).action(guarded(async (o: WriteFlags & { vtag?: string; map?: string }) => {

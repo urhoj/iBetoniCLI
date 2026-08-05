@@ -40,7 +40,6 @@ export async function runBuildingLookup(client, opts) {
 export function registerBuildingCommands(parent, getClient) {
     parent
         .command("building")
-        .description("Building-registry lookup for a sijainti, worksite, address, or lat/lng — metro WFS (Helsinki/Vantaa/Espoo/HSY) with a national Ryhti fallback so points anywhere in Finland resolve")
         .option("--sijainti <id>", "Resolve coordinates from a sijainti id", Number)
         .option("--worksite <tyomaaId>", "Resolve coordinates from a worksite (tenant-scoped)", Number)
         .option("--tyomaa <tyomaaId>", "Alias for --worksite", Number)

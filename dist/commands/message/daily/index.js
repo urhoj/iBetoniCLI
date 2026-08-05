@@ -201,8 +201,7 @@ export function registerMessageDailyCommands(parent, getClient) {
         .description("Grid daily-message boxes (date-keyed shared whiteboard with per-role ACL)");
     // reads ──────────────────────────────────────────────────────────────────────
     addAsiakasTargetOption(d
-        .command("list [asiakasId]")
-        .description("List a company's daily boxes (+ a date's messages + permissions)"))
+        .command("list [asiakasId]"))
         .option("--date <date>", "Date for messages: YYYYMMDD | YYYY-MM-DD | today/yesterday/tomorrow")
         .action(guarded(async (idStr, opts) => {
         const asiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
@@ -210,7 +209,6 @@ export function registerMessageDailyCommands(parent, getClient) {
         writeJson(await runDailyList(client, asiakasId, opts.date ? toYyyymmdd(opts.date) : undefined));
     }));
     d.command("get <boxId>")
-        .description("One daily box: its row + message + permissions (resolved client-side)")
         .requiredOption("--asiakas <id>", "Company that the box is listed for (asiakasId)", Number)
         .option("--date <date>", "Date for the message: YYYYMMDD | YYYY-MM-DD | today")
         .action(guarded(async (boxIdStr, opts) => {
@@ -220,7 +218,6 @@ export function registerMessageDailyCommands(parent, getClient) {
     // content + metadata writes ───────────────────────────────────────────────────
     addWriteFlagsToCommand(d
         .command("set <boxId>")
-        .description("Write or clear a box's message for a date (the core daily-message write)")
         .requiredOption("--date <date>", "Date the message applies to (YYYYMMDD | YYYY-MM-DD | today)")
         .option("--message <text>", "Message text to store")
         .option("--clear", "Clear the message for the date (mutually exclusive with --message)")).action(guarded(async (boxIdStr, opts) => {
@@ -235,13 +232,11 @@ export function registerMessageDailyCommands(parent, getClient) {
     }));
     addWriteFlagsToCommand(d
         .command("save <boxId>")
-        .description("Rename a box / edit its lisätieto (box metadata, not message content)")
         .requiredOption("--title <text>", "New box title")
         .option("--lisatieto <text>", "Optional sub-text shown under the title")).action(jsonAction(getClient, (client, boxIdStr, opts) => runDailySaveBox(client, { boxId: parseId(boxIdStr, "boxId"), boxTitle: opts.title, boxLisatieto: opts.lisatieto ?? null }, opts)));
     // box lifecycle ────────────────────────────────────────────────────────────────
     addWriteFlagsToCommand(d
         .command("add [asiakasId]")
-        .description("Create a daily box for a company (or --init the caller's own first box)")
         .option("--asiakas <id>", "Owner asiakasId (alias for the positional)", Number)
         .option("--date <date>", "Date the box is for (default 00000000 = undated default box)")
         .option("--title <text>", "Box title")
@@ -257,27 +252,24 @@ export function registerMessageDailyCommands(parent, getClient) {
             boxTitle: opts.title,
         }, opts));
     }));
-    addWriteFlagsToCommand(d.command("delete <boxId>").description("Delete a daily box (and its messages) for all companies")).action(guarded(async (boxIdStr, opts) => {
+    addWriteFlagsToCommand(d.command("delete <boxId>")).action(guarded(async (boxIdStr, opts) => {
         const client = await getClient();
         writeJson(await runDailyDeleteBox(client, parseId(boxIdStr, "boxId"), opts));
     }));
     // sharing + per-role ACL ─────────────────────────────────────────────────────
     addWriteFlagsToCommand(d
         .command("share <boxId>")
-        .description("Share a box to another tenant (read-only until you grant + perm-set)")
         .requiredOption("--to <asiakasId>", "Tenant to share the box with", Number)).action(guarded(async (boxIdStr, opts) => {
         const client = await getClient();
         writeJson(await runDailyShare(client, { boxId: parseId(boxIdStr, "boxId"), asiakasId: opts.to }, opts));
     }));
     addWriteFlagsToCommand(d
-        .command("unshare <dailyMessageBoxAsiakasId>")
-        .description("Stop sharing a box with a tenant (by dailyMessageBoxAsiakasId)")).action(guarded(async (idStr, opts) => {
+        .command("unshare <dailyMessageBoxAsiakasId>")).action(guarded(async (idStr, opts) => {
         const client = await getClient();
         writeJson(await runDailyUnshare(client, parseId(idStr, "permissionId"), opts));
     }));
     addWriteFlagsToCommand(d
         .command("grant <boxId>")
-        .description("Add a per-role ACL row on a shared box (defaults read-only; set access via perm-set)")
         .requiredOption("--to <asiakasId>", "Tenant the role belongs to", Number)
         .requiredOption("--role <typeId>", "asiakasPersonSettingTypeId the rule applies to", Number)
         .requiredOption("--box-asiakas <id>", "dailyMessageBoxAsiakasId of the share row", Number)).action(guarded(async (boxIdStr, opts) => {
@@ -290,14 +282,12 @@ export function registerMessageDailyCommands(parent, getClient) {
         }, opts));
     }));
     addWriteFlagsToCommand(d
-        .command("revoke <dailyMessageBoxAsiakasPermissionsId>")
-        .description("Remove a per-role ACL row (by dailyMessageBoxAsiakasPermissionsId)")).action(guarded(async (idStr, opts) => {
+        .command("revoke <dailyMessageBoxAsiakasPermissionsId>")).action(guarded(async (idStr, opts) => {
         const client = await getClient();
         writeJson(await runDailyRevoke(client, parseId(idStr, "permissionId"), opts));
     }));
     addWriteFlagsToCommand(d
         .command("perm-set <dailyMessageBoxAsiakasPermissionsId>")
-        .description("Set a permission row's role + access (read|edit)")
         .requiredOption("--role <typeId>", "asiakasPersonSettingTypeId", Number)
         .requiredOption("--access <mode>", "read = read-only, edit = read/write")).action(guarded(async (idStr, opts) => {
         if (opts.access !== "read" && opts.access !== "edit") {

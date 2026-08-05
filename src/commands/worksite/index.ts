@@ -517,7 +517,6 @@ export function registerWorksiteCommands(
   const w = parent.command("worksite").description("Worksite commands");
 
   w.command("list")
-    .description("List worksites")
     .option("--limit <n>", "Max rows", cappedInt(500))
     .option("--cursor <c>", "Pagination cursor")
     .option("--customer <n>", "Filter by parent asiakasId", (v: string) => Number(v))
@@ -530,7 +529,6 @@ export function registerWorksiteCommands(
     );
 
   w.command("get <tyomaaId>")
-    .description("Get a single worksite by tyomaaId")
     .option("--include-building", "Attach the parsed Helsinki building data (rakennusData)")
     .option("--include-cameras", "Attach the nearby traffic cameras (cameras[])")
     .action(
@@ -545,7 +543,6 @@ export function registerWorksiteCommands(
     );
 
   w.command("metrics <tyomaaId>")
-    .description("Volume / keikka-count metrics for a worksite")
     .action(
       guarded(async (idStr: string) => {
         const client = await getClient();
@@ -557,7 +554,6 @@ export function registerWorksiteCommands(
   const dates = w.command("dates").description("Worksite compliance dates (read-only)");
   dates
     .command("list <tyomaaId>")
-    .description("List a worksite's compliance/permit dates")
     .action(
       guarded(async (idStr: string) => {
         const client = await getClient();
@@ -566,7 +562,6 @@ export function registerWorksiteCommands(
     );
   dates
     .command("expiring")
-    .description("Company-wide expiring worksite dates")
     .option("--days <n>", "Look-ahead window in days (default 30)", (v: string) => Number(v))
     .action(
       guarded(async (opts: { days?: number }) => {
@@ -576,7 +571,6 @@ export function registerWorksiteCommands(
     );
 
   w.command("search [query]")
-    .description("Free-text search for worksites")
     .option("--search <s>", "Search query (alias for the <query> positional)")
     .option("--limit <n>", "Max results", cappedInt(500))
     .option("--my-companies", "Search across every company you belong to (rows tagged with ownerAsiakasId)")
@@ -589,9 +583,6 @@ export function registerWorksiteCommands(
     );
 
   w.command("dashboard [tyomaaId]")
-    .description(
-      "One-shot Address Information Dashboard report for a worksite (tyomaa) — merges weather, building, cadastral parcel, nearby traffic cameras, nearby sijainnit, worksite deliveries, and nearby vehicles into a single JSON, with each section independently degrading to forbidden/error instead of failing the whole report. Resolve the point from EXACTLY ONE of the positional tyomaaId or --address."
-    )
     .option("--address <address>", "Resolve the point from a street address instead of tyomaaId")
     .action(guarded(async (idStr: string | undefined, opts: { address?: string }) => {
       if (idStr !== undefined && opts.address !== undefined) {
@@ -608,7 +599,6 @@ export function registerWorksiteCommands(
 
   const createCmd = w
     .command("create")
-    .description("Create a new worksite (POST /api/tyomaa/new)")
     .requiredOption(
       "--body <json>",
       "JSON object forwarded verbatim as the request body"
@@ -633,13 +623,6 @@ export function registerWorksiteCommands(
 
   const updateCmd = w
     .command("update <tyomaaId>")
-    .description(
-      "Update a worksite (owner auto-derived from the session). Set fields with typed flags " +
-        "(--name/--num/--address/--address2/--postal-code/--city/--driving-instructions/" +
-        "--comment/--invoice-ref/--contact-person) and/or a --body/--from-json JSON patch " +
-        "(typed flags win). At least one field is required. Omitted fields are PRESERVED; " +
-        'pass an empty string to CLEAR a field (e.g. --comment "").'
-    )
     .option("--name <s>", "Worksite name (tyomaaNimi)")
     .option("--num <s>", "Worksite number (tyomaaNum)")
     .option("--address <s>", "Street address (tyomaaOsoite1)")
@@ -702,7 +685,6 @@ export function registerWorksiteCommands(
   addWriteFlagsToCommand(
     w
       .command("delete <tyomaaId>")
-      .description("Delete a worksite (tyomaa). Requires --reason.")
   ).action(guarded(async (tyomaaIdStr: string, opts: WriteFlags) => {
     if (!opts.reason) {
       failWith("Missing required flag: --reason", 4);
@@ -712,10 +694,7 @@ export function registerWorksiteCommands(
     writeJson(result);
   }));
 
-  addWriteFlagsToCommand(
-    w.command("refresh-location <tyomaaId>")
-      .description("Re-geocode a worksite from Google Maps")
-  ).action(
+  addWriteFlagsToCommand(w.command("refresh-location <tyomaaId>")).action(
     guarded(async (idStr: string, opts: WriteFlags) => {
       const client = await getClient();
       writeJson(await runWorksiteRefreshLocation(client, parseId(idStr, "tyomaaId"), opts));
@@ -724,7 +703,6 @@ export function registerWorksiteCommands(
 
   addWriteFlagsToCommand(
     w.command("set-geofence <tyomaaId>")
-      .description("Set a worksite geofence radius in metres (1-10000)")
       .requiredOption("--radius <m>", "Geofence radius in metres", Number)
   ).action(guarded(async (idStr: string, opts: WriteFlags & { radius: number }) => {
     if (!Number.isInteger(opts.radius) || opts.radius < 1 || opts.radius > 10000) {
@@ -734,10 +712,7 @@ export function registerWorksiteCommands(
     writeJson(await runWorksiteSetGeofence(client, parseId(idStr, "tyomaaId"), opts.radius, opts));
   }));
 
-  addWriteFlagsToCommand(
-    w.command("helsinki-fetch <tyomaaId>")
-      .description("Refresh Helsinki building data for a worksite")
-  ).action(
+  addWriteFlagsToCommand(w.command("helsinki-fetch <tyomaaId>")).action(
     guarded(async (idStr: string, opts: WriteFlags) => {
       const client = await getClient();
       writeJson(await runWorksiteHelsinkiFetch(client, parseId(idStr, "tyomaaId"), opts));
@@ -751,7 +726,6 @@ export function registerWorksiteCommands(
   addWriteFlagsToCommand(
     worksitePerson
       .command("add")
-      .description("Attach a person to a worksite (tyomaaPerson). Requires --reason.")
       .requiredOption("--worksite <id>", "Target tyomaaId", Number)
       .requiredOption("--person <id>", "Target personId", Number)
       .option("--contact-type <id>", "contactPersonTypeId (default 1)", Number, 1)
@@ -771,7 +745,6 @@ export function registerWorksiteCommands(
   addWriteFlagsToCommand(
     worksitePerson
       .command("remove")
-      .description("Detach a person from a worksite. Requires --reason.")
       .requiredOption("--worksite <id>", "Target tyomaaId", Number)
       .requiredOption("--person <id>", "Target personId", Number)
       .option("--contact-type <id>", "contactPersonTypeId (default 1)", Number, 1)
@@ -790,7 +763,6 @@ export function registerWorksiteCommands(
 
   worksitePerson
     .command("list [tyomaaId]")
-    .description("List persons attached to a worksite.")
     .option("--worksite <id>", "Target tyomaaId (alias for the positional; same flag as person add/remove)", Number)
     .action(
       guarded(async (tyomaaIdStr: string | undefined, opts: { worksite?: number }) => {
@@ -803,20 +775,9 @@ export function registerWorksiteCommands(
       })
     );
 
-  registerLogAlias(
-    w,
-    getClient,
-    "tyomaa",
-    "tyomaaId",
-    "Change-tracker audit trail for one worksite (tyomaa). Alias of `ib log entity tyomaa`."
-  );
+  registerLogAlias(w, getClient, "tyomaa", "tyomaaId");
 
   w.command("duplicates")
-    .description(
-      "List likely-duplicate worksite pairs for a tenant (strict name+address+number, " +
-        "or the anonymous same-address cluster). Read-only; admin gated. Owner defaults " +
-        "to your active company; --owner scans another tenant. Feeds `ib worksite merge`."
-    )
     .option("--owner <id>", "ownerAsiakasId to scan (default: active company)", Number)
     .action(
       guarded(async (opts: { owner?: number }) => {
@@ -829,11 +790,6 @@ export function registerWorksiteCommands(
 
   const worksiteMergeCmd = w
     .command("merge")
-    .description(
-      "Merge two duplicate worksites: the secondary's references move onto the main, " +
-        "then the secondary is DELETED. IRREVERSIBLE, admin gated. --dry-run runs the " +
-        "read-only /validate safety check (never merges). A real merge requires --reason."
-    )
     .requiredOption("--main <id>", "tyomaaId to KEEP (references merge into this)", Number)
     .requiredOption("--secondary <id>", "tyomaaId to REMOVE (merged away, then deleted)", Number)
     .option("--owner <id>", "ownerAsiakasId (default: active company)", Number);

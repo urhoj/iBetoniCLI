@@ -44,7 +44,6 @@ export async function runParcelLookup(client, opts) {
 export function registerParcelCommands(parent, getClient) {
     parent
         .command("parcel")
-        .description("Cadastral parcel (kiinteistö/palsta) lookup from MML — by kiinteistötunnus or a sijainti/worksite/address/lat+lng point; returns boundaries + computed area anywhere in Finland")
         .option("--kiinteistotunnus <tunnus>", "Property identifier, dashed or 14-digit — direct lookup (no geocode)")
         .option("--sijainti <id>", "Resolve coordinates from a sijainti id", Number)
         .option("--worksite <tyomaaId>", "Resolve coordinates from a worksite (tenant-scoped)", Number)

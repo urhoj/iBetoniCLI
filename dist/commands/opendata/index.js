@@ -22,7 +22,6 @@ export function registerOpendataCommands(parent, getClient) {
     registerParcelCommands(od, getClient);
     registerWeatherCommands(od, getClient);
     od.command("prh [ytunnus]")
-        .description("Look up a company in the Finnish business registry (PRH) by <ytunnus>, or --search <name>")
         .option("--search <name>", "Search by company name instead of business ID")
         .option("--page <n>", "Result page for --search (default 1)", (v) => Number(v), 1)
         .action(guarded(async (ytunnus, opts) => {

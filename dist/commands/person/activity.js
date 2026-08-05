@@ -13,7 +13,6 @@ export async function runPersonActivity(client, personId, opts) {
 export function registerPersonActivityCommand(parent, getClient) {
     parent
         .command("activity <personId>")
-        .description("Login / security-event / impersonation history for one person (developer-only)")
         .option("--limit <n>", "Max rows per list (default 100, max 1000)", (s) => Number(s))
         .action(guarded(async (personIdStr, opts) => {
         const personId = parseId(personIdStr, "personId");

@@ -546,7 +546,6 @@ export function registerLegalCommands(
 
   legal
     .command("types")
-    .description("List legal document types (GET /api/legal-documents/types)")
     .action(
       guarded(async () => {
         const client = await getClient();
@@ -556,7 +555,6 @@ export function registerLegalCommands(
 
   legal
     .command("show <typeName>")
-    .description("Current ACTIVE document of a type, incl. markdown content")
     .option("--meta", "Omit markdownContent (returns contentLength instead)")
     .action(
       guarded(async (typeName: string, opts: { meta?: boolean }) => {
@@ -568,7 +566,6 @@ export function registerLegalCommands(
   legal
     .command("active")
     .alias("list")
-    .description("Current ACTIVE document of EVERY type (one row per type; hasActive:false where none)")
     .action(
       guarded(async () => {
         const client = await getClient();
@@ -578,7 +575,6 @@ export function registerLegalCommands(
 
   legal
     .command("status")
-    .description("Which legal documents you have accepted / still need to accept")
     .option("--person <id>", "Check another person (developer/sysadmin only)", Number)
     .option("--owner <id>", "ownerAsiakasId scope (default: your company from the token)", Number)
     .action(
@@ -596,7 +592,6 @@ export function registerLegalCommands(
 
   legal
     .command("versions <typeName>")
-    .description("All versions of a document type (active + drafts + history); each row carries status")
     .option("--owner <id>", "Filter by ownerAsiakasId tenant scope", Number)
     .option("--status <status>", `Filter by lifecycle status (${LEGAL_STATUSES.join("|")})`)
     .action(
@@ -611,7 +606,6 @@ export function registerLegalCommands(
 
   legal
     .command("drafts")
-    .description("Unpublished DRAFT versions across all types (status='draft'; content stripped)")
     .action(
       guarded(async () => {
         const client = await getClient();
@@ -621,7 +615,6 @@ export function registerLegalCommands(
 
   legal
     .command("diff [a] [b]")
-    .description("Line diff: two documentIds (<a> old, <b> new), or --type (newest draft vs active)")
     .option("--type <typeName>", "Diff the newest DRAFT vs the current ACTIVE version of this type")
     .option("--owner <id>", "ownerAsiakasId scope for --type resolution (e.g. 1349 = BetoniJerry)", Number)
     .action(
@@ -648,7 +641,6 @@ export function registerLegalCommands(
 
   legal
     .command("get <documentIdOrType>")
-    .description("One document version by id — or a typeName (e.g. PRIVACY) for its current ACTIVE version")
     .action(
       guarded(async (refStr: string) => {
         const ref = parseLegalGetRef(refStr);
@@ -659,7 +651,6 @@ export function registerLegalCommands(
 
   const saveCmd = legal
     .command("save")
-    .description("Create a NEW document version (immutable; draft unless --activate)")
     .requiredOption("--type <typeName>", "Document type name (see ib legal types)")
     // NOT --version: the root global -V/--version is recognised anywhere in argv
     // and would shadow it (enforced by the root-option reuse test in
@@ -765,8 +756,7 @@ export function registerLegalCommands(
   );
 
   const activateCmd = legal
-    .command("activate <documentId>")
-    .description("Publish a version: atomically archives the current active, activates this one");
+    .command("activate <documentId>");
   addWriteFlagsToCommand(activateCmd).action(
     guarded(async (documentIdStr: string, opts: { dryRun?: boolean; reason?: string; idempotencyKey?: string }) => {
       const documentId = parseId(documentIdStr, "documentId");
@@ -777,8 +767,7 @@ export function registerLegalCommands(
   );
 
   const deleteCmd = legal
-    .command("delete <documentId>")
-    .description("Soft-delete (deactivate) a document version");
+    .command("delete <documentId>");
   addWriteFlagsToCommand(deleteCmd).action(
     guarded(async (documentIdStr: string, opts: { dryRun?: boolean; reason?: string; idempotencyKey?: string }) => {
       const documentId = parseId(documentIdStr, "documentId");
@@ -790,7 +779,6 @@ export function registerLegalCommands(
 
   legal
     .command("acceptances <typeName>")
-    .description("Compliance report: WHO has accepted a document type (developer/sysadmin)")
     // NOT --version: shadowed by the root global -V/--version (enforced by the
     // root-option reuse test in test/reference/help-wiring.test.ts).
     .option("--doc-version <v>", "Only acceptances of this version string")
@@ -809,7 +797,6 @@ export function registerLegalCommands(
 
   const acceptCmd = legal
     .command("accept [typeName]")
-    .description("Record YOUR OWN acceptance of the current active version (developer testing aid)")
     .option("--type <typeName>", "Document type name (alias for the positional)");
   addWriteFlagsToCommand(acceptCmd).action(
     guarded(async (
@@ -834,7 +821,6 @@ export function registerLegalCommands(
 
   const typeCreateCmd = typeGroup
     .command("create")
-    .description("Create a new legal document type")
     .requiredOption("--name <typeName>", "Type name, UPPER_SNAKE, max 50 (e.g. TOS_EN); immutable after creation")
     .requiredOption("--display-name <s>", "Human-readable name (max 100)")
     .option("--description <s>", "Short description (max 200)")
@@ -859,7 +845,6 @@ export function registerLegalCommands(
 
   const typeUpdateCmd = typeGroup
     .command("update <typeName>")
-    .description("Update a type's editable fields (typeName itself is immutable)")
     .option("--display-name <s>", "Human-readable name (max 100)")
     .option("--description <s>", "Short description (max 200)")
     .option("--sort-order <n>", "List position", Number)

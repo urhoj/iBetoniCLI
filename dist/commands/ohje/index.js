@@ -220,7 +220,6 @@ export function registerOhjeCommands(parent, getClient) {
         .command("ohje")
         .description("UI help-text content (the helps table behind HelperIcon) — end-user help, NOT `ib --help`");
     o.command("get <helpId>")
-        .description("Get one UI help entry by helpId (GET /api/helps/get/:helpId)")
         .action(guarded(async (helpId) => {
         if (!isValidHelpId(helpId)) {
             failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
@@ -230,10 +229,6 @@ export function registerOhjeCommands(parent, getClient) {
         writeJson(result);
     }));
     addNeedsReviewFlags(o.command("list")
-        .description("List every UI help entry (GET /api/helps/getAll). Reads are public. The full " +
-        "table is large (~115 KB), so use the client-side shapers to keep output small: " +
-        "--empty-shorttext (grooming backfill targets), --fields (column projection, skips " +
-        "htmltext), --sort field:dir. Order applied: filter → sort → limit → project.")
         .option("--limit <n>", "Max rows to return (client-side cap, after filter+sort)", (v) => Number(v))
         .option("--empty-shorttext", "Only rows whose shorttext is blank (grooming backfill targets)")
         .option("--fields <cols>", "Comma-separated columns to keep, e.g. helpId,title,shorttext,accessCount (drops the large htmltext)", (v) => v.split(",").map((s) => s.trim()).filter(Boolean))
@@ -241,11 +236,6 @@ export function registerOhjeCommands(parent, getClient) {
         .action(jsonAction(getClient, (client, opts) => runOhjeList(client, opts)));
     const updateCmd = o
         .command("update <helpId>")
-        .description("Update a UI help entry (PUT /api/helps/update). GET-merges the current row " +
-        "so omitted fields are preserved (helps_save overwrites the whole row). " +
-        "Provide typed flags or --body JSON (typed flags win). --reason is required. " +
-        "--dry-run previews the merged row CLIENT-SIDE without writing (the backend " +
-        "does not honour X-Dry-Run here). Requires isHelperEditor or system-admin/developer.")
         .option("--body <json>", "JSON object with any of title/shorttext/htmltext/img (typed flags win)")
         .option("--title <s>", "Help title (otsikko)")
         .option("--shorttext <s>", "Short text (shorttext)")
@@ -304,13 +294,7 @@ export function registerOhjeCommands(parent, getClient) {
         writeJson(result);
     }));
     const deleteCmd = o
-        .command("delete <helpId>")
-        .description("Delete a UI help entry (DELETE /api/helps/delete/:helpId). Removes orphan " +
-        "(stale-named) or empty data-driven helpIds; a missing help row makes its " +
-        "HelperIcon render nothing (graceful absence). --reason is required for a write. " +
-        "--dry-run previews the row that WOULD be deleted CLIENT-SIDE without issuing the " +
-        "DELETE (works before the backend route deploys). Idempotent: a missing row " +
-        "returns deleted:false. Requires isHelperEditor or system-admin/developer.");
+        .command("delete <helpId>");
     addWriteFlagsToCommand(deleteCmd).action(guarded(async (helpId, opts) => {
         if (!isValidHelpId(helpId)) {
             failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);

@@ -55,18 +55,15 @@ export async function runCachePattern(client, pattern, opts) {
 export function registerCacheCommands(parent, getClient, opts = {}) {
     const c = parent.command("cache", { hidden: !!opts.hidden }).description("Redis cache inspection and invalidation (admin/developer)");
     c.command("stats")
-        .description("Cache connection, key count, and hit rate (developer-only)")
         .action(guarded(async () => {
         writeJson(await runCacheStats(await getClient()));
     }));
     c.command("keys")
-        .description("Key counts grouped by prefix (developer-only)")
         .option("--pattern <glob>", "SCAN match pattern", "*")
         .action(guarded(async (opts) => {
         writeJson(await runCacheKeys(await getClient(), opts));
     }));
     c.command("invalidate <entityType>")
-        .description("Invalidate one entity family by domain identifier. Previews unless --confirm.")
         .option("--id <n>", "Entity id (e.g. keikkaId)", (v) => Number(v))
         .option("--asiakas-id <n>", "Tenant scope (developers only; non-devs use their own)", (v) => Number(v))
         .option("--cascade", "Also invalidate related families (keikka only)")
@@ -77,7 +74,6 @@ export function registerCacheCommands(parent, getClient, opts = {}) {
         writeJson(await runCacheInvalidate(await getClient(), { entityType, id: opts.id, asiakasId: opts.asiakasId, cascade: opts.cascade }, { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason }));
     }));
     c.command("clear")
-        .description("Flush the entire cache (developer-only). Previews unless --confirm.")
         .option("--confirm", "Execute the full flush (default is dry-run preview)")
         .option("--force-prod", "Allow execution against a deployed (shared-cache) endpoint")
         .option("--reason <text>", "Audit reason (X-Action-Reason)")
@@ -85,7 +81,6 @@ export function registerCacheCommands(parent, getClient, opts = {}) {
         writeJson(await runCacheClear(await getClient(), { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason }));
     }));
     c.command("pattern <glob>")
-        .description("Invalidate keys matching a raw glob (developer-only). Previews unless --confirm.")
         .option("--confirm", "Execute the invalidation (default is dry-run preview)")
         .option("--force-prod", "Allow execution against a deployed (shared-cache) endpoint")
         .option("--reason <text>", "Audit reason (X-Action-Reason)")
@@ -93,7 +88,6 @@ export function registerCacheCommands(parent, getClient, opts = {}) {
         writeJson(await runCachePattern(await getClient(), glob, { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason }));
     }));
     c.command("entities")
-        .description("List the valid cache entity types and their parameters (offline)")
         .action(guarded(() => {
         writeJson({ items: CACHE_ENTITIES, count: CACHE_ENTITIES.length });
     }));

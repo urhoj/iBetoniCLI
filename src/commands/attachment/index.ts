@@ -364,7 +364,6 @@ export function registerAttachmentCommands(
 
   const listCmd = a
     .command("list")
-    .description("List attachments linked to ONE entity (exactly one entity flag)")
     .option("--group <g>", "Filter by attachment group (name or id — see `ib attachment types`)")
     .option("--type <t>", "Filter by attachment type (name or id — see `ib attachment types`)")
     .option("--limit <n>", "Max rows (capped at 500)", cappedInt(500));
@@ -379,7 +378,6 @@ export function registerAttachmentCommands(
   }));
 
   a.command("get <attachmentId>")
-    .description("One attachment: metadata, group/type names, 1h read-SAS blobUrl")
     .action(
       guarded(async (id: string) => {
         writeJson(await runAttachmentGet(await getClient(), Number(id)));
@@ -387,7 +385,6 @@ export function registerAttachmentCommands(
     );
 
   a.command("types")
-    .description("Attachment groups + types legend (id + name; tenant-scoped reference data)")
     .action(
       guarded(async () => {
         writeJson(await runAttachmentTypes(await getClient()));
@@ -395,7 +392,6 @@ export function registerAttachmentCommands(
     );
 
   a.command("search [text]")
-    .description("Search attachments in the active company by file name/comment; with no text and no --missing, lists ALL active company attachments (like `ib keikka list`)")
     .option("--missing", "Only attachments with NO linked entity (orphans)")
     .option("--limit <n>", "Max rows (capped at 500)", cappedInt(500))
     .action(
@@ -405,7 +401,6 @@ export function registerAttachmentCommands(
     );
 
   a.command("download <attachmentId>")
-    .description("Download the file to local disk (LOCAL ONLY — denied on remote exec/MCP)")
     .option("--out <path>", "Output path (default: original file name in cwd)")
     .option("--force", "Overwrite an existing file")
     .action(
@@ -416,7 +411,6 @@ export function registerAttachmentCommands(
 
   const uploadCmd = a
     .command("upload <file>")
-    .description("Upload a local file and link it to ONE entity (LOCAL ONLY — denied on remote exec/MCP)")
     .option("--comment <text>", "fileComment shown in the UI")
     .option("--group <g>", "Attachment group (name or id — see `ib attachment types`)")
     .option("--type <t>", "Attachment type (name or id — see `ib attachment types`)")
@@ -440,7 +434,6 @@ export function registerAttachmentCommands(
   );
 
   a.command("upload-url")
-    .description("Mint a 1h write-SAS upload URL (remote-safe primitive; server picks the blob path)")
     .requiredOption("--name <fileName>", "Original file name WITH extension (server derives the blob name)")
     .action(
       guarded(async (opts: { name: string }) => {
@@ -450,7 +443,6 @@ export function registerAttachmentCommands(
 
   const registerCmd = a
     .command("register")
-    .description("Persist metadata AFTER PUTting bytes to an upload-url (remote-safe primitive)")
     .requiredOption("--name <fileName>", "fileName returned by upload-url")
     .requiredOption("--orig-name <name>", "Original file name")
     .requiredOption("--folder <fileFolder>", "fileFolder returned by upload-url")
@@ -485,8 +477,7 @@ export function registerAttachmentCommands(
   }));
 
   const attachCmd = a
-    .command("attach <attachmentId>")
-    .description("Link an existing attachment to ONE entity (sets that FK; others untouched)");
+    .command("attach <attachmentId>");
   addEntityFlags(attachCmd);
   addWriteFlagsToCommand(attachCmd).action(
     jsonAction(getClient, (client, id: string, opts: WriteFlags & Record<string, unknown>) =>
@@ -495,8 +486,7 @@ export function registerAttachmentCommands(
   );
 
   const detachCmd = a
-    .command("detach <attachmentId> [entity]")
-    .description("Unlink an attachment from one entity. Name the entity as a positional word OR an attach-style flag (--keikka 9001 — the id is ignored). Requires a manager role on the owner company.");
+    .command("detach <attachmentId> [entity]");
   addEntityFlags(detachCmd);
   addWriteFlagsToCommand(detachCmd).action(
     guarded(async (id: string, entity: string | undefined, opts: WriteFlags & Record<string, unknown>) => {
@@ -509,7 +499,6 @@ export function registerAttachmentCommands(
 
   const updateCmd = a
     .command("update <attachmentId>")
-    .description("Update comment / group / type / invoice-flag (server read-merges unchanged fields)")
     .option("--comment <text>", "New fileComment")
     .option("--liita-laskuun <0|1>", "Invoice-attachment flag (lasku/asiakas admin only)", (s: string) => Number(s))
     .option("--group <g>", "Attachment group (name or id — see `ib attachment types`)")
@@ -530,8 +519,7 @@ export function registerAttachmentCommands(
   );
 
   const deleteCmd = a
-    .command("delete <attachmentId>")
-    .description("Soft-delete the row AND hard-delete the Azure blob (IRREVERSIBLE). Requires --reason.");
+    .command("delete <attachmentId>");
   addWriteFlagsToCommand(deleteCmd).action(guarded(async (id: string, opts: WriteFlags) => {
     if (!opts.reason) {
       failWith("Missing required flag: --reason (blob deletion is irreversible)", 4);

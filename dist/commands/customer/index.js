@@ -724,9 +724,6 @@ export function runCustomerMerge(client, opts, flags) {
 export function registerCustomerCommands(parent, getClient) {
     const c = parent.command("customer").description("Customer commands");
     c.command("list")
-        .description("List customers. --full returns every flat-customer field + jerry " +
-        "companyDescription in one call (for diffing a whole tenant); --ids " +
-        "1,2,3 restricts to specific asiakasIds (refresh only what changed).")
         .option("--limit <n>", "Max rows", cappedInt(500))
         .option("--cursor <c>", "Pagination cursor")
         .option("--full", "Return full customer fields + companyDescription (not just id/name/ytunnus/type)")
@@ -767,28 +764,23 @@ export function registerCustomerCommands(parent, getClient) {
         writeJson(result);
     }));
     c.command("dead-list")
-        .description("List customers the PRH nightly sweep flagged dead (konkurssi/selvitystila/purettu) " +
-        "or caution (yrityssaneeraus). Reads pre-checked prhStatus columns; tenant-scoped.")
         .option("--limit <n>", "Max rows", cappedInt(500))
         .action(guarded(async (opts) => {
         const client = await getClient();
         writeJson(await runCustomerDeadList(client, { limit: opts.limit }));
     }));
     c.command("get <asiakasId>")
-        .description("Get a single customer by asiakasId")
         .action(guarded(async (idStr) => {
         const client = await getClient();
         const result = await runCustomerGet(client, parseId(idStr, "asiakasId"));
         writeJson(result);
     }));
     c.command("worksites <asiakasId>")
-        .description("List worksites belonging to a customer")
         .action(guarded(async (idStr) => {
         const client = await getClient();
         writeJson(await runCustomerWorksites(client, parseId(idStr, "asiakasId")));
     }));
-    const modulesCmd = addAsiakasTargetOption(c.command("modules [asiakasId]").description("Report or toggle a customer's module flags + roolit. Without --set/--unset: read-only report. Field keys: " +
-        ALL_FIELD_KEYS.join(", ")))
+    const modulesCmd = addAsiakasTargetOption(c.command("modules [asiakasId]"))
         .option("--set <keys>", "Comma-separated field keys to turn ON (e.g. jerry,weather,pumppu)")
         .option("--unset <keys>", "Comma-separated field keys to turn OFF");
     addWriteFlagsToCommand(modulesCmd).action(guarded(async (idStr, opts) => {
@@ -812,7 +804,7 @@ export function registerCustomerCommands(parent, getClient) {
         });
         writeJson(result);
     }));
-    const operatorCmd = addAsiakasTargetOption(c.command("operator [asiakasId]").description("Verify or provision the full operator preset (all 9 operator flags at once). System-admin, cross-tenant. Default (no flag): verify — exit 0 iff all 9 are on, else exit 1."))
+    const operatorCmd = addAsiakasTargetOption(c.command("operator [asiakasId]"))
         .option("--set", "Turn ALL 9 operator flags ON")
         .option("--reset", "Turn ALL 9 operator flags OFF");
     addWriteFlagsToCommand(operatorCmd).action(guarded(async (idStr, opts) => {
@@ -837,7 +829,7 @@ export function registerCustomerCommands(parent, getClient) {
         if (!result.allSet)
             setExitCode(1);
     }));
-    const settingsCmd = addAsiakasTargetOption(c.command("settings [asiakasId]").description("Report or toggle ALL asiakasSettings (every canonical ASIAKAS_SETTING_TYPE_IDS name) + pumppu. No --set/--unset = read-only report. Names accept canonical settings (case-insensitive), the 8 module aliases, or pumppu."))
+    const settingsCmd = addAsiakasTargetOption(c.command("settings [asiakasId]"))
         .option("--set <keys>", "Comma-separated setting names to turn ON")
         .option("--unset <keys>", "Comma-separated setting names to turn OFF");
     addWriteFlagsToCommand(settingsCmd).action(guarded(async (idStr, opts) => {
@@ -861,7 +853,6 @@ export function registerCustomerCommands(parent, getClient) {
         }));
     }));
     c.command("search [query]")
-        .description("Free-text search for customers")
         .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max results", cappedInt(500))
         .option("--my-companies", "Search across every company you belong to (rows tagged with ownerAsiakasId)")
@@ -887,7 +878,6 @@ export function registerCustomerCommands(parent, getClient) {
         writeJson(await runCustomerPrhById(client, ytunnus));
     }));
     c.command("log <asiakasId>")
-        .description("Change-tracker audit trail for one customer (who changed what, with --reason).")
         .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)
         .action(guarded(async (idStr, opts) => {
         const client = await getClient();
@@ -895,7 +885,6 @@ export function registerCustomerCommands(parent, getClient) {
     }));
     const createCmd = c
         .command("create")
-        .description("Create a customer. Typed flags assemble the createY body (yTunnus required). --from-prh prefills name+yTunnus from the business registry. --body raw JSON overrides the typed flags.")
         .option("--name <s>", "Customer name (asiakasNimi)")
         .option("--ytunnus <s>", "Business ID (yTunnus) — REQUIRED unless --from-prh/--body supplies it")
         .option("--email <s>", "Invoicing email (laskutusEmail)")
@@ -945,7 +934,6 @@ export function registerCustomerCommands(parent, getClient) {
     }));
     const updateCmd = c
         .command("update <asiakasId>")
-        .description("Update a customer. Reads the current record, overlays the provided flags (preserving everything else — no contact-person clobber), and writes back. --from-prh refreshes name+yTunnus+billing address from the registry (explicit flags still win). --body raw JSON overrides flags.")
         .option("--name <s>", "Customer name (asiakasNimi)")
         .option("--ytunnus <s>", "Business ID (ytunnus)")
         .option("--email <s>", "Invoicing email (laskutusEmail)")
@@ -977,10 +965,6 @@ export function registerCustomerCommands(parent, getClient) {
     const upsertCmd = c
         .command("create-or-update")
         .alias("upsert")
-        .description("Upsert a customer keyed by business ID (ytunnus). Looks it up in your tenant " +
-        "(system admins: across tenants), then 1 match → update (read-merge with your " +
-        "flags), 0 → create, >1 → error. --from-prh <yt> uses that business ID as the key " +
-        "AND prefills name+yTunnus+billing address from PRH on create. Returns { ...customer, action }.")
         .option("--ytunnus <s>", "Business ID key (yTunnus) — required unless --from-prh/--body supplies it")
         .option("--from-prh <ytunnus>", "Use this business ID as the key AND prefill from PRH on create")
         .option("--name <s>", "Customer name (asiakasNimi)")
@@ -1014,8 +998,7 @@ export function registerCustomerCommands(parent, getClient) {
         }
     });
     addWriteFlagsToCommand(c
-        .command("delete <asiakasId>")
-        .description("Delete a customer (asiakas). Requires --reason.")).action(guarded(async (asiakasIdStr, opts) => {
+        .command("delete <asiakasId>")).action(guarded(async (asiakasIdStr, opts) => {
         if (!opts.reason) {
             failWith("Missing required flag: --reason", 4);
         }
@@ -1031,7 +1014,6 @@ export function registerCustomerCommands(parent, getClient) {
         "RBAC roles managed via `person role`. See docs: asiakas-contact-person-model.");
     addWriteFlagsToCommand(customerPerson
         .command("add")
-        .description("Attach a person to a customer (asiakasPerson). Requires --reason.")
         .requiredOption("--asiakas <id>", "Target asiakasId", Number)
         .requiredOption("--person <id>", "Target personId", Number)
         .option("--contact-type <id>", "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)", Number, 1)).action(guarded(async (opts) => {
@@ -1044,7 +1026,6 @@ export function registerCustomerCommands(parent, getClient) {
     }));
     addWriteFlagsToCommand(customerPerson
         .command("remove")
-        .description("Detach a person from a customer (asiakasPerson). Requires --reason.")
         .requiredOption("--asiakas <id>", "Target asiakasId", Number)
         .requiredOption("--person <id>", "Target personId", Number)
         .option("--contact-type <id>", "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)", Number, 1)).action(guarded(async (opts) => {
@@ -1056,8 +1037,7 @@ export function registerCustomerCommands(parent, getClient) {
         writeJson(result);
     }));
     addAsiakasTargetOption(customerPerson
-        .command("list [asiakasId]")
-        .description("List persons attached to a customer. Optional --role filter."))
+        .command("list [asiakasId]"))
         .option("--role <name>", "Filter by role name (e.g. keikkaHandler)")
         .option("--include-roles", "Add permissionRoles[] (full per-company role names) to each person — N extra GETs")
         .action(guarded(async (asiakasIdStr, opts) => {
@@ -1066,9 +1046,6 @@ export function registerCustomerCommands(parent, getClient) {
         writeJson(result);
     }));
     c.command("duplicates")
-        .description("List likely-duplicate customer pairs for a tenant (y-tunnus / exact-name / " +
-        "email / name-prefix). Read-only; system-admin gated. Owner defaults to your " +
-        "active company; --owner scans another tenant. Feeds `ib customer merge`.")
         .option("--owner <id>", "ownerAsiakasId to scan (default: active company)", Number)
         .action(guarded(async (opts) => {
         const client = await getClient();
@@ -1077,9 +1054,6 @@ export function registerCustomerCommands(parent, getClient) {
     }));
     const mergeCmd = c
         .command("merge")
-        .description("Merge two duplicate customers: the secondary's references move onto the main, " +
-        "then the secondary is DELETED. IRREVERSIBLE, system-admin gated. --dry-run runs " +
-        "the read-only /validate safety check (never merges). A real merge requires --reason.")
         .requiredOption("--main <id>", "asiakasId to KEEP (references merge into this)", Number)
         .requiredOption("--secondary <id>", "asiakasId to REMOVE (merged away, then deleted)", Number)
         .option("--owner <id>", "ownerAsiakasId (default: active company)", Number)

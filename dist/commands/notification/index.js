@@ -124,7 +124,6 @@ export function registerNotificationCommands(parent, getClient) {
         .description("Firebase Cloud Messaging push notifications");
     const sendCmd = fcm
         .command("send")
-        .description("Send an FCM push to one person's devices (Admin/HR only). --dry-run previews recipient + device count.")
         .requiredOption("--person <idOrName>", "Recipient personId, or a name resolved within your company")
         .requiredOption("--title <text>", "Notification title")
         .requiredOption("--body <text>", "Notification body")
@@ -147,7 +146,6 @@ export function registerNotificationCommands(parent, getClient) {
         .description("Email channel — send an email to a person or address");
     const emailSend = email
         .command("send <recipient>")
-        .description("Send an email to a personId/name (resolved in your company) or a raw address (Admin/HR/developer only). One of --body/--html/--html-body required. --dry-run previews the resolved recipient + sender.")
         .requiredOption("--subject <text>", "Email subject")
         .option("--body <text>", "Plain-text body (auto-wrapped to HTML)")
         .option("--html <file>", "Path to an HTML file to send as the HTML body")

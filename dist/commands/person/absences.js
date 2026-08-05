@@ -19,7 +19,6 @@ export async function runPersonAbsences(client, opts) {
 export function registerPersonAbsencesCommand(parent, getClient) {
     parent
         .command("absences")
-        .description("Staff absences (vacation/sick) in a date range — who is away / unassignable")
         .requiredOption("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)")
         .requiredOption("--to <date>", "End date YYYY-MM-DD (or today/yesterday/tomorrow)")
         .option("--person <pid>", "Filter to one personId", (s) => Number(s))

@@ -82,7 +82,6 @@ export function registerPersonEmailCommands(
 
   email
     .command("list <person>")
-    .description("List a person's emails — primary (main:1) and alternatives (main:0)")
     .action(
       guarded(async (personRef: string) => {
         writeJson(await runPersonEmailList(await getClient(), personRef));
@@ -90,8 +89,7 @@ export function registerPersonEmailCommands(
     );
 
   const addCmd = email
-    .command("add <person> <email>")
-    .description("Add an alternative email to a person. Requires --reason.");
+    .command("add <person> <email>");
   addWriteFlagsToCommand(addCmd).action(
     guarded(async (personRef: string, emailAddr: string, opts: WriteFlags) => {
       if (!opts.reason) failWith("Missing required flag: --reason", 4);
@@ -106,10 +104,7 @@ export function registerPersonEmailCommands(
   );
 
   const setMainCmd = email
-    .command("set-main <person> <email>")
-    .description(
-      "Promote one of a person's emails to primary (demotes the old primary to an alternative). Requires --reason."
-    );
+    .command("set-main <person> <email>");
   addWriteFlagsToCommand(setMainCmd).action(
     guarded(async (personRef: string, emailAddr: string, opts: WriteFlags) => {
       if (!opts.reason) failWith("Missing required flag: --reason", 4);
@@ -124,8 +119,7 @@ export function registerPersonEmailCommands(
   );
 
   const removeCmd = email
-    .command("remove <person> <email>")
-    .description("Remove an alternative email from a person. Requires --reason.");
+    .command("remove <person> <email>");
   addWriteFlagsToCommand(removeCmd).action(
     guarded(async (personRef: string, emailAddr: string, opts: WriteFlags) => {
       if (!opts.reason) failWith("Missing required flag: --reason", 4);

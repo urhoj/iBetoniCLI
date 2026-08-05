@@ -453,7 +453,6 @@ export function registerVehicleCommands(
   const v = parent.command("vehicle").description("Vehicle commands");
 
   v.command("list")
-    .description("List vehicles")
     .option("--limit <n>", "Max rows", cappedInt(500))
     .option("--cursor <c>", "Pagination cursor")
     .option("--deleted", "Include soft-deleted vehicles (default: excluded)")
@@ -495,7 +494,6 @@ export function registerVehicleCommands(
     );
 
   v.command("get <vehicleId>")
-    .description("Get a single vehicle by vehicleId")
     .option(
       "--asiakas <id>",
       "Read a vehicle owned by another company (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant)",
@@ -510,7 +508,6 @@ export function registerVehicleCommands(
     );
 
   v.command("status <vehicleId>")
-    .description("Current driver, keikka, and latest GPS ping for a vehicle")
     .action(
       guarded(async (idStr: string) => {
         const client = await getClient();
@@ -521,7 +518,6 @@ export function registerVehicleCommands(
 
 
   v.command("types")
-    .description("List vehicle types (vehicleTypeId + name)")
     .option(
       "--asiakas <id>",
       "List another company's vehicle types (cross-tenant; needed for `vehicle create --asiakas` since types are tenant-defined)",
@@ -534,7 +530,6 @@ export function registerVehicleCommands(
     );
 
   v.command("locations")
-    .description("Fleet-wide live GPS positions (current lat/lng + speed/heading/engine/address)")
     .action(
       guarded(async () => {
         const client = await getClient();
@@ -543,7 +538,6 @@ export function registerVehicleCommands(
     );
 
   v.command("search [query]")
-    .description("Search vehicles by reg-no / name substring")
     .option("--search <s>", "Search query (alias for the <query> positional)")
     .option("--limit <n>", "Max rows", cappedInt(500))
     .option(
@@ -558,7 +552,6 @@ export function registerVehicleCommands(
     );
 
   v.command("timeline <vehicleId>")
-    .description("Per-day GPS timeline: named stops (sijainti/tyomaa) + travel legs with durations")
     .option("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
     .action(
       guarded(async (idStr: string, opts: VehicleDayFilter) => {
@@ -569,11 +562,6 @@ export function registerVehicleCommands(
 
   const createCmd = v
     .command("create")
-    .description(
-      "Create a vehicle (new stub then save). --asiakas creates it under that tenant " +
-        "(rides the /new path param — requires admin/owner/vehicleHandler role there); " +
-        "default = active company from JWT."
-    )
     .option("--reg <s>", "Registration number (vehicleRegNo)")
     .option("--name <s>", "Display name (vehicleNimi)")
     .option("--no <n>", "Fleet number (vehicleNo)", (s: string) => Number(s))
@@ -638,7 +626,6 @@ export function registerVehicleCommands(
 
   const updateCmd = v
     .command("update <vehicleId>")
-    .description("Update a vehicle (read-merge-write; only provided flags change).")
     .option("--reg <s>", "Registration number (vehicleRegNo)")
     .option("--name <s>", "Display name (vehicleNimi)")
     .option("--no <n>", "Fleet number (vehicleNo)", (s: string) => Number(s))
@@ -716,7 +703,6 @@ export function registerVehicleCommands(
     .description("Vehicle inspection/cert date reads");
   dates
     .command("list <vehicleId>")
-    .description("List a vehicle's dates")
     .action(
       guarded(async (idStr: string) => {
         writeJson(await runVehicleDatesList(await getClient(), parseId(idStr, "vehicleId")));
@@ -724,7 +710,6 @@ export function registerVehicleCommands(
     );
   dates
     .command("expiring")
-    .description("List expiring vehicle dates across the fleet")
     .option("--days <n>", "Days-ahead window (default 30)", (s: string) =>
       Number(s)
     )
@@ -735,7 +720,6 @@ export function registerVehicleCommands(
     );
 
   v.command("route <vehicleId>")
-    .description("Per-day ordered GPS track points (polyline) for a vehicle")
     .option("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
     .action(
       guarded(async (idStr: string, opts: VehicleDayFilter) => {
@@ -745,7 +729,6 @@ export function registerVehicleCommands(
     );
 
   v.command("visits <filterType> <id>")
-    .description("Vehicles that visited a worksite/location. filterType: tyomaa | sijainti")
     .option("--days <n>", "Look-back window in days (omit for all-time)", (val: string) => Number(val))
     .option(
       "--date <d>",
@@ -763,13 +746,7 @@ export function registerVehicleCommands(
       })
     );
 
-  registerLogAlias(
-    v,
-    getClient,
-    "vehicle",
-    "vehicleId",
-    "Change-tracker audit trail for one vehicle. Alias of `ib log entity vehicle`."
-  );
+  registerLogAlias(v, getClient, "vehicle", "vehicleId");
 
   // The vehicle-driver subgroup: day-driver dispatch + standing default driver.
   registerVehicleDriverCommands(v, getClient);

@@ -356,7 +356,6 @@ export function registerKeikkaCommands(
   const k = parent.command("keikka").description("Keikka commands");
 
   k.command("list")
-    .description("List keikkas matching the filters")
     .option("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
     .option("--to <date>", "End date YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
     .option(
@@ -403,9 +402,6 @@ export function registerKeikkaCommands(
     );
 
   k.command("latest")
-    .description(
-      "Latest keikka matching the filters — searches backwards from today, no date range needed"
-    )
     .option("--status <s>", "Filter by status (keikkaTilaId, e.g. 9 = Toimitettu)")
     .option("--customer <id>", "Filter by asiakasId", (v: string) => Number(v))
     .option("--vehicle <id>", "Filter by vehicleId", (v: string) => Number(v))
@@ -423,7 +419,6 @@ export function registerKeikkaCommands(
     );
 
   k.command("get <keikkaId>")
-    .description("Get a single keikka by id")
     .action(
       guarded(async (idStr: string) => {
         const client = await getClient();
@@ -433,7 +428,6 @@ export function registerKeikkaCommands(
     );
 
   k.command("search [query]")
-    .description("Search keikkas (full-text: phone, keikkaId, worksite name/number, invoice ref)")
     .option("--search <s>", "Search query (alias for the <query> positional)")
     .option("--limit <n>", "Max hits (client-side; backend caps at 100)", (v: string) => Number(v))
     .action(
@@ -448,7 +442,6 @@ export function registerKeikkaCommands(
     );
 
   k.command("validate [keikkaId]")
-    .description("Validate a keikka (or a whole day with --date) against the reminders-drawer rules")
     .option("--date <date>", "Validate every keikka for this date (YYYY-MM-DD or today/yesterday/tomorrow)")
     .action(
       guarded(async (idStr: string | undefined, opts: { date?: string }) => {
@@ -466,7 +459,6 @@ export function registerKeikkaCommands(
 
   const createCmd = k
     .command("create")
-    .description("Create a new keikka (POST /api/keikka/newKeikka)")
     .requiredOption(
       "--body <json>",
       "JSON object forwarded verbatim as the request body"
@@ -491,7 +483,6 @@ export function registerKeikkaCommands(
 
   const updateCmd = k
     .command("update <keikkaId>")
-    .description("Update a keikka (v1.0: --status only)")
     .option("--status <s>", "New keikkaTilaId (numeric, e.g. 9 = Toimitettu)");
   addWriteFlagsToCommand(updateCmd).action(
     guarded(async (
@@ -523,8 +514,7 @@ export function registerKeikkaCommands(
 
   const drivers = k.command("drivers").description("Driver assignment commands");
   const assignCmd = drivers
-    .command("assign <keikkaId>")
-    .description("Assign the default driver to a keikka");
+    .command("assign <keikkaId>");
   addWriteFlagsToCommand(assignCmd).action(
     jsonAction(getClient, (client, idStr: string, opts: { dryRun?: boolean; idempotencyKey?: string; reason?: string; }) =>
       runKeikkaDriversAssign(client, parseId(idStr, "keikkaId"), { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })
@@ -536,7 +526,6 @@ export function registerKeikkaCommands(
     getClient,
     "keikka",
     "keikkaId",
-    "Change-tracker audit trail for one keikka (folds in its keikkaBetoni rows). Alias of `ib log entity keikka`.",
     "Filter by changeTracker fieldName (e.g. kuskit, laskuMemo)"
   );
 }

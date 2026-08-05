@@ -39,17 +39,14 @@ export async function runScheduleWeek(client, start) {
 export function registerScheduleCommands(parent, getClient) {
     const s = parent.command("schedule").description("Schedule (keikka window) commands");
     s.command("today")
-        .description("List today's keikkas (from=to=today)")
         .action(jsonAction(getClient, runScheduleToday));
     s.command("day <date>")
-        .description("List keikkas for a single date (YYYY-MM-DD)")
         .action(guarded(async (date) => {
         const client = await getClient();
         const result = await runScheduleDay(client, date);
         writeJson(result);
     }));
     s.command("week <start>")
-        .description("List keikkas for the 7-day window starting <start> (YYYY-MM-DD)")
         .action(guarded(async (start) => {
         const client = await getClient();
         const result = await runScheduleWeek(client, start);

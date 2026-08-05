@@ -581,9 +581,6 @@ export function registerFeedbackCommands(
     // group using `add` to create a top-level entry) naturally types
     // `feedback add`; accept it instead of dead-ending on exit 4 (feedback #229).
     .alias("add")
-    .description(
-      "File a proposal/trouble report. Silent server-side; works under --read-only."
-    )
     .option("--description <text>", "Alias for the positional description")
     .option("--body <text>", "Alias for --description (free text, not JSON); if several are given, they must match")
     .option(
@@ -660,7 +657,6 @@ export function registerFeedbackCommands(
     );
 
   f.command("list")
-    .description("List feedback for triage (developer-only). Defaults to active items (open+reviewed); --all for every status")
     .option("--status <status>", "open | reviewed | applied | dismissed (or a comma-separated list, e.g. open,reviewed)")
     .option("--unresolved", "Shortcut for --status open,reviewed (un-closed items) — same as the default")
     .option("--all", "Include every status (open,reviewed,applied,dismissed); overrides the open+reviewed default")
@@ -680,7 +676,6 @@ export function registerFeedbackCommands(
     );
 
   f.command("get <id>")
-    .description("Fetch one feedback row by id (developer-only)")
     .option("--full", "Accepted for cross-command consistency; get always returns the full row (no-op)")
     .action(
       guarded(async (idStr: string) => {
@@ -691,9 +686,6 @@ export function registerFeedbackCommands(
     );
 
   f.command("resolve <id>")
-    .description(
-      "Triage a feedback row: set status and/or note (developer-only; a write)"
-    )
     .option("--status <status>", "open | reviewed | applied | dismissed")
     .option("--note <text>", "Resolution note stored on the row")
     .option("--reason <text>", "Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header")
@@ -721,9 +713,6 @@ export function registerFeedbackCommands(
     );
 
   f.command("update <id>")
-    .description(
-      "Edit a filed row's classification (--scope/--kind/--severity) or --description (developer-only; a write)"
-    )
     .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other")
     .option("--kind <kind>", "improvement | bug | idea | legal")
     .option("--severity <sev>", "critical | major | minor | cosmetic")
@@ -767,7 +756,6 @@ export function registerFeedbackCommands(
     );
 
   f.command("count")
-    .description("Counts of feedback by status/kind/scope (developer-only)")
     .option("--kind <kind>", "improvement | bug | idea | legal")
     .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other")
     .action(

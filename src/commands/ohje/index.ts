@@ -334,7 +334,6 @@ export function registerOhjeCommands(
     );
 
   o.command("get <helpId>")
-    .description("Get one UI help entry by helpId (GET /api/helps/get/:helpId)")
     .action(guarded(async (helpId: string) => {
       if (!isValidHelpId(helpId)) {
         failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
@@ -346,12 +345,6 @@ export function registerOhjeCommands(
 
   addNeedsReviewFlags(
     o.command("list")
-      .description(
-        "List every UI help entry (GET /api/helps/getAll). Reads are public. The full " +
-          "table is large (~115 KB), so use the client-side shapers to keep output small: " +
-          "--empty-shorttext (grooming backfill targets), --fields (column projection, skips " +
-          "htmltext), --sort field:dir. Order applied: filter → sort → limit → project."
-      )
       .option("--limit <n>", "Max rows to return (client-side cap, after filter+sort)", (v: string) => Number(v))
       .option("--empty-shorttext", "Only rows whose shorttext is blank (grooming backfill targets)")
       .option(
@@ -369,13 +362,6 @@ export function registerOhjeCommands(
 
   const updateCmd = o
     .command("update <helpId>")
-    .description(
-      "Update a UI help entry (PUT /api/helps/update). GET-merges the current row " +
-        "so omitted fields are preserved (helps_save overwrites the whole row). " +
-        "Provide typed flags or --body JSON (typed flags win). --reason is required. " +
-        "--dry-run previews the merged row CLIENT-SIDE without writing (the backend " +
-        "does not honour X-Dry-Run here). Requires isHelperEditor or system-admin/developer."
-    )
     .option(
       "--body <json>",
       "JSON object with any of title/shorttext/htmltext/img (typed flags win)"
@@ -478,15 +464,7 @@ export function registerOhjeCommands(
   );
 
   const deleteCmd = o
-    .command("delete <helpId>")
-    .description(
-      "Delete a UI help entry (DELETE /api/helps/delete/:helpId). Removes orphan " +
-        "(stale-named) or empty data-driven helpIds; a missing help row makes its " +
-        "HelperIcon render nothing (graceful absence). --reason is required for a write. " +
-        "--dry-run previews the row that WOULD be deleted CLIENT-SIDE without issuing the " +
-        "DELETE (works before the backend route deploys). Idempotent: a missing row " +
-        "returns deleted:false. Requires isHelperEditor or system-admin/developer."
-    );
+    .command("delete <helpId>");
   addWriteFlagsToCommand(deleteCmd).action(
     guarded(async (
       helpId: string,

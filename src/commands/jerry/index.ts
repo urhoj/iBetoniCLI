@@ -778,7 +778,6 @@ export function registerJerryCommands(
 
   request
     .command("list")
-    .description("List pump requests (--mine default, or --open provider inbox)")
     .option("--open", "Provider inbox: open requests (requires provider role)")
     .option("--mine", "Your own requests (default)")
     .option("--status <csv>", "Filter --mine by status (CSV)")
@@ -794,7 +793,6 @@ export function registerJerryCommands(
 
   request
     .command("get <requestId>")
-    .description("Get a single pump request (--provider for the provider-facing detail)")
     .option("--provider", "Use the provider-facing detail view (requires provider role)")
     .action(
       guarded(async (idStr: string, opts: { provider?: boolean }) => {
@@ -805,7 +803,6 @@ export function registerJerryCommands(
 
   request
     .command("offers <requestId>")
-    .description("List the offers on a customer-owned request")
     .action(
       guarded(async (idStr: string) => {
         const client = await getClient();
@@ -816,9 +813,6 @@ export function registerJerryCommands(
   addWriteFlagsToCommand(
     request
       .command("create [address]")
-      .description(
-        "Create a customer pump request (tarjouspyyntö). Address positional or --address. Requires --reason. ⚠ --dry-run is deploy-gated."
-      )
       .option("--address <s>", "Worksite address (osoite); alias for the positional")
       .requiredOption("--pump-at <iso>", "Pump datetime (pumppausaika; ISO, e.g. 2026-06-17T09:00:00+03:00)")
       .requiredOption("--m3 <n>", "Concrete volume m³ (maaraM3; > 0)", Number)
@@ -862,34 +856,24 @@ export function registerJerryCommands(
   // write flags, --reason required. Only the run fn differs.
   const registerRequestLifecycle = (
     name: string,
-    description: string,
     run: (client: ApiClient, requestId: number, opts: WriteOpts) => Promise<unknown>
   ): void => {
-    addWriteFlagsToCommand(
-      request.command(`${name} <requestId>`).description(description)
-    ).action(guarded(async (idStr: string, opts: WriteOpts) => {
-      requireReason(opts);
-      const client = await getClient();
-      writeJson(await run(client, parseId(idStr, "requestId"), opts));
-    }));
+    addWriteFlagsToCommand(request.command(`${name} <requestId>`)).action(
+      guarded(async (idStr: string, opts: WriteOpts) => {
+        requireReason(opts);
+        const client = await getClient();
+        writeJson(await run(client, parseId(idStr, "requestId"), opts));
+      })
+    );
   };
 
-  registerRequestLifecycle(
-    "cancel",
-    "Cancel your OWN request (customer) — only while no offers received. Requires --reason.",
-    runJerryRequestCancel
+  registerRequestLifecycle("cancel", runJerryRequestCancel);
+  // decline is the only member that also sends --reason in the BODY (it is
+  // shown to the customer).
+  registerRequestLifecycle("decline", (client, id, opts) =>
+    runJerryRequestDecline(client, id, opts.reason, opts)
   );
-  registerRequestLifecycle(
-    "decline",
-    "Decline a request WITHOUT offering (provider); --reason is stored + shown to the customer. Requires --reason.",
-    // The only member that also sends --reason in the BODY (it is shown to the customer).
-    (client, id, opts) => runJerryRequestDecline(client, id, opts.reason, opts)
-  );
-  registerRequestLifecycle(
-    "undecline",
-    "Reverse a prior decline (provider) — the request returns to your Avoimet tab. Requires --reason.",
-    runJerryRequestUndecline
-  );
+  registerRequestLifecycle("undecline", runJerryRequestUndecline);
 
   // offer ──────────────────────────────────────────────────────────────────────
   const offer = j.command("offer").description("Act on offers (create/send/accept/confirm)");
@@ -897,7 +881,6 @@ export function registerJerryCommands(
   addWriteFlagsToCommand(
     offer
       .command("create <requestId>")
-      .description("Create/update your draft offer on a request (provider). Requires --reason.")
       .requiredOption("--price-cents <n>", "Offer price in cents (integer 1..99999900)", Number)
       .option("--vat-percent <n>", "VAT percent (default 25.5)", Number)
       .option("--price-terms <s>", "Price-estimate terms (Hinta-arvion ehdot) shown to the customer")
@@ -944,7 +927,6 @@ export function registerJerryCommands(
   // and withdraw so the registration order is unchanged.
   const registerOfferLifecycle = (
     name: string,
-    description: string,
     run: (
       client: ApiClient,
       requestId: number,
@@ -952,32 +934,23 @@ export function registerJerryCommands(
       opts: WriteOpts
     ) => Promise<unknown>
   ): void => {
-    addWriteFlagsToCommand(
-      offer.command(`${name} <requestId> <offerId>`).description(description)
-    ).action(guarded(async (idStr: string, offerIdStr: string, opts: WriteOpts) => {
-      requireReason(opts);
-      const client = await getClient();
-      writeJson(
-        await run(client, parseId(idStr, "requestId"), parseId(offerIdStr, "offerId"), opts)
-      );
-    }));
+    addWriteFlagsToCommand(offer.command(`${name} <requestId> <offerId>`)).action(
+      guarded(async (idStr: string, offerIdStr: string, opts: WriteOpts) => {
+        requireReason(opts);
+        const client = await getClient();
+        writeJson(
+          await run(client, parseId(idStr, "requestId"), parseId(offerIdStr, "offerId"), opts)
+        );
+      })
+    );
   };
 
-  registerOfferLifecycle(
-    "send",
-    "Send a draft offer to the customer (draft → pending; provider). Requires --reason.",
-    runJerryOfferSend
-  );
-  registerOfferLifecycle(
-    "accept",
-    "Accept an offer (customer-side). Rejects siblings + closes the request. Requires --reason.",
-    runJerryOfferAccept
-  );
+  registerOfferLifecycle("send", runJerryOfferSend);
+  registerOfferLifecycle("accept", runJerryOfferAccept);
 
   addWriteFlagsToCommand(
     offer
       .command("confirm <requestId> <offerId>")
-      .description("Confirm an accepted offer → builds a keikka (provider). Requires --scheduled-at + --reason.")
       .requiredOption("--scheduled-at <iso>", "Scheduled keikka start (future ISO datetime)")
       .option("--pumppu <vehicleId>", "Pin one of your vehicles to the keikka", Number)
   ).action(
@@ -994,20 +967,11 @@ export function registerJerryCommands(
     })
   );
 
-  registerOfferLifecycle(
-    "withdraw",
-    "Withdraw your sent offer before the customer accepts (pending → withdrawn; provider). Requires --reason.",
-    runJerryOfferWithdraw
-  );
-  registerOfferLifecycle(
-    "delete",
-    "Hard-delete your OWN DRAFT offer (provider; draft only — sent offers 409, use withdraw). Requires --reason.",
-    runJerryOfferDelete
-  );
+  registerOfferLifecycle("withdraw", runJerryOfferWithdraw);
+  registerOfferLifecycle("delete", runJerryOfferDelete);
 
   // counts ─────────────────────────────────────────────────────────────────────
   j.command("counts")
-    .description("Lifecycle counts (--mine customer view default, or --provider)")
     .option("--provider", "Provider badge counts (requires provider role)")
     .option("--mine", "Customer counts (default)")
     .action(
@@ -1019,7 +983,6 @@ export function registerJerryCommands(
 
   // check-address ────────────────────────────────────────────────────────────
   j.command("check-address")
-    .description("Anonymous geofence feasibility probe (which provider varikot cover an address)")
     .requiredOption("--address <s>", "Street address to check (maps to `osoite`)")
     .option("--lat <n>", "Latitude (trusted only with --lng + --place-id)", Number)
     .option("--lng <n>", "Longitude (trusted only with --lat + --place-id)", Number)
@@ -1063,7 +1026,6 @@ export function registerJerryCommands(
 
   // coverage ─────────────────────────────────────────────────────────────────
   j.command("coverage")
-    .description("Developer view of BetoniJerry supply coverage — covered areas + enrolled depot circles")
     .action(
       guarded(async () => {
         const client = await getClient();
@@ -1073,7 +1035,6 @@ export function registerJerryCommands(
 
   // email-activity ─────────────────────────────────────────────────────────────
   j.command("email-activity")
-    .description("Developer SendGrid deliverability check — domain-auth validity, send stats, suppressions")
     .option("--days <n>", "Window in days (1..90, default 7)", (v: string) => Math.min(90, Math.max(1, Number(v))))
     .option("--domain <d>", "Sending domain (default betonijerry.fi)")
     .action(
@@ -1089,7 +1050,6 @@ export function registerJerryCommands(
     .description("Per-provider BetoniJerry settings (contact, opening hours, description)");
 
   ps.command("get")
-    .description("Read a provider's Jerry settings (defaults to your company)")
     .option("--asiakas <id>", "Target company asiakasId", Number)
     .action(
       guarded(async (opts: { asiakas?: number }) => {
@@ -1101,7 +1061,6 @@ export function registerJerryCommands(
   addWriteFlagsToCommand(
     ps
       .command("set")
-      .description("Upsert a provider's Jerry settings. Requires --reason.")
       .option(
         "--body <json>",
         "JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo? }"
@@ -1130,7 +1089,6 @@ export function registerJerryCommands(
 
   admin
     .command("list")
-    .description("List Jerry-active companies with per-company counts")
     .action(
       guarded(async () => {
         const client = await getClient();
@@ -1140,7 +1098,6 @@ export function registerJerryCommands(
 
   admin
     .command("search [query]")
-    .description("Search non-Jerry companies (Add picker)")
     .option("--search <s>", "Search query (alias for the <query> positional)")
     .action(
       guarded(async (query: string | undefined, opts: { search?: string }) => {
@@ -1149,34 +1106,28 @@ export function registerJerryCommands(
       })
     );
 
-  addAsiakasTargetOption(
-    admin
-      .command("detail [asiakasId]")
-      .description("Company drill-down: people by role, vehicles, sijainnit Jerry status")
-  ).action(
-      guarded(async (idStr: string | undefined, opts: { asiakas?: number }) => {
-        const client = await getClient();
-        writeJson(await runJerryAdminDetail(client, resolveAsiakasTarget(idStr, opts.asiakas)));
-      })
-    );
+  addAsiakasTargetOption(admin.command("detail [asiakasId]")).action(
+    guarded(async (idStr: string | undefined, opts: { asiakas?: number }) => {
+      const client = await getClient();
+      writeJson(await runJerryAdminDetail(client, resolveAsiakasTarget(idStr, opts.asiakas)));
+    })
+  );
 
-  for (const [name, verb, enable] of [
-    ["enable", "Enable", true],
-    ["disable", "Disable", false],
+  for (const [name, enable] of [
+    ["enable", true],
+    ["disable", false],
   ] as const) {
     addWriteFlagsToCommand(
-      addAsiakasTargetOption(
-        admin
-          .command(`${name} [asiakasId]`)
-          .description(`${verb} the Jerry module for a company (audited). Requires --reason.`)
-      )
-    ).action(guarded(async (idStr: string | undefined, opts: WriteOpts & { asiakas?: number }) => {
-      requireReason(opts);
-      const client = await getClient();
-      writeJson(
-        await runJerryAdminToggle(client, resolveAsiakasTarget(idStr, opts.asiakas), enable, opts)
-      );
-    }));
+      addAsiakasTargetOption(admin.command(`${name} [asiakasId]`))
+    ).action(
+      guarded(async (idStr: string | undefined, opts: WriteOpts & { asiakas?: number }) => {
+        requireReason(opts);
+        const client = await getClient();
+        writeJson(
+          await runJerryAdminToggle(client, resolveAsiakasTarget(idStr, opts.asiakas), enable, opts)
+        );
+      })
+    );
   }
 
   // admin onboarding — provider-acquisition pipeline ──────────────────────────
@@ -1186,7 +1137,6 @@ export function registerJerryCommands(
 
   onboarding
     .command("list")
-    .description("List onboarding prospects with live Jerry status and reminder-due flag")
     .option("--status <key>", `Filter by pipeline status key: ${ONBOARDING_STATUS_KEYS}`)
     .option("--tier <n>", "Filter by tier (1/2)", Number)
     .option("--due", "Only rows where the email1b reminder is due")
@@ -1216,7 +1166,6 @@ export function registerJerryCommands(
   addWriteFlagsToCommand(
     onboarding
       .command("add <asiakasId>")
-      .description("Add a company to the onboarding pipeline")
       .option("--tier <n>", "1 = priority, 2 = secondary", Number)
       .option("--malli <v>", "Email variant (A/B)")
       .option("--kanava <text>", "Preferred channel")
@@ -1240,7 +1189,6 @@ export function registerJerryCommands(
   addWriteFlagsToCommand(
     onboarding
       .command("set <asiakasId>")
-      .description("Partial-update a prospect (status, tier, notes, outreach contact)")
       .option("--status <key>", `Pipeline status key: ${ONBOARDING_STATUS_KEYS}`)
       .option("--tier <n>", "1/2", Number)
       .option("--malli <v>", "Email variant (A/B)")
@@ -1263,7 +1211,6 @@ export function registerJerryCommands(
   addWriteFlagsToCommand(
     onboarding
       .command("log <asiakasId>")
-      .description("Log a call/response/note event (optionally set status atomically)")
       .requiredOption("--type <t>", "call | response | note")
       .requiredOption("--text <text>", "Event text")
       .option("--time <iso>", "Backdated event time (ISO 8601)")
@@ -1285,7 +1232,6 @@ export function registerJerryCommands(
 
   adminRequest
     .command("list")
-    .description("System-wide tarjouspyyntö list with offer summary (filters)")
     .option("--status <csv>", "Status filter CSV (open,accepted,...)")
     .option("--from <date>", "createdAt from (YYYY-MM-DD / today / yesterday)", resolveDate)
     .option("--to <date>", "createdAt to (inclusive)", resolveDate)
@@ -1301,7 +1247,6 @@ export function registerJerryCommands(
 
   adminRequest
     .command("get <requestId>")
-    .description("One request's full detail (admin view)")
     .action(
       guarded(async (idStr: string) => {
         const client = await getClient();
@@ -1311,7 +1256,6 @@ export function registerJerryCommands(
 
   adminRequest
     .command("offers <requestId>")
-    .description("All offers on one request (admin view, no masking)")
     .action(
       guarded(async (idStr: string) => {
         const client = await getClient();
@@ -1319,24 +1263,23 @@ export function registerJerryCommands(
       })
     );
 
-  const adminReqAction = (name: string, desc: string, run: (c: ApiClient, id: number, f: WriteOpts) => Promise<unknown>) =>
-    addWriteFlagsToCommand(adminRequest.command(`${name} <requestId>`).description(desc))
+  const adminReqAction = (name: string, run: (c: ApiClient, id: number, f: WriteOpts) => Promise<unknown>) =>
+    addWriteFlagsToCommand(adminRequest.command(`${name} <requestId>`))
       .action(guarded(async (idStr: string, opts: WriteOpts) => {
         requireReason(opts);
         const client = await getClient();
         writeJson(await run(client, parseId(idStr, "requestId"), opts));
       }));
 
-  adminReqAction("expire", "Force-expire a request (admin). Requires --reason.", runJerryAdminRequestExpire);
-  adminReqAction("cancel", "Cancel any request (admin). Requires --reason.", runJerryAdminRequestCancel);
-  adminReqAction("resend", "Re-run provider fan-out for a request (admin). Requires --reason.", runJerryAdminRequestResend);
-  adminReqAction("delete", "Delete a draft request (admin). Requires --reason.", runJerryAdminRequestDelete);
+  adminReqAction("expire", runJerryAdminRequestExpire);
+  adminReqAction("cancel", runJerryAdminRequestCancel);
+  adminReqAction("resend", runJerryAdminRequestResend);
+  adminReqAction("delete", runJerryAdminRequestDelete);
 
   // extend needs --days/--until, so it is registered outside adminReqAction.
   addWriteFlagsToCommand(
     adminRequest
       .command("extend <requestId>")
-      .description("Extend a request's validity / reactivate it (admin). Requires --reason.")
       .option("--days <n>", "Make it valid for N more days from now (default 14)", Number)
       .option("--until <date>", "Absolute new expiry (ISO date/datetime)")
   ).action(guarded(async (idStr: string, opts: { days?: number; until?: string } & WriteOpts) => {
@@ -1353,7 +1296,6 @@ export function registerJerryCommands(
 
   adminSearches
     .command("list")
-    .description("Searched addresses aggregated by place, with covered vs no_supply split")
     .option("--from <date>", "createdAt from (YYYY-MM-DD / today / yesterday)", resolveDate)
     .option("--to <date>", "createdAt to (inclusive)", resolveDate)
     .option("--deliverable <k>", "Filter: covered | no_supply (never covered)")
@@ -1368,7 +1310,6 @@ export function registerJerryCommands(
 
   adminSearches
     .command("funnel")
-    .description("Conversion funnel: coverage-check → wizard step 1..5 → sent, + outcomes")
     .option("--from <date>", "createdAt from (YYYY-MM-DD / today / yesterday)", resolveDate)
     .option("--to <date>", "createdAt to (inclusive)", resolveDate)
     .action(

@@ -106,7 +106,6 @@ export function registerMessageSupportCommands(parent, getClient) {
         .description("Operator → platform support escalations");
     support
         .command("inbox")
-        .description("Support triage queue (developer-only): open | resolved | all")
         .option("--status <status>", "open | resolved | all", "open")
         .option("--limit <n>", "Max rows", Number)
         .action(guarded(async (opts) => {
@@ -114,7 +113,6 @@ export function registerMessageSupportCommands(parent, getClient) {
     }));
     support
         .command("mine")
-        .description("Your own company's support threads (open | resolved | all)")
         .option("--status <status>", "open | resolved | all", "open")
         .option("--limit <n>", "Max rows", Number)
         .action(guarded(async (opts) => {
@@ -122,7 +120,6 @@ export function registerMessageSupportCommands(parent, getClient) {
     }));
     support
         .command("contact")
-        .description("Open (or append to) a support thread about a tarjous or keikka. A real write; --dry-run previews the payload CLIENT-SIDE (no POST). Reply later with `ib message chat send <threadId>`.")
         .option("--tarjous <id>", "pumppuRequestId this escalation is about", Number)
         .option("--keikka <id>", "keikkaId this escalation is about", Number)
         .requiredOption("--body <text>", "The message to support")
@@ -147,7 +144,6 @@ export function registerMessageSupportCommands(parent, getClient) {
     }));
     support
         .command("resolve <threadId>")
-        .description("Mark a support thread resolved, or --reopen it (developer-only; a write). --dry-run previews the body client-side.")
         .option("--reopen", "Set status back to open instead of resolved")
         // client-side --dry-run (the status PATCH has no server X-Dry-Run guard); no
         // audit headers — the status change persists no reason.

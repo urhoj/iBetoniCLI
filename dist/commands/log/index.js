@@ -131,10 +131,9 @@ export async function runLogUser(client, personId, limit, opts = {}) {
     return envelope((Array.isArray(rows) ? rows : []).map(projectRow));
 }
 /** Registers a thin `log <id>` alias on an entity group, delegating to runLogEntity. */
-export function registerLogAlias(group, getClient, entityType, idArgName, description, fieldExample = "Filter by changeTracker fieldName") {
+export function registerLogAlias(group, getClient, entityType, idArgName, fieldExample = "Filter by changeTracker fieldName") {
     group
         .command(`log <${idArgName}>`)
-        .description(description)
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
         .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)
         .option("--field <name>", fieldExample)
@@ -149,14 +148,11 @@ export function registerLogAlias(group, getClient, entityType, idArgName, descri
 export function registerLogCommands(parent, getClient) {
     const c = parent.command("log").description("ChangeTracker (audit trail) reads");
     c.command("entity <entityType> <entityId>")
-        .description("Audit trail for ONE entity — who changed which field, when, old→new, with --reason. " +
-        "Valid entityTypes: `ib log types`.")
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
         .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)
         .option("--field <name>", "Filter by changeTracker fieldName (client-side)")
         .action(jsonAction(getClient, (client, entityType, entityIdStr, opts) => runLogEntity(client, entityType, parseId(entityIdStr, "entityId"), opts.limit, { owner: opts.owner, field: opts.field })));
     c.command("latest")
-        .description("Newest changes across the whole company (admin), optionally one entityType.")
         .option("--entity-type <type>", "Filter to one entityType")
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
         .option("--limit <n>", "Max rows (default 100, server cap 500)", cappedInt(500), 100)
@@ -168,7 +164,6 @@ export function registerLogCommands(parent, getClient) {
         }));
     }));
     c.command("range")
-        .description("Changes MADE within a time window (admin). Filter by entityType/person.")
         .requiredOption("--from <iso>", "Window start YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)")
         .requiredOption("--to <iso>", "Window end YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)")
         .option("--entity-type <type>", "Filter to one entityType")
@@ -187,8 +182,6 @@ export function registerLogCommands(parent, getClient) {
         }));
     }));
     c.command("by-entity-date")
-        .description("Changes affecting deliveries DATED in the window (admin) — filters by " +
-        "keikka.pumppuAika / palkki starttime, not change time.")
         .requiredOption("--entity-type <type>", "keikka or palkki")
         .requiredOption("--from <iso>", "Entity-date window start YYYY-MM-DD (or today/yesterday/tomorrow)")
         .requiredOption("--to <iso>", "Entity-date window end YYYY-MM-DD (or today/yesterday/tomorrow)")
@@ -205,12 +198,10 @@ export function registerLogCommands(parent, getClient) {
         }));
     }));
     c.command("user [personId]")
-        .description("Changes MADE BY a person (no arg = yourself; another personId needs admin).")
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
         .option("--limit <n>", "Max rows (default 100)", cappedInt(500), 100)
         .action(jsonAction(getClient, (client, personIdStr, opts) => runLogUser(client, parseOptionalId(personIdStr, "personId") ?? null, opts.limit, { owner: opts.owner })));
     c.command("types")
-        .description("Offline catalog of changeTracker entityTypes (id meaning, read gate, notes).")
         .action(guarded(() => {
         writeJson(runLogTypes());
     }));

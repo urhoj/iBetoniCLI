@@ -37,7 +37,6 @@ export async function runValidatePerson(client, profile, asiakasId, personId) {
 export function registerValidateCommands(parent, getClient) {
     parent
         .command("validate [action]")
-        .description("Validate a company or a single employee against a profile (company: jerry|betoni; person: onboarding). Use 'list' to list profiles.")
         .option("--asiakas <id>", "Target asiakasId (default: active company)", Number)
         .option("--person <id>", "Validate this person as an employee of the company", Number)
         .option("--profile <p>", "Profile id (company: jerry|betoni; person: onboarding [default])")

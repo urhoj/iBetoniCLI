@@ -102,9 +102,6 @@ export function registerVersionCommand(
 ): void {
   parent
     .command("version")
-    .description(
-      "Show the local CLI version + the deployed iB version (commit SHA + slot) at the active endpoint"
-    )
     .action(
       // `runVersion` swallows an unreachable endpoint into `reachable:false`,
       // but `getEndpoint()` can still throw (unreadable/!malformed credentials),

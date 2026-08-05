@@ -180,7 +180,6 @@ export function registerMessageChatCommands(parent, getClient) {
         .command("chat")
         .description("Conversational message threads (Jerry tarjous now, keikka later)");
     c.command("threads")
-        .description("List your message threads (inbox), newest first")
         .option("--unread", "Only threads with unread messages")
         .option("--tarjous <id>", "Only threads for this pumppuRequestId", Number)
         .action(guarded(async (opts) => {
@@ -188,7 +187,6 @@ export function registerMessageChatCommands(parent, getClient) {
         writeJson(await runChatThreads(client, opts));
     }));
     c.command("thread [threadId]")
-        .description("Get one thread's metadata + participants")
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
         .action(guarded(async (threadIdStr, opts) => {
         const client = await getClient();
@@ -196,7 +194,6 @@ export function registerMessageChatCommands(parent, getClient) {
         writeJson(await runChatThread(client, id));
     }));
     c.command("list [threadId]")
-        .description("List messages in a thread (does NOT mark read)")
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
         .option("--since <iso>", "Only messages created after this ISO timestamp")
         .option("--limit <n>", "Max messages (default 100, server max 500)", Number)
@@ -207,7 +204,6 @@ export function registerMessageChatCommands(parent, getClient) {
         writeJson(await runChatList(client, id, opts));
     }));
     c.command("search [query]")
-        .description("Search your own messages by body text across all your threads (newest first)")
         .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max results (default 50, server max 200)", Number)
         .action(guarded(async (query, opts) => {
@@ -216,7 +212,6 @@ export function registerMessageChatCommands(parent, getClient) {
     }));
     const sendCmd = c
         .command("send [threadId]")
-        .description("Send a message to a thread. --dry-run previews body + recipients CLIENT-SIDE (no send). --reason → sourceNote (optional).")
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
         .requiredOption("--body <text>", "Message text (max 4000 chars)")
         .option("--source <src>", "Provenance: web|cli|ai (default: IB_SOURCE env or cli)");
@@ -241,7 +236,6 @@ export function registerMessageChatCommands(parent, getClient) {
         }));
     }));
     c.command("mark-read [threadId]")
-        .description("Mark a thread read (stamp lastReadAt)")
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
         .action(guarded(async (threadIdStr, opts) => {
         const client = await getClient();
@@ -250,7 +244,6 @@ export function registerMessageChatCommands(parent, getClient) {
     }));
     const deleteCmd = c
         .command("delete <messageId>")
-        .description("Soft-delete a chat message. Author may delete own only while unanswered; a developer may moderate. --dry-run previews CLIENT-SIDE (no delete).")
         .option("--thread <id>", "Thread id the message belongs to", Number)
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
     addWriteFlagsToCommand(deleteCmd).action(guarded(async (messageIdStr, opts) => {
@@ -270,7 +263,6 @@ export function registerMessageChatCommands(parent, getClient) {
     }));
     const editCmd = c
         .command("edit <messageId>")
-        .description("Edit a chat message's body. Author-only and only while unanswered. --dry-run previews the from→to diff CLIENT-SIDE (no edit).")
         .option("--thread <id>", "Thread id the message belongs to", Number)
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
         .requiredOption("--body <text>", "New message text (max 4000 chars)");
@@ -291,7 +283,6 @@ export function registerMessageChatCommands(parent, getClient) {
     }));
     const restoreCmd = c
         .command("restore <messageId>")
-        .description("Restore (un-delete) a soft-deleted chat message. Author or developer. --dry-run previews via the deleted list (no restore).")
         .option("--thread <id>", "Thread id the message belongs to", Number)
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
     addWriteFlagsToCommand(restoreCmd).action(guarded(async (messageIdStr, opts) => {

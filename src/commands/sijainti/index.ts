@@ -909,7 +909,6 @@ export function registerSijaintiCommands(
   const s = parent.command("sijainti").description("Sijainti (location) commands");
 
   s.command("list")
-    .description("List sijainti (locations)")
     .option("--type <t>", "Filter by sijaintiTypeId or type name (e.g. betoniasema)")
     .option(
       "--search <text>",
@@ -963,9 +962,6 @@ export function registerSijaintiCommands(
 
   s.command("plants")
     .alias("tehtaat")
-    .description(
-      "List concrete plants (betoniasemat) across ALL companies — sugar for `list --type betoniasema --all`"
-    )
     .option("--asiakas <id>", "Only this company's plants (numeric asiakasId)", Number)
     .option(
       "--search <text>",
@@ -984,7 +980,6 @@ export function registerSijaintiCommands(
     }));
 
   s.command("get <sijaintiId>")
-    .description("Get a single sijainti by sijaintiId")
     .action(
       guarded(async (idStr: string) => {
         const client = await getClient();
@@ -994,9 +989,6 @@ export function registerSijaintiCommands(
     );
 
   s.command("dashboard [sijaintiId]")
-    .description(
-      "One-shot Address Information Dashboard report for a sijainti (location) — merges weather, building, cadastral parcel, nearby traffic cameras, nearby sijainnit, worksite deliveries, and nearby vehicles into a single JSON, with each section independently degrading to forbidden/error instead of failing the whole report. Resolve the point from EXACTLY ONE of the positional sijaintiId or --address."
-    )
     .option("--address <address>", "Resolve the point from a street address instead of sijaintiId")
     .action(guarded(async (idStr: string | undefined, opts: { address?: string }) => {
       if (idStr !== undefined && opts.address !== undefined) {
@@ -1013,14 +1005,6 @@ export function registerSijaintiCommands(
 
   const createCmd = s
     .command("create")
-    .description(
-      "Create a new sijainti (POST /api/geocode/sijainti/add). Required: --name, --type. " +
-        "--lyh defaults to --name (≤50 chars), --max-distance is the general delivery radius in km (default 50; independent of BetoniJerry enrolment), --asiakas to your active company. " +
-        "--geocode resolves lat/lng from the address when coordinates are not given. " +
-        "Coordinates (--lat/--lng or --geocode) are persisted via a follow-up updateLatLng " +
-        "call and echoed back as { lat, lng, coordsPersisted } so geocoding is verifiable. " +
-        "Use typed flags or --body JSON (typed flags win)."
-    )
     .option("--body <json>", "JSON object forwarded as the request body")
     .option("--name <n>", "sijaintiNimi (required)")
     .option("--address <a>", "sijaintiOsoite1 (street)")
@@ -1106,13 +1090,6 @@ export function registerSijaintiCommands(
 
   const updateCmd = s
     .command("update")
-    .description(
-      "Update a sijainti (read-merge-write over POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Typed flags win over --body. " +
-        "Omitted fields KEEP their current values (the save proc would otherwise NULL e.g. jerryActiveUntil and dates); pass an explicit null in --body to clear a field. " +
-        "--max-distance is the general delivery radius in km (stored as maxDeliveryDistance), independent of BetoniJerry enrolment. " +
-        "An address change re-geocodes the new address automatically when no --lat/--lng are given (--geocode forces re-resolution). " +
-        "Coords are persisted via a follow-up updateLatLng call (the save proc itself drops them) and echoed as { lat, lng, coordsPersisted }."
-    )
     .option("--body <json>", "JSON object forwarded as the request body")
     .option("--id <sijaintiId>", "Target sijaintiId", Number)
     .option("--name <n>", "sijaintiNimi")
@@ -1201,14 +1178,6 @@ export function registerSijaintiCommands(
 
   const setJerryCmd = s
     .command("set-jerry <sijaintiId>")
-    .description(
-      "Enrol/unenrol a varikko in BetoniJerry (--on/--off). BetoniJerry coverage " +
-        "keys on the delivery radius maxDeliveryDistance (KM) — NOT geofenceRadius " +
-        "(metres, a GPS depot detector) — so --on also sets that radius: --radius " +
-        "<km>, or a 50 km default when the varikko has none (otherwise it would be " +
-        "enrolled but cover nothing). Also requires the company's isPumppuToimittaja " +
-        "flag AND HAS_JERRY setting (ib jerry admin enable)."
-    )
     .option("--on", "Enrol: jerryActiveUntil = sentinel + ensure a delivery radius")
     .option("--off", "Unenrol: jerryActiveUntil = null")
     .option("--radius <km>", "Delivery radius in km (maxDeliveryDistance) to set when enrolling", Number)
@@ -1257,33 +1226,22 @@ export function registerSijaintiCommands(
 
   // delete / undelete are the same registration — one <sijaintiId>, write flags,
   // --reason required. Only the run fn differs.
-  for (const [name, description, run] of [
-    [
-      "delete",
-      "Soft-delete a sijainti (DELETE /api/geocode/sijainti/delete/:id). Requires --reason.",
-      runSijaintiDelete,
-    ],
-    [
-      "undelete",
-      "Restore a soft-deleted sijainti (POST /api/geocode/sijainti/undelete/:id). Requires --reason.",
-      runSijaintiUndelete,
-    ],
+  for (const [name, run] of [
+    ["delete", runSijaintiDelete],
+    ["undelete", runSijaintiUndelete],
   ] as const) {
-    addWriteFlagsToCommand(
-      s.command(`${name} <sijaintiId>`).description(description)
-    ).action(guarded(async (idStr: string, opts: WriteFlags) => {
-      if (!opts.reason) {
-        failWith("Missing required flag: --reason", 4);
-      }
-      const client = await getClient();
-      writeJson(await run(client, parseId(idStr, "sijaintiId"), opts));
-    }));
+    addWriteFlagsToCommand(s.command(`${name} <sijaintiId>`)).action(
+      guarded(async (idStr: string, opts: WriteFlags) => {
+        if (!opts.reason) {
+          failWith("Missing required flag: --reason", 4);
+        }
+        const client = await getClient();
+        writeJson(await run(client, parseId(idStr, "sijaintiId"), opts));
+      })
+    );
   }
 
   s.command("types")
-    .description(
-      "List sijainti type categories (the 'Sijainnin laji' lookup; maps sijaintiTypeId → selite)"
-    )
     .option("--jerry", "Use the BetoniJerry sijainti type set")
     .action(
       guarded(async (opts: { jerry?: boolean }) => {
@@ -1294,9 +1252,6 @@ export function registerSijaintiCommands(
     );
 
   s.command("geocode")
-    .description(
-      "Geocode an address string to coordinates (POST /api/geocode/getLatLng, Google Maps)"
-    )
     .requiredOption("--address <a>", "Free-form address to geocode")
     .action(
       guarded(async (opts: { address: string }) => {
@@ -1307,9 +1262,6 @@ export function registerSijaintiCommands(
     );
 
   s.command("closest")
-    .description(
-      "Find the closest sijainti of a given type to a worksite (straight-line distance)"
-    )
     .option("--worksite <id>", "Target tyomaaId (same flag as the rest of the CLI)", Number)
     .option("--tyomaa <id>", "Target tyomaaId (Finnish alias of --worksite)", Number)
     .requiredOption("--type <id>", "sijaintiTypeId to search within", Number)
@@ -1334,9 +1286,6 @@ export function registerSijaintiCommands(
     );
 
   s.command("distance")
-    .description(
-      "Driving distance/time between two points (each is 'lat,lng' or a sijaintiId)"
-    )
     .requiredOption("--from <point>", "Origin: 'lat,lng' or a sijaintiId")
     .requiredOption("--to <point>", "Destination: 'lat,lng' or a sijaintiId")
     .action(async (opts: { from: string; to: string }) => {

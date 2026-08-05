@@ -97,23 +97,19 @@ export function registerSchemaCommands(
       }
     });
 
-  listOpt(s.command("tables").description("List dbo tables")).action(jsonAction(getClient, runSchemaTables));
-  listOpt(s.command("views").description("List dbo views")).action(jsonAction(getClient, runSchemaViews));
-  listOpt(s.command("procs").description("List dbo stored procedures and functions")).action(
+  listOpt(s.command("tables")).action(jsonAction(getClient, runSchemaTables));
+  listOpt(s.command("views")).action(jsonAction(getClient, runSchemaViews));
+  listOpt(s.command("procs")).action(
     jsonAction(getClient, runSchemaProcs)
   );
 
   s.command("table <name>")
-    .description("Columns, keys, FKs, and indexes for a table (comma-separated names → batch)")
     .action(runOneOrBatch(runSchemaTable));
   s.command("view <name>")
-    .description("Columns and definition (T-SQL) for a view (comma-separated names → batch)")
     .action(runOneOrBatch(runSchemaView));
   s.command("proc <name>")
-    .description("Signature (parameters) and definition (T-SQL) for a proc/function (comma-separated names → batch)")
     .action(runOneOrBatch(runSchemaProc));
 
   s.command("dump")
-    .description("Structural map of the whole schema (no proc/view bodies)")
     .action(jsonAction(getClient, runSchemaDump));
 }

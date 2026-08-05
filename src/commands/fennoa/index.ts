@@ -74,9 +74,6 @@ export function registerFennoaCommands(parent: Command, getClient: () => Promise
 
   fennoa
     .command("purchases")
-    .description(
-      "Open purchase invoices (payables) fetched live from Fennoa — default target PumiNet Oy (asiakasId 26). System-admin only; result cached 15 min server-side."
-    )
     .option("--all", "Include settled invoices in the window, not only open (total_due > 0)")
     .option("--months <n>", "Created-after window in months (default 6, max 12)", (v: string) => Number(v))
     .option("--asiakas <id>", "Target company override (e.g. 8 = Kalle Urho Oy verification path)", (v: string) => Number(v))

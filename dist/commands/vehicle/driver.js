@@ -102,32 +102,27 @@ export function registerVehicleDriverCommands(parent, getClient) {
     // ── fleet / day planning reads (date-keyed) ──
     driver
         .command("board <date>")
-        .description("All grid-eligible vehicles for a day with their driver / gap / keikka load")
         .action(guarded(async (date) => {
         writeJson(await runVehicleDriverBoard(await getClient(), date));
     }));
     driver
         .command("gaps <date>")
-        .description("Vehicles needing a driver that day (the 'Ei kuljettajaa' list)")
         .action(guarded(async (date) => {
         writeJson(await runVehicleDriverGaps(await getClient(), date));
     }));
     driver
         .command("available <date>")
-        .description("Drivers free to assign that day (pumpparit, minus already-assigned minus absent)")
         .action(guarded(async (date) => {
         writeJson(await runVehicleDriverAvailable(await getClient(), date));
     }));
     // ── per-vehicle day-driver ──
     driver
         .command("who <vehicleId> <date>")
-        .description("The day driver assigned to a vehicle on a date (or null)")
         .action(guarded(async (vehicleIdStr, date) => {
         writeJson(await runVehicleDriverWho(await getClient(), parseId(vehicleIdStr, "vehicleId"), date));
     }));
     driver
         .command("history <vehicleId>")
-        .description("Who drove this vehicle on each day of a range (from personPvm)")
         .requiredOption("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)")
         .requiredOption("--to <date>", "End date YYYY-MM-DD (or today/yesterday/tomorrow)")
         .action(guarded(async (vehicleIdStr, opts) => {
@@ -135,14 +130,12 @@ export function registerVehicleDriverCommands(parent, getClient) {
     }));
     addWriteFlagsToCommand(driver
         .command("assign <vehicleId> <date>")
-        .description("Set the day driver of a vehicle (atomic cascade: personPvm + keikkat + palkit). Requires --reason.")
         .requiredOption("--person <pid>", "Driver personId", (s) => Number(s))).action(guarded(async (vehicleIdStr, date, opts) => {
         requireReason(opts);
         writeJson(await runVehicleDriverAssign(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts.person, date, opts));
     }));
     addWriteFlagsToCommand(driver
-        .command("clear <vehicleId> <date>")
-        .description("Remove the day driver from a vehicle (atomic; frees the driver). Requires --reason.")).action(guarded(async (vehicleIdStr, date, opts) => {
+        .command("clear <vehicleId> <date>")).action(guarded(async (vehicleIdStr, date, opts) => {
         requireReason(opts);
         writeJson(await runVehicleDriverClear(await getClient(), parseId(vehicleIdStr, "vehicleId"), date, opts));
     }));
@@ -152,20 +145,17 @@ export function registerVehicleDriverCommands(parent, getClient) {
         .description("The vehicle's STANDING default driver (vehicle.defaultKuski_personId)");
     def
         .command("get <vehicleId>")
-        .description("Read the vehicle's standing default driver personId")
         .action(guarded(async (vehicleIdStr) => {
         writeJson(await runVehicleDefaultGet(await getClient(), parseId(vehicleIdStr, "vehicleId")));
     }));
     addWriteFlagsToCommand(def
         .command("set <vehicleId>")
-        .description("Set the standing default driver (cascades to future dates). Requires --reason.")
         .requiredOption("--person <pid>", "Default driver personId", (s) => Number(s))).action(guarded(async (vehicleIdStr, opts) => {
         requireReason(opts);
         writeJson(await runVehicleDefaultSet(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts.person, opts));
     }));
     addWriteFlagsToCommand(def
-        .command("clear <vehicleId>")
-        .description("Clear the standing default driver (cascades to future dates). Requires --reason.")).action(guarded(async (vehicleIdStr, opts) => {
+        .command("clear <vehicleId>")).action(guarded(async (vehicleIdStr, opts) => {
         requireReason(opts);
         writeJson(await runVehicleDefaultSet(await getClient(), parseId(vehicleIdStr, "vehicleId"), null, opts));
     }));

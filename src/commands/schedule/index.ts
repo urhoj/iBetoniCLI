@@ -58,11 +58,9 @@ export function registerScheduleCommands(
   const s = parent.command("schedule").description("Schedule (keikka window) commands");
 
   s.command("today")
-    .description("List today's keikkas (from=to=today)")
     .action(jsonAction(getClient, runScheduleToday));
 
   s.command("day <date>")
-    .description("List keikkas for a single date (YYYY-MM-DD)")
     .action(
       guarded(async (date: string) => {
         const client = await getClient();
@@ -72,7 +70,6 @@ export function registerScheduleCommands(
     );
 
   s.command("week <start>")
-    .description("List keikkas for the 7-day window starting <start> (YYYY-MM-DD)")
     .action(
       guarded(async (start: string) => {
         const client = await getClient();

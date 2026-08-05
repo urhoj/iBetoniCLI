@@ -54,7 +54,6 @@ export function registerMessageThreadCommands(parent, getClient) {
         .description("Thread lifecycle: archive/reopen, rename, participants (manager-gated)");
     const archiveCmd = t
         .command("archive [threadId]")
-        .description("Archive a thread (becomes read-only; send/edit/restore then 409)")
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
     addWriteFlagsToCommand(archiveCmd).action(guarded(async (idStr, opts) => {
         const client = await getClient();
@@ -63,7 +62,6 @@ export function registerMessageThreadCommands(parent, getClient) {
     }));
     const reopenCmd = t
         .command("reopen [threadId]")
-        .description("Reopen an archived thread (clears archivedAt)")
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
     addWriteFlagsToCommand(reopenCmd).action(guarded(async (idStr, opts) => {
         const client = await getClient();
@@ -72,7 +70,6 @@ export function registerMessageThreadCommands(parent, getClient) {
     }));
     const renameCmd = t
         .command("rename [threadId]")
-        .description('Set the thread title (empty --title clears it; max 200 chars; deploy-gated on messageThread.title migration)')
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
         .requiredOption("--title <text>", 'New thread title (max 200 chars; "" clears)');
     addWriteFlagsToCommand(renameCmd).action(guarded(async (idStr, opts) => {
@@ -85,7 +82,6 @@ export function registerMessageThreadCommands(parent, getClient) {
         .description("Add/remove a thread participant (must be a member of the owning company)");
     const addCmd = p
         .command("add [threadId]")
-        .description("Add a colleague to the thread (must be a member of the owning company)")
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
         .requiredOption("--person <id>", "personId to add", Number)
         .option("--role <role>", "Participant role (customer|pumppu|betoni|lattia|support|provider; default pumppu)");
@@ -96,7 +92,6 @@ export function registerMessageThreadCommands(parent, getClient) {
     }));
     const remCmd = p
         .command("remove [threadId]")
-        .description("Soft-remove a participant (sets leftAt = now)")
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
         .requiredOption("--person <id>", "personId to remove", Number);
     addWriteFlagsToCommand(remCmd).action(guarded(async (idStr, opts) => {

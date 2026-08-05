@@ -37,7 +37,6 @@ export function registerAiCommands(parent, getClient, opts = {}) {
         .description("Read AI assistant conversations (developer-only)");
     ai
         .command("conversations")
-        .description("List recent /ai conversations (developer-only, cross-tenant) for audit; drill into one with `ib dev ai conversation <id>`")
         .option("--limit <n>", "Max rows to return (1-100, default 20)", (v) => Number(v))
         .option("--person <personId>", "Filter to one person's conversations", (v) => Number(v))
         .action(guarded(async (opts) => {
@@ -48,7 +47,6 @@ export function registerAiCommands(parent, getClient, opts = {}) {
     }));
     ai
         .command("conversation <conversationId>")
-        .description("Fetch the full transcript of an /ai conversation by id (developer-only, cross-tenant)")
         .action(guarded(async (idStr) => {
         writeJson(await runAiConversation(await getClient(), parseId(idStr, "conversationId")));
     }));

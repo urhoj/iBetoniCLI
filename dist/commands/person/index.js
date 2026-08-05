@@ -316,7 +316,6 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     registerPersonAbsencesCommand(p, getClient);
     registerPersonActivityCommand(p, getClient);
     p.command("list")
-        .description("List persons")
         .option("--role <role>", "Filter by role name")
         .option("--asiakas <id>", "Filter by asiakasId", (v) => Number(v))
         .option("--owned", "List persons the company OWNS instead of its members (the default)")
@@ -327,14 +326,12 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         writeJson(result);
     }));
     p.command("get <personId>")
-        .description("Get a single person by personId")
         .action(guarded(async (idStr) => {
         const client = await getClient();
         const result = await runPersonGet(client, parseId(idStr, "personId"));
         writeJson(result);
     }));
     p.command("search [query]")
-        .description("Free-text search for persons")
         .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max results", cappedInt(500))
         .option("--my-companies", "Search across every company you belong to (each hit tagged with its asiakasId)")
@@ -358,9 +355,6 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     }));
     const notifyCmd = p
         .command("notify <person>")
-        .description("Send an FCM push to a person (alias for `ib notification fcm send --person`). " +
-        "Admin/HR only. <person> is a personId or a name resolved within your company. " +
-        "--dry-run previews recipient + device count.")
         .requiredOption("--title <text>", "Notification title")
         .requiredOption("--body <text>", "Notification body")
         .option("--data <json>", "Extra FCM data payload as a JSON object", parseJsonObject);
@@ -374,13 +368,6 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     }));
     const createCmd = p
         .command("create")
-        .description("Create a person. Required: --first, --last. --email is OPTIONAL (phone-only " +
-        "contacts are fine; add the email later). --asiakas defaults to your active " +
-        "company. Returns the created person record (clean {personId, ...}). With " +
-        "--get-or-create a duplicate email returns the existing person (reused:true) " +
-        "ONLY when that person is visible to you; an email owned by a company you can't " +
-        "access errors with guidance (the dedup is global). Use typed flags or --body " +
-        "JSON (typed flags win). Requires --reason.")
         .option("--first <s>", "personFirstName (required)")
         .option("--last <s>", "personLastName (required)")
         .option("--phone <s>", "personPhone")
@@ -493,10 +480,6 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     }));
     addWriteFlagsToCommand(p
         .command("update <personId>")
-        .description("Update a person. Set fields with typed flags (--first/--last/--phone/--email/--memo) " +
-        "and/or a --body/--from-json JSON patch (typed flags win). At least one field is " +
-        "required. Omitted fields are PRESERVED; pass an empty string to CLEAR a field " +
-        "(e.g. --email \"\"). Requires --reason.")
         .option("--first <s>", "personFirstName")
         .option("--last <s>", "personLastName")
         .option("--phone <s>", "personPhone")
@@ -524,11 +507,6 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     }));
     addWriteFlagsToCommand(p
         .command("owner <personId>")
-        .description("Set or clear a person's owner company (ownerAsiakasId). Provide EXACTLY ONE of " +
-        "--global (make the person global/self-managing, ownerAsiakasId=null) or " +
-        "--asiakas <id> (assign/move ownership). Roles are separate (see `person role`). " +
-        "Requires --reason. Authz: developer=any; self → global always, self → a company you " +
-        "belong to; company-admin may release a person owned by their company → global.")
         .option("--global", "Make the person GLOBAL (ownerAsiakasId=null)")
         .option("--asiakas <id>", "Set owner to this asiakasId", Number)).action(guarded(async (personIdStr, opts) => {
         if (!opts.reason) {
@@ -545,8 +523,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         writeJson(result);
     }));
     addWriteFlagsToCommand(p
-        .command("delete <personId>")
-        .description("Delete a person. Requires --reason.")).action(guarded(async (personIdStr, opts) => {
+        .command("delete <personId>")).action(guarded(async (personIdStr, opts) => {
         if (!opts.reason) {
             failWith("Missing required flag: --reason", 4);
         }
@@ -560,7 +537,6 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .description("Manage a person's per-company roles (asiakasPersonSettings)");
     personRole
         .command("list <personId>")
-        .description("List a person's roles in a company")
         .requiredOption("--asiakas <id>", "Target asiakasId", (v) => Number(v))
         .action(guarded(async (personIdStr, opts) => {
         const client = await getClient();
@@ -569,7 +545,6 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     }));
     addWriteFlagsToCommand(personRole
         .command("grant <personId>")
-        .description("Grant a role to a person in a company. Requires --role, --asiakas, --reason.")
         .requiredOption("--role <name>", "Role name (see ROLE_TYPEID_BY_NAME)")
         .requiredOption("--asiakas <id>", "Target asiakasId", (v) => Number(v))).action(guarded(async (personIdStr, opts) => {
         if (!opts.reason) {
@@ -594,7 +569,6 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     }));
     addWriteFlagsToCommand(personRole
         .command("revoke <personId>")
-        .description("Revoke a role from a person in a company (idempotent). Requires --role, --asiakas, --reason.")
         .requiredOption("--role <name>", "Role name (see ROLE_TYPEID_BY_NAME)")
         .requiredOption("--asiakas <id>", "Target asiakasId", (v) => Number(v))).action(guarded(async (personIdStr, opts) => {
         if (!opts.reason) {
@@ -624,26 +598,20 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     // the role names accepted by `person role grant/revoke` (and `customer person list --role`).
     personRole
         .command("explain <name>")
-        .description("Explain a role name: typeId, display name, DB description/comment, access tiers, deprecation")
         .action(guarded(async (name) => {
         const client = await getClient();
         writeJson(await explainRole(client, name));
     }));
     // ─── self-introspection ───────────────────────────────────────────────────
     p.command("me")
-        .description("Your own profile, your roles across all your companies, and actable companies")
         .action(jsonAction(getClient, runPersonMe));
     p.command("companies [personId]")
-        .description("List the companies a person belongs to (defaults to you)")
         .action(guarded(async (personIdStr) => {
         const client = await getClient();
         const result = await runPersonCompanies(client, parseOptionalId(personIdStr, "personId"));
         writeJson(result);
     }));
     p.command("duplicates")
-        .description("List likely-duplicate person pairs for a tenant (same phone / email / " +
-        "first+last name). Read-only; admin gated. Owner defaults to your active " +
-        "company; --owner scans another tenant. Feeds `ib person merge`.")
         .option("--owner <id>", "ownerAsiakasId to scan (default: active company)", Number)
         .action(guarded(async (opts) => {
         const client = await getClient();
@@ -652,9 +620,6 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     }));
     const personMergeCmd = p
         .command("merge")
-        .description("Merge two duplicate persons: the secondary's references move onto the main, " +
-        "then the secondary is DELETED. IRREVERSIBLE, admin gated. --dry-run runs the " +
-        "read-only /validate safety check (never merges). A real merge requires --reason.")
         .requiredOption("--main <id>", "personId to KEEP (references merge into this)", Number)
         .requiredOption("--secondary <id>", "personId to REMOVE (merged away, then deleted)", Number)
         .option("--owner <id>", "ownerAsiakasId (default: active company)", Number);
@@ -674,8 +639,6 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         writeJson(await runPersonMerge(client, { mainId: opts.main, secondaryId: opts.secondary, ownerAsiakasId: owner }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
     }));
     p.command("log <personId>")
-        .description("Change-tracker audit trail for one person (who changed what, when, with --reason). " +
-        "Includes role grants/revokes — pass `--field asiakasPersonSetting` for role changes only.")
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
         .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)
         .option("--field <name>", "Filter by changeTracker fieldName (e.g. asiakasPersonSetting)")

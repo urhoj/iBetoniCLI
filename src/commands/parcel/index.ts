@@ -56,9 +56,6 @@ export function registerParcelCommands(
 ): void {
   parent
     .command("parcel")
-    .description(
-      "Cadastral parcel (kiinteistö/palsta) lookup from MML — by kiinteistötunnus or a sijainti/worksite/address/lat+lng point; returns boundaries + computed area anywhere in Finland"
-    )
     .option(
       "--kiinteistotunnus <tunnus>",
       "Property identifier, dashed or 14-digit — direct lookup (no geocode)"

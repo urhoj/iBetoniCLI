@@ -55,9 +55,6 @@ export function registerInboxCommand(
 ): void {
   parent
     .command("inbox", { hidden: !!opts.hidden })
-    .description(
-      "Aggregated operator inbox: counts of every open/incomplete signal (deploy-pending changelog, unresolved feedback, open support, staged legal drafts, glossary misses, live no_supply tarjouspyynnot) plus a `needsYou` headline"
-    )
     .option(
       "--details",
       "Include slimmed top-items per signal, not just counts"

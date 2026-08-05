@@ -63,9 +63,6 @@ export function registerHelpCommands(
 ): void {
   program
     .command("help [topic]")
-    .description(
-      "Concept guides for AI users; an unknown topic falls back to `ib glossary lookup`."
-    )
     .action(
       guarded(async (topic?: string) => {
         writeJson(topic ? await runHelpTopic(topic, getClient) : runHelpList());

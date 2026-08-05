@@ -165,14 +165,12 @@ export function registerPersonDayCommands(person, getClient) {
         .description("Person-day availability (personPvm status) management");
     day
         .command("statuses")
-        .description("List the day-status types (vacation/sick/free/…) for the active company")
         .option("--full", "Include prefix/style/description/active/ownerAsiakasId")
         .action(guarded(async (opts) => {
         writeJson(await runPersonDayStatuses(await getClient(), { full: opts.full }));
     }));
     day
         .command("get")
-        .description("List a person's day rows (status / vehicle / text) over a date range")
         .requiredOption("--person <id>", "personId", (s) => Number(s))
         .requiredOption("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)")
         .option("--to <date>", "End date YYYY-MM-DD (default: --from)")
@@ -181,7 +179,6 @@ export function registerPersonDayCommands(person, getClient) {
     }));
     const setCmd = day
         .command("set")
-        .description("Set a person's day availability status (vacation/sick/free/…). Requires --reason.")
         .requiredOption("--person <id>", "personId", (s) => Number(s))
         .requiredOption("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)")
         .requiredOption("--status <id|name>", "personPvmStatusId or status name (see `ib person day statuses`)")
@@ -200,7 +197,6 @@ export function registerPersonDayCommands(person, getClient) {
     }));
     const clearCmd = day
         .command("clear")
-        .description("Delete a person's day row for a date (remove status entry). Requires --reason.")
         .requiredOption("--person <id>", "personId", (s) => Number(s))
         .requiredOption("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)");
     addWriteFlagsToCommand(clearCmd).action(guarded(async (opts) => {

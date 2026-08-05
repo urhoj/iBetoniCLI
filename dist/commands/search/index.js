@@ -195,7 +195,6 @@ export function buildSearchSources(client, query, limit, myCompanies = false) {
 export function registerSearchCommands(parent, getClient) {
     parent
         .command("search [query]")
-        .description("Cross-entity search: customers, worksites, persons, vehicles, keikkas, sijainnit (one flat ranked list)")
         .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--in <entities>", `Comma-separated subset of: ${SEARCH_ENTITIES.join(",")}`)
         .option("--limit <n>", "Max hits per entity", (v) => Number(v), DEFAULT_LIMIT)

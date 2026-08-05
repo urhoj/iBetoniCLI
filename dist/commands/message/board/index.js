@@ -173,8 +173,6 @@ export function registerMessageBoardCommands(parent, getClient) {
         .alias("ilmoitustaulu")
         .description("Company announcement board (ilmoitustaulu) — dated one-to-many notices shown to every member");
     b.command("list")
-        .description("List notices ACTIVE on a day (GET /api/ilmoitustaulu). Any company member. " +
-        "--date takes today|yesterday|tomorrow or YYYYMMDD (defaults to today).")
         .option("--date <d>", "Day to query: today|yesterday|tomorrow|YYYYMMDD (default today)")
         .action(guarded(async (opts) => {
         const date = toBoardQueryDate(opts.date);
@@ -185,15 +183,11 @@ export function registerMessageBoardCommands(parent, getClient) {
         writeJson(await runBoardList(client, date));
     }));
     b.command("all")
-        .description("List EVERY notice incl. expired/scheduled (GET /api/ilmoitustaulu/all). " +
-        "Requires isAsiakasAdmin/isAsiakasEditor or isIlmoitustauluEditor.")
         .action(guarded(async () => {
         const client = await getClient();
         writeJson(await runBoardAll(client));
     }));
     b.command("get <messageId>")
-        .description("Get one notice by id (no single-GET route — filtered client-side over /all, " +
-        "so it needs the same admin/editor access). Unknown id → exit 5.")
         .action(guarded(async (raw) => {
         const messageId = parseMessageId(raw);
         const client = await getClient();
@@ -204,10 +198,6 @@ export function registerMessageBoardCommands(parent, getClient) {
     }));
     const createCmd = b
         .command("create")
-        .description("Create a notice (POST /api/ilmoitustaulu). --title, --text and --start-date " +
-        "are required; --priority defaults to info; --expires-at is optional (omit = never). " +
-        "--reason required. --dry-run previews the payload CLIENT-SIDE without writing. " +
-        "Requires admin/editor.")
         .requiredOption("--title <s>", "Notice title")
         .requiredOption("--text <s>", "Notice body text")
         .option("--priority <p>", `Priority: ${PRIORITIES.join("|")} (default info)`)
@@ -229,10 +219,6 @@ export function registerMessageBoardCommands(parent, getClient) {
     }));
     const updateCmd = b
         .command("update <messageId>")
-        .description("Update a notice (PUT /api/ilmoitustaulu/:messageId). GET-merges the current " +
-        "row so omitted fields are preserved (the backend overwrites the whole row). " +
-        "--reason required. --dry-run previews the merged row CLIENT-SIDE without writing " +
-        "(no server X-Dry-Run guard). Admins edit any row; editors only their own.")
         .option("--title <s>", "Notice title")
         .option("--text <s>", "Notice body text")
         .option("--priority <p>", `Priority: ${PRIORITIES.join("|")}`)
@@ -252,10 +238,7 @@ export function registerMessageBoardCommands(parent, getClient) {
         }));
     }));
     const deleteCmd = b
-        .command("delete <messageId>")
-        .description("Delete a notice (DELETE /api/ilmoitustaulu/:messageId). --reason required. " +
-        "--dry-run previews what would be deleted CLIENT-SIDE without writing. " +
-        "Admins delete any row; editors only their own.");
+        .command("delete <messageId>");
     addWriteFlagsToCommand(deleteCmd).action(guarded(async (raw, opts) => {
         const messageId = parseMessageId(raw);
         if (!opts.dryRun && !opts.reason)

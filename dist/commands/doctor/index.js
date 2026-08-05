@@ -72,7 +72,6 @@ export async function runDoctor(opts) {
 export function registerDoctorCommand(parent, getClient, getEndpoint, cliVersion, isReadOnly) {
     parent
         .command("doctor")
-        .description("Aggregated health check: identity, token expiry, connectivity (deployed build), and an authenticated probe")
         .action(guarded(async () => {
         const client = await getClient();
         const endpoint = await getEndpoint();

@@ -202,7 +202,6 @@ export function registerTaskCommands(parent, getClient, opts = {}) {
         .command("task", { hidden: !!opts.hidden })
         .description("Recurring operator tasks — weekly/monthly work for humans + AI (due-since + done-log)");
     t.command("list")
-        .description("List recurring tasks, most-overdue first (developer-only)")
         .option("--due", "Only tasks due now (nextDueAt <= now)")
         .option("--executor <executor>", "human | ai")
         .option("--agent <agent>", "claude | hermes (recommendedAgent filter)")
@@ -215,12 +214,10 @@ export function registerTaskCommands(parent, getClient, opts = {}) {
         writeJson(await runTaskList(await getClient(), opts));
     }));
     t.command("get <id>")
-        .description("Fetch one recurring task by id (developer-only)")
         .action(guarded(async (idStr) => {
         writeJson(await runTaskGet(await getClient(), parseTaskId(idStr, "get")));
     }));
     addWriteFlagsToCommand(t.command("add")
-        .description("Create a recurring task (developer-only; a write)")
         .requiredOption("--title <text>", "Task title (max 200 chars)")
         .option("--executor <executor>", "human | ai (required)")
         .option("--instructions <text>", "Freetext checklist / AI prompt context")
@@ -232,13 +229,11 @@ export function registerTaskCommands(parent, getClient, opts = {}) {
         .option("--first-due <date>", "First due date (YYYY-MM-DD or today/tomorrow); default: due immediately")
         .option("--feedback <id>", "cliFeedback id this task graduated from (provenance)", intFlag("--feedback"))).action(jsonAction(getClient, (client, opts) => runTaskAdd(client, opts, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })));
     addWriteFlagsToCommand(t.command("complete <id>")
-        .description("Complete a due task: log done (default) / --skipped / --failed; done+skipped advance nextDueAt (developer-only; a write)")
         .option("--notes <text>", "Result summary stored on the log row")
         .option("--skipped", "Log outcome=skipped (advances nextDueAt)")
         .option("--failed", "Log outcome=failed (task STAYS due)")
         .option("--agent <agent>", "claude | hermes — set when an AI completes the task")).action(jsonAction(getClient, (client, idStr, opts) => runTaskComplete(client, parseTaskId(idStr, "complete"), opts, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })));
     addWriteFlagsToCommand(t.command("set <id>")
-        .description("Partial update — omit a flag to keep the current value; \"\" clears text fields (developer-only; a write)")
         .option("--title <text>", "New title")
         .option("--instructions <text>", 'New instructions ("" clears)')
         .option("--skill <ref>", 'New skillRef ("" clears)')
@@ -251,7 +246,6 @@ export function registerTaskCommands(parent, getClient, opts = {}) {
         .option("--activate", "Reactivate the task")
         .option("--deactivate", "Deactivate (soft-retire) the task")).action(jsonAction(getClient, (client, idStr, opts) => runTaskSet(client, parseTaskId(idStr, "set"), opts, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })));
     t.command("log <id>")
-        .description("Completion history for one task, newest first (developer-only)")
         .option("--limit <n>", "Max rows (default 50, cap 200)", intFlag("--limit"))
         .action(guarded(async (idStr, opts) => {
         writeJson(await runTaskLog(await getClient(), parseTaskId(idStr, "log"), opts));

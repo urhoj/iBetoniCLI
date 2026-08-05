@@ -95,7 +95,6 @@ export function registerPerfCommands(parent: Command, getClient: () => Promise<A
 
   perf
     .command("slow")
-    .description("Recent slow queries from the collector's ring buffer")
     .option("--limit <n>", "Max rows (default 50)", (v: string) => Number(v))
     .option("--env <name>", "Environment buffer to read (default: backend's current env)")
     .action(
@@ -106,7 +105,6 @@ export function registerPerfCommands(parent: Command, getClient: () => Promise<A
 
   perf
     .command("stats")
-    .description("Aggregate slow-query stats: top procedures, avg/max, by-entity")
     .option("--env <name>", "Environment buffer to read (default: backend's current env)")
     .action(
       guarded(async (opts: { env?: string }) => {
@@ -116,7 +114,6 @@ export function registerPerfCommands(parent: Command, getClient: () => Promise<A
 
   perf
     .command("config")
-    .description("Collector thresholds + available environments")
     .action(
       guarded(async () => {
         writeJson(await runPerfConfig(await getClient()));
@@ -125,7 +122,6 @@ export function registerPerfCommands(parent: Command, getClient: () => Promise<A
 
   const clear = perf
     .command("clear")
-    .description("Clear the slow-query buffer for one environment (developer write)")
     .option("--env <name>", "Environment buffer to clear (default: backend's current env)");
   addWriteFlagsToCommand(clear).action(
     jsonAction(getClient, (client, opts: { env?: string; reason?: string; idempotencyKey?: string; dryRun?: boolean }) =>

@@ -92,17 +92,14 @@ export function registerCompanyCommands(
 
   company
     .command("list")
-    .description("List available companies for the current user")
     .action(jsonAction(getClient, runCompanyList));
 
   company
     .command("current")
-    .description("Print the active company")
     .action(jsonAction(getClient, runCompanyCurrent));
 
   company
     .command("switch")
-    .description("Switch the active company and persist the rotated JWT")
     .requiredOption("--to <asiakasId>", "Target asiakasId", (v: string) =>
       Number(v)
     )

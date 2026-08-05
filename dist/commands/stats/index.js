@@ -55,7 +55,6 @@ export async function runStats(client, opts) {
 export function registerStatsCommands(parent, getClient) {
     parent
         .command("stats")
-        .description("Aggregated delivery statistics (volume, counts, breakdowns) for a date range")
         .option("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)")
         .option("--to <date>", "End date YYYY-MM-DD (or today/yesterday/tomorrow)")
         .option("--today", "Shortcut for --from today --to today")

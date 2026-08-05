@@ -228,7 +228,6 @@ export async function runKeikkaValidate(client, opts) {
 export function registerKeikkaCommands(parent, getClient) {
     const k = parent.command("keikka").description("Keikka commands");
     k.command("list")
-        .description("List keikkas matching the filters")
         .option("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
         .option("--to <date>", "End date YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
         .option("--date <date>", "Single-day shorthand: sets --from and --to to this one day (YYYY-MM-DD or today/yesterday/tomorrow). Mutually exclusive with --from/--to.")
@@ -264,7 +263,6 @@ export function registerKeikkaCommands(parent, getClient) {
         writeJson(result);
     }));
     k.command("latest")
-        .description("Latest keikka matching the filters — searches backwards from today, no date range needed")
         .option("--status <s>", "Filter by status (keikkaTilaId, e.g. 9 = Toimitettu)")
         .option("--customer <id>", "Filter by asiakasId", (v) => Number(v))
         .option("--vehicle <id>", "Filter by vehicleId", (v) => Number(v))
@@ -275,14 +273,12 @@ export function registerKeikkaCommands(parent, getClient) {
         writeJson(await runKeikkaLatest(client, opts));
     }));
     k.command("get <keikkaId>")
-        .description("Get a single keikka by id")
         .action(guarded(async (idStr) => {
         const client = await getClient();
         const result = await runKeikkaGet(client, parseId(idStr, "keikkaId"));
         writeJson(result);
     }));
     k.command("search [query]")
-        .description("Search keikkas (full-text: phone, keikkaId, worksite name/number, invoice ref)")
         .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max hits (client-side; backend caps at 100)", (v) => Number(v))
         .action(guarded(async (query, opts) => {
@@ -293,7 +289,6 @@ export function registerKeikkaCommands(parent, getClient) {
         writeJson(result);
     }));
     k.command("validate [keikkaId]")
-        .description("Validate a keikka (or a whole day with --date) against the reminders-drawer rules")
         .option("--date <date>", "Validate every keikka for this date (YYYY-MM-DD or today/yesterday/tomorrow)")
         .action(guarded(async (idStr, opts) => {
         const client = await getClient();
@@ -308,7 +303,6 @@ export function registerKeikkaCommands(parent, getClient) {
     }));
     const createCmd = k
         .command("create")
-        .description("Create a new keikka (POST /api/keikka/newKeikka)")
         .requiredOption("--body <json>", "JSON object forwarded verbatim as the request body");
     addWriteFlagsToCommand(createCmd).action(guarded(async (opts) => {
         const client = await getClient();
@@ -322,7 +316,6 @@ export function registerKeikkaCommands(parent, getClient) {
     }));
     const updateCmd = k
         .command("update <keikkaId>")
-        .description("Update a keikka (v1.0: --status only)")
         .option("--status <s>", "New keikkaTilaId (numeric, e.g. 9 = Toimitettu)");
     addWriteFlagsToCommand(updateCmd).action(guarded(async (idStr, opts) => {
         if (opts.status === undefined) {
@@ -338,9 +331,8 @@ export function registerKeikkaCommands(parent, getClient) {
     }));
     const drivers = k.command("drivers").description("Driver assignment commands");
     const assignCmd = drivers
-        .command("assign <keikkaId>")
-        .description("Assign the default driver to a keikka");
+        .command("assign <keikkaId>");
     addWriteFlagsToCommand(assignCmd).action(jsonAction(getClient, (client, idStr, opts) => runKeikkaDriversAssign(client, parseId(idStr, "keikkaId"), { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })));
-    registerLogAlias(k, getClient, "keikka", "keikkaId", "Change-tracker audit trail for one keikka (folds in its keikkaBetoni rows). Alias of `ib log entity keikka`.", "Filter by changeTracker fieldName (e.g. kuskit, laskuMemo)");
+    registerLogAlias(k, getClient, "keikka", "keikkaId", "Filter by changeTracker fieldName (e.g. kuskit, laskuMemo)");
 }
 //# sourceMappingURL=index.js.map

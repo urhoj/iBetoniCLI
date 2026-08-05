@@ -126,9 +126,6 @@ export function registerDoctorCommand(
 ): void {
   parent
     .command("doctor")
-    .description(
-      "Aggregated health check: identity, token expiry, connectivity (deployed build), and an authenticated probe"
-    )
     .action(
       guarded(async () => {
         const client = await getClient();

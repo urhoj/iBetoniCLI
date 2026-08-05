@@ -46,15 +46,12 @@ export function registerCompanyCommands(parent, getClient, isReadOnly) {
     const company = parent.command("company").description("Company commands");
     company
         .command("list")
-        .description("List available companies for the current user")
         .action(jsonAction(getClient, runCompanyList));
     company
         .command("current")
-        .description("Print the active company")
         .action(jsonAction(getClient, runCompanyCurrent));
     company
         .command("switch")
-        .description("Switch the active company and persist the rotated JWT")
         .requiredOption("--to <asiakasId>", "Target asiakasId", (v) => Number(v))
         .action(guarded(async (opts) => {
         assertPersistedSwitchAllowed(isReadOnly());

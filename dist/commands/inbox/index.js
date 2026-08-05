@@ -15,7 +15,6 @@ export async function runInbox(client, opts = {}) {
 export function registerInboxCommand(parent, getClient, opts = {}) {
     parent
         .command("inbox", { hidden: !!opts.hidden })
-        .description("Aggregated operator inbox: counts of every open/incomplete signal (deploy-pending changelog, unresolved feedback, open support, staged legal drafts, glossary misses, live no_supply tarjouspyynnot) plus a `needsYou` headline")
         .option("--details", "Include slimmed top-items per signal, not just counts")
         .action(guarded(async (opts) => {
         const client = await getClient();

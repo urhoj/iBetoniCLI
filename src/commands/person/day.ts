@@ -227,7 +227,6 @@ export function registerPersonDayCommands(
 
   day
     .command("statuses")
-    .description("List the day-status types (vacation/sick/free/…) for the active company")
     .option("--full", "Include prefix/style/description/active/ownerAsiakasId")
     .action(
       guarded(async (opts: { full?: boolean }) => {
@@ -237,7 +236,6 @@ export function registerPersonDayCommands(
 
   day
     .command("get")
-    .description("List a person's day rows (status / vehicle / text) over a date range")
     .requiredOption("--person <id>", "personId", (s: string) => Number(s))
     .requiredOption("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)")
     .option("--to <date>", "End date YYYY-MM-DD (default: --from)")
@@ -249,7 +247,6 @@ export function registerPersonDayCommands(
 
   const setCmd = day
     .command("set")
-    .description("Set a person's day availability status (vacation/sick/free/…). Requires --reason.")
     .requiredOption("--person <id>", "personId", (s: string) => Number(s))
     .requiredOption("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)")
     .requiredOption("--status <id|name>", "personPvmStatusId or status name (see `ib person day statuses`)")
@@ -271,7 +268,6 @@ export function registerPersonDayCommands(
 
   const clearCmd = day
     .command("clear")
-    .description("Delete a person's day row for a date (remove status entry). Requires --reason.")
     .requiredOption("--person <id>", "personId", (s: string) => Number(s))
     .requiredOption("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)");
   addWriteFlagsToCommand(clearCmd).action(

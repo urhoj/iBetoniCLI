@@ -27,9 +27,6 @@ export function registerPersonActivityCommand(
 ): void {
   parent
     .command("activity <personId>")
-    .description(
-      "Login / security-event / impersonation history for one person (developer-only)"
-    )
     .option("--limit <n>", "Max rows per list (default 100, max 1000)", (s: string) => Number(s))
     .action(
       guarded(async (personIdStr: string, opts: PersonActivityOpts) => {

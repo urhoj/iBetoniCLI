@@ -239,7 +239,6 @@ export function registerGlossaryCommands(program, getClient) {
     // `ib glossary` (no arg) shows a friendly usage message instead of erroring.
     glossary
         .command("lookup [term]", { isDefault: true })
-        .description("Resolve a term or synonym to its definition + related commands (exit 5 if undefined; the miss is recorded)")
         .action(guarded(async (term) => {
         if (!term) {
             // Bare `ib glossary` with no subcommand and no term — show group help.
@@ -256,7 +255,6 @@ export function registerGlossaryCommands(program, getClient) {
     }));
     addNeedsReviewFlags(glossary
         .command("list")
-        .description("List glossary entries; --search filters, --stalest orders least-recently-reviewed first")
         .option("--search <s>", "Filter by term/definition/synonym substring")
         .option("--stalest <n>", "Return up to N entries, stalest first", (v) => Number(v))
         .option("--domain <d>", "Filter to a domain (exact match)")
@@ -264,17 +262,14 @@ export function registerGlossaryCommands(program, getClient) {
         .option("--terms-only", "Return only {term, synonyms} per entry (cheap index view; strips definitions)")).action(jsonAction(getClient, (client, opts) => runGlossaryList(client, opts)));
     glossary
         .command("misses")
-        .description("Open lookup misses ranked by frequency — the groomer's queue (developer only)")
         .option("--top <n>", "Return up to N", (v) => Number(v))
         .action(jsonAction(getClient, (client, opts) => runGlossaryMisses(client, opts.top)));
     const dismiss = glossary
         .command("dismiss")
-        .description("Dismiss an open lookup miss without defining it — junk/test terms (developer only)")
         .argument("<term>", "Missed term to dismiss (as listed by `ib glossary misses`)");
     addWriteFlagsToCommand(dismiss).action(jsonAction(getClient, (client, term, opts) => runGlossaryDismiss(client, term, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })));
     glossary
         .command("lint")
-        .description("Audit entries: dead relatedCommands, near-duplicate terms, empty fields (developer only)")
         .option("--strict", "Exit 1 if any warn-level finding exists (for CI)")
         .option("--suggest-related", "Also suggest candidate relatedCommands: specs mentioning a term/synonym/entity but not yet linked (info-level, fb#110)")
         .action(guarded(async (opts) => {
@@ -285,7 +280,6 @@ export function registerGlossaryCommands(program, getClient) {
     }));
     const set = glossary
         .command("set")
-        .description("Create/update a glossary entry — creates the term if absent (upsert), pass --update-only to require it exists. PARTIAL: only fields you pass change; omit to keep, \"\" to clear (developer only)")
         .argument("<term>", "Canonical term")
         .option("--definition <d>", "One-paragraph definition (omit to keep current)")
         .option("--synonyms <list>", 'Comma-separated aliases incl. inflections (omit to keep; "" to clear)')
@@ -342,7 +336,6 @@ export function registerGlossaryCommands(program, getClient) {
     }));
     const del = glossary
         .command("delete")
-        .description("Delete a glossary entry (developer only)")
         .argument("<term>", "Canonical term");
     addWriteFlagsToCommand(del).action(jsonAction(getClient, (client, term, opts) => runGlossaryDelete(client, term, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })));
 }

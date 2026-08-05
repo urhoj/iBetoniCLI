@@ -255,7 +255,6 @@ export function buildProgram(): Command {
     .description("Reference / meta commands (machine-readable CLI catalogue)");
   reference
     .command("dump")
-    .description("Emit the full command surface as JSON on stdout")
     .argument(
       "[domain...]",
       "Restrict the commands map to one or more domains — the token after `ib` (e.g. keikka). Multiple domains share a single primer."
@@ -306,18 +305,12 @@ export function buildProgram(): Command {
 
   detail
     .command("get")
-    .description(
-      "On-demand business/AI context for one command (DB-backed via /api/cli/command-catalog); exit 5 if none"
-    )
     .argument("<command...>", "Command path after `ib` (e.g. keikka latest)")
     .action(jsonAction(getClient, (client, commandParts: string[]) => runReferenceDetail(client, commandParts, getCallerTier())));
 
   addNeedsReviewFlags(
     detail
       .command("list")
-      .description(
-        "List command-catalog entries, optionally ordered by stalest (DB-backed)"
-      )
       .option("--stalest <n>", "Return up to N entries sorted by least-recently reviewed", (v: string) => Number(v))
       .option("--domain <d>", "Only commands in this ib domain (e.g. attachment) — narrows BEFORE --stalest")
       .option("--with-detail", "Include each entry's full detail text, folding the per-command `reference detail get` into one call (needs the backend deployed)")
@@ -333,9 +326,6 @@ export function buildProgram(): Command {
 
   const detailSet = detail
     .command("set")
-    .description(
-      "Write summary and/or detail for one command in the command-catalog (developer only)"
-    )
     .argument("<command...>", "Command path after `ib` (e.g. keikka latest)")
     .option("--summary <text>", "Short one-line summary stored in the catalog")
     .option("--detail <text>", "Full markdown business-context detail")
@@ -414,9 +404,6 @@ export function buildProgram(): Command {
   // command path no longer resolves. --reason required for a real delete.
   const detailDelete = detail
     .command("delete")
-    .description(
-      "Delete one command-catalog row by its exact key — prunes orphans of re-homed/removed commands (developer only)"
-    )
     .argument("<command...>", "The exact stored command key after `ib` (e.g. ai conversation)");
   addWriteFlagsToCommand(detailDelete).action(
     guarded(async (
@@ -437,9 +424,6 @@ export function buildProgram(): Command {
   // by a rename/re-home). Read-only (one GET + local diff); --strict is a CI gate.
   detail
     .command("lint")
-    .description(
-      "Audit the command-catalog for orphan rows — keys with no live command (re-homed/renamed leftovers); --strict for CI (developer only)"
-    )
     .option("--strict", "Exit 1 if any orphan row exists (for CI)")
     .action(guarded(async (opts: { strict?: boolean }) => {
       const res = await runReferenceDetailLint(await getClient());
@@ -452,7 +436,6 @@ export function buildProgram(): Command {
   // a GLOBAL write-lock flag; reusing the name here would be ambiguous.
   program
     .command("commands")
-    .description("Domain index of ib commands; filters/--all for flat lists (offline)")
     .argument(
       "[domain]",
       "Only commands in this domain — the token after `ib` (e.g. keikka)"

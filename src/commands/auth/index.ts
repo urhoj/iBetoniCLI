@@ -45,7 +45,6 @@ export function registerAuthCommands(
 
   auth
     .command("login")
-    .description("Open browser to authorize this CLI and persist credentials")
     // No LOCAL --endpoint option: the root global `--endpoint` claims the value
     // during parse (Commander recognises root options anywhere), so a local
     // duplicate silently fell back to its default — `auth login --endpoint
@@ -66,7 +65,6 @@ export function registerAuthCommands(
 
   auth
     .command("logout")
-    .description("Revoke the refresh token and delete local credentials")
     .action(async () => {
       try {
         const store = createStore(defaultCredentialsPath());
@@ -90,7 +88,6 @@ export function registerAuthCommands(
 
   auth
     .command("whoami")
-    .description("Print the current authenticated user")
     .action(
       guarded(async () => {
         // resolveAuth (IB_TOKEN-or-file) — so whoami works for headless/CI
@@ -163,7 +160,6 @@ export function registerAuthCommands(
 
   auth
     .command("switch")
-    .description("Switch the active company")
     .requiredOption("--to <asiakasId>", "Target asiakasId", (v: string) => Number(v))
     .action(
       guarded(async (opts: { to: number }) => {
@@ -196,7 +192,6 @@ export function registerAuthCommands(
 
   auth
     .command("refresh")
-    .description("Refresh the JWT manually")
     .action(async () => {
       try {
         const store = createStore(defaultCredentialsPath());
@@ -232,7 +227,6 @@ export function registerAuthCommands(
 
   auth
     .command("impersonate")
-    .description("Impersonate another person (server-gated by canImpersonate)")
     .argument("[personId]", "Target personId (or use --email)", (v: string) => Number(v))
     .option("--email <email>", "Target email (alternative to the personId positional)")
     .option("--end", "End the active impersonation session and restore your own login")
