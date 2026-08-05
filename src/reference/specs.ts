@@ -1588,7 +1588,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib person list",
     description:
-      "List the active company's persons. By DEFAULT returns its MEMBERS (the asiakasPerson attachment — the same set as `ib customer person list`); --owned returns the persons it OWNS (person.ownerAsiakasId) instead. --asiakas <id> scopes to the MEMBERS of another company you belong to (member-gated). Optional --role uses ROLE_NAME_BY_TYPEID from @ibetoni/constants.",
+      "List the active company's persons. By DEFAULT returns its MEMBERS (the asiakasPerson attachment — the same set as `ib customer person list`); --owned returns the persons it OWNS (person.ownerAsiakasId) instead. --asiakas <id> scopes to the MEMBERS of another company — you must belong to it, OR be a sysadmin/developer (who may target any tenant). Optional --role uses ROLE_NAME_BY_TYPEID from @ibetoni/constants.",
     permissions: ["auth.page.person.read"],
     flags: [
       {
@@ -1600,7 +1600,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         name: "asiakas",
         type: "number",
         description:
-          "Scope to the MEMBERS of this asiakasId instead of the active company (you must belong to it). Combine with --owned for the persons it owns.",
+          "Scope to the MEMBERS of this asiakasId instead of the active company (you must belong to it, or be a sysadmin/developer). Combine with --owned for the persons it owns.",
       },
       {
         name: "owned",
@@ -1645,12 +1645,18 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     command: "ib person search",
     description:
       "Free-text search across person names / emails. POST /api/person/search. " +
-      "Scoped to your active company. With --my-companies the search runs across " +
-      "every company you belong to in one server-side call (with a per-company " +
-      "client-sweep fallback if that endpoint isn't deployed yet) and returns one " +
-      "flat list tagged with the asiakasId/name of each hit. " +
+      "Scoped to your active company. Four mutually exclusive scopes: (default) the " +
+      "active company; --asiakas <id> one OTHER company; --my-companies every company " +
+      "you belong to, in one server-side call (with a per-company client-sweep fallback " +
+      "if that endpoint isn't deployed yet); --all-companies EVERY tenant " +
+      "(developer/sysadmin only). --my-companies and --all-companies return one flat " +
+      "list tagged with the asiakasId/name of each hit. " +
       "Global persons (ownerAsiakasId=null) are included in every company's results.",
-    permissions: ["auth.page.person.read"],
+    permissions: [
+      "auth.page.person.read",
+      "--asiakas: a company you belong to, or sysadmin/developer for any tenant",
+      "--all-companies: sysadmin/developer (server-enforced)",
+    ],
     args: [{ name: "query", type: "string", required: false, description: "search string (or pass --search)" }],
     flags: [
       {
@@ -1665,19 +1671,52 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         description: "Max results",
       },
       {
+        name: "asiakas",
+        type: "number",
+        description:
+          "Search this asiakasId instead of your active company (cross-tenant; any tenant for sysadmin/developer)",
+      },
+      {
         name: "my-companies",
         type: "boolean",
         description:
           "Search across all companies you belong to; each hit carries its asiakasId/asiakasName",
       },
+      {
+        name: "all-companies",
+        type: "boolean",
+        description:
+          "Search EVERY tenant, no owner filter (developer/sysadmin only); each hit carries its asiakasId/asiakasName",
+      },
     ],
     outputShape:
       "ListEnvelope<{ personId, name, email, phone, asiakasId }>. " +
-      "With --my-companies each row also carries asiakasName, and the envelope gains truncated:true when the result hit the limit (backend ≥ 2026-06-11).",
-    errors: permErrors("auth.page.person.read"),
+      "With --my-companies / --all-companies each row also carries asiakasName, and the envelope gains truncated:true when the result hit the limit (backend ≥ 2026-06-11).",
+    notes: [
+      "The scope flags are mutually exclusive (exit 4) — they name three different result sets, so no precedence rule is applied.",
+      "--all-companies is DEPLOY-GATED on GET /api/cli/person/search/global; a 404 there means the backend predates it. It has no client-side fallback on purpose: a global sweep cannot be synthesized from your own memberships, and a narrower result would read as complete.",
+      "--all-companies is an unindexed cross-tenant scan (IX_person_owner is a tenant-first index), so it is bounded server-side by --limit. Prefer --asiakas <id> when you know the company.",
+    ],
+    errors: authErrors(
+      // ONE 403 row on purpose: hintForError matches the FIRST row with this
+      // status, so splitting the three causes into three rows would leave two
+      // permanently unreachable (the dead-row trap of feedback #280/#289).
+      apiErr(
+        403,
+        "Permission denied (page permission, or no access to the requested scope)",
+        "check auth.page.person.read; --asiakas on another tenant and --all-companies additionally require sysadmin/developer"
+      ),
+      apiErr(
+        404,
+        "--all-companies route not deployed on this backend",
+        "check `ib version`; drop --all-companies and use --asiakas <id> or --my-companies meanwhile"
+      )
+    ),
     examples: [
       "ib person search 'Matti'",
       "ib person search 'Ikonen' --my-companies",
+      "ib person search 'Jerry' --asiakas 1349",
+      "ib person search 'Ikonen' --all-companies --limit 100",
     ],
   },
   {

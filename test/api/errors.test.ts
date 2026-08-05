@@ -184,3 +184,24 @@ describe("failUsage", () => {
     }
   });
 });
+
+// feedback #311: an empty hint has to beat the `http` row too, not just the
+// client-origin one. The global `--company` switch fails BEFORE the command
+// reaches its own endpoint, so the leaf's HTTP 403 remedy is a false lead
+// (`ib person search --company <id>` answered a switch 403 with "check
+// auth.page.person.read"). Suppression is checked ahead of the httpRow match.
+describe("hintForError — empty hint suppresses an HTTP row (feedback #311)", () => {
+  const perm403 = [
+    { http: 403, exit: 3, meaning: "Permission denied", remedy: "check auth.page.person.read" },
+  ];
+
+  test("a 403 carrying an empty hint yields no envelope hint", () => {
+    const err = new CliError("Company switch failed: HTTP 403 …", 403, null, 3, "");
+    expect(hintForError(err, perm403)).toBeNull();
+  });
+
+  test("a 403 WITHOUT a hint still gets the command's own remedy", () => {
+    const err = new CliError("Permission denied", 403, null, 3);
+    expect(hintForError(err, perm403)).toBe("check auth.page.person.read");
+  });
+});

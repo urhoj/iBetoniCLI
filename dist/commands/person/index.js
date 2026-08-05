@@ -1,6 +1,6 @@
 import { unwrapRows, listEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
-import { writeJson, failWith, errorMessage } from "../../output/json.js";
+import { writeJson, failWith, failUsage, errorMessage } from "../../output/json.js";
 import { decodeJwtPayload, impersonationFromClaims, } from "../../auth/jwt.js";
 import { resolveCallerTier } from "../../tier.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
@@ -113,17 +113,24 @@ export function projectPersonHit(row) {
  * POST /api/person/search — existing (non-/api/cli/) route used by the FE
  * person typeahead. Body is `{ searchString: <query> }`. The backend scopes
  * results to the caller's company (req.user.ownerAsiakasId) when no
- * ownerAsiakasId is in the body, so the CLI sends only searchString. Sent with
+ * ownerAsiakasId is in the body, so the CLI omits it by default. Sent with
  * `{ read: true }` so this read-over-POST is exempt from the `--read-only`
  * write-lock and the acting-as diagnostic. The raw backend rows (a bare array
  * or an mssql `{ recordset }` wrapper) are normalised via `unwrapRows` and
  * projected by `projectPersonHit` into the documented
  * `ListEnvelope<PersonSearchHit>`.
+ *
+ * `ownerAsiakasId` (from `--asiakas <id>`) searches ANOTHER tenant instead of
+ * the active company. The backend gates it with `canAccessOwnerAsiakas`, which
+ * allows a company you belong to — or ANY company for a sysadmin/developer, the
+ * cross-tenant lever this flag exists for (feedback #310). Unauthorized → 403.
  */
-export async function runPersonSearch(client, query, limit) {
+export async function runPersonSearch(client, query, limit, ownerAsiakasId) {
     const body = { searchString: query };
     if (limit !== undefined)
         body.limit = limit;
+    if (ownerAsiakasId !== undefined)
+        body.ownerAsiakasId = ownerAsiakasId;
     const raw = await client.post("/api/person/search", body, { read: true });
     const items = unwrapRows(raw).map(projectPersonHit);
     return listEnvelope(items);
@@ -146,6 +153,20 @@ export async function runPersonSearchMyCompanies(client, query, opts) {
         }
         throw e;
     }
+}
+/**
+ * Search EVERY tenant (`--all-companies`) via `GET /api/cli/person/search/global`
+ * — the true global sweep, developer/sysadmin-gated server-side (403 otherwise).
+ *
+ * Deliberately has NO client-side fallback, unlike `--my-companies`: a global
+ * sweep cannot be synthesized from the caller's own memberships, so a 404 (route
+ * not deployed) must surface rather than silently degrade into a narrower
+ * result the caller would read as "these are all the matches" (feedback #310).
+ * `hintForError` already turns the backend's `code: ROUTE_NOT_FOUND` into the
+ * not-deployed remedy.
+ */
+export async function runPersonSearchAllCompanies(client, query, limit) {
+    return client.get(`/api/cli/person/search/global${qs({ q: query, limit })}`);
 }
 /**
  * Legacy client-side fan-out for `--my-companies` (the fallback when the
@@ -341,9 +362,31 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max results", cappedInt(500))
         .option("--my-companies", "Search across every company you belong to (each hit tagged with its asiakasId)")
+        .option("--asiakas <id>", "Search this company instead of your active one (cross-tenant: sysadmin/developer, or a company you belong to)", (v) => Number(v))
+        .option("--all-companies", "Search EVERY tenant (developer/sysadmin only; deploy-gated)")
         .action(guarded(async (query, opts) => {
+        // The three scope flags name three DIFFERENT result sets; silently
+        // letting one win would answer a question the caller did not ask.
+        const scopes = [
+            opts.myCompanies && "--my-companies",
+            opts.allCompanies && "--all-companies",
+            opts.asiakas !== undefined && "--asiakas",
+        ].filter(Boolean);
+        if (scopes.length > 1) {
+            failUsage(`${scopes.join(" and ")} are mutually exclusive — pick one scope ` +
+                `(--asiakas <id> = one other company, --my-companies = the companies you belong to, ` +
+                `--all-companies = every tenant)`);
+        }
         const client = await getClient();
         const q = resolveSearchQuery(query, opts.search);
+        if (opts.allCompanies) {
+            writeJson(await runPersonSearchAllCompanies(client, q, opts.limit));
+            return;
+        }
+        if (opts.asiakas !== undefined) {
+            writeJson(await runPersonSearch(client, q, opts.limit, parseId(String(opts.asiakas), "asiakasId")));
+            return;
+        }
         if (opts.myCompanies) {
             const result = await runPersonSearchMyCompanies(client, q, {
                 limit: opts.limit,

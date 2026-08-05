@@ -74,7 +74,13 @@ export async function createCliContext(opts) {
         if (e instanceof CliError && e.statusCode === 403) {
             throw new CliError(`${e.message} — note: --company switches to a company you are a MEMBER of; to act on a ` +
                 `customer your active company OWNS (e.g. just created), use that command's --asiakas <id> ` +
-                `flag instead of the global --company.`, e.statusCode, e.body, e.exitCode);
+                `flag instead of the global --company.`, e.statusCode, e.body, e.exitCode, 
+            // Empty hint = SUPPRESS the running command's spec remedy. This 403 came
+            // from the global --company lens switch, BEFORE the command called its own
+            // endpoint, so the leaf's HTTP 403 row is a false lead (`ib person search
+            // --company <id>` answered a switch failure with "check auth.page.person.read"
+            // — feedback #311). The message above is already the full remedy.
+            "");
         }
         throw e;
     }

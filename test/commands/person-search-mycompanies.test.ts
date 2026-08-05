@@ -2,6 +2,7 @@ import { describe, test, expect, vi } from "vitest";
 import {
   runPersonSearchMyCompanies,
   runPersonSearchMyCompaniesFanout,
+  runPersonSearchAllCompanies,
 } from "../../src/commands/person/index.js";
 import { CliError } from "../../src/api/errors.js";
 import type { ApiClient } from "../../src/api/client.js";
@@ -127,5 +128,56 @@ describe("runPersonSearchMyCompanies (server endpoint + graceful fallback)", () 
       runPersonSearchMyCompanies(mkClient(get), "A", { fallback })
     ).rejects.toBeInstanceOf(CliError);
     expect(fallback).not.toHaveBeenCalled();
+  });
+});
+
+// feedback #310: the true global sweep. Unlike --my-companies it has NO
+// client-side fallback — a global result cannot be synthesized from the caller's
+// own memberships, and a silently narrower list would read as complete.
+describe("runPersonSearchAllCompanies (--all-companies)", () => {
+  const mkClient = (get: ReturnType<typeof vi.fn>) =>
+    ({ get, post: vi.fn(), put: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn() }) as unknown as ApiClient;
+
+  const envelope = {
+    items: [
+      {
+        personId: 6233,
+        name: "Betoni Jerry",
+        email: "betoni.jerry@ibetoni.fi",
+        phone: null,
+        asiakasId: 1349,
+        asiakasName: "BetoniJerry",
+      },
+    ],
+    nextCursor: null,
+    count: 1,
+    truncated: false,
+  };
+
+  test("calls GET /api/cli/person/search/global with q + limit", async () => {
+    const get = vi.fn().mockResolvedValue(envelope);
+    const res = await runPersonSearchAllCompanies(mkClient(get), "Jerry", 100);
+    expect(get).toHaveBeenCalledWith("/api/cli/person/search/global?q=Jerry&limit=100");
+    expect(res).toBe(envelope);
+  });
+
+  test("omits limit from the query when unset", async () => {
+    const get = vi.fn().mockResolvedValue(envelope);
+    await runPersonSearchAllCompanies(mkClient(get), "Jerry");
+    expect(get).toHaveBeenCalledWith("/api/cli/person/search/global?q=Jerry");
+  });
+
+  test("propagates a 404 instead of degrading to a narrower scope", async () => {
+    const get = vi.fn().mockRejectedValue(new CliError("not found", 404, null, 5));
+    await expect(
+      runPersonSearchAllCompanies(mkClient(get), "Jerry")
+    ).rejects.toBeInstanceOf(CliError);
+  });
+
+  test("propagates the 403 a non-developer gets", async () => {
+    const get = vi.fn().mockRejectedValue(new CliError("forbidden", 403, null, 3));
+    await expect(
+      runPersonSearchAllCompanies(mkClient(get), "Jerry")
+    ).rejects.toMatchObject({ statusCode: 403, exitCode: 3 });
   });
 });

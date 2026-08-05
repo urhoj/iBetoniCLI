@@ -8565,12 +8565,12 @@ exports[`Help snapshots — contract stability > help for ib person list matches
   ib person list [flags]
 
 DESCRIPTION
-  List the active company's persons. By DEFAULT returns its MEMBERS (the asiakasPerson attachment — the same set as \`ib customer person list\`); --owned returns the persons it OWNS (person.ownerAsiakasId) instead. --asiakas <id> scopes to the MEMBERS of another company you belong to (member-gated). Optional --role uses ROLE_NAME_BY_TYPEID from @ibetoni/constants.
+  List the active company's persons. By DEFAULT returns its MEMBERS (the asiakasPerson attachment — the same set as \`ib customer person list\`); --owned returns the persons it OWNS (person.ownerAsiakasId) instead. --asiakas <id> scopes to the MEMBERS of another company — you must belong to it, OR be a sysadmin/developer (who may target any tenant). Optional --role uses ROLE_NAME_BY_TYPEID from @ibetoni/constants.
   Permissions: requires auth.page.person.read.
 
 FLAGS
   --role STRING    Filter by role name (e.g. driver, admin, laskuAdmin)
-  --asiakas NUMBER    Scope to the MEMBERS of this asiakasId instead of the active company (you must belong to it). Combine with --owned for the persons it owns.
+  --asiakas NUMBER    Scope to the MEMBERS of this asiakasId instead of the active company (you must belong to it, or be a sysadmin/developer). Combine with --owned for the persons it owns.
   --owned    List persons the company OWNS (person.ownerAsiakasId) instead of its asiakasPerson members (the default).
   --limit NUMBER    Max rows (capped at 500) (default: 100)
 
@@ -8928,8 +8928,8 @@ exports[`Help snapshots — contract stability > help for ib person search match
   ib person search [<query>] [flags]
 
 DESCRIPTION
-  Free-text search across person names / emails. POST /api/person/search. Scoped to your active company. With --my-companies the search runs across every company you belong to in one server-side call (with a per-company client-sweep fallback if that endpoint isn't deployed yet) and returns one flat list tagged with the asiakasId/name of each hit. Global persons (ownerAsiakasId=null) are included in every company's results.
-  Permissions: requires auth.page.person.read.
+  Free-text search across person names / emails. POST /api/person/search. Scoped to your active company. Four mutually exclusive scopes: (default) the active company; --asiakas <id> one OTHER company; --my-companies every company you belong to, in one server-side call (with a per-company client-sweep fallback if that endpoint isn't deployed yet); --all-companies EVERY tenant (developer/sysadmin only). --my-companies and --all-companies return one flat list tagged with the asiakasId/name of each hit. Global persons (ownerAsiakasId=null) are included in every company's results.
+  Permissions: requires auth.page.person.read, --asiakas: a company you belong to, or sysadmin/developer for any tenant, --all-companies: sysadmin/developer (server-enforced).
 
 ARGUMENTS
   <query> STRING    search string (or pass --search) (optional)
@@ -8937,22 +8937,32 @@ ARGUMENTS
 FLAGS
   --search STRING    Search query (alias for the <query> positional)
   --limit NUMBER    Max results (default: 50)
+  --asiakas NUMBER    Search this asiakasId instead of your active company (cross-tenant; any tenant for sysadmin/developer)
   --my-companies    Search across all companies you belong to; each hit carries its asiakasId/asiakasName
+  --all-companies    Search EVERY tenant, no owner filter (developer/sysadmin only); each hit carries its asiakasId/asiakasName
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ personId, name, email, phone, asiakasId }>. With --my-companies each row also carries asiakasName, and the envelope gains truncated:true when the result hit the limit (backend ≥ 2026-06-11).
+  ListEnvelope<{ personId, name, email, phone, asiakasId }>. With --my-companies / --all-companies each row also carries asiakasName, and the envelope gains truncated:true when the result hit the limit (backend ≥ 2026-06-11).
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
-  exit 3 (HTTP 403)  Permission denied      → check auth.page.person.read
+  exit 3 (HTTP 403)  Permission denied (page permission, or no access to the requested scope) → check auth.page.person.read; --asiakas on another tenant and --all-companies additionally require sysadmin/developer
+  exit 5 (HTTP 404)  --all-companies route not deployed on this backend → check \`ib version\`; drop --all-companies and use --asiakas <id> or --my-companies meanwhile
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - The scope flags are mutually exclusive (exit 4) — they name three different result sets, so no precedence rule is applied.
+  - --all-companies is DEPLOY-GATED on GET /api/cli/person/search/global; a 404 there means the backend predates it. It has no client-side fallback on purpose: a global sweep cannot be synthesized from your own memberships, and a narrower result would read as complete.
+  - --all-companies is an unindexed cross-tenant scan (IX_person_owner is a tenant-first index), so it is bounded server-side by --limit. Prefer --asiakas <id> when you know the company.
 
 EXAMPLES
   ib person search 'Matti'
   ib person search 'Ikonen' --my-companies
+  ib person search 'Jerry' --asiakas 1349
+  ib person search 'Ikonen' --all-companies --limit 100
 "
 `;
 

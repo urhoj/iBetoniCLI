@@ -99,6 +99,26 @@ describe("ib person list/get/search", () => {
     );
   });
 
+  // feedback #310: --asiakas <id> is the cross-tenant lever. The backend gates it
+  // with canAccessOwnerAsiakas (any tenant for sysadmin/developer); omitting the
+  // field is what keeps the DEFAULT scoped to the caller's active company.
+  test("runPersonSearch sends ownerAsiakasId when --asiakas targets another tenant", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    await runPersonSearch(mockClient, "Jerry", undefined, 1349);
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/person/search",
+      { searchString: "Jerry", ownerAsiakasId: 1349 },
+      { read: true }
+    );
+  });
+
+  test("runPersonSearch omits ownerAsiakasId entirely when no --asiakas is given", async () => {
+    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    await runPersonSearch(mockClient, "Jerry", 5);
+    const body = (mockClient.post as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(body).not.toHaveProperty("ownerAsiakasId");
+  });
+
   test("runPersonSearch projects rows to a ListEnvelope with asiakasId from ownerAsiakasId", async () => {
     (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       recordset: [
