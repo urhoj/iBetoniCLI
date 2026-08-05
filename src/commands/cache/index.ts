@@ -135,7 +135,9 @@ export function registerCacheCommands(parent: Command, getClient: () => Promise<
 
   c.command("entities")
     .description("List the valid cache entity types and their parameters (offline)")
-    .action(() => {
-      writeJson({ items: CACHE_ENTITIES, count: CACHE_ENTITIES.length });
-    });
+    .action(
+      guarded(() => {
+        writeJson({ items: CACHE_ENTITIES, count: CACHE_ENTITIES.length });
+      })
+    );
 }

@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { writeJson, setExitCode } from "../../output/json.js";
+import { guarded } from "../_shared/action.js";
 
 /**
  * `ib version` — report the local CLI version AND the deployed iB version at the
@@ -104,13 +105,20 @@ export function registerVersionCommand(
     .description(
       "Show the local CLI version + the deployed iB version (commit SHA + slot) at the active endpoint"
     )
-    .action(async () => {
-      const endpoint = await getEndpoint();
-      const report = await runVersion({ endpoint, cliVersion });
-      writeJson(report);
-      // Unreachable → exit 7 (network). Set the code and RETURN (don't
-      // process.exit) so the JSON on stdout drains first — a hard exit truncates
-      // piped output on Windows, and piped stdout is this CLI's primary mode.
-      if (!report.reachable) setExitCode(7);
-    });
+    .action(
+      // `runVersion` swallows an unreachable endpoint into `reachable:false`,
+      // but `getEndpoint()` can still throw (unreadable/!malformed credentials),
+      // and an unrouted throw here would escape as PLAIN TEXT instead of the
+      // JSON envelope. `guarded` only intercepts throws — the exit-7 path below
+      // is untouched.
+      guarded(async () => {
+        const endpoint = await getEndpoint();
+        const report = await runVersion({ endpoint, cliVersion });
+        writeJson(report);
+        // Unreachable → exit 7 (network). Set the code and RETURN (don't
+        // process.exit) so the JSON on stdout drains first — a hard exit truncates
+        // piped output on Windows, and piped stdout is this CLI's primary mode.
+        if (!report.reachable) setExitCode(7);
+      })
+    );
 }

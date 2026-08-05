@@ -1,4 +1,5 @@
 import { writeJson, setExitCode } from "../../output/json.js";
+import { guarded } from "../_shared/action.js";
 /** Coerce an unknown JSON value to a string field, preserving null/absent as null. */
 function asStr(v) {
     if (typeof v === "string")
@@ -57,7 +58,13 @@ export function registerVersionCommand(parent, cliVersion, getEndpoint) {
     parent
         .command("version")
         .description("Show the local CLI version + the deployed iB version (commit SHA + slot) at the active endpoint")
-        .action(async () => {
+        .action(
+    // `runVersion` swallows an unreachable endpoint into `reachable:false`,
+    // but `getEndpoint()` can still throw (unreadable/!malformed credentials),
+    // and an unrouted throw here would escape as PLAIN TEXT instead of the
+    // JSON envelope. `guarded` only intercepts throws — the exit-7 path below
+    // is untouched.
+    guarded(async () => {
         const endpoint = await getEndpoint();
         const report = await runVersion({ endpoint, cliVersion });
         writeJson(report);
@@ -66,6 +73,6 @@ export function registerVersionCommand(parent, cliVersion, getEndpoint) {
         // piped output on Windows, and piped stdout is this CLI's primary mode.
         if (!report.reachable)
             setExitCode(7);
-    });
+    }));
 }
 //# sourceMappingURL=index.js.map

@@ -94,8 +94,8 @@ export function registerCacheCommands(parent, getClient, opts = {}) {
     }));
     c.command("entities")
         .description("List the valid cache entity types and their parameters (offline)")
-        .action(() => {
+        .action(guarded(() => {
         writeJson({ items: CACHE_ENTITIES, count: CACHE_ENTITIES.length });
-    });
+    }));
 }
 //# sourceMappingURL=index.js.map
