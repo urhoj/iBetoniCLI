@@ -57,7 +57,7 @@ import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
 import { canonicalPath, DEV_ALIAS_DOMAINS } from "./reference/aliasPaths.js";
-import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, setActiveCommandErrors, setExitCode as setExit } from "./output/json.js";
+import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, writeErrorEnvelope, setActiveCommandErrors, setExitCode as setExit } from "./output/json.js";
 import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { buildValidationEnvelope, type FlagProblem } from "./output/validationEnvelope.js";
 import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, commandPath } from "./output/unknownCommand.js";
@@ -571,7 +571,7 @@ function emitUsageEnvelope<T extends { error: string; hint: string }>(
   err: unknown,
   env: T
 ): void {
-  emitStderr(JSON.stringify(env) + "\n");
+  writeErrorEnvelope(env, 4);
   recordFriction(err, 4, `${env.error} — ${env.hint}`);
   setExit(4);
 }

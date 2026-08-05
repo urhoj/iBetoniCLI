@@ -34,8 +34,21 @@ try {
 catch {
     setCallerTier("standard");
 }
-await program
-    .parseAsync(process.argv)
-    .catch((err) => handleParseRejection(err, parserText, erroringCommand));
-flushStats({ pretty: getGlobalOptions(program).pretty });
+await program.parseAsync(process.argv).catch((err) => {
+    // The preAction hook above never fired (no action ran), so the output mode is
+    // still the JSON default — set it here or `--pretty` is a silent no-op on
+    // every usage error. Commander consumes ROOT options before subcommand
+    // dispatch, so the flag is known even though routing failed. Read
+    // `program.opts()` and not `getGlobalOptions`: the latter validates --company
+    // and THROWS, which inside this catch would escape as an unhandled rejection.
+    // Doing it here rather than before parseAsync is deliberate — the parse has
+    // already failed, so this can only ever affect an error render, never flip a
+    // successful command's stdout out of JSON.
+    if (program.opts().pretty)
+        setOutputMode("pretty");
+    handleParseRejection(err, parserText, erroringCommand);
+});
+// Same reason: `getGlobalOptions` here threw a raw CliError stack trace past the
+// handled envelope on `ib … --company abc`, clobbering exit 4 with exit 1.
+flushStats({ pretty: !!program.opts().pretty });
 //# sourceMappingURL=ib.js.map

@@ -1,6 +1,6 @@
 import { CliError, exitCodeForError, hintForError } from "../api/errors.js";
 import { isListEnvelope, type ListEnvelope } from "../api/envelopes.js";
-import { renderList, renderRecord } from "./pretty.js";
+import { renderError, renderList, renderRecord } from "./pretty.js";
 import type { CommandError, CommandSpec } from "./help.js";
 import { buildValidationEnvelope, type FlagProblem } from "./validationEnvelope.js";
 import { getEmbeddedCtx } from "../embedded.js";
@@ -56,6 +56,25 @@ export function writeJson(value: unknown): void {
   emitStdout(JSON.stringify(value) + "\n");
 }
 
+/**
+ * The single serialization point for error envelopes — the stderr twin of
+ * {@link writeJson}, and the only place that decides JSON vs `--pretty` for an
+ * error. Every error path (this module's {@link writeError} and the parser's
+ * `emitUsageEnvelope`) MUST go through it; writing `JSON.stringify(env)` to
+ * stderr directly is what made `--pretty` silently a no-op on every failure.
+ * JSON mode is byte-identical to a bare `JSON.stringify` — the machine contract
+ * does not move.
+ */
+export function writeErrorEnvelope(
+  env: Record<string, unknown>,
+  exitCode?: number
+): void {
+  const mode = getEmbeddedCtx()?.outputMode ?? outputMode;
+  emitStderr(
+    (mode === "pretty" ? renderError(env, exitCode) : JSON.stringify(env)) + "\n"
+  );
+}
+
 export function writeError(err: unknown): void {
   const activeErrors = getEmbeddedCtx()?.activeCommandErrors ?? activeCommandErrors;
   if (err instanceof CliError) {
@@ -78,8 +97,8 @@ export function writeError(err: unknown): void {
     // allowed values, and a copy-paste sample in ONE response (feedback #204).
     const problems = Array.isArray(body.problems) ? body.problems : undefined;
     const sample = typeof body.sample === "string" ? body.sample : undefined;
-    emitStderr(
-      JSON.stringify({
+    writeErrorEnvelope(
+      {
         success: false,
         error: err.message,
         code: body.code ?? null,
@@ -87,19 +106,21 @@ export function writeError(err: unknown): void {
         ...(problems ? { problems } : {}),
         ...(sample ? { sample } : {}),
         ...(hint ? { hint } : {}),
-      }) + "\n"
+      },
+      exitCodeForError(err)
     );
     return;
   }
   recordFriction(err);
   const message = err instanceof Error ? err.message : String(err);
-  emitStderr(
-    JSON.stringify({
+  writeErrorEnvelope(
+    {
       success: false,
       error: message,
       code: null,
       statusCode: 0,
-    }) + "\n"
+    },
+    exitCodeForError(err)
   );
 }
 

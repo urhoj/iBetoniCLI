@@ -154,6 +154,81 @@ export function renderRecord(record: Record<string, unknown>): string {
   return table.toString();
 }
 
+/**
+ * Envelope keys folded into the headline (or carrying nothing for a human):
+ * `success` is always false on an error, `error`/`code` ARE the headline.
+ */
+const ERROR_HEADLINE_KEYS = new Set(["success", "error", "code"]);
+
+/**
+ * Human rendering of an error envelope for `--pretty` (stderr). Deliberately a
+ * text block, not a `renderRecord` table: an error is one message plus a few
+ * pointers, and the table's `success: false` / `statusCode: 0` rows are noise
+ * that pushes the actual remedy off the bottom. The JSON default is untouched —
+ * see `writeErrorEnvelope`.
+ */
+export function renderError(
+  env: Record<string, unknown>,
+  exitCode?: number
+): string {
+  const c = chalk();
+  const code = typeof env.code === "string" && env.code ? ` ${c.dim(`[${env.code}]`)}` : "";
+  const lines = [c.red(`✗ ${String(env.error ?? "error")}`) + code];
+  // Drop anything that carries no signal: the headline keys, nulls, an empty
+  // list, and the placeholder statusCode 0 that every client-side error has.
+  const rows = Object.entries(env).filter(
+    ([k, v]) =>
+      !ERROR_HEADLINE_KEYS.has(k) &&
+      v !== null &&
+      v !== undefined &&
+      !(k === "statusCode" && v === 0) &&
+      !(Array.isArray(v) && v.length === 0)
+  );
+  const labelWidth = rows.length
+    ? Math.max(...rows.map(([k]) => k.length)) + 2
+    : 0;
+  for (const [k, v] of rows) {
+    lines.push(...labeledLines(k, errorValue(v), labelWidth));
+  }
+  if (exitCode !== undefined) lines.push("", c.dim(`(exit ${exitCode})`));
+  return lines.join("\n");
+}
+
+/** Scalar lists read as prose (`list, current, switch`); everything else keeps
+ *  the table renderer's formatting (so `problems[]` renders identically). */
+function errorValue(value: unknown): string {
+  if (Array.isArray(value) && !value.some(isPlainObject)) {
+    return value.map((v) => String(v)).join(", ");
+  }
+  return formatCell(value);
+}
+
+/** `  key:   value`, wrapped to the terminal with continuation lines hanging
+ *  under the value column. */
+function labeledLines(key: string, value: string, labelWidth: number): string[] {
+  const indent = " ".repeat(2 + labelWidth);
+  const width = Math.max(terminalWidth() - indent.length, MIN_VALUE_WIDTH);
+  const wrapped: string[] = [];
+  for (const paragraph of value.split("\n")) {
+    let line = "";
+    for (const word of paragraph.split(" ")) {
+      if (line && line.length + 1 + word.length > width) {
+        wrapped.push(line);
+        line = word;
+      } else {
+        line = line ? `${line} ${word}` : word;
+      }
+    }
+    wrapped.push(line);
+  }
+  const label =
+    "  " + chalk().dim(`${key}:`) + " ".repeat(labelWidth - key.length - 1);
+  return wrapped.map((line, i) => (i === 0 ? label + line : indent + line));
+}
+
+/** Never wrap an error value narrower than this, however cramped the terminal. */
+const MIN_VALUE_WIDTH = 20;
+
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }

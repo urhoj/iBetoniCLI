@@ -1,6 +1,6 @@
 import { CliError, exitCodeForError, hintForError } from "../api/errors.js";
 import { isListEnvelope } from "../api/envelopes.js";
-import { renderList, renderRecord } from "./pretty.js";
+import { renderError, renderList, renderRecord } from "./pretty.js";
 import { buildValidationEnvelope } from "./validationEnvelope.js";
 import { getEmbeddedCtx } from "../embedded.js";
 import { recordFriction } from "../friction.js";
@@ -55,6 +55,19 @@ export function writeJson(value) {
     }
     emitStdout(JSON.stringify(value) + "\n");
 }
+/**
+ * The single serialization point for error envelopes — the stderr twin of
+ * {@link writeJson}, and the only place that decides JSON vs `--pretty` for an
+ * error. Every error path (this module's {@link writeError} and the parser's
+ * `emitUsageEnvelope`) MUST go through it; writing `JSON.stringify(env)` to
+ * stderr directly is what made `--pretty` silently a no-op on every failure.
+ * JSON mode is byte-identical to a bare `JSON.stringify` — the machine contract
+ * does not move.
+ */
+export function writeErrorEnvelope(env, exitCode) {
+    const mode = getEmbeddedCtx()?.outputMode ?? outputMode;
+    emitStderr((mode === "pretty" ? renderError(env, exitCode) : JSON.stringify(env)) + "\n");
+}
 export function writeError(err) {
     const activeErrors = getEmbeddedCtx()?.activeCommandErrors ?? activeCommandErrors;
     if (err instanceof CliError) {
@@ -76,7 +89,7 @@ export function writeError(err) {
         // allowed values, and a copy-paste sample in ONE response (feedback #204).
         const problems = Array.isArray(body.problems) ? body.problems : undefined;
         const sample = typeof body.sample === "string" ? body.sample : undefined;
-        emitStderr(JSON.stringify({
+        writeErrorEnvelope({
             success: false,
             error: err.message,
             code: body.code ?? null,
@@ -84,17 +97,17 @@ export function writeError(err) {
             ...(problems ? { problems } : {}),
             ...(sample ? { sample } : {}),
             ...(hint ? { hint } : {}),
-        }) + "\n");
+        }, exitCodeForError(err));
         return;
     }
     recordFriction(err);
     const message = err instanceof Error ? err.message : String(err);
-    emitStderr(JSON.stringify({
+    writeErrorEnvelope({
         success: false,
         error: message,
         code: null,
         statusCode: 0,
-    }) + "\n");
+    }, exitCodeForError(err));
 }
 /**
  * Terminal error handler for command actions: emit the backend-shape error to

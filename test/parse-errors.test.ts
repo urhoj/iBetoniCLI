@@ -5,6 +5,7 @@ import {
   handleParseRejection,
 } from "../src/program.js";
 import { CliError } from "../src/api/errors.js";
+import { setOutputMode } from "../src/output/json.js";
 import { runArgv } from "../src/runArgv.js";
 
 /**
@@ -83,6 +84,31 @@ describe("parser errors → JSON envelope", () => {
     expect(byFlag["--type"].allowed).toEqual(["feature", "improvement", "bugfix"]);
     expect(byFlag["--area"].allowed).toEqual(["frontend", "backend", "cli", "database", "cicd"]);
     expect(String(parsed.sample)).toContain("ib dev changelog add");
+    expect(process.exitCode).toBe(4);
+  });
+
+  test("unknown subcommand under a group → JSON envelope by default", async () => {
+    await run(["company", "8"]);
+    const parsed = lastStderrJson();
+    expect(parsed.code).toBe("USAGE");
+    expect(parsed.group).toBe("ib company");
+    expect(parsed.unknownCommand).toBe("8");
+    expect(parsed.available).toEqual(["list", "current", "switch"]);
+    expect(process.exitCode).toBe(4);
+  });
+
+  test("--pretty renders the usage envelope as a human block, same exit 4", async () => {
+    setOutputMode("pretty");
+    try {
+      await run(["company", "8"]);
+    } finally {
+      setOutputMode("json");
+    }
+    const out = String(stderrSpy.mock.calls.at(-1)![0]);
+    expect(out.startsWith("{")).toBe(false);
+    expect(out).toContain('✗ unknown command "8" under `ib company`');
+    expect(out).toContain("list, current, switch");
+    expect(out).toContain("(exit 4)");
     expect(process.exitCode).toBe(4);
   });
 
