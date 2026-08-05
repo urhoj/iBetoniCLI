@@ -7,6 +7,7 @@ import {
   assertPersistedSwitchAllowed,
 } from "../../auth/switch.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { jsonAction, guarded } from "../_shared/action.js";
 import { CliError } from "../../api/errors.js";
 
 interface AvailableCompany {
@@ -92,28 +93,12 @@ export function registerCompanyCommands(
   company
     .command("list")
     .description("List available companies for the current user")
-    .action(async () => {
-      try {
-        const client = await getClient();
-        const result = await runCompanyList(client);
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+    .action(jsonAction(getClient, runCompanyList));
 
   company
     .command("current")
     .description("Print the active company")
-    .action(async () => {
-      try {
-        const client = await getClient();
-        const result = await runCompanyCurrent(client);
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+    .action(jsonAction(getClient, runCompanyCurrent));
 
   company
     .command("switch")
@@ -121,8 +106,8 @@ export function registerCompanyCommands(
     .requiredOption("--to <asiakasId>", "Target asiakasId", (v: string) =>
       Number(v)
     )
-    .action(async (opts: { to: number }) => {
-      try {
+    .action(
+      guarded(async (opts: { to: number }) => {
         assertPersistedSwitchAllowed(isReadOnly());
         const store = createStore(defaultCredentialsPath());
         const creds = await store.load();
@@ -147,10 +132,8 @@ export function registerCompanyCommands(
             name: next.ownerAsiakasName,
           },
         });
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   // `ib company validate` was renamed to the top-level `ib validate` (clean
   // break, mirrors the ib changes→ib log rename). Old path errors with exit 4.

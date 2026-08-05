@@ -13,6 +13,7 @@ import { decodeJwtPayload, impersonationFromClaims } from "../../auth/jwt.js";
 import { resolveAuth } from "../../auth/resolve.js";
 import { resolveCallerTier } from "../../tier.js";
 import { CliError } from "../../api/errors.js";
+import { guarded } from "../_shared/action.js";
 import {
   performImpersonate,
   performImpersonateExtend,
@@ -96,8 +97,8 @@ export function registerAuthCommands(
   auth
     .command("whoami")
     .description("Print the current authenticated user")
-    .action(async () => {
-      try {
+    .action(
+      guarded(async () => {
         // resolveAuth (IB_TOKEN-or-file) — so whoami works for headless/CI
         // sessions too, not just the on-disk creds store.
         const resolved = await resolveAuth({
@@ -163,17 +164,15 @@ export function registerAuthCommands(
         });
         if (refreshed) out.refreshed = true;
         writeJson(out);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   auth
     .command("switch")
     .description("Switch the active company")
     .requiredOption("--to <asiakasId>", "Target asiakasId", (v: string) => Number(v))
-    .action(async (opts: { to: number }) => {
-      try {
+    .action(
+      guarded(async (opts: { to: number }) => {
         assertPersistedSwitchAllowed(isReadOnly());
         const store = createStore(defaultCredentialsPath());
         const creds = await store.load();
@@ -198,10 +197,8 @@ export function registerAuthCommands(
             name: next.ownerAsiakasName,
           },
         });
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   auth
     .command("refresh")

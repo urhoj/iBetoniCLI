@@ -21,6 +21,7 @@ import {
   type CombinatorMergeOptions,
 } from "../_shared/combinator.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
+import { guarded } from "../_shared/action.js";
 
 export interface WorksiteListFilter {
   limit?: number;
@@ -521,84 +522,72 @@ export function registerWorksiteCommands(
     .option("--limit <n>", "Max rows", (v: string) => Math.min(Number(v), 500))
     .option("--cursor <c>", "Pagination cursor")
     .option("--customer <n>", "Filter by parent asiakasId", (v: string) => Number(v))
-    .action(async (opts: WorksiteListFilter) => {
-      try {
+    .action(
+      guarded(async (opts: WorksiteListFilter) => {
         const client = await getClient();
         const result = await runWorksiteList(client, { limit: opts.limit, cursor: opts.cursor, customer: opts.customer });
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   w.command("get <tyomaaId>")
     .description("Get a single worksite by tyomaaId")
     .option("--include-building", "Attach the parsed Helsinki building data (rakennusData)")
     .option("--include-cameras", "Attach the nearby traffic cameras (cameras[])")
-    .action(async (idStr: string, opts: { includeBuilding?: boolean; includeCameras?: boolean }) => {
-      try {
+    .action(
+      guarded(async (idStr: string, opts: { includeBuilding?: boolean; includeCameras?: boolean }) => {
         const client = await getClient();
         const result = await runWorksiteGet(client, parseId(idStr, "tyomaaId"), {
           includeBuilding: opts.includeBuilding,
           includeCameras: opts.includeCameras,
         });
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   w.command("metrics <tyomaaId>")
     .description("Volume / keikka-count metrics for a worksite")
-    .action(async (idStr: string) => {
-      try {
+    .action(
+      guarded(async (idStr: string) => {
         const client = await getClient();
         const result = await runWorksiteMetrics(client, parseId(idStr, "tyomaaId"));
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   const dates = w.command("dates").description("Worksite compliance dates (read-only)");
   dates
     .command("list <tyomaaId>")
     .description("List a worksite's compliance/permit dates")
-    .action(async (idStr: string) => {
-      try {
+    .action(
+      guarded(async (idStr: string) => {
         const client = await getClient();
         writeJson(await runWorksiteDatesList(client, parseId(idStr, "tyomaaId")));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
   dates
     .command("expiring")
     .description("Company-wide expiring worksite dates")
     .option("--days <n>", "Look-ahead window in days (default 30)", (v: string) => Number(v))
-    .action(async (opts: { days?: number }) => {
-      try {
+    .action(
+      guarded(async (opts: { days?: number }) => {
         const client = await getClient();
         writeJson(await runWorksiteDatesExpiring(client, opts.days));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   w.command("search [query]")
     .description("Free-text search for worksites")
     .option("--search <s>", "Search query (alias for the <query> positional)")
     .option("--limit <n>", "Max results", (v: string) => Math.min(Number(v), 500))
     .option("--my-companies", "Search across every company you belong to (rows tagged with ownerAsiakasId)")
-    .action(async (query: string | undefined, opts: { search?: string; limit?: number; myCompanies?: boolean }) => {
-      try {
+    .action(
+      guarded(async (query: string | undefined, opts: { search?: string; limit?: number; myCompanies?: boolean }) => {
         const client = await getClient();
         const result = await runWorksiteSearch(client, resolveSearchQuery(query, opts.search), opts.limit, !!opts.myCompanies);
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   w.command("dashboard [tyomaaId]")
     .description(
@@ -749,14 +738,12 @@ export function registerWorksiteCommands(
   addWriteFlagsToCommand(
     w.command("refresh-location <tyomaaId>")
       .description("Re-geocode a worksite from Google Maps")
-  ).action(async (idStr: string, opts: WriteFlags) => {
-    try {
+  ).action(
+    guarded(async (idStr: string, opts: WriteFlags) => {
       const client = await getClient();
       writeJson(await runWorksiteRefreshLocation(client, parseId(idStr, "tyomaaId"), opts));
-    } catch (e) {
-      exitWithError(e);
-    }
-  });
+    })
+  );
 
   addWriteFlagsToCommand(
     w.command("set-geofence <tyomaaId>")
@@ -777,14 +764,12 @@ export function registerWorksiteCommands(
   addWriteFlagsToCommand(
     w.command("helsinki-fetch <tyomaaId>")
       .description("Refresh Helsinki building data for a worksite")
-  ).action(async (idStr: string, opts: WriteFlags) => {
-    try {
+  ).action(
+    guarded(async (idStr: string, opts: WriteFlags) => {
       const client = await getClient();
       writeJson(await runWorksiteHelsinkiFetch(client, parseId(idStr, "tyomaaId"), opts));
-    } catch (e) {
-      exitWithError(e);
-    }
-  });
+    })
+  );
 
   const worksitePerson = w
     .command("person")
@@ -842,18 +827,16 @@ export function registerWorksiteCommands(
     .command("list [tyomaaId]")
     .description("List persons attached to a worksite.")
     .option("--worksite <id>", "Target tyomaaId (alias for the positional; same flag as person add/remove)", Number)
-    .action(async (tyomaaIdStr: string | undefined, opts: { worksite?: number }) => {
-      try {
+    .action(
+      guarded(async (tyomaaIdStr: string | undefined, opts: { worksite?: number }) => {
         const client = await getClient();
         const result = await runWorksitePersonList(
           client,
           resolveTarget(tyomaaIdStr, opts.worksite, "tyomaaId", "worksite")
         );
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   registerLogAlias(
     w,
@@ -870,16 +853,14 @@ export function registerWorksiteCommands(
         "to your active company; --owner scans another tenant. Feeds `ib worksite merge`."
     )
     .option("--owner <id>", "ownerAsiakasId to scan (default: active company)", Number)
-    .action(async (opts: { owner?: number }) => {
-      try {
+    .action(
+      guarded(async (opts: { owner?: number }) => {
         const client = await getClient();
         const owner =
           opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
         writeJson(await runWorksiteDuplicates(client, owner));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   const worksiteMergeCmd = w
     .command("merge")

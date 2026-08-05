@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { basename, resolve as resolvePath } from "node:path";
 import { writeFlagsToHeaders, addWriteFlagsToCommand } from "../../api/writeFlags.js";
 import { CliError } from "../../api/errors.js";
+import { guarded } from "../_shared/action.js";
 /** Wire entity names ↔ commander option keys. Mirrors backend ENTITY_COLUMNS. */
 const ENTITY_OPTS = [
     { optKey: "keikka", flag: "--keikka <id>", entity: "keikka", blurb: "keikkaId" },
@@ -277,48 +278,28 @@ export function registerAttachmentCommands(parent, getClient) {
     });
     a.command("get <attachmentId>")
         .description("One attachment: metadata, group/type names, 1h read-SAS blobUrl")
-        .action(async (id) => {
-        try {
-            writeJson(await runAttachmentGet(await getClient(), Number(id)));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (id) => {
+        writeJson(await runAttachmentGet(await getClient(), Number(id)));
+    }));
     a.command("types")
         .description("Attachment groups + types legend (id + name; tenant-scoped reference data)")
-        .action(async () => {
-        try {
-            writeJson(await runAttachmentTypes(await getClient()));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async () => {
+        writeJson(await runAttachmentTypes(await getClient()));
+    }));
     a.command("search [text]")
         .description("Search attachments in the active company by file name/comment; with no text and no --missing, lists ALL active company attachments (like `ib keikka list`)")
         .option("--missing", "Only attachments with NO linked entity (orphans)")
         .option("--limit <n>", "Max rows (capped at 500)", (s) => Math.min(Number(s), 500))
-        .action(async (text, opts) => {
-        try {
-            writeJson(await runAttachmentSearch(await getClient(), { q: text, missing: opts.missing, limit: opts.limit }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (text, opts) => {
+        writeJson(await runAttachmentSearch(await getClient(), { q: text, missing: opts.missing, limit: opts.limit }));
+    }));
     a.command("download <attachmentId>")
         .description("Download the file to local disk (LOCAL ONLY — denied on remote exec/MCP)")
         .option("--out <path>", "Output path (default: original file name in cwd)")
         .option("--force", "Overwrite an existing file")
-        .action(async (id, opts) => {
-        try {
-            writeJson(await runAttachmentDownload(await getClient(), Number(id), opts.out, !!opts.force));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (id, opts) => {
+        writeJson(await runAttachmentDownload(await getClient(), Number(id), opts.out, !!opts.force));
+    }));
     const uploadCmd = a
         .command("upload <file>")
         .description("Upload a local file and link it to ONE entity (LOCAL ONLY — denied on remote exec/MCP)")
@@ -347,14 +328,9 @@ export function registerAttachmentCommands(parent, getClient) {
     a.command("upload-url")
         .description("Mint a 1h write-SAS upload URL (remote-safe primitive; server picks the blob path)")
         .requiredOption("--name <fileName>", "Original file name WITH extension (server derives the blob name)")
-        .action(async (opts) => {
-        try {
-            writeJson(await runAttachmentUploadUrl(await getClient(), opts.name));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        writeJson(await runAttachmentUploadUrl(await getClient(), opts.name));
+    }));
     const registerCmd = a
         .command("register")
         .description("Persist metadata AFTER PUTting bytes to an upload-url (remote-safe primitive)")

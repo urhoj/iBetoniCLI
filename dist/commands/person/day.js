@@ -2,6 +2,7 @@ import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { resolveDate } from "../../dates.js";
 import { CliError } from "../../api/errors.js";
+import { guarded } from "../_shared/action.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 /** Active company id (personPvm `:asiakasId`) from the JWT — same pattern as `vehicle create`. */
 function ownerAsiakasIdOf(client) {
@@ -165,28 +166,18 @@ export function registerPersonDayCommands(person, getClient) {
         .command("statuses")
         .description("List the day-status types (vacation/sick/free/…) for the active company")
         .option("--full", "Include prefix/style/description/active/ownerAsiakasId")
-        .action(async (opts) => {
-        try {
-            writeJson(await runPersonDayStatuses(await getClient(), { full: opts.full }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        writeJson(await runPersonDayStatuses(await getClient(), { full: opts.full }));
+    }));
     day
         .command("get")
         .description("List a person's day rows (status / vehicle / text) over a date range")
         .requiredOption("--person <id>", "personId", (s) => Number(s))
         .requiredOption("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)")
         .option("--to <date>", "End date YYYY-MM-DD (default: --from)")
-        .action(async (opts) => {
-        try {
-            writeJson(await runPersonDayGet(await getClient(), opts.person, opts.from, opts.to));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        writeJson(await runPersonDayGet(await getClient(), opts.person, opts.from, opts.to));
+    }));
     const setCmd = day
         .command("set")
         .description("Set a person's day availability status (vacation/sick/free/…). Requires --reason.")

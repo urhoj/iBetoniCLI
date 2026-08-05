@@ -2,6 +2,7 @@ import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { parseId } from "../../targets.js";
+import { guarded } from "../_shared/action.js";
 /** YYYY-MM-DD (or today/yesterday/tomorrow) → integer yyyymmdd. */
 function toYyyymmdd(date) {
     return Number(resolveDate(date).replace(/-/g, ""));
@@ -102,61 +103,36 @@ export function registerVehicleDriverCommands(parent, getClient) {
     driver
         .command("board <date>")
         .description("All grid-eligible vehicles for a day with their driver / gap / keikka load")
-        .action(async (date) => {
-        try {
-            writeJson(await runVehicleDriverBoard(await getClient(), date));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (date) => {
+        writeJson(await runVehicleDriverBoard(await getClient(), date));
+    }));
     driver
         .command("gaps <date>")
         .description("Vehicles needing a driver that day (the 'Ei kuljettajaa' list)")
-        .action(async (date) => {
-        try {
-            writeJson(await runVehicleDriverGaps(await getClient(), date));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (date) => {
+        writeJson(await runVehicleDriverGaps(await getClient(), date));
+    }));
     driver
         .command("available <date>")
         .description("Drivers free to assign that day (pumpparit, minus already-assigned minus absent)")
-        .action(async (date) => {
-        try {
-            writeJson(await runVehicleDriverAvailable(await getClient(), date));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (date) => {
+        writeJson(await runVehicleDriverAvailable(await getClient(), date));
+    }));
     // ── per-vehicle day-driver ──
     driver
         .command("who <vehicleId> <date>")
         .description("The day driver assigned to a vehicle on a date (or null)")
-        .action(async (vehicleIdStr, date) => {
-        try {
-            writeJson(await runVehicleDriverWho(await getClient(), parseId(vehicleIdStr, "vehicleId"), date));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (vehicleIdStr, date) => {
+        writeJson(await runVehicleDriverWho(await getClient(), parseId(vehicleIdStr, "vehicleId"), date));
+    }));
     driver
         .command("history <vehicleId>")
         .description("Who drove this vehicle on each day of a range (from personPvm)")
         .requiredOption("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)")
         .requiredOption("--to <date>", "End date YYYY-MM-DD (or today/yesterday/tomorrow)")
-        .action(async (vehicleIdStr, opts) => {
-        try {
-            writeJson(await runVehicleDriverHistory(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (vehicleIdStr, opts) => {
+        writeJson(await runVehicleDriverHistory(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts));
+    }));
     addWriteFlagsToCommand(driver
         .command("assign <vehicleId> <date>")
         .description("Set the day driver of a vehicle (atomic cascade: personPvm + keikkat + palkit). Requires --reason.")
@@ -187,14 +163,9 @@ export function registerVehicleDriverCommands(parent, getClient) {
     def
         .command("get <vehicleId>")
         .description("Read the vehicle's standing default driver personId")
-        .action(async (vehicleIdStr) => {
-        try {
-            writeJson(await runVehicleDefaultGet(await getClient(), parseId(vehicleIdStr, "vehicleId")));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (vehicleIdStr) => {
+        writeJson(await runVehicleDefaultGet(await getClient(), parseId(vehicleIdStr, "vehicleId")));
+    }));
     addWriteFlagsToCommand(def
         .command("set <vehicleId>")
         .description("Set the standing default driver (cascades to future dates). Requires --reason.")

@@ -1,9 +1,9 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
 import { assertWritableEndpoint } from "../../api/endpointGuard.js";
 import { CACHE_ENTITIES } from "./entities.js";
-
+import { guarded } from "../_shared/action.js";
 export interface CacheWriteOpts {
   confirm: boolean;
   forceProd: boolean;
@@ -76,24 +76,20 @@ export function registerCacheCommands(parent: Command, getClient: () => Promise<
 
   c.command("stats")
     .description("Cache connection, key count, and hit rate (developer-only)")
-    .action(async () => {
-      try {
+    .action(
+      guarded(async () => {
         writeJson(await runCacheStats(await getClient()));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   c.command("keys")
     .description("Key counts grouped by prefix (developer-only)")
     .option("--pattern <glob>", "SCAN match pattern", "*")
-    .action(async (opts: { pattern?: string }) => {
-      try {
+    .action(
+      guarded(async (opts: { pattern?: string }) => {
         writeJson(await runCacheKeys(await getClient(), opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   c.command("invalidate <entityType>")
     .description("Invalidate one entity family by domain identifier. Previews unless --confirm.")
@@ -103,8 +99,8 @@ export function registerCacheCommands(parent: Command, getClient: () => Promise<
     .option("--confirm", "Execute the invalidation (default is dry-run preview)")
     .option("--force-prod", "Allow execution against a deployed (shared-cache) endpoint")
     .option("--reason <text>", "Audit reason (X-Action-Reason)")
-    .action(async (entityType: string, opts: { id?: number; asiakasId?: number; cascade?: boolean; confirm?: boolean; forceProd?: boolean; reason?: string }) => {
-      try {
+    .action(
+      guarded(async (entityType: string, opts: { id?: number; asiakasId?: number; cascade?: boolean; confirm?: boolean; forceProd?: boolean; reason?: string }) => {
         writeJson(
           await runCacheInvalidate(
             await getClient(),
@@ -112,36 +108,30 @@ export function registerCacheCommands(parent: Command, getClient: () => Promise<
             { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason }
           )
         );
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   c.command("clear")
     .description("Flush the entire cache (developer-only). Previews unless --confirm.")
     .option("--confirm", "Execute the full flush (default is dry-run preview)")
     .option("--force-prod", "Allow execution against a deployed (shared-cache) endpoint")
     .option("--reason <text>", "Audit reason (X-Action-Reason)")
-    .action(async (opts: { confirm?: boolean; forceProd?: boolean; reason?: string }) => {
-      try {
+    .action(
+      guarded(async (opts: { confirm?: boolean; forceProd?: boolean; reason?: string }) => {
         writeJson(await runCacheClear(await getClient(), { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason }));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   c.command("pattern <glob>")
     .description("Invalidate keys matching a raw glob (developer-only). Previews unless --confirm.")
     .option("--confirm", "Execute the invalidation (default is dry-run preview)")
     .option("--force-prod", "Allow execution against a deployed (shared-cache) endpoint")
     .option("--reason <text>", "Audit reason (X-Action-Reason)")
-    .action(async (glob: string, opts: { confirm?: boolean; forceProd?: boolean; reason?: string }) => {
-      try {
+    .action(
+      guarded(async (glob: string, opts: { confirm?: boolean; forceProd?: boolean; reason?: string }) => {
         writeJson(await runCachePattern(await getClient(), glob, { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason }));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   c.command("entities")
     .description("List the valid cache entity types and their parameters (offline)")

@@ -6,6 +6,7 @@ import { resolveDate } from "../../dates.js";
 import { parseRefId } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { COORDINATED as COORDINATED_REPOS, normalizeRepoCsv } from "./repos.js";
+import { guarded } from "../_shared/action.js";
 export function readJsonInput(path) {
     const raw = (path === "-" ? readFileSync(0, "utf8") : readFileSync(path, "utf8")).replace(/^\uFEFF/, "");
     return JSON.parse(raw);
@@ -524,45 +525,30 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--unreleased", "List only UNRELEASED/pending entries (versionTag IS NULL) staged for the next release, + the max bump level — routes to `changelog pending`")
         .option("--pending", "Alias for --unreleased")
         .option("--limit <n>", "Max rows", Number)
-        .action(async (o) => {
-        try {
-            // --unreleased/--pending is the pending-queue view, not a month filter;
-            // route it to the dedicated endpoint so the literal command an agent
-            // reaches for works (feedback #196/#197).
-            if (o.unreleased || o.pending) {
-                writeJson(await runChangelogPending(await getClient()));
-                return;
-            }
-            writeJson(await runChangelogList(await getClient(), o));
+        .action(guarded(async (o) => {
+        // --unreleased/--pending is the pending-queue view, not a month filter;
+        // route it to the dedicated endpoint so the literal command an agent
+        // reaches for works (feedback #196/#197).
+        if (o.unreleased || o.pending) {
+            writeJson(await runChangelogPending(await getClient()));
+            return;
         }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        writeJson(await runChangelogList(await getClient(), o));
+    }));
     c.command("get <changelogId>")
         .description("Get one entry")
-        .action(async (idStr) => {
-        try {
-            const id = parseRefId(idStr, "changelog", "get");
-            const client = await getClient();
-            writeJson(await runWithSiblingHint(client, id, "feedback", () => runChangelogGet(client, id)));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (idStr) => {
+        const id = parseRefId(idStr, "changelog", "get");
+        const client = await getClient();
+        writeJson(await runWithSiblingHint(client, id, "feedback", () => runChangelogGet(client, id)));
+    }));
     addWriteFlagsToCommand(c
         .command("delete <changelogId>")
-        .description("Soft-delete an entry (sets isDeleted=1; retained for audit but hidden from all reads, no CLI undelete). Use to retract a mistaken/test entry.")).action(async (idStr, o) => {
-        try {
-            const id = parseRefId(idStr, "changelog", "delete");
-            const client = await getClient();
-            writeJson(await runWithSiblingHint(client, id, "feedback", () => runChangelogDelete(client, id, o)));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .description("Soft-delete an entry (sets isDeleted=1; retained for audit but hidden from all reads, no CLI undelete). Use to retract a mistaken/test entry.")).action(guarded(async (idStr, o) => {
+        const id = parseRefId(idStr, "changelog", "delete");
+        const client = await getClient();
+        writeJson(await runWithSiblingHint(client, id, "feedback", () => runChangelogDelete(client, id, o)));
+    }));
     addWriteFlagsToCommand(c
         .command("update <changelogId>")
         .description("Edit an entry")
@@ -663,36 +649,26 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--unreleased", "Report UNRELEASED/pending entries staged for the next release instead of a month — routes to `changelog pending`")
         .option("--pending", "Alias for --unreleased")
         .option("--format <f>", "md|json", "md")
-        .action(async (o) => {
-        try {
-            // `report` covers already-RELEASED months; the unreleased/pending queue
-            // has its own endpoint. Accept --unreleased/--pending here so the
-            // natural `report --unreleased` an agent tries works instead of dead-
-            // ending on "required option --month" (feedback #196/#197).
-            if (o.unreleased || o.pending) {
-                writeJson(await runChangelogPending(await getClient()));
-                return;
-            }
-            if (!o.month)
-                failWith("--month <YYYY-MM> is required for a monthly report. For UNRELEASED/pending entries staged for the next release, use `ib dev changelog pending` (or `report --unreleased`).", 4);
-            if (!/^\d{4}-\d{2}$/.test(o.month))
-                failWith("--month must be YYYY-MM", 4);
-            writeJson(await runChangelogReport(await getClient(), o.month, o.format));
+        .action(guarded(async (o) => {
+        // `report` covers already-RELEASED months; the unreleased/pending queue
+        // has its own endpoint. Accept --unreleased/--pending here so the
+        // natural `report --unreleased` an agent tries works instead of dead-
+        // ending on "required option --month" (feedback #196/#197).
+        if (o.unreleased || o.pending) {
+            writeJson(await runChangelogPending(await getClient()));
+            return;
         }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        if (!o.month)
+            failWith("--month <YYYY-MM> is required for a monthly report. For UNRELEASED/pending entries staged for the next release, use `ib dev changelog pending` (or `report --unreleased`).", 4);
+        if (!/^\d{4}-\d{2}$/.test(o.month))
+            failWith("--month must be YYYY-MM", 4);
+        writeJson(await runChangelogReport(await getClient(), o.month, o.format));
+    }));
     c.command("pending")
         .description("List PENDING/unreleased changelog entries (versionTag IS NULL) staged for the next release, + the max bump level they imply. Drives the deploy-time app version bump.")
-        .action(async () => {
-        try {
-            writeJson(await runChangelogPending(await getClient()));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async () => {
+        writeJson(await runChangelogPending(await getClient()));
+    }));
     addWriteFlagsToCommand(c
         .command("release")
         .description("Stamp unreleased entries with a version tag (marks them released). Called by scripts/apply-release-version.ps1. Use --vtag to stamp them all with one tag, or --map for precise per-entry repo@version tags.")

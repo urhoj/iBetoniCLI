@@ -1,6 +1,7 @@
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
 import { resolveDate, monthRange, weekRange, todayHelsinki } from "../../dates.js";
 import { CliError } from "../../api/errors.js";
+import { guarded } from "../_shared/action.js";
 export const STATS_DIMS = ["customer", "vehicle", "driver", "worksite", "status", "day"];
 /**
  * Resolve the mutually-exclusive period flags to a concrete { from, to } range.
@@ -62,15 +63,10 @@ export function registerStatsCommands(parent, getClient) {
         .option("--week <start>", "7-day window starting <start> (YYYY-MM-DD)")
         .option("--by <dim>", `Single breakdown: ${STATS_DIMS.join("|")} (omit for full bundle)`)
         .option("--all", "All tenants (requires developer/system-admin access; 403 otherwise)")
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            const result = await runStats(client, opts);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        const result = await runStats(client, opts);
+        writeJson(result);
+    }));
 }
 //# sourceMappingURL=index.js.map

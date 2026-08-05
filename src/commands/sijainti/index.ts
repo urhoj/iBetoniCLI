@@ -17,6 +17,7 @@ import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { CliError } from "../../api/errors.js";
 import { parseId } from "../../targets.js";
+import { guarded } from "../_shared/action.js";
 import {
   runAddressDashboard,
   type AddressDashboardReport,
@@ -1015,15 +1016,13 @@ export function registerSijaintiCommands(
 
   s.command("get <sijaintiId>")
     .description("Get a single sijainti by sijaintiId")
-    .action(async (idStr: string) => {
-      try {
+    .action(
+      guarded(async (idStr: string) => {
         const client = await getClient();
         const result = await runSijaintiGet(client, parseId(idStr, "sijaintiId"));
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   s.command("dashboard [sijaintiId]")
     .description(
@@ -1346,30 +1345,26 @@ export function registerSijaintiCommands(
       "List sijainti type categories (the 'Sijainnin laji' lookup; maps sijaintiTypeId → selite)"
     )
     .option("--jerry", "Use the BetoniJerry sijainti type set")
-    .action(async (opts: { jerry?: boolean }) => {
-      try {
+    .action(
+      guarded(async (opts: { jerry?: boolean }) => {
         const client = await getClient();
         const result = await runSijaintiTypes(client, opts.jerry);
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   s.command("geocode")
     .description(
       "Geocode an address string to coordinates (POST /api/geocode/getLatLng, Google Maps)"
     )
     .requiredOption("--address <a>", "Free-form address to geocode")
-    .action(async (opts: { address: string }) => {
-      try {
+    .action(
+      guarded(async (opts: { address: string }) => {
         const client = await getClient();
         const result = await runSijaintiGeocode(client, opts.address);
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   s.command("closest")
     .description(
@@ -1379,8 +1374,8 @@ export function registerSijaintiCommands(
     .option("--tyomaa <id>", "Target tyomaaId (Finnish alias of --worksite)", Number)
     .requiredOption("--type <id>", "sijaintiTypeId to search within", Number)
     .option("--asiakas <id>", "Owner asiakasId (defaults to active company)", Number)
-    .action(async (opts: { worksite?: number; tyomaa?: number; type: number; asiakas?: number }) => {
-      try {
+    .action(
+      guarded(async (opts: { worksite?: number; tyomaa?: number; type: number; asiakas?: number }) => {
         const client = await getClient();
         if (opts.worksite !== undefined && opts.tyomaa !== undefined && opts.worksite !== opts.tyomaa) {
           failWith("--worksite and --tyomaa differ — pass only one", 4);
@@ -1395,10 +1390,8 @@ export function registerSijaintiCommands(
           asiakasId: opts.asiakas,
         });
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   s.command("distance")
     .description(

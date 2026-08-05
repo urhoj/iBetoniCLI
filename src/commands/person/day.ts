@@ -5,6 +5,7 @@ import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { resolveDate } from "../../dates.js";
 import { CliError } from "../../api/errors.js";
+import { guarded } from "../_shared/action.js";
 import {
   type WriteFlags,
   writeFlagsToHeaders,
@@ -228,13 +229,11 @@ export function registerPersonDayCommands(
     .command("statuses")
     .description("List the day-status types (vacation/sick/free/…) for the active company")
     .option("--full", "Include prefix/style/description/active/ownerAsiakasId")
-    .action(async (opts: { full?: boolean }) => {
-      try {
+    .action(
+      guarded(async (opts: { full?: boolean }) => {
         writeJson(await runPersonDayStatuses(await getClient(), { full: opts.full }));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   day
     .command("get")
@@ -242,13 +241,11 @@ export function registerPersonDayCommands(
     .requiredOption("--person <id>", "personId", (s: string) => Number(s))
     .requiredOption("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)")
     .option("--to <date>", "End date YYYY-MM-DD (default: --from)")
-    .action(async (opts: { person: number; from: string; to?: string }) => {
-      try {
+    .action(
+      guarded(async (opts: { person: number; from: string; to?: string }) => {
         writeJson(await runPersonDayGet(await getClient(), opts.person, opts.from, opts.to));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   const setCmd = day
     .command("set")

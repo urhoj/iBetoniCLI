@@ -5,6 +5,7 @@ import { resolveDate, todayHelsinki, addDaysISO } from "../../dates.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { registerLogAlias } from "../log/index.js";
 import { parseId, resolveSearchQuery } from "../../targets.js";
+import { guarded } from "../_shared/action.js";
 // Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
 export { resolveDate };
 /**
@@ -245,36 +246,31 @@ export function registerKeikkaCommands(parent, getClient) {
         .option("--status <s>", "Filter by status")
         .option("--limit <n>", "Max rows", (v) => Math.min(Number(v), 500))
         .option("--cursor <c>", "Pagination cursor")
-        .action(async (rawOpts, command) => {
-        try {
-            const client = await getClient();
-            const { date, ...opts } = rawOpts;
-            let { from, to } = opts;
-            // --date is a single-day convenience (fb#236): an AI reaching for a
-            // `--date` on `keikka list` (schedule commands own dates) now works
-            // instead of hitting "unknown option". It expands to from=to=<day>; a
-            // conflict with an EXPLICIT --from/--to (the source is "cli", not the
-            // "today" default) is a caller error, not a silent override.
-            if (date !== undefined) {
-                if (command.getOptionValueSource("from") === "cli" ||
-                    command.getOptionValueSource("to") === "cli") {
-                    failWith("--date is a single-day shorthand for --from/--to — pass it alone, not together with --from/--to", 4);
-                }
-                from = date;
-                to = date;
+        .action(guarded(async (rawOpts, command) => {
+        const client = await getClient();
+        const { date, ...opts } = rawOpts;
+        let { from, to } = opts;
+        // --date is a single-day convenience (fb#236): an AI reaching for a
+        // `--date` on `keikka list` (schedule commands own dates) now works
+        // instead of hitting "unknown option". It expands to from=to=<day>; a
+        // conflict with an EXPLICIT --from/--to (the source is "cli", not the
+        // "today" default) is a caller error, not a silent override.
+        if (date !== undefined) {
+            if (command.getOptionValueSource("from") === "cli" ||
+                command.getOptionValueSource("to") === "cli") {
+                failWith("--date is a single-day shorthand for --from/--to — pass it alone, not together with --from/--to", 4);
             }
-            const resolved = {
-                ...opts,
-                from: resolveDate(from),
-                to: resolveDate(to),
-            };
-            const result = await runKeikkaList(client, resolved);
-            writeJson(result);
+            from = date;
+            to = date;
         }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const resolved = {
+            ...opts,
+            from: resolveDate(from),
+            to: resolveDate(to),
+        };
+        const result = await runKeikkaList(client, resolved);
+        writeJson(result);
+    }));
     k.command("latest")
         .description("Latest keikka matching the filters — searches backwards from today, no date range needed")
         .option("--status <s>", "Filter by status (keikkaTilaId, e.g. 9 = Toimitettu)")
@@ -282,62 +278,42 @@ export function registerKeikkaCommands(parent, getClient) {
         .option("--vehicle <id>", "Filter by vehicleId", (v) => Number(v))
         .option("--worksite <id>", "Filter by worksite (tyomaaId)", (v) => Number(v))
         .option("--lookback <days>", "How far back from today to search (default 365, max 3650)", (v) => Number(v))
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runKeikkaLatest(client, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        writeJson(await runKeikkaLatest(client, opts));
+    }));
     k.command("get <keikkaId>")
         .description("Get a single keikka by id")
-        .action(async (idStr) => {
-        try {
-            const client = await getClient();
-            const result = await runKeikkaGet(client, parseId(idStr, "keikkaId"));
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (idStr) => {
+        const client = await getClient();
+        const result = await runKeikkaGet(client, parseId(idStr, "keikkaId"));
+        writeJson(result);
+    }));
     k.command("search [query]")
         .description("Search keikkas (full-text: phone, keikkaId, worksite name/number, invoice ref)")
         .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max hits (client-side; backend caps at 100)", (v) => Number(v))
-        .action(async (query, opts) => {
-        try {
-            const client = await getClient();
-            const ownerAsiakasId = decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId ??
-                failWith("could not resolve ownerAsiakasId from the active token", 4);
-            const result = await runKeikkaSearch(client, resolveSearchQuery(query, opts.search), ownerAsiakasId, opts.limit);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (query, opts) => {
+        const client = await getClient();
+        const ownerAsiakasId = decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId ??
+            failWith("could not resolve ownerAsiakasId from the active token", 4);
+        const result = await runKeikkaSearch(client, resolveSearchQuery(query, opts.search), ownerAsiakasId, opts.limit);
+        writeJson(result);
+    }));
     k.command("validate [keikkaId]")
         .description("Validate a keikka (or a whole day with --date) against the reminders-drawer rules")
         .option("--date <date>", "Validate every keikka for this date (YYYY-MM-DD or today/yesterday/tomorrow)")
-        .action(async (idStr, opts) => {
-        try {
-            const client = await getClient();
-            if (opts.date && idStr) {
-                failWith("Pass either a keikkaId or --date, not both", 4);
-            }
-            const result = await runKeikkaValidate(client, {
-                keikkaId: idStr ? parseId(idStr, "keikkaId") : undefined,
-                date: opts.date ? resolveDate(opts.date) : undefined,
-            });
-            writeJson(result);
+        .action(guarded(async (idStr, opts) => {
+        const client = await getClient();
+        if (opts.date && idStr) {
+            failWith("Pass either a keikkaId or --date, not both", 4);
         }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const result = await runKeikkaValidate(client, {
+            keikkaId: idStr ? parseId(idStr, "keikkaId") : undefined,
+            date: opts.date ? resolveDate(opts.date) : undefined,
+        });
+        writeJson(result);
+    }));
     const createCmd = k
         .command("create")
         .description("Create a new keikka (POST /api/keikka/newKeikka)")

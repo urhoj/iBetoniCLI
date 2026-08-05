@@ -1,5 +1,6 @@
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../api/writeFlags.js";
 import { writeJson, exitWithError } from "../../output/json.js";
+import { guarded } from "../_shared/action.js";
 /** Build a `?k=v&...` query suffix from defined params (one idiom for all reads). */
 function qs(params) {
     const u = new URLSearchParams();
@@ -64,37 +65,22 @@ export function registerPerfCommands(parent, getClient, opts = {}) {
         .description("Recent slow queries from the collector's ring buffer")
         .option("--limit <n>", "Max rows (default 50)", (v) => Number(v))
         .option("--env <name>", "Environment buffer to read (default: backend's current env)")
-        .action(async (opts) => {
-        try {
-            writeJson(await runPerfSlow(await getClient(), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        writeJson(await runPerfSlow(await getClient(), opts));
+    }));
     perf
         .command("stats")
         .description("Aggregate slow-query stats: top procedures, avg/max, by-entity")
         .option("--env <name>", "Environment buffer to read (default: backend's current env)")
-        .action(async (opts) => {
-        try {
-            writeJson(await runPerfStats(await getClient(), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        writeJson(await runPerfStats(await getClient(), opts));
+    }));
     perf
         .command("config")
         .description("Collector thresholds + available environments")
-        .action(async () => {
-        try {
-            writeJson(await runPerfConfig(await getClient()));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async () => {
+        writeJson(await runPerfConfig(await getClient()));
+    }));
     const clear = perf
         .command("clear")
         .description("Clear the slow-query buffer for one environment (developer write)")

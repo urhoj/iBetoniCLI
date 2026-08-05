@@ -2,6 +2,7 @@ import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseId, parseOptionalId } from "../../targets.js";
+import { guarded } from "../_shared/action.js";
 import { CHANGE_ENTITY_TYPES, findEntityType, isKnownEntityType, runLogTypes, } from "./entityTypes.js";
 function projectRow(r) {
     const item = {
@@ -136,18 +137,13 @@ export function registerLogAlias(group, getClient, entityType, idArgName, descri
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
         .option("--limit <n>", "Max rows (default 100, cap 500)", (v) => Math.min(Number(v), 500), 100)
         .option("--field <name>", fieldExample)
-        .action(async (idStr, opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runLogEntity(client, entityType, parseId(idStr, "entityId"), opts.limit, {
-                owner: opts.owner,
-                field: opts.field,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (idStr, opts) => {
+        const client = await getClient();
+        writeJson(await runLogEntity(client, entityType, parseId(idStr, "entityId"), opts.limit, {
+            owner: opts.owner,
+            field: opts.field,
+        }));
+    }));
 }
 export function registerLogCommands(parent, getClient) {
     const c = parent.command("log").description("ChangeTracker (audit trail) reads");
@@ -174,18 +170,13 @@ export function registerLogCommands(parent, getClient) {
         .option("--entity-type <type>", "Filter to one entityType")
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
         .option("--limit <n>", "Max rows (default 100, server cap 500)", (v) => Math.min(Number(v), 500), 100)
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runLogLatest(client, opts.limit, {
-                entityType: opts.entityType,
-                owner: opts.owner,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        writeJson(await runLogLatest(client, opts.limit, {
+            entityType: opts.entityType,
+            owner: opts.owner,
+        }));
+    }));
     c.command("range")
         .description("Changes MADE within a time window (admin). Filter by entityType/person.")
         .requiredOption("--from <iso>", "Window start YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)")

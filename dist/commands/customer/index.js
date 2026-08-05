@@ -7,6 +7,7 @@ import { resolveRoleTypeId } from "../../roles.js";
 import { resolveTarget, parseId, resolveSearchQuery } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
 import { runPersonRoleList } from "../person/index.js";
+import { guarded } from "../_shared/action.js";
 // PRH lookups live in the shared module (also powers `ib opendata prh`). Aliased
 // to the historical names so internal `--from-prh` call sites and the hidden
 // `ib customer prh` alias are unchanged; re-exported for importers/tests.
@@ -770,77 +771,57 @@ export function registerCustomerCommands(parent, getClient) {
         .option("--sijainti-types <csv>", "With --include sijainnit: keep only these sijaintiTypeId rows (e.g. 1,2) — filtered server-side")
         .option("--since <date>", "Only customers registered on/after this date (YYYY-MM-DD, or today/yesterday) — 'new customers since X', server-side")
         .option("--sort <field>", "Order results: name (default) or registered (newest-registered first) — server-side")
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            if (opts.sort !== undefined && opts.sort !== "name" && opts.sort !== "registered") {
-                return failWith("--sort must be one of: name, registered", 4);
-            }
-            const ids = typeof opts.ids === "string"
-                ? opts.ids.split(",").map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0)
-                : undefined;
-            const include = typeof opts.include === "string"
-                ? opts.include.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
-                : undefined;
-            const fields = typeof opts.fields === "string"
-                ? opts.fields.split(",").map((s) => s.trim()).filter(Boolean)
-                : undefined;
-            const sijaintiTypes = typeof opts.sijaintiTypes === "string"
-                ? opts.sijaintiTypes.split(",").map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0)
-                : undefined;
-            const result = await runCustomerList(client, {
-                limit: opts.limit,
-                cursor: opts.cursor,
-                full: opts.full,
-                ids,
-                include,
-                fields,
-                sijaintiTypes,
-                since: resolveDate(opts.since),
-                sort: opts.sort,
-            });
-            writeJson(result);
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        if (opts.sort !== undefined && opts.sort !== "name" && opts.sort !== "registered") {
+            return failWith("--sort must be one of: name, registered", 4);
         }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const ids = typeof opts.ids === "string"
+            ? opts.ids.split(",").map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0)
+            : undefined;
+        const include = typeof opts.include === "string"
+            ? opts.include.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
+            : undefined;
+        const fields = typeof opts.fields === "string"
+            ? opts.fields.split(",").map((s) => s.trim()).filter(Boolean)
+            : undefined;
+        const sijaintiTypes = typeof opts.sijaintiTypes === "string"
+            ? opts.sijaintiTypes.split(",").map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0)
+            : undefined;
+        const result = await runCustomerList(client, {
+            limit: opts.limit,
+            cursor: opts.cursor,
+            full: opts.full,
+            ids,
+            include,
+            fields,
+            sijaintiTypes,
+            since: resolveDate(opts.since),
+            sort: opts.sort,
+        });
+        writeJson(result);
+    }));
     c.command("dead-list")
         .description("List customers the PRH nightly sweep flagged dead (konkurssi/selvitystila/purettu) " +
         "or caution (yrityssaneeraus). Reads pre-checked prhStatus columns; tenant-scoped.")
         .option("--limit <n>", "Max rows", (v) => Math.min(Number(v), 500))
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runCustomerDeadList(client, { limit: opts.limit }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        writeJson(await runCustomerDeadList(client, { limit: opts.limit }));
+    }));
     c.command("get <asiakasId>")
         .description("Get a single customer by asiakasId")
-        .action(async (idStr) => {
-        try {
-            const client = await getClient();
-            const result = await runCustomerGet(client, parseId(idStr, "asiakasId"));
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (idStr) => {
+        const client = await getClient();
+        const result = await runCustomerGet(client, parseId(idStr, "asiakasId"));
+        writeJson(result);
+    }));
     c.command("worksites <asiakasId>")
         .description("List worksites belonging to a customer")
-        .action(async (idStr) => {
-        try {
-            const client = await getClient();
-            writeJson(await runCustomerWorksites(client, parseId(idStr, "asiakasId")));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (idStr) => {
+        const client = await getClient();
+        writeJson(await runCustomerWorksites(client, parseId(idStr, "asiakasId")));
+    }));
     const modulesCmd = c
         .command("modules [asiakasId]")
         .description("Report or toggle a customer's module flags + roolit. Without --set/--unset: read-only report. Field keys: " +
@@ -943,49 +924,34 @@ export function registerCustomerCommands(parent, getClient) {
         .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max results", (v) => Math.min(Number(v), 500))
         .option("--my-companies", "Search across every company you belong to (rows tagged with ownerAsiakasId)")
-        .action(async (query, opts) => {
-        try {
-            const client = await getClient();
-            const result = await runCustomerSearch(client, resolveSearchQuery(query, opts.search), opts.limit, !!opts.myCompanies);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (query, opts) => {
+        const client = await getClient();
+        const result = await runCustomerSearch(client, resolveSearchQuery(query, opts.search), opts.limit, !!opts.myCompanies);
+        writeJson(result);
+    }));
     // Hidden back-compat alias — canonical command is now `ib opendata prh`.
     c.command("prh [ytunnus]", { hidden: true })
         .description("Deprecated alias for `ib opendata prh` (still works). Look up a company in the Finnish business registry (PRH) by <ytunnus> or --search <name>.")
         .option("--search <name>", "Search by company name instead of business ID")
         .option("--page <n>", "Result page for --search (default 1)", (v) => Number(v), 1)
-        .action(async (ytunnus, opts) => {
-        try {
-            const client = await getClient();
-            if (opts.search) {
-                writeJson(await runCustomerPrhSearch(client, opts.search, opts.page));
-                return;
-            }
-            if (!ytunnus) {
-                failWith("provide a business-ID positional or --search <name>", 4);
-            }
-            writeJson(await runCustomerPrhById(client, ytunnus));
+        .action(guarded(async (ytunnus, opts) => {
+        const client = await getClient();
+        if (opts.search) {
+            writeJson(await runCustomerPrhSearch(client, opts.search, opts.page));
+            return;
         }
-        catch (e) {
-            exitWithError(e);
+        if (!ytunnus) {
+            failWith("provide a business-ID positional or --search <name>", 4);
         }
-    });
+        writeJson(await runCustomerPrhById(client, ytunnus));
+    }));
     c.command("log <asiakasId>")
         .description("Change-tracker audit trail for one customer (who changed what, with --reason).")
         .option("--limit <n>", "Max rows (default 100, cap 500)", (v) => Math.min(Number(v), 500), 100)
-        .action(async (idStr, opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runCustomerHistory(client, parseId(idStr, "asiakasId"), opts.limit));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (idStr, opts) => {
+        const client = await getClient();
+        writeJson(await runCustomerHistory(client, parseId(idStr, "asiakasId"), opts.limit));
+    }));
     const createCmd = c
         .command("create")
         .description("Create a customer. Typed flags assemble the createY body (yTunnus required). --from-prh prefills name+yTunnus from the business registry. --body raw JSON overrides the typed flags.")
@@ -1179,31 +1145,21 @@ export function registerCustomerCommands(parent, getClient) {
         .option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number)
         .option("--role <name>", "Filter by role name (e.g. keikkaHandler)")
         .option("--include-roles", "Add permissionRoles[] (full per-company role names) to each person — N extra GETs")
-        .action(async (asiakasIdStr, opts) => {
-        try {
-            const client = await getClient();
-            const result = await runCustomerPersonList(client, resolveAsiakasTarget(asiakasIdStr, opts.asiakas), opts.role, opts.includeRoles);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (asiakasIdStr, opts) => {
+        const client = await getClient();
+        const result = await runCustomerPersonList(client, resolveAsiakasTarget(asiakasIdStr, opts.asiakas), opts.role, opts.includeRoles);
+        writeJson(result);
+    }));
     c.command("duplicates")
         .description("List likely-duplicate customer pairs for a tenant (y-tunnus / exact-name / " +
         "email / name-prefix). Read-only; system-admin gated. Owner defaults to your " +
         "active company; --owner scans another tenant. Feeds `ib customer merge`.")
         .option("--owner <id>", "ownerAsiakasId to scan (default: active company)", Number)
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
-            writeJson(await runCustomerDuplicates(client, owner));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
+        writeJson(await runCustomerDuplicates(client, owner));
+    }));
     const mergeCmd = c
         .command("merge")
         .description("Merge two duplicate customers: the secondary's references move onto the main, " +

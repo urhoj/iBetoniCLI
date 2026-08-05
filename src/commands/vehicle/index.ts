@@ -14,6 +14,7 @@ import { CliError } from "../../api/errors.js";
 import { diffFields } from "../../diff.js";
 import { registerVehicleDriverCommands } from "./driver.js";
 import { registerLogAlias } from "../log/index.js";
+import { guarded } from "../_shared/action.js";
 
 /**
  * Parse a CLI boolean flag value. Accepts true/1/yes/on (case-insensitive) as
@@ -514,27 +515,23 @@ export function registerVehicleCommands(
       "Read a vehicle owned by another company (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant)",
       (val: string) => Number(val)
     )
-    .action(async (idStr: string, opts: { asiakas?: number }) => {
-      try {
+    .action(
+      guarded(async (idStr: string, opts: { asiakas?: number }) => {
         const client = await getClient();
         const result = await runVehicleGet(client, parseId(idStr, "vehicleId"), opts.asiakas);
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   v.command("status <vehicleId>")
     .description("Current driver, keikka, and latest GPS ping for a vehicle")
-    .action(async (idStr: string) => {
-      try {
+    .action(
+      guarded(async (idStr: string) => {
         const client = await getClient();
         const result = await runVehicleStatus(client, parseId(idStr, "vehicleId"));
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
 
   v.command("types")
@@ -544,24 +541,20 @@ export function registerVehicleCommands(
       "List another company's vehicle types (cross-tenant; needed for `vehicle create --asiakas` since types are tenant-defined)",
       (val: string) => Number(val)
     )
-    .action(async (opts: { asiakas?: number }) => {
-      try {
+    .action(
+      guarded(async (opts: { asiakas?: number }) => {
         writeJson(await runVehicleTypes(await getClient(), opts.asiakas));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   v.command("locations")
     .description("Fleet-wide live GPS positions (current lat/lng + speed/heading/engine/address)")
-    .action(async () => {
-      try {
+    .action(
+      guarded(async () => {
         const client = await getClient();
         writeJson(await runVehicleLocations(client));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   v.command("search [query]")
     .description("Search vehicles by reg-no / name substring")
@@ -574,25 +567,21 @@ export function registerVehicleCommands(
       "Search another company's fleet (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant)",
       (val: string) => Number(val)
     )
-    .action(async (query: string | undefined, opts: { search?: string; limit?: number; asiakas?: number }) => {
-      try {
+    .action(
+      guarded(async (query: string | undefined, opts: { search?: string; limit?: number; asiakas?: number }) => {
         writeJson(await runVehicleSearch(await getClient(), resolveSearchQuery(query, opts.search), opts.limit, opts.asiakas));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   v.command("timeline <vehicleId>")
     .description("Per-day GPS timeline: named stops (sijainti/tyomaa) + travel legs with durations")
     .option("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
-    .action(async (idStr: string, opts: VehicleDayFilter) => {
-      try {
+    .action(
+      guarded(async (idStr: string, opts: VehicleDayFilter) => {
         const client = await getClient();
         writeJson(await runVehicleTimeline(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) }));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   const createCmd = v
     .command("create")
@@ -752,38 +741,32 @@ export function registerVehicleCommands(
   dates
     .command("list <vehicleId>")
     .description("List a vehicle's dates")
-    .action(async (idStr: string) => {
-      try {
+    .action(
+      guarded(async (idStr: string) => {
         writeJson(await runVehicleDatesList(await getClient(), parseId(idStr, "vehicleId")));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
   dates
     .command("expiring")
     .description("List expiring vehicle dates across the fleet")
     .option("--days <n>", "Days-ahead window (default 30)", (s: string) =>
       Number(s)
     )
-    .action(async (opts: { days?: number }) => {
-      try {
+    .action(
+      guarded(async (opts: { days?: number }) => {
         writeJson(await runVehicleDatesExpiring(await getClient(), opts.days));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   v.command("route <vehicleId>")
     .description("Per-day ordered GPS track points (polyline) for a vehicle")
     .option("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
-    .action(async (idStr: string, opts: VehicleDayFilter) => {
-      try {
+    .action(
+      guarded(async (idStr: string, opts: VehicleDayFilter) => {
         const client = await getClient();
         writeJson(await runVehicleRoute(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) }));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   v.command("visits <filterType> <id>")
     .description("Vehicles that visited a worksite/location. filterType: tyomaa | sijainti")
@@ -792,8 +775,8 @@ export function registerVehicleCommands(
       "--date <d>",
       "Only visits on this day (YYYY-MM-DD or today/yesterday/tomorrow; Europe/Helsinki)"
     )
-    .action(async (filterType: string, idStr: string, opts: VehicleVisitsFilter) => {
-      try {
+    .action(
+      guarded(async (filterType: string, idStr: string, opts: VehicleVisitsFilter) => {
         const client = await getClient();
         writeJson(
           await runVehicleVisits(client, filterType, parseId(idStr, "vehicleId"), {
@@ -801,10 +784,8 @@ export function registerVehicleCommands(
             date: opts.date ? resolveDate(opts.date) : undefined,
           })
         );
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   registerLogAlias(
     v,

@@ -1,8 +1,9 @@
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
 import { registerBuildingCommands } from "../building/index.js";
 import { registerParcelCommands } from "../parcel/index.js";
 import { registerWeatherCommands } from "../weather/index.js";
 import { runPrhById, runPrhSearch } from "../../prh.js";
+import { guarded } from "../_shared/action.js";
 /**
  * `ib opendata` — FREE / OPEN external-data APIs, distinct from tenant business
  * data. Each leaf queries a public source (city building registries via WFS,
@@ -24,21 +25,16 @@ export function registerOpendataCommands(parent, getClient) {
         .description("Look up a company in the Finnish business registry (PRH) by <ytunnus>, or --search <name>")
         .option("--search <name>", "Search by company name instead of business ID")
         .option("--page <n>", "Result page for --search (default 1)", (v) => Number(v), 1)
-        .action(async (ytunnus, opts) => {
-        try {
-            const client = await getClient();
-            if (opts.search) {
-                writeJson(await runPrhSearch(client, opts.search, opts.page));
-                return;
-            }
-            if (!ytunnus) {
-                failWith("provide a business-ID positional or --search <name>", 4);
-            }
-            writeJson(await runPrhById(client, ytunnus));
+        .action(guarded(async (ytunnus, opts) => {
+        const client = await getClient();
+        if (opts.search) {
+            writeJson(await runPrhSearch(client, opts.search, opts.page));
+            return;
         }
-        catch (e) {
-            exitWithError(e);
+        if (!ytunnus) {
+            failWith("provide a business-ID positional or --search <name>", 4);
         }
-    });
+        writeJson(await runPrhById(client, ytunnus));
+    }));
 }
 //# sourceMappingURL=index.js.map

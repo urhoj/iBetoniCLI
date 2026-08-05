@@ -1,8 +1,8 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
 import { parseId } from "../../targets.js";
-
+import { guarded } from "../_shared/action.js";
 export interface PersonActivityOpts {
   limit?: number;
 }
@@ -31,12 +31,10 @@ export function registerPersonActivityCommand(
       "Login / security-event / impersonation history for one person (developer-only)"
     )
     .option("--limit <n>", "Max rows per list (default 100, max 1000)", (s: string) => Number(s))
-    .action(async (personIdStr: string, opts: PersonActivityOpts) => {
-      try {
+    .action(
+      guarded(async (personIdStr: string, opts: PersonActivityOpts) => {
         const personId = parseId(personIdStr, "personId");
         writeJson(await runPersonActivity(await getClient(), personId, opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 }

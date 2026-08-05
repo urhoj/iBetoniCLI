@@ -2,6 +2,7 @@ import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../../api/writeF
 import { writeJson, exitWithError, failWith } from "../../../output/json.js";
 import { resolveThreadId } from "./resolveThread.js";
 import { parseOptionalId, resolveSearchQuery } from "../../../targets.js";
+import { guarded } from "../../_shared/action.js";
 /** Wrap a backend array into the universal `{ items, nextCursor, count }` envelope. */
 function toEnvelope(value) {
     const items = Array.isArray(value) ? value : [];
@@ -189,28 +190,18 @@ export function registerMessageChatCommands(parent, getClient) {
         .description("List your message threads (inbox), newest first")
         .option("--unread", "Only threads with unread messages")
         .option("--tarjous <id>", "Only threads for this pumppuRequestId", Number)
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runChatThreads(client, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        writeJson(await runChatThreads(client, opts));
+    }));
     c.command("thread [threadId]")
         .description("Get one thread's metadata + participants")
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
-        .action(async (threadIdStr, opts) => {
-        try {
-            const client = await getClient();
-            const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
-            writeJson(await runChatThread(client, id));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (threadIdStr, opts) => {
+        const client = await getClient();
+        const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
+        writeJson(await runChatThread(client, id));
+    }));
     c.command("list [threadId]")
         .description("List messages in a thread (does NOT mark read)")
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
@@ -231,15 +222,10 @@ export function registerMessageChatCommands(parent, getClient) {
         .description("Search your own messages by body text across all your threads (newest first)")
         .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max results (default 50, server max 200)", Number)
-        .action(async (query, opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runChatSearch(client, resolveSearchQuery(query, opts.search), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (query, opts) => {
+        const client = await getClient();
+        writeJson(await runChatSearch(client, resolveSearchQuery(query, opts.search), opts));
+    }));
     const sendCmd = c
         .command("send [threadId]")
         .description("Send a message to a thread. --dry-run previews body + recipients CLIENT-SIDE (no send). --reason → sourceNote (optional).")
@@ -274,16 +260,11 @@ export function registerMessageChatCommands(parent, getClient) {
     c.command("mark-read [threadId]")
         .description("Mark a thread read (stamp lastReadAt)")
         .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
-        .action(async (threadIdStr, opts) => {
-        try {
-            const client = await getClient();
-            const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
-            writeJson(await runChatMarkRead(client, id));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (threadIdStr, opts) => {
+        const client = await getClient();
+        const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
+        writeJson(await runChatMarkRead(client, id));
+    }));
     const deleteCmd = c
         .command("delete <messageId>")
         .description("Soft-delete a chat message. Author may delete own only while unanswered; a developer may moderate. --dry-run previews CLIENT-SIDE (no delete).")

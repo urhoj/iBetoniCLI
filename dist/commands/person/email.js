@@ -1,6 +1,7 @@
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
 import { writeJson, failWith, exitWithError } from "../../output/json.js";
 import { resolvePersonRef } from "../notification/index.js";
+import { guarded } from "../_shared/action.js";
 /** GET /api/person/getPersonEmails/:personId → ListEnvelope of primary + alternatives. */
 export async function runPersonEmailList(client, person) {
     const personId = await resolvePersonRef(client, person);
@@ -30,14 +31,9 @@ export function registerPersonEmailCommands(person, getClient) {
     email
         .command("list <person>")
         .description("List a person's emails — primary (main:1) and alternatives (main:0)")
-        .action(async (personRef) => {
-        try {
-            writeJson(await runPersonEmailList(await getClient(), personRef));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (personRef) => {
+        writeJson(await runPersonEmailList(await getClient(), personRef));
+    }));
     const addCmd = email
         .command("add <person> <email>")
         .description("Add an alternative email to a person. Requires --reason.");

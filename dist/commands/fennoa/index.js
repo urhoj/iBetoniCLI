@@ -1,4 +1,5 @@
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
+import { guarded } from "../_shared/action.js";
 /** Build a `?k=v&...` query suffix from defined params (one idiom for all reads). */
 function qs(params) {
     const u = new URLSearchParams();
@@ -38,13 +39,8 @@ export function registerFennoaCommands(parent, getClient) {
         .option("--months <n>", "Created-after window in months (default 6, max 12)", (v) => Number(v))
         .option("--asiakas <id>", "Target company override (e.g. 8 = Kalle Urho Oy verification path)", (v) => Number(v))
         .option("--refresh", "Bypass the server's 15-minute cache")
-        .action(async (opts) => {
-        try {
-            writeJson(await runFennoaPurchases(await getClient(), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        writeJson(await runFennoaPurchases(await getClient(), opts));
+    }));
 }
 //# sourceMappingURL=index.js.map

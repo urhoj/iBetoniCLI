@@ -15,6 +15,7 @@ import { registerPersonDayCommands } from "./day.js";
 import { registerPersonEmailCommands } from "./email.js";
 import { registerPersonAbsencesCommand } from "./absences.js";
 import { registerPersonActivityCommand } from "./activity.js";
+import { jsonAction, guarded } from "../_shared/action.js";
 /**
  * Merge typed create flags over a parsed --body object (typed flags win) into the
  * /api/person/newPerson body. Email is intentionally optional: person.personEmail
@@ -327,28 +328,18 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .option("--asiakas <id>", "Filter by asiakasId", (v) => Number(v))
         .option("--owned", "List persons the company OWNS instead of its members (the default)")
         .option("--limit <n>", "Max rows", (v) => Math.min(Number(v), 500))
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            const result = await runPersonList(client, opts);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        const result = await runPersonList(client, opts);
+        writeJson(result);
+    }));
     p.command("get <personId>")
         .description("Get a single person by personId")
-        .action(async (idStr) => {
-        try {
-            const client = await getClient();
-            const result = await runPersonGet(client, parseId(idStr, "personId"));
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (idStr) => {
+        const client = await getClient();
+        const result = await runPersonGet(client, parseId(idStr, "personId"));
+        writeJson(result);
+    }));
     p.command("search [query]")
         .description("Free-text search for persons")
         .option("--search <s>", "Search query (alias for the <query> positional)")
@@ -622,16 +613,11 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .command("list <personId>")
         .description("List a person's roles in a company")
         .requiredOption("--asiakas <id>", "Target asiakasId", (v) => Number(v))
-        .action(async (personIdStr, opts) => {
-        try {
-            const client = await getClient();
-            const result = await runPersonRoleList(client, parseId(personIdStr, "personId"), opts.asiakas);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (personIdStr, opts) => {
+        const client = await getClient();
+        const result = await runPersonRoleList(client, parseId(personIdStr, "personId"), opts.asiakas);
+        writeJson(result);
+    }));
     addWriteFlagsToCommand(personRole
         .command("grant <personId>")
         .description("Grant a role to a person in a company. Requires --role, --asiakas, --reason.")
@@ -700,55 +686,31 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     personRole
         .command("explain <name>")
         .description("Explain a role name: typeId, display name, DB description/comment, access tiers, deprecation")
-        .action(async (name) => {
-        try {
-            const client = await getClient();
-            writeJson(await explainRole(client, name));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (name) => {
+        const client = await getClient();
+        writeJson(await explainRole(client, name));
+    }));
     // ─── self-introspection ───────────────────────────────────────────────────
     p.command("me")
         .description("Your own profile, your roles across all your companies, and actable companies")
-        .action(async () => {
-        try {
-            const client = await getClient();
-            const result = await runPersonMe(client);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(jsonAction(getClient, runPersonMe));
     p.command("companies [personId]")
         .description("List the companies a person belongs to (defaults to you)")
-        .action(async (personIdStr) => {
-        try {
-            const client = await getClient();
-            const result = await runPersonCompanies(client, parseOptionalId(personIdStr, "personId"));
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (personIdStr) => {
+        const client = await getClient();
+        const result = await runPersonCompanies(client, parseOptionalId(personIdStr, "personId"));
+        writeJson(result);
+    }));
     p.command("duplicates")
         .description("List likely-duplicate person pairs for a tenant (same phone / email / " +
         "first+last name). Read-only; admin gated. Owner defaults to your active " +
         "company; --owner scans another tenant. Feeds `ib person merge`.")
         .option("--owner <id>", "ownerAsiakasId to scan (default: active company)", Number)
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
-            writeJson(await runPersonDuplicates(client, owner));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
+        writeJson(await runPersonDuplicates(client, owner));
+    }));
     const personMergeCmd = p
         .command("merge")
         .description("Merge two duplicate persons: the secondary's references move onto the main, " +
@@ -783,19 +745,14 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
         .option("--limit <n>", "Max rows (default 100, cap 500)", (v) => Math.min(Number(v), 500), 100)
         .option("--field <name>", "Filter by changeTracker fieldName (e.g. asiakasPersonSetting)")
-        .action(async (personIdStr, opts) => {
-        try {
-            const client = await getClient();
-            const result = await runPersonHistory(client, parseId(personIdStr, "personId"), opts.limit, {
-                owner: opts.owner,
-                field: opts.field,
-            });
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (personIdStr, opts) => {
+        const client = await getClient();
+        const result = await runPersonHistory(client, parseId(personIdStr, "personId"), opts.limit, {
+            owner: opts.owner,
+            field: opts.field,
+        });
+        writeJson(result);
+    }));
 }
 /**
  * GET /api/changes/person/:personId/:ownerAsiakasId — the change-tracker audit

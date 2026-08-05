@@ -2,6 +2,7 @@ import { CliError } from "../../api/errors.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
 import { resolveDate } from "../../dates.js";
+import { guarded } from "../_shared/action.js";
 const EXECUTORS = ["human", "ai"];
 const AGENTS = ["claude", "hermes"];
 const SERVER_LIST_CAP = 200;
@@ -210,24 +211,14 @@ export function registerTaskCommands(parent, getClient, opts = {}) {
         .option("--inactive", "Include deactivated tasks (default: active only)")
         .option("--limit <n>", "Max rows (default 50, cap 200)", intFlag("--limit"))
         .option("--offset <n>", "Pagination offset", intFlag("--offset", 0))
-        .action(async (opts) => {
-        try {
-            writeJson(await runTaskList(await getClient(), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        writeJson(await runTaskList(await getClient(), opts));
+    }));
     t.command("get <id>")
         .description("Fetch one recurring task by id (developer-only)")
-        .action(async (idStr) => {
-        try {
-            writeJson(await runTaskGet(await getClient(), parseTaskId(idStr, "get")));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (idStr) => {
+        writeJson(await runTaskGet(await getClient(), parseTaskId(idStr, "get")));
+    }));
     addWriteFlagsToCommand(t.command("add")
         .description("Create a recurring task (developer-only; a write)")
         .requiredOption("--title <text>", "Task title (max 200 chars)")
@@ -295,13 +286,8 @@ export function registerTaskCommands(parent, getClient, opts = {}) {
     t.command("log <id>")
         .description("Completion history for one task, newest first (developer-only)")
         .option("--limit <n>", "Max rows (default 50, cap 200)", intFlag("--limit"))
-        .action(async (idStr, opts) => {
-        try {
-            writeJson(await runTaskLog(await getClient(), parseTaskId(idStr, "log"), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (idStr, opts) => {
+        writeJson(await runTaskLog(await getClient(), parseTaskId(idStr, "log"), opts));
+    }));
 }
 //# sourceMappingURL=index.js.map

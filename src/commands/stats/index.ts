@@ -1,9 +1,9 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
 import { resolveDate, monthRange, weekRange, todayHelsinki } from "../../dates.js";
 import { CliError } from "../../api/errors.js";
-
+import { guarded } from "../_shared/action.js";
 export const STATS_DIMS = ["customer", "vehicle", "driver", "worksite", "status", "day"] as const;
 export type StatsDim = (typeof STATS_DIMS)[number];
 
@@ -78,13 +78,11 @@ export function registerStatsCommands(parent: Command, getClient: () => Promise<
     .option("--week <start>", "7-day window starting <start> (YYYY-MM-DD)")
     .option("--by <dim>", `Single breakdown: ${STATS_DIMS.join("|")} (omit for full bundle)`)
     .option("--all", "All tenants (requires developer/system-admin access; 403 otherwise)")
-    .action(async (opts: StatsOptions) => {
-      try {
+    .action(
+      guarded(async (opts: StatsOptions) => {
         const client = await getClient();
         const result = await runStats(client, opts);
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 }

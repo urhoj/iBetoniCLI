@@ -33,6 +33,7 @@ import { resolveDate } from "../../dates.js";
 import { parseRefId } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { COORDINATED as COORDINATED_REPOS, normalizeRepoCsv } from "./repos.js";
+import { guarded } from "../_shared/action.js";
 
 export function readJsonInput(path: string): unknown {
   const raw = (path === "-" ? readFileSync(0, "utf8") : readFileSync(path, "utf8")).replace(/^\uFEFF/, "");
@@ -680,8 +681,8 @@ export function registerChangelogCommands(
     .option("--unreleased", "List only UNRELEASED/pending entries (versionTag IS NULL) staged for the next release, + the max bump level — routes to `changelog pending`")
     .option("--pending", "Alias for --unreleased")
     .option("--limit <n>", "Max rows", Number)
-    .action(async (o: Record<string, string | number | boolean>) => {
-      try {
+    .action(
+      guarded(async (o: Record<string, string | number | boolean>) => {
         // --unreleased/--pending is the pending-queue view, not a month filter;
         // route it to the dedicated endpoint so the literal command an agent
         // reaches for works (feedback #196/#197).
@@ -690,22 +691,18 @@ export function registerChangelogCommands(
           return;
         }
         writeJson(await runChangelogList(await getClient(), o));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   c.command("get <changelogId>")
     .description("Get one entry")
-    .action(async (idStr: string) => {
-      try {
+    .action(
+      guarded(async (idStr: string) => {
         const id = parseRefId(idStr, "changelog", "get");
         const client = await getClient();
         writeJson(await runWithSiblingHint(client, id, "feedback", () => runChangelogGet(client, id)));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   addWriteFlagsToCommand(
     c
@@ -713,15 +710,13 @@ export function registerChangelogCommands(
       .description(
         "Soft-delete an entry (sets isDeleted=1; retained for audit but hidden from all reads, no CLI undelete). Use to retract a mistaken/test entry."
       )
-  ).action(async (idStr: string, o: WriteFlags) => {
-    try {
+  ).action(
+    guarded(async (idStr: string, o: WriteFlags) => {
       const id = parseRefId(idStr, "changelog", "delete");
       const client = await getClient();
       writeJson(await runWithSiblingHint(client, id, "feedback", () => runChangelogDelete(client, id, o)));
-    } catch (e) {
-      exitWithError(e);
-    }
-  });
+    })
+  );
 
   addWriteFlagsToCommand(
     c
@@ -824,8 +819,8 @@ export function registerChangelogCommands(
     .option("--unreleased", "Report UNRELEASED/pending entries staged for the next release instead of a month — routes to `changelog pending`")
     .option("--pending", "Alias for --unreleased")
     .option("--format <f>", "md|json", "md")
-    .action(async (o: { month?: string; unreleased?: boolean; pending?: boolean; format: string }) => {
-      try {
+    .action(
+      guarded(async (o: { month?: string; unreleased?: boolean; pending?: boolean; format: string }) => {
         // `report` covers already-RELEASED months; the unreleased/pending queue
         // has its own endpoint. Accept --unreleased/--pending here so the
         // natural `report --unreleased` an agent tries works instead of dead-
@@ -844,22 +839,18 @@ export function registerChangelogCommands(
         writeJson(
           await runChangelogReport(await getClient(), o.month, o.format)
         );
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   c.command("pending")
     .description(
       "List PENDING/unreleased changelog entries (versionTag IS NULL) staged for the next release, + the max bump level they imply. Drives the deploy-time app version bump."
     )
-    .action(async () => {
-      try {
+    .action(
+      guarded(async () => {
         writeJson(await runChangelogPending(await getClient()));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   addWriteFlagsToCommand(
     c

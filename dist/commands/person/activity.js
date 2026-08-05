@@ -1,5 +1,6 @@
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
 import { parseId } from "../../targets.js";
+import { guarded } from "../_shared/action.js";
 /**
  * GET /api/cli/person/:personId/activity — developer-gated login / security-event /
  * impersonation history for one person. Deploy-gated (no-op until the backend ships).
@@ -14,14 +15,9 @@ export function registerPersonActivityCommand(parent, getClient) {
         .command("activity <personId>")
         .description("Login / security-event / impersonation history for one person (developer-only)")
         .option("--limit <n>", "Max rows per list (default 100, max 1000)", (s) => Number(s))
-        .action(async (personIdStr, opts) => {
-        try {
-            const personId = parseId(personIdStr, "personId");
-            writeJson(await runPersonActivity(await getClient(), personId, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (personIdStr, opts) => {
+        const personId = parseId(personIdStr, "personId");
+        writeJson(await runPersonActivity(await getClient(), personId, opts));
+    }));
 }
 //# sourceMappingURL=activity.js.map

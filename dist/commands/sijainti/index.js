@@ -5,6 +5,7 @@ import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { CliError } from "../../api/errors.js";
 import { parseId } from "../../targets.js";
+import { guarded } from "../_shared/action.js";
 import { runAddressDashboard, } from "../_shared/addressDashboard.js";
 /**
  * Sentinel `jerryActiveUntil` value meaning "enrolled in BetoniJerry, no end
@@ -740,16 +741,11 @@ export function registerSijaintiCommands(parent, getClient) {
     });
     s.command("get <sijaintiId>")
         .description("Get a single sijainti by sijaintiId")
-        .action(async (idStr) => {
-        try {
-            const client = await getClient();
-            const result = await runSijaintiGet(client, parseId(idStr, "sijaintiId"));
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (idStr) => {
+        const client = await getClient();
+        const result = await runSijaintiGet(client, parseId(idStr, "sijaintiId"));
+        writeJson(result);
+    }));
     s.command("dashboard [sijaintiId]")
         .description("One-shot Address Information Dashboard report for a sijainti (location) — merges weather, building, cadastral parcel, nearby traffic cameras, nearby sijainnit, worksite deliveries, and nearby vehicles into a single JSON, with each section independently degrading to forbidden/error instead of failing the whole report. Resolve the point from EXACTLY ONE of the positional sijaintiId or --address.")
         .option("--address <address>", "Resolve the point from a street address instead of sijaintiId")
@@ -978,56 +974,41 @@ export function registerSijaintiCommands(parent, getClient) {
     s.command("types")
         .description("List sijainti type categories (the 'Sijainnin laji' lookup; maps sijaintiTypeId → selite)")
         .option("--jerry", "Use the BetoniJerry sijainti type set")
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            const result = await runSijaintiTypes(client, opts.jerry);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        const result = await runSijaintiTypes(client, opts.jerry);
+        writeJson(result);
+    }));
     s.command("geocode")
         .description("Geocode an address string to coordinates (POST /api/geocode/getLatLng, Google Maps)")
         .requiredOption("--address <a>", "Free-form address to geocode")
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            const result = await runSijaintiGeocode(client, opts.address);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        const result = await runSijaintiGeocode(client, opts.address);
+        writeJson(result);
+    }));
     s.command("closest")
         .description("Find the closest sijainti of a given type to a worksite (straight-line distance)")
         .option("--worksite <id>", "Target tyomaaId (same flag as the rest of the CLI)", Number)
         .option("--tyomaa <id>", "Target tyomaaId (Finnish alias of --worksite)", Number)
         .requiredOption("--type <id>", "sijaintiTypeId to search within", Number)
         .option("--asiakas <id>", "Owner asiakasId (defaults to active company)", Number)
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            if (opts.worksite !== undefined && opts.tyomaa !== undefined && opts.worksite !== opts.tyomaa) {
-                failWith("--worksite and --tyomaa differ — pass only one", 4);
-            }
-            const tyomaaId = opts.worksite ?? opts.tyomaa;
-            if (tyomaaId === undefined) {
-                failWith("missing target: pass --worksite <id> (--tyomaa is accepted as an alias)", 4);
-            }
-            const result = await runSijaintiClosest(client, {
-                tyomaaId,
-                sijaintiTypeId: opts.type,
-                asiakasId: opts.asiakas,
-            });
-            writeJson(result);
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        if (opts.worksite !== undefined && opts.tyomaa !== undefined && opts.worksite !== opts.tyomaa) {
+            failWith("--worksite and --tyomaa differ — pass only one", 4);
         }
-        catch (e) {
-            exitWithError(e);
+        const tyomaaId = opts.worksite ?? opts.tyomaa;
+        if (tyomaaId === undefined) {
+            failWith("missing target: pass --worksite <id> (--tyomaa is accepted as an alias)", 4);
         }
-    });
+        const result = await runSijaintiClosest(client, {
+            tyomaaId,
+            sijaintiTypeId: opts.type,
+            asiakasId: opts.asiakas,
+        });
+        writeJson(result);
+    }));
     s.command("distance")
         .description("Driving distance/time between two points (each is 'lat,lng' or a sijaintiId)")
         .requiredOption("--from <point>", "Origin: 'lat,lng' or a sijaintiId")

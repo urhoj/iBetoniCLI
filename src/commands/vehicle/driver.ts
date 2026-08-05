@@ -9,6 +9,7 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { parseId } from "../../targets.js";
+import { guarded } from "../_shared/action.js";
 
 type Row = Record<string, unknown>;
 
@@ -184,62 +185,52 @@ export function registerVehicleDriverCommands(
   driver
     .command("board <date>")
     .description("All grid-eligible vehicles for a day with their driver / gap / keikka load")
-    .action(async (date: string) => {
-      try {
+    .action(
+      guarded(async (date: string) => {
         writeJson(await runVehicleDriverBoard(await getClient(), date));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   driver
     .command("gaps <date>")
     .description("Vehicles needing a driver that day (the 'Ei kuljettajaa' list)")
-    .action(async (date: string) => {
-      try {
+    .action(
+      guarded(async (date: string) => {
         writeJson(await runVehicleDriverGaps(await getClient(), date));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   driver
     .command("available <date>")
     .description("Drivers free to assign that day (pumpparit, minus already-assigned minus absent)")
-    .action(async (date: string) => {
-      try {
+    .action(
+      guarded(async (date: string) => {
         writeJson(await runVehicleDriverAvailable(await getClient(), date));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   // ── per-vehicle day-driver ──
   driver
     .command("who <vehicleId> <date>")
     .description("The day driver assigned to a vehicle on a date (or null)")
-    .action(async (vehicleIdStr: string, date: string) => {
-      try {
+    .action(
+      guarded(async (vehicleIdStr: string, date: string) => {
         writeJson(await runVehicleDriverWho(await getClient(), parseId(vehicleIdStr, "vehicleId"), date));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   driver
     .command("history <vehicleId>")
     .description("Who drove this vehicle on each day of a range (from personPvm)")
     .requiredOption("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)")
     .requiredOption("--to <date>", "End date YYYY-MM-DD (or today/yesterday/tomorrow)")
-    .action(async (vehicleIdStr: string, opts: VehicleDriverHistoryFilter) => {
-      try {
+    .action(
+      guarded(async (vehicleIdStr: string, opts: VehicleDriverHistoryFilter) => {
         writeJson(
           await runVehicleDriverHistory(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts)
         );
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   addWriteFlagsToCommand(
     driver
@@ -280,13 +271,11 @@ export function registerVehicleDriverCommands(
   def
     .command("get <vehicleId>")
     .description("Read the vehicle's standing default driver personId")
-    .action(async (vehicleIdStr: string) => {
-      try {
+    .action(
+      guarded(async (vehicleIdStr: string) => {
         writeJson(await runVehicleDefaultGet(await getClient(), parseId(vehicleIdStr, "vehicleId")));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   addWriteFlagsToCommand(
     def

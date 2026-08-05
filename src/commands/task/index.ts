@@ -18,6 +18,7 @@ import {
   type WriteFlags,
 } from "../../api/writeFlags.js";
 import { resolveDate } from "../../dates.js";
+import { guarded } from "../_shared/action.js";
 
 const EXECUTORS = ["human", "ai"] as const;
 type Executor = (typeof EXECUTORS)[number];
@@ -293,23 +294,19 @@ export function registerTaskCommands(
     .option("--inactive", "Include deactivated tasks (default: active only)")
     .option("--limit <n>", "Max rows (default 50, cap 200)", intFlag("--limit"))
     .option("--offset <n>", "Pagination offset", intFlag("--offset", 0))
-    .action(async (opts: TaskListOptions) => {
-      try {
+    .action(
+      guarded(async (opts: TaskListOptions) => {
         writeJson(await runTaskList(await getClient(), opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   t.command("get <id>")
     .description("Fetch one recurring task by id (developer-only)")
-    .action(async (idStr: string) => {
-      try {
+    .action(
+      guarded(async (idStr: string) => {
         writeJson(await runTaskGet(await getClient(), parseTaskId(idStr, "get")));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   addWriteFlagsToCommand(
     t.command("add")
@@ -402,11 +399,9 @@ export function registerTaskCommands(
   t.command("log <id>")
     .description("Completion history for one task, newest first (developer-only)")
     .option("--limit <n>", "Max rows (default 50, cap 200)", intFlag("--limit"))
-    .action(async (idStr: string, opts: { limit?: number }) => {
-      try {
+    .action(
+      guarded(async (idStr: string, opts: { limit?: number }) => {
         writeJson(await runTaskLog(await getClient(), parseTaskId(idStr, "log"), opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 }

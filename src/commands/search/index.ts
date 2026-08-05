@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
 import { CliError } from "../../api/errors.js";
 import { resolveSearchQuery } from "../../targets.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
@@ -9,12 +9,12 @@ import { runPersonSearch, type PersonSearchHit } from "../person/index.js";
 import { runWorksiteSearch } from "../worksite/index.js";
 import { runVehicleSearch } from "../vehicle/index.js";
 import { runKeikkaSearch, type KeikkaSearchHit } from "../keikka/index.js";
+import { guarded } from "../_shared/action.js";
 import {
   runSijaintiListJoined,
   sijaintiRowMatches,
   SIJAINTI_SEARCH_SCAN_LIMIT,
 } from "../sijainti/index.js";
-
 /** Canonical entity order — also the within-tier sort order of merged hits. */
 export const SEARCH_ENTITIES = ["customer", "worksite", "person", "vehicle", "keikka", "sijainti"] as const;
 export type SearchEntity = (typeof SEARCH_ENTITIES)[number];
@@ -278,16 +278,14 @@ export function registerSearchCommands(
     .option("--in <entities>", `Comma-separated subset of: ${SEARCH_ENTITIES.join(",")}`)
     .option("--limit <n>", "Max hits per entity", (v: string) => Number(v), DEFAULT_LIMIT)
     .option("--my-companies", "Also search every company you belong to (customer/worksite/person only; vehicle, keikka & sijainti stay active-company)")
-    .action(async (query: string | undefined, opts: { search?: string; in?: string; limit: number; myCompanies?: boolean }) => {
-      try {
+    .action(
+      guarded(async (query: string | undefined, opts: { search?: string; in?: string; limit: number; myCompanies?: boolean }) => {
         const q = resolveSearchQuery(query, opts.search);
         const entities = parseEntityFilter(opts.in);
         const client = await getClient();
         const srcs = buildSearchSources(client, q, opts.limit, !!opts.myCompanies);
         const result = await runUnifiedSearch(q, srcs, entities, opts.limit);
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 }

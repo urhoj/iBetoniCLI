@@ -7,6 +7,7 @@ import { resolveTarget, parseId, resolveSearchQuery } from "../../targets.js";
 import { runAddressDashboard, } from "../_shared/addressDashboard.js";
 import { runCombinatorDuplicates, runCombinatorMerge, } from "../_shared/combinator.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
+import { guarded } from "../_shared/action.js";
 /**
  * GET /api/cli/worksite/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
@@ -324,86 +325,56 @@ export function registerWorksiteCommands(parent, getClient) {
         .option("--limit <n>", "Max rows", (v) => Math.min(Number(v), 500))
         .option("--cursor <c>", "Pagination cursor")
         .option("--customer <n>", "Filter by parent asiakasId", (v) => Number(v))
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            const result = await runWorksiteList(client, { limit: opts.limit, cursor: opts.cursor, customer: opts.customer });
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        const result = await runWorksiteList(client, { limit: opts.limit, cursor: opts.cursor, customer: opts.customer });
+        writeJson(result);
+    }));
     w.command("get <tyomaaId>")
         .description("Get a single worksite by tyomaaId")
         .option("--include-building", "Attach the parsed Helsinki building data (rakennusData)")
         .option("--include-cameras", "Attach the nearby traffic cameras (cameras[])")
-        .action(async (idStr, opts) => {
-        try {
-            const client = await getClient();
-            const result = await runWorksiteGet(client, parseId(idStr, "tyomaaId"), {
-                includeBuilding: opts.includeBuilding,
-                includeCameras: opts.includeCameras,
-            });
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (idStr, opts) => {
+        const client = await getClient();
+        const result = await runWorksiteGet(client, parseId(idStr, "tyomaaId"), {
+            includeBuilding: opts.includeBuilding,
+            includeCameras: opts.includeCameras,
+        });
+        writeJson(result);
+    }));
     w.command("metrics <tyomaaId>")
         .description("Volume / keikka-count metrics for a worksite")
-        .action(async (idStr) => {
-        try {
-            const client = await getClient();
-            const result = await runWorksiteMetrics(client, parseId(idStr, "tyomaaId"));
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (idStr) => {
+        const client = await getClient();
+        const result = await runWorksiteMetrics(client, parseId(idStr, "tyomaaId"));
+        writeJson(result);
+    }));
     const dates = w.command("dates").description("Worksite compliance dates (read-only)");
     dates
         .command("list <tyomaaId>")
         .description("List a worksite's compliance/permit dates")
-        .action(async (idStr) => {
-        try {
-            const client = await getClient();
-            writeJson(await runWorksiteDatesList(client, parseId(idStr, "tyomaaId")));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (idStr) => {
+        const client = await getClient();
+        writeJson(await runWorksiteDatesList(client, parseId(idStr, "tyomaaId")));
+    }));
     dates
         .command("expiring")
         .description("Company-wide expiring worksite dates")
         .option("--days <n>", "Look-ahead window in days (default 30)", (v) => Number(v))
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runWorksiteDatesExpiring(client, opts.days));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        writeJson(await runWorksiteDatesExpiring(client, opts.days));
+    }));
     w.command("search [query]")
         .description("Free-text search for worksites")
         .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max results", (v) => Math.min(Number(v), 500))
         .option("--my-companies", "Search across every company you belong to (rows tagged with ownerAsiakasId)")
-        .action(async (query, opts) => {
-        try {
-            const client = await getClient();
-            const result = await runWorksiteSearch(client, resolveSearchQuery(query, opts.search), opts.limit, !!opts.myCompanies);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (query, opts) => {
+        const client = await getClient();
+        const result = await runWorksiteSearch(client, resolveSearchQuery(query, opts.search), opts.limit, !!opts.myCompanies);
+        writeJson(result);
+    }));
     w.command("dashboard [tyomaaId]")
         .description("One-shot Address Information Dashboard report for a worksite (tyomaa) — merges weather, building, cadastral parcel, nearby traffic cameras, nearby sijainnit, worksite deliveries, and nearby vehicles into a single JSON, with each section independently degrading to forbidden/error instead of failing the whole report. Resolve the point from EXACTLY ONE of the positional tyomaaId or --address.")
         .option("--address <address>", "Resolve the point from a street address instead of tyomaaId")
@@ -513,15 +484,10 @@ export function registerWorksiteCommands(parent, getClient) {
         }
     });
     addWriteFlagsToCommand(w.command("refresh-location <tyomaaId>")
-        .description("Re-geocode a worksite from Google Maps")).action(async (idStr, opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runWorksiteRefreshLocation(client, parseId(idStr, "tyomaaId"), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .description("Re-geocode a worksite from Google Maps")).action(guarded(async (idStr, opts) => {
+        const client = await getClient();
+        writeJson(await runWorksiteRefreshLocation(client, parseId(idStr, "tyomaaId"), opts));
+    }));
     addWriteFlagsToCommand(w.command("set-geofence <tyomaaId>")
         .description("Set a worksite geofence radius in metres (1-10000)")
         .requiredOption("--radius <m>", "Geofence radius in metres", Number)).action(async (idStr, opts) => {
@@ -537,15 +503,10 @@ export function registerWorksiteCommands(parent, getClient) {
         }
     });
     addWriteFlagsToCommand(w.command("helsinki-fetch <tyomaaId>")
-        .description("Refresh Helsinki building data for a worksite")).action(async (idStr, opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runWorksiteHelsinkiFetch(client, parseId(idStr, "tyomaaId"), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .description("Refresh Helsinki building data for a worksite")).action(guarded(async (idStr, opts) => {
+        const client = await getClient();
+        writeJson(await runWorksiteHelsinkiFetch(client, parseId(idStr, "tyomaaId"), opts));
+    }));
     const worksitePerson = w
         .command("person")
         .description("Manage persons attached to a worksite");
@@ -589,32 +550,22 @@ export function registerWorksiteCommands(parent, getClient) {
         .command("list [tyomaaId]")
         .description("List persons attached to a worksite.")
         .option("--worksite <id>", "Target tyomaaId (alias for the positional; same flag as person add/remove)", Number)
-        .action(async (tyomaaIdStr, opts) => {
-        try {
-            const client = await getClient();
-            const result = await runWorksitePersonList(client, resolveTarget(tyomaaIdStr, opts.worksite, "tyomaaId", "worksite"));
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (tyomaaIdStr, opts) => {
+        const client = await getClient();
+        const result = await runWorksitePersonList(client, resolveTarget(tyomaaIdStr, opts.worksite, "tyomaaId", "worksite"));
+        writeJson(result);
+    }));
     registerLogAlias(w, getClient, "tyomaa", "tyomaaId", "Change-tracker audit trail for one worksite (tyomaa). Alias of `ib log entity tyomaa`.");
     w.command("duplicates")
         .description("List likely-duplicate worksite pairs for a tenant (strict name+address+number, " +
         "or the anonymous same-address cluster). Read-only; admin gated. Owner defaults " +
         "to your active company; --owner scans another tenant. Feeds `ib worksite merge`.")
         .option("--owner <id>", "ownerAsiakasId to scan (default: active company)", Number)
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
-            writeJson(await runWorksiteDuplicates(client, owner));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
+        writeJson(await runWorksiteDuplicates(client, owner));
+    }));
     const worksiteMergeCmd = w
         .command("merge")
         .description("Merge two duplicate worksites: the secondary's references move onto the main, " +

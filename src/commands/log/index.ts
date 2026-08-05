@@ -17,6 +17,7 @@ import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseId, parseOptionalId } from "../../targets.js";
+import { guarded } from "../_shared/action.js";
 import {
   CHANGE_ENTITY_TYPES,
   findEntityType,
@@ -249,8 +250,8 @@ export function registerLogAlias(
     .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))
     .option("--limit <n>", "Max rows (default 100, cap 500)", (v: string) => Math.min(Number(v), 500), 100)
     .option("--field <name>", fieldExample)
-    .action(async (idStr: string, opts: { owner?: number; limit: number; field?: string }) => {
-      try {
+    .action(
+      guarded(async (idStr: string, opts: { owner?: number; limit: number; field?: string }) => {
         const client = await getClient();
         writeJson(
           await runLogEntity(client, entityType, parseId(idStr, "entityId"), opts.limit, {
@@ -258,10 +259,8 @@ export function registerLogAlias(
             field: opts.field,
           })
         );
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 }
 
 export function registerLogCommands(
@@ -315,8 +314,8 @@ export function registerLogCommands(
       (v: string) => Math.min(Number(v), 500),
       100
     )
-    .action(async (opts: { entityType?: string; owner?: number; limit: number }) => {
-      try {
+    .action(
+      guarded(async (opts: { entityType?: string; owner?: number; limit: number }) => {
         const client = await getClient();
         writeJson(
           await runLogLatest(client, opts.limit, {
@@ -324,10 +323,8 @@ export function registerLogCommands(
             owner: opts.owner,
           })
         );
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   c.command("range")
     .description("Changes MADE within a time window (admin). Filter by entityType/person.")

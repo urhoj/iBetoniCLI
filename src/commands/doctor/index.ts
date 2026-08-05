@@ -1,13 +1,13 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { writeJson, exitWithError, setExitCode } from "../../output/json.js";
+import { writeJson, setExitCode } from "../../output/json.js";
 import { decodeJwtPayload, impersonationFromClaims, type ImpersonationInfo } from "../../auth/jwt.js";
 import { resolveCallerTier } from "../../tier.js";
 import type { CallerTier } from "../../tier.js";
 import { runVersion, type VersionReport } from "../version/index.js";
 import { runCompanyList } from "../company/index.js";
 import { CliError } from "../../api/errors.js";
-
+import { guarded } from "../_shared/action.js";
 /**
  * `ib doctor` — one aggregated "is my setup working" report for AI/CI/new users.
  *
@@ -129,8 +129,8 @@ export function registerDoctorCommand(
     .description(
       "Aggregated health check: identity, token expiry, connectivity (deployed build), and an authenticated probe"
     )
-    .action(async () => {
-      try {
+    .action(
+      guarded(async () => {
         const client = await getClient();
         const endpoint = await getEndpoint();
         const report = await runDoctor({
@@ -142,8 +142,6 @@ export function registerDoctorCommand(
         writeJson(report);
         // Set the code and RETURN (don't process.exit) so stdout drains first.
         if (!report.ok) setExitCode(1);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 }

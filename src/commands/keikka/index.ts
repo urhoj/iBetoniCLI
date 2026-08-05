@@ -12,6 +12,7 @@ import { resolveDate, todayHelsinki, addDaysISO } from "../../dates.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { registerLogAlias } from "../log/index.js";
 import { parseId, resolveSearchQuery } from "../../targets.js";
+import { guarded } from "../_shared/action.js";
 
 // Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
 export { resolveDate };
@@ -369,8 +370,8 @@ export function registerKeikkaCommands(
     .option("--status <s>", "Filter by status")
     .option("--limit <n>", "Max rows", (v: string) => Math.min(Number(v), 500))
     .option("--cursor <c>", "Pagination cursor")
-    .action(async (rawOpts: KeikkaListFilter & { date?: string }, command: Command) => {
-      try {
+    .action(
+      guarded(async (rawOpts: KeikkaListFilter & { date?: string }, command: Command) => {
         const client = await getClient();
         const { date, ...opts } = rawOpts;
         let { from, to } = opts;
@@ -399,10 +400,8 @@ export function registerKeikkaCommands(
         };
         const result = await runKeikkaList(client, resolved);
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   k.command("latest")
     .description(
@@ -417,49 +416,43 @@ export function registerKeikkaCommands(
       "How far back from today to search (default 365, max 3650)",
       (v: string) => Number(v)
     )
-    .action(async (opts: KeikkaLatestFilter) => {
-      try {
+    .action(
+      guarded(async (opts: KeikkaLatestFilter) => {
         const client = await getClient();
         writeJson(await runKeikkaLatest(client, opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   k.command("get <keikkaId>")
     .description("Get a single keikka by id")
-    .action(async (idStr: string) => {
-      try {
+    .action(
+      guarded(async (idStr: string) => {
         const client = await getClient();
         const result = await runKeikkaGet(client, parseId(idStr, "keikkaId"));
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   k.command("search [query]")
     .description("Search keikkas (full-text: phone, keikkaId, worksite name/number, invoice ref)")
     .option("--search <s>", "Search query (alias for the <query> positional)")
     .option("--limit <n>", "Max hits (client-side; backend caps at 100)", (v: string) => Number(v))
-    .action(async (query: string | undefined, opts: { search?: string; limit?: number }) => {
-      try {
+    .action(
+      guarded(async (query: string | undefined, opts: { search?: string; limit?: number }) => {
         const client = await getClient();
         const ownerAsiakasId =
           decodeJwtPayload(client.getCurrentToken()).ownerAsiakasId ??
           failWith("could not resolve ownerAsiakasId from the active token", 4);
         const result = await runKeikkaSearch(client, resolveSearchQuery(query, opts.search), ownerAsiakasId, opts.limit);
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   k.command("validate [keikkaId]")
     .description("Validate a keikka (or a whole day with --date) against the reminders-drawer rules")
     .option("--date <date>", "Validate every keikka for this date (YYYY-MM-DD or today/yesterday/tomorrow)")
-    .action(async (idStr: string | undefined, opts: { date?: string }) => {
-      try {
+    .action(
+      guarded(async (idStr: string | undefined, opts: { date?: string }) => {
         const client = await getClient();
         if (opts.date && idStr) {
           failWith("Pass either a keikkaId or --date, not both", 4);
@@ -469,10 +462,8 @@ export function registerKeikkaCommands(
           date: opts.date ? resolveDate(opts.date) : undefined,
         });
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   const createCmd = k
     .command("create")

@@ -6,8 +6,8 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
-import { writeJson, exitWithError } from "../../output/json.js";
-
+import { writeJson } from "../../output/json.js";
+import { guarded } from "../_shared/action.js";
 interface PurchaseInvoiceRow {
   id: number;
   supplierName: string | null;
@@ -90,11 +90,9 @@ export function registerFennoaCommands(parent: Command, getClient: () => Promise
     .option("--months <n>", "Created-after window in months (default 6, max 12)", (v: string) => Number(v))
     .option("--asiakas <id>", "Target company override (e.g. 8 = Kalle Urho Oy verification path)", (v: string) => Number(v))
     .option("--refresh", "Bypass the server's 15-minute cache")
-    .action(async (opts: { all?: boolean; months?: number; asiakas?: number; refresh?: boolean }) => {
-      try {
+    .action(
+      guarded(async (opts: { all?: boolean; months?: number; asiakas?: number; refresh?: boolean }) => {
         writeJson(await runFennoaPurchases(await getClient(), opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 }

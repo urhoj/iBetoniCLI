@@ -1,6 +1,7 @@
 import { CliError } from "../../../api/errors.js";
 import { writeJson, exitWithError } from "../../../output/json.js";
 import { parseId } from "../../../targets.js";
+import { guarded } from "../../_shared/action.js";
 const STATUSES = ["open", "resolved", "all"];
 const CONTEXT_TYPES = ["pumppuRequest", "keikka"];
 /**
@@ -108,27 +109,17 @@ export function registerMessageSupportCommands(parent, getClient) {
         .description("Support triage queue (developer-only): open | resolved | all")
         .option("--status <status>", "open | resolved | all", "open")
         .option("--limit <n>", "Max rows", Number)
-        .action(async (opts) => {
-        try {
-            writeJson(await runSupportInbox(await getClient(), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        writeJson(await runSupportInbox(await getClient(), opts));
+    }));
     support
         .command("mine")
         .description("Your own company's support threads (open | resolved | all)")
         .option("--status <status>", "open | resolved | all", "open")
         .option("--limit <n>", "Max rows", Number)
-        .action(async (opts) => {
-        try {
-            writeJson(await runSupportMine(await getClient(), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        writeJson(await runSupportMine(await getClient(), opts));
+    }));
     support
         .command("contact")
         .description("Open (or append to) a support thread about a tarjous or keikka. A real write; --dry-run previews the payload CLIENT-SIDE (no POST). Reply later with `ib message chat send <threadId>`.")
@@ -166,13 +157,8 @@ export function registerMessageSupportCommands(parent, getClient) {
         // client-side --dry-run (the status PATCH has no server X-Dry-Run guard); no
         // audit headers — the status change persists no reason.
         .option("--dry-run", "Print the update body without sending (client-side)")
-        .action(async (threadIdStr, opts) => {
-        try {
-            writeJson(await runSupportResolve(await getClient(), parseId(threadIdStr, "threadId"), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (threadIdStr, opts) => {
+        writeJson(await runSupportResolve(await getClient(), parseId(threadIdStr, "threadId"), opts));
+    }));
 }
 //# sourceMappingURL=index.js.map

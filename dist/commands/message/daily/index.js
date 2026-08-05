@@ -3,6 +3,7 @@ import { writeJson, exitWithError, failWith } from "../../../output/json.js";
 import { resolveDate } from "../../../dates.js";
 import { resolveAsiakasTarget } from "../../customer/index.js";
 import { parseId } from "../../../targets.js";
+import { guarded } from "../../_shared/action.js";
 /**
  * Normalise a date flag to the backend's `YYYYMMDD` shape. Accepts
  * `today`/`yesterday`/`tomorrow` and `YYYY-MM-DD` (via {@link resolveDate}),
@@ -203,29 +204,19 @@ export function registerMessageDailyCommands(parent, getClient) {
         .description("List a company's daily boxes (+ a date's messages + permissions)")
         .option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number)
         .option("--date <date>", "Date for messages: YYYYMMDD | YYYY-MM-DD | today/yesterday/tomorrow")
-        .action(async (idStr, opts) => {
-        try {
-            const asiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
-            const client = await getClient();
-            writeJson(await runDailyList(client, asiakasId, opts.date ? toYyyymmdd(opts.date) : undefined));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (idStr, opts) => {
+        const asiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
+        const client = await getClient();
+        writeJson(await runDailyList(client, asiakasId, opts.date ? toYyyymmdd(opts.date) : undefined));
+    }));
     d.command("get <boxId>")
         .description("One daily box: its row + message + permissions (resolved client-side)")
         .requiredOption("--asiakas <id>", "Company that the box is listed for (asiakasId)", Number)
         .option("--date <date>", "Date for the message: YYYYMMDD | YYYY-MM-DD | today")
-        .action(async (boxIdStr, opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runDailyGet(client, opts.asiakas, parseId(boxIdStr, "boxId"), opts.date ? toYyyymmdd(opts.date) : undefined));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (boxIdStr, opts) => {
+        const client = await getClient();
+        writeJson(await runDailyGet(client, opts.asiakas, parseId(boxIdStr, "boxId"), opts.date ? toYyyymmdd(opts.date) : undefined));
+    }));
     // content + metadata writes ───────────────────────────────────────────────────
     addWriteFlagsToCommand(d
         .command("set <boxId>")
@@ -284,39 +275,24 @@ export function registerMessageDailyCommands(parent, getClient) {
             exitWithError(e);
         }
     });
-    addWriteFlagsToCommand(d.command("delete <boxId>").description("Delete a daily box (and its messages) for all companies")).action(async (boxIdStr, opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runDailyDeleteBox(client, parseId(boxIdStr, "boxId"), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+    addWriteFlagsToCommand(d.command("delete <boxId>").description("Delete a daily box (and its messages) for all companies")).action(guarded(async (boxIdStr, opts) => {
+        const client = await getClient();
+        writeJson(await runDailyDeleteBox(client, parseId(boxIdStr, "boxId"), opts));
+    }));
     // sharing + per-role ACL ─────────────────────────────────────────────────────
     addWriteFlagsToCommand(d
         .command("share <boxId>")
         .description("Share a box to another tenant (read-only until you grant + perm-set)")
-        .requiredOption("--to <asiakasId>", "Tenant to share the box with", Number)).action(async (boxIdStr, opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runDailyShare(client, { boxId: parseId(boxIdStr, "boxId"), asiakasId: opts.to }, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .requiredOption("--to <asiakasId>", "Tenant to share the box with", Number)).action(guarded(async (boxIdStr, opts) => {
+        const client = await getClient();
+        writeJson(await runDailyShare(client, { boxId: parseId(boxIdStr, "boxId"), asiakasId: opts.to }, opts));
+    }));
     addWriteFlagsToCommand(d
         .command("unshare <dailyMessageBoxAsiakasId>")
-        .description("Stop sharing a box with a tenant (by dailyMessageBoxAsiakasId)")).action(async (idStr, opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runDailyUnshare(client, parseId(idStr, "permissionId"), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .description("Stop sharing a box with a tenant (by dailyMessageBoxAsiakasId)")).action(guarded(async (idStr, opts) => {
+        const client = await getClient();
+        writeJson(await runDailyUnshare(client, parseId(idStr, "permissionId"), opts));
+    }));
     addWriteFlagsToCommand(d
         .command("grant <boxId>")
         .description("Add a per-role ACL row on a shared box (defaults read-only; set access via perm-set)")
@@ -338,15 +314,10 @@ export function registerMessageDailyCommands(parent, getClient) {
     });
     addWriteFlagsToCommand(d
         .command("revoke <dailyMessageBoxAsiakasPermissionsId>")
-        .description("Remove a per-role ACL row (by dailyMessageBoxAsiakasPermissionsId)")).action(async (idStr, opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runDailyRevoke(client, parseId(idStr, "permissionId"), opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .description("Remove a per-role ACL row (by dailyMessageBoxAsiakasPermissionsId)")).action(guarded(async (idStr, opts) => {
+        const client = await getClient();
+        writeJson(await runDailyRevoke(client, parseId(idStr, "permissionId"), opts));
+    }));
     addWriteFlagsToCommand(d
         .command("perm-set <dailyMessageBoxAsiakasPermissionsId>")
         .description("Set a permission row's role + access (read|edit)")

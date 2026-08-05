@@ -20,6 +20,7 @@ import { readJsonObjectInput } from "../../api/parseBody.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 import { parseRefId } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
+import { guarded } from "../_shared/action.js";
 
 const KINDS = ["improvement", "bug", "idea", "legal"] as const;
 type Kind = (typeof KINDS)[number];
@@ -702,15 +703,13 @@ export function registerFeedbackCommands(
   f.command("get <id>")
     .description("Fetch one feedback row by id (developer-only)")
     .option("--full", "Accepted for cross-command consistency; get always returns the full row (no-op)")
-    .action(async (idStr: string) => {
-      try {
+    .action(
+      guarded(async (idStr: string) => {
         const id = parseRefId(idStr, "feedback", "get");
         const client = await getClient();
         writeJson(await runWithSiblingHint(client, id, "changelog", () => runFeedbackGet(client, id)));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   f.command("resolve <id>")
     .description(
@@ -800,11 +799,9 @@ export function registerFeedbackCommands(
     .description("Counts of feedback by status/kind/scope (developer-only)")
     .option("--kind <kind>", "improvement | bug | idea | legal")
     .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other")
-    .action(async (opts: { kind?: string; scope?: string }) => {
-      try {
+    .action(
+      guarded(async (opts: { kind?: string; scope?: string }) => {
         writeJson(await runFeedbackCount(await getClient(), opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 }

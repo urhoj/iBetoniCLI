@@ -4,6 +4,7 @@ import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { parseId } from "../../targets.js";
 import { runKeikkaGet } from "../keikka/index.js";
+import { guarded } from "../_shared/action.js";
 /** Expand `now` to the current ISO timestamp; pass any other value through. */
 function resolveTime(input) {
     return input === "now" ? new Date().toISOString() : input;
@@ -142,29 +143,19 @@ export function registerWeatherCommands(parent, getClient, opts = {}) {
         .requiredOption("--lat <n>", "Latitude (Finland: 59.5–70.1)", Number)
         .requiredOption("--lng <n>", "Longitude (Finland: 19.0–31.6)", Number)
         .requiredOption("--time <iso>", "Forecast time (ISO 8601, or 'now')")
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runWeatherForecast(client, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        writeJson(await runWeatherForecast(client, opts));
+    }));
     w.command("day")
         .description("Daily aggregate forecast (min/max/avg temp, wind, precipitation)")
         .requiredOption("--lat <n>", "Latitude", Number)
         .requiredOption("--lng <n>", "Longitude", Number)
         .requiredOption("--date <d>", "Date (YYYY-MM-DD, or today/tomorrow)")
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runWeatherDay(client, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        writeJson(await runWeatherDay(client, opts));
+    }));
     w.command("pumping")
         .description("Weather over a concrete-pumping window (start + duration minutes)")
         .requiredOption("--lat <n>", "Latitude", Number)
@@ -184,62 +175,37 @@ export function registerWeatherCommands(parent, getClient, opts = {}) {
     w.command("worksite <tyomaaId>")
         .description("Forecast for a worksite (resolves coordinates from the tyomaa)")
         .option("--force-refresh", "Bypass the cache and refetch from FMI")
-        .action(async (idStr, opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runWeatherWorksite(client, parseId(idStr, "tyomaaId"), !!opts.forceRefresh));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (idStr, opts) => {
+        const client = await getClient();
+        writeJson(await runWeatherWorksite(client, parseId(idStr, "tyomaaId"), !!opts.forceRefresh));
+    }));
     w.command("sijainti <sijaintiId>")
         .description("Point forecast for a sijainti (resolves coordinates from the location)")
         .option("--time <iso>", "Forecast time (ISO 8601, or 'now')", "now")
-        .action(async (idStr, opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runWeatherSijainti(client, parseId(idStr, "sijaintiId"), opts.time));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (idStr, opts) => {
+        const client = await getClient();
+        writeJson(await runWeatherSijainti(client, parseId(idStr, "sijaintiId"), opts.time));
+    }));
     w.command("keikka <keikkaId>")
         .description("Forecast for a keikka (resolves coordinates from its worksite)")
         .option("--force-refresh", "Bypass the cache and refetch from FMI")
-        .action(async (idStr, opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runWeatherKeikka(client, parseId(idStr, "keikkaId"), !!opts.forceRefresh));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (idStr, opts) => {
+        const client = await getClient();
+        writeJson(await runWeatherKeikka(client, parseId(idStr, "keikkaId"), !!opts.forceRefresh));
+    }));
     w.command("address")
         .description("Point forecast for a street address (geocodes via Google, then FMI)")
         .requiredOption("--address <s>", "Street address (min 5 chars)")
         .requiredOption("--time <iso>", "Forecast time (ISO 8601, or 'now')")
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runWeatherAddress(client, opts));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        writeJson(await runWeatherAddress(client, opts));
+    }));
     w.command("status")
         .description("Whether the weather module is enabled for the active company")
-        .action(async () => {
-        try {
-            writeJson(await runWeatherStatus(await getClient()));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async () => {
+        writeJson(await runWeatherStatus(await getClient()));
+    }));
     const toggleCmd = w
         .command("toggle")
         .description("Enable/disable the weather module (admin)")

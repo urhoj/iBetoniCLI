@@ -1,9 +1,10 @@
-import { writeJson, exitWithError, setExitCode } from "../../output/json.js";
+import { writeJson, setExitCode } from "../../output/json.js";
 import { decodeJwtPayload, impersonationFromClaims } from "../../auth/jwt.js";
 import { resolveCallerTier } from "../../tier.js";
 import { runVersion } from "../version/index.js";
 import { runCompanyList } from "../company/index.js";
 import { CliError } from "../../api/errors.js";
+import { guarded } from "../_shared/action.js";
 /**
  * Build the doctor report. Pure-ish: takes the client + endpoint resolver, makes
  * the two reads, and never throws — failures fold into the report so `ok` is the
@@ -72,24 +73,19 @@ export function registerDoctorCommand(parent, getClient, getEndpoint, cliVersion
     parent
         .command("doctor")
         .description("Aggregated health check: identity, token expiry, connectivity (deployed build), and an authenticated probe")
-        .action(async () => {
-        try {
-            const client = await getClient();
-            const endpoint = await getEndpoint();
-            const report = await runDoctor({
-                client,
-                endpoint,
-                cliVersion,
-                readOnly: isReadOnly(),
-            });
-            writeJson(report);
-            // Set the code and RETURN (don't process.exit) so stdout drains first.
-            if (!report.ok)
-                setExitCode(1);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async () => {
+        const client = await getClient();
+        const endpoint = await getEndpoint();
+        const report = await runDoctor({
+            client,
+            endpoint,
+            cliVersion,
+            readOnly: isReadOnly(),
+        });
+        writeJson(report);
+        // Set the code and RETURN (don't process.exit) so stdout drains first.
+        if (!report.ok)
+            setExitCode(1);
+    }));
 }
 //# sourceMappingURL=index.js.map

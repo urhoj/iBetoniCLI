@@ -23,6 +23,7 @@ import { CliError } from "../../../api/errors.js";
 import type { ListEnvelope } from "../../../api/envelopes.js";
 import { writeJson, exitWithError } from "../../../output/json.js";
 import { parseId } from "../../../targets.js";
+import { guarded } from "../../_shared/action.js";
 
 const STATUSES = ["open", "resolved", "all"] as const;
 type StatusFilter = (typeof STATUSES)[number];
@@ -177,26 +178,22 @@ export function registerMessageSupportCommands(
     .description("Support triage queue (developer-only): open | resolved | all")
     .option("--status <status>", "open | resolved | all", "open")
     .option("--limit <n>", "Max rows", Number)
-    .action(async (opts: { status?: string; limit?: number }) => {
-      try {
+    .action(
+      guarded(async (opts: { status?: string; limit?: number }) => {
         writeJson(await runSupportInbox(await getClient(), opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   support
     .command("mine")
     .description("Your own company's support threads (open | resolved | all)")
     .option("--status <status>", "open | resolved | all", "open")
     .option("--limit <n>", "Max rows", Number)
-    .action(async (opts: { status?: string; limit?: number }) => {
-      try {
+    .action(
+      guarded(async (opts: { status?: string; limit?: number }) => {
         writeJson(await runSupportMine(await getClient(), opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   support
     .command("contact")
@@ -243,11 +240,9 @@ export function registerMessageSupportCommands(
     // client-side --dry-run (the status PATCH has no server X-Dry-Run guard); no
     // audit headers — the status change persists no reason.
     .option("--dry-run", "Print the update body without sending (client-side)")
-    .action(async (threadIdStr: string, opts: { reopen?: boolean; dryRun?: boolean }) => {
-      try {
+    .action(
+      guarded(async (threadIdStr: string, opts: { reopen?: boolean; dryRun?: boolean }) => {
         writeJson(await runSupportResolve(await getClient(), parseId(threadIdStr, "threadId"), opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 }

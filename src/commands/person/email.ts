@@ -8,6 +8,7 @@ import {
 } from "../../api/writeFlags.js";
 import { writeJson, failWith, exitWithError } from "../../output/json.js";
 import { resolvePersonRef } from "../notification/index.js";
+import { guarded } from "../_shared/action.js";
 
 interface PersonEmailRow {
   email: string;
@@ -82,13 +83,11 @@ export function registerPersonEmailCommands(
   email
     .command("list <person>")
     .description("List a person's emails — primary (main:1) and alternatives (main:0)")
-    .action(async (personRef: string) => {
-      try {
+    .action(
+      guarded(async (personRef: string) => {
         writeJson(await runPersonEmailList(await getClient(), personRef));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   const addCmd = email
     .command("add <person> <email>")

@@ -5,6 +5,7 @@ import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../../api/writeF
 import { writeJson, exitWithError, failWith } from "../../../output/json.js";
 import { resolveThreadId, type ThreadTarget } from "./resolveThread.js";
 import { parseOptionalId, resolveSearchQuery } from "../../../targets.js";
+import { guarded } from "../../_shared/action.js";
 
 type Row = Record<string, unknown>;
 
@@ -284,27 +285,23 @@ export function registerMessageChatCommands(
     .description("List your message threads (inbox), newest first")
     .option("--unread", "Only threads with unread messages")
     .option("--tarjous <id>", "Only threads for this pumppuRequestId", Number)
-    .action(async (opts: { unread?: boolean; tarjous?: number }) => {
-      try {
+    .action(
+      guarded(async (opts: { unread?: boolean; tarjous?: number }) => {
         const client = await getClient();
         writeJson(await runChatThreads(client, opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   c.command("thread [threadId]")
     .description("Get one thread's metadata + participants")
     .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
-    .action(async (threadIdStr: string | undefined, opts: { tarjous?: number }) => {
-      try {
+    .action(
+      guarded(async (threadIdStr: string | undefined, opts: { tarjous?: number }) => {
         const client = await getClient();
         const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
         writeJson(await runChatThread(client, id));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   c.command("list [threadId]")
     .description("List messages in a thread (does NOT mark read)")
@@ -331,14 +328,12 @@ export function registerMessageChatCommands(
     .description("Search your own messages by body text across all your threads (newest first)")
     .option("--search <s>", "Search query (alias for the <query> positional)")
     .option("--limit <n>", "Max results (default 50, server max 200)", Number)
-    .action(async (query: string | undefined, opts: { search?: string; limit?: number }) => {
-      try {
+    .action(
+      guarded(async (query: string | undefined, opts: { search?: string; limit?: number }) => {
         const client = await getClient();
         writeJson(await runChatSearch(client, resolveSearchQuery(query, opts.search), opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   const sendCmd = c
     .command("send [threadId]")
@@ -388,15 +383,13 @@ export function registerMessageChatCommands(
   c.command("mark-read [threadId]")
     .description("Mark a thread read (stamp lastReadAt)")
     .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
-    .action(async (threadIdStr: string | undefined, opts: { tarjous?: number }) => {
-      try {
+    .action(
+      guarded(async (threadIdStr: string | undefined, opts: { tarjous?: number }) => {
         const client = await getClient();
         const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
         writeJson(await runChatMarkRead(client, id));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   const deleteCmd = c
     .command("delete <messageId>")

@@ -9,6 +9,7 @@ import { decodeJwtPayload, impersonationFromClaims } from "../../auth/jwt.js";
 import { resolveAuth } from "../../auth/resolve.js";
 import { resolveCallerTier } from "../../tier.js";
 import { CliError } from "../../api/errors.js";
+import { guarded } from "../_shared/action.js";
 import { performImpersonate, performImpersonateExtend, performImpersonateEnd, buildImpersonationProfile, IMPERSONATOR_PROFILE, } from "../../auth/impersonate.js";
 import { writeJson, writeError, exitWithError, failWith, errorMessage, } from "../../output/json.js";
 /**
@@ -75,101 +76,91 @@ export function registerAuthCommands(parent, isReadOnly) {
     auth
         .command("whoami")
         .description("Print the current authenticated user")
-        .action(async () => {
-        try {
-            // resolveAuth (IB_TOKEN-or-file) — so whoami works for headless/CI
-            // sessions too, not just the on-disk creds store.
-            const resolved = await resolveAuth({
-                credentialsPath: defaultCredentialsPath(),
-                defaultEndpoint: getGlobalOptions(parent).endpoint ?? undefined,
-            });
-            if (!resolved) {
-                failWith("Not logged in. Run `ib auth login` first (or set IB_TOKEN).", 2);
-                return;
-            }
-            const store = createStore(defaultCredentialsPath());
-            let token = resolved.token;
-            let claims = decodeJwtPayload(token);
-            // Impersonation marker lives on the creds profile (file sessions);
-            // renderWhoami falls back to the JWT imp claims for IB_TOKEN sessions.
-            const profile = resolved.source === "file" ? await store.load() : null;
-            let refreshed = false;
-            // A dead session must be caught HERE, at the orientation read — not on
-            // the next write (fb#258). Expired file sessions self-heal (bearer
-            // refresh → OAuth refresh_token grant); anything unrecoverable exits 2.
-            if (claims.exp != null && claims.exp * 1000 < Date.now()) {
-                const expiredAt = new Date(claims.exp * 1000).toISOString();
-                if (resolved.source === "env") {
-                    failWith(`IB_TOKEN is expired (since ${expiredAt}) and non-refreshable`, 2, "mint a fresh JWT and update IB_TOKEN");
-                }
-                if (profile?.impersonation ?? impersonationFromClaims(claims)) {
-                    failWith(`impersonation session expired (since ${expiredAt})`, 2, "run `ib auth impersonate --end` to restore your own login, or re-impersonate");
-                }
-                try {
-                    token = await refreshAndPersistSession({
-                        endpoint: resolved.endpoint,
-                        store,
-                        currentJwt: token,
-                    });
-                    claims = decodeJwtPayload(token);
-                    refreshed = true;
-                }
-                catch (e) {
-                    failWith(`session expired (since ${expiredAt}) and unrefreshable: ${errorMessage(e)}`, 2, "run `ib auth login` to re-authenticate");
-                }
-            }
-            const tier = resolveCallerTier(token);
-            const out = renderWhoami({
-                claims,
-                endpoint: resolved.endpoint,
-                source: resolved.source,
-                readOnly: isReadOnly(),
-                tier,
-                impersonation: profile?.impersonation,
-            });
-            if (refreshed)
-                out.refreshed = true;
-            writeJson(out);
+        .action(guarded(async () => {
+        // resolveAuth (IB_TOKEN-or-file) — so whoami works for headless/CI
+        // sessions too, not just the on-disk creds store.
+        const resolved = await resolveAuth({
+            credentialsPath: defaultCredentialsPath(),
+            defaultEndpoint: getGlobalOptions(parent).endpoint ?? undefined,
+        });
+        if (!resolved) {
+            failWith("Not logged in. Run `ib auth login` first (or set IB_TOKEN).", 2);
+            return;
         }
-        catch (e) {
-            exitWithError(e);
+        const store = createStore(defaultCredentialsPath());
+        let token = resolved.token;
+        let claims = decodeJwtPayload(token);
+        // Impersonation marker lives on the creds profile (file sessions);
+        // renderWhoami falls back to the JWT imp claims for IB_TOKEN sessions.
+        const profile = resolved.source === "file" ? await store.load() : null;
+        let refreshed = false;
+        // A dead session must be caught HERE, at the orientation read — not on
+        // the next write (fb#258). Expired file sessions self-heal (bearer
+        // refresh → OAuth refresh_token grant); anything unrecoverable exits 2.
+        if (claims.exp != null && claims.exp * 1000 < Date.now()) {
+            const expiredAt = new Date(claims.exp * 1000).toISOString();
+            if (resolved.source === "env") {
+                failWith(`IB_TOKEN is expired (since ${expiredAt}) and non-refreshable`, 2, "mint a fresh JWT and update IB_TOKEN");
+            }
+            if (profile?.impersonation ?? impersonationFromClaims(claims)) {
+                failWith(`impersonation session expired (since ${expiredAt})`, 2, "run `ib auth impersonate --end` to restore your own login, or re-impersonate");
+            }
+            try {
+                token = await refreshAndPersistSession({
+                    endpoint: resolved.endpoint,
+                    store,
+                    currentJwt: token,
+                });
+                claims = decodeJwtPayload(token);
+                refreshed = true;
+            }
+            catch (e) {
+                failWith(`session expired (since ${expiredAt}) and unrefreshable: ${errorMessage(e)}`, 2, "run `ib auth login` to re-authenticate");
+            }
         }
-    });
+        const tier = resolveCallerTier(token);
+        const out = renderWhoami({
+            claims,
+            endpoint: resolved.endpoint,
+            source: resolved.source,
+            readOnly: isReadOnly(),
+            tier,
+            impersonation: profile?.impersonation,
+        });
+        if (refreshed)
+            out.refreshed = true;
+        writeJson(out);
+    }));
     auth
         .command("switch")
         .description("Switch the active company")
         .requiredOption("--to <asiakasId>", "Target asiakasId", (v) => Number(v))
-        .action(async (opts) => {
-        try {
-            assertPersistedSwitchAllowed(isReadOnly());
-            const store = createStore(defaultCredentialsPath());
-            const creds = await store.load();
-            if (!creds) {
-                failWith("Not logged in. Run `ib auth login` first.", 2);
-            }
-            const next = await performSwitch({
-                endpoint: creds.endpoint,
-                jwt: creds.jwt,
-                toAsiakasId: opts.to,
-            });
-            await store.save({
-                ...creds,
-                jwt: next.jwt,
-                ownerAsiakasId: next.ownerAsiakasId,
-                ownerAsiakasName: next.ownerAsiakasName,
-            });
-            writeJson({
-                ok: true,
-                activeCompany: {
-                    asiakasId: next.ownerAsiakasId,
-                    name: next.ownerAsiakasName,
-                },
-            });
+        .action(guarded(async (opts) => {
+        assertPersistedSwitchAllowed(isReadOnly());
+        const store = createStore(defaultCredentialsPath());
+        const creds = await store.load();
+        if (!creds) {
+            failWith("Not logged in. Run `ib auth login` first.", 2);
         }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const next = await performSwitch({
+            endpoint: creds.endpoint,
+            jwt: creds.jwt,
+            toAsiakasId: opts.to,
+        });
+        await store.save({
+            ...creds,
+            jwt: next.jwt,
+            ownerAsiakasId: next.ownerAsiakasId,
+            ownerAsiakasName: next.ownerAsiakasName,
+        });
+        writeJson({
+            ok: true,
+            activeCompany: {
+                asiakasId: next.ownerAsiakasId,
+                name: next.ownerAsiakasName,
+            },
+        });
+    }));
     auth
         .command("refresh")
         .description("Refresh the JWT manually")

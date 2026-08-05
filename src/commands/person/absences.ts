@@ -1,9 +1,9 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
-
+import { guarded } from "../_shared/action.js";
 type Row = Record<string, unknown>;
 
 export interface PersonAbsencesFilter {
@@ -40,11 +40,9 @@ export function registerPersonAbsencesCommand(
     .requiredOption("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)")
     .requiredOption("--to <date>", "End date YYYY-MM-DD (or today/yesterday/tomorrow)")
     .option("--person <pid>", "Filter to one personId", (s: string) => Number(s))
-    .action(async (opts: PersonAbsencesFilter) => {
-      try {
+    .action(
+      guarded(async (opts: PersonAbsencesFilter) => {
         writeJson(await runPersonAbsences(await getClient(), opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 }

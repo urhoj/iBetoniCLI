@@ -2,9 +2,9 @@ import type { Command } from "commander";
 import { TOPICS } from "../../reference/domain.js";
 import type { ApiClient } from "../../api/client.js";
 import { runGlossaryLookup } from "../glossary/index.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
 import { CliError } from "../../api/errors.js";
-
+import { guarded } from "../_shared/action.js";
 /**
  * `ib help` (no arg) — list every concept-guide topic id+title. Offline, no
  * auth, no network (reads {@link TOPICS} only). Returns the universal list
@@ -66,11 +66,9 @@ export function registerHelpCommands(
     .description(
       "Concept guides for AI users; an unknown topic falls back to `ib glossary lookup`."
     )
-    .action(async (topic?: string) => {
-      try {
+    .action(
+      guarded(async (topic?: string) => {
         writeJson(topic ? await runHelpTopic(topic, getClient) : runHelpList());
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 }

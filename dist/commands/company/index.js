@@ -1,6 +1,7 @@
 import { createStore, defaultCredentialsPath } from "../../auth/store.js";
 import { performSwitch, assertPersistedSwitchAllowed, } from "../../auth/switch.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { jsonAction, guarded } from "../_shared/action.js";
 import { CliError } from "../../api/errors.js";
 function companyName(c) {
     return c.asiakasNimi ?? c.name ?? "";
@@ -45,64 +46,41 @@ export function registerCompanyCommands(parent, getClient, isReadOnly) {
     company
         .command("list")
         .description("List available companies for the current user")
-        .action(async () => {
-        try {
-            const client = await getClient();
-            const result = await runCompanyList(client);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(jsonAction(getClient, runCompanyList));
     company
         .command("current")
         .description("Print the active company")
-        .action(async () => {
-        try {
-            const client = await getClient();
-            const result = await runCompanyCurrent(client);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(jsonAction(getClient, runCompanyCurrent));
     company
         .command("switch")
         .description("Switch the active company and persist the rotated JWT")
         .requiredOption("--to <asiakasId>", "Target asiakasId", (v) => Number(v))
-        .action(async (opts) => {
-        try {
-            assertPersistedSwitchAllowed(isReadOnly());
-            const store = createStore(defaultCredentialsPath());
-            const creds = await store.load();
-            if (!creds) {
-                failWith("Not logged in. Run `ib auth login` first.", 2);
-            }
-            const next = await performSwitch({
-                endpoint: creds.endpoint,
-                jwt: creds.jwt,
-                toAsiakasId: opts.to,
-            });
-            await store.save({
-                ...creds,
-                jwt: next.jwt,
-                ownerAsiakasId: next.ownerAsiakasId,
-                ownerAsiakasName: next.ownerAsiakasName,
-            });
-            writeJson({
-                ok: true,
-                activeCompany: {
-                    asiakasId: next.ownerAsiakasId,
-                    name: next.ownerAsiakasName,
-                },
-            });
+        .action(guarded(async (opts) => {
+        assertPersistedSwitchAllowed(isReadOnly());
+        const store = createStore(defaultCredentialsPath());
+        const creds = await store.load();
+        if (!creds) {
+            failWith("Not logged in. Run `ib auth login` first.", 2);
         }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const next = await performSwitch({
+            endpoint: creds.endpoint,
+            jwt: creds.jwt,
+            toAsiakasId: opts.to,
+        });
+        await store.save({
+            ...creds,
+            jwt: next.jwt,
+            ownerAsiakasId: next.ownerAsiakasId,
+            ownerAsiakasName: next.ownerAsiakasName,
+        });
+        writeJson({
+            ok: true,
+            activeCompany: {
+                asiakasId: next.ownerAsiakasId,
+                name: next.ownerAsiakasName,
+            },
+        });
+    }));
     // `ib company validate` was renamed to the top-level `ib validate` (clean
     // break, mirrors the ib changes→ib log rename). Old path errors with exit 4.
     company

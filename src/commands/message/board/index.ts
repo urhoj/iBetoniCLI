@@ -9,6 +9,7 @@ import {
 import { writeJson, exitWithError, failWith } from "../../../output/json.js";
 import { resolveDate, todayHelsinki } from "../../../dates.js";
 import type { CommandSpec } from "../../../output/help.js";
+import { guarded } from "../../_shared/action.js";
 
 /**
  * `ib message board` (alias `ib message ilmoitustaulu`) — the company
@@ -315,14 +316,12 @@ export function registerMessageBoardCommands(
       "List EVERY notice incl. expired/scheduled (GET /api/ilmoitustaulu/all). " +
         "Requires isAsiakasAdmin/isAsiakasEditor or isIlmoitustauluEditor."
     )
-    .action(async () => {
-      try {
+    .action(
+      guarded(async () => {
         const client = await getClient();
         writeJson(await runBoardAll(client));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   b.command("get <messageId>")
     .description(

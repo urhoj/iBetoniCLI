@@ -11,6 +11,7 @@ import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../api/writeFlags.js";
 import { writeJson, exitWithError } from "../../output/json.js";
+import { guarded } from "../_shared/action.js";
 
 interface RawSlow {
   procedure: string;
@@ -106,36 +107,30 @@ export function registerPerfCommands(parent: Command, getClient: () => Promise<A
     .description("Recent slow queries from the collector's ring buffer")
     .option("--limit <n>", "Max rows (default 50)", (v: string) => Number(v))
     .option("--env <name>", "Environment buffer to read (default: backend's current env)")
-    .action(async (opts: { limit?: number; env?: string }) => {
-      try {
+    .action(
+      guarded(async (opts: { limit?: number; env?: string }) => {
         writeJson(await runPerfSlow(await getClient(), opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   perf
     .command("stats")
     .description("Aggregate slow-query stats: top procedures, avg/max, by-entity")
     .option("--env <name>", "Environment buffer to read (default: backend's current env)")
-    .action(async (opts: { env?: string }) => {
-      try {
+    .action(
+      guarded(async (opts: { env?: string }) => {
         writeJson(await runPerfStats(await getClient(), opts));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   perf
     .command("config")
     .description("Collector thresholds + available environments")
-    .action(async () => {
-      try {
+    .action(
+      guarded(async () => {
         writeJson(await runPerfConfig(await getClient()));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   const clear = perf
     .command("clear")

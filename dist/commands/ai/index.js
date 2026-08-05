@@ -1,6 +1,7 @@
 import { CliError } from "../../api/errors.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
 import { parseId } from "../../targets.js";
+import { guarded } from "../_shared/action.js";
 /** GET /api/cli/ai/conversation/:id — developer-only, cross-tenant full transcript. */
 export async function runAiConversation(client, id) {
     if (!Number.isInteger(id) || id <= 0) {
@@ -39,27 +40,17 @@ export function registerAiCommands(parent, getClient, opts = {}) {
         .description("List recent /ai conversations (developer-only, cross-tenant) for audit; drill into one with `ib dev ai conversation <id>`")
         .option("--limit <n>", "Max rows to return (1-100, default 20)", (v) => Number(v))
         .option("--person <personId>", "Filter to one person's conversations", (v) => Number(v))
-        .action(async (opts) => {
-        try {
-            writeJson(await runAiConversationList(await getClient(), {
-                limit: opts.limit,
-                personId: opts.person,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        writeJson(await runAiConversationList(await getClient(), {
+            limit: opts.limit,
+            personId: opts.person,
+        }));
+    }));
     ai
         .command("conversation <conversationId>")
         .description("Fetch the full transcript of an /ai conversation by id (developer-only, cross-tenant)")
-        .action(async (idStr) => {
-        try {
-            writeJson(await runAiConversation(await getClient(), parseId(idStr, "conversationId")));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (idStr) => {
+        writeJson(await runAiConversation(await getClient(), parseId(idStr, "conversationId")));
+    }));
 }
 //# sourceMappingURL=index.js.map

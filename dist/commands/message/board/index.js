@@ -1,6 +1,7 @@
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../../output/json.js";
 import { resolveDate, todayHelsinki } from "../../../dates.js";
+import { guarded } from "../../_shared/action.js";
 /** Priority levels the board UI renders (info=primary, warning=warning, urgent=error). */
 const PRIORITIES = ["info", "warning", "urgent"];
 /**
@@ -195,15 +196,10 @@ export function registerMessageBoardCommands(parent, getClient) {
     b.command("all")
         .description("List EVERY notice incl. expired/scheduled (GET /api/ilmoitustaulu/all). " +
         "Requires isAsiakasAdmin/isAsiakasEditor or isIlmoitustauluEditor.")
-        .action(async () => {
-        try {
-            const client = await getClient();
-            writeJson(await runBoardAll(client));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async () => {
+        const client = await getClient();
+        writeJson(await runBoardAll(client));
+    }));
     b.command("get <messageId>")
         .description("Get one notice by id (no single-GET route — filtered client-side over /all, " +
         "so it needs the same admin/editor access). Unknown id → exit 5.")

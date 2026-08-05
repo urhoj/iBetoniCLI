@@ -11,9 +11,9 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { CliError } from "../../api/errors.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
 import { parseId } from "../../targets.js";
-
+import { guarded } from "../_shared/action.js";
 /** One row of the `ib dev ai conversations` browse list (no message bodies). */
 export interface AiConversationRow {
   conversationId: number;
@@ -78,29 +78,25 @@ export function registerAiCommands(
     )
     .option("--limit <n>", "Max rows to return (1-100, default 20)", (v) => Number(v))
     .option("--person <personId>", "Filter to one person's conversations", (v) => Number(v))
-    .action(async (opts: { limit?: number; person?: number }) => {
-      try {
+    .action(
+      guarded(async (opts: { limit?: number; person?: number }) => {
         writeJson(
           await runAiConversationList(await getClient(), {
             limit: opts.limit,
             personId: opts.person,
           })
         );
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   ai
     .command("conversation <conversationId>")
     .description(
       "Fetch the full transcript of an /ai conversation by id (developer-only, cross-tenant)"
     )
-    .action(async (idStr: string) => {
-      try {
+    .action(
+      guarded(async (idStr: string) => {
         writeJson(await runAiConversation(await getClient(), parseId(idStr, "conversationId")));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 }

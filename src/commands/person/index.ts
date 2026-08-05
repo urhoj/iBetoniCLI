@@ -37,6 +37,7 @@ import { registerPersonDayCommands } from "./day.js";
 import { registerPersonEmailCommands } from "./email.js";
 import { registerPersonAbsencesCommand } from "./absences.js";
 import { registerPersonActivityCommand } from "./activity.js";
+import { jsonAction, guarded } from "../_shared/action.js";
 
 export interface PersonListFilter {
   role?: string;
@@ -507,27 +508,23 @@ export function registerPersonCommands(
       "List persons the company OWNS instead of its members (the default)"
     )
     .option("--limit <n>", "Max rows", (v: string) => Math.min(Number(v), 500))
-    .action(async (opts: PersonListFilter) => {
-      try {
+    .action(
+      guarded(async (opts: PersonListFilter) => {
         const client = await getClient();
         const result = await runPersonList(client, opts);
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   p.command("get <personId>")
     .description("Get a single person by personId")
-    .action(async (idStr: string) => {
-      try {
+    .action(
+      guarded(async (idStr: string) => {
         const client = await getClient();
         const result = await runPersonGet(client, parseId(idStr, "personId"));
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   p.command("search [query]")
     .description("Free-text search for persons")
@@ -872,15 +869,13 @@ export function registerPersonCommands(
     .command("list <personId>")
     .description("List a person's roles in a company")
     .requiredOption("--asiakas <id>", "Target asiakasId", (v: string) => Number(v))
-    .action(async (personIdStr: string, opts: { asiakas: number }) => {
-      try {
+    .action(
+      guarded(async (personIdStr: string, opts: { asiakas: number }) => {
         const client = await getClient();
         const result = await runPersonRoleList(client, parseId(personIdStr, "personId"), opts.asiakas);
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   addWriteFlagsToCommand(
     personRole
@@ -954,42 +949,30 @@ export function registerPersonCommands(
     .description(
       "Explain a role name: typeId, display name, DB description/comment, access tiers, deprecation"
     )
-    .action(async (name: string) => {
-      try {
+    .action(
+      guarded(async (name: string) => {
         const client = await getClient();
         writeJson(await explainRole(client, name));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   // ─── self-introspection ───────────────────────────────────────────────────
   p.command("me")
     .description("Your own profile, your roles across all your companies, and actable companies")
-    .action(async () => {
-      try {
-        const client = await getClient();
-        const result = await runPersonMe(client);
-        writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+    .action(jsonAction(getClient, runPersonMe));
 
   p.command("companies [personId]")
     .description("List the companies a person belongs to (defaults to you)")
-    .action(async (personIdStr?: string) => {
-      try {
+    .action(
+      guarded(async (personIdStr?: string) => {
         const client = await getClient();
         const result = await runPersonCompanies(
           client,
           parseOptionalId(personIdStr, "personId")
         );
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   p.command("duplicates")
     .description(
@@ -998,16 +981,14 @@ export function registerPersonCommands(
         "company; --owner scans another tenant. Feeds `ib person merge`."
     )
     .option("--owner <id>", "ownerAsiakasId to scan (default: active company)", Number)
-    .action(async (opts: { owner?: number }) => {
-      try {
+    .action(
+      guarded(async (opts: { owner?: number }) => {
         const client = await getClient();
         const owner =
           opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
         writeJson(await runPersonDuplicates(client, owner));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 
   const personMergeCmd = p
     .command("merge")
@@ -1061,18 +1042,16 @@ export function registerPersonCommands(
     .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))
     .option("--limit <n>", "Max rows (default 100, cap 500)", (v: string) => Math.min(Number(v), 500), 100)
     .option("--field <name>", "Filter by changeTracker fieldName (e.g. asiakasPersonSetting)")
-    .action(async (personIdStr: string, opts: { owner?: number; limit: number; field?: string }) => {
-      try {
+    .action(
+      guarded(async (personIdStr: string, opts: { owner?: number; limit: number; field?: string }) => {
         const client = await getClient();
         const result = await runPersonHistory(client, parseId(personIdStr, "personId"), opts.limit, {
           owner: opts.owner,
           field: opts.field,
         });
         writeJson(result);
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 }
 
 interface RawPersonChangeRow {

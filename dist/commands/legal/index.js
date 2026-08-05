@@ -7,6 +7,7 @@ import { decodeJwtPayload } from "../../auth/jwt.js";
 import { lineDiff } from "../../textDiff.js";
 import { applyTextEdit, parseEditOp } from "../../textEdit.js";
 import { validateStructuredJson } from "./validateJson.js";
+import { guarded } from "../_shared/action.js";
 /** Lifecycle status values on legalDocuments.status (see backend migration). */
 export const LEGAL_STATUSES = ["draft", "active", "archived", "deleted"];
 const stripContent = (d) => {
@@ -347,133 +348,93 @@ export function registerLegalCommands(parent, getClient) {
     legal
         .command("types")
         .description("List legal document types (GET /api/legal-documents/types)")
-        .action(async () => {
-        try {
-            const client = await getClient();
-            writeJson(await runLegalTypes(client));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async () => {
+        const client = await getClient();
+        writeJson(await runLegalTypes(client));
+    }));
     legal
         .command("show <typeName>")
         .description("Current ACTIVE document of a type, incl. markdown content")
         .option("--meta", "Omit markdownContent (returns contentLength instead)")
-        .action(async (typeName, opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runLegalShow(client, typeName, !!opts.meta));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (typeName, opts) => {
+        const client = await getClient();
+        writeJson(await runLegalShow(client, typeName, !!opts.meta));
+    }));
     legal
         .command("active")
         .alias("list")
         .description("Current ACTIVE document of EVERY type (one row per type; hasActive:false where none)")
-        .action(async () => {
-        try {
-            const client = await getClient();
-            writeJson(await runLegalActive(client));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async () => {
+        const client = await getClient();
+        writeJson(await runLegalActive(client));
+    }));
     legal
         .command("status")
         .description("Which legal documents you have accepted / still need to accept")
         .option("--person <id>", "Check another person (developer/sysadmin only)", Number)
         .option("--owner <id>", "ownerAsiakasId scope (default: your company from the token)", Number)
-        .action(async (opts) => {
-        try {
-            const client = await getClient();
-            const claims = decodeJwtPayload(client.getCurrentToken());
-            const personId = opts.person ??
-                claims.personId ??
-                failWith("could not resolve personId from the active token — pass --person <id>", 4);
-            const owner = opts.owner ?? claims.ownerAsiakasId ?? null;
-            writeJson(await runLegalStatus(client, personId, owner));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (opts) => {
+        const client = await getClient();
+        const claims = decodeJwtPayload(client.getCurrentToken());
+        const personId = opts.person ??
+            claims.personId ??
+            failWith("could not resolve personId from the active token — pass --person <id>", 4);
+        const owner = opts.owner ?? claims.ownerAsiakasId ?? null;
+        writeJson(await runLegalStatus(client, personId, owner));
+    }));
     legal
         .command("versions <typeName>")
         .description("All versions of a document type (active + drafts + history); each row carries status")
         .option("--owner <id>", "Filter by ownerAsiakasId tenant scope", Number)
         .option("--status <status>", `Filter by lifecycle status (${LEGAL_STATUSES.join("|")})`)
-        .action(async (typeName, opts) => {
-        try {
-            if (opts.status && !LEGAL_STATUSES.includes(opts.status)) {
-                failWith(`Invalid --status "${opts.status}". Valid: ${LEGAL_STATUSES.join(", ")}`, 4);
-            }
-            const client = await getClient();
-            writeJson(await runLegalVersions(client, typeName, opts.owner, opts.status));
+        .action(guarded(async (typeName, opts) => {
+        if (opts.status && !LEGAL_STATUSES.includes(opts.status)) {
+            failWith(`Invalid --status "${opts.status}". Valid: ${LEGAL_STATUSES.join(", ")}`, 4);
         }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        writeJson(await runLegalVersions(client, typeName, opts.owner, opts.status));
+    }));
     legal
         .command("drafts")
         .description("Unpublished DRAFT versions across all types (status='draft'; content stripped)")
-        .action(async () => {
-        try {
-            const client = await getClient();
-            writeJson(await runLegalDrafts(client));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async () => {
+        const client = await getClient();
+        writeJson(await runLegalDrafts(client));
+    }));
     legal
         .command("diff [a] [b]")
         .description("Line diff: two documentIds (<a> old, <b> new), or --type (newest draft vs active)")
         .option("--type <typeName>", "Diff the newest DRAFT vs the current ACTIVE version of this type")
         .option("--owner <id>", "ownerAsiakasId scope for --type resolution (e.g. 1349 = BetoniJerry)", Number)
-        .action(async (aStr, bStr, opts) => {
-        try {
-            let input;
-            if (opts.type) {
-                if (aStr !== undefined || bStr !== undefined) {
-                    failWith("pass either <a> <b> documentIds OR --type <name>, not both", 4);
-                }
-                input = { type: opts.type, owner: opts.owner };
+        .action(guarded(async (aStr, bStr, opts) => {
+        let input;
+        if (opts.type) {
+            if (aStr !== undefined || bStr !== undefined) {
+                failWith("pass either <a> <b> documentIds OR --type <name>, not both", 4);
             }
-            else {
-                if (opts.owner !== undefined)
-                    failWith("--owner only applies with --type", 4);
-                if (aStr === undefined || bStr === undefined) {
-                    failWith("provide two positive documentIds (<a> <b>) or use --type <name>", 4);
-                }
-                const a = parseId(aStr, "version");
-                const b = parseId(bStr, "version");
-                input = { a, b };
+            input = { type: opts.type, owner: opts.owner };
+        }
+        else {
+            if (opts.owner !== undefined)
+                failWith("--owner only applies with --type", 4);
+            if (aStr === undefined || bStr === undefined) {
+                failWith("provide two positive documentIds (<a> <b>) or use --type <name>", 4);
             }
-            const client = await getClient();
-            writeJson(await runLegalDiff(client, input));
+            const a = parseId(aStr, "version");
+            const b = parseId(bStr, "version");
+            input = { a, b };
         }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        const client = await getClient();
+        writeJson(await runLegalDiff(client, input));
+    }));
     legal
         .command("get <documentIdOrType>")
         .description("One document version by id — or a typeName (e.g. PRIVACY) for its current ACTIVE version")
-        .action(async (refStr) => {
-        try {
-            const ref = parseLegalGetRef(refStr);
-            const client = await getClient();
-            writeJson(await runLegalGet(client, ref));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (refStr) => {
+        const ref = parseLegalGetRef(refStr);
+        const client = await getClient();
+        writeJson(await runLegalGet(client, ref));
+    }));
     const saveCmd = legal
         .command("save")
         .description("Create a NEW document version (immutable; draft unless --activate)")
@@ -599,18 +560,13 @@ export function registerLegalCommands(parent, getClient) {
         // root-option reuse test in test/reference/help-wiring.test.ts).
         .option("--doc-version <v>", "Only acceptances of this version string")
         .option("--limit <n>", "Max rows (default 500, cap 500)", (v) => Math.min(Number(v), 500))
-        .action(async (typeName, opts) => {
-        try {
-            const client = await getClient();
-            writeJson(await runLegalAcceptances(client, typeName, {
-                version: opts.docVersion,
-                limit: opts.limit,
-            }));
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (typeName, opts) => {
+        const client = await getClient();
+        writeJson(await runLegalAcceptances(client, typeName, {
+            version: opts.docVersion,
+            limit: opts.limit,
+        }));
+    }));
     const acceptCmd = legal
         .command("accept [typeName]")
         .description("Record YOUR OWN acceptance of the current active version (developer testing aid)")

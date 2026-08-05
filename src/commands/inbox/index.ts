@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { writeJson, exitWithError } from "../../output/json.js";
-
+import { writeJson } from "../../output/json.js";
+import { guarded } from "../_shared/action.js";
 /**
  * The aggregated operator-inbox rollup returned by `GET /api/cli/inbox`.
  * Counts always present; the per-signal `items` are present only with `--details`.
@@ -62,12 +62,10 @@ export function registerInboxCommand(
       "--details",
       "Include slimmed top-items per signal, not just counts"
     )
-    .action(async (opts: { details?: boolean }) => {
-      try {
+    .action(
+      guarded(async (opts: { details?: boolean }) => {
         const client = await getClient();
         writeJson(await runInbox(client, { details: opts.details }));
-      } catch (e) {
-        exitWithError(e);
-      }
-    });
+      })
+    );
 }

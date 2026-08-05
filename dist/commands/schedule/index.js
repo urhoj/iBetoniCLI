@@ -1,6 +1,7 @@
-import { writeJson, exitWithError } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
 import { runKeikkaList } from "../keikka/index.js";
 import { todayHelsinki, resolveDate, addDaysISO } from "../../dates.js";
+import { jsonAction, guarded } from "../_shared/action.js";
 export { addDaysISO };
 /**
  * `ib schedule today` — thin wrapper around runKeikkaList with from=to=today.
@@ -39,39 +40,20 @@ export function registerScheduleCommands(parent, getClient) {
     const s = parent.command("schedule").description("Schedule (keikka window) commands");
     s.command("today")
         .description("List today's keikkas (from=to=today)")
-        .action(async () => {
-        try {
-            const client = await getClient();
-            const result = await runScheduleToday(client);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(jsonAction(getClient, runScheduleToday));
     s.command("day <date>")
         .description("List keikkas for a single date (YYYY-MM-DD)")
-        .action(async (date) => {
-        try {
-            const client = await getClient();
-            const result = await runScheduleDay(client, date);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (date) => {
+        const client = await getClient();
+        const result = await runScheduleDay(client, date);
+        writeJson(result);
+    }));
     s.command("week <start>")
         .description("List keikkas for the 7-day window starting <start> (YYYY-MM-DD)")
-        .action(async (start) => {
-        try {
-            const client = await getClient();
-            const result = await runScheduleWeek(client, start);
-            writeJson(result);
-        }
-        catch (e) {
-            exitWithError(e);
-        }
-    });
+        .action(guarded(async (start) => {
+        const client = await getClient();
+        const result = await runScheduleWeek(client, start);
+        writeJson(result);
+    }));
 }
 //# sourceMappingURL=index.js.map
