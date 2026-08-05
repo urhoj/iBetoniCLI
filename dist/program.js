@@ -306,9 +306,7 @@ export function buildProgram() {
                 failWith("Missing required flag: --reason", 4);
             try {
                 const client = await getClient();
-                writeJson(await runReferenceDetailEdit(client, commandParts, field, editOp, {
-                    dryRun: opts.dryRun, reason: opts.reason, idempotencyKey: opts.idempotencyKey,
-                }, getCallerTier()));
+                writeJson(await runReferenceDetailEdit(client, commandParts, field, editOp, opts, getCallerTier()));
             }
             catch (e) {
                 exitWithError(e);
@@ -317,11 +315,7 @@ export function buildProgram() {
         }
         assertAiConfidence(opts.aiConfidence);
         const client = await getClient();
-        const result = await runReferenceDetailSet(client, commandParts, { summary: opts.summary, detail: opts.detail, aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        }, getCallerTier());
+        const result = await runReferenceDetailSet(client, commandParts, { summary: opts.summary, detail: opts.detail, aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }, opts, getCallerTier());
         writeJson(result);
     }));
     // `delete` — prune one catalog row by its EXACT key. Deliberately NOT gated by
@@ -334,9 +328,7 @@ export function buildProgram() {
         if (!opts.dryRun && !opts.reason)
             failWith("Missing required flag: --reason", 4);
         const client = await getClient();
-        writeJson(await runReferenceDetailDelete(client, commandParts, {
-            dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
-        }));
+        writeJson(await runReferenceDetailDelete(client, commandParts, opts));
     }));
     // `lint` — audit the catalog for orphan rows (keys with no live command left
     // by a rename/re-home). Read-only (one GET + local diff); --strict is a CI gate.

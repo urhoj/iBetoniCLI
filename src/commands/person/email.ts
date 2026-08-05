@@ -94,11 +94,7 @@ export function registerPersonEmailCommands(
     guarded(async (personRef: string, emailAddr: string, opts: WriteFlags) => {
       if (!opts.reason) failWith("Missing required flag: --reason", 4);
       writeJson(
-        await runPersonEmailAdd(await getClient(), personRef, emailAddr, {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        })
+        await runPersonEmailAdd(await getClient(), personRef, emailAddr, opts)
       );
     })
   );
@@ -109,11 +105,7 @@ export function registerPersonEmailCommands(
     guarded(async (personRef: string, emailAddr: string, opts: WriteFlags) => {
       if (!opts.reason) failWith("Missing required flag: --reason", 4);
       writeJson(
-        await runPersonEmailSetMain(await getClient(), personRef, emailAddr, {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        })
+        await runPersonEmailSetMain(await getClient(), personRef, emailAddr, opts)
       );
     })
   );
@@ -124,11 +116,7 @@ export function registerPersonEmailCommands(
     guarded(async (personRef: string, emailAddr: string, opts: WriteFlags) => {
       if (!opts.reason) failWith("Missing required flag: --reason", 4);
       writeJson(
-        await runPersonEmailRemove(await getClient(), personRef, emailAddr, {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        })
+        await runPersonEmailRemove(await getClient(), personRef, emailAddr, opts)
       );
     })
   );

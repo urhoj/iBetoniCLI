@@ -227,12 +227,12 @@ export function registerTaskCommands(parent, getClient, opts = {}) {
         .option("--asiakas <id>", "Company (asiakas) the task is scoped to; omit = internal/global", intFlag("--asiakas"))
         .option("--cadence <spec>", "<count>/<unit>, unit day|week|month, count 1-120 (e.g. 1/month, 2/week) — required")
         .option("--first-due <date>", "First due date (YYYY-MM-DD or today/tomorrow); default: due immediately")
-        .option("--feedback <id>", "cliFeedback id this task graduated from (provenance)", intFlag("--feedback"))).action(jsonAction(getClient, (client, opts) => runTaskAdd(client, opts, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })));
+        .option("--feedback <id>", "cliFeedback id this task graduated from (provenance)", intFlag("--feedback"))).action(jsonAction(getClient, (client, opts) => runTaskAdd(client, opts, opts)));
     addWriteFlagsToCommand(t.command("complete <id>")
         .option("--notes <text>", "Result summary stored on the log row")
         .option("--skipped", "Log outcome=skipped (advances nextDueAt)")
         .option("--failed", "Log outcome=failed (task STAYS due)")
-        .option("--agent <agent>", "claude | hermes — set when an AI completes the task")).action(jsonAction(getClient, (client, idStr, opts) => runTaskComplete(client, parseTaskId(idStr, "complete"), opts, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })));
+        .option("--agent <agent>", "claude | hermes — set when an AI completes the task")).action(jsonAction(getClient, (client, idStr, opts) => runTaskComplete(client, parseTaskId(idStr, "complete"), opts, opts)));
     addWriteFlagsToCommand(t.command("set <id>")
         .option("--title <text>", "New title")
         .option("--instructions <text>", 'New instructions ("" clears)')
@@ -244,7 +244,7 @@ export function registerTaskCommands(parent, getClient, opts = {}) {
         .option("--cadence <spec>", "<count>/<unit>, unit day|week|month, count 1-120")
         .option("--next-due <date>", "Override nextDueAt (YYYY-MM-DD or today/tomorrow)")
         .option("--activate", "Reactivate the task")
-        .option("--deactivate", "Deactivate (soft-retire) the task")).action(jsonAction(getClient, (client, idStr, opts) => runTaskSet(client, parseTaskId(idStr, "set"), opts, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })));
+        .option("--deactivate", "Deactivate (soft-retire) the task")).action(jsonAction(getClient, (client, idStr, opts) => runTaskSet(client, parseTaskId(idStr, "set"), opts, opts)));
     t.command("log <id>")
         .option("--limit <n>", "Max rows (default 50, cap 200)", intFlag("--limit"))
         .action(guarded(async (idStr, opts) => {

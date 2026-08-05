@@ -319,8 +319,8 @@ export function registerTaskCommands(
       .option("--first-due <date>", "First due date (YYYY-MM-DD or today/tomorrow); default: due immediately")
       .option("--feedback <id>", "cliFeedback id this task graduated from (provenance)", intFlag("--feedback"))
   ).action(
-    jsonAction(getClient, (client, opts: TaskAddInput & { dryRun?: boolean; idempotencyKey?: string; reason?: string }) =>
-      runTaskAdd(client, opts, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })
+    jsonAction(getClient, (client, opts: TaskAddInput & WriteFlags) =>
+      runTaskAdd(client, opts, opts)
     )
   );
 
@@ -331,8 +331,8 @@ export function registerTaskCommands(
       .option("--failed", "Log outcome=failed (task STAYS due)")
       .option("--agent <agent>", "claude | hermes — set when an AI completes the task")
   ).action(
-    jsonAction(getClient, (client, idStr: string, opts: TaskCompleteInput & { dryRun?: boolean; idempotencyKey?: string; reason?: string }) =>
-      runTaskComplete(client, parseTaskId(idStr, "complete"), opts, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })
+    jsonAction(getClient, (client, idStr: string, opts: TaskCompleteInput & WriteFlags) =>
+      runTaskComplete(client, parseTaskId(idStr, "complete"), opts, opts)
     )
   );
 
@@ -350,8 +350,8 @@ export function registerTaskCommands(
       .option("--activate", "Reactivate the task")
       .option("--deactivate", "Deactivate (soft-retire) the task")
   ).action(
-    jsonAction(getClient, (client, idStr: string, opts: TaskSetInput & { dryRun?: boolean; idempotencyKey?: string; reason?: string }) =>
-      runTaskSet(client, parseTaskId(idStr, "set"), opts, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })
+    jsonAction(getClient, (client, idStr: string, opts: TaskSetInput & WriteFlags) =>
+      runTaskSet(client, parseTaskId(idStr, "set"), opts, opts)
     )
   );
 

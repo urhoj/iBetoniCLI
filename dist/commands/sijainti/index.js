@@ -774,18 +774,13 @@ export function registerSijaintiCommands(parent, getClient) {
         // persistSijaintiCoords) and a ZERO_RESULTS address fails fast here.
         if (opts.geocode)
             await applyGeocodeToBody(client, body);
-        const flags = {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        };
-        const result = await runSijaintiCreate(client, body, flags);
+        const result = await runSijaintiCreate(client, body, opts);
         // The add proc drops lat/lng; persist them via the dedicated updateLatLng
         // route (the FE's create→saveLatLng flow) and echo { lat, lng, coordsPersisted }.
         const newId = !opts.dryRun
             ? result?.sijaintiId
             : undefined;
-        writeJson(await persistSijaintiCoords(client, result, newId, { lat: body.lat, lng: body.lng }, flags));
+        writeJson(await persistSijaintiCoords(client, result, newId, { lat: body.lat, lng: body.lng }, opts));
     }));
     const updateCmd = s
         .command("update")
@@ -822,16 +817,11 @@ export function registerSijaintiCommands(parent, getClient) {
         if (body.sijaintiId === undefined) {
             failWith("update requires sijaintiId — pass --id or include it in --body", 4);
         }
-        const flags = {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        };
-        const { result, merged, geocodeFailed } = await runSijaintiUpdate(client, body, flags, !!opts.geocode);
+        const { result, merged, geocodeFailed } = await runSijaintiUpdate(client, body, opts, !!opts.geocode);
         // The save proc drops lat/lng; persist them via the dedicated updateLatLng
         // route (the FE's update→saveLatLng flow) and echo { lat, lng, coordsPersisted }.
         const sijaintiId = !opts.dryRun ? Number(body.sijaintiId) : undefined;
-        const echo = await persistSijaintiCoords(client, result, sijaintiId, { lat: merged.lat, lng: merged.lng }, flags);
+        const echo = await persistSijaintiCoords(client, result, sijaintiId, { lat: merged.lat, lng: merged.lng }, opts);
         if (geocodeFailed) {
             const base = echo && typeof echo === "object"
                 ? echo
@@ -859,11 +849,7 @@ export function registerSijaintiCommands(parent, getClient) {
         }
         assertPuomiFlags(opts.puomiMin, opts.puomiMax);
         const client = await getClient();
-        const result = await runSijaintiSetJerry(client, parseId(idStr, "sijaintiId"), !!opts.on, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        }, opts.radius, opts.puomiMin !== undefined || opts.puomiMax !== undefined
+        const result = await runSijaintiSetJerry(client, parseId(idStr, "sijaintiId"), !!opts.on, opts, opts.radius, opts.puomiMin !== undefined || opts.puomiMax !== undefined
             ? { min: opts.puomiMin, max: opts.puomiMax }
             : undefined);
         writeJson(result);

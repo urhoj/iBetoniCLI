@@ -18,6 +18,7 @@ import { guarded } from "../_shared/action.js";
 import {
   runCombinatorDuplicates,
   runCombinatorMerge,
+  registerCombinatorCommands,
   type CombinatorMergeOptions,
 } from "../_shared/combinator.js";
 // PRH lookups live in the shared module (also powers `ib opendata prh`). Aliased
@@ -1172,11 +1173,7 @@ export function registerCustomerCommands(
       } catch (validationErr) {
         failWith(errorMessage(validationErr), 4);
       }
-      const result = await runCustomerModulesApply(client, asiakasId, changes, {
-        dryRun: opts.dryRun,
-        idempotencyKey: opts.idempotencyKey,
-        reason: opts.reason,
-      });
+      const result = await runCustomerModulesApply(client, asiakasId, changes, opts);
       writeJson(result);
     })
   );
@@ -1198,11 +1195,7 @@ export function registerCustomerCommands(
       }
       if (opts.set || opts.reset) {
         const changes = operatorPresetChanges(!!opts.set);
-        const result = await runCustomerModulesApply(client, asiakasId, changes, {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        });
+        const result = await runCustomerModulesApply(client, asiakasId, changes, opts);
         writeJson(result);
         return;
       }
@@ -1235,11 +1228,7 @@ export function registerCustomerCommands(
       } catch (validationErr) {
         failWith(errorMessage(validationErr), 4);
       }
-      writeJson(await runCustomerSettingsApply(client, asiakasId, changes, {
-        dryRun: opts.dryRun,
-        idempotencyKey: opts.idempotencyKey,
-        reason: opts.reason,
-      }));
+      writeJson(await runCustomerSettingsApply(client, asiakasId, changes, opts));
     })
   );
 
@@ -1394,11 +1383,7 @@ export function registerCustomerCommands(
     async (opts: CustomerUpsertOptions & WriteFlags) => {
       try {
         const client = await getClient();
-        const result = await runCustomerUpsert(client, opts, {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        });
+        const result = await runCustomerUpsert(client, opts, opts);
         writeJson(result);
       } catch (e) {
         // Caller input errors (no key / ambiguous match) are exit 4; API/network
@@ -1487,64 +1472,13 @@ export function registerCustomerCommands(
       })
     );
 
-  c.command("duplicates")
-    .option("--owner <id>", "ownerAsiakasId to scan (default: active company)", Number)
-    .action(
-      guarded(async (opts: { owner?: number }) => {
-        const client = await getClient();
-        const owner =
-          opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
-        writeJson(await runCustomerDuplicates(client, owner));
-      })
-    );
-
-  const mergeCmd = c
-    .command("merge")
-    .requiredOption("--main <id>", "asiakasId to KEEP (references merge into this)", Number)
-    .requiredOption("--secondary <id>", "asiakasId to REMOVE (merged away, then deleted)", Number)
-    .option("--owner <id>", "ownerAsiakasId (default: active company)", Number)
-    .option("--allow-big-merge", "System-admin: permit a merge above the safety row cap");
-  addWriteFlagsToCommand(mergeCmd).action(
-    guarded(async (
-      opts: WriteFlags & {
-        main: number;
-        secondary: number;
-        owner?: number;
-        allowBigMerge?: boolean;
-      }
-    ) => {
-      if (
-        !Number.isInteger(opts.main) || opts.main <= 0 ||
-        !Number.isInteger(opts.secondary) || opts.secondary <= 0
-      ) {
-        failWith("--main and --secondary must be positive integer asiakasIds", 4);
-      }
-      if (opts.main === opts.secondary) {
-        failWith("--main and --secondary must differ", 4);
-      }
-      if (!opts.dryRun && !opts.reason) {
-        failWith(
-          "customer merge is irreversible — pass --reason (or --dry-run to preview via /validate)",
-          4
-        );
-      }
-      const client = await getClient();
-      const owner =
-        opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
-      writeJson(
-        await runCustomerMerge(
-          client,
-          {
-            mainId: opts.main,
-            secondaryId: opts.secondary,
-            ownerAsiakasId: owner,
-            allowBigMerge: opts.allowBigMerge,
-          },
-          { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }
-        )
-      );
-    })
-  );
+  registerCombinatorCommands(c, getClient, {
+    base: "asiakas-combinator",
+    idFields: ASIAKAS_MERGE_ID_FIELDS,
+    entityNoun: "customer",
+    idLabel: "asiakasId",
+    allowBigMerge: true,
+  });
 }
 
 /**

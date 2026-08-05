@@ -50,7 +50,7 @@ import { registerImpersonationCommands } from "./commands/dev/impersonation/inde
 import { runReferenceDump, fetchPrimerGlossary } from "./reference/dump.js";
 import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailEdit, runReferenceDetailDelete, runReferenceDetailLint } from "./reference/detail.js";
 import { parseEditOp } from "./textEdit.js";
-import { addWriteFlagsToCommand } from "./api/writeFlags.js";
+import { addWriteFlagsToCommand, type WriteFlags } from "./api/writeFlags.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "./assess.js";
 import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDomain } from "./reference/commandsList.js";
 import { renderDomainHelp } from "./reference/domain.js";
@@ -338,14 +338,11 @@ export function buildProgram(): Command {
   addWriteFlagsToCommand(addAssessWriteFlags(detailSet)).action(
     guarded(async (
       commandParts: string[],
-      opts: {
+      opts: WriteFlags & {
         summary?: string;
         detail?: string;
         aiConfidence?: number;
         needsHumanReview?: boolean;
-        dryRun?: boolean;
-        idempotencyKey?: string;
-        reason?: string;
         field?: string;
         replace?: string;
         with?: string;
@@ -373,9 +370,7 @@ export function buildProgram(): Command {
         try {
           const client = await getClient();
           writeJson(
-            await runReferenceDetailEdit(client, commandParts, field, editOp, {
-              dryRun: opts.dryRun, reason: opts.reason, idempotencyKey: opts.idempotencyKey,
-            }, getCallerTier())
+            await runReferenceDetailEdit(client, commandParts, field, editOp, opts, getCallerTier())
           );
         } catch (e) {
           exitWithError(e);
@@ -388,11 +383,7 @@ export function buildProgram(): Command {
         client,
         commandParts,
         { summary: opts.summary, detail: opts.detail, aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview },
-        {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        },
+        opts,
         getCallerTier()
       );
       writeJson(result);
@@ -406,17 +397,10 @@ export function buildProgram(): Command {
     .command("delete")
     .argument("<command...>", "The exact stored command key after `ib` (e.g. ai conversation)");
   addWriteFlagsToCommand(detailDelete).action(
-    guarded(async (
-      commandParts: string[],
-      opts: { dryRun?: boolean; idempotencyKey?: string; reason?: string }
-    ) => {
+    guarded(async (commandParts: string[], opts: WriteFlags) => {
       if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
       const client = await getClient();
-      writeJson(
-        await runReferenceDetailDelete(client, commandParts, {
-          dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
-        })
-      );
+      writeJson(await runReferenceDetailDelete(client, commandParts, opts));
     })
   );
 

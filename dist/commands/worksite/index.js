@@ -6,8 +6,7 @@ import { parseJsonBodyFlag, resolveJsonObjectBody } from "../../api/parseBody.js
 import { registerLogAlias } from "../log/index.js";
 import { resolveTarget, parseId, resolveSearchQuery, cappedInt } from "../../targets.js";
 import { runAddressDashboard, } from "../_shared/addressDashboard.js";
-import { runCombinatorDuplicates, runCombinatorMerge, } from "../_shared/combinator.js";
-import { resolveActiveOwnerAsiakasId } from "../../owner.js";
+import { runCombinatorDuplicates, runCombinatorMerge, registerCombinatorCommands, } from "../_shared/combinator.js";
 import { guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 /**
@@ -384,11 +383,7 @@ export function registerWorksiteCommands(parent, getClient) {
     addWriteFlagsToCommand(createCmd).action(guarded(async (opts) => {
         const client = await getClient();
         const parsed = parseJsonBodyFlag(opts.body);
-        const result = await runWorksiteCreate(client, parsed, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        });
+        const result = await runWorksiteCreate(client, parsed, opts);
         writeJson(result);
     }));
     const updateCmd = w
@@ -425,7 +420,7 @@ export function registerWorksiteCommands(parent, getClient) {
         }
         const client = await getClient();
         const ownerAsiakasId = resolveOwnerAsiakasId(client);
-        const result = await runWorksiteUpdate(client, { tyomaaId: parseId(idStr, "tyomaaId"), ownerAsiakasId, yyyymmdd: opts.yyyymmdd }, patch, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason });
+        const result = await runWorksiteUpdate(client, { tyomaaId: parseId(idStr, "tyomaaId"), ownerAsiakasId, yyyymmdd: opts.yyyymmdd }, patch, opts);
         writeJson(result);
     }));
     addWriteFlagsToCommand(w
@@ -489,32 +484,11 @@ export function registerWorksiteCommands(parent, getClient) {
         writeJson(result);
     }));
     registerLogAlias(w, getClient, "tyomaa", "tyomaaId");
-    w.command("duplicates")
-        .option("--owner <id>", "ownerAsiakasId to scan (default: active company)", Number)
-        .action(guarded(async (opts) => {
-        const client = await getClient();
-        const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
-        writeJson(await runWorksiteDuplicates(client, owner));
-    }));
-    const worksiteMergeCmd = w
-        .command("merge")
-        .requiredOption("--main <id>", "tyomaaId to KEEP (references merge into this)", Number)
-        .requiredOption("--secondary <id>", "tyomaaId to REMOVE (merged away, then deleted)", Number)
-        .option("--owner <id>", "ownerAsiakasId (default: active company)", Number);
-    addWriteFlagsToCommand(worksiteMergeCmd).action(guarded(async (opts) => {
-        if (!Number.isInteger(opts.main) || opts.main <= 0 ||
-            !Number.isInteger(opts.secondary) || opts.secondary <= 0) {
-            failWith("--main and --secondary must be positive integer tyomaaIds", 4);
-        }
-        if (opts.main === opts.secondary) {
-            failWith("--main and --secondary must differ", 4);
-        }
-        if (!opts.dryRun && !opts.reason) {
-            failWith("worksite merge is irreversible — pass --reason (or --dry-run to preview via /validate)", 4);
-        }
-        const client = await getClient();
-        const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
-        writeJson(await runWorksiteMerge(client, { mainId: opts.main, secondaryId: opts.secondary, ownerAsiakasId: owner }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
-    }));
+    registerCombinatorCommands(w, getClient, {
+        base: "tyomaa-combinator",
+        idFields: TYOMAA_MERGE_ID_FIELDS,
+        entityNoun: "worksite",
+        idLabel: "tyomaaId",
+    });
 }
 //# sourceMappingURL=index.js.map

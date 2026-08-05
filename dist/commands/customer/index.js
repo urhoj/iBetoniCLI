@@ -9,7 +9,7 @@ import { resolveTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTarget
 import { resolveDate } from "../../dates.js";
 import { runPersonRoleList } from "../person/index.js";
 import { guarded } from "../_shared/action.js";
-import { runCombinatorDuplicates, runCombinatorMerge, } from "../_shared/combinator.js";
+import { runCombinatorDuplicates, runCombinatorMerge, registerCombinatorCommands, } from "../_shared/combinator.js";
 // PRH lookups live in the shared module (also powers `ib opendata prh`). Aliased
 // to the historical names so internal `--from-prh` call sites and the hidden
 // `ib customer prh` alias are unchanged; re-exported for importers/tests.
@@ -797,11 +797,7 @@ export function registerCustomerCommands(parent, getClient) {
         catch (validationErr) {
             failWith(errorMessage(validationErr), 4);
         }
-        const result = await runCustomerModulesApply(client, asiakasId, changes, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        });
+        const result = await runCustomerModulesApply(client, asiakasId, changes, opts);
         writeJson(result);
     }));
     const operatorCmd = addAsiakasTargetOption(c.command("operator [asiakasId]"))
@@ -815,11 +811,7 @@ export function registerCustomerCommands(parent, getClient) {
         }
         if (opts.set || opts.reset) {
             const changes = operatorPresetChanges(!!opts.set);
-            const result = await runCustomerModulesApply(client, asiakasId, changes, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            });
+            const result = await runCustomerModulesApply(client, asiakasId, changes, opts);
             writeJson(result);
             return;
         }
@@ -846,11 +838,7 @@ export function registerCustomerCommands(parent, getClient) {
         catch (validationErr) {
             failWith(errorMessage(validationErr), 4);
         }
-        writeJson(await runCustomerSettingsApply(client, asiakasId, changes, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        }));
+        writeJson(await runCustomerSettingsApply(client, asiakasId, changes, opts));
     }));
     c.command("search [query]")
         .option("--search <s>", "Search query (alias for the <query> positional)")
@@ -980,11 +968,7 @@ export function registerCustomerCommands(parent, getClient) {
     addWriteFlagsToCommand(upsertCmd).action(async (opts) => {
         try {
             const client = await getClient();
-            const result = await runCustomerUpsert(client, opts, {
-                dryRun: opts.dryRun,
-                idempotencyKey: opts.idempotencyKey,
-                reason: opts.reason,
-            });
+            const result = await runCustomerUpsert(client, opts, opts);
             writeJson(result);
         }
         catch (e) {
@@ -1045,39 +1029,13 @@ export function registerCustomerCommands(parent, getClient) {
         const result = await runCustomerPersonList(client, resolveAsiakasTarget(asiakasIdStr, opts.asiakas), opts.role, opts.includeRoles);
         writeJson(result);
     }));
-    c.command("duplicates")
-        .option("--owner <id>", "ownerAsiakasId to scan (default: active company)", Number)
-        .action(guarded(async (opts) => {
-        const client = await getClient();
-        const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
-        writeJson(await runCustomerDuplicates(client, owner));
-    }));
-    const mergeCmd = c
-        .command("merge")
-        .requiredOption("--main <id>", "asiakasId to KEEP (references merge into this)", Number)
-        .requiredOption("--secondary <id>", "asiakasId to REMOVE (merged away, then deleted)", Number)
-        .option("--owner <id>", "ownerAsiakasId (default: active company)", Number)
-        .option("--allow-big-merge", "System-admin: permit a merge above the safety row cap");
-    addWriteFlagsToCommand(mergeCmd).action(guarded(async (opts) => {
-        if (!Number.isInteger(opts.main) || opts.main <= 0 ||
-            !Number.isInteger(opts.secondary) || opts.secondary <= 0) {
-            failWith("--main and --secondary must be positive integer asiakasIds", 4);
-        }
-        if (opts.main === opts.secondary) {
-            failWith("--main and --secondary must differ", 4);
-        }
-        if (!opts.dryRun && !opts.reason) {
-            failWith("customer merge is irreversible — pass --reason (or --dry-run to preview via /validate)", 4);
-        }
-        const client = await getClient();
-        const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
-        writeJson(await runCustomerMerge(client, {
-            mainId: opts.main,
-            secondaryId: opts.secondary,
-            ownerAsiakasId: owner,
-            allowBigMerge: opts.allowBigMerge,
-        }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
-    }));
+    registerCombinatorCommands(c, getClient, {
+        base: "asiakas-combinator",
+        idFields: ASIAKAS_MERGE_ID_FIELDS,
+        entityNoun: "customer",
+        idLabel: "asiakasId",
+        allowBigMerge: true,
+    });
 }
 /**
  * Resolve the caller's current `ownerAsiakasId`. Used by every customer

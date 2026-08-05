@@ -1,5 +1,5 @@
 import { listEnvelope, toListEnvelope } from "../../../api/envelopes.js";
-import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../../api/writeFlags.js";
+import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
 import { resolveThreadId } from "./resolveThread.js";
 import { parseOptionalId, resolveSearchQuery } from "../../../targets.js";
@@ -255,11 +255,7 @@ export function registerMessageChatCommands(parent, getClient) {
             thread: opts.thread,
             tarjous: opts.tarjous,
         });
-        writeJson(await runChatDelete(client, id, messageId, {
-            reason: opts.reason,
-            idempotencyKey: opts.idempotencyKey,
-            dryRun: opts.dryRun,
-        }));
+        writeJson(await runChatDelete(client, id, messageId, opts));
     }));
     const editCmd = c
         .command("edit <messageId>")
@@ -291,9 +287,7 @@ export function registerMessageChatCommands(parent, getClient) {
             failWith("messageId is required", 4);
         const client = await getClient();
         const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
-        writeJson(await runChatRestore(client, id, messageId, {
-            reason: opts.reason, idempotencyKey: opts.idempotencyKey, dryRun: opts.dryRun,
-        }));
+        writeJson(await runChatRestore(client, id, messageId, opts));
     }));
 }
 //# sourceMappingURL=index.js.map

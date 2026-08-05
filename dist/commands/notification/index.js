@@ -134,11 +134,7 @@ export function registerNotificationCommands(parent, getClient) {
             title: opts.title,
             body: opts.body,
             data: opts.data,
-        }, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        });
+        }, opts);
         writeJson(result);
     }));
     const email = n
@@ -160,11 +156,7 @@ export function registerNotificationCommands(parent, getClient) {
             throw new CliError("--from-brand must be 'betoni' or 'betonijerry'", 400, null, exitCodeFromStatus(400));
         }
         const html = resolveEmailHtml({ html: opts.html, htmlBody: opts.htmlBody });
-        const result = await runNotificationEmailSend(await getClient(), { recipient, subject: opts.subject, text: opts.body, html, fromBrand: brand }, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        });
+        const result = await runNotificationEmailSend(await getClient(), { recipient, subject: opts.subject, text: opts.body, html, fromBrand: brand }, opts);
         writeJson(result);
     }));
 }

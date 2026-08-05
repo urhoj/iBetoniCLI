@@ -10,7 +10,11 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { qs } from "../../api/query.js";
-import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../api/writeFlags.js";
+import {
+  addWriteFlagsToCommand,
+  writeFlagsToHeaders,
+  type WriteFlags,
+} from "../../api/writeFlags.js";
 import { writeJson } from "../../output/json.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 
@@ -76,7 +80,7 @@ export async function runPerfConfig(client: ApiClient): Promise<Record<string, u
 /** DELETE the buffer. --dry-run resolves CLIENT-SIDE (the route honours no X-Dry-Run). */
 export async function runPerfClear(
   client: ApiClient,
-  opts: { env?: string; reason?: string; idempotencyKey?: string; dryRun?: boolean }
+  opts: WriteFlags & { env?: string }
 ): Promise<unknown> {
   const path = `/api/admin/slow-queries${qs({ env: opts.env })}`;
   if (opts.dryRun) {
@@ -124,7 +128,7 @@ export function registerPerfCommands(parent: Command, getClient: () => Promise<A
     .command("clear")
     .option("--env <name>", "Environment buffer to clear (default: backend's current env)");
   addWriteFlagsToCommand(clear).action(
-    jsonAction(getClient, (client, opts: { env?: string; reason?: string; idempotencyKey?: string; dryRun?: boolean }) =>
+    jsonAction(getClient, (client, opts: WriteFlags & { env?: string }) =>
       runPerfClear(client, opts)
     )
   );

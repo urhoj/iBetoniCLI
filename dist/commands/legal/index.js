@@ -464,7 +464,7 @@ export function registerLegalCommands(parent, getClient) {
                 notes: opts.notes,
                 effectiveDate: opts.effectiveDate,
                 activate: !!opts.activate,
-            }, { dryRun: opts.dryRun, reason: opts.reason, idempotencyKey: opts.idempotencyKey }));
+            }, opts));
             return;
         }
         if (!opts.file && !opts.content)
@@ -499,7 +499,7 @@ export function registerLegalCommands(parent, getClient) {
             notes: opts.notes,
             effectiveDate: opts.effectiveDate,
             activate: !!opts.activate,
-        }, { dryRun: opts.dryRun, reason: opts.reason, idempotencyKey: opts.idempotencyKey }));
+        }, opts));
     }));
     const activateCmd = legal
         .command("activate <documentId>");

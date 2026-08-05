@@ -376,11 +376,7 @@ export function registerVehicleCommands(parent, getClient) {
             vehicleM3: opts.capacity,
             vehiclePuomi: opts.puomi,
             asiakasId: opts.asiakas,
-        }, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        });
+        }, opts);
         writeJson(result);
     }));
     const updateCmd = v
@@ -409,11 +405,7 @@ export function registerVehicleCommands(parent, getClient) {
             showInGrid: opts.showInGrid,
             firstDate: resolveDate(opts.firstDate),
             lastDate: resolveDate(opts.lastDate),
-        }, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        });
+        }, opts);
         writeJson(result);
     }));
     const dates = v

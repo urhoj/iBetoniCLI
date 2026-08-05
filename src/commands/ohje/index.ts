@@ -384,7 +384,7 @@ export function registerOhjeCommands(
   addWriteFlagsToCommand(addAssessWriteFlags(updateCmd)).action(
     guarded(async (
       helpId: string,
-      opts: {
+      opts: WriteFlags & {
         body?: string;
         title?: string;
         shorttext?: string;
@@ -393,9 +393,6 @@ export function registerOhjeCommands(
         mustExist?: boolean;
         aiConfidence?: number;
         needsHumanReview?: boolean;
-        dryRun?: boolean;
-        idempotencyKey?: string;
-        reason?: string;
         field?: string;
         replace?: string;
         with?: string;
@@ -432,8 +429,7 @@ export function registerOhjeCommands(
         const client = await getClient();
         writeJson(
           await runOhjeEditField(
-            client, helpId, field, editOp,
-            { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason },
+            client, helpId, field, editOp, opts,
             { aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }
           )
         );
@@ -451,11 +447,7 @@ export function registerOhjeCommands(
         client,
         helpId,
         fields,
-        {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        },
+        opts,
         { mustExist: opts.mustExist },
         { aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }
       );
@@ -466,22 +458,13 @@ export function registerOhjeCommands(
   const deleteCmd = o
     .command("delete <helpId>");
   addWriteFlagsToCommand(deleteCmd).action(
-    guarded(async (
-      helpId: string,
-      opts: { dryRun?: boolean; idempotencyKey?: string; reason?: string }
-    ) => {
+    guarded(async (helpId: string, opts: WriteFlags) => {
       if (!isValidHelpId(helpId)) {
         failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
       }
       if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
       const client = await getClient();
-      writeJson(
-        await runOhjeDelete(client, helpId, {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        })
-      );
+      writeJson(await runOhjeDelete(client, helpId, opts));
     })
   );
 }

@@ -1,6 +1,14 @@
+import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
-import { writeFlagsToHeaders, type WriteFlags } from "../../api/writeFlags.js";
+import {
+  addWriteFlagsToCommand,
+  writeFlagsToHeaders,
+  type WriteFlags,
+} from "../../api/writeFlags.js";
+import { writeJson, failWith } from "../../output/json.js";
+import { resolveActiveOwnerAsiakasId } from "../../owner.js";
+import { guarded } from "./action.js";
 
 /**
  * One likely-duplicate entity pair from a combinator's /duplicates endpoint.
@@ -91,4 +99,104 @@ export async function runCombinatorMerge(
   return client.post<unknown>(`/api/admin/${base}/merge`, body, {
     headers: writeFlagsToHeaders(flags),
   });
+}
+
+/**
+ * Everything that differs between the asiakas / person / tyomaa `duplicates` +
+ * `merge` registrations — and nothing else. The three copies were otherwise
+ * verbatim: same flag names, same owner fallback, same three guards in the same
+ * order; only the entity wording and customer's `--allow-big-merge` varied.
+ */
+export interface CombinatorCommandsConfig {
+  /** Route segment, e.g. `asiakas-combinator`. */
+  base: string;
+  /** Request-body id field names for /merge + /validate. */
+  idFields: CombinatorIdFields;
+  /** Entity word in the "<noun> merge is irreversible" guard (customer/person/worksite). */
+  entityNoun: string;
+  /** Id word in the flag descriptions and the positive-integer guard, pluralized with a bare "s". */
+  idLabel: string;
+  /** asiakas combinator only: expose the system-admin `--allow-big-merge` escape hatch. */
+  allowBigMerge?: boolean;
+}
+
+/**
+ * Register the `duplicates` + `merge` leaves of one combinator on its group.
+ *
+ * `merge` is IRREVERSIBLE, so it keeps all three guards before any network call:
+ * both ids positive integers, the two ids distinct, and `--reason` mandatory
+ * unless `--dry-run` (which routes to the read-only /validate preview instead).
+ */
+export function registerCombinatorCommands(
+  parent: Command,
+  getClient: () => Promise<ApiClient>,
+  cfg: CombinatorCommandsConfig
+): void {
+  parent
+    .command("duplicates")
+    .option("--owner <id>", "ownerAsiakasId to scan (default: active company)", Number)
+    .action(
+      guarded(async (opts: { owner?: number }) => {
+        const client = await getClient();
+        const owner =
+          opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
+        writeJson(await runCombinatorDuplicates(client, cfg.base, owner));
+      })
+    );
+
+  const mergeCmd = parent
+    .command("merge")
+    .requiredOption("--main <id>", `${cfg.idLabel} to KEEP (references merge into this)`, Number)
+    .requiredOption(
+      "--secondary <id>",
+      `${cfg.idLabel} to REMOVE (merged away, then deleted)`,
+      Number
+    )
+    .option("--owner <id>", "ownerAsiakasId (default: active company)", Number);
+  if (cfg.allowBigMerge) {
+    mergeCmd.option("--allow-big-merge", "System-admin: permit a merge above the safety row cap");
+  }
+  addWriteFlagsToCommand(mergeCmd).action(
+    guarded(async (
+      opts: WriteFlags & {
+        main: number;
+        secondary: number;
+        owner?: number;
+        allowBigMerge?: boolean;
+      }
+    ) => {
+      if (
+        !Number.isInteger(opts.main) || opts.main <= 0 ||
+        !Number.isInteger(opts.secondary) || opts.secondary <= 0
+      ) {
+        failWith(`--main and --secondary must be positive integer ${cfg.idLabel}s`, 4);
+      }
+      if (opts.main === opts.secondary) {
+        failWith("--main and --secondary must differ", 4);
+      }
+      if (!opts.dryRun && !opts.reason) {
+        failWith(
+          `${cfg.entityNoun} merge is irreversible — pass --reason (or --dry-run to preview via /validate)`,
+          4
+        );
+      }
+      const client = await getClient();
+      const owner =
+        opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
+      writeJson(
+        await runCombinatorMerge(
+          client,
+          cfg.base,
+          cfg.idFields,
+          {
+            mainId: opts.main,
+            secondaryId: opts.secondary,
+            ownerAsiakasId: owner,
+            allowBigMerge: opts.allowBigMerge,
+          },
+          opts
+        )
+      );
+    })
+  );
 }

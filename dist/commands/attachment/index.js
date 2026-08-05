@@ -341,20 +341,18 @@ export function registerAttachmentCommands(parent, getClient) {
             fileComment: opts.comment,
             attachmentGroupId: groupId, attachmentTypeId: typeId,
             fileETag: opts.etag,
-        }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
+        }, opts));
     }));
     const attachCmd = a
         .command("attach <attachmentId>");
     addEntityFlags(attachCmd);
-    addWriteFlagsToCommand(attachCmd).action(jsonAction(getClient, (client, id, opts) => runAttachmentAttach(client, Number(id), opts, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })));
+    addWriteFlagsToCommand(attachCmd).action(jsonAction(getClient, (client, id, opts) => runAttachmentAttach(client, Number(id), opts, opts)));
     const detachCmd = a
         .command("detach <attachmentId> [entity]");
     addEntityFlags(detachCmd);
     addWriteFlagsToCommand(detachCmd).action(guarded(async (id, entity, opts) => {
         const entityWord = resolveDetachEntity(entity, opts);
-        writeJson(await runAttachmentDetach(await getClient(), Number(id), entityWord, {
-            dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
-        }));
+        writeJson(await runAttachmentDetach(await getClient(), Number(id), entityWord, opts));
     }));
     const updateCmd = a
         .command("update <attachmentId>")
@@ -372,7 +370,7 @@ export function registerAttachmentCommands(parent, getClient) {
             fileComment: opts.comment,
             liitaLaskuun: opts.liitaLaskuun,
             attachmentGroupId: groupId, attachmentTypeId: typeId,
-        }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
+        }, opts));
     }));
     const deleteCmd = a
         .command("delete <attachmentId>");
@@ -380,9 +378,7 @@ export function registerAttachmentCommands(parent, getClient) {
         if (!opts.reason) {
             failWith("Missing required flag: --reason (blob deletion is irreversible)", 4);
         }
-        writeJson(await runAttachmentDelete(await getClient(), Number(id), {
-            dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
-        }));
+        writeJson(await runAttachmentDelete(await getClient(), Number(id), opts));
     }));
 }
 //# sourceMappingURL=index.js.map

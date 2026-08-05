@@ -256,12 +256,7 @@ export function registerPersonDayCommands(
       if (!opts.reason) {
         failWith("Missing required flag: --reason", 4);
       }
-      const result = await runPersonDaySet(await getClient(), opts.person, opts.date, opts.status, {
-        dryRun: opts.dryRun,
-        idempotencyKey: opts.idempotencyKey,
-        reason: opts.reason,
-        text: opts.text,
-      });
+      const result = await runPersonDaySet(await getClient(), opts.person, opts.date, opts.status, opts);
       writeJson(result);
     })
   );
@@ -275,11 +270,7 @@ export function registerPersonDayCommands(
       if (!opts.reason) {
         failWith("Missing required flag: --reason", 4);
       }
-      const result = await runPersonDayClear(await getClient(), opts.person, opts.date, {
-        dryRun: opts.dryRun,
-        idempotencyKey: opts.idempotencyKey,
-        reason: opts.reason,
-      });
+      const result = await runPersonDayClear(await getClient(), opts.person, opts.date, opts);
       writeJson(result);
     })
   );

@@ -66,7 +66,7 @@ export async function runGlossaryImport(client, entries, flags) {
         const inp = mergeSetInput(e, {});
         try {
             await runGlossarySet(client, term, { definition: inp.definition, synonyms: inp.synonyms, related: inp.related, entity: inp.entity, domain: inp.domain,
-                aiConfidence: inp.aiConfidence, needsHumanReview: inp.needsHumanReview, updateOnly: flags.updateOnly }, { dryRun: flags.dryRun, idempotencyKey: flags.idempotencyKey, reason: flags.reason });
+                aiConfidence: inp.aiConfidence, needsHumanReview: inp.needsHumanReview, updateOnly: flags.updateOnly }, flags);
             results.push({ term, ok: true });
         }
         catch (err) {
@@ -267,7 +267,7 @@ export function registerGlossaryCommands(program, getClient) {
     const dismiss = glossary
         .command("dismiss")
         .argument("<term>", "Missed term to dismiss (as listed by `ib glossary misses`)");
-    addWriteFlagsToCommand(dismiss).action(jsonAction(getClient, (client, term, opts) => runGlossaryDismiss(client, term, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })));
+    addWriteFlagsToCommand(dismiss).action(jsonAction(getClient, (client, term, opts) => runGlossaryDismiss(client, term, opts)));
     glossary
         .command("lint")
         .option("--strict", "Exit 1 if any warn-level finding exists (for CI)")
@@ -313,7 +313,7 @@ export function registerGlossaryCommands(program, getClient) {
         assertAiConfidence(merged.aiConfidence);
         writeJson(await runGlossarySet(await getClient(), term, { definition: merged.definition, synonyms: merged.synonyms, related: merged.related, entity: merged.entity, domain: merged.domain,
             addSynonyms: opts.addSynonyms, removeSynonyms: opts.removeSynonyms, appendDefinition: opts.appendDefinition,
-            updateOnly: opts.updateOnly, aiConfidence: merged.aiConfidence, needsHumanReview: merged.needsHumanReview }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
+            updateOnly: opts.updateOnly, aiConfidence: merged.aiConfidence, needsHumanReview: merged.needsHumanReview }, opts));
     }));
     const imp = glossary
         .command("import")
@@ -332,11 +332,11 @@ export function registerGlossaryCommands(program, getClient) {
         if (!Array.isArray(arr)) {
             failWith("import: JSON root must be an array", 4);
         }
-        writeJson(await runGlossaryImport(await getClient(), arr, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason, updateOnly: opts.updateOnly }));
+        writeJson(await runGlossaryImport(await getClient(), arr, opts));
     }));
     const del = glossary
         .command("delete")
         .argument("<term>", "Canonical term");
-    addWriteFlagsToCommand(del).action(jsonAction(getClient, (client, term, opts) => runGlossaryDelete(client, term, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })));
+    addWriteFlagsToCommand(del).action(jsonAction(getClient, (client, term, opts) => runGlossaryDelete(client, term, opts)));
 }
 //# sourceMappingURL=index.js.map

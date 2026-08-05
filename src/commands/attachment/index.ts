@@ -471,7 +471,7 @@ export function registerAttachmentCommands(
           attachmentGroupId: groupId, attachmentTypeId: typeId,
           fileETag: opts.etag as string | undefined,
         },
-        { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }
+        opts
       )
     );
   }));
@@ -481,7 +481,7 @@ export function registerAttachmentCommands(
   addEntityFlags(attachCmd);
   addWriteFlagsToCommand(attachCmd).action(
     jsonAction(getClient, (client, id: string, opts: WriteFlags & Record<string, unknown>) =>
-      runAttachmentAttach(client, Number(id), opts, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })
+      runAttachmentAttach(client, Number(id), opts, opts)
     )
   );
 
@@ -491,9 +491,7 @@ export function registerAttachmentCommands(
   addWriteFlagsToCommand(detachCmd).action(
     guarded(async (id: string, entity: string | undefined, opts: WriteFlags & Record<string, unknown>) => {
       const entityWord = resolveDetachEntity(entity, opts);
-      writeJson(await runAttachmentDetach(await getClient(), Number(id), entityWord, {
-        dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
-      }));
+      writeJson(await runAttachmentDetach(await getClient(), Number(id), entityWord, opts));
     })
   );
 
@@ -514,7 +512,7 @@ export function registerAttachmentCommands(
         fileComment: opts.comment as string | undefined,
         liitaLaskuun: opts.liitaLaskuun as number | undefined,
         attachmentGroupId: groupId, attachmentTypeId: typeId,
-      }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
+      }, opts));
     })
   );
 
@@ -524,9 +522,7 @@ export function registerAttachmentCommands(
     if (!opts.reason) {
       failWith("Missing required flag: --reason (blob deletion is irreversible)", 4);
     }
-    writeJson(await runAttachmentDelete(await getClient(), Number(id), {
-      dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
-    }));
+    writeJson(await runAttachmentDelete(await getClient(), Number(id), opts));
   }));
 }
 

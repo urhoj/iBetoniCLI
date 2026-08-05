@@ -671,7 +671,7 @@ export function registerLegalCommands(
     .option("--prepend <text>", "Edit mode: prepend this text to the start of the current markdown (verbatim)")
     .option("--all", "With --replace: substitute every occurrence instead of erroring on multiple matches");
   addWriteFlagsToCommand(saveCmd).action(
-    guarded(async (opts: {
+    guarded(async (opts: WriteFlags & {
       type: string;
       docVersion: string;
       title?: string;
@@ -682,9 +682,6 @@ export function registerLegalCommands(
       effectiveDate?: string;
       activate?: boolean;
       validateJson?: boolean;
-      dryRun?: boolean;
-      reason?: string;
-      idempotencyKey?: string;
       replace?: string;
       with?: string;
       append?: string;
@@ -714,7 +711,7 @@ export function registerLegalCommands(
               effectiveDate: opts.effectiveDate,
               activate: !!opts.activate,
             },
-            { dryRun: opts.dryRun, reason: opts.reason, idempotencyKey: opts.idempotencyKey }
+            opts
           )
         );
         return;
@@ -749,7 +746,7 @@ export function registerLegalCommands(
             effectiveDate: opts.effectiveDate,
             activate: !!opts.activate,
           },
-          { dryRun: opts.dryRun, reason: opts.reason, idempotencyKey: opts.idempotencyKey }
+          opts
         )
       );
     })
@@ -758,7 +755,7 @@ export function registerLegalCommands(
   const activateCmd = legal
     .command("activate <documentId>");
   addWriteFlagsToCommand(activateCmd).action(
-    guarded(async (documentIdStr: string, opts: { dryRun?: boolean; reason?: string; idempotencyKey?: string }) => {
+    guarded(async (documentIdStr: string, opts: WriteFlags) => {
       const documentId = parseId(documentIdStr, "documentId");
       if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
       const client = await getClient();
@@ -769,7 +766,7 @@ export function registerLegalCommands(
   const deleteCmd = legal
     .command("delete <documentId>");
   addWriteFlagsToCommand(deleteCmd).action(
-    guarded(async (documentIdStr: string, opts: { dryRun?: boolean; reason?: string; idempotencyKey?: string }) => {
+    guarded(async (documentIdStr: string, opts: WriteFlags) => {
       const documentId = parseId(documentIdStr, "documentId");
       if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
       const client = await getClient();
@@ -801,7 +798,7 @@ export function registerLegalCommands(
   addWriteFlagsToCommand(acceptCmd).action(
     guarded(async (
       typeNameArg: string | undefined,
-      opts: { type?: string; dryRun?: boolean; reason?: string; idempotencyKey?: string }
+      opts: WriteFlags & { type?: string }
     ) => {
       const typeName = resolveTypeNameTarget(typeNameArg, opts.type);
       if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
@@ -827,15 +824,12 @@ export function registerLegalCommands(
     .option("--sort-order <n>", "List position (default 0)", Number)
     .option("--setting-type-id <n>", "personSettingTypeId for acceptance tracking (must exist and be unmapped)", Number);
   addWriteFlagsToCommand(typeCreateCmd).action(
-    guarded(async (opts: {
+    guarded(async (opts: WriteFlags & {
       name: string;
       displayName: string;
       description?: string;
       sortOrder?: number;
       settingTypeId?: number;
-      dryRun?: boolean;
-      reason?: string;
-      idempotencyKey?: string;
     }) => {
       if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);
       const client = await getClient();
@@ -852,14 +846,11 @@ export function registerLegalCommands(
   addWriteFlagsToCommand(typeUpdateCmd).action(
     guarded(async (
       typeName: string,
-      opts: {
+      opts: WriteFlags & {
         displayName?: string;
         description?: string;
         sortOrder?: number;
         settingTypeId?: number;
-        dryRun?: boolean;
-        reason?: string;
-        idempotencyKey?: string;
       }
     ) => {
       if (!opts.dryRun && !opts.reason) failWith("Missing required flag: --reason", 4);

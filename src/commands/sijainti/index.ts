@@ -1021,7 +1021,7 @@ export function registerSijaintiCommands(
       "Resolve lat/lng from the address via Google Maps when coordinates are not given (then persisted + echoed)"
     );
   addWriteFlagsToCommand(createCmd).action(
-    guarded(async (opts: {
+    guarded(async (opts: WriteFlags & {
       body?: string;
       name?: string;
       address?: string;
@@ -1034,9 +1034,6 @@ export function registerSijaintiCommands(
       puomiMin?: number;
       puomiMax?: number;
       geocode?: boolean;
-      dryRun?: boolean;
-      idempotencyKey?: string;
-      reason?: string;
     }) => {
       assertPuomiFlags(opts.puomiMin, opts.puomiMax);
       const client = await getClient();
@@ -1071,19 +1068,14 @@ export function registerSijaintiCommands(
       // be persisted (the add proc itself binds no lat/lng — see
       // persistSijaintiCoords) and a ZERO_RESULTS address fails fast here.
       if (opts.geocode) await applyGeocodeToBody(client, body);
-      const flags = {
-        dryRun: opts.dryRun,
-        idempotencyKey: opts.idempotencyKey,
-        reason: opts.reason,
-      };
-      const result = await runSijaintiCreate(client, body, flags);
+      const result = await runSijaintiCreate(client, body, opts);
       // The add proc drops lat/lng; persist them via the dedicated updateLatLng
       // route (the FE's create→saveLatLng flow) and echo { lat, lng, coordsPersisted }.
       const newId = !opts.dryRun
         ? (result as { sijaintiId?: number } | null)?.sijaintiId
         : undefined;
       writeJson(
-        await persistSijaintiCoords(client, result, newId, { lat: body.lat, lng: body.lng }, flags)
+        await persistSijaintiCoords(client, result, newId, { lat: body.lat, lng: body.lng }, opts)
       );
     })
   );
@@ -1106,7 +1098,7 @@ export function registerSijaintiCommands(
       "Re-resolve lat/lng from the (changed) address via Google Maps when coordinates are not given (then persisted + echoed)"
     );
   addWriteFlagsToCommand(updateCmd).action(
-    guarded(async (opts: {
+    guarded(async (opts: WriteFlags & {
       body?: string;
       id?: number;
       name?: string;
@@ -1119,9 +1111,6 @@ export function registerSijaintiCommands(
       puomiMin?: number;
       puomiMax?: number;
       geocode?: boolean;
-      dryRun?: boolean;
-      idempotencyKey?: string;
-      reason?: string;
     }) => {
       assertPuomiFlags(opts.puomiMin, opts.puomiMax);
       const client = await getClient();
@@ -1143,15 +1132,10 @@ export function registerSijaintiCommands(
       if (body.sijaintiId === undefined) {
         failWith("update requires sijaintiId — pass --id or include it in --body", 4);
       }
-      const flags = {
-        dryRun: opts.dryRun,
-        idempotencyKey: opts.idempotencyKey,
-        reason: opts.reason,
-      };
       const { result, merged, geocodeFailed } = await runSijaintiUpdate(
         client,
         body,
-        flags,
+        opts,
         !!opts.geocode
       );
       // The save proc drops lat/lng; persist them via the dedicated updateLatLng
@@ -1162,7 +1146,7 @@ export function registerSijaintiCommands(
         result,
         sijaintiId,
         { lat: merged.lat, lng: merged.lng },
-        flags
+        opts
       );
       if (geocodeFailed) {
         const base =
@@ -1186,15 +1170,12 @@ export function registerSijaintiCommands(
   addWriteFlagsToCommand(setJerryCmd).action(
     guarded(async (
       idStr: string,
-      opts: {
+      opts: WriteFlags & {
         on?: boolean;
         off?: boolean;
         radius?: number;
         puomiMin?: number;
         puomiMax?: number;
-        dryRun?: boolean;
-        idempotencyKey?: string;
-        reason?: string;
       }
     ) => {
       if (opts.on === opts.off) {
@@ -1210,11 +1191,7 @@ export function registerSijaintiCommands(
         client,
         parseId(idStr, "sijaintiId"),
         !!opts.on,
-        {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        },
+        opts,
         opts.radius,
         opts.puomiMin !== undefined || opts.puomiMax !== undefined
           ? { min: opts.puomiMin, max: opts.puomiMax }

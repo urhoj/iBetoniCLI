@@ -17,6 +17,7 @@ import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import {
   runCombinatorDuplicates,
   runCombinatorMerge,
+  registerCombinatorCommands,
   type CombinatorMergeOptions,
 } from "../_shared/combinator.js";
 import { roleNameForTypeId, resolveRoleTypeId, explainRole } from "../../roles.js";
@@ -576,11 +577,7 @@ export function registerPersonCommands(
       const result = await runNotificationFcmSend(
         await getClient(),
         { person, title: opts.title, body: opts.body, data: opts.data },
-        {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        }
+        opts
       );
       writeJson(result);
     })
@@ -884,51 +881,12 @@ export function registerPersonCommands(
       })
     );
 
-  p.command("duplicates")
-    .option("--owner <id>", "ownerAsiakasId to scan (default: active company)", Number)
-    .action(
-      guarded(async (opts: { owner?: number }) => {
-        const client = await getClient();
-        const owner =
-          opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
-        writeJson(await runPersonDuplicates(client, owner));
-      })
-    );
-
-  const personMergeCmd = p
-    .command("merge")
-    .requiredOption("--main <id>", "personId to KEEP (references merge into this)", Number)
-    .requiredOption("--secondary <id>", "personId to REMOVE (merged away, then deleted)", Number)
-    .option("--owner <id>", "ownerAsiakasId (default: active company)", Number);
-  addWriteFlagsToCommand(personMergeCmd).action(
-    guarded(async (opts: WriteFlags & { main: number; secondary: number; owner?: number }) => {
-      if (
-        !Number.isInteger(opts.main) || opts.main <= 0 ||
-        !Number.isInteger(opts.secondary) || opts.secondary <= 0
-      ) {
-        failWith("--main and --secondary must be positive integer personIds", 4);
-      }
-      if (opts.main === opts.secondary) {
-        failWith("--main and --secondary must differ", 4);
-      }
-      if (!opts.dryRun && !opts.reason) {
-        failWith(
-          "person merge is irreversible — pass --reason (or --dry-run to preview via /validate)",
-          4
-        );
-      }
-      const client = await getClient();
-      const owner =
-        opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
-      writeJson(
-        await runPersonMerge(
-          client,
-          { mainId: opts.main, secondaryId: opts.secondary, ownerAsiakasId: owner },
-          { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }
-        )
-      );
-    })
-  );
+  registerCombinatorCommands(p, getClient, {
+    base: "person-combinator",
+    idFields: PERSON_MERGE_ID_FIELDS,
+    entityNoun: "person",
+    idLabel: "personId",
+  });
 
   p.command("log <personId>")
     .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))

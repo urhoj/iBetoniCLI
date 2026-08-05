@@ -614,11 +614,7 @@ export function registerVehicleCommands(
           vehiclePuomi: opts.puomi,
           asiakasId: opts.asiakas,
         },
-        {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        }
+        opts
       );
       writeJson(result);
     })
@@ -688,11 +684,7 @@ export function registerVehicleCommands(
           firstDate: resolveDate(opts.firstDate),
           lastDate: resolveDate(opts.lastDate),
         },
-        {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        }
+        opts
       );
       writeJson(result);
     })

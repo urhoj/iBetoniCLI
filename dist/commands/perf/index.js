@@ -1,5 +1,5 @@
 import { qs } from "../../api/query.js";
-import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../api/writeFlags.js";
+import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
 import { writeJson } from "../../output/json.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 /** GET recent slow queries → ListEnvelope. `truncated` when the page filled the limit. */

@@ -275,7 +275,7 @@ export function registerOhjeCommands(parent, getClient) {
                 failWith("Missing required flag: --reason", 4);
             assertAiConfidence(opts.aiConfidence);
             const client = await getClient();
-            writeJson(await runOhjeEditField(client, helpId, field, editOp, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }, { aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }));
+            writeJson(await runOhjeEditField(client, helpId, field, editOp, opts, { aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }));
             return;
         }
         assertAiConfidence(opts.aiConfidence);
@@ -286,11 +286,7 @@ export function registerOhjeCommands(parent, getClient) {
         }
         const client = await getClient();
         const fields = buildOhjeFields(opts);
-        const result = await runOhjeUpdate(client, helpId, fields, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        }, { mustExist: opts.mustExist }, { aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview });
+        const result = await runOhjeUpdate(client, helpId, fields, opts, { mustExist: opts.mustExist }, { aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview });
         writeJson(result);
     }));
     const deleteCmd = o
@@ -302,11 +298,7 @@ export function registerOhjeCommands(parent, getClient) {
         if (!opts.dryRun && !opts.reason)
             failWith("Missing required flag: --reason", 4);
         const client = await getClient();
-        writeJson(await runOhjeDelete(client, helpId, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        }));
+        writeJson(await runOhjeDelete(client, helpId, opts));
     }));
 }
 //# sourceMappingURL=index.js.map

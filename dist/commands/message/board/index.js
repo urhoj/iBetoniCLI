@@ -211,11 +211,7 @@ export function registerMessageBoardCommands(parent, getClient) {
         assertPriority(opts.priority);
         const client = await getClient();
         const fields = buildBoardFields(opts);
-        writeJson(await runBoardCreate(client, fields, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        }));
+        writeJson(await runBoardCreate(client, fields, opts));
     }));
     const updateCmd = b
         .command("update <messageId>")
@@ -231,11 +227,7 @@ export function registerMessageBoardCommands(parent, getClient) {
         assertPriority(opts.priority);
         const client = await getClient();
         const fields = buildBoardFields(opts);
-        writeJson(await runBoardUpdate(client, messageId, fields, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        }));
+        writeJson(await runBoardUpdate(client, messageId, fields, opts));
     }));
     const deleteCmd = b
         .command("delete <messageId>");
@@ -244,11 +236,7 @@ export function registerMessageBoardCommands(parent, getClient) {
         if (!opts.dryRun && !opts.reason)
             failWith("Missing required flag: --reason", 4);
         const client = await getClient();
-        writeJson(await runBoardDelete(client, messageId, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        }));
+        writeJson(await runBoardDelete(client, messageId, opts));
     }));
 }
 // ─── CommandSpecs (co-located: one source of truth for this sub-group). ───────

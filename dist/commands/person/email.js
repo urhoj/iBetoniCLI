@@ -38,33 +38,21 @@ export function registerPersonEmailCommands(person, getClient) {
     addWriteFlagsToCommand(addCmd).action(guarded(async (personRef, emailAddr, opts) => {
         if (!opts.reason)
             failWith("Missing required flag: --reason", 4);
-        writeJson(await runPersonEmailAdd(await getClient(), personRef, emailAddr, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        }));
+        writeJson(await runPersonEmailAdd(await getClient(), personRef, emailAddr, opts));
     }));
     const setMainCmd = email
         .command("set-main <person> <email>");
     addWriteFlagsToCommand(setMainCmd).action(guarded(async (personRef, emailAddr, opts) => {
         if (!opts.reason)
             failWith("Missing required flag: --reason", 4);
-        writeJson(await runPersonEmailSetMain(await getClient(), personRef, emailAddr, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        }));
+        writeJson(await runPersonEmailSetMain(await getClient(), personRef, emailAddr, opts));
     }));
     const removeCmd = email
         .command("remove <person> <email>");
     addWriteFlagsToCommand(removeCmd).action(guarded(async (personRef, emailAddr, opts) => {
         if (!opts.reason)
             failWith("Missing required flag: --reason", 4);
-        writeJson(await runPersonEmailRemove(await getClient(), personRef, emailAddr, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        }));
+        writeJson(await runPersonEmailRemove(await getClient(), personRef, emailAddr, opts));
     }));
 }
 //# sourceMappingURL=email.js.map

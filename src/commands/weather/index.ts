@@ -314,13 +314,7 @@ export function registerWeatherCommands(
     .option("--on", "Enable the module")
     .option("--off", "Disable the module");
   addWriteFlagsToCommand(toggleCmd).action(
-    guarded(async (opts: {
-      on?: boolean;
-      off?: boolean;
-      dryRun?: boolean;
-      idempotencyKey?: string;
-      reason?: string;
-    }) => {
+    guarded(async (opts: WriteFlags & { on?: boolean; off?: boolean }) => {
       // Covers both "neither" and "both" — failWith keeps the envelope honest
       // (statusCode 0: no HTTP request happened) and matches the spec's exit-4
       // row so the remedy surfaces as the envelope hint.
@@ -328,13 +322,7 @@ export function registerWeatherCommands(
         failWith("Pass exactly one of --on / --off", 4);
       }
       const client = await getClient();
-      writeJson(
-        await runWeatherToggle(client, !!opts.on, {
-          dryRun: opts.dryRun,
-          idempotencyKey: opts.idempotencyKey,
-          reason: opts.reason,
-        })
-      );
+      writeJson(await runWeatherToggle(client, !!opts.on, opts));
     })
   );
 }

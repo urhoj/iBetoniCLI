@@ -1,7 +1,11 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../../api/client.js";
 import { listEnvelope, toListEnvelope, type ListEnvelope } from "../../../api/envelopes.js";
-import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../../api/writeFlags.js";
+import {
+  addWriteFlagsToCommand,
+  writeFlagsToHeaders,
+  type WriteFlags,
+} from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
 import { resolveThreadId, type ThreadTarget } from "./resolveThread.js";
 import { parseOptionalId, resolveSearchQuery } from "../../../targets.js";
@@ -72,12 +76,9 @@ export async function runChatSearch(
 }
 
 /** Options for {@link runChatSend}. `source` is already resolved by the action. */
-export interface ChatSendOpts {
+export interface ChatSendOpts extends WriteFlags {
   body: string;
   source: string;
-  reason?: string;
-  idempotencyKey?: string;
-  dryRun?: boolean;
 }
 
 /**
@@ -130,12 +131,8 @@ export async function runChatMarkRead(
   return client.post<unknown>(`/api/messages/threads/${threadId}/read`, {});
 }
 
-/** Options for {@link runChatDelete}. */
-export interface ChatDeleteOpts {
-  reason?: string;
-  idempotencyKey?: string;
-  dryRun?: boolean;
-}
+/** Options for {@link runChatDelete} — the universal write flags, nothing extra. */
+export type ChatDeleteOpts = WriteFlags;
 
 /**
  * DELETE /api/messages/threads/:id/messages/:messageId — soft-delete a message.
@@ -174,11 +171,8 @@ export async function runChatDelete(
 }
 
 /** Options for {@link runChatEdit}. */
-export interface ChatEditOpts {
+export interface ChatEditOpts extends WriteFlags {
   body: string;
-  reason?: string;
-  idempotencyKey?: string;
-  dryRun?: boolean;
 }
 
 /**
@@ -211,12 +205,8 @@ export async function runChatEdit(
   );
 }
 
-/** Options for {@link runChatRestore}. */
-export interface ChatRestoreOpts {
-  reason?: string;
-  idempotencyKey?: string;
-  dryRun?: boolean;
-}
+/** Options for {@link runChatRestore} — the universal write flags, nothing extra. */
+export type ChatRestoreOpts = WriteFlags;
 
 /**
  * POST /api/messages/threads/:id/messages/:messageId/restore — un-soft-delete.
@@ -329,13 +319,10 @@ export function registerMessageChatCommands(
   addWriteFlagsToCommand(sendCmd).action(
     guarded(async (
       threadIdStr: string | undefined,
-      opts: {
+      opts: WriteFlags & {
         tarjous?: number;
         body: string;
         source?: string;
-        dryRun?: boolean;
-        idempotencyKey?: string;
-        reason?: string;
       }
     ) => {
       const body = String(opts.body ?? "").trim();
@@ -376,13 +363,7 @@ export function registerMessageChatCommands(
   addWriteFlagsToCommand(deleteCmd).action(
     guarded(async (
       messageIdStr: string,
-      opts: {
-        thread?: number;
-        tarjous?: number;
-        dryRun?: boolean;
-        idempotencyKey?: string;
-        reason?: string;
-      }
+      opts: WriteFlags & { thread?: number; tarjous?: number }
     ) => {
       const messageId = parseOptionalId(messageIdStr, "messageId");
       if (messageId === undefined) failWith("messageId is required", 4);
@@ -391,13 +372,7 @@ export function registerMessageChatCommands(
         thread: opts.thread,
         tarjous: opts.tarjous,
       });
-      writeJson(
-        await runChatDelete(client, id, messageId, {
-          reason: opts.reason,
-          idempotencyKey: opts.idempotencyKey,
-          dryRun: opts.dryRun,
-        })
-      );
+      writeJson(await runChatDelete(client, id, messageId, opts));
     })
   );
 
@@ -409,7 +384,7 @@ export function registerMessageChatCommands(
   addWriteFlagsToCommand(editCmd).action(
     guarded(async (
       messageIdStr: string,
-      opts: { thread?: number; tarjous?: number; body: string; dryRun?: boolean; idempotencyKey?: string; reason?: string }
+      opts: WriteFlags & { thread?: number; tarjous?: number; body: string }
     ) => {
       const messageId = parseOptionalId(messageIdStr, "messageId");
       if (messageId === undefined) failWith("messageId is required", 4);
@@ -431,15 +406,13 @@ export function registerMessageChatCommands(
   addWriteFlagsToCommand(restoreCmd).action(
     guarded(async (
       messageIdStr: string,
-      opts: { thread?: number; tarjous?: number; dryRun?: boolean; idempotencyKey?: string; reason?: string }
+      opts: WriteFlags & { thread?: number; tarjous?: number }
     ) => {
       const messageId = parseOptionalId(messageIdStr, "messageId");
       if (messageId === undefined) failWith("messageId is required", 4);
       const client = await getClient();
       const id = await resolveThreadId(client, { thread: opts.thread, tarjous: opts.tarjous });
-      writeJson(await runChatRestore(client, id, messageId, {
-        reason: opts.reason, idempotencyKey: opts.idempotencyKey, dryRun: opts.dryRun,
-      }));
+      writeJson(await runChatRestore(client, id, messageId, opts));
     })
   );
 }

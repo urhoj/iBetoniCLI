@@ -211,11 +211,7 @@ export function registerWeatherCommands(parent, getClient, opts = {}) {
             failWith("Pass exactly one of --on / --off", 4);
         }
         const client = await getClient();
-        writeJson(await runWeatherToggle(client, !!opts.on, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        }));
+        writeJson(await runWeatherToggle(client, !!opts.on, opts));
     }));
 }
 //# sourceMappingURL=index.js.map

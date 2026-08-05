@@ -4,7 +4,7 @@ import { writeJson, failWith, errorMessage } from "../../output/json.js";
 import { decodeJwtPayload, impersonationFromClaims, } from "../../auth/jwt.js";
 import { resolveCallerTier } from "../../tier.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
-import { runCombinatorDuplicates, runCombinatorMerge, } from "../_shared/combinator.js";
+import { runCombinatorDuplicates, runCombinatorMerge, registerCombinatorCommands, } from "../_shared/combinator.js";
 import { roleNameForTypeId, resolveRoleTypeId, explainRole } from "../../roles.js";
 import { parseId, parseOptionalId, resolveSearchQuery, cappedInt } from "../../targets.js";
 import { runCompanyList } from "../company/index.js";
@@ -359,11 +359,7 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .requiredOption("--body <text>", "Notification body")
         .option("--data <json>", "Extra FCM data payload as a JSON object", parseJsonObject);
     addWriteFlagsToCommand(notifyCmd).action(guarded(async (person, opts) => {
-        const result = await runNotificationFcmSend(await getClient(), { person, title: opts.title, body: opts.body, data: opts.data }, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        });
+        const result = await runNotificationFcmSend(await getClient(), { person, title: opts.title, body: opts.body, data: opts.data }, opts);
         writeJson(result);
     }));
     const createCmd = p
@@ -611,33 +607,12 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         const result = await runPersonCompanies(client, parseOptionalId(personIdStr, "personId"));
         writeJson(result);
     }));
-    p.command("duplicates")
-        .option("--owner <id>", "ownerAsiakasId to scan (default: active company)", Number)
-        .action(guarded(async (opts) => {
-        const client = await getClient();
-        const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
-        writeJson(await runPersonDuplicates(client, owner));
-    }));
-    const personMergeCmd = p
-        .command("merge")
-        .requiredOption("--main <id>", "personId to KEEP (references merge into this)", Number)
-        .requiredOption("--secondary <id>", "personId to REMOVE (merged away, then deleted)", Number)
-        .option("--owner <id>", "ownerAsiakasId (default: active company)", Number);
-    addWriteFlagsToCommand(personMergeCmd).action(guarded(async (opts) => {
-        if (!Number.isInteger(opts.main) || opts.main <= 0 ||
-            !Number.isInteger(opts.secondary) || opts.secondary <= 0) {
-            failWith("--main and --secondary must be positive integer personIds", 4);
-        }
-        if (opts.main === opts.secondary) {
-            failWith("--main and --secondary must differ", 4);
-        }
-        if (!opts.dryRun && !opts.reason) {
-            failWith("person merge is irreversible — pass --reason (or --dry-run to preview via /validate)", 4);
-        }
-        const client = await getClient();
-        const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
-        writeJson(await runPersonMerge(client, { mainId: opts.main, secondaryId: opts.secondary, ownerAsiakasId: owner }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
-    }));
+    registerCombinatorCommands(p, getClient, {
+        base: "person-combinator",
+        idFields: PERSON_MERGE_ID_FIELDS,
+        entityNoun: "person",
+        idLabel: "personId",
+    });
     p.command("log <personId>")
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
         .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)

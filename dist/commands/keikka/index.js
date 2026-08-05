@@ -307,11 +307,7 @@ export function registerKeikkaCommands(parent, getClient) {
     addWriteFlagsToCommand(createCmd).action(guarded(async (opts) => {
         const client = await getClient();
         const parsed = parseJsonBodyFlag(opts.body);
-        const result = await runKeikkaCreate(client, parsed, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        });
+        const result = await runKeikkaCreate(client, parsed, opts);
         writeJson(result);
     }));
     const updateCmd = k
@@ -322,17 +318,13 @@ export function registerKeikkaCommands(parent, getClient) {
             failWith("Nothing to update: pass --status (v1.0 supports --status only)", 4);
         }
         const client = await getClient();
-        const result = await runKeikkaUpdate(client, parseId(idStr, "keikkaId"), { status: opts.status }, {
-            dryRun: opts.dryRun,
-            idempotencyKey: opts.idempotencyKey,
-            reason: opts.reason,
-        });
+        const result = await runKeikkaUpdate(client, parseId(idStr, "keikkaId"), { status: opts.status }, opts);
         writeJson(result);
     }));
     const drivers = k.command("drivers").description("Driver assignment commands");
     const assignCmd = drivers
         .command("assign <keikkaId>");
-    addWriteFlagsToCommand(assignCmd).action(jsonAction(getClient, (client, idStr, opts) => runKeikkaDriversAssign(client, parseId(idStr, "keikkaId"), { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason })));
+    addWriteFlagsToCommand(assignCmd).action(jsonAction(getClient, (client, idStr, opts) => runKeikkaDriversAssign(client, parseId(idStr, "keikkaId"), opts)));
     registerLogAlias(k, getClient, "keikka", "keikkaId", "Filter by changeTracker fieldName (e.g. kuskit, laskuMemo)");
 }
 //# sourceMappingURL=index.js.map
