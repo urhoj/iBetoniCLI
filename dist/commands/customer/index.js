@@ -1,10 +1,11 @@
 import { createRequire } from "node:module";
+import { listEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith, errorMessage, setExitCode, } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveRoleTypeId } from "../../roles.js";
-import { resolveTarget, parseId, resolveSearchQuery } from "../../targets.js";
+import { resolveTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
 import { runPersonRoleList } from "../person/index.js";
 import { guarded } from "../_shared/action.js";
@@ -13,6 +14,7 @@ import { runCombinatorDuplicates, runCombinatorMerge, } from "../_shared/combina
 // to the historical names so internal `--from-prh` call sites and the hidden
 // `ib customer prh` alias are unchanged; re-exported for importers/tests.
 import { runPrhById as runCustomerPrhById, runPrhSearch as runCustomerPrhSearch, } from "../../prh.js";
+import { qs } from "../../api/query.js";
 export { runCustomerPrhById, runCustomerPrhSearch };
 /**
  * Client-side fallback for `customer list --fields` / `--sijainti-types`:
@@ -55,27 +57,17 @@ export function projectCustomerRow(row, fields, sijaintiTypes) {
  * single call instead of N×`customer get`.
  */
 export async function runCustomerList(client, opts) {
-    const params = new URLSearchParams();
-    if (opts.limit !== undefined)
-        params.set("limit", String(opts.limit));
-    if (opts.cursor)
-        params.set("cursor", opts.cursor);
-    if (opts.full)
-        params.set("full", "1");
-    if (opts.ids && opts.ids.length > 0)
-        params.set("ids", opts.ids.join(","));
-    if (opts.include && opts.include.length > 0)
-        params.set("include", opts.include.join(","));
-    if (opts.fields && opts.fields.length > 0)
-        params.set("fields", opts.fields.join(","));
-    if (opts.sijaintiTypes && opts.sijaintiTypes.length > 0)
-        params.set("sijaintiTypes", opts.sijaintiTypes.join(","));
-    if (opts.since)
-        params.set("since", opts.since);
-    if (opts.sort)
-        params.set("sort", opts.sort);
-    const qs = params.toString();
-    const env = await client.get(`/api/cli/customer/list${qs ? `?${qs}` : ""}`);
+    const env = await client.get(`/api/cli/customer/list${qs({
+        limit: opts.limit,
+        cursor: opts.cursor || undefined,
+        full: opts.full ? "1" : undefined,
+        ids: opts.ids?.length ? opts.ids.join(",") : undefined,
+        include: opts.include?.length ? opts.include.join(",") : undefined,
+        fields: opts.fields?.length ? opts.fields.join(",") : undefined,
+        sijaintiTypes: opts.sijaintiTypes?.length ? opts.sijaintiTypes.join(",") : undefined,
+        since: opts.since || undefined,
+        sort: opts.sort || undefined,
+    })}`);
     // Re-apply --fields / --sijainti-types CLIENT-SIDE too, so the flags trim the
     // payload even against a backend that predates the server-side push-down. On a
     // deployed backend the rows already arrive projected/filtered, so this is a no-op.
@@ -90,11 +82,7 @@ export async function runCustomerList(client, opts) {
  * Tenant-scoped; reads the pre-swept columns (no live PRH call).
  */
 export async function runCustomerDeadList(client, opts = {}) {
-    const params = new URLSearchParams();
-    if (opts.limit !== undefined)
-        params.set("limit", String(opts.limit));
-    const qs = params.toString();
-    return client.get(`/api/cli/customer/dead-list${qs ? `?${qs}` : ""}`);
+    return client.get(`/api/cli/customer/dead-list${qs({ limit: opts.limit })}`);
 }
 /**
  * GET /api/cli/customer/get/:asiakasId. Returns the flat backend record as-is.
@@ -427,7 +415,7 @@ export async function runCustomerWorksites(client, asiakasId) {
         address: r.tyomaaOsoite1 || null,
         city: r.tyomaaOsoite4 || null,
     }));
-    return { items, nextCursor: null, count: items.length };
+    return listEnvelope(items);
 }
 /**
  * GET /api/asiakas/search?searchString=<query> — existing (non-/api/cli/) route
@@ -441,12 +429,7 @@ export async function runCustomerWorksites(client, asiakasId) {
  * `ownerAsiakasId`).
  */
 export async function runCustomerSearch(client, query, limit, myCompanies = false) {
-    const params = new URLSearchParams({ searchString: query });
-    if (limit !== undefined)
-        params.set("limit", String(limit));
-    if (myCompanies)
-        params.set("myCompanies", "1");
-    return client.get(`/api/asiakas/search?${params.toString()}`);
+    return client.get(`/api/asiakas/search${qs({ searchString: query, limit, myCompanies: myCompanies ? "1" : undefined })}`);
 }
 /**
  * POST /api/asiakas/createY with a free-form body forwarded to the existing
@@ -744,7 +727,7 @@ export function registerCustomerCommands(parent, getClient) {
         .description("List customers. --full returns every flat-customer field + jerry " +
         "companyDescription in one call (for diffing a whole tenant); --ids " +
         "1,2,3 restricts to specific asiakasIds (refresh only what changed).")
-        .option("--limit <n>", "Max rows", (v) => Math.min(Number(v), 500))
+        .option("--limit <n>", "Max rows", cappedInt(500))
         .option("--cursor <c>", "Pagination cursor")
         .option("--full", "Return full customer fields + companyDescription (not just id/name/ytunnus/type)")
         .option("--ids <csv>", "Comma-separated asiakasIds to return (e.g. 1,2,3)")
@@ -786,7 +769,7 @@ export function registerCustomerCommands(parent, getClient) {
     c.command("dead-list")
         .description("List customers the PRH nightly sweep flagged dead (konkurssi/selvitystila/purettu) " +
         "or caution (yrityssaneeraus). Reads pre-checked prhStatus columns; tenant-scoped.")
-        .option("--limit <n>", "Max rows", (v) => Math.min(Number(v), 500))
+        .option("--limit <n>", "Max rows", cappedInt(500))
         .action(guarded(async (opts) => {
         const client = await getClient();
         writeJson(await runCustomerDeadList(client, { limit: opts.limit }));
@@ -804,11 +787,8 @@ export function registerCustomerCommands(parent, getClient) {
         const client = await getClient();
         writeJson(await runCustomerWorksites(client, parseId(idStr, "asiakasId")));
     }));
-    const modulesCmd = c
-        .command("modules [asiakasId]")
-        .description("Report or toggle a customer's module flags + roolit. Without --set/--unset: read-only report. Field keys: " +
-        ALL_FIELD_KEYS.join(", "))
-        .option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number)
+    const modulesCmd = addAsiakasTargetOption(c.command("modules [asiakasId]").description("Report or toggle a customer's module flags + roolit. Without --set/--unset: read-only report. Field keys: " +
+        ALL_FIELD_KEYS.join(", ")))
         .option("--set <keys>", "Comma-separated field keys to turn ON (e.g. jerry,weather,pumppu)")
         .option("--unset <keys>", "Comma-separated field keys to turn OFF");
     addWriteFlagsToCommand(modulesCmd).action(async (idStr, opts) => {
@@ -837,10 +817,7 @@ export function registerCustomerCommands(parent, getClient) {
             exitWithError(e);
         }
     });
-    const operatorCmd = c
-        .command("operator [asiakasId]")
-        .description("Verify or provision the full operator preset (all 9 operator flags at once). System-admin, cross-tenant. Default (no flag): verify — exit 0 iff all 9 are on, else exit 1.")
-        .option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number)
+    const operatorCmd = addAsiakasTargetOption(c.command("operator [asiakasId]").description("Verify or provision the full operator preset (all 9 operator flags at once). System-admin, cross-tenant. Default (no flag): verify — exit 0 iff all 9 are on, else exit 1."))
         .option("--set", "Turn ALL 9 operator flags ON")
         .option("--reset", "Turn ALL 9 operator flags OFF");
     addWriteFlagsToCommand(operatorCmd).action(async (idStr, opts) => {
@@ -870,10 +847,7 @@ export function registerCustomerCommands(parent, getClient) {
             exitWithError(e);
         }
     });
-    const settingsCmd = c
-        .command("settings [asiakasId]")
-        .description("Report or toggle ALL asiakasSettings (every canonical ASIAKAS_SETTING_TYPE_IDS name) + pumppu. No --set/--unset = read-only report. Names accept canonical settings (case-insensitive), the 8 module aliases, or pumppu.")
-        .option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number)
+    const settingsCmd = addAsiakasTargetOption(c.command("settings [asiakasId]").description("Report or toggle ALL asiakasSettings (every canonical ASIAKAS_SETTING_TYPE_IDS name) + pumppu. No --set/--unset = read-only report. Names accept canonical settings (case-insensitive), the 8 module aliases, or pumppu."))
         .option("--set <keys>", "Comma-separated setting names to turn ON")
         .option("--unset <keys>", "Comma-separated setting names to turn OFF");
     addWriteFlagsToCommand(settingsCmd).action(async (idStr, opts) => {
@@ -904,7 +878,7 @@ export function registerCustomerCommands(parent, getClient) {
     c.command("search [query]")
         .description("Free-text search for customers")
         .option("--search <s>", "Search query (alias for the <query> positional)")
-        .option("--limit <n>", "Max results", (v) => Math.min(Number(v), 500))
+        .option("--limit <n>", "Max results", cappedInt(500))
         .option("--my-companies", "Search across every company you belong to (rows tagged with ownerAsiakasId)")
         .action(guarded(async (query, opts) => {
         const client = await getClient();
@@ -929,7 +903,7 @@ export function registerCustomerCommands(parent, getClient) {
     }));
     c.command("log <asiakasId>")
         .description("Change-tracker audit trail for one customer (who changed what, with --reason).")
-        .option("--limit <n>", "Max rows (default 100, cap 500)", (v) => Math.min(Number(v), 500), 100)
+        .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)
         .action(guarded(async (idStr, opts) => {
         const client = await getClient();
         writeJson(await runCustomerHistory(client, parseId(idStr, "asiakasId"), opts.limit));
@@ -1121,10 +1095,9 @@ export function registerCustomerCommands(parent, getClient) {
             exitWithError(e);
         }
     });
-    customerPerson
+    addAsiakasTargetOption(customerPerson
         .command("list [asiakasId]")
-        .description("List persons attached to a customer. Optional --role filter.")
-        .option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number)
+        .description("List persons attached to a customer. Optional --role filter."))
         .option("--role <name>", "Filter by role name (e.g. keikkaHandler)")
         .option("--include-roles", "Add permissionRoles[] (full per-company role names) to each person — N extra GETs")
         .action(guarded(async (asiakasIdStr, opts) => {
@@ -1233,6 +1206,6 @@ export async function runCustomerPersonList(client, asiakasId, roleName, include
                 .filter((name) => Boolean(name));
         }));
     }
-    return { items, nextCursor: null, count: items.length };
+    return listEnvelope(items);
 }
 //# sourceMappingURL=index.js.map

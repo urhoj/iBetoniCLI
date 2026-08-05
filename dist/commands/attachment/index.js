@@ -5,6 +5,7 @@ import { basename, resolve as resolvePath } from "node:path";
 import { writeFlagsToHeaders, addWriteFlagsToCommand } from "../../api/writeFlags.js";
 import { CliError } from "../../api/errors.js";
 import { guarded } from "../_shared/action.js";
+import { cappedInt } from "../../targets.js";
 /** Wire entity names ↔ commander option keys. Mirrors backend ENTITY_COLUMNS. */
 const ENTITY_OPTS = [
     { optKey: "keikka", flag: "--keikka <id>", entity: "keikka", blurb: "keikkaId" },
@@ -261,7 +262,7 @@ export function registerAttachmentCommands(parent, getClient) {
         .description("List attachments linked to ONE entity (exactly one entity flag)")
         .option("--group <g>", "Filter by attachment group (name or id — see `ib attachment types`)")
         .option("--type <t>", "Filter by attachment type (name or id — see `ib attachment types`)")
-        .option("--limit <n>", "Max rows (capped at 500)", (s) => Math.min(Number(s), 500));
+        .option("--limit <n>", "Max rows (capped at 500)", cappedInt(500));
     addEntityFlags(listCmd).action(async (opts) => {
         try {
             const client = await getClient();
@@ -289,7 +290,7 @@ export function registerAttachmentCommands(parent, getClient) {
     a.command("search [text]")
         .description("Search attachments in the active company by file name/comment; with no text and no --missing, lists ALL active company attachments (like `ib keikka list`)")
         .option("--missing", "Only attachments with NO linked entity (orphans)")
-        .option("--limit <n>", "Max rows (capped at 500)", (s) => Math.min(Number(s), 500))
+        .option("--limit <n>", "Max rows (capped at 500)", cappedInt(500))
         .action(guarded(async (text, opts) => {
         writeJson(await runAttachmentSearch(await getClient(), { q: text, missing: opts.missing, limit: opts.limit }));
     }));

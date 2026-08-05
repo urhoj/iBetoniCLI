@@ -2,8 +2,9 @@ import { test, expect, vi, beforeEach, describe } from "vitest";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, runChangelogDelete, normalizeSentryRef, normalizeLanguage, normalizeType, readJsonInput, validateEnums, validateFieldLengths, resolveChangelogDescription, resolveShaAlias }
+import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, runChangelogDelete, normalizeSentryRef, normalizeLanguage, normalizeType, validateEnums, validateFieldLengths, resolveChangelogDescription, resolveShaAlias }
   from "../../src/commands/changelog/index.js";
+import { readJsonInput } from "../../src/api/parseBody.js";
 import type { ChangelogAddBody } from "../../src/commands/changelog/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { writeFlagsToHeaders } from "../../src/api/writeFlags.js";

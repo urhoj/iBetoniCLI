@@ -1,13 +1,10 @@
+import { listEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 import { CliError } from "../../api/errors.js";
+import { qs } from "../../api/query.js";
+import { cappedInt } from "../../targets.js";
 function listQuery(path, opts) {
-    const params = new URLSearchParams();
-    if (opts.search)
-        params.set("search", opts.search);
-    if (opts.limit !== undefined)
-        params.set("limit", String(opts.limit));
-    const qs = params.toString();
-    return `${path}${qs ? `?${qs}` : ""}`;
+    return `${path}${qs({ search: opts.search || undefined, limit: opts.limit })}`;
 }
 export async function runSchemaTables(client, opts) {
     return client.get(listQuery("/api/cli/schema/tables", opts));
@@ -49,7 +46,7 @@ export async function runSchemaBatch(client, single, names) {
             throw e;
         }
     }));
-    return { items, nextCursor: null, count: items.length };
+    return listEnvelope(items);
 }
 /**
  * Register `ib schema` subcommands. Read-only resource (no write-safety flags).
@@ -60,7 +57,7 @@ export function registerSchemaCommands(parent, getClient, opts = {}) {
     const s = parent.command("schema", { hidden: !!opts.hidden }).description("SQL schema introspection (developer-only)");
     const listOpt = (cmd) => cmd
         .option("--search <substr>", "Filter object names by substring")
-        .option("--limit <n>", "Max rows (default 200, max 1000)", (v) => Math.min(Number(v), 1000));
+        .option("--limit <n>", "Max rows (default 200, max 1000)", cappedInt(1000));
     const runList = (fn) => async (opts) => {
         try {
             writeJson(await fn(await getClient(), opts));

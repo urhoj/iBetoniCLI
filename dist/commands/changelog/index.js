@@ -1,16 +1,13 @@
+import { listEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
-import { readFileSync } from "node:fs";
-import { readJsonObjectInput } from "../../api/parseBody.js";
+import { readJsonInput, readJsonObjectInput } from "../../api/parseBody.js";
 import { writeJson, exitWithError, failWith, failUsage, failValidation } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { parseRefId } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { COORDINATED as COORDINATED_REPOS, normalizeRepoCsv } from "./repos.js";
 import { guarded } from "../_shared/action.js";
-export function readJsonInput(path) {
-    const raw = (path === "-" ? readFileSync(0, "utf8") : readFileSync(path, "utf8")).replace(/^\uFEFF/, "");
-    return JSON.parse(raw);
-}
+import { qs } from "../../api/query.js";
 const TYPES = ["feature", "improvement", "bugfix"];
 const AREAS = ["frontend", "backend", "cli", "database", "cicd"];
 const BUMP_LEVELS = ["none", "patch", "minor", "major"];
@@ -63,7 +60,7 @@ export async function runChangelogAdd(client, body, flags) {
 export async function runChangelogList(client, opts) {
     if (typeof opts.sentry === "string")
         opts.sentry = normalizeSentryRef(opts.sentry);
-    const p = new URLSearchParams();
+    const p = {};
     // CLI option key → API query key. --feedback maps to the backend's `feedbackId`
     // filter; --search/--status are substring LIKE filters (the controller passes
     // req.query straight to listEntries). --has-feedback/--has-sentry are handled below.
@@ -71,18 +68,15 @@ export async function runChangelogList(client, opts) {
         month: "month", type: "type", area: "area", repo: "repo", feedback: "feedbackId",
         sentry: "sentryIssue", source: "source", search: "search", status: "status", limit: "limit",
     };
-    for (const [optKey, apiKey] of Object.entries(keyMap)) {
-        if (opts[optKey] !== undefined)
-            p.set(apiKey, String(opts[optKey]));
-    }
+    for (const [optKey, apiKey] of Object.entries(keyMap))
+        p[apiKey] = opts[optKey];
     if (opts.hasFeedback)
-        p.set("hasFeedback", "1");
+        p.hasFeedback = "1";
     if (opts.hasSentry)
-        p.set("hasSentry", "1");
-    const qs = p.toString();
-    const rows = await client.get(`/api/changelog${qs ? `?${qs}` : ""}`);
+        p.hasSentry = "1";
+    const rows = await client.get(`/api/changelog${qs(p)}`);
     const items = Array.isArray(rows) ? rows : [];
-    return { items, nextCursor: null, count: items.length };
+    return listEnvelope(items);
 }
 export async function runChangelogGet(client, id) {
     return client.get(`/api/changelog/${id}`);

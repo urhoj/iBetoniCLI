@@ -2,7 +2,7 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../../api/write
 import { writeJson, exitWithError, failWith } from "../../../output/json.js";
 import { resolveDate } from "../../../dates.js";
 import { resolveAsiakasTarget } from "../../customer/index.js";
-import { parseId } from "../../../targets.js";
+import { parseId, addAsiakasTargetOption } from "../../../targets.js";
 import { guarded } from "../../_shared/action.js";
 /**
  * Normalise a date flag to the backend's `YYYYMMDD` shape. Accepts
@@ -200,9 +200,9 @@ export function registerMessageDailyCommands(parent, getClient) {
         .command("daily")
         .description("Grid daily-message boxes (date-keyed shared whiteboard with per-role ACL)");
     // reads ──────────────────────────────────────────────────────────────────────
-    d.command("list [asiakasId]")
-        .description("List a company's daily boxes (+ a date's messages + permissions)")
-        .option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number)
+    addAsiakasTargetOption(d
+        .command("list [asiakasId]")
+        .description("List a company's daily boxes (+ a date's messages + permissions)"))
         .option("--date <date>", "Date for messages: YYYYMMDD | YYYY-MM-DD | today/yesterday/tomorrow")
         .action(guarded(async (idStr, opts) => {
         const asiakasId = resolveAsiakasTarget(idStr, opts.asiakas);

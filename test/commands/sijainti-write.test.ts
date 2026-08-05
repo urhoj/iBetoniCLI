@@ -10,9 +10,9 @@ import {
   applyGeocodeToBody,
   buildSijaintiBody,
   applySijaintiCreateDefaults,
-  extractGeocodeLatLng,
   assertPuomiFlags,
 } from "../../src/commands/sijainti/index.js";
+import { extractGeocodeLatLng } from "../../src/commands/_shared/geocode.js";
 import type { ApiClient } from "../../src/api/client.js";
 
 const mockClient = {

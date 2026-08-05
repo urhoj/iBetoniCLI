@@ -9,15 +9,16 @@
  * JSON array (avoids Finnish ä/ö shell mangling); lint audits dead
  * relatedCommands, near-duplicates, empty fields.
  */
-import { readFileSync } from "node:fs";
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { writeJson, exitWithError, failWith, errorMessage } from "../../output/json.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, type WriteFlags } from "../../api/writeFlags.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { CliError } from "../../api/errors.js";
+import { readJsonInput } from "../../api/parseBody.js";
 import { runGlossaryLint } from "./lint.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "../../assess.js";
+import { qs } from "../../api/query.js";
 
 interface GlossaryEntry {
   term: string;
@@ -90,11 +91,6 @@ export function mergeSetInput(
     aiConfidence: flags.aiConfidence ?? (json.aiConfidence as number | undefined),
     needsHumanReview: flags.needsHumanReview ?? (json.needsHumanReview as boolean | undefined),
   };
-}
-
-export function readJsonInput(path: string): unknown {
-  const raw = (path === "-" ? readFileSync(0, "utf8") : readFileSync(path, "utf8")).replace(/^\uFEFF/, "");
-  return JSON.parse(raw);
 }
 
 /**
@@ -195,22 +191,23 @@ export async function runGlossaryLookupBatch(
       }
     })
   );
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 export async function runGlossaryList(
   client: ApiClient,
   opts: { search?: string; stalest?: number; domain?: string; related?: string; termsOnly?: boolean; needsReview?: boolean; maxConfidence?: number }
 ): Promise<ListEnvelope<unknown>> {
-  const q = new URLSearchParams();
-  if (opts.search) q.set("search", opts.search);
-  if (opts.stalest) q.set("stalest", String(opts.stalest));
-  if (opts.domain) q.set("domain", opts.domain);
-  if (opts.related) q.set("related", opts.related);
-  if (opts.needsReview) q.set("needsReview", "1");
-  if (opts.needsReview && opts.maxConfidence != null) q.set("maxConfidence", String(opts.maxConfidence));
-  const qs = q.toString();
-  const res = await client.get<{ items: unknown[]; count: number }>(`/api/cli/glossary${qs ? `?${qs}` : ""}`);
+  const res = await client.get<{ items: unknown[]; count: number }>(
+    `/api/cli/glossary${qs({
+      search: opts.search || undefined,
+      stalest: opts.stalest || undefined,
+      domain: opts.domain || undefined,
+      related: opts.related || undefined,
+      needsReview: opts.needsReview ? "1" : undefined,
+      maxConfidence: opts.needsReview && opts.maxConfidence != null ? opts.maxConfidence : undefined,
+    })}`
+  );
   const items = opts.termsOnly
     ? projectGlossaryForPrimer(res.items as Array<Record<string, unknown>>)
     : res.items;

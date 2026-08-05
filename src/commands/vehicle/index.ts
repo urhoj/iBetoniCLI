@@ -2,14 +2,14 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
-import { resolveDate } from "../../dates.js";
+import { resolveDate, todayHelsinki } from "../../dates.js";
 import {
   type WriteFlags,
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
-import { parseId, resolveSearchQuery } from "../../targets.js";
+import { parseId, resolveSearchQuery, cappedInt } from "../../targets.js";
 import { CliError } from "../../api/errors.js";
 import { diffFields } from "../../diff.js";
 import { registerVehicleDriverCommands } from "./driver.js";
@@ -59,16 +59,6 @@ type GpsListEnvelope = ListEnvelope<Record<string, unknown>> & { gpsAvailable: b
 const VISIT_FILTER_TYPES = ["tyomaa", "sijainti"] as const;
 
 const VISIT_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-/** UTC ISO timestamp → YYYY-MM-DD in Europe/Helsinki (en-CA locale formats ISO). */
-function helsinkiDate(iso: string): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Helsinki",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(iso));
-}
 
 /**
  * GET /api/cli/vehicle/list with the universal list envelope shape.
@@ -198,8 +188,8 @@ export async function runVehicleVisits(
   );
   if (opts.date === undefined) return env;
   const items = (env.items || []).filter((v) => {
-    const arrived = typeof v.arrived === "string" ? helsinkiDate(v.arrived) : null;
-    const departed = typeof v.departed === "string" ? helsinkiDate(v.departed) : null;
+    const arrived = typeof v.arrived === "string" ? todayHelsinki(new Date(v.arrived)) : null;
+    const departed = typeof v.departed === "string" ? todayHelsinki(new Date(v.departed)) : null;
     // A visit spanning midnight matches on either end.
     return arrived === opts.date || departed === opts.date;
   });
@@ -464,7 +454,7 @@ export function registerVehicleCommands(
 
   v.command("list")
     .description("List vehicles")
-    .option("--limit <n>", "Max rows", (val: string) => Math.min(Number(val), 500))
+    .option("--limit <n>", "Max rows", cappedInt(500))
     .option("--cursor <c>", "Pagination cursor")
     .option("--deleted", "Include soft-deleted vehicles (default: excluded)")
     .option("--grid-only", "Only vehicles shown in the grid (showInGrid=1)")
@@ -559,9 +549,7 @@ export function registerVehicleCommands(
   v.command("search [query]")
     .description("Search vehicles by reg-no / name substring")
     .option("--search <s>", "Search query (alias for the <query> positional)")
-    .option("--limit <n>", "Max rows", (val: string) =>
-      Math.min(Number(val), 500)
-    )
+    .option("--limit <n>", "Max rows", cappedInt(500))
     .option(
       "--asiakas <id>",
       "Search another company's fleet (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant)",

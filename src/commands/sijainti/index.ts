@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import {
   type WriteFlags,
   writeFlagsToHeaders,
@@ -16,12 +16,14 @@ import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { CliError } from "../../api/errors.js";
-import { parseId } from "../../targets.js";
+import { parseId, cappedInt } from "../../targets.js";
 import { guarded } from "../_shared/action.js";
+import { extractGeocodeLatLng } from "../_shared/geocode.js";
 import {
   runAddressDashboard,
   type AddressDashboardReport,
 } from "../_shared/addressDashboard.js";
+import { qs } from "../../api/query.js";
 
 /**
  * Sentinel `jerryActiveUntil` value meaning "enrolled in BetoniJerry, no end
@@ -146,25 +148,6 @@ export function applySijaintiCreateDefaults(body: Record<string, unknown>): {
   return { body, missing };
 }
 
-/**
- * Pull {lat,lng} out of the /api/geocode/getLatLng response — the raw Google
- * Geocoding payload (`results[0].geometry.location`), with a top-level
- * {lat,lng} fallback. Returns null for ZERO_RESULTS / error / 0,0 shapes.
- */
-export function extractGeocodeLatLng(geo: unknown): { lat: number; lng: number } | null {
-  const g = geo as Record<string, unknown> | null;
-  if (!g || typeof g !== "object") return null;
-  const loc =
-    (g.results as Array<{ geometry?: { location?: { lat?: unknown; lng?: unknown } } }> | undefined)?.[0]
-      ?.geometry?.location ?? { lat: g.lat, lng: g.lng };
-  const lat = Number(loc?.lat);
-  const lng = Number(loc?.lng);
-  if (Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0)) {
-    return { lat, lng };
-  }
-  return null;
-}
-
 export interface SijaintiListFilter {
   type?: string;
   limit?: number;
@@ -243,16 +226,15 @@ export async function runSijaintiList(
   client: ApiClient,
   opts: SijaintiListFilter
 ): Promise<ListEnvelope<Record<string, unknown>>> {
-  const params = new URLSearchParams();
-  if (opts.type) params.set("type", opts.type);
-  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
-  if (opts.validAt) params.set("validAtDate", opts.validAt);
-  if (opts.includeDeleted) params.set("includeDeleted", "1");
-  if (opts.search) params.set("search", opts.search);
-  if (opts.all) params.set("scope", "all");
-  const qs = params.toString();
   return client.get<ListEnvelope<Record<string, unknown>>>(
-    `/api/cli/sijainti/list${qs ? `?${qs}` : ""}`
+    `/api/cli/sijainti/list${qs({
+      type: opts.type || undefined,
+      limit: opts.limit,
+      validAtDate: opts.validAt || undefined,
+      includeDeleted: opts.includeDeleted ? "1" : undefined,
+      search: opts.search || undefined,
+      scope: opts.all ? "all" : undefined,
+    })}`
   );
 }
 
@@ -558,7 +540,7 @@ export async function runSijaintiTypes(
     sijaintiTypeId: r.sijaintiTypeId,
     selite: r.sijaintiTypeSelite ?? null,
   }));
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 /** Backend list cap — what a client-side `--search` scan fetches to cover the set. */
@@ -938,7 +920,7 @@ export function registerSijaintiCommands(
       "--search <text>",
       "Case-insensitive substring over name/address/typeName (newer backends also pre-filter server-side)"
     )
-    .option("--limit <n>", "Max rows", (v: string) => Math.min(Number(v), 500))
+    .option("--limit <n>", "Max rows", cappedInt(500))
     .option(
       "--valid-at <date>",
       "Only sijainnit valid on this date (YYYY-MM-DD or today/yesterday/tomorrow)"
@@ -998,7 +980,7 @@ export function registerSijaintiCommands(
       "--search <text>",
       "Case-insensitive substring over name/address (same semantics as `list --search`)"
     )
-    .option("--limit <n>", "Max rows", (v: string) => Math.min(Number(v), 500))
+    .option("--limit <n>", "Max rows", cappedInt(500))
     .action(async (opts: { asiakas?: number; search?: string; limit?: number }) => {
       assertValidAsiakasFlag(opts.asiakas);
       try {
@@ -1302,43 +1284,34 @@ export function registerSijaintiCommands(
     }
   );
 
-  addWriteFlagsToCommand(
-    s
-      .command("delete <sijaintiId>")
-      .description(
-        "Soft-delete a sijainti (DELETE /api/geocode/sijainti/delete/:id). Requires --reason."
-      )
-  ).action(async (idStr: string, opts: WriteFlags) => {
-    if (!opts.reason) {
-      failWith("Missing required flag: --reason", 4);
-    }
-    try {
-      const client = await getClient();
-      const result = await runSijaintiDelete(client, parseId(idStr, "sijaintiId"), opts);
-      writeJson(result);
-    } catch (e) {
-      exitWithError(e);
-    }
-  });
-
-  addWriteFlagsToCommand(
-    s
-      .command("undelete <sijaintiId>")
-      .description(
-        "Restore a soft-deleted sijainti (POST /api/geocode/sijainti/undelete/:id). Requires --reason."
-      )
-  ).action(async (idStr: string, opts: WriteFlags) => {
-    if (!opts.reason) {
-      failWith("Missing required flag: --reason", 4);
-    }
-    try {
-      const client = await getClient();
-      const result = await runSijaintiUndelete(client, parseId(idStr, "sijaintiId"), opts);
-      writeJson(result);
-    } catch (e) {
-      exitWithError(e);
-    }
-  });
+  // delete / undelete are the same registration — one <sijaintiId>, write flags,
+  // --reason required. Only the run fn differs.
+  for (const [name, description, run] of [
+    [
+      "delete",
+      "Soft-delete a sijainti (DELETE /api/geocode/sijainti/delete/:id). Requires --reason.",
+      runSijaintiDelete,
+    ],
+    [
+      "undelete",
+      "Restore a soft-deleted sijainti (POST /api/geocode/sijainti/undelete/:id). Requires --reason.",
+      runSijaintiUndelete,
+    ],
+  ] as const) {
+    addWriteFlagsToCommand(
+      s.command(`${name} <sijaintiId>`).description(description)
+    ).action(async (idStr: string, opts: WriteFlags) => {
+      if (!opts.reason) {
+        failWith("Missing required flag: --reason", 4);
+      }
+      try {
+        const client = await getClient();
+        writeJson(await run(client, parseId(idStr, "sijaintiId"), opts));
+      } catch (e) {
+        exitWithError(e);
+      }
+    });
+  }
 
   s.command("types")
     .description(

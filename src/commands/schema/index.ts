@@ -1,8 +1,10 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 import { CliError } from "../../api/errors.js";
+import { qs } from "../../api/query.js";
+import { cappedInt } from "../../targets.js";
 
 export interface SchemaListFilter {
   search?: string;
@@ -13,11 +15,7 @@ type Envelope = ListEnvelope<Record<string, unknown>>;
 type Record_ = Record<string, unknown>;
 
 function listQuery(path: string, opts: SchemaListFilter): string {
-  const params = new URLSearchParams();
-  if (opts.search) params.set("search", opts.search);
-  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
-  const qs = params.toString();
-  return `${path}${qs ? `?${qs}` : ""}`;
+  return `${path}${qs({ search: opts.search || undefined, limit: opts.limit })}`;
 }
 
 export async function runSchemaTables(client: ApiClient, opts: SchemaListFilter): Promise<Envelope> {
@@ -65,7 +63,7 @@ export async function runSchemaBatch(
       }
     })
   );
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 /**
@@ -83,7 +81,7 @@ export function registerSchemaCommands(
   const listOpt = (cmd: Command) =>
     cmd
       .option("--search <substr>", "Filter object names by substring")
-      .option("--limit <n>", "Max rows (default 200, max 1000)", (v: string) => Math.min(Number(v), 1000));
+      .option("--limit <n>", "Max rows (default 200, max 1000)", cappedInt(1000));
 
   const runList =
     (fn: (c: ApiClient, o: SchemaListFilter) => Promise<Envelope>) =>

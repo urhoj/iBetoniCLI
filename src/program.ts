@@ -631,6 +631,22 @@ function longFlag(flags: string): string {
 }
 
 /**
+ * Terminal path shared by every `commander.*` usage-error branch below: emit the
+ * envelope on stderr, record the friction, exit 4. The friction string is what
+ * was DISPLAYED (error + hint), not Commander's bare internal message — the
+ * groomer only sees this log, and a bare `unknown command 'x'` reads as "no
+ * pointer was given" (fb#275).
+ */
+function emitUsageEnvelope<T extends { error: string; hint: string }>(
+  err: unknown,
+  env: T
+): void {
+  emitStderr(JSON.stringify(env) + "\n");
+  recordFriction(err, 4, `${env.error} — ${env.hint}`);
+  setExit(4);
+}
+
+/**
  * Terminal handler for `program.parseAsync(...).catch(...)`. Never calls
  * `process.exit()` (Windows-unsafe post-fetch) — sets `process.exitCode` and
  * lets the loop drain. Routing:
@@ -672,14 +688,7 @@ export function handleParseRejection(
           (Array.isArray(cmd.args) && cmd.args[0]) ||
           text.match(/unknown command '([^']+)'/)?.[1] ||
           "";
-        const env = buildUnknownCommandEnvelope(cmd, token, getCallerTier());
-        emitStderr(JSON.stringify(env) + "\n");
-        // Record what was DISPLAYED (error + did-you-mean hint), not Commander's
-        // bare internal message — the friction groomer only sees this log, and a
-        // bare `unknown command 'x'` reads as "no pointer was given" (fb#275).
-        recordFriction(err, 4, `${env.error} — ${env.hint}`);
-        setExit(4);
-        return;
+        return emitUsageEnvelope(err, buildUnknownCommandEnvelope(cmd, token, getCallerTier()));
       }
     }
     if (err.code === "commander.missingMandatoryOptionValue" && erroringCommand) {
@@ -699,11 +708,7 @@ export function handleParseRejection(
           flag: longFlag(f),
           issue: "missing",
         }));
-        const env = buildValidationEnvelope(path, problems, { spec });
-        emitStderr(JSON.stringify(env) + "\n");
-        recordFriction(err, 4, `${env.error} — ${env.hint}`);
-        setExit(4);
-        return;
+        return emitUsageEnvelope(err, buildValidationEnvelope(path, problems, { spec }));
       }
     }
     // Unknown option → enriched envelope: the command's real positionals + flags,
@@ -716,11 +721,7 @@ export function handleParseRejection(
         err.message?.match(/unknown option '([^']+)'/)?.[1] ||
         "";
       if (cmd && token) {
-        const env = buildUnknownOptionEnvelope(cmd, token);
-        emitStderr(JSON.stringify(env) + "\n");
-        recordFriction(err, 4, `${env.error} — ${env.hint}`);
-        setExit(4);
-        return;
+        return emitUsageEnvelope(err, buildUnknownOptionEnvelope(cmd, token));
       }
     }
     const detail = (text || err.message || "usage error")
@@ -728,18 +729,13 @@ export function handleParseRejection(
       .trim();
     const genericHint =
       "usage error — run `ib <command> --help` for the exact arguments and flags, or `ib commands` to discover commands";
-    emitStderr(
-      JSON.stringify({
-        success: false,
-        error: detail,
-        code: "USAGE",
-        statusCode: 0,
-        hint: genericHint,
-      }) + "\n"
-    );
-    recordFriction(err, 4, `${detail} — ${genericHint}`);
-    setExit(4);
-    return;
+    return emitUsageEnvelope(err, {
+      success: false,
+      error: detail,
+      code: "USAGE",
+      statusCode: 0,
+      hint: genericHint,
+    });
   }
   const message = err instanceof Error ? err.message : String(err);
   recordFriction(err, 1);

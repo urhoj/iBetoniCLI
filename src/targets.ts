@@ -1,5 +1,29 @@
+import type { Command } from "commander";
 import { failWith } from "./output/json.js";
 import { CliError } from "./api/errors.js";
+
+/**
+ * Commander coercer for a `--limit`-style flag that is clamped to `cap`.
+ * Deliberately NOT a validator: a non-numeric value still yields `NaN` (which
+ * the backend rejects) — this only reproduces the long-standing clamp, so the
+ * ~25 hand-spelled `(v) => Math.min(Number(v), N)` copies stay behaviourally
+ * identical.
+ */
+export function cappedInt(cap: number): (v: string) => number {
+  return (v: string) => Math.min(Number(v), cap);
+}
+
+/**
+ * Attach the `--asiakas <id>` alias for an optional `[asiakasId]` positional —
+ * the dual-target pattern (feedback #28), resolved in the action via
+ * {@link resolveTarget} / `resolveAsiakasTarget`. Same shape as
+ * `addWriteFlagsToCommand`: takes the command, returns it for chaining.
+ * NOT for the cross-tenant `--asiakas` SCOPE overrides (vehicle, sijainti
+ * list, …) — those carry their own descriptions and no positional twin.
+ */
+export function addAsiakasTargetOption(cmd: Command): Command {
+  return cmd.option("--asiakas <id>", "Target asiakasId (alias for the positional)", Number);
+}
 
 /**
  * Parse a required primary-key positional id (`<keikkaId>`, `<asiakasId>`, …).

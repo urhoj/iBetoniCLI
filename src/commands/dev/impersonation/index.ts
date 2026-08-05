@@ -12,6 +12,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../../api/client.js";
 import type { ListEnvelope } from "../../../api/envelopes.js";
+import { qs } from "../../../api/query.js";
 import { writeJson, exitWithError } from "../../../output/json.js";
 import { parseId } from "../../../targets.js";
 
@@ -37,16 +38,6 @@ export interface ImpersonationSessionsOpts {
   endReason?: string;
   active?: boolean;
   limit?: number;
-}
-
-/** Build a `?k=v&...` suffix from the defined filters. */
-function qs(params: Record<string, string | number | boolean | undefined>): string {
-  const u = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined) u.set(k, String(v));
-  }
-  const s = u.toString();
-  return s ? `?${s}` : "";
 }
 
 /**

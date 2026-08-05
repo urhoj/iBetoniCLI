@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import {
   type WriteFlags,
   writeFlagsToHeaders,
@@ -11,8 +11,9 @@ import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveDate, todayHelsinki, addDaysISO } from "../../dates.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { registerLogAlias } from "../log/index.js";
-import { parseId, resolveSearchQuery } from "../../targets.js";
+import { parseId, resolveSearchQuery, cappedInt } from "../../targets.js";
 import { guarded } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 
 // Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
 export { resolveDate };
@@ -76,18 +77,17 @@ export async function runKeikkaList(
     hint?: string;
   }
 > {
-  const params = new URLSearchParams();
-  if (opts.from) params.set("from", opts.from);
-  if (opts.to) params.set("to", opts.to);
-  if (opts.customer !== undefined) params.set("customer", String(opts.customer));
-  if (opts.vehicle !== undefined) params.set("vehicle", String(opts.vehicle));
-  if (opts.worksite !== undefined) params.set("worksite", String(opts.worksite));
-  if (opts.status) params.set("status", opts.status);
-  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
-  if (opts.cursor) params.set("cursor", opts.cursor);
-  const qs = params.toString();
   const envelope = await client.get<ListEnvelope<Record<string, unknown>>>(
-    `/api/cli/keikka/list${qs ? `?${qs}` : ""}`
+    `/api/cli/keikka/list${qs({
+      from: opts.from || undefined,
+      to: opts.to || undefined,
+      customer: opts.customer,
+      vehicle: opts.vehicle,
+      worksite: opts.worksite,
+      status: opts.status || undefined,
+      limit: opts.limit,
+      cursor: opts.cursor || undefined,
+    })}`
   );
   // Echo the interpreted date window so a count:0 result is self-evidently
   // scoped — without it an empty list is indistinguishable from a mis-aimed query.
@@ -226,13 +226,12 @@ export async function runKeikkaSearch(
   ownerAsiakasId: number,
   limit?: number
 ): Promise<ListEnvelope<KeikkaSearchHit>> {
-  const qs = new URLSearchParams({
-    searchString: query,
-    ownerAsiakasId: String(ownerAsiakasId),
-    usingFullTextSearch: "true",
-  });
   const rows = await client.get<Record<string, unknown>[]>(
-    `/api/keikka/search?${qs.toString()}`
+    `/api/keikka/search${qs({
+      searchString: query,
+      ownerAsiakasId,
+      usingFullTextSearch: "true",
+    })}`
   );
   const seen = new Map<number, KeikkaSearchHit>();
   for (const r of rows || []) {
@@ -250,7 +249,7 @@ export async function runKeikkaSearch(
     });
   }
   const items = [...seen.values()].slice(0, limit ?? seen.size);
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 /**
@@ -368,7 +367,7 @@ export function registerKeikkaCommands(
     .option("--vehicle <id>", "Filter by vehicleId", (v: string) => Number(v))
     .option("--worksite <id>", "Filter by worksite (tyomaaId)", (v: string) => Number(v))
     .option("--status <s>", "Filter by status")
-    .option("--limit <n>", "Max rows", (v: string) => Math.min(Number(v), 500))
+    .option("--limit <n>", "Max rows", cappedInt(500))
     .option("--cursor <c>", "Pagination cursor")
     .action(
       guarded(async (rawOpts: KeikkaListFilter & { date?: string }, command: Command) => {

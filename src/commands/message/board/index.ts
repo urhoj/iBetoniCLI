@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../../api/client.js";
-import type { ListEnvelope } from "../../../api/envelopes.js";
+import { toListEnvelope, type ListEnvelope } from "../../../api/envelopes.js";
 import {
   type WriteFlags,
   writeFlagsToHeaders,
@@ -84,12 +84,6 @@ export function toBoardQueryDate(input: string | undefined): string | null {
   return /^\d{8}$/.test(compact) ? compact : null;
 }
 
-/** Wrap a backend array into the universal `{ items, nextCursor, count }` envelope. */
-function toEnvelope(rows: unknown): ListEnvelope<BoardMessage> {
-  const items = Array.isArray(rows) ? (rows as BoardMessage[]) : [];
-  return { items, nextCursor: null, count: items.length };
-}
-
 /**
  * GET /api/ilmoitustaulu?date=YYYYMMDD — notices ACTIVE on a given day
  * (`startDate <= date AND (expiresAt IS NULL OR expiresAt >= date)`), newest
@@ -101,7 +95,7 @@ export async function runBoardList(
   client: ApiClient,
   dateYyyymmdd: string
 ): Promise<ListEnvelope<BoardMessage>> {
-  return toEnvelope(
+  return toListEnvelope<BoardMessage>(
     await client.get<BoardMessage[]>(
       `/api/ilmoitustaulu?date=${encodeURIComponent(dateYyyymmdd)}`
     )
@@ -115,7 +109,7 @@ export async function runBoardList(
 export async function runBoardAll(
   client: ApiClient
 ): Promise<ListEnvelope<BoardMessage>> {
-  return toEnvelope(await client.get<BoardMessage[]>("/api/ilmoitustaulu/all"));
+  return toListEnvelope<BoardMessage>(await client.get<BoardMessage[]>("/api/ilmoitustaulu/all"));
 }
 
 /**

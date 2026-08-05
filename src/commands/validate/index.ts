@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { CliError } from "../../api/errors.js";
@@ -17,7 +17,7 @@ export async function runValidateProfiles(
   client: ApiClient
 ): Promise<ListEnvelope<ValidationProfileRow>> {
   const items = await client.get<ValidationProfileRow[]>("/api/validation/profiles");
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 /** GET /api/validation/:profile/:asiakasId — company checklist. */

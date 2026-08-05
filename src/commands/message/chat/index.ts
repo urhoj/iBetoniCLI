@@ -1,19 +1,14 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../../api/client.js";
-import type { ListEnvelope } from "../../../api/envelopes.js";
+import { listEnvelope, toListEnvelope, type ListEnvelope } from "../../../api/envelopes.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../../output/json.js";
 import { resolveThreadId, type ThreadTarget } from "./resolveThread.js";
 import { parseOptionalId, resolveSearchQuery } from "../../../targets.js";
 import { guarded } from "../../_shared/action.js";
+import { qs } from "../../../api/query.js";
 
 type Row = Record<string, unknown>;
-
-/** Wrap a backend array into the universal `{ items, nextCursor, count }` envelope. */
-function toEnvelope(value: unknown): ListEnvelope<Row> {
-  const items = Array.isArray(value) ? (value as Row[]) : [];
-  return { items, nextCursor: null, count: items.length };
-}
 
 /**
  * GET /api/messages/threads/mine → your threads (inbox), newest first.
@@ -32,7 +27,7 @@ export async function runChatThreads(
     );
   }
   if (opts.unread) items = items.filter((r) => Number(r.unreadCount) > 0);
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 /** GET /api/messages/threads/:id → thread metadata + participants. */
@@ -50,14 +45,13 @@ export async function runChatList(
   threadId: number,
   opts: { since?: string; limit?: number; deleted?: boolean }
 ): Promise<ListEnvelope<Row>> {
-  const params = new URLSearchParams();
-  if (opts.deleted) params.set("includeDeleted", "1");
-  if (opts.since) params.set("since", opts.since);
-  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
-  const qs = params.toString();
-  return toEnvelope(
+  return toListEnvelope<Row>(
     await client.get<Row[]>(
-      `/api/messages/threads/${threadId}/messages${qs ? `?${qs}` : ""}`
+      `/api/messages/threads/${threadId}/messages${qs({
+        includeDeleted: opts.deleted ? "1" : undefined,
+        since: opts.since || undefined,
+        limit: opts.limit,
+      })}`
     )
   );
 }
@@ -74,7 +68,7 @@ export async function runChatSearch(
 ): Promise<ListEnvelope<Row>> {
   const parts = [`q=${encodeURIComponent(query)}`];
   if (opts.limit !== undefined) parts.push(`limit=${opts.limit}`);
-  return toEnvelope(await client.get<Row[]>(`/api/messages/search?${parts.join("&")}`));
+  return toListEnvelope<Row>(await client.get<Row[]>(`/api/messages/search?${parts.join("&")}`));
 }
 
 /** Options for {@link runChatSend}. `source` is already resolved by the action. */

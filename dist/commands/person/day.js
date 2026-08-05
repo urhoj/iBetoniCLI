@@ -1,3 +1,4 @@
+import { listEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { resolveDate } from "../../dates.js";
@@ -44,7 +45,7 @@ export async function runPersonDayStatuses(client, opts = {}) {
             ownerAsiakasId: r.ownerAsiakasId != null ? Number(r.ownerAsiakasId) : null,
         };
     });
-    return { items, nextCursor: null, count: items.length };
+    return listEnvelope(items);
 }
 /** GET /api/personPvm/list/:asiakasId — a person's day rows over [from, to] (to defaults to from). */
 export async function runPersonDayGet(client, personId, from, to) {
@@ -62,7 +63,7 @@ export async function runPersonDayGet(client, personId, from, to) {
         vehicleId: r.vehicleId != null ? Number(r.vehicleId) : null,
         text: r.personPvmText ?? null,
     }));
-    return { items, nextCursor: null, count: items.length };
+    return listEnvelope(items);
 }
 /**
  * Resolve a `--status` value to a personPvmStatusId. All-digits → used as-is.

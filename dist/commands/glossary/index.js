@@ -1,20 +1,11 @@
-/**
- * `ib glossary` — the DB-backed domain glossary (synonym-aware vocabulary).
- * lookup/list are open; set/import/lint/delete/misses/dismiss are developer-only. Backend:
- * /api/cli/glossary/*. The vocabulary is the single source of truth in the DB.
- * Key behaviors: lookup <term> → exit 5 + miss recorded on 404, did-you-mean
- * hints via /glossary?search=, comma-separated terms → batch lookup; set is a
- * PARTIAL update (omitted flags preserved via COALESCE; "" clears), --update-only
- * 404s instead of inserting, --from-json reads one object; import bulk-sets a
- * JSON array (avoids Finnish ä/ö shell mangling); lint audits dead
- * relatedCommands, near-duplicates, empty fields.
- */
-import { readFileSync } from "node:fs";
 import { writeJson, exitWithError, failWith, errorMessage } from "../../output/json.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../api/writeFlags.js";
+import { listEnvelope } from "../../api/envelopes.js";
 import { CliError } from "../../api/errors.js";
+import { readJsonInput } from "../../api/parseBody.js";
 import { runGlossaryLint } from "./lint.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "../../assess.js";
+import { qs } from "../../api/query.js";
 const splitList = (s) => (s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
 const arrToCsv = (v) => Array.isArray(v) ? v.join(",") : (typeof v === "string" ? v : undefined);
 /**
@@ -54,10 +45,6 @@ export function mergeSetInput(json, flags) {
         aiConfidence: flags.aiConfidence ?? json.aiConfidence,
         needsHumanReview: flags.needsHumanReview ?? json.needsHumanReview,
     };
-}
-export function readJsonInput(path) {
-    const raw = (path === "-" ? readFileSync(0, "utf8") : readFileSync(path, "utf8")).replace(/^\uFEFF/, "");
-    return JSON.parse(raw);
 }
 /**
  * Bulk-set entries from a pre-parsed JSON array. Runs sequentially (one PUT per
@@ -150,24 +137,17 @@ export async function runGlossaryLookupBatch(client, terms) {
             throw e;
         }
     }));
-    return { items, nextCursor: null, count: items.length };
+    return listEnvelope(items);
 }
 export async function runGlossaryList(client, opts) {
-    const q = new URLSearchParams();
-    if (opts.search)
-        q.set("search", opts.search);
-    if (opts.stalest)
-        q.set("stalest", String(opts.stalest));
-    if (opts.domain)
-        q.set("domain", opts.domain);
-    if (opts.related)
-        q.set("related", opts.related);
-    if (opts.needsReview)
-        q.set("needsReview", "1");
-    if (opts.needsReview && opts.maxConfidence != null)
-        q.set("maxConfidence", String(opts.maxConfidence));
-    const qs = q.toString();
-    const res = await client.get(`/api/cli/glossary${qs ? `?${qs}` : ""}`);
+    const res = await client.get(`/api/cli/glossary${qs({
+        search: opts.search || undefined,
+        stalest: opts.stalest || undefined,
+        domain: opts.domain || undefined,
+        related: opts.related || undefined,
+        needsReview: opts.needsReview ? "1" : undefined,
+        maxConfidence: opts.needsReview && opts.maxConfidence != null ? opts.maxConfidence : undefined,
+    })}`);
     const items = opts.termsOnly
         ? projectGlossaryForPrimer(res.items)
         : res.items;

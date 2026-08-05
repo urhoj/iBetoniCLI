@@ -1,10 +1,11 @@
+import { listEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { CliError } from "../../api/errors.js";
 /** GET /api/validation/profiles → ListEnvelope (each row carries `entity`). */
 export async function runValidateProfiles(client) {
     const items = await client.get("/api/validation/profiles");
-    return { items, nextCursor: null, count: items.length };
+    return listEnvelope(items);
 }
 /** GET /api/validation/:profile/:asiakasId — company checklist. */
 export async function runValidateCompany(client, profile, asiakasId) {

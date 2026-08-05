@@ -43,6 +43,21 @@ export function parseJsonBodyFlag(raw) {
     }
     return parsed;
 }
+/** Read a file (or stdin when the path is `-`) as UTF-8, stripping a leading BOM. */
+function readRawInput(pathOrDash) {
+    const raw = pathOrDash === "-" ? readFileSync(0, "utf8") : readFileSync(pathOrDash, "utf8");
+    return raw.replace(/^\uFEFF/, "");
+}
+/**
+ * Read and JSON-parse a file (or stdin when the path is `-`), returning whatever
+ * shape the document holds — object OR array. The raw fs / `SyntaxError` is left
+ * to escape: every caller wraps this in its own catch with a command-specific
+ * message, so mapping the failure here would flatten those.
+ * Use {@link readJsonObjectInput} when the value must be a JSON object.
+ */
+export function readJsonInput(path) {
+    return JSON.parse(readRawInput(path));
+}
 /**
  * Read a JSON object from a file path, or from stdin when the path is `-`.
  * Strips a leading BOM. This is the shell-safe alternative to inline `--body`
@@ -60,7 +75,7 @@ export function parseJsonBodyFlag(raw) {
 export function readJsonObjectInput(pathOrDash) {
     let raw;
     try {
-        raw = (pathOrDash === "-" ? readFileSync(0, "utf8") : readFileSync(pathOrDash, "utf8")).replace(/^\uFEFF/, "");
+        raw = readRawInput(pathOrDash);
     }
     catch (e) {
         const detail = e instanceof Error ? e.message : String(e);

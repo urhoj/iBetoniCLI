@@ -1,11 +1,13 @@
+import { listEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveDate, todayHelsinki, addDaysISO } from "../../dates.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { registerLogAlias } from "../log/index.js";
-import { parseId, resolveSearchQuery } from "../../targets.js";
+import { parseId, resolveSearchQuery, cappedInt } from "../../targets.js";
 import { guarded } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 // Re-exported for backward compatibility — resolveDate now lives in src/dates.ts.
 export { resolveDate };
 /**
@@ -40,25 +42,16 @@ function zeroRowHint(range, opts) {
  * Query parameters are appended only when set on `opts`.
  */
 export async function runKeikkaList(client, opts) {
-    const params = new URLSearchParams();
-    if (opts.from)
-        params.set("from", opts.from);
-    if (opts.to)
-        params.set("to", opts.to);
-    if (opts.customer !== undefined)
-        params.set("customer", String(opts.customer));
-    if (opts.vehicle !== undefined)
-        params.set("vehicle", String(opts.vehicle));
-    if (opts.worksite !== undefined)
-        params.set("worksite", String(opts.worksite));
-    if (opts.status)
-        params.set("status", opts.status);
-    if (opts.limit !== undefined)
-        params.set("limit", String(opts.limit));
-    if (opts.cursor)
-        params.set("cursor", opts.cursor);
-    const qs = params.toString();
-    const envelope = await client.get(`/api/cli/keikka/list${qs ? `?${qs}` : ""}`);
+    const envelope = await client.get(`/api/cli/keikka/list${qs({
+        from: opts.from || undefined,
+        to: opts.to || undefined,
+        customer: opts.customer,
+        vehicle: opts.vehicle,
+        worksite: opts.worksite,
+        status: opts.status || undefined,
+        limit: opts.limit,
+        cursor: opts.cursor || undefined,
+    })}`);
     // Echo the interpreted date window so a count:0 result is self-evidently
     // scoped — without it an empty list is indistinguishable from a mis-aimed query.
     const range = { from: opts.from ?? null, to: opts.to ?? null };
@@ -144,12 +137,11 @@ export async function runKeikkaGet(client, keikkaId) {
  * (the backend caps at TOP 100, no limit param).
  */
 export async function runKeikkaSearch(client, query, ownerAsiakasId, limit) {
-    const qs = new URLSearchParams({
+    const rows = await client.get(`/api/keikka/search${qs({
         searchString: query,
-        ownerAsiakasId: String(ownerAsiakasId),
+        ownerAsiakasId,
         usingFullTextSearch: "true",
-    });
-    const rows = await client.get(`/api/keikka/search?${qs.toString()}`);
+    })}`);
     const seen = new Map();
     for (const r of rows || []) {
         const id = Number(r.keikkaId);
@@ -167,7 +159,7 @@ export async function runKeikkaSearch(client, query, ownerAsiakasId, limit) {
         });
     }
     const items = [...seen.values()].slice(0, limit ?? seen.size);
-    return { items, nextCursor: null, count: items.length };
+    return listEnvelope(items);
 }
 /**
  * POST /api/keikka/newKeikka with a free-form body forwarded to the existing
@@ -244,7 +236,7 @@ export function registerKeikkaCommands(parent, getClient) {
         .option("--vehicle <id>", "Filter by vehicleId", (v) => Number(v))
         .option("--worksite <id>", "Filter by worksite (tyomaaId)", (v) => Number(v))
         .option("--status <s>", "Filter by status")
-        .option("--limit <n>", "Max rows", (v) => Math.min(Number(v), 500))
+        .option("--limit <n>", "Max rows", cappedInt(500))
         .option("--cursor <c>", "Pagination cursor")
         .action(guarded(async (rawOpts, command) => {
         const client = await getClient();

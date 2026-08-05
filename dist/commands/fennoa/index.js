@@ -1,15 +1,6 @@
+import { qs } from "../../api/query.js";
 import { writeJson } from "../../output/json.js";
 import { guarded } from "../_shared/action.js";
-/** Build a `?k=v&...` query suffix from defined params (one idiom for all reads). */
-function qs(params) {
-    const u = new URLSearchParams();
-    for (const [k, v] of Object.entries(params)) {
-        if (v !== undefined)
-            u.set(k, String(v));
-    }
-    const s = u.toString();
-    return s ? `?${s}` : "";
-}
 /** GET open purchase invoices (payables) → ListEnvelope + summary. */
 export async function runFennoaPurchases(client, opts) {
     const res = await client.get(`/api/admin/fennoa/purchase-invoices${qs({

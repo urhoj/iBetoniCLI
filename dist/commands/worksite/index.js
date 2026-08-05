@@ -1,27 +1,25 @@
+import { listEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { parseJsonBodyFlag, resolveJsonObjectBody } from "../../api/parseBody.js";
 import { registerLogAlias } from "../log/index.js";
-import { resolveTarget, parseId, resolveSearchQuery } from "../../targets.js";
+import { resolveTarget, parseId, resolveSearchQuery, cappedInt } from "../../targets.js";
 import { runAddressDashboard, } from "../_shared/addressDashboard.js";
 import { runCombinatorDuplicates, runCombinatorMerge, } from "../_shared/combinator.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { guarded } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 /**
  * GET /api/cli/worksite/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`.
  */
 export async function runWorksiteList(client, opts) {
-    const params = new URLSearchParams();
-    if (opts.limit !== undefined)
-        params.set("limit", String(opts.limit));
-    if (opts.cursor)
-        params.set("cursor", opts.cursor);
-    if (opts.customer !== undefined)
-        params.set("customer", String(opts.customer));
-    const qs = params.toString();
-    return client.get(`/api/cli/worksite/list${qs ? `?${qs}` : ""}`);
+    return client.get(`/api/cli/worksite/list${qs({
+        limit: opts.limit,
+        cursor: opts.cursor || undefined,
+        customer: opts.customer,
+    })}`);
 }
 /**
  * GET /api/cli/worksite/get/:tyomaaId. Returns the flat, enriched backend
@@ -32,13 +30,10 @@ export async function runWorksiteList(client, opts) {
  * record still carries `cameraCount` + `hasBuildingData` presence signals.
  */
 export async function runWorksiteGet(client, tyomaaId, opts = {}) {
-    const params = new URLSearchParams();
-    if (opts.includeBuilding)
-        params.set("includeBuilding", "1");
-    if (opts.includeCameras)
-        params.set("includeCameras", "1");
-    const qs = params.toString();
-    return client.get(`/api/cli/worksite/get/${tyomaaId}${qs ? `?${qs}` : ""}`);
+    return client.get(`/api/cli/worksite/get/${tyomaaId}${qs({
+        includeBuilding: opts.includeBuilding ? "1" : undefined,
+        includeCameras: opts.includeCameras ? "1" : undefined,
+    })}`);
 }
 /**
  * POST /api/tyomaa/search — the existing (non-/api/cli/) route that also backs
@@ -81,7 +76,7 @@ export async function runWorksiteSearch(client, query, limit, myCompanies = fals
         drivingInstructions: r.tyomaaAjoOhje || null,
         comment: r.tyomaaMemo || null,
     }));
-    return { items, nextCursor: null, count: items.length };
+    return listEnvelope(items);
 }
 /**
  * POST /api/tyomaa/new with a free-form body forwarded to the existing BE
@@ -257,7 +252,7 @@ export async function runWorksitePersonList(client, tyomaaId) {
         email: r.personEmail || null,
         contactType: r.contactPersonTypeId || null,
     }));
-    return { items, nextCursor: null, count: items.length };
+    return listEnvelope(items);
 }
 /**
  * `ib worksite dashboard` — resolve the caller's point from exactly one of
@@ -322,7 +317,7 @@ export function registerWorksiteCommands(parent, getClient) {
     const w = parent.command("worksite").description("Worksite commands");
     w.command("list")
         .description("List worksites")
-        .option("--limit <n>", "Max rows", (v) => Math.min(Number(v), 500))
+        .option("--limit <n>", "Max rows", cappedInt(500))
         .option("--cursor <c>", "Pagination cursor")
         .option("--customer <n>", "Filter by parent asiakasId", (v) => Number(v))
         .action(guarded(async (opts) => {
@@ -368,7 +363,7 @@ export function registerWorksiteCommands(parent, getClient) {
     w.command("search [query]")
         .description("Free-text search for worksites")
         .option("--search <s>", "Search query (alias for the <query> positional)")
-        .option("--limit <n>", "Max results", (v) => Math.min(Number(v), 500))
+        .option("--limit <n>", "Max results", cappedInt(500))
         .option("--my-companies", "Search across every company you belong to (rows tagged with ownerAsiakasId)")
         .action(guarded(async (query, opts) => {
         const client = await getClient();

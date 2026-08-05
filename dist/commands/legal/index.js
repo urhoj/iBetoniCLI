@@ -1,13 +1,15 @@
 import { readFile } from "node:fs/promises";
 import { CliError } from "../../api/errors.js";
+import { listEnvelope } from "../../api/envelopes.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith, failUsage } from "../../output/json.js";
-import { parseId } from "../../targets.js";
+import { parseId, cappedInt } from "../../targets.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { lineDiff } from "../../textDiff.js";
 import { applyTextEdit, parseEditOp } from "../../textEdit.js";
 import { validateStructuredJson } from "./validateJson.js";
 import { guarded } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 /** Lifecycle status values on legalDocuments.status (see backend migration). */
 export const LEGAL_STATUSES = ["draft", "active", "archived", "deleted"];
 const stripContent = (d) => {
@@ -22,7 +24,7 @@ const diffMeta = (d) => ({ ...stripContent(d), contentLength: contentLengthOf(d)
 export async function runLegalTypes(client) {
     const rows = await client.get("/api/legal-documents/types");
     const items = Array.isArray(rows) ? rows : [];
-    return { items, nextCursor: null, count: items.length };
+    return listEnvelope(items);
 }
 export async function runLegalShow(client, typeName, metaOnly) {
     const doc = await client.get(`/api/legal-documents/current/${encodeURIComponent(typeName)}`);
@@ -75,7 +77,7 @@ export async function runLegalActive(client) {
             throw e;
         }
     }));
-    return { items, nextCursor: null, count: items.length };
+    return listEnvelope(items);
 }
 export async function runLegalStatus(client, personId, ownerAsiakasId) {
     const q = ownerAsiakasId != null ? `?ownerAsiakasId=${ownerAsiakasId}` : "";
@@ -96,7 +98,7 @@ export async function runLegalVersions(client, typeName, ownerAsiakasId, status)
     // Client-side lifecycle filter — the backend returns the full history.
     if (status)
         items = items.filter((r) => r.status === status);
-    return { items, nextCursor: null, count: items.length };
+    return listEnvelope(items);
 }
 /**
  * Unpublished DRAFT versions across EVERY type — the cross-type answer to "is
@@ -109,7 +111,7 @@ export async function runLegalDrafts(client) {
     const types = await runLegalTypes(client);
     const perType = await Promise.all(types.items.map((t) => runLegalVersions(client, t.typeName, undefined, "draft").then((v) => v.items)));
     const items = perType.flat();
-    return { items, nextCursor: null, count: items.length };
+    return listEnvelope(items);
 }
 /**
  * Classify `legal get`'s positional (feedback #231): `ib legal list` keys its
@@ -265,13 +267,8 @@ export async function runLegalDelete(client, documentId, flags) {
     });
 }
 export async function runLegalAcceptances(client, typeName, opts) {
-    const params = new URLSearchParams();
-    if (opts.version)
-        params.set("version", opts.version);
-    if (opts.limit != null)
-        params.set("limit", String(opts.limit));
-    const qs = params.toString();
-    const data = await client.get(`/api/legal-documents/acceptances/${encodeURIComponent(typeName)}${qs ? `?${qs}` : ""}`);
+    const suffix = qs({ version: opts.version || undefined, limit: opts.limit ?? undefined });
+    const data = await client.get(`/api/legal-documents/acceptances/${encodeURIComponent(typeName)}${suffix}`);
     return {
         items: data.acceptances ?? [],
         nextCursor: null,
@@ -559,7 +556,7 @@ export function registerLegalCommands(parent, getClient) {
         // NOT --version: shadowed by the root global -V/--version (enforced by the
         // root-option reuse test in test/reference/help-wiring.test.ts).
         .option("--doc-version <v>", "Only acceptances of this version string")
-        .option("--limit <n>", "Max rows (default 500, cap 500)", (v) => Math.min(Number(v), 500))
+        .option("--limit <n>", "Max rows (default 500, cap 500)", cappedInt(500))
         .action(guarded(async (typeName, opts) => {
         const client = await getClient();
         writeJson(await runLegalAcceptances(client, typeName, {

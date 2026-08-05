@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { createStore, defaultCredentialsPath } from "../../auth/store.js";
 import {
   performSwitch,
@@ -52,7 +52,7 @@ export async function runCompanyList(
     name: companyName(c),
     current: c.asiakasId === res.currentCompanyId,
   }));
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 /**

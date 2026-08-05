@@ -18,15 +18,14 @@
  */
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import type { CommandSpec } from "../../output/help.js";
 import {
   type WriteFlags,
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { readFileSync } from "node:fs";
-import { readJsonObjectInput } from "../../api/parseBody.js";
+import { readJsonInput, readJsonObjectInput } from "../../api/parseBody.js";
 import { writeJson, exitWithError, failWith, failUsage, failValidation } from "../../output/json.js";
 import type { FlagProblem } from "../../output/validationEnvelope.js";
 import { resolveDate } from "../../dates.js";
@@ -34,11 +33,7 @@ import { parseRefId } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { COORDINATED as COORDINATED_REPOS, normalizeRepoCsv } from "./repos.js";
 import { guarded } from "../_shared/action.js";
-
-export function readJsonInput(path: string): unknown {
-  const raw = (path === "-" ? readFileSync(0, "utf8") : readFileSync(path, "utf8")).replace(/^\uFEFF/, "");
-  return JSON.parse(raw);
-}
+import { qs } from "../../api/query.js";
 
 type Row = Record<string, unknown>;
 
@@ -125,7 +120,7 @@ export async function runChangelogAdd(
 
 export async function runChangelogList(client: ApiClient, opts: Record<string, string | number | boolean | undefined>): Promise<ListEnvelope<Row>> {
   if (typeof opts.sentry === "string") opts.sentry = normalizeSentryRef(opts.sentry);
-  const p = new URLSearchParams();
+  const p: Record<string, string | number | boolean | undefined> = {};
   // CLI option key → API query key. --feedback maps to the backend's `feedbackId`
   // filter; --search/--status are substring LIKE filters (the controller passes
   // req.query straight to listEntries). --has-feedback/--has-sentry are handled below.
@@ -133,15 +128,12 @@ export async function runChangelogList(client: ApiClient, opts: Record<string, s
     month: "month", type: "type", area: "area", repo: "repo", feedback: "feedbackId",
     sentry: "sentryIssue", source: "source", search: "search", status: "status", limit: "limit",
   };
-  for (const [optKey, apiKey] of Object.entries(keyMap)) {
-    if (opts[optKey] !== undefined) p.set(apiKey, String(opts[optKey]));
-  }
-  if (opts.hasFeedback) p.set("hasFeedback", "1");
-  if (opts.hasSentry) p.set("hasSentry", "1");
-  const qs = p.toString();
-  const rows = await client.get<Row[]>(`/api/changelog${qs ? `?${qs}` : ""}`);
+  for (const [optKey, apiKey] of Object.entries(keyMap)) p[apiKey] = opts[optKey];
+  if (opts.hasFeedback) p.hasFeedback = "1";
+  if (opts.hasSentry) p.hasSentry = "1";
+  const rows = await client.get<Row[]>(`/api/changelog${qs(p)}`);
   const items = Array.isArray(rows) ? rows : [];
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 export async function runChangelogGet(

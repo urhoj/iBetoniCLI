@@ -1,15 +1,6 @@
+import { qs } from "../../../api/query.js";
 import { writeJson, exitWithError } from "../../../output/json.js";
 import { parseId } from "../../../targets.js";
-/** Build a `?k=v&...` suffix from the defined filters. */
-function qs(params) {
-    const u = new URLSearchParams();
-    for (const [k, v] of Object.entries(params)) {
-        if (v !== undefined)
-            u.set(k, String(v));
-    }
-    const s = u.toString();
-    return s ? `?${s}` : "";
-}
 /**
  * GET /api/cli/impersonation-sessions — reconstructed sessions as a ListEnvelope.
  * The backend returns `{ items, count, truncated }`.

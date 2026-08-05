@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { resolveDate } from "../../dates.js";
@@ -74,7 +74,7 @@ export async function runPersonDayStatuses(
       ownerAsiakasId: r.ownerAsiakasId != null ? Number(r.ownerAsiakasId) : null,
     } as StatusRowFull;
   });
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 /** GET /api/personPvm/list/:asiakasId — a person's day rows over [from, to] (to defaults to from). */
@@ -100,7 +100,7 @@ export async function runPersonDayGet(
     vehicleId: r.vehicleId != null ? Number(r.vehicleId) : null,
     text: (r.personPvmText as string) ?? null,
   }));
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 /**

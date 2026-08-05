@@ -1,3 +1,4 @@
+import { listEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith, failUsage } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
@@ -70,7 +71,7 @@ export async function runOhjeList(client, opts = {}) {
             return projected;
         });
     }
-    return { items, nextCursor: null, count: items.length };
+    return listEnvelope(items);
 }
 /**
  * Project commander options into {@link OhjeFields}: typed flags win over

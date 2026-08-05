@@ -1,3 +1,4 @@
+import { toListEnvelope } from "../../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../../output/json.js";
 import { resolveDate, todayHelsinki } from "../../../dates.js";
@@ -19,11 +20,6 @@ export function toBoardQueryDate(input) {
     const compact = iso.replace(/-/g, "");
     return /^\d{8}$/.test(compact) ? compact : null;
 }
-/** Wrap a backend array into the universal `{ items, nextCursor, count }` envelope. */
-function toEnvelope(rows) {
-    const items = Array.isArray(rows) ? rows : [];
-    return { items, nextCursor: null, count: items.length };
-}
 /**
  * GET /api/ilmoitustaulu?date=YYYYMMDD — notices ACTIVE on a given day
  * (`startDate <= date AND (expiresAt IS NULL OR expiresAt >= date)`), newest
@@ -32,14 +28,14 @@ function toEnvelope(rows) {
  * it returns the full active set.
  */
 export async function runBoardList(client, dateYyyymmdd) {
-    return toEnvelope(await client.get(`/api/ilmoitustaulu?date=${encodeURIComponent(dateYyyymmdd)}`));
+    return toListEnvelope(await client.get(`/api/ilmoitustaulu?date=${encodeURIComponent(dateYyyymmdd)}`));
 }
 /**
  * GET /api/ilmoitustaulu/all — EVERY notice for the company including expired
  * and not-yet-started ones (the admin-panel view). Requires admin/editor.
  */
 export async function runBoardAll(client) {
-    return toEnvelope(await client.get("/api/ilmoitustaulu/all"));
+    return toListEnvelope(await client.get("/api/ilmoitustaulu/all"));
 }
 /**
  * Get one notice by id. The backend exposes NO single-message GET route, so we

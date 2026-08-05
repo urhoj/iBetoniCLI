@@ -14,19 +14,20 @@ import { Command } from "commander";
 import { readFile } from "node:fs/promises";
 import type { ApiClient } from "../../api/client.js";
 import { CliError } from "../../api/errors.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import {
   addWriteFlagsToCommand,
   writeFlagsToHeaders,
   type WriteFlags,
 } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith, failUsage } from "../../output/json.js";
-import { parseId } from "../../targets.js";
+import { parseId, cappedInt } from "../../targets.js";
 import { decodeJwtPayload, type DecodedClaims } from "../../auth/jwt.js";
 import { lineDiff } from "../../textDiff.js";
 import { applyTextEdit, parseEditOp, type TextEditOp } from "../../textEdit.js";
 import { validateStructuredJson } from "./validateJson.js";
 import { guarded } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 
 /** Lifecycle status values on legalDocuments.status (see backend migration). */
 export const LEGAL_STATUSES = ["draft", "active", "archived", "deleted"] as const;
@@ -69,7 +70,7 @@ const diffMeta = (d: Row): Row => ({ ...stripContent(d), contentLength: contentL
 export async function runLegalTypes(client: ApiClient): Promise<ListEnvelope<LegalDocType>> {
   const rows = await client.get<LegalDocType[]>("/api/legal-documents/types");
   const items = Array.isArray(rows) ? rows : [];
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 export async function runLegalShow(
@@ -132,7 +133,7 @@ export async function runLegalActive(client: ApiClient): Promise<ListEnvelope<Ro
       }
     })
   );
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 export async function runLegalStatus(
@@ -175,7 +176,7 @@ export async function runLegalVersions(
   let items = (Array.isArray(rows) ? rows : []).map(stripContent);
   // Client-side lifecycle filter — the backend returns the full history.
   if (status) items = items.filter((r) => r.status === status);
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 /**
@@ -191,7 +192,7 @@ export async function runLegalDrafts(client: ApiClient): Promise<ListEnvelope<Ro
     types.items.map((t) => runLegalVersions(client, t.typeName, undefined, "draft").then((v) => v.items))
   );
   const items = perType.flat();
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 /**
@@ -404,17 +405,14 @@ export async function runLegalAcceptances(
   typeName: string,
   opts: { version?: string; limit?: number }
 ): Promise<ListEnvelope<Row> & { typeName: string; personSettingTypeId: number }> {
-  const params = new URLSearchParams();
-  if (opts.version) params.set("version", opts.version);
-  if (opts.limit != null) params.set("limit", String(opts.limit));
-  const qs = params.toString();
+  const suffix = qs({ version: opts.version || undefined, limit: opts.limit ?? undefined });
   const data = await client.get<{
     typeName: string;
     personSettingTypeId: number;
     count: number;
     truncated: boolean;
     acceptances: Row[];
-  }>(`/api/legal-documents/acceptances/${encodeURIComponent(typeName)}${qs ? `?${qs}` : ""}`);
+  }>(`/api/legal-documents/acceptances/${encodeURIComponent(typeName)}${suffix}`);
   return {
     items: data.acceptances ?? [],
     nextCursor: null,
@@ -812,7 +810,7 @@ export function registerLegalCommands(
     // NOT --version: shadowed by the root global -V/--version (enforced by the
     // root-option reuse test in test/reference/help-wiring.test.ts).
     .option("--doc-version <v>", "Only acceptances of this version string")
-    .option("--limit <n>", "Max rows (default 500, cap 500)", (v: string) => Math.min(Number(v), 500))
+    .option("--limit <n>", "Max rows (default 500, cap 500)", cappedInt(500))
     .action(
       guarded(async (typeName: string, opts: { docVersion?: string; limit?: number }) => {
         const client = await getClient();

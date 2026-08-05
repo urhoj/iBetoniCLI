@@ -12,11 +12,11 @@
  */
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
-import { parseId, parseOptionalId } from "../../targets.js";
+import { parseId, parseOptionalId, cappedInt } from "../../targets.js";
 import { guarded } from "../_shared/action.js";
 import {
   CHANGE_ENTITY_TYPES,
@@ -123,7 +123,7 @@ function assertIsoDate(value: string, flag: string): void {
 }
 
 function envelope(items: ChangeItem[], truncated = false): ListEnvelope<ChangeItem> {
-  const out: ListEnvelope<ChangeItem> = { items, nextCursor: null, count: items.length };
+  const out: ListEnvelope<ChangeItem> = listEnvelope(items);
   if (truncated) out.truncated = true;
   return out;
 }
@@ -248,7 +248,7 @@ export function registerLogAlias(
     .command(`log <${idArgName}>`)
     .description(description)
     .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))
-    .option("--limit <n>", "Max rows (default 100, cap 500)", (v: string) => Math.min(Number(v), 500), 100)
+    .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)
     .option("--field <name>", fieldExample)
     .action(
       guarded(async (idStr: string, opts: { owner?: number; limit: number; field?: string }) => {
@@ -278,7 +278,7 @@ export function registerLogCommands(
     .option(
       "--limit <n>",
       "Max rows (default 100, cap 500)",
-      (v: string) => Math.min(Number(v), 500),
+      cappedInt(500),
       100
     )
     .option("--field <name>", "Filter by changeTracker fieldName (client-side)")
@@ -311,7 +311,7 @@ export function registerLogCommands(
     .option(
       "--limit <n>",
       "Max rows (default 100, server cap 500)",
-      (v: string) => Math.min(Number(v), 500),
+      cappedInt(500),
       100
     )
     .action(
@@ -342,7 +342,7 @@ export function registerLogCommands(
     .option(
       "--limit <n>",
       "Max rows kept client-side (default 200, cap 2000)",
-      (v: string) => Math.min(Number(v), 2000),
+      cappedInt(2000),
       200
     )
     .action(
@@ -390,7 +390,7 @@ export function registerLogCommands(
     .option(
       "--limit <n>",
       "Max rows kept client-side (default 200, cap 2000)",
-      (v: string) => Math.min(Number(v), 2000),
+      cappedInt(2000),
       200
     )
     .action(
@@ -426,7 +426,7 @@ export function registerLogCommands(
     .option(
       "--limit <n>",
       "Max rows (default 100)",
-      (v: string) => Math.min(Number(v), 500),
+      cappedInt(500),
       100
     )
     .action(

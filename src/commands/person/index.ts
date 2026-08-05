@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { unwrapRows, type ListEnvelope } from "../../api/envelopes.js";
+import { unwrapRows, listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
@@ -25,7 +25,7 @@ import {
   type CombinatorMergeOptions,
 } from "../_shared/combinator.js";
 import { roleNameForTypeId, resolveRoleTypeId, explainRole } from "../../roles.js";
-import { parseId, parseOptionalId, resolveSearchQuery } from "../../targets.js";
+import { parseId, parseOptionalId, resolveSearchQuery, cappedInt } from "../../targets.js";
 import { runCompanyList } from "../company/index.js";
 import {
   runNotificationFcmSend,
@@ -38,6 +38,7 @@ import { registerPersonEmailCommands } from "./email.js";
 import { registerPersonAbsencesCommand } from "./absences.js";
 import { registerPersonActivityCommand } from "./activity.js";
 import { jsonAction, guarded } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 
 export interface PersonListFilter {
   role?: string;
@@ -135,14 +136,13 @@ export async function runPersonList(
   client: ApiClient,
   opts: PersonListFilter
 ): Promise<ListEnvelope<Record<string, unknown>>> {
-  const params = new URLSearchParams();
-  if (opts.role) params.set("role", opts.role);
-  if (opts.asiakas !== undefined) params.set("asiakas", String(opts.asiakas));
-  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
-  if (opts.owned) params.set("owned", "1");
-  const qs = params.toString();
   return client.get<ListEnvelope<Record<string, unknown>>>(
-    `/api/cli/person/list${qs ? `?${qs}` : ""}`
+    `/api/cli/person/list${qs({
+      role: opts.role || undefined,
+      asiakas: opts.asiakas,
+      limit: opts.limit,
+      owned: opts.owned ? "1" : undefined,
+    })}`
   );
 }
 
@@ -200,7 +200,7 @@ export async function runPersonSearch(
   if (limit !== undefined) body.limit = limit;
   const raw = await client.post<unknown>("/api/person/search", body, { read: true });
   const items = unwrapRows(raw).map(projectPersonHit);
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 /** A cross-company search hit: a PersonSearchHit plus its authoritative company. */
@@ -223,11 +223,9 @@ export async function runPersonSearchMyCompanies(
     fallback: () => Promise<ListEnvelope<MyCompanyPersonHit>>;
   }
 ): Promise<ListEnvelope<MyCompanyPersonHit>> {
-  const qs = new URLSearchParams({ q: query });
-  if (opts.limit !== undefined) qs.set("limit", String(opts.limit));
   try {
     return await client.get<ListEnvelope<MyCompanyPersonHit>>(
-      `/api/cli/person/search?${qs.toString()}`
+      `/api/cli/person/search${qs({ q: query, limit: opts.limit })}`
     );
   } catch (e) {
     // Endpoint not deployed yet → fall back to the client-side fan-out.
@@ -257,7 +255,7 @@ export async function runPersonSearchMyCompaniesFanout(
       items.push({ ...hit, asiakasId: c.asiakasId, asiakasName: c.name });
     }
   }
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 /** One person↔company role row, with the role name resolved. */
@@ -298,7 +296,7 @@ export async function runPersonRoleList(
     roleTypeId: r.asiakasPersonSettingTypeId,
     role: roleNameForTypeId(r.asiakasPersonSettingTypeId),
   }));
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 /**
@@ -446,7 +444,7 @@ export async function runPersonCompanies(
     rows = raw.recordset || raw.recordsets?.[0] || [];
   }
   const items = rows.map((r) => ({ asiakasId: r.asiakasId, name: r.asiakasNimi ?? r.asiakasName ?? r.name ?? null }));
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 /**
@@ -507,7 +505,7 @@ export function registerPersonCommands(
       "--owned",
       "List persons the company OWNS instead of its members (the default)"
     )
-    .option("--limit <n>", "Max rows", (v: string) => Math.min(Number(v), 500))
+    .option("--limit <n>", "Max rows", cappedInt(500))
     .action(
       guarded(async (opts: PersonListFilter) => {
         const client = await getClient();
@@ -529,7 +527,7 @@ export function registerPersonCommands(
   p.command("search [query]")
     .description("Free-text search for persons")
     .option("--search <s>", "Search query (alias for the <query> positional)")
-    .option("--limit <n>", "Max results", (v: string) => Math.min(Number(v), 500))
+    .option("--limit <n>", "Max results", cappedInt(500))
     .option(
       "--my-companies",
       "Search across every company you belong to (each hit tagged with its asiakasId)"
@@ -1040,7 +1038,7 @@ export function registerPersonCommands(
         "Includes role grants/revokes — pass `--field asiakasPersonSetting` for role changes only."
     )
     .option("--owner <id>", "ownerAsiakasId (default: active company)", (v: string) => Number(v))
-    .option("--limit <n>", "Max rows (default 100, cap 500)", (v: string) => Math.min(Number(v), 500), 100)
+    .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)
     .option("--field <name>", "Filter by changeTracker fieldName (e.g. asiakasPersonSetting)")
     .action(
       guarded(async (personIdStr: string, opts: { owner?: number; limit: number; field?: string }) => {

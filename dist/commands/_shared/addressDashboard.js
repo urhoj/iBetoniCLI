@@ -1,4 +1,5 @@
 import { CliError } from "../../api/errors.js";
+import { extractGeocodeLatLng } from "./geocode.js";
 /**
  * Shared orchestrator behind `ib worksite dashboard` / `ib sijainti dashboard`
  * (Address Information Dashboard, spec 2026-07-01). Fans out to the seven
@@ -120,25 +121,6 @@ export function assembleReport(sections) {
     return report;
 }
 /**
- * Pull `{lat,lng}` out of `/api/geocode/getLatLng`'s raw Google payload
- * (`results[0].geometry.location`), with a normalized top-level `{lat,lng}`
- * fallback (mirrors `runWeatherAddress`'s `extractLatLng`). Returns null for
- * ZERO_RESULTS / error / 0,0 shapes.
- */
-function extractGeocodedLatLng(geo) {
-    const g = geo;
-    if (!g || typeof g !== "object")
-        return null;
-    const results = g.results;
-    const location = results?.[0]?.geometry?.location;
-    const lat = Number(location?.lat ?? g.lat);
-    const lng = Number(location?.lng ?? g.lng);
-    if (Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0)) {
-        return { lat, lng };
-    }
-    return null;
-}
-/**
  * Phase 1: resolve the caller's point (`address` | `tyomaaId` | `sijaintiId`)
  * to `{lat,lng}`. The `source` query fragment returned alongside it is used
  * ONLY by this function's own `tyomaaId`/`sijaintiId` parcel resolve below —
@@ -162,7 +144,7 @@ async function resolvePoint(client, input) {
         // exempts it from the `--read-only` write-lock AND suppresses the
         // "[ib] write · acting as asiakasId …" acting-as banner (dashboard is read-only).
         const geo = await client.post("/api/geocode/getLatLng", { osoite: input.address }, { read: true });
-        const coords = extractGeocodedLatLng(geo);
+        const coords = extractGeocodeLatLng(geo);
         if (!coords) {
             const status = geo?.status ?? "unknown";
             throw new CliError(`could not geocode address (status: ${status})`, 404, geo, 5);

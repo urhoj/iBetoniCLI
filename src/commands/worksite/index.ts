@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import {
   type WriteFlags,
   writeFlagsToHeaders,
@@ -10,7 +10,7 @@ import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { parseJsonBodyFlag, resolveJsonObjectBody } from "../../api/parseBody.js";
 import { registerLogAlias } from "../log/index.js";
-import { resolveTarget, parseId, resolveSearchQuery } from "../../targets.js";
+import { resolveTarget, parseId, resolveSearchQuery, cappedInt } from "../../targets.js";
 import {
   runAddressDashboard,
   type AddressDashboardReport,
@@ -22,6 +22,7 @@ import {
 } from "../_shared/combinator.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { guarded } from "../_shared/action.js";
+import { qs } from "../../api/query.js";
 
 export interface WorksiteListFilter {
   limit?: number;
@@ -37,13 +38,12 @@ export async function runWorksiteList(
   client: ApiClient,
   opts: WorksiteListFilter
 ): Promise<ListEnvelope<Record<string, unknown>>> {
-  const params = new URLSearchParams();
-  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
-  if (opts.cursor) params.set("cursor", opts.cursor);
-  if (opts.customer !== undefined) params.set("customer", String(opts.customer));
-  const qs = params.toString();
   return client.get<ListEnvelope<Record<string, unknown>>>(
-    `/api/cli/worksite/list${qs ? `?${qs}` : ""}`
+    `/api/cli/worksite/list${qs({
+      limit: opts.limit,
+      cursor: opts.cursor || undefined,
+      customer: opts.customer,
+    })}`
   );
 }
 
@@ -60,12 +60,11 @@ export async function runWorksiteGet(
   tyomaaId: number,
   opts: { includeBuilding?: boolean; includeCameras?: boolean } = {}
 ): Promise<Record<string, unknown>> {
-  const params = new URLSearchParams();
-  if (opts.includeBuilding) params.set("includeBuilding", "1");
-  if (opts.includeCameras) params.set("includeCameras", "1");
-  const qs = params.toString();
   return client.get<Record<string, unknown>>(
-    `/api/cli/worksite/get/${tyomaaId}${qs ? `?${qs}` : ""}`
+    `/api/cli/worksite/get/${tyomaaId}${qs({
+      includeBuilding: opts.includeBuilding ? "1" : undefined,
+      includeCameras: opts.includeCameras ? "1" : undefined,
+    })}`
   );
 }
 
@@ -149,7 +148,7 @@ export async function runWorksiteSearch(
     drivingInstructions: r.tyomaaAjoOhje || null,
     comment: r.tyomaaMemo || null,
   }));
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 /**
@@ -435,7 +434,7 @@ export async function runWorksitePersonList(
     email: r.personEmail || null,
     contactType: r.contactPersonTypeId || null,
   }));
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 /**
@@ -519,7 +518,7 @@ export function registerWorksiteCommands(
 
   w.command("list")
     .description("List worksites")
-    .option("--limit <n>", "Max rows", (v: string) => Math.min(Number(v), 500))
+    .option("--limit <n>", "Max rows", cappedInt(500))
     .option("--cursor <c>", "Pagination cursor")
     .option("--customer <n>", "Filter by parent asiakasId", (v: string) => Number(v))
     .action(
@@ -579,7 +578,7 @@ export function registerWorksiteCommands(
   w.command("search [query]")
     .description("Free-text search for worksites")
     .option("--search <s>", "Search query (alias for the <query> positional)")
-    .option("--limit <n>", "Max results", (v: string) => Math.min(Number(v), 500))
+    .option("--limit <n>", "Max results", cappedInt(500))
     .option("--my-companies", "Search across every company you belong to (rows tagged with ownerAsiakasId)")
     .action(
       guarded(async (query: string | undefined, opts: { search?: string; limit?: number; myCompanies?: boolean }) => {

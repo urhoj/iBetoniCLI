@@ -1,13 +1,10 @@
+import { listEnvelope, toListEnvelope } from "../../../api/envelopes.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith } from "../../../output/json.js";
 import { resolveThreadId } from "./resolveThread.js";
 import { parseOptionalId, resolveSearchQuery } from "../../../targets.js";
 import { guarded } from "../../_shared/action.js";
-/** Wrap a backend array into the universal `{ items, nextCursor, count }` envelope. */
-function toEnvelope(value) {
-    const items = Array.isArray(value) ? value : [];
-    return { items, nextCursor: null, count: items.length };
-}
+import { qs } from "../../../api/query.js";
 /**
  * GET /api/messages/threads/mine → your threads (inbox), newest first.
  * `--tarjous` filters to one pumppuRequest; `--unread` to unreadCount > 0.
@@ -21,7 +18,7 @@ export async function runChatThreads(client, opts) {
     }
     if (opts.unread)
         items = items.filter((r) => Number(r.unreadCount) > 0);
-    return { items, nextCursor: null, count: items.length };
+    return listEnvelope(items);
 }
 /** GET /api/messages/threads/:id → thread metadata + participants. */
 export async function runChatThread(client, threadId) {
@@ -33,15 +30,11 @@ export async function runChatThread(client, threadId) {
  * `--deleted` adds `?includeDeleted=1` (own deleted rows; all rows for developers).
  */
 export async function runChatList(client, threadId, opts) {
-    const params = new URLSearchParams();
-    if (opts.deleted)
-        params.set("includeDeleted", "1");
-    if (opts.since)
-        params.set("since", opts.since);
-    if (opts.limit !== undefined)
-        params.set("limit", String(opts.limit));
-    const qs = params.toString();
-    return toEnvelope(await client.get(`/api/messages/threads/${threadId}/messages${qs ? `?${qs}` : ""}`));
+    return toListEnvelope(await client.get(`/api/messages/threads/${threadId}/messages${qs({
+        includeDeleted: opts.deleted ? "1" : undefined,
+        since: opts.since || undefined,
+        limit: opts.limit,
+    })}`));
 }
 /**
  * GET /api/messages/search?q=&limit= — search the caller's own messages by body
@@ -52,7 +45,7 @@ export async function runChatSearch(client, query, opts) {
     const parts = [`q=${encodeURIComponent(query)}`];
     if (opts.limit !== undefined)
         parts.push(`limit=${opts.limit}`);
-    return toEnvelope(await client.get(`/api/messages/search?${parts.join("&")}`));
+    return toListEnvelope(await client.get(`/api/messages/search?${parts.join("&")}`));
 }
 /**
  * POST /api/messages/threads/:id/messages — send a message.

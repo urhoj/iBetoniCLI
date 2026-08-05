@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import type { ListEnvelope } from "../../api/envelopes.js";
+import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import {
   type WriteFlags,
   writeFlagsToHeaders,
@@ -139,7 +139,7 @@ export async function runOhjeList(
       return projected as OhjeRecord;
     });
   }
-  return { items, nextCursor: null, count: items.length };
+  return listEnvelope(items);
 }
 
 /**

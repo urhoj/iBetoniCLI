@@ -1,5 +1,6 @@
 import type { ApiClient } from "../../api/client.js";
 import { CliError } from "../../api/errors.js";
+import { extractGeocodeLatLng } from "./geocode.js";
 
 /**
  * Shared orchestrator behind `ib worksite dashboard` / `ib sijainti dashboard`
@@ -165,27 +166,6 @@ interface ResolvedPoint {
 }
 
 /**
- * Pull `{lat,lng}` out of `/api/geocode/getLatLng`'s raw Google payload
- * (`results[0].geometry.location`), with a normalized top-level `{lat,lng}`
- * fallback (mirrors `runWeatherAddress`'s `extractLatLng`). Returns null for
- * ZERO_RESULTS / error / 0,0 shapes.
- */
-function extractGeocodedLatLng(geo: unknown): { lat: number; lng: number } | null {
-  const g = geo as Record<string, unknown> | null;
-  if (!g || typeof g !== "object") return null;
-  const results = g.results as
-    | Array<{ geometry?: { location?: { lat?: unknown; lng?: unknown } } }>
-    | undefined;
-  const location = results?.[0]?.geometry?.location;
-  const lat = Number(location?.lat ?? g.lat);
-  const lng = Number(location?.lng ?? g.lng);
-  if (Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0)) {
-    return { lat, lng };
-  }
-  return null;
-}
-
-/**
  * Phase 1: resolve the caller's point (`address` | `tyomaaId` | `sijaintiId`)
  * to `{lat,lng}`. The `source` query fragment returned alongside it is used
  * ONLY by this function's own `tyomaaId`/`sijaintiId` parcel resolve below —
@@ -213,7 +193,7 @@ async function resolvePoint(client: ApiClient, input: AddressDashboardInput): Pr
       { osoite: input.address },
       { read: true }
     );
-    const coords = extractGeocodedLatLng(geo);
+    const coords = extractGeocodeLatLng(geo);
     if (!coords) {
       const status = (geo as { status?: string } | null)?.status ?? "unknown";
       throw new CliError(`could not geocode address (status: ${status})`, 404, geo, 5);

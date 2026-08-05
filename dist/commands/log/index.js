@@ -1,7 +1,8 @@
+import { listEnvelope } from "../../api/envelopes.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
-import { parseId, parseOptionalId } from "../../targets.js";
+import { parseId, parseOptionalId, cappedInt } from "../../targets.js";
 import { guarded } from "../_shared/action.js";
 import { CHANGE_ENTITY_TYPES, findEntityType, isKnownEntityType, runLogTypes, } from "./entityTypes.js";
 function projectRow(r) {
@@ -50,7 +51,7 @@ function assertIsoDate(value, flag) {
     }
 }
 function envelope(items, truncated = false) {
-    const out = { items, nextCursor: null, count: items.length };
+    const out = listEnvelope(items);
     if (truncated)
         out.truncated = true;
     return out;
@@ -135,7 +136,7 @@ export function registerLogAlias(group, getClient, entityType, idArgName, descri
         .command(`log <${idArgName}>`)
         .description(description)
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
-        .option("--limit <n>", "Max rows (default 100, cap 500)", (v) => Math.min(Number(v), 500), 100)
+        .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)
         .option("--field <name>", fieldExample)
         .action(guarded(async (idStr, opts) => {
         const client = await getClient();
@@ -151,7 +152,7 @@ export function registerLogCommands(parent, getClient) {
         .description("Audit trail for ONE entity — who changed which field, when, old→new, with --reason. " +
         "Valid entityTypes: `ib log types`.")
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
-        .option("--limit <n>", "Max rows (default 100, cap 500)", (v) => Math.min(Number(v), 500), 100)
+        .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)
         .option("--field <name>", "Filter by changeTracker fieldName (client-side)")
         .action(async (entityType, entityIdStr, opts) => {
         try {
@@ -169,7 +170,7 @@ export function registerLogCommands(parent, getClient) {
         .description("Newest changes across the whole company (admin), optionally one entityType.")
         .option("--entity-type <type>", "Filter to one entityType")
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
-        .option("--limit <n>", "Max rows (default 100, server cap 500)", (v) => Math.min(Number(v), 500), 100)
+        .option("--limit <n>", "Max rows (default 100, server cap 500)", cappedInt(500), 100)
         .action(guarded(async (opts) => {
         const client = await getClient();
         writeJson(await runLogLatest(client, opts.limit, {
@@ -184,7 +185,7 @@ export function registerLogCommands(parent, getClient) {
         .option("--entity-type <type>", "Filter to one entityType")
         .option("--person <personId>", "Filter to one actor", (v) => Number(v))
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
-        .option("--limit <n>", "Max rows kept client-side (default 200, cap 2000)", (v) => Math.min(Number(v), 2000), 200)
+        .option("--limit <n>", "Max rows kept client-side (default 200, cap 2000)", cappedInt(2000), 200)
         .action(async (opts) => {
         try {
             const client = await getClient();
@@ -208,7 +209,7 @@ export function registerLogCommands(parent, getClient) {
         .requiredOption("--from <iso>", "Entity-date window start YYYY-MM-DD (or today/yesterday/tomorrow)")
         .requiredOption("--to <iso>", "Entity-date window end YYYY-MM-DD (or today/yesterday/tomorrow)")
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
-        .option("--limit <n>", "Max rows kept client-side (default 200, cap 2000)", (v) => Math.min(Number(v), 2000), 200)
+        .option("--limit <n>", "Max rows kept client-side (default 200, cap 2000)", cappedInt(2000), 200)
         .action(async (opts) => {
         try {
             const client = await getClient();
@@ -227,7 +228,7 @@ export function registerLogCommands(parent, getClient) {
     c.command("user [personId]")
         .description("Changes MADE BY a person (no arg = yourself; another personId needs admin).")
         .option("--owner <id>", "ownerAsiakasId (default: active company)", (v) => Number(v))
-        .option("--limit <n>", "Max rows (default 100)", (v) => Math.min(Number(v), 500), 100)
+        .option("--limit <n>", "Max rows (default 100)", cappedInt(500), 100)
         .action(async (personIdStr, opts) => {
         try {
             const client = await getClient();

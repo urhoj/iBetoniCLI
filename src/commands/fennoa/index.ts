@@ -6,6 +6,7 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
+import { qs } from "../../api/query.js";
 import { writeJson } from "../../output/json.js";
 import { guarded } from "../_shared/action.js";
 interface PurchaseInvoiceRow {
@@ -40,16 +41,6 @@ interface PurchasesResponse {
   asiakasId: number;
   months: number;
   cached?: boolean;
-}
-
-/** Build a `?k=v&...` query suffix from defined params (one idiom for all reads). */
-function qs(params: Record<string, string | number | undefined>): string {
-  const u = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined) u.set(k, String(v));
-  }
-  const s = u.toString();
-  return s ? `?${s}` : "";
 }
 
 /** GET open purchase invoices (payables) → ListEnvelope + summary. */

@@ -1,3 +1,4 @@
+import { listEnvelope } from "../../api/envelopes.js";
 import { createStore, defaultCredentialsPath } from "../../auth/store.js";
 import { performSwitch, assertPersistedSwitchAllowed, } from "../../auth/switch.js";
 import { writeJson, exitWithError, failWith } from "../../output/json.js";
@@ -17,7 +18,7 @@ export async function runCompanyList(client) {
         name: companyName(c),
         current: c.asiakasId === res.currentCompanyId,
     }));
-    return { items, nextCursor: null, count: items.length };
+    return listEnvelope(items);
 }
 /**
  * GET /api/company-selection/available and return only the active company

@@ -1,16 +1,7 @@
+import { qs } from "../../api/query.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../api/writeFlags.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 import { guarded } from "../_shared/action.js";
-/** Build a `?k=v&...` query suffix from defined params (one idiom for all reads). */
-function qs(params) {
-    const u = new URLSearchParams();
-    for (const [k, v] of Object.entries(params)) {
-        if (v !== undefined)
-            u.set(k, String(v));
-    }
-    const s = u.toString();
-    return s ? `?${s}` : "";
-}
 /** GET recent slow queries → ListEnvelope. `truncated` when the page filled the limit. */
 export async function runPerfSlow(client, opts) {
     const res = await client.get(`/api/admin/slow-queries${qs({ limit: opts.limit, env: opts.env })}`);
