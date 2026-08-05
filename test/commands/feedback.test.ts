@@ -9,8 +9,12 @@ import {
   runFeedbackUpdate,
   runFeedbackCount,
   resolveFeedbackCreateDescription,
+  mergeFeedbackCreateInput,
   registerFeedbackCommands,
 } from "../../src/commands/feedback/index.js";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
 
@@ -74,6 +78,85 @@ describe("ib feedback create", () => {
       expect.objectContaining({ description: "filed via --body" }),
       expect.objectContaining({ meta: true })
     );
+  });
+
+  // ─── fb#299: argv-safe input ───────────────────────────────────────────────
+  // A report body is exactly the text most likely to contain double quotes, and
+  // PowerShell splits a native arg on those — the CLI then saw N positionals and
+  // exited 4. --from-json bypasses argv entirely.
+  describe("--from-json (feedback #299)", () => {
+    const withJsonFile = async (payload: unknown, fn: (path: string) => Promise<void>) => {
+      const p = join(tmpdir(), `ib-feedback-fromjson-${process.pid}.json`);
+      writeFileSync(p, JSON.stringify(payload), "utf8");
+      try { await fn(p); } finally { unlinkSync(p); }
+    };
+
+    test("precedence is explicit flag > JSON > Commander default", () => {
+      // The middle rung is the trap: --kind/--scope declare defaults, so a naive
+      // "flags win" would let a default the caller never typed beat the JSON.
+      expect(mergeFeedbackCreateInput({ kind: "bug" }, {}, { kind: "improvement" }).kind).toBe("bug");
+      expect(mergeFeedbackCreateInput({ kind: "bug" }, { kind: "idea" }, { kind: "improvement" }).kind).toBe("idea");
+      expect(mergeFeedbackCreateInput({}, {}, { kind: "improvement" }).kind).toBe("improvement");
+      expect(mergeFeedbackCreateInput({ description: "d", command: "ib x", error: "boom" }, {}, {}))
+        .toMatchObject({ description: "d", command: "ib x", error: "boom" });
+    });
+
+    test("a quote-bearing payload round-trips, and JSON kind/scope beat the flag defaults", async () => {
+      post.mockResolvedValueOnce({ feedbackId: 299 });
+      const description = 'help says "Only keys present are written" but {"aiConfidence":90} is dropped';
+      await withJsonFile(
+        { description, kind: "bug", scope: "cli", command: "ib glossary set --from-json f.json", error: 'too many arguments for "create"' },
+        async (p) => {
+          const program = new Command();
+          registerFeedbackCommands(program, async () => mockClient);
+          await program.parseAsync(["feedback", "create", "--from-json", p], { from: "user" });
+        }
+      );
+      expect(post).toHaveBeenCalledWith(
+        "/api/feedback",
+        {
+          kind: "bug", // NOT the "improvement" default
+          scope: "cli",
+          description,
+          command: "ib glossary set --from-json f.json",
+          error: 'too many arguments for "create"',
+        },
+        { meta: true }
+      );
+    });
+
+    test("an explicit flag overrides the JSON key", async () => {
+      post.mockResolvedValueOnce({ feedbackId: 300 });
+      await withJsonFile({ description: "d", kind: "bug" }, async (p) => {
+        const program = new Command();
+        registerFeedbackCommands(program, async () => mockClient);
+        await program.parseAsync(["feedback", "create", "--from-json", p, "--kind", "idea"], { from: "user" });
+      });
+      expect(post.mock.calls[0][1]).toMatchObject({ kind: "idea", description: "d" });
+    });
+
+    test("--title in the JSON still folds into the description", async () => {
+      post.mockResolvedValueOnce({ feedbackId: 301 });
+      await withJsonFile({ title: "T", description: "body" }, async (p) => {
+        const program = new Command();
+        registerFeedbackCommands(program, async () => mockClient);
+        await program.parseAsync(["feedback", "create", "--from-json", p], { from: "user" });
+      });
+      expect(post.mock.calls[0][1]).toMatchObject({ description: "T\n\nbody" });
+    });
+
+    test("a missing --from-json file exits 4 without POSTing", async () => {
+      const program = new Command();
+      registerFeedbackCommands(program, async () => mockClient);
+      const prevExit = process.exitCode;
+      await program.parseAsync(
+        ["feedback", "create", "--from-json", join(tmpdir(), "ib-does-not-exist-299.json")],
+        { from: "user" }
+      );
+      expect(process.exitCode).toBe(4);
+      expect(post).not.toHaveBeenCalled();
+      process.exitCode = prevExit;
+    });
   });
 
   test("--title folds into the description as its first line (feedback #240/#241)", () => {

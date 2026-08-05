@@ -34,6 +34,15 @@ export function projectGlossaryForPrimer(items) {
  * wins regardless of what the JSON file contains. Fields absent from both json
  * and flags are left `undefined` (omitted from the PATCH body, so the backend
  * COALESCE preserves the current DB value).
+ *
+ * The two ASSESSMENT fields are the exception to that last sentence, and the
+ * reason they must be merged here (fb#298): the backend does NOT COALESCE them,
+ * it direct-assigns (`aiConfidence == null ? null : …`, `needsHumanReview ? 1 : 0`
+ * in glossaryCliRoutes.js) so that omitting them RESETS the row and re-opens it
+ * for grooming. Dropping a JSON-supplied aiConfidence therefore does not merely
+ * fail to write it — it silently wipes the stored score. That bit `import`
+ * hardest: it has no --ai-confidence flag at all, so a bulk groom could only
+ * ever carry the score per-entry in the JSON.
  */
 export function mergeSetInput(json, flags) {
     return {
@@ -42,6 +51,8 @@ export function mergeSetInput(json, flags) {
         related: flags.related ?? arrToCsv(json.relatedCommands ?? json.related),
         entity: flags.entity ?? (json.relatedEntity ?? json.entity),
         domain: flags.domain ?? json.domain,
+        aiConfidence: flags.aiConfidence ?? json.aiConfidence,
+        needsHumanReview: flags.needsHumanReview ?? json.needsHumanReview,
     };
 }
 export function readJsonInput(path) {
@@ -66,7 +77,8 @@ export async function runGlossaryImport(client, entries, flags) {
         }
         const inp = mergeSetInput(e, {});
         try {
-            await runGlossarySet(client, term, { definition: inp.definition, synonyms: inp.synonyms, related: inp.related, entity: inp.entity, domain: inp.domain, updateOnly: flags.updateOnly }, { dryRun: flags.dryRun, idempotencyKey: flags.idempotencyKey, reason: flags.reason });
+            await runGlossarySet(client, term, { definition: inp.definition, synonyms: inp.synonyms, related: inp.related, entity: inp.entity, domain: inp.domain,
+                aiConfidence: inp.aiConfidence, needsHumanReview: inp.needsHumanReview, updateOnly: flags.updateOnly }, { dryRun: flags.dryRun, idempotencyKey: flags.idempotencyKey, reason: flags.reason });
             results.push({ term, ok: true });
         }
         catch (err) {
@@ -336,8 +348,11 @@ export function registerGlossaryCommands(program, getClient) {
         .option("--remove-synonyms <list>", "Comma-separated synonyms to REMOVE by name (excl. --synonyms)")
         .option("--append-definition <text>", "Append a clause to the current definition (excl. --definition)");
     addWriteFlagsToCommand(addAssessWriteFlags(set)).action(async (term, opts) => {
-        assertAiConfidence(opts.aiConfidence);
-        let merged = { definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity, domain: opts.domain };
+        const flagFields = {
+            definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity, domain: opts.domain,
+            aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview,
+        };
+        let merged = flagFields;
         if (opts.fromJson) {
             let json;
             try {
@@ -346,12 +361,16 @@ export function registerGlossaryCommands(program, getClient) {
             catch {
                 failWith("--from-json: not valid JSON", 4);
             }
-            merged = mergeSetInput(json, { definition: opts.definition, synonyms: opts.synonyms, related: opts.related, entity: opts.entity, domain: opts.domain });
+            merged = mergeSetInput(json, flagFields);
         }
+        // Validate the MERGED score, not just the flag — a --from-json object can
+        // now supply aiConfidence, and an out-of-range value there deserves the
+        // same client-side exit 4 as a bad flag (fb#298).
+        assertAiConfidence(merged.aiConfidence);
         try {
             writeJson(await runGlossarySet(await getClient(), term, { definition: merged.definition, synonyms: merged.synonyms, related: merged.related, entity: merged.entity, domain: merged.domain,
                 addSynonyms: opts.addSynonyms, removeSynonyms: opts.removeSynonyms, appendDefinition: opts.appendDefinition,
-                updateOnly: opts.updateOnly, aiConfidence: opts.aiConfidence, needsHumanReview: opts.needsHumanReview }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
+                updateOnly: opts.updateOnly, aiConfidence: merged.aiConfidence, needsHumanReview: merged.needsHumanReview }, { dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason }));
         }
         catch (e) {
             exitWithError(e);

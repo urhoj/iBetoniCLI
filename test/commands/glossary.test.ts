@@ -1,7 +1,11 @@
 import { describe, test, expect, vi } from "vitest";
+import { Command } from "commander";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   runGlossaryLookup, runGlossaryList, runGlossarySet, runGlossaryMisses, runGlossaryLookupBatch,
-  mergeSetInput, runGlossaryImport, runGlossaryDelete, runGlossaryDismiss,
+  mergeSetInput, runGlossaryImport, runGlossaryDelete, runGlossaryDismiss, registerGlossaryCommands,
 } from "../../src/commands/glossary/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
@@ -216,6 +220,70 @@ describe("glossary domain filters", () => {
   test("mergeSetInput threads domain (flag overrides json)", () => {
     expect(mergeSetInput({ domain: "j" }, {}).domain).toBe("j");
     expect(mergeSetInput({ domain: "j" }, { domain: "f" }).domain).toBe("f");
+  });
+});
+
+// ─── fb#298: --from-json must carry the assessment fields ────────────────────
+// The backend DIRECT-ASSIGNS aiConfidence/needsHumanReview (it does not COALESCE
+// them), so a dropped JSON key does not merely fail to write — it wipes the
+// stored score. These guard the whole path, not just the merge helper: the
+// original defect was at the ACTION call site, which passed opts.* instead of
+// the merged values, so a mergeSetInput-only test would have stayed green.
+describe("glossary assessment fields from --from-json (fb#298)", () => {
+  const withJsonFile = async (payload: unknown, fn: (path: string) => Promise<void>) => {
+    const p = join(tmpdir(), `ib-glossary-fromjson-${process.pid}.json`);
+    writeFileSync(p, JSON.stringify(payload), "utf8");
+    try { await fn(p); } finally { unlinkSync(p); }
+  };
+
+  test("mergeSetInput carries both fields from JSON; an explicit flag still wins", () => {
+    expect(mergeSetInput({ aiConfidence: 90, needsHumanReview: true }, {}))
+      .toMatchObject({ aiConfidence: 90, needsHumanReview: true });
+    expect(mergeSetInput({ aiConfidence: 90 }, { aiConfidence: 40 }).aiConfidence).toBe(40);
+    // Absent from both → undefined (omitted from the body; the backend resets).
+    expect(mergeSetInput({}, {}).aiConfidence).toBeUndefined();
+  });
+
+  test("set --from-json PUTs the JSON aiConfidence (before the fix the score was silently nulled)", async () => {
+    const put = vi.fn().mockResolvedValue({ term: "x" });
+    await withJsonFile({ definition: "d", aiConfidence: 90 }, async (p) => {
+      const program = new Command();
+      registerGlossaryCommands(program, async () => mkClient({ put }));
+      await program.parseAsync(["glossary", "set", "x", "--from-json", p], { from: "user" });
+    });
+    expect(put.mock.calls[0][1]).toMatchObject({ definition: "d", aiConfidence: 90 });
+  });
+
+  test("an explicit --ai-confidence overrides the JSON key", async () => {
+    const put = vi.fn().mockResolvedValue({ term: "x" });
+    await withJsonFile({ definition: "d", aiConfidence: 90 }, async (p) => {
+      const program = new Command();
+      registerGlossaryCommands(program, async () => mkClient({ put }));
+      await program.parseAsync(["glossary", "set", "x", "--from-json", p, "--ai-confidence", "40"], { from: "user" });
+    });
+    expect(put.mock.calls[0][1]).toMatchObject({ aiConfidence: 40 });
+  });
+
+  test("an out-of-range aiConfidence in the JSON exits 4 client-side (no PUT)", async () => {
+    const put = vi.fn().mockResolvedValue({ term: "x" });
+    await withJsonFile({ definition: "d", aiConfidence: 150 }, async (p) => {
+      const program = new Command();
+      registerGlossaryCommands(program, async () => mkClient({ put }));
+      await expect(
+        program.parseAsync(["glossary", "set", "x", "--from-json", p], { from: "user" })
+      ).rejects.toMatchObject({ exitCode: 4 });
+    });
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  test("import forwards a per-entry aiConfidence — a bulk groom no longer wipes every score", async () => {
+    const put = vi.fn(async (p: string) => ({ term: p.split("/").pop() }));
+    await runGlossaryImport(
+      mkClient({ put }),
+      [{ term: "loma", definition: "d", aiConfidence: 85, needsHumanReview: true }],
+      { reason: "groom" }
+    );
+    expect(put.mock.calls[0][1]).toMatchObject({ aiConfidence: 85, needsHumanReview: true });
   });
 });
 

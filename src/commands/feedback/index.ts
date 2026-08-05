@@ -16,6 +16,7 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { CliError } from "../../api/errors.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
+import { readJsonObjectInput } from "../../api/parseBody.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 import { parseRefId } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
@@ -162,6 +163,53 @@ export function resolveFeedbackCreateDescription(input: {
     throw new CliError("description is required", 400, null, 4);
   }
   return title ? `${title}\n\n${description}` : description;
+}
+
+/** Flags that a `--from-json` object can also supply (drives explicit-flag detection). */
+export const FROM_JSON_FIELDS = [
+  "description", "body", "title", "kind", "scope", "command", "error", "severity", "complexity",
+] as const;
+
+/** Field set `create` accepts from a flag or a `--from-json` object. */
+export interface FeedbackCreateFields {
+  description?: string;
+  body?: string;
+  title?: string;
+  kind?: string;
+  scope?: string;
+  command?: string;
+  error?: string;
+  severity?: string;
+  complexity?: number;
+}
+
+/**
+ * Merge a `--from-json` object with the CLI flags (fb#299).
+ *
+ * Precedence: an EXPLICITLY-typed flag wins, then the JSON object, then the
+ * Commander default. That middle rung is why `explicit` is passed separately
+ * from the raw opts — `--kind`/`--scope` declare defaults ("improvement"/"cli"),
+ * so feeding the raw opts in would let a default the caller never typed silently
+ * outrank a JSON-supplied value. Callers detect "actually typed" with
+ * `cmd.getOptionValueSource(name) === "cli"` (same idiom as `keikka list`).
+ */
+export function mergeFeedbackCreateInput(
+  json: Record<string, unknown>,
+  explicit: FeedbackCreateFields,
+  defaults: FeedbackCreateFields
+): FeedbackCreateFields {
+  const s = (k: string): string | undefined => json[k] as string | undefined;
+  return {
+    description: explicit.description ?? s("description"),
+    body: explicit.body ?? s("body"),
+    title: explicit.title ?? s("title"),
+    kind: explicit.kind ?? s("kind") ?? defaults.kind,
+    scope: explicit.scope ?? s("scope") ?? defaults.scope,
+    command: explicit.command ?? s("command"),
+    error: explicit.error ?? s("error"),
+    severity: explicit.severity ?? s("severity"),
+    complexity: explicit.complexity ?? (json.complexity as number | undefined),
+  };
 }
 
 interface FeedbackCreateBody {
@@ -555,6 +603,10 @@ export function registerFeedbackCommands(
       "1-5 agent-triage estimate: 1 simple+autonomous · 2 simple+wants-input · 3 complex+autonomous · 4 complex+needs-user · 5 very-complex+needs-user & heavier model (see `ib help complexity`)",
       Number
     )
+    .option(
+      "--from-json <file>",
+      "Read the whole payload from a JSON object file (or - for stdin); explicit flags override. Shell-safe: the only way to pass text containing quotes on Windows PowerShell."
+    )
     .option("--dry-run", "Print the payload without sending (client-side)")
     .action(
       async (
@@ -569,25 +621,38 @@ export function registerFeedbackCommands(
           error?: string;
           severity?: string;
           complexity?: number;
+          fromJson?: string;
           dryRun?: boolean;
-        }
+        },
+        cmd: Command
       ) => {
         try {
+          // Only the flags the caller ACTUALLY typed outrank the JSON object —
+          // see mergeFeedbackCreateInput (--kind/--scope carry defaults).
+          const explicit: Record<string, unknown> = {};
+          for (const k of FROM_JSON_FIELDS) {
+            if (cmd.getOptionValueSource(k) === "cli") explicit[k] = (opts as Record<string, unknown>)[k];
+          }
+          const merged = mergeFeedbackCreateInput(
+            opts.fromJson ? readJsonObjectInput(opts.fromJson) : {},
+            explicit as FeedbackCreateFields,
+            { kind: opts.kind, scope: opts.scope }
+          );
           const client = await getClient();
           writeJson(
             await runFeedbackCreate(client, {
               description: resolveFeedbackCreateDescription({
                 description,
-                descriptionFlag: opts.description,
-                bodyFlag: opts.body,
-                title: opts.title,
+                descriptionFlag: merged.description,
+                bodyFlag: merged.body,
+                title: merged.title,
               }),
-              kind: opts.kind,
-              scope: opts.scope,
-              command: opts.command,
-              error: opts.error,
-              severity: opts.severity,
-              complexity: opts.complexity,
+              kind: merged.kind,
+              scope: merged.scope,
+              command: merged.command,
+              error: merged.error,
+              severity: merged.severity,
+              complexity: merged.complexity,
               dryRun: opts.dryRun,
             })
           );

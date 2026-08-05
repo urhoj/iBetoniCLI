@@ -2286,6 +2286,7 @@ FLAGS
   --error STRING    Error message you hit, if any
   --severity STRING    critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug
   --complexity NUMBER    1-5 agent-triage estimate (orthogonal to --severity): 1 simple+autonomous · 2 simple+wants-input · 3 complex+autonomous · 4 complex+needs-user · 5 very-complex+needs-user & heavier model. Lets a batch-fix agent pull \`list --max-complexity 3\`. See \`ib help complexity\`.
+  --from-json STRING    Read the whole payload from a JSON object file (or - for stdin); explicit flags override. Keys: description, body, title, kind, scope, command, error, severity, complexity.
   --dry-run    Print the payload without sending (client-side)
 
 GLOBAL FLAGS
@@ -2296,6 +2297,8 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Validation             → description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (STRICT — unknown exits 4); --severity, when given, must be critical|major|minor|cosmetic; --complexity, when given, must be an integer 1-5
+  exit 4 (client-side)  too many arguments — the shell split the description on its inner double-quotes (typical on Windows PowerShell) → Pass the report via --from-json <file|-> instead of argv
+  exit 4 (client-side)  --from-json file is unreadable, not valid JSON, or not a JSON object → Check the file path and that the root is an object, not an array
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -2303,6 +2306,7 @@ NOTES
   - You can pass the description positionally or as its --description/--body aliases; if you pass more than one, they must match. Here --body is FREE TEXT, unlike the raw-JSON --body on the entity update commands.
   - gh-issue-style invocation works: \`feedback add --title X --description Y\` — \`add\` aliases \`create\`, and --title is prepended to the description as its first line (blank line between). Feedback rows store only a description, so the title is a formatting convenience, not a separate field.
   - A description starting with "-" is parsed as an option (exit 4) — put a bare \`--\` terminator before it: ib dev feedback create --kind bug -- "--pretty output too wide". Everything after \`--\` is taken as positional text.
+  - SHELL QUOTING (fb#299): a report body is exactly the text most likely to contain double quotes (quoted help text, JSON fragments, error strings), and Windows PowerShell splits a native argument on those inner quotes — the CLI then sees many positionals and exits 4 with "too many arguments". --from-json <file|-> sidesteps argv entirely and is the recommended path for any long or quote-bearing report; it also covers --command/--error, which carry quoted text just as often as the description.
   - When invoked by the betoni.online /ai assistant, the originating conversation id is auto-attached as context.conversationId (via the IB_CONVERSATION_ID env var the /ai loop injects) — a developer can then read the full conversation with \`ib dev ai conversation <id>\`. Manual CLI use does not set it.
 
 EXAMPLES
@@ -2315,6 +2319,8 @@ EXAMPLES
   ib dev feedback create "TOS 2.0 lacks a clause covering the AI assistant features; draft update suggested" --kind legal
   ib dev feedback create "Jerry inbox should show boom length on request cards" --scope jerry --kind idea
   ib dev feedback create "keikka editor throws on save" --kind bug --severity major
+  ib dev feedback create --from-json ./report.json
+  ib dev feedback create --from-json ./report.json --kind bug
   ib dev feedback create "add row counts to schema table output" --kind idea --complexity 2
 "
 `;
@@ -3100,7 +3106,7 @@ DESCRIPTION
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
-  <file> STRING    JSON array file of {term, definition, synonyms?, relatedCommands?, relatedEntity?, domain?} objects (or - for stdin) (required)
+  <file> STRING    JSON array file of {term, definition, synonyms?, relatedCommands?, relatedEntity?, domain?, aiConfidence?, needsHumanReview?} objects (or - for stdin) (required)
 
 FLAGS
   --update-only    Only update existing terms; never insert
@@ -3124,6 +3130,7 @@ NOTES
   - Each entry must have a \`term\` field; entries missing it are counted as failed.
   - Synonyms and relatedCommands may be arrays (arrays are accepted and converted to a comma list internally) or comma-separated strings.
   - Avoids shell argv mangling of Finnish ä/ö — pass UTF-8 JSON instead of quoting on the command line.
+  - There is no --ai-confidence flag here, so a per-entry \`aiConfidence\` key is the ONLY way a bulk groom can carry its score. The backend resets that field on any write that omits it, so an entry without the key is stored unscored (and re-queued for grooming). Entry keys are honoured since fb#298 — before that fix import silently wiped the score of every term it touched.
 
 EXAMPLES
   ib glossary import terms.json --reason "bulk groom"
@@ -3277,7 +3284,7 @@ FLAGS
   --entity STRING    Related DB entity, e.g. Person / personId. Omit to keep.
   --domain STRING    Domain grouping (e.g. vacation). Omit to keep.
   --update-only    Only update an existing term; do not create a new one (404 if absent)
-  --from-json STRING    Read fields from a JSON object file (or - for stdin); flags override. Only keys present in the object are written (others kept).
+  --from-json STRING    Read fields from a JSON object file (or - for stdin); flags override. Keys: definition, synonyms, relatedCommands, relatedEntity, domain, aiConfidence, needsHumanReview. Only keys present in the object are written (others kept, EXCEPT the two assessment fields — see notes).
   --add-synonyms STRING    Comma-separated synonyms to ADD to the existing list — no full resend. Excl. --synonyms.
   --remove-synonyms STRING    Comma-separated synonyms to REMOVE by name (idempotent). Excl. --synonyms.
   --append-definition STRING    Append a clause to the current definition (single-space join; re-appending identical text is a no-op). Excl. --definition.
@@ -3305,6 +3312,7 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - PARTIAL (PATCH) semantics: an omitted flag is NOT sent, so the backend preserves the existing value — you can update just one field (e.g. only --synonyms) without re-sending the definition. To CLEAR a field pass an empty value: \`--synonyms ""\` empties the list, \`--entity ""\` blanks it. To OVERWRITE, pass the new value.
   - Requires the partial-aware backend (COALESCE save proc) deployed; against an older backend an omitted field is still overwritten to empty/null — re-send all fields (or use --from-json) until the backend is updated.
+  - --ai-confidence / --needs-human-review are NOT partial: the backend direct-assigns them, so any write that omits them RESETS the score to null and clears the parked flag (by design — a human edit re-opens the row for grooming). A grooming write must therefore carry aiConfidence EVERY time, via the flag or the --from-json key. Both are read from --from-json since fb#298; before that fix the JSON key was silently dropped and the score wiped.
   - Append mode (--add-synonyms / --remove-synonyms / --append-definition) edits in place without re-sending the whole field — built for no-filesystem callers (MCP ib_exec, /api/cli/exec) that can't use --from-json. The merge runs server-side and the target term must already exist (404 otherwise). Deploy-gated: against an un-updated backend these flags no-op (the value is preserved, not corrupted).
   - An append flag COMPOSES with plain overwrite flags for OTHER fields in the same call: \`--definition "new" --add-synonyms "x"\` overwrites the definition AND merges the synonym in one request. Only the same-field twin is rejected (exit 4): --definition⊥--append-definition and --synonyms⊥--add/remove-synonyms. Deploy-gated: an un-updated backend drops the plain field instead of composing — until it deploys, set OTHER fields in a separate call.
 
