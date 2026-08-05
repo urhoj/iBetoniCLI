@@ -40,7 +40,7 @@ export async function performImpersonate(opts) {
         // "not found" misleads — a valid personId reads as wrong — so surface BOTH
         // possibilities in the message and point at a verification step.
         if (e instanceof CliError && e.statusCode === 404 && opts.personId !== undefined && !opts.email) {
-            throw new CliError(`Impersonate failed: personId ${opts.personId} could not be impersonated — it does not exist, OR it exists but has no personEmail (impersonation is email-keyed and requires one).`, 404, e.body, e.exitCode, `verify the target with \`ib person get ${opts.personId}\`; a person with no personEmail cannot be impersonated (set one first, or impersonate a different person)`);
+            throw new CliError(`Impersonate failed: personId ${opts.personId} could not be impersonated — it does not exist, OR it exists but has no personEmail (impersonation is email-keyed and requires one).`, e.statusCode, e.body, e.exitCode, `verify the target with \`ib person get ${opts.personId}\`; a person with no personEmail cannot be impersonated (set one first, or impersonate a different person)`);
         }
         throw e;
     }

@@ -9,10 +9,9 @@
  */
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { CliError } from "../../api/errors.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
-import { writeJson } from "../../output/json.js";
-import { parseId } from "../../targets.js";
+import { failWith, writeJson } from "../../output/json.js";
+import { assertPositiveInt, parseId } from "../../targets.js";
 import { guarded } from "../_shared/action.js";
 /** One row of the `ib dev ai conversations` browse list (no message bodies). */
 export interface AiConversationRow {
@@ -28,9 +27,7 @@ export async function runAiConversation(
   client: ApiClient,
   id: number
 ): Promise<Record<string, unknown>> {
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new CliError("conversationId must be a positive integer", 400, null, 4);
-  }
+  assertPositiveInt(id, "conversationId");
   return client.get<Record<string, unknown>>(`/api/cli/ai/conversation/${id}`);
 }
 
@@ -45,13 +42,11 @@ export async function runAiConversationList(
 ): Promise<ListEnvelope<AiConversationRow>> {
   const limit = opts.limit ?? 20;
   if (!Number.isInteger(limit) || limit <= 0 || limit > 100) {
-    throw new CliError("limit must be an integer between 1 and 100", 400, null, 4);
+    failWith("limit must be an integer between 1 and 100", 4);
   }
   const params = new URLSearchParams({ limit: String(limit) });
   if (opts.personId !== undefined) {
-    if (!Number.isInteger(opts.personId) || opts.personId <= 0) {
-      throw new CliError("personId must be a positive integer", 400, null, 4);
-    }
+    assertPositiveInt(opts.personId, "personId");
     params.set("personId", String(opts.personId));
   }
   const res = await client.get<{ items?: AiConversationRow[] }>(

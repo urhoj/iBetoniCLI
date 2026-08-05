@@ -61,7 +61,7 @@ export async function performImpersonate(opts: {
     if (e instanceof CliError && e.statusCode === 404 && opts.personId !== undefined && !opts.email) {
       throw new CliError(
         `Impersonate failed: personId ${opts.personId} could not be impersonated — it does not exist, OR it exists but has no personEmail (impersonation is email-keyed and requires one).`,
-        404,
+        e.statusCode,
         e.body,
         e.exitCode,
         `verify the target with \`ib person get ${opts.personId}\`; a person with no personEmail cannot be impersonated (set one first, or impersonate a different person)`,

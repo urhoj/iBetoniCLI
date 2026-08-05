@@ -19,17 +19,14 @@
  */
 import type { Command } from "commander";
 import type { ApiClient } from "../../../api/client.js";
-import { CliError } from "../../../api/errors.js";
 import type { ListEnvelope } from "../../../api/envelopes.js";
-import { writeJson } from "../../../output/json.js";
-import { parseId } from "../../../targets.js";
+import { failWith, writeJson } from "../../../output/json.js";
+import { assertEnum, parseId } from "../../../targets.js";
 import { guarded } from "../../_shared/action.js";
 
 const STATUSES = ["open", "resolved", "all"] as const;
-type StatusFilter = (typeof STATUSES)[number];
 
 const CONTEXT_TYPES = ["pumppuRequest", "keikka"] as const;
-type ContextType = (typeof CONTEXT_TYPES)[number];
 
 type Row = Record<string, unknown>;
 
@@ -42,9 +39,7 @@ export async function runSupportInbox(
   opts: { status?: string; limit?: number }
 ): Promise<ListEnvelope<Row>> {
   const status = opts.status ?? "open";
-  if (!STATUSES.includes(status as StatusFilter)) {
-    throw new CliError(`--status must be one of: ${STATUSES.join(", ")}`, 400, null, 4);
-  }
+  assertEnum(status, STATUSES, "--status");
   const qs = new URLSearchParams();
   qs.set("status", status);
   if (opts.limit !== undefined) qs.set("limit", String(opts.limit));
@@ -71,9 +66,7 @@ export async function runSupportMine(
   opts: { status?: string; limit?: number }
 ): Promise<ListEnvelope<Row>> {
   const status = opts.status ?? "open";
-  if (!STATUSES.includes(status as StatusFilter)) {
-    throw new CliError(`--status must be one of: ${STATUSES.join(", ")}`, 400, null, 4);
-  }
+  assertEnum(status, STATUSES, "--status");
   const qs = new URLSearchParams();
   qs.set("status", status);
   if (opts.limit !== undefined) qs.set("limit", String(opts.limit));
@@ -105,20 +98,18 @@ export async function runSupportContact(
   client: ApiClient,
   input: SupportContactInput
 ): Promise<Row> {
-  if (!CONTEXT_TYPES.includes(input.contextType as ContextType)) {
-    throw new CliError(
+  if (!(CONTEXT_TYPES as readonly string[]).includes(input.contextType)) {
+    failWith(
       `contextType must be one of: ${CONTEXT_TYPES.join(", ")} (set --keikka or --tarjous)`,
-      400,
-      null,
       4
     );
   }
   if (!Number.isFinite(input.contextId) || input.contextId <= 0) {
-    throw new CliError("contextId must be a positive number (--keikka or --tarjous)", 400, null, 4);
+    failWith("contextId must be a positive number (--keikka or --tarjous)", 4);
   }
   const body = String(input.body ?? "").trim();
   if (!body) {
-    throw new CliError("--body cannot be empty", 400, null, 4);
+    failWith("--body cannot be empty", 4);
   }
   const payload: Row = {
     contextType: input.contextType,
@@ -147,7 +138,7 @@ export async function runSupportResolve(
   input: SupportResolveInput
 ): Promise<Row> {
   if (!Number.isFinite(threadId) || threadId <= 0) {
-    throw new CliError("threadId must be a positive number", 400, null, 4);
+    failWith("threadId must be a positive number", 4);
   }
   const status = input.reopen ? "open" : "resolved";
   const path = `/api/messages/support/${threadId}/status`;
@@ -208,7 +199,7 @@ export function registerMessageSupportCommands(
         // error. Gate on finiteness instead. (run* keeps its own guard as defence.)
         const contextId = Number.isFinite(opts.keikka) ? opts.keikka : opts.tarjous;
         if (!Number.isFinite(contextId)) {
-          throw new CliError("Provide --keikka or --tarjous (positive integer)", 400, null, 4);
+          failWith("Provide --keikka or --tarjous (positive integer)", 4);
         }
         const contextType = Number.isFinite(opts.keikka) ? "keikka" : "pumppuRequest";
         writeJson(

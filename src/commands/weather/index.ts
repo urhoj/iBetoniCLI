@@ -1,6 +1,5 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { CliError } from "../../api/errors.js";
 import {
   type WriteFlags,
   writeFlagsToHeaders,
@@ -98,7 +97,14 @@ export async function runWeatherSijainti(
   const lat = Number(s?.lat);
   const lng = Number(s?.lng);
   if (!s || !Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
-    throw new CliError(`sijainti ${sijaintiId} has no coordinates`, 404, s, 5);
+    // Client-origin: the GET succeeded, the row just carries no pin. The spec's
+    // `http: 404` row still covers the server's "no such sijainti"; its remedy's
+    // applicable half rides along here so this branch keeps its hint.
+    failWith(
+      `sijainti ${sijaintiId} has no coordinates`,
+      5,
+      "ensure the location has a GPS pin (`ib sijainti list`)"
+    );
   }
   return runWeatherForecast(client, { lat, lng, time });
 }
@@ -116,11 +122,10 @@ export async function runWeatherKeikka(
   const k = await runKeikkaGet(client, keikkaId);
   const tyomaaId = (k?.worksite as { tyomaaId?: number } | null)?.tyomaaId;
   if (!tyomaaId) {
-    throw new CliError(
+    failWith(
       `keikka ${keikkaId} has no worksite to resolve coordinates from`,
-      404,
-      k,
-      5
+      5,
+      "the keikka must have a worksite with coordinates"
     );
   }
   return runWeatherWorksite(client, tyomaaId, forceRefresh);
@@ -151,17 +156,16 @@ function extractLatLng(geo: unknown): { lat: number; lng: number } {
   if (lat !== undefined && lng !== undefined) {
     return { lat, lng };
   }
-  throw new CliError(
+  failWith(
     `Could not geocode address (status: ${(g?.status as string) ?? "unknown"})`,
-    404,
-    geo,
-    5
+    5,
+    "try a more specific Finnish address"
   );
 }
 
 /**
  * POST /api/geocode/getLatLng { osoite } → extract lat/lng → runWeatherForecast.
- * Throws CliError(exit 5) if the address cannot be geocoded.
+ * Exits 5 (client-origin) if the address cannot be geocoded.
  */
 export async function runWeatherAddress(
   client: ApiClient,

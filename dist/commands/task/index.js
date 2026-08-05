@@ -1,5 +1,5 @@
-import { CliError } from "../../api/errors.js";
-import { writeJson } from "../../output/json.js";
+import { failWith, writeJson } from "../../output/json.js";
+import { assertEnum, assertPositiveInt } from "../../targets.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
 import { resolveDate } from "../../dates.js";
 import { guarded, jsonAction } from "../_shared/action.js";
@@ -14,7 +14,7 @@ export function parseCadence(value) {
     const m = /^(\d+)\/(day|week|month)$/.exec((value ?? "").trim());
     const count = m ? Number(m[1]) : 0;
     if (!m || count < 1 || count > CADENCE_COUNT_MAX) {
-        throw new CliError(`--cadence must be <count>/<unit> with unit day|week|month and count 1-${CADENCE_COUNT_MAX} (e.g. 1/month, 2/week)`, 400, null, 4);
+        failWith(`--cadence must be <count>/<unit> with unit day|week|month and count 1-${CADENCE_COUNT_MAX} (e.g. 1/month, 2/week)`, 4);
     }
     return { cadenceCount: count, cadenceUnit: m[2] };
 }
@@ -27,7 +27,7 @@ export function intFlag(flag, min = 1) {
     return (value) => {
         const n = Number((value ?? "").trim());
         if (!Number.isSafeInteger(n) || n < min) {
-            throw new CliError(`${flag} must be an integer >= ${min}`, 400, null, 4);
+            failWith(`${flag} must be an integer >= ${min}`, 4);
         }
         return n;
     };
@@ -51,15 +51,8 @@ function probedEnvelope(rows, requested) {
 }
 function parseTaskId(v, cmd) {
     const n = Number(v);
-    if (!Number.isInteger(n) || n <= 0) {
-        throw new CliError(`task ${cmd}: id must be a positive integer`, 400, null, 4);
-    }
+    assertPositiveInt(n, `task ${cmd}: id`);
     return n;
-}
-function assertEnum(value, allowed, flag) {
-    if (value !== undefined && !allowed.includes(value)) {
-        throw new CliError(`${flag} must be one of: ${allowed.join(", ")}`, 400, null, 4);
-    }
 }
 /** GET /api/tasks — most-overdue first; active only unless --inactive. */
 export async function runTaskList(client, opts) {
@@ -92,13 +85,13 @@ export async function runTaskGet(client, id) {
 /** POST /api/tasks — create a recurring task (developer-only server-side). */
 export async function runTaskAdd(client, input, flags) {
     if (!input.title?.trim())
-        throw new CliError("--title is required", 400, null, 4);
+        failWith("--title is required", 4);
     if (!input.executor || !EXECUTORS.includes(input.executor)) {
-        throw new CliError(`--executor is required and must be one of: ${EXECUTORS.join(", ")}`, 400, null, 4);
+        failWith(`--executor is required and must be one of: ${EXECUTORS.join(", ")}`, 4);
     }
     assertEnum(input.agent, AGENTS, "--agent");
     if (!input.cadence)
-        throw new CliError("--cadence is required (e.g. 1/month)", 400, null, 4);
+        failWith("--cadence is required (e.g. 1/month)", 4);
     const { cadenceCount, cadenceUnit } = parseCadence(input.cadence);
     const body = {
         title: input.title.trim(),
@@ -127,7 +120,7 @@ export async function runTaskAdd(client, input, flags) {
 /** POST /api/tasks/:id/complete — done (default) / --skipped / --failed. */
 export async function runTaskComplete(client, id, input, flags) {
     if (input.skipped && input.failed) {
-        throw new CliError("--skipped and --failed are mutually exclusive", 400, null, 4);
+        failWith("--skipped and --failed are mutually exclusive", 4);
     }
     assertEnum(input.agent, AGENTS, "--agent");
     const outcome = input.failed ? "failed" : input.skipped ? "skipped" : "done";
@@ -147,11 +140,11 @@ function emptyToNull(v) {
 /** PUT /api/tasks/:id — partial update; omitted flags keep current values. */
 export async function runTaskSet(client, id, input, flags) {
     if (input.activate && input.deactivate) {
-        throw new CliError("--activate and --deactivate are mutually exclusive", 400, null, 4);
+        failWith("--activate and --deactivate are mutually exclusive", 4);
     }
     assertEnum(input.executor, EXECUTORS, "--executor");
     if (input.agent !== undefined && input.agent !== "" && !AGENTS.includes(input.agent)) {
-        throw new CliError(`--agent must be one of: ${AGENTS.join(", ")} (or "" to clear)`, 400, null, 4);
+        failWith(`--agent must be one of: ${AGENTS.join(", ")} (or "" to clear)`, 4);
     }
     const body = {};
     if (input.title !== undefined)
@@ -180,7 +173,7 @@ export async function runTaskSet(client, id, input, flags) {
     if (input.deactivate)
         body.active = false;
     if (Object.keys(body).length === 0) {
-        throw new CliError("Provide at least one field to update", 400, null, 4);
+        failWith("Provide at least one field to update", 4);
     }
     return client.put(`/api/tasks/${id}`, body, {
         headers: writeFlagsToHeaders(flags),

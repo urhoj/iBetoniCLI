@@ -14,6 +14,42 @@ export function cappedInt(cap: number): (v: string) => number {
 }
 
 /**
+ * Guard an OPTIONAL enum-valued flag against its allowed set. `undefined` is a
+ * no-op (the flag was not given); anything else outside `allowed` exits 4 with
+ * the house message `--flag must be one of: a, b, c`.
+ *
+ * Raised through {@link failWith}, so the error carries `statusCode: 0` —
+ * `origin:"client"`, the only shape `hintForError`'s `matchClientRow` will look
+ * at. Hand-building the error with a fabricated 400 instead reports a status no
+ * server sent AND makes the command's own client ERRORS remedy unreachable.
+ */
+export function assertEnum(
+  value: string | undefined,
+  allowed: readonly string[],
+  flag: string
+): void {
+  if (value !== undefined && !allowed.includes(value)) {
+    failWith(`${flag} must be one of: ${allowed.join(", ")}`, 4);
+  }
+}
+
+/**
+ * Guard an already-coerced value that must be a positive integer, emitting the
+ * canonical `<label> must be a positive integer` (exit 4, client-origin). `NaN`
+ * — what a bare `Number(v)` yields for a typo — fails the `Number.isInteger`
+ * arm, so a fat-fingered id cannot reach the wire as `"NaN"`.
+ *
+ * The value-level twin of {@link parseId}: use that one when parsing a raw
+ * positional STRING (it also rejects `"5.5"`/`"0x10"`/`"1e3"`, which are already
+ * lost once `Number()` has run), and this one for a Commander-coerced number.
+ */
+export function assertPositiveInt(value: number, label: string): void {
+  if (!Number.isInteger(value) || value <= 0) {
+    failWith(`${label} must be a positive integer`, 4);
+  }
+}
+
+/**
  * Attach the `--asiakas <id>` alias for an optional `[asiakasId]` positional —
  * the dual-target pattern (feedback #28), resolved in the action via
  * {@link resolveTarget} / `resolveAsiakasTarget`. Same shape as

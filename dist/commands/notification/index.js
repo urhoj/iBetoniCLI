@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
-import { CliError, exitCodeFromStatus } from "../../api/errors.js";
-import { writeJson } from "../../output/json.js";
+import { failWith, writeJson } from "../../output/json.js";
 import { guarded } from "../_shared/action.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { runPersonSearch } from "../person/index.js";
@@ -11,10 +10,10 @@ export function parseJsonObject(raw) {
         parsed = JSON.parse(raw);
     }
     catch {
-        throw new CliError("--data must be valid JSON", 400, null, exitCodeFromStatus(400));
+        failWith("--data must be valid JSON", 4);
     }
     if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-        throw new CliError("--data must be a JSON object", 400, null, exitCodeFromStatus(400));
+        failWith("--data must be a JSON object", 4);
     }
     return parsed;
 }
@@ -32,14 +31,14 @@ export async function resolvePersonRef(client, ref) {
         return Number(trimmed);
     const hits = (await runPersonSearch(client, trimmed)).items;
     if (hits.length === 0) {
-        throw new CliError(`No person matches "${ref}" in your company`, 404, null, exitCodeFromStatus(404));
+        failWith(`No person matches "${ref}" in your company`, 5);
     }
     if (hits.length > 1) {
         const list = hits
             .slice(0, 10)
             .map((h) => `${h.personId} ${h.name}`)
             .join("; ");
-        throw new CliError(`"${ref}" is ambiguous (${hits.length} matches): ${list}. Re-run with the personId.`, 400, null, exitCodeFromStatus(400));
+        failWith(`"${ref}" is ambiguous (${hits.length} matches): ${list}. Re-run with the personId.`, 4);
     }
     return hits[0].personId;
 }
@@ -96,7 +95,7 @@ export async function runNotificationEmailSend(client, input, flags) {
  */
 export function resolveEmailHtml(opts) {
     if (opts.html && opts.htmlBody) {
-        throw new CliError("--html and --html-body are mutually exclusive", 400, null, exitCodeFromStatus(400));
+        failWith("--html and --html-body are mutually exclusive", 4);
     }
     if (opts.htmlBody !== undefined)
         return opts.htmlBody;
@@ -105,7 +104,7 @@ export function resolveEmailHtml(opts) {
             return readFileSync(opts.html, "utf8");
         }
         catch {
-            throw new CliError(`cannot read --html file: ${opts.html}`, 400, null, exitCodeFromStatus(400));
+            failWith(`cannot read --html file: ${opts.html}`, 4);
         }
     }
     return undefined;
@@ -149,11 +148,11 @@ export function registerNotificationCommands(parent, getClient) {
         .option("--from-brand <brand>", "Sender identity: betoni (default, noreply@ibetoni.fi) or betonijerry (noreply@betonijerry.fi)", "betoni");
     addWriteFlagsToCommand(emailSend).action(guarded(async (recipient, opts) => {
         if (!opts.body && !opts.html && !opts.htmlBody) {
-            throw new CliError("one of --body, --html, or --html-body is required", 400, null, exitCodeFromStatus(400));
+            failWith("one of --body, --html, or --html-body is required", 4);
         }
         const brand = opts.fromBrand ?? "betoni";
         if (brand !== "betoni" && brand !== "betonijerry") {
-            throw new CliError("--from-brand must be 'betoni' or 'betonijerry'", 400, null, exitCodeFromStatus(400));
+            failWith("--from-brand must be 'betoni' or 'betonijerry'", 4);
         }
         const html = resolveEmailHtml({ html: opts.html, htmlBody: opts.htmlBody });
         const result = await runNotificationEmailSend(await getClient(), { recipient, subject: opts.subject, text: opts.body, html, fromBrand: brand }, opts);

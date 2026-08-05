@@ -140,7 +140,7 @@ export async function runLegalGet(client, ref) {
     }
     catch (e) {
         if (e instanceof CliError && e.statusCode === 404) {
-            throw new CliError(`no active document of type "${ref}"`, 404, null, 5, `ib legal versions ${ref} lists drafts/history; ib legal types lists valid typeNames`);
+            throw new CliError(`no active document of type "${ref}"`, e.statusCode, null, 5, `ib legal versions ${ref} lists drafts/history; ib legal types lists valid typeNames`);
         }
         throw e;
     }
@@ -165,10 +165,10 @@ export async function runLegalDiff(client, input) {
         const active = versions.items.find((r) => r.status === "active");
         const draft = versions.items.find((r) => r.status === "draft"); // newest first (createdTime DESC)
         if (!active) {
-            throw new CliError(`Type "${input.type}" has no active version to diff against`, 404, null, 5);
+            failWith(`Type "${input.type}" has no active version to diff against`, 5);
         }
         if (!draft) {
-            throw new CliError(`Type "${input.type}" has no draft version to diff`, 404, null, 5);
+            failWith(`Type "${input.type}" has no draft version to diff`, 5);
         }
         // Independent fetches — issue them together (saves one full round-trip).
         [docA, docB] = await Promise.all([
@@ -199,7 +199,7 @@ export async function resolveDocumentType(client, typeName) {
     const list = Array.isArray(types) ? types : [];
     const t = list.find((x) => x.typeName === typeName);
     if (!t) {
-        throw new CliError(`Unknown document type "${typeName}". Valid: ${list.map((x) => x.typeName).join(", ")}`, 404, null, 5);
+        failWith(`Unknown document type "${typeName}". Valid: ${list.map((x) => x.typeName).join(", ")}`, 5);
     }
     return t;
 }

@@ -2,7 +2,6 @@ import { listEnvelope } from "../../api/envelopes.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { resolveDate } from "../../dates.js";
-import { CliError } from "../../api/errors.js";
 import { guarded } from "../_shared/action.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 /** Active company id (personPvm `:asiakasId`) from the JWT — same pattern as `vehicle create`. */
@@ -82,9 +81,9 @@ export async function resolveStatusId(client, value) {
     if (matches.length === 1)
         return matches[0].statusId;
     if (matches.length === 0) {
-        throw new CliError(`No status matches "${value}". Available: ${candidates}`, 400, null, 4);
+        failWith(`No status matches "${value}". Available: ${candidates}`, 4);
     }
-    throw new CliError(`Status "${value}" is ambiguous — use the id. Available: ${candidates}`, 400, null, 4);
+    failWith(`Status "${value}" is ambiguous — use the id. Available: ${candidates}`, 4);
 }
 /**
  * Set a person's day availability status. Read-merges the existing row for that

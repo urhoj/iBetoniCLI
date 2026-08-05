@@ -14,11 +14,10 @@
  */
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { CliError } from "../../api/errors.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { readJsonObjectInput } from "../../api/parseBody.js";
-import { writeJson } from "../../output/json.js";
-import { parseRefId } from "../../targets.js";
+import { failWith, writeJson } from "../../output/json.js";
+import { assertEnum, parseRefId } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 
@@ -27,7 +26,6 @@ type Kind = (typeof KINDS)[number];
 const SCOPES = ["cli", "app", "jerry", "bsg2", "workspace", "security", "ops", "impeccable", "other"] as const;
 type Scope = (typeof SCOPES)[number];
 const STATUSES = ["open", "reviewed", "applied", "dismissed"] as const;
-type Status = (typeof STATUSES)[number];
 const SEVERITIES = ["critical", "major", "minor", "cosmetic"] as const;
 type Severity = (typeof SEVERITIES)[number];
 
@@ -43,12 +41,7 @@ const COMPLEXITY_MAX = 5;
 function validateComplexity(value: unknown, flag = "--complexity"): number {
   const n = Number(value);
   if (!Number.isInteger(n) || n < COMPLEXITY_MIN || n > COMPLEXITY_MAX) {
-    throw new CliError(
-      `${flag} must be an integer ${COMPLEXITY_MIN}-${COMPLEXITY_MAX}`,
-      400,
-      null,
-      4
-    );
+    failWith(`${flag} must be an integer ${COMPLEXITY_MIN}-${COMPLEXITY_MAX}`, 4);
   }
   return n;
 }
@@ -150,10 +143,8 @@ export function resolveFeedbackCreateDescription(input: {
     .filter((s): s is string => !!s);
   const flagged = given[0];
   if (new Set(given).size > 1 || (positional && flagged && positional !== flagged)) {
-    throw new CliError(
+    failWith(
       "Provide the description once — positionally, with --description, or with --body; if several are given, they must match",
-      400,
-      null,
       4
     );
   }
@@ -161,7 +152,7 @@ export function resolveFeedbackCreateDescription(input: {
   const description = positional ?? flagged;
   if (!description) {
     if (title) return title;
-    throw new CliError("description is required", 400, null, 4);
+    failWith("description is required", 4);
   }
   return title ? `${title}\n\n${description}` : description;
 }
@@ -227,14 +218,10 @@ interface FeedbackCreateBody {
 function buildCreateBody(input: FeedbackCreateInput): FeedbackCreateBody {
   const description = input.description?.trim();
   if (!description) {
-    throw new CliError("description is required", 400, null, 4);
+    failWith("description is required", 4);
   }
-  if (input.scope !== undefined && !SCOPES.includes(input.scope as Scope)) {
-    throw new CliError(`--scope must be one of: ${SCOPES.join(", ")}`, 400, null, 4);
-  }
-  if (input.severity !== undefined && !SEVERITIES.includes(input.severity as Severity)) {
-    throw new CliError(`--severity must be one of: ${SEVERITIES.join(", ")}`, 400, null, 4);
-  }
+  assertEnum(input.scope, SCOPES, "--scope");
+  assertEnum(input.severity, SEVERITIES, "--severity");
   const body: FeedbackCreateBody = {
     kind: KINDS.includes(input.kind as Kind) ? (input.kind as Kind) : "improvement",
     scope: (input.scope as Scope) ?? "cli",
@@ -285,7 +272,7 @@ function resolveStatuses(opts: {
     opts.status && "--status",
   ].filter(Boolean);
   if (selectors.length > 1) {
-    throw new CliError(`Use only one of ${selectors.join(", ")}`, 400, null, 4);
+    failWith(`Use only one of ${selectors.join(", ")}`, 4);
   }
   if (opts.all) return null;
   if (opts.status) {
@@ -294,9 +281,7 @@ function resolveStatuses(opts: {
       .map((s) => s.trim())
       .filter(Boolean);
     for (const s of list) {
-      if (!STATUSES.includes(s as Status)) {
-        throw new CliError(`--status must be one of: ${STATUSES.join(", ")}`, 400, null, 4);
-      }
+      assertEnum(s, STATUSES, "--status");
     }
     if (list.length) return list;
   }
@@ -474,11 +459,9 @@ export async function runFeedbackResolve(
   id: number,
   input: FeedbackResolveInput
 ): Promise<Record<string, unknown>> {
-  if (input.status !== undefined && !STATUSES.includes(input.status as Status)) {
-    throw new CliError(`--status must be one of: ${STATUSES.join(", ")}`, 400, null, 4);
-  }
+  assertEnum(input.status, STATUSES, "--status");
   if (input.status === undefined && input.note === undefined) {
-    throw new CliError("Provide --status and/or --note", 400, null, 4);
+    failWith("Provide --status and/or --note", 4);
   }
   const body: Record<string, unknown> = {};
   if (input.status !== undefined) body.status = input.status;
@@ -526,17 +509,11 @@ export async function runFeedbackUpdate(
   id: number,
   input: FeedbackUpdateInput
 ): Promise<Record<string, unknown>> {
-  if (input.scope !== undefined && !SCOPES.includes(input.scope as Scope)) {
-    throw new CliError(`--scope must be one of: ${SCOPES.join(", ")}`, 400, null, 4);
-  }
-  if (input.kind !== undefined && !KINDS.includes(input.kind as Kind)) {
-    throw new CliError(`--kind must be one of: ${KINDS.join(", ")}`, 400, null, 4);
-  }
-  if (input.severity !== undefined && !SEVERITIES.includes(input.severity as Severity)) {
-    throw new CliError(`--severity must be one of: ${SEVERITIES.join(", ")}`, 400, null, 4);
-  }
+  assertEnum(input.scope, SCOPES, "--scope");
+  assertEnum(input.kind, KINDS, "--kind");
+  assertEnum(input.severity, SEVERITIES, "--severity");
   if (input.description !== undefined && !input.description.trim()) {
-    throw new CliError("--description must be non-empty", 400, null, 4);
+    failWith("--description must be non-empty", 4);
   }
   const body: Record<string, unknown> = {};
   if (input.scope !== undefined) body.scope = input.scope;
@@ -545,10 +522,8 @@ export async function runFeedbackUpdate(
   if (input.complexity !== undefined) body.complexity = validateComplexity(input.complexity);
   if (input.description !== undefined) body.description = input.description.trim();
   if (Object.keys(body).length === 0) {
-    throw new CliError(
+    failWith(
       "Provide at least one of --scope / --kind / --severity / --complexity / --description",
-      400,
-      null,
       4
     );
   }
@@ -740,10 +715,8 @@ export function registerFeedbackCommands(
         // runFeedbackUpdate sees one field. Both only when they agree.
         if (opts.body !== undefined) {
           if (opts.description !== undefined && opts.description.trim() !== opts.body.trim())
-            throw new CliError(
+            failWith(
               "Provide the description via --description or --body, not both with different values",
-              400,
-              null,
               4
             );
           if (opts.description === undefined) opts.description = opts.body;

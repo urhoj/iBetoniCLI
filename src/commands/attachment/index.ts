@@ -8,7 +8,7 @@ import { basename, resolve as resolvePath } from "node:path";
 import { type WriteFlags, writeFlagsToHeaders, addWriteFlagsToCommand } from "../../api/writeFlags.js";
 import { CliError } from "../../api/errors.js";
 import { guarded, jsonAction } from "../_shared/action.js";
-import { cappedInt } from "../../targets.js";
+import { assertPositiveInt, cappedInt } from "../../targets.js";
 
 type Row = Record<string, unknown>;
 
@@ -48,9 +48,7 @@ export function resolveEntityTarget(opts: Record<string, unknown>): {
     );
   }
   const entityId = Number(opts[hits[0].optKey]);
-  if (!Number.isInteger(entityId) || entityId <= 0) {
-    failWith(`${hits[0].flag.split(" ")[0]} must be a positive integer`, 4);
-  }
+  assertPositiveInt(entityId, hits[0].flag.split(" ")[0]);
   return { entity: hits[0].entity, entityId };
 }
 

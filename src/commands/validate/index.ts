@@ -4,7 +4,7 @@ import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { guarded } from "../_shared/action.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
-import { CliError } from "../../api/errors.js";
+import { assertPositiveInt } from "../../targets.js";
 
 export interface ValidationProfileRow {
   id: string;
@@ -27,9 +27,7 @@ export async function runValidateCompany(
   profile: string,
   asiakasId: number
 ): Promise<unknown> {
-  if (!Number.isInteger(asiakasId) || asiakasId < 1) {
-    throw new CliError("--asiakas must be a positive integer", 0, null, 4);
-  }
+  assertPositiveInt(asiakasId, "--asiakas");
   return client.get<unknown>(`/api/validation/${encodeURIComponent(profile)}/${asiakasId}`);
 }
 
@@ -40,12 +38,8 @@ export async function runValidatePerson(
   asiakasId: number,
   personId: number
 ): Promise<unknown> {
-  if (!Number.isInteger(asiakasId) || asiakasId < 1) {
-    throw new CliError("--asiakas must be a positive integer", 0, null, 4);
-  }
-  if (!Number.isInteger(personId) || personId < 1) {
-    throw new CliError("--person must be a positive integer", 0, null, 4);
-  }
+  assertPositiveInt(asiakasId, "--asiakas");
+  assertPositiveInt(personId, "--person");
   return client.get<unknown>(
     `/api/validation/person/${encodeURIComponent(profile)}/${asiakasId}/${personId}`
   );
@@ -93,10 +87,8 @@ export function registerValidateCommands(
           return;
         }
         if (!opts.profile) {
-          throw new CliError(
+          failWith(
             "Company validation needs --profile (jerry | betoni). Run `ib validate list` to see profiles.",
-            0,
-            null,
             4
           );
         }

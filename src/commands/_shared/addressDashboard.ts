@@ -1,5 +1,5 @@
 import type { ApiClient } from "../../api/client.js";
-import { CliError } from "../../api/errors.js";
+import { failWith } from "../../output/json.js";
 import { extractGeocodeLatLng } from "./geocode.js";
 
 /**
@@ -178,7 +178,7 @@ interface ResolvedPoint {
  *   they are resolved from the parcel lookup's `coords` field — fetched
  *   once here and reused as the `parcel` section in phase 2 (no double fetch).
  *
- * Throws a `CliError` (exit 4 for a missing/ambiguous input, exit 5 for an
+ * Fails client-origin (exit 4 for a missing/ambiguous input, exit 5 for an
  * unresolvable point) — the caller turns that into a report-shaped result
  * instead of letting the whole command fail.
  */
@@ -196,7 +196,7 @@ async function resolvePoint(client: ApiClient, input: AddressDashboardInput): Pr
     const coords = extractGeocodeLatLng(geo);
     if (!coords) {
       const status = (geo as { status?: string } | null)?.status ?? "unknown";
-      throw new CliError(`could not geocode address (status: ${status})`, 404, geo, 5);
+      failWith(`could not geocode address (status: ${status})`, 5);
     }
     return { lat: coords.lat, lng: coords.lng, source };
   }
@@ -208,7 +208,7 @@ async function resolvePoint(client: ApiClient, input: AddressDashboardInput): Pr
         ? `sijainti=${input.sijaintiId}`
         : null;
   if (source === null) {
-    throw new CliError("provide exactly one of tyomaaId, sijaintiId, or address", 0, null, 4);
+    failWith("provide exactly one of tyomaaId, sijaintiId, or address", 4);
   }
 
   const parcel = await client.get<Record<string, unknown>>(
@@ -218,7 +218,7 @@ async function resolvePoint(client: ApiClient, input: AddressDashboardInput): Pr
   const lat = Number(coords?.lat);
   const lng = Number(coords?.lng);
   if (!coords || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-    throw new CliError("could not resolve coordinates for the given point", 404, parcel, 5);
+    failWith("could not resolve coordinates for the given point", 5);
   }
   return { lat, lng, source, parcel };
 }

@@ -9,9 +9,9 @@
  */
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { CliError } from "../../api/errors.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
-import { writeJson } from "../../output/json.js";
+import { failWith, writeJson } from "../../output/json.js";
+import { assertEnum, assertPositiveInt } from "../../targets.js";
 import {
   addWriteFlagsToCommand,
   writeFlagsToHeaders,
@@ -34,10 +34,8 @@ export function parseCadence(value: string): { cadenceCount: number; cadenceUnit
   const m = /^(\d+)\/(day|week|month)$/.exec((value ?? "").trim());
   const count = m ? Number(m[1]) : 0;
   if (!m || count < 1 || count > CADENCE_COUNT_MAX) {
-    throw new CliError(
+    failWith(
       `--cadence must be <count>/<unit> with unit day|week|month and count 1-${CADENCE_COUNT_MAX} (e.g. 1/month, 2/week)`,
-      400,
-      null,
       4
     );
   }
@@ -53,7 +51,7 @@ export function intFlag(flag: string, min = 1): (value: string) => number {
   return (value: string) => {
     const n = Number((value ?? "").trim());
     if (!Number.isSafeInteger(n) || n < min) {
-      throw new CliError(`${flag} must be an integer >= ${min}`, 400, null, 4);
+      failWith(`${flag} must be an integer >= ${min}`, 4);
     }
     return n;
   };
@@ -81,16 +79,8 @@ function probedEnvelope(
 
 function parseTaskId(v: string, cmd: string): number {
   const n = Number(v);
-  if (!Number.isInteger(n) || n <= 0) {
-    throw new CliError(`task ${cmd}: id must be a positive integer`, 400, null, 4);
-  }
+  assertPositiveInt(n, `task ${cmd}: id`);
   return n;
-}
-
-function assertEnum(value: string | undefined, allowed: readonly string[], flag: string): void {
-  if (value !== undefined && !allowed.includes(value)) {
-    throw new CliError(`${flag} must be one of: ${allowed.join(", ")}`, 400, null, 4);
-  }
 }
 
 export interface TaskListOptions {
@@ -149,12 +139,12 @@ export async function runTaskAdd(
   input: TaskAddInput,
   flags: WriteFlags
 ): Promise<Record<string, unknown>> {
-  if (!input.title?.trim()) throw new CliError("--title is required", 400, null, 4);
+  if (!input.title?.trim()) failWith("--title is required", 4);
   if (!input.executor || !EXECUTORS.includes(input.executor as Executor)) {
-    throw new CliError(`--executor is required and must be one of: ${EXECUTORS.join(", ")}`, 400, null, 4);
+    failWith(`--executor is required and must be one of: ${EXECUTORS.join(", ")}`, 4);
   }
   assertEnum(input.agent, AGENTS, "--agent");
-  if (!input.cadence) throw new CliError("--cadence is required (e.g. 1/month)", 400, null, 4);
+  if (!input.cadence) failWith("--cadence is required (e.g. 1/month)", 4);
   const { cadenceCount, cadenceUnit } = parseCadence(input.cadence);
 
   const body: Record<string, unknown> = {
@@ -190,7 +180,7 @@ export async function runTaskComplete(
   flags: WriteFlags
 ): Promise<Record<string, unknown>> {
   if (input.skipped && input.failed) {
-    throw new CliError("--skipped and --failed are mutually exclusive", 400, null, 4);
+    failWith("--skipped and --failed are mutually exclusive", 4);
   }
   assertEnum(input.agent, AGENTS, "--agent");
   const outcome = input.failed ? "failed" : input.skipped ? "skipped" : "done";
@@ -229,11 +219,11 @@ export async function runTaskSet(
   flags: WriteFlags
 ): Promise<Record<string, unknown>> {
   if (input.activate && input.deactivate) {
-    throw new CliError("--activate and --deactivate are mutually exclusive", 400, null, 4);
+    failWith("--activate and --deactivate are mutually exclusive", 4);
   }
   assertEnum(input.executor, EXECUTORS, "--executor");
   if (input.agent !== undefined && input.agent !== "" && !AGENTS.includes(input.agent as Agent)) {
-    throw new CliError(`--agent must be one of: ${AGENTS.join(", ")} (or "" to clear)`, 400, null, 4);
+    failWith(`--agent must be one of: ${AGENTS.join(", ")} (or "" to clear)`, 4);
   }
   const body: Record<string, unknown> = {};
   if (input.title !== undefined) body.title = input.title;
@@ -252,7 +242,7 @@ export async function runTaskSet(
   if (input.activate) body.active = true;
   if (input.deactivate) body.active = false;
   if (Object.keys(body).length === 0) {
-    throw new CliError("Provide at least one field to update", 400, null, 4);
+    failWith("Provide at least one field to update", 4);
   }
   return client.put<Record<string, unknown>>(`/api/tasks/${id}`, body, {
     headers: writeFlagsToHeaders(flags),

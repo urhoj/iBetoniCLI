@@ -5,7 +5,7 @@ import { writeJson, exitWithError, failWith, errorMessage, setExitCode } from ".
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveRoleTypeId } from "../../roles.js";
-import { resolveTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption } from "../../targets.js";
+import { assertEnum, resolveTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
 import { runPersonRoleList } from "../person/index.js";
 import { guarded } from "../_shared/action.js";
@@ -735,9 +735,7 @@ export function registerCustomerCommands(parent, getClient) {
         .option("--sort <field>", "Order results: name (default) or registered (newest-registered first) — server-side")
         .action(guarded(async (opts) => {
         const client = await getClient();
-        if (opts.sort !== undefined && opts.sort !== "name" && opts.sort !== "registered") {
-            return failWith("--sort must be one of: name, registered", 4);
-        }
+        assertEnum(opts.sort, ["name", "registered"], "--sort");
         const ids = typeof opts.ids === "string"
             ? opts.ids.split(",").map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0)
             : undefined;

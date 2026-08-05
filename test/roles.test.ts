@@ -18,7 +18,11 @@ describe("resolveRoleTypeId", () => {
     expect(() => resolveRoleTypeId("notARole")).toThrow(/keikkaHandler/);
   });
 
-  test("unknown role is a CliError mapped to validation exit 4 (statusCode 400)", () => {
+  // The guard is local — no request is made — so it must report itself as
+  // client-origin (`statusCode: 0`). It used to fabricate 400, which both lied
+  // in the envelope and hid `ib person list`'s own client ERRORS remedy from
+  // `hintForError` (it consults `matchClientRow` only at statusCode 0).
+  test("unknown role is a client-origin CliError mapped to validation exit 4", () => {
     let caught: unknown;
     try {
       resolveRoleTypeId("notARole");
@@ -26,7 +30,7 @@ describe("resolveRoleTypeId", () => {
       caught = e;
     }
     expect(caught).toBeInstanceOf(CliError);
-    expect((caught as CliError).statusCode).toBe(400);
+    expect((caught as CliError).statusCode).toBe(0);
     expect((caught as CliError).exitCode).toBe(4);
   });
 });

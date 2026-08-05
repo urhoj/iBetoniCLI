@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import type { ApiClient } from "./api/client.js";
-import { CliError, exitCodeFromStatus } from "./api/errors.js";
+import { failWith } from "./output/json.js";
 
 // `@ibetoni/constants` is CommonJS — pull in via createRequire so the ESM
 // build needs no default-export shim. ROLE_NAME_BY_TYPEID / ROLE_TYPEID_BY_NAME
@@ -34,10 +34,9 @@ function roleMaps(): RoleMaps {
 /**
  * Translate a role NAME (e.g. "keikkaHandler") to its asiakasPersonSettingTypeId
  * via ROLE_TYPEID_BY_NAME. Returns 0 for an unset name (callers treat 0 as
- * "no filter"). For an unknown name throws a {@link CliError} carrying
- * statusCode 400 → exit code 4 (validation), so `exitWithError` maps it to the
- * documented exit-code contract instead of the generic `1`; the message lists
- * the valid names so the CLI can surface them.
+ * "no filter"). An unknown name exits 4 (validation) via `failWith`, so
+ * `exitWithError` maps it to the documented exit-code contract instead of the
+ * generic `1`; the message lists the valid names so the CLI can surface them.
  */
 export function resolveRoleTypeId(roleName?: string): number {
   if (!roleName) return 0;
@@ -45,12 +44,7 @@ export function resolveRoleTypeId(roleName?: string): number {
   const id = ROLE_TYPEID_BY_NAME[roleName];
   if (!id) {
     const valid = Object.keys(ROLE_TYPEID_BY_NAME).sort().join(", ");
-    throw new CliError(
-      `unknown role: ${roleName}. Valid: ${valid}`,
-      400,
-      null,
-      exitCodeFromStatus(400)
-    );
+    failWith(`unknown role: ${roleName}. Valid: ${valid}`, 4);
   }
   return id;
 }
@@ -114,13 +108,7 @@ export async function explainRole(
   roleName: string
 ): Promise<RoleExplanation> {
   const typeId = resolveRoleTypeId(roleName);
-  if (!typeId)
-    throw new CliError(
-      `unknown role: ${roleName}`,
-      400,
-      null,
-      exitCodeFromStatus(400)
-    );
+  if (!typeId) failWith(`unknown role: ${roleName}`, 4);
   const maps = roleMaps();
   const tiers = TIER_GROUPS.filter(({ key }) =>
     (maps[key] as number[]).includes(typeId)

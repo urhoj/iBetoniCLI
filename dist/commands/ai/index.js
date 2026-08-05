@@ -1,12 +1,9 @@
-import { CliError } from "../../api/errors.js";
-import { writeJson } from "../../output/json.js";
-import { parseId } from "../../targets.js";
+import { failWith, writeJson } from "../../output/json.js";
+import { assertPositiveInt, parseId } from "../../targets.js";
 import { guarded } from "../_shared/action.js";
 /** GET /api/cli/ai/conversation/:id — developer-only, cross-tenant full transcript. */
 export async function runAiConversation(client, id) {
-    if (!Number.isInteger(id) || id <= 0) {
-        throw new CliError("conversationId must be a positive integer", 400, null, 4);
-    }
+    assertPositiveInt(id, "conversationId");
     return client.get(`/api/cli/ai/conversation/${id}`);
 }
 /**
@@ -17,13 +14,11 @@ export async function runAiConversation(client, id) {
 export async function runAiConversationList(client, opts = {}) {
     const limit = opts.limit ?? 20;
     if (!Number.isInteger(limit) || limit <= 0 || limit > 100) {
-        throw new CliError("limit must be an integer between 1 and 100", 400, null, 4);
+        failWith("limit must be an integer between 1 and 100", 4);
     }
     const params = new URLSearchParams({ limit: String(limit) });
     if (opts.personId !== undefined) {
-        if (!Number.isInteger(opts.personId) || opts.personId <= 0) {
-            throw new CliError("personId must be a positive integer", 400, null, 4);
-        }
+        assertPositiveInt(opts.personId, "personId");
         params.set("personId", String(opts.personId));
     }
     const res = await client.get(`/api/cli/ai/conversations?${params.toString()}`);

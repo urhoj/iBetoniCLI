@@ -10,7 +10,6 @@ import {
 } from "../../api/writeFlags.js";
 import { decodeJwtPayload } from "../../auth/jwt.js";
 import { parseId, resolveSearchQuery, cappedInt } from "../../targets.js";
-import { CliError } from "../../api/errors.js";
 import { diffFields } from "../../diff.js";
 import { registerVehicleDriverCommands } from "./driver.js";
 import { registerLogAlias } from "../log/index.js";
@@ -364,8 +363,9 @@ export async function runVehicleCreate(
  * Update a vehicle via read-merge-write: GET the full current row from the MAIN
  * `/api/vehicle/get/:id` endpoint (returns an array), overlay only the provided
  * `changes`, and POST the complete body to `/api/vehicle/save` (the proc expects
- * every column). Throws a 404 {@link CliError} (exit 5) when the vehicle is
- * absent so the caller surfaces "not found" rather than a malformed save.
+ * every column). Exits 5 (client-origin — the GET succeeded, the row is just
+ * absent) when the vehicle is missing, so the caller surfaces "not found"
+ * rather than a malformed save.
  *
  * `--dry-run` is resolved entirely client-side (the save route ignores
  * `X-Dry-Run`): it returns `{ dryRun: true, vehicleId, wouldChange:{ field:{
@@ -386,7 +386,7 @@ export async function runVehicleUpdate(
     ? rows[0]
     : (rows as Record<string, unknown> | null);
   if (!current) {
-    throw new CliError(`Vehicle ${vehicleId} not found`, 404, null, 5);
+    failWith(`Vehicle ${vehicleId} not found`, 5);
   }
   const body = {
     vehicleId,

@@ -1,4 +1,3 @@
-import { CliError } from "../../api/errors.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
@@ -52,7 +51,10 @@ export async function runWeatherSijainti(client, sijaintiId, time) {
     const lat = Number(s?.lat);
     const lng = Number(s?.lng);
     if (!s || !Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
-        throw new CliError(`sijainti ${sijaintiId} has no coordinates`, 404, s, 5);
+        // Client-origin: the GET succeeded, the row just carries no pin. The spec's
+        // `http: 404` row still covers the server's "no such sijainti"; its remedy's
+        // applicable half rides along here so this branch keeps its hint.
+        failWith(`sijainti ${sijaintiId} has no coordinates`, 5, "ensure the location has a GPS pin (`ib sijainti list`)");
     }
     return runWeatherForecast(client, { lat, lng, time });
 }
@@ -65,7 +67,7 @@ export async function runWeatherKeikka(client, keikkaId, forceRefresh) {
     const k = await runKeikkaGet(client, keikkaId);
     const tyomaaId = k?.worksite?.tyomaaId;
     if (!tyomaaId) {
-        throw new CliError(`keikka ${keikkaId} has no worksite to resolve coordinates from`, 404, k, 5);
+        failWith(`keikka ${keikkaId} has no worksite to resolve coordinates from`, 5, "the keikka must have a worksite with coordinates");
     }
     return runWeatherWorksite(client, tyomaaId, forceRefresh);
 }
@@ -94,11 +96,11 @@ function extractLatLng(geo) {
     if (lat !== undefined && lng !== undefined) {
         return { lat, lng };
     }
-    throw new CliError(`Could not geocode address (status: ${g?.status ?? "unknown"})`, 404, geo, 5);
+    failWith(`Could not geocode address (status: ${g?.status ?? "unknown"})`, 5, "try a more specific Finnish address");
 }
 /**
  * POST /api/geocode/getLatLng { osoite } → extract lat/lng → runWeatherForecast.
- * Throws CliError(exit 5) if the address cannot be geocoded.
+ * Exits 5 (client-origin) if the address cannot be geocoded.
  */
 export async function runWeatherAddress(client, opts) {
     const geo = await client.post("/api/geocode/getLatLng", {

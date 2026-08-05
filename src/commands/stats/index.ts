@@ -3,6 +3,7 @@ import type { ApiClient } from "../../api/client.js";
 import { writeJson } from "../../output/json.js";
 import { resolveDate, monthRange, weekRange, todayHelsinki } from "../../dates.js";
 import { CliError } from "../../api/errors.js";
+import { assertEnum } from "../../targets.js";
 import { guarded } from "../_shared/action.js";
 export const STATS_DIMS = ["customer", "vehicle", "driver", "worksite", "status", "day"] as const;
 export type StatsDim = (typeof STATS_DIMS)[number];
@@ -52,9 +53,7 @@ export async function runStats(client: ApiClient, opts: StatsOptions): Promise<u
   const { from, to } = resolveStatsPeriod(opts);
   const params = new URLSearchParams({ from, to });
   if (opts.by) {
-    if (!STATS_DIMS.includes(opts.by as StatsDim)) {
-      throw new CliError(`--by must be one of: ${STATS_DIMS.join(", ")}`, 0, null, 4);
-    }
+    assertEnum(opts.by, STATS_DIMS, "--by");
     params.set("by", opts.by);
   }
   if (opts.all) {
