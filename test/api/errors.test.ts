@@ -112,6 +112,51 @@ describe("hintForError — error-carried hint (failUsage)", () => {
   });
 });
 
+// fb#305/#306 — client rows are keyed by exit code, so a command with two at the
+// same exit used to serve whichever was listed first to every hintless guard.
+describe("hintForError — client rows disambiguated by `match`", () => {
+  const twoRows = [
+    { origin: "client" as const, exit: 4, match: "--boom", meaning: "bad boom", remedy: "pass metres >= 0" },
+    { origin: "client" as const, exit: 4, match: "--asiakas", meaning: "bad asiakas", remedy: "pass a positive asiakasId" },
+  ];
+
+  test("each row answers its OWN message, regardless of listing order", () => {
+    expect(hintForError(new CliError("--boom must be a non-negative number", 0, null, 4), twoRows))
+      .toBe("pass metres >= 0");
+    expect(hintForError(new CliError("--asiakas must be a positive integer asiakasId", 0, null, 4), twoRows))
+      .toBe("pass a positive asiakasId");
+  });
+
+  test("a message matching NO row yields no hint instead of the first row's remedy", () => {
+    expect(hintForError(new CliError("value too long — --impact is 505 chars", 0, null, 4), twoRows))
+      .toBeNull();
+  });
+
+  test("matching is case-insensitive", () => {
+    expect(hintForError(new CliError("--BOOM must be a number", 0, null, 4), twoRows))
+      .toBe("pass metres >= 0");
+  });
+
+  test("an array `match` fires on ANY of its alternatives", () => {
+    const rows = [
+      { origin: "client" as const, exit: 4, match: ["is required", "must be one of"], meaning: "validation", remedy: "check the flags" },
+      { origin: "client" as const, exit: 4, match: "--from-json", meaning: "bad file", remedy: "check the path" },
+    ];
+    expect(hintForError(new CliError("description is required", 0, null, 4), rows)).toBe("check the flags");
+    expect(hintForError(new CliError("--scope must be one of: cli, app", 0, null, 4), rows)).toBe("check the flags");
+    expect(hintForError(new CliError("--from-json x.json is not valid JSON", 0, null, 4), rows)).toBe("check the path");
+  });
+
+  test("a lone row that declares `match` does NOT win by exit code alone", () => {
+    const rows = [{ origin: "client" as const, exit: 4, match: "--boom", meaning: "bad boom", remedy: "pass metres >= 0" }];
+    expect(hintForError(new CliError("something else entirely", 0, null, 4), rows)).toBeNull();
+  });
+
+  test("client rows never answer a SERVER error at the same exit (fb#289 guard holds)", () => {
+    expect(hintForError(new CliError("Bad Request", 400, null, 4), twoRows)).toBeNull();
+  });
+});
+
 describe("failUsage", () => {
   test("throws a CliError carrying exit 4 and the (default-empty) suppressing hint", () => {
     try {

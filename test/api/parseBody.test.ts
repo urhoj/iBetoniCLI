@@ -123,3 +123,48 @@ describe("resolveJsonObjectBody", () => {
     }
   });
 });
+
+/**
+ * fb#307 — these failures are raised locally, before any request. They used to
+ * carry a fabricated `statusCode: 400`, which told the caller the BACKEND had
+ * rejected a request that was never sent, made `hintForError` serve an `http:400`
+ * row's remedy (a missing FILE answered with "check --type/--area/--date"), and
+ * logged the same lie to the friction store.
+ */
+describe("locally-raised parse failures declare client origin (statusCode 0)", () => {
+  const captured = (fn: () => unknown): CliError => {
+    try {
+      fn();
+    } catch (e) {
+      return e as CliError;
+    }
+    throw new Error("should have thrown");
+  };
+
+  test("a missing --from-json file is client-origin, not an HTTP 400", () => {
+    const err = captured(() => readJsonObjectInput(join(tmpdir(), "ib-does-not-exist-9f3a.json")));
+    expect(err.statusCode).toBe(0);
+    expect(err.exitCode).toBe(4);
+  });
+
+  test.each([
+    ["invalid --body JSON", () => parseJsonBodyFlag("{not json}")],
+    ["non-object --body", () => parseJsonBodyFlag("[1,2,3]")],
+    ["both --body and --from-json", () => resolveJsonObjectBody({ body: "{}", fromJson: "./x.json" })],
+  ])("%s is client-origin", (_label, fn) => {
+    expect(captured(fn).statusCode).toBe(0);
+  });
+
+  test("a malformed --from-json file is client-origin", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ib-parsebody-"));
+    const file = join(dir, "bad.json");
+    try {
+      writeFileSync(file, "{not json}", "utf8");
+      expect(captured(() => readJsonObjectInput(file)).statusCode).toBe(0);
+      writeFileSync(file, "[1,2,3]", "utf8");
+      expect(captured(() => readJsonObjectInput(file)).statusCode).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

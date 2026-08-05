@@ -43,6 +43,52 @@ describe("every documented error row declares exactly one origin", () => {
   });
 });
 
+/**
+ * Feedback #305/#306 — the inverse of the dead-row problem above: client rows are
+ * matched by EXIT CODE, and exit 4 covers nearly every local guard, so a command
+ * with two client exit-4 rows served whichever was listed FIRST to every hintless
+ * `failWith(msg, 4)` in that command. `match` binds a row to its own message; this
+ * invariant keeps a second ambiguous row from being added without one.
+ */
+describe("client rows sharing an exit code are disambiguated by `match`", () => {
+  test("no spec has two client rows at the same exit without `match` on each", () => {
+    const offenders: string[] = [];
+    for (const spec of COMMAND_SPECS) {
+      const byExit = new Map<number, CommandError[]>();
+      for (const row of spec.errors ?? []) {
+        if (row.origin !== "client") continue;
+        byExit.set(row.exit, [...(byExit.get(row.exit) ?? []), row]);
+      }
+      for (const [exit, rows] of byExit) {
+        if (rows.length < 2) continue;
+        for (const row of rows) {
+          if (row.match === undefined)
+            offenders.push(`${spec.command} :: exit ${exit} — ${row.meaning}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("a `match` string actually appears in no OTHER row's match at the same exit", () => {
+    // Overlapping matchers would reintroduce order-dependence by the back door.
+    const offenders: string[] = [];
+    for (const spec of COMMAND_SPECS) {
+      const rows = (spec.errors ?? []).filter((r) => r.origin === "client");
+      for (const a of rows) {
+        for (const b of rows) {
+          if (a === b || a.exit !== b.exit) continue;
+          const as = a.match === undefined ? [] : [a.match].flat();
+          const bs = b.match === undefined ? [] : [b.match].flat();
+          if (as.some((x) => bs.some((y) => x.toLowerCase() === y.toLowerCase())))
+            offenders.push(`${spec.command} :: exit ${a.exit} — duplicate match`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
 // The four rows the fb#289 audit missed: each documents a SERVER response but was
 // written as a bare `{ exit }`, so the command's own remedy was unreachable.
 describe("previously dead rows now reach their own remedy", () => {
@@ -63,4 +109,49 @@ describe("previously dead rows now reach their own remedy", () => {
       expect(hintForError(new CliError("Unauthorized", 401, null, 2), rows)).toMatch(/auth refresh/i);
     }
   );
+});
+
+// The three mis-hints reproduced live while investigating fb#305.
+describe("ambiguous client rows no longer serve an unrelated remedy", () => {
+  const client4 = (message: string) => new CliError(message, 0, null, 4);
+
+  test("`ib commands` unknown domain is not answered with the --mutations/--reads remedy", () => {
+    const hint = hintForError(
+      client4("unknown domain: nosuchdomain. Valid: attachment, auth, ..."),
+      rowsOf("ib commands")
+    );
+    expect(hint).toMatch(/valid domains/i);
+    expect(hint).not.toMatch(/mutually exclusive/i);
+  });
+
+  test("`ib commands` bad flag combo still gets its own remedy", () => {
+    const hint = hintForError(
+      client4("--mutations and --reads are mutually exclusive"),
+      rowsOf("ib commands")
+    );
+    expect(hint).toMatch(/mutually exclusive/i);
+  });
+
+  test("`jerry check-address` bad --asiakas is not answered with the boom remedy", () => {
+    const hint = hintForError(
+      client4("--asiakas must be a positive integer asiakasId"),
+      rowsOf("ib jerry check-address")
+    );
+    expect(hint).toMatch(/--explain/i);
+    expect(hint).not.toMatch(/metres/i);
+  });
+
+  test("`changelog add` over-length field is not answered with the argv remedy (fb#305)", () => {
+    const hint = hintForError(
+      client4("value too long — --impact is 505 chars (max 500); shorten to fit the devChangelog column"),
+      rowsOf("ib dev changelog add")
+    );
+    expect(hint).not.toMatch(/instead of argv/i);
+  });
+
+  test("an undocumented guard gets NO hint rather than an arbitrary one", () => {
+    expect(
+      hintForError(client4("something no ERRORS row documents"), rowsOf("ib dev changelog add"))
+    ).toBeNull();
+  });
 });

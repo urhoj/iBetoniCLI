@@ -1941,6 +1941,7 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 4 (client-side)  too many arguments — the shell split a quoted flag value on its inner double-quotes (typical on Windows PowerShell) → Pass the whole entry via --from-json <file|-> instead of argv
   exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → Check the path; the root must be an object and every key an accepted field name (the error lists them)
+  exit 4 (client-side)  a bounded free-text flag exceeds its devChangelog column width → trim the named flag by the stated overflow — a column-width limit, so --from-json does not help
 
 NOTES
   - You can pass the description positionally, as --description, or as its --summary/--body aliases — if you pass more than one they must match (mirrors \`ib dev feedback create\`). Here --body is FREE TEXT, unlike the raw-JSON --body on the entity update commands.
@@ -2240,6 +2241,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation (bad enum/language) → language must be fi|en
   exit 4 (HTTP 400)  --bump-level on an already-RELEASED entry (one carrying a versionTag) — that bump has already shipped → Leave it as recorded; every other field is still editable. Only UNRELEASED entries (ib dev changelog pending) still drive a deploy.
   exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → Check the path; the root must be an object and every key an accepted field name (the error lists them)
+  exit 4 (client-side)  a bounded free-text flag exceeds its devChangelog column width → trim the named flag by the stated overflow — a column-width limit, so --from-json does not help
 
 NOTES
   - SHELL QUOTING (fb#300): this is the command used to CORRECT an entry, which is exactly the retry that hits the quoting hazard again — Windows PowerShell splits a native argument on inner double-quotes. Pass quote-bearing prose via --from-json <file|-> rather than stripping the quotes.

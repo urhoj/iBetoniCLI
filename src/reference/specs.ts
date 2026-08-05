@@ -305,10 +305,17 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "stderr: the authorization URL + 'Waiting for the OAuth callback…' immediately, then 'Logged in as <email> at <company>.'; credentials file written",
     errors: [
-      { origin: "client", exit: 2, meaning: "OAuth flow failed", remedy: "retry; check network / browser" },
       {
         origin: "client",
         exit: 2,
+        match: ["oauth callback", "token exchange failed", "login token is missing", "failed to bind callback server"],
+        meaning: "OAuth flow failed",
+        remedy: "retry; check network / browser",
+      },
+      {
+        origin: "client",
+        exit: 2,
+        match: ["authorize preflight failed", "cannot reach"],
         meaning: "Authorize preflight failed (4xx/5xx from /oauth/authorize, or endpoint unreachable)",
         remedy:
           "the server's error is surfaced immediately without opening the browser (no 5-min callback hang) — fix the server-side cause (e.g. OAuth client registration / Redis) or the endpoint/network, then retry",
@@ -345,22 +352,27 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ personId, email?, activeCompany: { asiakasId, name, betoniJerryUmbrella? }, tier: 'developer'|'admin'|'standard', companies: { asiakasId, roles }[], endpoint, source: 'file'|'env', readOnly, tokenExpiresAt?, tokenExpired?, refreshed?, impersonating? } — `tier` is the discovery/capability gate; `companies` are the `company switch` targets (no name in the JWT — use `ib company list` for names); `source:'env'` = IB_TOKEN (non-refreshable); `refreshed: true` = the stored JWT had expired and whoami self-healed the session before reporting.",
     errors: [
-      { origin: "client", exit: 2, meaning: "Not logged in", remedy: "ib auth login first (or set IB_TOKEN)" },
+      { origin: "client", exit: 2, match: "not logged in", meaning: "Not logged in", remedy: "ib auth login first (or set IB_TOKEN)" },
       {
         origin: "client",
         exit: 2,
+        // "and unrefreshable" — NOT "session expired", which is also a substring
+        // of the impersonation row's message below.
+        match: "and unrefreshable",
         meaning: "Session expired and unrefreshable (both the JWT-bearer refresh and the OAuth refresh-token grant failed)",
         remedy: "ib auth login to re-authenticate",
       },
       {
         origin: "client",
         exit: 2,
+        match: "ib_token is expired",
         meaning: "IB_TOKEN expired (env sessions have no refresh path)",
         remedy: "mint a fresh JWT and update IB_TOKEN",
       },
       {
         origin: "client",
         exit: 2,
+        match: "impersonation session expired",
         meaning: "Impersonation session expired (never auto-refreshed — it would escalate)",
         remedy: "ib auth impersonate --end to restore your own login, or re-impersonate",
       },
@@ -4154,8 +4166,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "{ geocoded: boolean, deliverable?: boolean, lat?, lng?, placeId?, formattedAddress?, providerCount?, nearestVarikkoKm?, providers?: [{ asiakasId, asiakasNimi, distanceKm }], considered?: [{ asiakasId, asiakasNimi, sijaintiId, excludedBy: 'no-coords'|'company-gate'|'not-enrolled'|'radius'|'boom', detail }] }",
     errors: [
       apiErr(400, "osoite missing", "pass --address"),
-      { origin: "client", exit: 4, meaning: "--boom not a non-negative number", remedy: "pass metres ≥ 0, or omit for no boom filter" },
-      { origin: "client", exit: 4, meaning: "--asiakas without --explain, or not a positive integer", remedy: "add --explain, or pass a positive asiakasId" },
+      { origin: "client", exit: 4, match: "--boom", meaning: "--boom not a non-negative number", remedy: "pass metres ≥ 0, or omit for no boom filter" },
+      { origin: "client", exit: 4, match: "--asiakas", meaning: "--asiakas without --explain, or not a positive integer", remedy: "add --explain, or pass a positive asiakasId" },
       apiErr(429, "Rate limit (20/min/IP)", "wait and retry"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
@@ -5274,8 +5286,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "no args: { hint, items:[{ domain, count, description|null, commands:[\"keikka list\", ...] }], nextCursor:null, count } (domain index) | with <domain> / --all / filters: { items: [{ command, description, permissions: string[], isWrite: boolean }], nextCursor: null, count }",
     errors: [
-      { origin: "client", exit: 4, meaning: "Bad flag combo", remedy: "--mutations and --reads are mutually exclusive" },
-      { origin: "client", exit: 4, meaning: "Unknown domain", remedy: "run `ib commands` (no arg) to see valid domains" },
+      { origin: "client", exit: 4, match: "mutually exclusive", meaning: "Bad flag combo", remedy: "--mutations and --reads are mutually exclusive" },
+      { origin: "client", exit: 4, match: "unknown domain", meaning: "Unknown domain", remedy: "run `ib commands` (no arg) to see valid domains" },
     ],
     examples: [
       "ib commands",
@@ -5427,9 +5439,9 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
     errors: [
-      { origin: "client", exit: 4, meaning: "Validation", remedy: "description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (STRICT — unknown exits 4); --severity, when given, must be critical|major|minor|cosmetic; --complexity, when given, must be an integer 1-5" },
-      { origin: "client", exit: 4, meaning: "too many arguments — the shell split the description on its inner double-quotes (typical on Windows PowerShell)", remedy: "Pass the report via --from-json <file|-> instead of argv" },
-      { origin: "client", exit: 4, meaning: "--from-json file is unreadable, not valid JSON, or not a JSON object", remedy: "Check the file path and that the root is an object, not an array" },
+      { origin: "client", exit: 4, match: ["is required", "must be one of", "must be an integer"], meaning: "Validation", remedy: "description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (STRICT — unknown exits 4); --severity, when given, must be critical|major|minor|cosmetic; --complexity, when given, must be an integer 1-5" },
+      { origin: "client", exit: 4, match: "too many arguments", meaning: "too many arguments — the shell split the description on its inner double-quotes (typical on Windows PowerShell)", remedy: "Pass the report via --from-json <file|-> instead of argv" },
+      { origin: "client", exit: 4, match: "--from-json", meaning: "--from-json file is unreadable, not valid JSON, or not a JSON object", remedy: "Check the file path and that the root is an object, not an array" },
       apiErr(401, "Token expired", "ib auth refresh"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
@@ -5678,12 +5690,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     const refusedRemote: CommandError = {
       origin: "client",
       exit: 3,
+      match: "shared-cache",
       meaning: "Refused: deployed endpoint without --force-prod",
       remedy: "prod and staging share Redis DB 3; add --force-prod or use a local endpoint",
     };
     const readOnlyErr: CommandError = {
       origin: "client",
       exit: 3,
+      match: "read-only mode is active",
       meaning: "Blocked by read-only mode",
       remedy: "executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)",
     };

@@ -29,6 +29,9 @@ function bodyParseHint(raw: string): string {
  * (validation) instead of the generic exit 1 a raw SyntaxError would produce.
  * The error carries a hint echoing the raw value and, when it looks
  * shell-mangled, how to pass JSON safely (see {@link bodyParseHint}).
+ *
+ * `statusCode` is **0** (client-origin), never a fabricated 400 — nothing was
+ * sent. See {@link readJsonObjectInput} for why that matters (feedback #307).
  */
 export function parseJsonBodyFlag(raw: string): Record<string, unknown> {
   let parsed: unknown;
@@ -36,10 +39,10 @@ export function parseJsonBodyFlag(raw: string): Record<string, unknown> {
     parsed = JSON.parse(raw);
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
-    throw new CliError(`Invalid --body JSON: ${detail}`, 400, null, 4, bodyParseHint(raw));
+    throw new CliError(`Invalid --body JSON: ${detail}`, 0, null, 4, bodyParseHint(raw));
   }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new CliError("--body must be a JSON object", 400, null, 4, bodyParseHint(raw));
+    throw new CliError("--body must be a JSON object", 0, null, 4, bodyParseHint(raw));
   }
   return parsed as Record<string, unknown>;
 }
@@ -49,6 +52,14 @@ export function parseJsonBodyFlag(raw: string): Record<string, unknown> {
  * Strips a leading BOM. This is the shell-safe alternative to inline `--body`
  * (a shell can strip its inner quotes), and mirrors `ib glossary import`'s
  * file/stdin pattern. Read/parse/shape failures all map to exit 4.
+ *
+ * These are LOCAL failures, so they carry `statusCode: 0` — the documented
+ * client-origin marker — not a fabricated HTTP status. They used to throw 400,
+ * which (a) told the caller the BACKEND rejected a request that was never sent,
+ * (b) made `hintForError` skip the client-row matcher and serve an `http: 400`
+ * row's remedy instead (a missing FILE answered with "check --type/--area/--date"
+ * on `changelog add`), and (c) logged the same lie to the friction store.
+ * Feedback #305/#307 — keep these at 0.
  */
 export function readJsonObjectInput(pathOrDash: string): Record<string, unknown> {
   let raw: string;
@@ -56,17 +67,17 @@ export function readJsonObjectInput(pathOrDash: string): Record<string, unknown>
     raw = (pathOrDash === "-" ? readFileSync(0, "utf8") : readFileSync(pathOrDash, "utf8")).replace(/^\uFEFF/, "");
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
-    throw new CliError(`Could not read --from-json ${pathOrDash}: ${detail}`, 400, null, 4);
+    throw new CliError(`Could not read --from-json ${pathOrDash}: ${detail}`, 0, null, 4);
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
-    throw new CliError(`--from-json ${pathOrDash} is not valid JSON: ${detail}`, 400, null, 4);
+    throw new CliError(`--from-json ${pathOrDash} is not valid JSON: ${detail}`, 0, null, 4);
   }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new CliError("--from-json must contain a JSON object", 400, null, 4);
+    throw new CliError("--from-json must contain a JSON object", 0, null, 4);
   }
   return parsed as Record<string, unknown>;
 }
@@ -82,7 +93,7 @@ export function resolveJsonObjectBody(opts: {
   fromJson?: string;
 }): Record<string, unknown> | null {
   if (opts.fromJson !== undefined && opts.body !== undefined) {
-    throw new CliError("--body and --from-json are mutually exclusive", 400, null, 4);
+    throw new CliError("--body and --from-json are mutually exclusive", 0, null, 4);
   }
   if (opts.fromJson !== undefined) return readJsonObjectInput(opts.fromJson);
   if (opts.body !== undefined) return parseJsonBodyFlag(opts.body);

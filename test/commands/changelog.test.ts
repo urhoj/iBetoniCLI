@@ -337,6 +337,27 @@ describe("validateFieldLengths — bounded free-text caps (fb#206)", () => {
     ).not.toThrow();
   });
 
+  // fb#305: a hintless failWith here inherited the command's FIRST client exit-4
+  // row — the argv-mangling one — telling a caller already using --from-json to
+  // use --from-json. The guard now carries its own hint naming the overflow.
+  test("carries a positive hint naming the per-flag overflow, not the argv remedy", () => {
+    const err = captureThrow(() => validateFieldLengths({ impact: "x".repeat(505) })) as unknown as {
+      hint?: string;
+    };
+    expect(err.hint).toMatch(/--impact by 5\b/);
+    expect(err.hint).not.toMatch(/instead of argv/i);
+    // and it explicitly rules out the remedy that used to be served
+    expect(err.hint).toMatch(/--from-json does not help/i);
+  });
+
+  test("the hint names every over-length flag with its own overflow", () => {
+    const err = captureThrow(() =>
+      validateFieldLengths({ status: "x".repeat(35), severity: "y".repeat(22) })
+    ) as unknown as { hint?: string };
+    expect(err.hint).toMatch(/--status by 5\b/);
+    expect(err.hint).toMatch(/--severity by 2\b/);
+  });
+
   test("checks --sha/--vtag which map to longer columns", () => {
     expect(() => validateFieldLengths({ sha: "a".repeat(500) })).not.toThrow();
     expect(() => validateFieldLengths({ sha: "a".repeat(501) })).toThrow(/--sha/);

@@ -284,18 +284,28 @@ const FIELD_MAX_LENGTHS: Record<string, number> = {
  * on "String or binary data would be truncated" (feedback #206). Every offending
  * flag is reported together (aggregated) so the caller fixes them in one re-run.
  * Shared by `add` and `update` (identical flag names). Exits 4; returns void.
+ *
+ * Uses `failUsage` (NOT bare `failWith`) deliberately: this message already IS
+ * the full remedy, and a hintless exit-4 would inherit the command's first
+ * client ERRORS row — on `add` that is the argv-mangling row, so a caller who
+ * was ALREADY using --from-json got told to use --from-json (feedback #305).
+ * The positive hint states the per-flag overflow and explicitly rules that
+ * remedy out. Keep the hint; reverting to `failWith` re-opens the dead end.
  */
 export function validateFieldLengths(o: Record<string, unknown>): void {
   const over: string[] = [];
+  const trims: string[] = [];
   for (const [flag, cap] of Object.entries(FIELD_MAX_LENGTHS)) {
     const v = o[flag];
-    if (typeof v === "string" && v.length > cap)
+    if (typeof v === "string" && v.length > cap) {
       over.push(`--${flag} is ${v.length} chars (max ${cap})`);
+      trims.push(`--${flag} by ${v.length - cap}`);
+    }
   }
   if (over.length)
-    failWith(
+    failUsage(
       `value too long — ${over.join("; ")}; shorten to fit the devChangelog column`,
-      4
+      `trim ${trims.join(", ")} chars — a column-width limit, not shell/argv mangling, so --from-json does not help`
     );
 }
 
@@ -996,14 +1006,23 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       {
         origin: "client",
         exit: 4,
+        match: "too many arguments",
         meaning: "too many arguments — the shell split a quoted flag value on its inner double-quotes (typical on Windows PowerShell)",
         remedy: "Pass the whole entry via --from-json <file|-> instead of argv",
       },
       {
         origin: "client",
         exit: 4,
+        match: "--from-json",
         meaning: "--from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key",
         remedy: "Check the path; the root must be an object and every key an accepted field name (the error lists them)",
+      },
+      {
+        origin: "client",
+        exit: 4,
+        match: "value too long",
+        meaning: "a bounded free-text flag exceeds its devChangelog column width",
+        remedy: "trim the named flag by the stated overflow — a column-width limit, so --from-json does not help",
       },
     ],
     notes: [
@@ -1228,8 +1247,16 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       {
         origin: "client",
         exit: 4,
+        match: "--from-json",
         meaning: "--from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key",
         remedy: "Check the path; the root must be an object and every key an accepted field name (the error lists them)",
+      },
+      {
+        origin: "client",
+        exit: 4,
+        match: "value too long",
+        meaning: "a bounded free-text flag exceeds its devChangelog column width",
+        remedy: "trim the named flag by the stated overflow — a column-width limit, so --from-json does not help",
       },
     ],
     notes: [

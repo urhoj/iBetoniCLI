@@ -1,5 +1,8 @@
 import type { CommandError } from "../output/help.js";
 
+/** The locally-raised half of {@link CommandError} — the only variant carrying `match`. */
+type ClientCommandError = Extract<CommandError, { origin: "client" }>;
+
 export class CliError extends Error {
   constructor(
     message: string,
@@ -48,13 +51,49 @@ function isRouteNotFound(body: unknown): boolean {
 }
 
 /**
+ * Pick the client-side ERRORS row documenting THIS error, for a locally-raised
+ * failure (`statusCode === 0`).
+ *
+ * Two-stage, because exit code alone is far too coarse a key — exit 4 covers
+ * nearly every local guard, so the old "first row with this exit" rule served
+ * an arbitrary remedy on any command with more than one (feedback #305/#306):
+ *
+ *  1. A row whose `match` (any entry, when an array) is a substring of the
+ *     message wins, case-insensitively.
+ *  2. Otherwise fall back to exit-only matching ONLY when the command has
+ *     exactly one client row at that exit AND that row declares no `match`.
+ *     A row that declares `match` never wins by exit alone, and an ambiguous
+ *     set yields NO hint — silence beats a confidently wrong remedy.
+ */
+function matchClientRow(
+  err: CliError,
+  specErrors?: CommandError[] | null
+): ClientCommandError | undefined {
+  const rows = (specErrors ?? []).filter(
+    (r): r is ClientCommandError =>
+      r.origin === "client" && r.exit === err.exitCode
+  );
+  const message = err.message.toLowerCase();
+  const matched = rows.find((r) =>
+    (r.match === undefined ? [] : Array.isArray(r.match) ? r.match : [r.match]).some(
+      (m) => message.includes(m.toLowerCase())
+    )
+  );
+  if (matched) return matched;
+  return rows.length === 1 && rows[0].match === undefined ? rows[0] : undefined;
+}
+
+/**
  * Remedy hint for an error, echoed into the stderr error envelope as `hint`.
  *
  * When the running command's spec ERRORS rows are supplied (resolved by the
- * bin preAction hook), the row matching this error's HTTP status — or, for
- * client-side errors (statusCode 0), its exit code — wins: the agent gets the
+ * bin preAction hook), the row matching this error wins: the agent gets the
  * command's OWN documented remedy (e.g. "switch to a provider company")
- * instead of a generic one. Falls back to the per-status generic hint so an
+ * instead of a generic one. A server failure matches by HTTP status; a
+ * locally-raised one (statusCode 0) goes through {@link matchClientRow}, which
+ * prefers a row's `match` substring and only falls back to exit-code matching
+ * when the command has a single unambiguous client row at that exit.
+ * Falls back to the per-status generic hint so an
  * agent that hasn't read --help beforehand still gets pointed at the next
  * step (most importantly the 404 deploy-gate ambiguity). `null` = no hint.
  */
@@ -80,12 +119,12 @@ export function hintForError(
   // one): an HTTP failure matches by status, a locally-raised one (statusCode 0)
   // by exit code. Never fall back to exit-matching for HTTP errors — see the
   // CommandError doc comment for why that mis-hints ~84 rows (feedback #289).
-  const specRow = specErrors?.find(
-    (r) =>
-      (r.http !== undefined && r.http === err.statusCode) ||
-      (r.origin === "client" && err.statusCode === 0 && r.exit === err.exitCode)
+  const httpRow = specErrors?.find(
+    (r) => r.http !== undefined && r.http === err.statusCode
   );
-  if (specRow?.remedy) return specRow.remedy;
+  if (httpRow?.remedy) return httpRow.remedy;
+  const clientRow = err.statusCode === 0 ? matchClientRow(err, specErrors) : undefined;
+  if (clientRow?.remedy) return clientRow.remedy;
   if (err.exitCode === 7) {
     return "network failure (DNS/connection/TLS) — check connectivity and the --endpoint URL";
   }
