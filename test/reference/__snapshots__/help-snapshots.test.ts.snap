@@ -3497,7 +3497,7 @@ exports[`Help snapshots — contract stability > help for ib jerry admin list ma
   ib jerry admin list [flags]
 
 DESCRIPTION
-  List Jerry-active companies (isPumppuToimittaja + HAS_JERRY setting) with per-company counts (admins, tarjousAdmins, pumpparit, vehicles, Jerry/non-Jerry varikot). GET /api/admin/jerry-companies. System-admin only.
+  List Jerry-active companies (isPumppuToimittaja + HAS_JERRY setting) with per-company counts (admins, tarjousAdmins, pumpparit, vehicles, Jerry/non-Jerry varikot, matchable varikot). GET /api/admin/jerry-companies. System-admin only. Health check: a row with matchableVarikkoCount 0 is Jerry-active but CANNOT receive a single tarjouspyyntö — its varikot are enrolled yet fail the geofence (no coords, or no delivery radius). Diagnose with \`ib jerry check-address --explain\`.
   Permissions: requires isSystemAdmin.
 
 FLAGS
@@ -3507,7 +3507,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, sijaintiNonJerryCount }>
+  ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, matchableVarikkoCount, sijaintiNonJerryCount }>. matchableVarikkoCount counts varikot that pass the REAL fan-out geofence (enrolled AND coords AND maxDeliveryDistance > 0); sijaintiJerryCount counts enrolment only, so matchableVarikkoCount 0 with sijaintiJerryCount > 0 means the company is Jerry-active but invisible to every tarjouspyyntö.
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
@@ -3926,7 +3926,7 @@ exports[`Help snapshots — contract stability > help for ib jerry admin request
   ib jerry admin request resend <requestId> [flags]
 
 DESCRIPTION
-  Re-run provider fan-out for a request (POST /api/admin/jerry-requests/:id/resend). Re-notifies eligible providers. System-admin only. Requires --reason.
+  Re-match providers and notify the NEW ones (POST /api/admin/jerry-requests/:id/resend). Safe to repeat: providers already on the recipient list keep their notifiedAt/viewedAt/declinedAt and are NOT re-emailed, so a resend with an unchanged match set is a no-op (notifiedCount 0). System-admin only. Requires --reason.
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
@@ -3944,7 +3944,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { success: true, status: 'open' | 'no_supply' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }
+  { success: true, status: 'open' | 'no_supply', providerCount, notifiedCount } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
@@ -3952,8 +3952,12 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - providerCount = companies matching the worksite now; notifiedCount = of those, how many were newly added and emailed.
+  - Use it to reach a provider that only just became eligible — it will not spam the ones that already ignored the request.
+
 EXAMPLES
-  ib jerry admin request resend 41 --reason "retry fanout"
+  ib jerry admin request resend 41 --reason "uusi tarjoaja alueelle"
 "
 `;
 

@@ -4599,15 +4599,19 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin request resend",
     description:
-      "Re-run provider fan-out for a request (POST /api/admin/jerry-requests/:id/resend). Re-notifies eligible providers. System-admin only. Requires --reason.",
+      "Re-match providers and notify the NEW ones (POST /api/admin/jerry-requests/:id/resend). Safe to repeat: providers already on the recipient list keep their notifiedAt/viewedAt/declinedAt and are NOT re-emailed, so a resend with an unchanged match set is a no-op (notifiedCount 0). System-admin only. Requires --reason.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
-    outputShape: "{ success: true, status: 'open' | 'no_supply' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
+    outputShape: "{ success: true, status: 'open' | 'no_supply', providerCount, notifiedCount } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
+    notes: [
+      "providerCount = companies matching the worksite now; notifiedCount = of those, how many were newly added and emailed.",
+      "Use it to reach a provider that only just became eligible — it will not spam the ones that already ignored the request.",
+    ],
     errors: [apiErr(403, "Not a system admin", "use a system-admin token"), apiErr(409, "Wrong state", "request not in a resendable state"), ...COMMON_AUTH_ERRORS],
-    examples: ['ib jerry admin request resend 41 --reason "retry fanout"'],
+    examples: ['ib jerry admin request resend 41 --reason "uusi tarjoaja alueelle"'],
   },
   {
     command: "ib jerry admin request extend",
