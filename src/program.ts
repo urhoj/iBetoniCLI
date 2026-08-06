@@ -30,7 +30,7 @@ import { canonicalPath } from "./reference/aliasPaths.js";
 import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, writeErrorEnvelope, setActiveCommandErrors, setExitCode as setExit, errorMessage } from "./output/json.js";
 import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { buildValidationEnvelope, type FlagProblem } from "./output/validationEnvelope.js";
-import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, buildExcessArgumentsEnvelope, commandPath } from "./output/unknownCommand.js";
+import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, buildExcessArgumentsEnvelope, dateFlagSuggestion, excessPositionals, commandPath } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { CliError } from "./api/errors.js";
 import { getCallerTier } from "./tier.js";
@@ -587,7 +587,17 @@ export function handleParseRejection(
           flag: longFlag(f),
           issue: "missing",
         }));
-        return emitUsageEnvelope(err, buildValidationEnvelope(path, problems, { spec }));
+        const envelope = buildValidationEnvelope(path, problems, { spec });
+        // Commander reports the missing flag BEFORE excess positionals, so a
+        // caller who made both mistakes at once would never see the date hint
+        // (feedback #328 follow-up — same masking shape as fb#309). Fold it in
+        // rather than making them fix one error to discover the next.
+        const dateHint = dateFlagSuggestion(cmd, excessPositionals(cmd));
+        if (dateHint) {
+          const base = (envelope.hint ?? "").trim().replace(/[.\s]*$/, "");
+          envelope.hint = `${base}. Also: a surplus positional looks like a date — pass it as \`${dateHint}\`, not as a positional.`;
+        }
+        return emitUsageEnvelope(err, envelope);
       }
     }
     // Unknown option → enriched envelope: the command's real positionals + flags,
@@ -612,8 +622,7 @@ export function handleParseRejection(
     if (err.code === "commander.excessArguments" && erroringCommand) {
       const cmd = erroringCommand();
       if (cmd) {
-        const declared = cmd.registeredArguments?.length ?? 0;
-        const excess = (cmd.args ?? []).slice(declared).map(String);
+        const excess = excessPositionals(cmd);
         if (excess.length) {
           return emitUsageEnvelope(err, buildExcessArgumentsEnvelope(cmd, excess, detail));
         }

@@ -255,6 +255,36 @@ function dateFlagOf(spec: CommandSpec | undefined): string | null {
   return names.find((n) => n === "date" || n === "pvm") ?? null;
 }
 
+/** Positionals a command received beyond the ones it declares. */
+export function excessPositionals(cmd: Command): string[] {
+  const declared = cmd.registeredArguments?.length ?? 0;
+  return (cmd.args ?? []).slice(declared).map(String);
+}
+
+/**
+ * `--date <normalized>` when one of `excess` is recognisably a date and this
+ * command declares a date flag — otherwise null. Takes the tokens explicitly
+ * (rather than re-deriving them) so the caller that already computed them and
+ * the caller that hasn't share one implementation without two sources of truth.
+ *
+ * Used by the excess-arguments path AND the missing-required-flag path.
+ * Commander reports a missing mandatory option BEFORE excess positionals, so a
+ * caller who makes both mistakes at once (`ib message daily get 5 today`, with
+ * --asiakas required) would otherwise be told only about the flag, and the date
+ * hint would silently never fire — the same validation-ordering masking that
+ * fb#309 hit with unknown options.
+ */
+export function dateFlagSuggestion(cmd: Command, excess: string[]): string | null {
+  const spec = COMMAND_SPECS.find((s) => s.command === canonicalPath(commandPath(cmd)));
+  const dateFlag = dateFlagOf(spec);
+  if (!dateFlag) return null;
+  for (const token of excess) {
+    const date = asDateSuggestion(token);
+    if (date) return `--${dateFlag} ${date}`;
+  }
+  return null;
+}
+
 export interface ExcessArgumentsEnvelope {
   success: false;
   error: string;
@@ -292,9 +322,8 @@ export function buildExcessArgumentsEnvelope(
   const availableOptions = spec ? specOptionLongs(spec) : commanderOptionLongs(cmd);
   const positionals = spec ? specPositionals(spec) : [];
 
-  const dateFlag = dateFlagOf(spec);
   const dated = excess.map((t) => ({ token: t, date: asDateSuggestion(t) })).find((x) => x.date);
-  const didYouMean = dateFlag && dated ? `--${dateFlag} ${dated.date}` : null;
+  const didYouMean = dateFlagSuggestion(cmd, excess);
 
   const parts: string[] = [];
   if (didYouMean) {

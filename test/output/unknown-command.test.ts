@@ -9,6 +9,7 @@ import {
   buildUnknownOptionEnvelope,
   buildExcessArgumentsEnvelope,
   asDateSuggestion,
+  dateFlagSuggestion,
   OPTION_REDIRECTS,
 } from "../../src/output/unknownCommand.js";
 
@@ -190,6 +191,32 @@ describe("buildExcessArgumentsEnvelope (#328)", () => {
     const env = buildExcessArgumentsEnvelope(leafByPath("vehicle", "timeline"), ["x"], "e");
     expect(env.availableOptions).toContain("--date");
     expect(env.positionals.length).toBeGreaterThan(0);
+  });
+});
+
+// Commander reports a missing mandatory option BEFORE excess positionals, so on
+// a command with a required flag the date hint was computed but never reached —
+// the same validation-ordering masking fb#309 hit with unknown options. Found by
+// probing `ib message daily get 5 today` (--asiakas is required there).
+describe("dateFlagSuggestion — shared by both parse-error paths (#328)", () => {
+  test("suggests the date flag for a surplus date token", () => {
+    expect(dateFlagSuggestion(leafByPath("message", "daily", "get"), ["today"])).toBe("--date today");
+    expect(dateFlagSuggestion(leafByPath("vehicle", "timeline"), ["20260806"])).toBe(
+      "--date 2026-08-06"
+    );
+  });
+
+  test("null when the command declares no date flag, or nothing looks like a date", () => {
+    expect(dateFlagSuggestion(leafByPath("vehicle", "timeline"), ["banana"])).toBeNull();
+    expect(dateFlagSuggestion(leafByPath("customer", "search"), ["2026-08-06"])).toBeNull();
+  });
+
+  test("takes the excess tokens as a parameter so both call sites agree", () => {
+    // Guards the refactor trap: the builder must not re-derive tokens from an
+    // unparsed Command (which would silently yield null in every unit test).
+    const cmd = leafByPath("vehicle", "route");
+    expect(dateFlagSuggestion(cmd, [])).toBeNull();
+    expect(dateFlagSuggestion(cmd, ["6.8.2026"])).toBe("--date 2026-08-06");
   });
 });
 
