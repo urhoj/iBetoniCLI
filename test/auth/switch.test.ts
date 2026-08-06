@@ -4,6 +4,20 @@ import {
   assertPersistedSwitchAllowed,
 } from "../../src/auth/switch.js";
 import { CliError } from "../../src/api/errors.js";
+import { runEmbedded, type EmbeddedCtx } from "../../src/embedded.js";
+
+function embeddedCtx(readOnly = false): EmbeddedCtx {
+  return {
+    token: "eyJembedded",
+    endpoint: "https://api.example.test",
+    readOnly,
+    outputMode: "json",
+    activeCommandErrors: null,
+    stdout: [],
+    stderr: [],
+    exitCode: null,
+  };
+}
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -88,5 +102,37 @@ describe("assertPersistedSwitchAllowed (read-only write-lock)", () => {
 
   test("no-op when read-only mode is off", () => {
     expect(() => assertPersistedSwitchAllowed(false)).not.toThrow();
+  });
+});
+
+// feedback #316: an embedded/in-process invocation has no credentials file of
+// its own — a persisted switch there would rotate the HOST server's session JWT
+// on behalf of a remote caller. Refused regardless of the read-only flag.
+describe("assertPersistedSwitchAllowed (embedded invocation)", () => {
+  test("refuses under an embedded context even when NOT read-only", async () => {
+    const err = await runEmbedded(embeddedCtx(false), async () => {
+      try {
+        assertPersistedSwitchAllowed(false);
+        return null;
+      } catch (e) {
+        return e;
+      }
+    });
+    expect(err).toBeInstanceOf(CliError);
+    expect((err as CliError).exitCode).toBe(3);
+    expect((err as CliError).body).toEqual({ code: "EMBEDDED_BLOCKED" });
+    expect((err as CliError).message).toMatch(/embedded\/remote invocation/i);
+  });
+
+  test("the embedded refusal wins over the read-only refusal", async () => {
+    const err = await runEmbedded(embeddedCtx(true), async () => {
+      try {
+        assertPersistedSwitchAllowed(true);
+        return null;
+      } catch (e) {
+        return e;
+      }
+    });
+    expect((err as CliError).body).toEqual({ code: "EMBEDDED_BLOCKED" });
   });
 });

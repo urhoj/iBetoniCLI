@@ -1,6 +1,7 @@
 import { CliError, exitCodeFromStatus } from "../api/errors.js";
 import { createStore, defaultCredentialsPath } from "./store.js";
 import { failWith } from "../output/json.js";
+import { getEmbeddedCtx } from "../embedded.js";
 
 export interface SwitchOptions {
   endpoint: string;
@@ -29,6 +30,21 @@ interface SwitchResponseBody {
  * never persisted, and writes made through it still hit the client gate.
  */
 export function assertPersistedSwitchAllowed(readOnly: boolean): void {
+  // An EMBEDDED invocation (`IB_EXEC_INPROCESS` / any library embedder) has no
+  // credentials file of its OWN — `defaultCredentialsPath()` resolves to the
+  // HOST process's store. A persisted switch there would rotate and overwrite
+  // the host server's session JWT on behalf of a remote caller, who supplied
+  // only a bearer token (feedback #316). Identity in the embedded path comes
+  // from EmbeddedCtx, never from disk, so this operation is meaningless there
+  // regardless of the read-only flag — refuse before touching the store.
+  if (getEmbeddedCtx()) {
+    throw new CliError(
+      "Refused: `company switch` persists a rotated JWT to the local credentials file, which does not exist for an embedded/remote invocation. Pass the target company per request instead (global --company <id>).",
+      0,
+      { code: "EMBEDDED_BLOCKED" },
+      3
+    );
+  }
   if (!readOnly) return;
   // Same READ_ONLY_BLOCKED code as the client gate: `code` in the stderr
   // envelope marks a client-side refusal vs a real HTTP 403 (both exit 3).

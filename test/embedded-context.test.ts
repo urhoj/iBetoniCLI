@@ -89,24 +89,42 @@ describe("embedded invocation context", () => {
     expect(String(fetchMock.mock.calls[0][0])).toBe(`${EMB_ENDPOINT}/api/version`);
   });
 
-  test("isReadOnly reflects EmbeddedCtx.readOnly on a non-client write path", async () => {
+  test("isReadOnly reflects EmbeddedCtx.readOnly", async () => {
     const fetchMock = vi.fn(async () => jsonResponse({}));
     vi.stubGlobal("fetch", fetchMock);
 
-    // `company switch` persists a rotated JWT OUTSIDE the API client, so it is
-    // gated by `isReadOnly()` rather than the client's write-lock — the argv
-    // carries no `--read-only`, so only the embedded context can refuse it.
-    const r = await runArgv(["company", "switch", "--to", "7"], {
+    // `doctor` echoes `isReadOnly()` straight into its report, so it observes the
+    // embedded write-lock wiring without mutating anything. (The argv carries no
+    // `--read-only`, so only the embedded context can set it.)
+    const r = await runArgv(["doctor"], {
       token: EMB_JWT,
       endpoint: EMB_ENDPOINT,
       readOnly: true,
     });
 
+    expect(JSON.parse(r.stdout).readOnly).toBe(true);
+  });
+
+  // feedback #316: `company switch` persists a rotated JWT OUTSIDE the API
+  // client, straight into the credentials file — which, embedded, is the HOST
+  // SERVER's. Refused unconditionally, so a non-read-only remote caller cannot
+  // rotate the server's own session.
+  test("company switch is refused under an embedded context and leaves the host credentials untouched", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({}));
+    vi.stubGlobal("fetch", fetchMock);
+    const before = readFileSync(credentialsPath, "utf8");
+
+    const r = await runArgv(["company", "switch", "--to", "7"], {
+      token: EMB_JWT,
+      endpoint: EMB_ENDPOINT,
+      readOnly: false, // NOT read-only — the embedded guard must still refuse
+    });
+
     expect(r.exitCode).toBe(3);
     const env = JSON.parse(r.stderr.trim());
-    expect(env.code).toBe("READ_ONLY_BLOCKED");
-    expect(env.error).toContain("company switch persists a rotated JWT");
+    expect(env.code).toBe("EMBEDDED_BLOCKED");
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(readFileSync(credentialsPath, "utf8")).toBe(before);
   });
 
   test("the per-company client is derived from the embedded token and persists nothing", async () => {

@@ -59,6 +59,36 @@ describe("recordFriction", () => {
     expect(lastEntry().exitCode).toBe(4);
   });
 
+  // feedback #312: the log file is machine-global but is drained by a
+  // per-session stop gate. Without an owner stamp the draining session
+  // mis-attributes foreign rows AND deletes them before their own actor sees
+  // them, so every entry records who captured it.
+  describe("session ownership stamp (sid)", () => {
+    const origSid = process.env.CLAUDE_CODE_SESSION_ID;
+    afterAll(() => {
+      if (origSid === undefined) delete process.env.CLAUDE_CODE_SESSION_ID;
+      else process.env.CLAUDE_CODE_SESSION_ID = origSid;
+    });
+
+    test("stamps the harness session id when one is exported", () => {
+      process.env.CLAUDE_CODE_SESSION_ID = "sess-abc-123";
+      recordFriction(new Error("boom"), 1);
+      expect(lastEntry().sid).toBe("sess-abc-123");
+    });
+
+    test("stamps null outside an agent session (shell / cron), never a fake owner", () => {
+      delete process.env.CLAUDE_CODE_SESSION_ID;
+      recordFriction(new Error("boom"), 1);
+      expect(lastEntry().sid).toBeNull();
+    });
+
+    test("an empty session id is recorded as null, not an empty-string owner", () => {
+      process.env.CLAUDE_CODE_SESSION_ID = "";
+      recordFriction(new Error("boom"), 1);
+      expect(lastEntry().sid).toBeNull();
+    });
+  });
+
   test("caps the ring buffer at 300 entries", () => {
     for (let i = 0; i < 350; i++) recordFriction(new Error("e" + i), 1);
     const lines = readFileSync(frictionPath(), "utf8").trim().split("\n");

@@ -22,6 +22,21 @@ import { getEmbeddedCtx } from "./embedded.js";
  */
 const FRICTION_CAP = 300;
 
+/**
+ * Which actor captured this entry. The log file is machine-GLOBAL (one
+ * `~/.ibetoni/cli-friction.jsonl` per box) but it is drained by a per-session
+ * stop gate, so without an owner stamp the draining session both mis-attributes
+ * foreign rows to itself AND destroys them before their own actor ever sees
+ * them (feedback #312). `CLAUDE_CODE_SESSION_ID` is exported into every child
+ * process by the agent harness; `null` when `ib` runs outside one (a shell, a
+ * cron routine) — the gate treats a null-owner row as unclaimed and leaves it
+ * for a human/cron drain rather than silently adopting it.
+ */
+function sessionId(): string | null {
+  const sid = process.env.CLAUDE_CODE_SESSION_ID;
+  return typeof sid === "string" && sid.length > 0 ? sid : null;
+}
+
 function frictionDir(): string {
   return join(homedir(), ".ibetoni");
 }
@@ -58,6 +73,7 @@ export function recordFriction(
     const statusCode = err instanceof CliError ? err.statusCode : 0;
     const entry = JSON.stringify({
       ts: new Date().toISOString(),
+      sid: sessionId(),
       argv,
       exitCode,
       statusCode,
