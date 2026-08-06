@@ -21,6 +21,22 @@ import { getEmbeddedCtx } from "./embedded.js";
  */
 const FRICTION_CAP = 300;
 /**
+ * Explicit opt-out for DELIBERATE negative-path invocations (feedback #313).
+ *
+ * A run of error-message probes files nothing but noise: one reported session
+ * logged 24 entries of which all 24 were intentional (`keikka nosuch`,
+ * `--bogus-flag`, …), every one exiting exactly as designed, yet the stop gate
+ * still demanded triage. The VITEST guard below covers the test suite; this
+ * covers everything else, and it has to exist because the case is NOT
+ * test-runner-only — two captured entries came from interactive shell probes
+ * run to verify hint routing after a spec change.
+ *
+ * Set `IB_FRICTION_OFF=1` (or true/yes) around a batch of deliberate failures.
+ */
+function frictionDisabled() {
+    return ["1", "true", "yes"].includes(String(process.env.IB_FRICTION_OFF ?? "").toLowerCase());
+}
+/**
  * Which actor captured this entry. The log file is machine-GLOBAL (one
  * `~/.ibetoni/cli-friction.jsonl` per box) but it is drained by a per-session
  * stop gate, so without an owner stamp the draining session both mis-attributes
@@ -44,6 +60,8 @@ export function recordFriction(err, exitCodeOverride, displayed) {
     try {
         if (getEmbeddedCtx())
             return; // real local CLI only
+        if (frictionDisabled())
+            return; // deliberate negative-path run
         // Never write from the test suite — vitest exercises writeError() in many
         // command tests, which would spam the real ~/.ibetoni log. The friction
         // test re-enables via IB_FRICTION_TEST against a temp HOME.
@@ -65,7 +83,7 @@ export function recordFriction(err, exitCodeOverride, displayed) {
             ? (err.body.code ?? null)
             : null;
         const statusCode = err instanceof CliError ? err.statusCode : 0;
-        const entry = JSON.stringify({
+        const entry = {
             ts: new Date().toISOString(),
             sid: sessionId(),
             argv,
@@ -73,7 +91,7 @@ export function recordFriction(err, exitCodeOverride, displayed) {
             statusCode,
             code,
             message,
-        });
+        };
         const p = frictionPath();
         let lines = [];
         try {
@@ -82,7 +100,34 @@ export function recordFriction(err, exitCodeOverride, displayed) {
         catch {
             /* first write — file does not exist yet */
         }
-        lines.push(entry);
+        // Collapse a REPEAT of the same (argv, exitCode, message) by the same actor
+        // into a count rather than a new row (feedback #313: three identical probe
+        // rounds turned 8 distinct failures into 24 entries). Matching on `sid` too
+        // keeps the ownership stamp intact — one session must not fold, and thereby
+        // adopt, another's row (feedback #312). Unparseable lines are left verbatim:
+        // never destroy a row we don't understand.
+        const rows = lines.map((line) => {
+            try {
+                return { line, obj: JSON.parse(line) };
+            }
+            catch {
+                return { line, obj: null };
+            }
+        });
+        const dup = rows.find(({ obj }) => obj &&
+            obj.argv === entry.argv &&
+            obj.exitCode === entry.exitCode &&
+            obj.message === entry.message &&
+            (obj.sid ?? null) === entry.sid);
+        if (dup?.obj) {
+            dup.obj.count = (typeof dup.obj.count === "number" ? dup.obj.count : 1) + 1;
+            dup.obj.lastTs = entry.ts;
+            dup.line = JSON.stringify(dup.obj);
+        }
+        else {
+            rows.push({ line: JSON.stringify(entry), obj: entry });
+        }
+        lines = rows.map((r) => r.line);
         if (lines.length > FRICTION_CAP)
             lines = lines.slice(-FRICTION_CAP);
         try {

@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll, afterAll, vi } from "vitest";
-import { readFileSync, rmSync, mkdtempSync } from "node:fs";
+import { readFileSync, writeFileSync, rmSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { recordFriction, frictionPath } from "../src/friction.js";
@@ -86,6 +86,73 @@ describe("recordFriction", () => {
       process.env.CLAUDE_CODE_SESSION_ID = "";
       recordFriction(new Error("boom"), 1);
       expect(lastEntry().sid).toBeNull();
+    });
+  });
+
+  // feedback #313: a session logged 24 entries that were 8 deliberate probes run
+  // three times. Every one exited exactly as designed; signal-to-noise was 0/24.
+  describe("deliberate negative-path runs (#313)", () => {
+    test("IB_FRICTION_OFF suppresses capture entirely", () => {
+      const before = readFileSync(frictionPath(), "utf8");
+      for (const v of ["1", "true", "YES"]) {
+        process.env.IB_FRICTION_OFF = v;
+        recordFriction(new Error("deliberate " + v), 4);
+      }
+      delete process.env.IB_FRICTION_OFF;
+      expect(readFileSync(frictionPath(), "utf8")).toBe(before);
+    });
+
+    test("a non-truthy IB_FRICTION_OFF does NOT disable capture (fail-open)", () => {
+      process.env.IB_FRICTION_OFF = "0";
+      recordFriction(new Error("still recorded"), 4);
+      delete process.env.IB_FRICTION_OFF;
+      expect(lastEntry().message).toBe("still recorded");
+    });
+
+    test("an identical repeat collapses into a count instead of a new row", () => {
+      const lineCount = () => readFileSync(frictionPath(), "utf8").trim().split("\n").length;
+      recordFriction(new Error("repeat me"), 4);
+      const after1 = lineCount();
+      recordFriction(new Error("repeat me"), 4);
+      recordFriction(new Error("repeat me"), 4);
+      expect(lineCount()).toBe(after1); // three probes, one row
+      const e = lastEntry();
+      expect(e.count).toBe(3);
+      // ts stays the FIRST sighting; lastTs records the most recent one.
+      expect(String(e.lastTs) >= String(e.ts)).toBe(true);
+    });
+
+    test("a DIFFERENT message still gets its own row", () => {
+      recordFriction(new Error("distinct A"), 4);
+      const n = readFileSync(frictionPath(), "utf8").trim().split("\n").length;
+      recordFriction(new Error("distinct B"), 4);
+      expect(readFileSync(frictionPath(), "utf8").trim().split("\n").length).toBe(n + 1);
+    });
+
+    // fb#312's ownership stamp must survive dedupe: folding across sessions
+    // would let one session adopt (and then drain) another's row.
+    test("never folds across sessions — a different sid gets its own row", () => {
+      const origSid = process.env.CLAUDE_CODE_SESSION_ID;
+      try {
+        process.env.CLAUDE_CODE_SESSION_ID = "sess-one";
+        recordFriction(new Error("shared text"), 4);
+        const n = readFileSync(frictionPath(), "utf8").trim().split("\n").length;
+        process.env.CLAUDE_CODE_SESSION_ID = "sess-two";
+        recordFriction(new Error("shared text"), 4);
+        expect(readFileSync(frictionPath(), "utf8").trim().split("\n").length).toBe(n + 1);
+        expect(lastEntry().sid).toBe("sess-two");
+      } finally {
+        if (origSid === undefined) delete process.env.CLAUDE_CODE_SESSION_ID;
+        else process.env.CLAUDE_CODE_SESSION_ID = origSid;
+      }
+    });
+
+    test("an unparseable line is preserved verbatim, never dropped by dedupe", () => {
+      writeFileSync(frictionPath(), "not json at all\n", { mode: 0o600 });
+      recordFriction(new Error("after garbage"), 4);
+      const lines = readFileSync(frictionPath(), "utf8").trim().split("\n");
+      expect(lines[0]).toBe("not json at all");
+      expect(lines).toHaveLength(2);
     });
   });
 
