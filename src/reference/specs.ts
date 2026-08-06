@@ -2111,11 +2111,16 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "vehicleId", type: "number", description: "vehicleId to inspect" }],
     flags: [],
     outputShape:
-      "{ vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,speed,direction,engineState,address,at}|null, gpsAvailable }",
+      "{ vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,speed,direction,engineState,address,at,ageMinutes,stale}|null, gpsAvailable, staleAfterMinutes }",
     errors: [
       apiErr(404, "Vehicle not found", "verify vehicleId"),
       ...permErrors("auth.page.vehicle.read"),
     ],
+    notes: [
+      "`lastGpsPing` is the LATEST ping, which says nothing about how old it is — a dead tracker's last ping keeps its speed and direction, so it reads as a truck still driving. Check `stale` (ageMinutes > staleAfterMinutes, default 60) before treating the coordinates as the vehicle's current position. Same contract as `ib vehicle locations`.",
+      "lastGpsPing is null when Ecofleet is disabled, the lookup failed (best-effort — a GPS outage never fails the command), or the fleet entry had no coordinate fix. Null is not evidence the vehicle is untracked; check `gpsAvailable`.",
+    ],
+    seeAlso: ["ib vehicle locations"],
     examples: ["ib vehicle status 7", "ib vehicle status 7 --pretty"],
   },
   {

@@ -10977,13 +10977,20 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
 
 OUTPUT (JSON, stdout)
-  { vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,speed,direction,engineState,address,at}|null, gpsAvailable }
+  { vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,speed,direction,engineState,address,at,ageMinutes,stale}|null, gpsAvailable, staleAfterMinutes }
 
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Vehicle not found      → verify vehicleId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - \`lastGpsPing\` is the LATEST ping, which says nothing about how old it is — a dead tracker's last ping keeps its speed and direction, so it reads as a truck still driving. Check \`stale\` (ageMinutes > staleAfterMinutes, default 60) before treating the coordinates as the vehicle's current position. Same contract as \`ib vehicle locations\`.
+  - lastGpsPing is null when Ecofleet is disabled, the lookup failed (best-effort — a GPS outage never fails the command), or the fleet entry had no coordinate fix. Null is not evidence the vehicle is untracked; check \`gpsAvailable\`.
+
+SEE ALSO
+  ib vehicle locations
 
 EXAMPLES
   ib vehicle status 7
