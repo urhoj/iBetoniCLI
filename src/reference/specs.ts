@@ -4301,12 +4301,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin list",
     description:
-      "List Jerry-active companies (isPumppuToimittaja + HAS_JERRY setting) with per-company counts (admins, tarjousAdmins, pumpparit, vehicles, Jerry/non-Jerry varikot). GET /api/admin/jerry-companies. System-admin only.",
+      "List Jerry-active companies (isPumppuToimittaja + HAS_JERRY setting) with per-company counts (admins, tarjousAdmins, pumpparit, vehicles, Jerry/non-Jerry varikot, matchable varikot). GET /api/admin/jerry-companies. System-admin only. Health check: a row with matchableVarikkoCount 0 is Jerry-active but CANNOT receive a single tarjouspyyntö — its varikot are enrolled yet fail the geofence (no coords, or no delivery radius). Diagnose with `ib jerry check-address --explain`.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     flags: [],
     outputShape:
-      "ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, sijaintiNonJerryCount }>",
+      "ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, matchableVarikkoCount, sijaintiNonJerryCount }>. matchableVarikkoCount counts varikot that pass the REAL fan-out geofence (enrolled AND coords AND maxDeliveryDistance > 0); sijaintiJerryCount counts enrolment only, so matchableVarikkoCount 0 with sijaintiJerryCount > 0 means the company is Jerry-active but invisible to every tarjouspyyntö.",
     errors: [
       apiErr(403, "Not a system admin", "use a system-admin token"),
       ...COMMON_AUTH_ERRORS,
