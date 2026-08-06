@@ -334,6 +334,25 @@ export async function runJerryAdminRequests(client, opts) {
     const items = Array.isArray(data?.requests) ? data.requests : [];
     return listEnvelope(items, { truncated: !!data?.truncated });
 }
+/** Bucket modes for the request rollup. */
+export const REQUEST_STATS_GROUPS = ["week", "month", "status"];
+/**
+ * Windowed tarjouspyyntö rollup (GET /api/admin/jerry-requests/stats).
+ * System-admin only.
+ *
+ * The aggregate sibling of `runJerryAdminRequests` (feedback #314): answering
+ * "how many per week?" previously meant pulling the whole list and bucketing it
+ * client-side, which every caller reimplemented and which silently truncates at
+ * the 300-row cap. Counting happens in SQL, in Helsinki time, so the answer does
+ * not depend on the caller's timezone or ISO-week arithmetic.
+ */
+export async function runJerryAdminRequestStats(client, opts) {
+    return client.get(`/api/admin/jerry-requests/stats${qs({
+        from: opts.from || undefined,
+        to: opts.to || undefined,
+        groupBy: opts.groupBy || undefined,
+    })}`);
+}
 /** One request's full detail, admin view (GET /api/admin/jerry-requests/:id). System-admin only. */
 export async function runJerryAdminRequestGet(client, id) {
     return client.get(`/api/admin/jerry-requests/${id}`);
@@ -739,6 +758,21 @@ export function registerJerryCommands(parent, getClient) {
         .option("--provider <id>", "Filter by provider asiakasId", Number)
         .option("--limit <n>", "Max rows (max 300)", cappedInt(300))
         .action(jsonAction(getClient, (client, opts) => runJerryAdminRequests(client, opts)));
+    adminRequest
+        .command("stats")
+        .option("--from <date>", "createdAt from (YYYY-MM-DD / today / yesterday)", resolveDate)
+        .option("--to <date>", "createdAt to (inclusive)", resolveDate)
+        .option("--group-by <mode>", `Bucket by ${REQUEST_STATS_GROUPS.join("|")} (default week)`)
+        .action(guarded(async (opts) => {
+        // Reject an unknown mode here: the server defaults to `week` on anything
+        // it does not recognise, which would answer a DIFFERENT question than the
+        // one asked without saying so.
+        if (opts.groupBy && !REQUEST_STATS_GROUPS.includes(opts.groupBy)) {
+            failWith(`--group-by must be one of: ${REQUEST_STATS_GROUPS.join(", ")}`, 4);
+        }
+        const client = await getClient();
+        writeJson(await runJerryAdminRequestStats(client, opts));
+    }));
     adminRequest
         .command("get <requestId>")
         .action(jsonAction(getClient, (client, idStr) => runJerryAdminRequestGet(client, parseId(idStr, "requestId"))));

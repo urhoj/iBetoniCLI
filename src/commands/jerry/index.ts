@@ -620,6 +620,38 @@ export async function runJerryAdminRequests(
   return listEnvelope(items, { truncated: !!data?.truncated });
 }
 
+/** Bucket modes for the request rollup. */
+export const REQUEST_STATS_GROUPS = ["week", "month", "status"] as const;
+
+export interface JerryAdminRequestStatsOpts {
+  from?: string;
+  to?: string;
+  groupBy?: string;
+}
+
+/**
+ * Windowed tarjouspyyntö rollup (GET /api/admin/jerry-requests/stats).
+ * System-admin only.
+ *
+ * The aggregate sibling of `runJerryAdminRequests` (feedback #314): answering
+ * "how many per week?" previously meant pulling the whole list and bucketing it
+ * client-side, which every caller reimplemented and which silently truncates at
+ * the 300-row cap. Counting happens in SQL, in Helsinki time, so the answer does
+ * not depend on the caller's timezone or ISO-week arithmetic.
+ */
+export async function runJerryAdminRequestStats(
+  client: ApiClient,
+  opts: JerryAdminRequestStatsOpts
+): Promise<Row> {
+  return client.get<Row>(
+    `/api/admin/jerry-requests/stats${qs({
+      from: opts.from || undefined,
+      to: opts.to || undefined,
+      groupBy: opts.groupBy || undefined,
+    })}`
+  );
+}
+
 /** One request's full detail, admin view (GET /api/admin/jerry-requests/:id). System-admin only. */
 export async function runJerryAdminRequestGet(
   client: ApiClient,
@@ -1244,6 +1276,27 @@ export function registerJerryCommands(
       jsonAction(getClient, (client, opts: JerryAdminRequestsOpts) =>
         runJerryAdminRequests(client, opts)
       )
+    );
+
+  adminRequest
+    .command("stats")
+    .option("--from <date>", "createdAt from (YYYY-MM-DD / today / yesterday)", resolveDate)
+    .option("--to <date>", "createdAt to (inclusive)", resolveDate)
+    .option("--group-by <mode>", `Bucket by ${REQUEST_STATS_GROUPS.join("|")} (default week)`)
+    .action(
+      guarded(async (opts: JerryAdminRequestStatsOpts) => {
+        // Reject an unknown mode here: the server defaults to `week` on anything
+        // it does not recognise, which would answer a DIFFERENT question than the
+        // one asked without saying so.
+        if (opts.groupBy && !REQUEST_STATS_GROUPS.includes(opts.groupBy as never)) {
+          failWith(
+            `--group-by must be one of: ${REQUEST_STATS_GROUPS.join(", ")}`,
+            4
+          );
+        }
+        const client = await getClient();
+        writeJson(await runJerryAdminRequestStats(client, opts));
+      })
     );
 
   adminRequest

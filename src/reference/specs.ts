@@ -4531,7 +4531,40 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ pumppuRequestId, status, createdAt, customerNimi, operatorName, osoite, totalM3, offerCount, acceptedPriceCents, bestPriceCents }>",
     errors: [apiErr(403, "Not a system admin", "use a system-admin token"), ...COMMON_AUTH_ERRORS],
+    seeAlso: ["ib jerry admin request stats"],
     examples: ["ib jerry admin request list --status open,accepted", "ib jerry admin request list --provider 1402 --from 2026-06-01"],
+  },
+  {
+    command: "ib jerry admin request stats",
+    description:
+      "Windowed tarjouspyyntö rollup — per-bucket counts with the status split and offer summary (GET /api/admin/jerry-requests/stats). The aggregate sibling of `request list`: answers 'how many per week?' in one call instead of pulling every row and bucketing client-side. System-admin only.",
+    permissions: ["isSystemAdmin"],
+    tier: "developer",
+    flags: [
+      { name: "from", type: "string", description: "createdAt from (YYYY-MM-DD/today/yesterday)" },
+      { name: "to", type: "string", description: "createdAt to (inclusive)" },
+      { name: "group-by", type: "string", default: "week", description: "Bucket by week | month | status" },
+    ],
+    outputShape:
+      "{ groupBy, from, to, buckets: [{ bucket, total, byStatus: { [status]: count }, offerCount, withOffers }], totals: { total, byStatus, offerCount, withOffers } }",
+    errors: [
+      apiErr(400, "Invalid groupBy", "use week, month or status"),
+      { origin: "client", exit: 4, match: "--group-by", meaning: "--group-by is not week/month/status", remedy: "pass one of week, month, status" },
+      apiErr(403, "Not a system admin", "use a system-admin token"),
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "Bucketing happens in SQL in HELSINKI time, not UTC: a Sunday-evening request belongs to the week a Finnish reader would put it in. Weeks are ISO weeks labelled with the ISO YEAR, so a week straddling New Year stays one bucket — 2027-01-03 is `2026-W53`, not `2027-W53`.",
+      "`withOffers` counts requests that received at least one non-draft offer; `offerCount` sums the offers themselves. With --group-by status the bucket IS the status, so byStatus has a single key — useful as a plain status breakdown for the window.",
+      "Unlike `request list` there is no row cap, so totals stay correct as volume grows (the list caps at 300 and would silently under-count a client-side rollup).",
+      "Deploy-gated: needs the backend adding /api/admin/jerry-requests/stats.",
+    ],
+    seeAlso: ["ib jerry admin request list", "ib jerry admin searches funnel"],
+    examples: [
+      "ib jerry admin request stats --from 2026-05-01",
+      "ib jerry admin request stats --from 2026-01-01 --group-by month",
+      "ib jerry admin request stats --from 2026-05-01 --group-by status",
+    ],
   },
   {
     command: "ib jerry admin request get",

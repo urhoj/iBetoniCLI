@@ -3905,6 +3905,9 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+SEE ALSO
+  ib jerry admin request stats
+
 EXAMPLES
   ib jerry admin request list --status open,accepted
   ib jerry admin request list --provider 1402 --from 2026-06-01
@@ -3979,6 +3982,48 @@ NOTES
 
 EXAMPLES
   ib jerry admin request resend 41 --reason "uusi tarjoaja alueelle"
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib jerry admin request stats matches snapshot 1`] = `
+"USAGE
+  ib jerry admin request stats [flags]
+
+DESCRIPTION
+  Windowed tarjouspyyntö rollup — per-bucket counts with the status split and offer summary (GET /api/admin/jerry-requests/stats). The aggregate sibling of \`request list\`: answers 'how many per week?' in one call instead of pulling every row and bucketing client-side. System-admin only.
+  Permissions: requires isSystemAdmin.
+
+FLAGS
+  --from STRING    createdAt from (YYYY-MM-DD/today/yesterday)
+  --to STRING    createdAt to (inclusive)
+  --group-by STRING    Bucket by week | month | status (default: week)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+
+OUTPUT (JSON, stdout)
+  { groupBy, from, to, buckets: [{ bucket, total, byStatus: { [status]: count }, offerCount, withOffers }], totals: { total, byStatus, offerCount, withOffers } }
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Invalid groupBy        → use week, month or status
+  exit 4 (client-side)  --group-by is not week/month/status → pass one of week, month, status
+  exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Bucketing happens in SQL in HELSINKI time, not UTC: a Sunday-evening request belongs to the week a Finnish reader would put it in. Weeks are ISO weeks labelled with the ISO YEAR, so a week straddling New Year stays one bucket — 2027-01-03 is \`2026-W53\`, not \`2027-W53\`.
+  - \`withOffers\` counts requests that received at least one non-draft offer; \`offerCount\` sums the offers themselves. With --group-by status the bucket IS the status, so byStatus has a single key — useful as a plain status breakdown for the window.
+  - Unlike \`request list\` there is no row cap, so totals stay correct as volume grows (the list caps at 300 and would silently under-count a client-side rollup).
+  - Deploy-gated: needs the backend adding /api/admin/jerry-requests/stats.
+
+SEE ALSO
+  ib jerry admin request list, ib jerry admin searches funnel
+
+EXAMPLES
+  ib jerry admin request stats --from 2026-05-01
+  ib jerry admin request stats --from 2026-01-01 --group-by month
+  ib jerry admin request stats --from 2026-05-01 --group-by status
 "
 `;
 

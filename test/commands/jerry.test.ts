@@ -11,6 +11,7 @@ import {
   runJerryProviderSettingsGet,
   runJerryProviderSettingsSet,
   runJerryAdminList,
+  runJerryAdminRequestStats,
   runJerryAdminSearch,
   runJerryAdminDetail,
   runJerryAdminToggle,
@@ -238,6 +239,37 @@ describe("ib jerry check-address", () => {
     await runJerryCheckAddress(mockClient, { address: "Sarkatie 7, Vantaa", explain: true, gate: [] });
     const [, body] = post.mock.calls[0];
     expect(body).not.toHaveProperty("gates");
+  });
+});
+
+// feedback #314: the rollup that used to be a client-side PowerShell group-by.
+describe("ib jerry admin request stats", () => {
+  test("passes the window and bucket mode through as query params", async () => {
+    get.mockResolvedValueOnce({ groupBy: "week", buckets: [], totals: {} });
+    await runJerryAdminRequestStats(mockClient, {
+      from: "2026-05-01",
+      to: "2026-08-06",
+      groupBy: "month",
+    });
+    expect(get).toHaveBeenCalledWith(
+      "/api/admin/jerry-requests/stats?from=2026-05-01&to=2026-08-06&groupBy=month"
+    );
+  });
+
+  test("omits unset params so the server default (week) applies", async () => {
+    get.mockResolvedValueOnce({ groupBy: "week", buckets: [], totals: {} });
+    await runJerryAdminRequestStats(mockClient, {});
+    expect(get).toHaveBeenCalledWith("/api/admin/jerry-requests/stats");
+  });
+
+  test("returns the rollup unwrapped — it is not a list envelope", async () => {
+    const rollup = {
+      groupBy: "week",
+      buckets: [{ bucket: "2026-W20", total: 2, byStatus: { open: 2 }, offerCount: 0, withOffers: 0 }],
+      totals: { total: 2, byStatus: { open: 2 }, offerCount: 0, withOffers: 0 },
+    };
+    get.mockResolvedValueOnce(rollup);
+    expect(await runJerryAdminRequestStats(mockClient, { from: "2026-05-01" })).toEqual(rollup);
   });
 });
 
