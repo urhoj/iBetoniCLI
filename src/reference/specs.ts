@@ -3063,8 +3063,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "address", type: "string", description: "Free-form address (REQUIRED)" },
     ],
     outputShape:
-      "{ status, lat, lng, ... } (raw Google geocode result; { status: 'ZERO_RESULTS' } when no match)",
+      "{ geocoded:boolean, lat|null, lng|null, placeId|null, formattedAddress|null, status, results[] }",
     errors: permErrors("auth.page.sijainnit.read"),
+    notes: [
+      "The flat fields are the SAME shape `ib jerry check-address` returns (geocoded/lat/lng/placeId/formattedAddress), so one parser reads both. The raw Google payload is retained as `results[]` for callers that need address_components, viewport, or location_type.",
+      "No match is `geocoded:false` with exit 0, not an error — the address not existing is an answer. Always read `status` alongside it: ZERO_RESULTS means Google found nothing (or the address was shorter than 5 characters), while TEST_ADDRESS / GOOGLE_MAPS_TIMEOUT / GOOGLE_MAPS_API_ERROR mean the lookup never happened. Treating a bare geocoded:false as 'no such address' hides a service failure.",
+    ],
+    seeAlso: ["ib jerry check-address"],
     examples: ['ib sijainti geocode --address "Mannerheimintie 1, Helsinki"'],
   },
   {

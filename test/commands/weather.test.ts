@@ -191,9 +191,13 @@ describe("ib weather address", () => {
       address: "Mannerheimintie 1, Helsinki",
       time: "2026-06-09T12:00:00.000Z",
     });
-    expect(mockClient.post).toHaveBeenCalledWith("/api/geocode/getLatLng", {
-      osoite: "Mannerheimintie 1, Helsinki",
-    });
+    // `read: true` — the geocode is a POST only because the address travels in
+    // the body, so a forecast must not be refused under --read-only.
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/geocode/getLatLng",
+      { osoite: "Mannerheimintie 1, Helsinki" },
+      { read: true }
+    );
     expect(mockClient.get).toHaveBeenCalledWith(
       "/api/weather/forecast/60.17/24.94/2026-06-09T12%3A00%3A00.000Z"
     );

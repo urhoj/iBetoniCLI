@@ -19,3 +19,35 @@ export function extractGeocodeLatLng(geo: unknown): { lat: number; lng: number }
   }
   return null;
 }
+
+/** Flat geocode summary — the shape `ib jerry check-address` already returns. */
+export interface FlatGeocode {
+  geocoded: boolean;
+  lat: number | null;
+  lng: number | null;
+  placeId: string | null;
+  formattedAddress: string | null;
+}
+
+/**
+ * Project the raw Google Geocoding payload onto the FLAT shape that
+ * `/api/pumppuRequests/checkAddress` (→ `ib jerry check-address`) returns, so
+ * the CLI's two geocoding entry points agree on field names (feedback #317 — a
+ * parser written against one silently got undefined,undefined from the other).
+ *
+ * `geocoded:false` (not a throw) on no match, mirroring check-address: the
+ * caller distinguishes "no such address" from a failure by the flag, not by an
+ * exit code. Callers wanting the raw payload keep reading `results[]`.
+ */
+export function flattenGeocodeResult(geo: unknown): FlatGeocode {
+  const coords = extractGeocodeLatLng(geo);
+  const first = (geo as { results?: Array<Record<string, unknown>> } | null)?.results?.[0];
+  const str = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
+  return {
+    geocoded: coords !== null,
+    lat: coords?.lat ?? null,
+    lng: coords?.lng ?? null,
+    placeId: str(first?.place_id),
+    formattedAddress: str(first?.formatted_address),
+  };
+}

@@ -180,16 +180,69 @@ describe("ib sijainti geocode", () => {
     post.mockReset();
   });
 
-  test("runSijaintiGeocode: POST /api/geocode/getLatLng with {osoite}, returns raw", async () => {
-    post.mockResolvedValueOnce({ status: "OK", lat: 60.17, lng: 24.94 });
-    const result = await runSijaintiGeocode(
-      mockClient,
-      "Mannerheimintie 1, Helsinki"
+  // feedback #317: this used to return the raw Google envelope while
+  // `ib jerry check-address` returned the flat shape, so one parser silently
+  // produced undefined,undefined against the other.
+  test("runSijaintiGeocode: flattens to the check-address shape, keeps results[]", async () => {
+    const results = [
+      {
+        formatted_address: "Heisikatu 3, 15300 Lahti, Finland",
+        place_id: "ChIJw6lz7RvWkUYRsdBiLM0fHcs",
+        geometry: { location: { lat: 60.9974026, lng: 25.7688606 } },
+        address_components: [{ long_name: "3" }],
+      },
+    ];
+    post.mockResolvedValueOnce({ status: "OK", results });
+    const result = await runSijaintiGeocode(mockClient, "Heisikatu 3, Lahti");
+    // `read: true` — a POST only because the address travels in the body, so it
+    // must not trip the --read-only write-lock or the acting-as write banner.
+    expect(post).toHaveBeenCalledWith(
+      "/api/geocode/getLatLng",
+      { osoite: "Heisikatu 3, Lahti" },
+      { read: true }
     );
-    expect(post).toHaveBeenCalledWith("/api/geocode/getLatLng", {
-      osoite: "Mannerheimintie 1, Helsinki",
+    expect(result).toEqual({
+      geocoded: true,
+      lat: 60.9974026,
+      lng: 25.7688606,
+      placeId: "ChIJw6lz7RvWkUYRsdBiLM0fHcs",
+      formattedAddress: "Heisikatu 3, 15300 Lahti, Finland",
+      status: "OK",
+      results,
     });
-    expect((result as { lat: number }).lat).toBe(60.17);
+  });
+
+  test("runSijaintiGeocode: top-level {lat,lng} shape flattens too", async () => {
+    post.mockResolvedValueOnce({ status: "OK", lat: 60.17, lng: 24.94 });
+    const result = await runSijaintiGeocode(mockClient, "Mannerheimintie 1, Helsinki");
+    expect(result).toMatchObject({ geocoded: true, lat: 60.17, lng: 24.94, placeId: null });
+    expect(result.results).toEqual([]);
+  });
+
+  test("runSijaintiGeocode: no match → geocoded:false, exit 0 (not an error)", async () => {
+    post.mockResolvedValueOnce({ status: "ZERO_RESULTS", results: [] });
+    const result = await runSijaintiGeocode(mockClient, "asdf");
+    expect(result).toEqual({
+      geocoded: false,
+      lat: null,
+      lng: null,
+      placeId: null,
+      formattedAddress: null,
+      status: "ZERO_RESULTS",
+      results: [],
+    });
+  });
+
+  // The backend's error envelope carries errorCode instead of status. Without
+  // surfacing it, a service failure is indistinguishable from "no such address".
+  test("runSijaintiGeocode: backend error envelope surfaces errorCode as status", async () => {
+    post.mockResolvedValueOnce({
+      success: false,
+      error: "Google Maps API request timed out",
+      errorCode: "GOOGLE_MAPS_TIMEOUT",
+    });
+    const result = await runSijaintiGeocode(mockClient, "Heisikatu 3, Lahti");
+    expect(result).toMatchObject({ geocoded: false, status: "GOOGLE_MAPS_TIMEOUT", results: [] });
   });
 });
 

@@ -7,7 +7,7 @@ import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { CliError } from "../../api/errors.js";
 import { parseId, cappedInt } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
-import { extractGeocodeLatLng } from "../_shared/geocode.js";
+import { flattenGeocodeResult } from "../_shared/geocode.js";
 import { runAddressDashboard, registerDashboardCommand, } from "../_shared/addressDashboard.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
@@ -285,14 +285,14 @@ export async function applyGeocodeToBody(client, body) {
     if (!address) {
         failWith("--geocode requires --address (or sijaintiOsoite1 in --body)", 4);
     }
+    // runSijaintiGeocode already flattens, so the coordinates are read straight
+    // off the result — no second extraction pass.
     const geo = await runSijaintiGeocode(client, address);
-    const coords = extractGeocodeLatLng(geo);
-    if (!coords) {
-        const status = geo?.status ?? "no match";
-        failWith(`could not geocode address "${address}" (status: ${status})`, 4);
+    if (!geo.geocoded) {
+        failWith(`could not geocode address "${address}" (status: ${geo.status ?? "no match"})`, 4);
     }
-    body.lat = coords.lat;
-    body.lng = coords.lng;
+    body.lat = geo.lat;
+    body.lng = geo.lng;
 }
 /**
  * Default BetoniJerry delivery radius (km) applied when a varikko is enrolled
@@ -520,12 +520,35 @@ export async function runSijaintiPlants(client, opts) {
 /**
  * POST /api/geocode/getLatLng — geocode a free-form address string to
  * coordinates via Google Maps. The backend derives ownerAsiakasId from the
- * token. Returns the raw Google geocode result verbatim (shape:
- * `{ status, lat, lng, ... }`; `{ status: "ZERO_RESULTS" }` when the address
- * is shorter than 5 characters or has no match). Read-only, no write flags.
+ * token.
+ *
+ * Returns the FLAT `{ geocoded, lat, lng, placeId, formattedAddress }` summary
+ * that `ib jerry check-address` also returns (feedback #317 — the two entry
+ * points used to disagree, so a parser written against one silently produced
+ * undefined,undefined from the other), with `status` and the raw `results[]`
+ * retained alongside. No match → `geocoded:false`, exit 0 — same as
+ * check-address; the address not existing is an answer, not an error.
+ *
+ * Marked `read: true`: it is a POST only because the address travels in the
+ * body, so it must not trip the `--read-only` write-lock or the acting-as write
+ * banner (and it IS retryable on a network blip).
  */
 export async function runSijaintiGeocode(client, address) {
-    return client.post("/api/geocode/getLatLng", { osoite: address });
+    const geo = await client.post("/api/geocode/getLatLng", { osoite: address }, { read: true });
+    const raw = geo;
+    return {
+        ...flattenGeocodeResult(geo),
+        // Google's status when it answered; otherwise the backend's own errorCode
+        // envelope (TEST_ADDRESS / GOOGLE_MAPS_TIMEOUT / …), which carries no
+        // `status` — without this a service failure is indistinguishable from
+        // "address not found", both arriving as a bare geocoded:false.
+        status: typeof raw?.status === "string"
+            ? raw.status
+            : typeof raw?.errorCode === "string"
+                ? raw.errorCode
+                : null,
+        results: Array.isArray(raw?.results) ? raw.results : [],
+    };
 }
 /**
  * Resolve the caller's active ownerAsiakasId. Used by closest/distance, whose

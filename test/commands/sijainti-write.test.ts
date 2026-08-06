@@ -142,9 +142,11 @@ describe("ib sijainti create/update", () => {
       { sijaintiId: 7, sijaintiOsoite1: "New Street 2, Tampere" },
       {}
     );
-    expect(post).toHaveBeenCalledWith("/api/geocode/getLatLng", {
-      osoite: "New Street 2, Tampere",
-    });
+    expect(post).toHaveBeenCalledWith(
+      "/api/geocode/getLatLng",
+      { osoite: "New Street 2, Tampere" },
+      { read: true }
+    );
     expect(merged.lat).toBe(61.5);
     expect(merged.lng).toBe(23.75);
     expect(geocodeFailed).toBeUndefined();
@@ -275,9 +277,11 @@ describe("applyGeocodeToBody (--geocode, shared by create/update)", () => {
     });
     const body: Record<string, unknown> = { sijaintiOsoite1: "Mannerheimintie 1, Helsinki" };
     await applyGeocodeToBody(mockClient, body);
-    expect(mPost()).toHaveBeenCalledWith("/api/geocode/getLatLng", {
-      osoite: "Mannerheimintie 1, Helsinki",
-    });
+    expect(mPost()).toHaveBeenCalledWith(
+      "/api/geocode/getLatLng",
+      { osoite: "Mannerheimintie 1, Helsinki" },
+      { read: true }
+    );
     expect(body).toMatchObject({ lat: 60.17, lng: 24.94 });
   });
 

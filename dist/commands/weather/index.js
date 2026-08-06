@@ -101,11 +101,13 @@ function extractLatLng(geo) {
 /**
  * POST /api/geocode/getLatLng { osoite } → extract lat/lng → runWeatherForecast.
  * Exits 5 (client-origin) if the address cannot be geocoded.
+ *
+ * The geocode is marked `read: true` — a POST only because the address travels
+ * in the body — so a forecast lookup is not refused by the `--read-only`
+ * write-lock and does not print the acting-as write banner.
  */
 export async function runWeatherAddress(client, opts) {
-    const geo = await client.post("/api/geocode/getLatLng", {
-        osoite: opts.address,
-    });
+    const geo = await client.post("/api/geocode/getLatLng", { osoite: opts.address }, { read: true });
     const { lat, lng } = extractLatLng(geo);
     return runWeatherForecast(client, { lat, lng, time: opts.time });
 }
