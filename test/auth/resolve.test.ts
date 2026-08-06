@@ -49,4 +49,32 @@ describe("resolveAuth", () => {
   test("returns null when neither is present", async () => {
     expect(await resolveAuth({ credentialsPath: join(dir, "missing.json") })).toBeNull();
   });
+
+  test("an explicit token wins over IB_TOKEN and the credentials file", async () => {
+    process.env.IB_TOKEN = "env_jwt";
+    const { createStore } = await import("../../src/auth/store.js");
+    const file = join(dir, "credentials.json");
+    await createStore(file).save({
+      jwt: "file_jwt",
+      refreshToken: "rt",
+      issuedAt: "",
+      expiresAt: "",
+      personId: 1,
+      ownerAsiakasId: 1,
+      ownerAsiakasName: "X",
+      endpoint: "https://api.example.com",
+    });
+    const auth = await resolveAuth({ credentialsPath: file, token: "caller_jwt" });
+    expect(auth!.token).toBe("caller_jwt");
+    expect(auth!.refreshable).toBe(false);
+  });
+
+  // An embedded caller that sent NO token must not silently act as the host's
+  // session — the empty token stands and the API answers 401.
+  test("an explicit EMPTY token does not fall back to the host credentials", async () => {
+    process.env.IB_TOKEN = "env_jwt";
+    const auth = await resolveAuth({ credentialsPath: join(dir, "missing.json"), token: "" });
+    expect(auth!.token).toBe("");
+    expect(auth!.refreshable).toBe(false);
+  });
 });

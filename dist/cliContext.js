@@ -30,17 +30,19 @@ export async function resolveEphemeralSwitch(opts) {
 /**
  * Build a `CliContext` for the current invocation.
  *
- * - Resolves auth via `resolveAuth` (env-var fallback first, then credentials
- *   file).
+ * - Resolves auth via `resolveAuth` (`embeddedToken` first, then the env var,
+ *   then the credentials file).
  * - For file-backed sessions, wires an `onRefresh` callback into the API
  *   client so a 401 transparently retries with a freshly minted JWT and the
  *   rotated token is persisted back to disk.
- * - Env-var (`IB_TOKEN`) sessions get no refresh path — a 401 surfaces.
+ * - Bare-token (`IB_TOKEN` / embedded) sessions get no refresh path — a 401
+ *   surfaces, and nothing is ever written to the credentials file.
  */
 export async function createCliContext(opts) {
     const auth = await resolveAuth({
         credentialsPath: opts.credentialsPath,
         defaultEndpoint: opts.global.endpoint ?? undefined,
+        token: opts.embeddedToken,
     });
     if (!auth) {
         return {

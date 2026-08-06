@@ -32,9 +32,20 @@ import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { buildValidationEnvelope, type FlagProblem } from "./output/validationEnvelope.js";
 import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, commandPath } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
-import { createApiClient } from "./api/client.js";
 import { CliError } from "./api/errors.js";
 import { getCallerTier } from "./tier.js";
+
+/**
+ * What a single invocation acts as: the resolved root globals, plus the caller's
+ * JWT when the invocation is EMBEDDED (in-process `/api/cli/exec`). Built once
+ * per factory call by `buildProgram`'s `invocation()`, which is the only reader
+ * of the embedded context.
+ */
+interface Invocation {
+  global: GlobalOptions;
+  /** The embedded caller's JWT; absent in normal CLI mode. */
+  embeddedToken?: string;
+}
 
 /**
  * Construct the `ib` program with rich (`CommandSpec`-driven) `--help` attached.
@@ -80,6 +91,36 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
   });
   addGlobalOptions(program);
 
+  // The acting context of this invocation: the parsed root globals, plus the
+  // EMBEDDED caller's identity when this process is serving an in-process
+  // `/api/cli/exec` call. This is the ONE place `getEmbeddedCtx()` is consulted,
+  // and every factory below resolves through it — so `getClient`,
+  // `getClientForAsiakas`, `getEndpoint` and `isReadOnly` all act with the
+  // caller's endpoint / token / write-lock. (Only `getClient` used to special-
+  // case the embedded context, which left an in-process call probing the
+  // SERVER's endpoint, minting per-company clients from the SERVER's credentials
+  // file, and slipping past the `isReadOnly()` gate.)
+  //
+  // Embedded values WIN over argv: the endpoint is the server's own base URL, so
+  // an argv `--endpoint` from a remote caller cannot redirect their JWT to a host
+  // of their choosing, and the write-lock can only be tightened. `quiet` is
+  // forced because the acting-as write diagnostic writes to `process.stderr` —
+  // the HOST's, which the embedded caller never sees.
+  function invocation(): Invocation {
+    const global = getGlobalOptions(program);
+    const emb = getEmbeddedCtx();
+    if (!emb) return { global };
+    return {
+      global: {
+        ...global,
+        endpoint: emb.endpoint,
+        readOnly: global.readOnly || emb.readOnly,
+        quiet: true,
+      },
+      embeddedToken: emb.token,
+    };
+  }
+
   // One CLI context per distinct company lens, memoized for the invocation.
   // Building it reads+parses the credentials file and decodes the JWT, and under
   // `--company <id>` it mints an ephemeral switch JWT via a NETWORK POST — so a
@@ -88,26 +129,27 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
   // `asiakas` because `getClientForAsiakas` deliberately wants a different
   // context per target company.
   const ctxCache = new Map<number | null, ReturnType<typeof createCliContext>>();
-  function contextFor(global: GlobalOptions): ReturnType<typeof createCliContext> {
-    const key = global.asiakas ?? null;
+  function contextFor(inv: Invocation): ReturnType<typeof createCliContext> {
+    const key = inv.global.asiakas ?? null;
     let pending = ctxCache.get(key);
     if (!pending) {
       pending = createCliContext({
         credentialsPath: defaultCredentialsPath(),
         version: packageJson.version,
-        global,
+        global: inv.global,
+        embeddedToken: inv.embeddedToken,
       });
       ctxCache.set(key, pending);
     }
     return pending;
   }
 
-  // Build an authenticated client from a resolved set of global options. Exits 2
-  // with "Not logged in" when no auth resolves — so command actions never deal
-  // with the unauthenticated case. The two factories below differ only in the
-  // global options they pass in.
-  async function clientFrom(global: GlobalOptions): Promise<ApiClient> {
-    const ctx = await contextFor(global);
+  // Build an authenticated client from a resolved invocation. Exits 2 with
+  // "Not logged in" when no auth resolves — so command actions never deal with
+  // the unauthenticated case. The two factories below differ only in the
+  // invocation they pass in.
+  async function clientFrom(inv: Invocation): Promise<ApiClient> {
+    const ctx = await contextFor(inv);
     if (!ctx.client) {
       // throw (not process.exit) — safe post-fetch on Windows; lands in the
       // action's exitWithError catch (or the bin catch) as envelope + exit 2.
@@ -116,26 +158,23 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
     return ctx.client;
   }
 
-  const getClient = (): Promise<ApiClient> => {
-    const embCtx = getEmbeddedCtx();
-    if (embCtx) {
-      return Promise.resolve(createApiClient({ endpoint: embCtx.endpoint, token: embCtx.token, version: packageJson.version, readOnly: embCtx.readOnly }));
-    }
-    return clientFrom(getGlobalOptions(program));
-  };
+  const getClient = (): Promise<ApiClient> => clientFrom(invocation());
 
   // A client bound to a SPECIFIC company via an ephemeral switch (never
   // persisted). Reuses the same tested switch path and inherits
-  // read-only/endpoint/version. Powers `person search --my-companies` fan-out.
-  const getClientForAsiakas = (asiakasId: number): Promise<ApiClient> =>
-    clientFrom({ ...getGlobalOptions(program), asiakas: asiakasId });
+  // read-only/endpoint/version — and, in embedded mode, derives from the
+  // caller's JWT. Powers `person search --my-companies` fan-out.
+  const getClientForAsiakas = (asiakasId: number): Promise<ApiClient> => {
+    const inv = invocation();
+    return clientFrom({ ...inv, global: { ...inv.global, asiakas: asiakasId } });
+  };
 
   // Resolve the active endpoint WITHOUT requiring auth — `createCliContext`
   // returns a usable `endpoint` (--endpoint → active profile → default) even
   // when no credentials resolve. Powers `ib version`, which queries the public
   // `/api/version` and so must work logged out.
   async function getEndpoint(): Promise<string> {
-    return (await contextFor(getGlobalOptions(program))).endpoint;
+    return (await contextFor(invocation())).endpoint;
   }
 
   // Disable Commander's built-in `help` command so `ib help [topic]` can
@@ -147,7 +186,7 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
   // Session write-lock resolver, evaluated at action time (after argv parse).
   // Passed to commands that mutate OUTSIDE the API client (persisted company
   // switch) so read-only mode covers them too, and to `doctor` for reporting.
-  const isReadOnly = (): boolean => getGlobalOptions(program).readOnly;
+  const isReadOnly = (): boolean => invocation().global.readOnly;
 
   // Load + register the domains this invocation needs — one of them when argv
   // names a known command, otherwise all of them. `DOMAIN_REGISTRARS` iterates
