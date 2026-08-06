@@ -1621,6 +1621,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(400, "Unknown role", "use a role from @ibetoni/constants ROLE_TYPEID_BY_NAME"),
       ...permErrors("auth.page.person.read"),
     ],
+    notes: [
+      "This command does NOT search by name — it enumerates and filters by role/company. To find a person by name or email use `ib person search <query>` (which also accepts `--search`).",
+    ],
+    seeAlso: ["ib person search"],
     examples: [
       "ib person list",
       "ib person list --owned",

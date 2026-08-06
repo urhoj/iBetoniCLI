@@ -210,7 +210,43 @@ export interface UnknownOptionEnvelope {
   didYouMean: string | null;
   availableOptions: string[];
   positionals: string[];
+  /** Sibling commands in this domain that DO accept the rejected flag. */
+  acceptedBy: string[];
   hint: string;
+}
+
+/**
+ * Sibling commands in the SAME domain whose spec accepts the rejected flag
+ * (feedback #308: `ib person list --search X` was a dead end even though
+ * `ib person search` owns exactly that capability — two failed invocations
+ * before the right command was found).
+ *
+ * Derived from `COMMAND_SPECS`, so it covers every domain automatically rather
+ * than needing a hand-written {@link OPTION_REDIRECTS} row per case. Sibling
+ * ENUMERATION is tier-gated — the caller already reached this command, but must
+ * not learn of one hidden at their level.
+ *
+ * Capped at 3, and a leaf NAMED after the flag (`--search` → `person search`)
+ * wins over catalogue order, since that is the strongest signal of which
+ * sibling actually owns the capability.
+ */
+export function siblingsAcceptingOption(
+  command: string,
+  unknownOption: string,
+  tier: CallerTier
+): string[] {
+  const domain = command.split(" ")[1];
+  if (!domain) return [];
+  const flag = `--${unknownOption.replace(/^-+/, "")}`;
+  const hits = COMMAND_SPECS.filter(
+    (s) =>
+      s.command !== command &&
+      s.command.split(" ")[1] === domain &&
+      !isHiddenAtTier(s, tier) &&
+      specOptionLongs(s).includes(flag)
+  ).map((s) => s.command);
+  const named = hits.filter((c) => c.endsWith(` ${flag.slice(2)}`));
+  return (named.length ? named : hits).slice(0, 3);
 }
 
 /**
@@ -367,14 +403,16 @@ export function buildExcessArgumentsEnvelope(
  * (`ib customer search --search X`) the default USAGE envelope only echoes
  * "unknown option '--search'" with a generic hint — a dead end that doesn't say
  * what the command DOES accept (feedback #235/#236). This lists the command's
- * real positionals + flags, a fuzzy "did you mean" among its actual flags, and
- * (when present) a curated cross-command redirect. `cmd` is the command that
- * threw (a leaf — options belong to leaves); `unknownOption` is the bad flag
- * verbatim incl. leading dashes (e.g. `--search`).
+ * real positionals + flags, a fuzzy "did you mean" among its actual flags, the
+ * sibling command(s) that DO accept the flag, and (when present) a curated
+ * cross-command redirect. `cmd` is the command that threw (a leaf — options
+ * belong to leaves); `unknownOption` is the bad flag verbatim incl. leading
+ * dashes (e.g. `--search`).
  */
 export function buildUnknownOptionEnvelope(
   cmd: Command,
-  unknownOption: string
+  unknownOption: string,
+  tier: CallerTier = "developer"
 ): UnknownOptionEnvelope {
   const command = commandPath(cmd);
   const spec = COMMAND_SPECS.find((s) => s.command === canonicalPath(command));
@@ -388,6 +426,11 @@ export function buildUnknownOptionEnvelope(
   );
   const didYouMean = guess ? `--${guess}` : null;
   const redirect = OPTION_REDIRECTS[`${command} ${unknownOption}`];
+  // A curated redirect is hand-written for this exact command+flag, so it wins;
+  // the derived sibling list is the general case behind it.
+  const acceptedBy = redirect
+    ? []
+    : siblingsAcceptingOption(canonicalPath(command), unknownOption, tier);
 
   const domain = command.split(" ")[1]; // token after `ib`, e.g. customer
   const discover = domain
@@ -396,6 +439,15 @@ export function buildUnknownOptionEnvelope(
 
   const parts: string[] = [];
   if (redirect) parts.push(redirect);
+  if (acceptedBy.length === 1) {
+    parts.push(
+      `\`${unknownOption}\` belongs to \`${acceptedBy[0]}\` — that sibling command owns this capability, not this one.`
+    );
+  } else if (acceptedBy.length > 1) {
+    parts.push(
+      `\`${unknownOption}\` belongs to a sibling command: ${acceptedBy.map((c) => `\`${c}\``).join(", ")}.`
+    );
+  }
   if (didYouMean) parts.push(`Did you mean \`${didYouMean}\`?`);
   if (positionals.length) {
     parts.push(`This command takes positional argument(s): ${positionals.join(" ")}.`);
@@ -417,6 +469,7 @@ export function buildUnknownOptionEnvelope(
     didYouMean,
     availableOptions,
     positionals,
+    acceptedBy,
     hint: parts.join(" "),
   };
 }

@@ -10,6 +10,7 @@ import {
   buildExcessArgumentsEnvelope,
   asDateSuggestion,
   dateFlagSuggestion,
+  siblingsAcceptingOption,
   OPTION_REDIRECTS,
 } from "../../src/output/unknownCommand.js";
 
@@ -127,6 +128,55 @@ describe("buildUnknownOptionEnvelope (#235/#236)", () => {
 
   test("OPTION_REDIRECTS is keyed by full command path + flag", () => {
     expect(OPTION_REDIRECTS).toHaveProperty("ib dev cache invalidate --pattern");
+  });
+});
+
+// feedback #308 — the reported invocation was a dead end: `ib person list
+// --search Vilenius` rejected the flag, offered didYouMean:null, and never
+// named `ib person search`, which owns exactly that capability.
+describe("sibling-command flag redirect (#308)", () => {
+  test("the reported case: person list --search names `ib person search`", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("person", "list"), "--search");
+    expect(env.acceptedBy).toEqual(["ib person search"]);
+    expect(env.hint).toContain("`ib person search`");
+    expect(env.hint).toContain("owns this capability");
+  });
+
+  test("derived from specs, so it generalises beyond the reported domain", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("customer", "get"), "--search");
+    expect(env.acceptedBy).toContain("ib customer search");
+  });
+
+  test("a leaf named after the flag beats catalogue order", () => {
+    const { acceptedBy } = buildUnknownOptionEnvelope(leafByPath("person", "list"), "--search");
+    expect(acceptedBy[0]).toBe("ib person search");
+  });
+
+  test("no sibling accepts it → empty, and no invented suggestion", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("person", "list"), "--zzzzzz");
+    expect(env.acceptedBy).toEqual([]);
+    expect(env.hint).not.toContain("sibling");
+  });
+
+  test("stays within the domain — never points at another domain's command", () => {
+    const { acceptedBy } = buildUnknownOptionEnvelope(leafByPath("person", "list"), "--search");
+    expect(acceptedBy.every((c) => c.startsWith("ib person "))).toBe(true);
+  });
+
+  test("a curated redirect wins — the derived list stays empty", () => {
+    const env = buildUnknownOptionEnvelope(
+      leafByPath("dev", "cache", "invalidate"),
+      "--pattern"
+    );
+    expect(env.acceptedBy).toEqual([]);
+    expect(env.hint).toContain("ib dev cache pattern");
+  });
+
+  test("sibling enumeration is tier-gated (developer-only leaves stay hidden)", () => {
+    const devOnly = siblingsAcceptingOption("ib dev feedback create", "--status", "developer");
+    const standard = siblingsAcceptingOption("ib dev feedback create", "--status", "standard");
+    expect(devOnly.length).toBeGreaterThan(0); // feedback list/resolve take --status
+    expect(standard).toEqual([]); // …and are tier:"developer"
   });
 });
 

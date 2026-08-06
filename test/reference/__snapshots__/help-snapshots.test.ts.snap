@@ -8605,6 +8605,12 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Permission denied      → check auth.page.person.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - This command does NOT search by name — it enumerates and filters by role/company. To find a person by name or email use \`ib person search <query>\` (which also accepts \`--search\`).
+
+SEE ALSO
+  ib person search
+
 EXAMPLES
   ib person list
   ib person list --owned

@@ -37,7 +37,7 @@ export const DOMAIN_BLURBS = {
     company: "The tenant company your token acts as (multi-tenancy).",
     fennoa: "Fennoa accounting integration — PumiNet Oy purchase invoices (system admin).",
     schedule: "Date-scoped views of keikkas: today / a day / a week.",
-    stats: "Aggregated delivery statistics.",
+    stats: "Aggregated delivery statistics — `stats --all` is the only CROSS-TENANT (developer) rollup; use it instead of looping `keikka list --company` over companies.",
     opendata: "Free/open external-data APIs — building registries, FMI weather, PRH business registry.",
     jerry: "BetoniJerry RFQ marketplace: requests, offers, confirmation.",
     message: "Chat threads, the announcement board, and daily grid notes.",

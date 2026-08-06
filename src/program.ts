@@ -610,7 +610,7 @@ export function handleParseRejection(
         err.message?.match(/unknown option '([^']+)'/)?.[1] ||
         "";
       if (cmd && token) {
-        return emitUsageEnvelope(err, buildUnknownOptionEnvelope(cmd, token));
+        return emitUsageEnvelope(err, buildUnknownOptionEnvelope(cmd, token, getCallerTier()));
       }
     }
     const detail = (text || err.message || "usage error")
