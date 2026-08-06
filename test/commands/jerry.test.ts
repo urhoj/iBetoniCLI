@@ -215,6 +215,30 @@ describe("ib jerry check-address", () => {
     expect(body).not.toHaveProperty("explain");
     expect(body).not.toHaveProperty("asiakasId");
   });
+
+  // feedback #319: considered[] was swamped by company-gate (93 of 110 rows on
+  // the reported probe), so the server now omits it unless asked.
+  test("--gate forwards the reason list as `gates`", async () => {
+    post.mockResolvedValueOnce({ geocoded: true, considered: [] });
+    await runJerryCheckAddress(mockClient, {
+      address: "Kauppakatu 5, Jyväskylä",
+      explain: true,
+      gate: ["no-coords", "radius"],
+    });
+    const [, body] = post.mock.calls[0];
+    expect(body).toEqual({
+      osoite: "Kauppakatu 5, Jyväskylä",
+      explain: true,
+      gates: ["no-coords", "radius"],
+    });
+  });
+
+  test("no --gate leaves the key off, so the server default applies", async () => {
+    post.mockResolvedValueOnce({ geocoded: true, considered: [] });
+    await runJerryCheckAddress(mockClient, { address: "Sarkatie 7, Vantaa", explain: true, gate: [] });
+    const [, body] = post.mock.calls[0];
+    expect(body).not.toHaveProperty("gates");
+  });
 });
 
 describe("ib jerry provider-settings", () => {

@@ -156,6 +156,15 @@ export async function runJerryCounts(client, provider) {
         : "/api/pumppuRequests/mine/counts";
     return client.get(path);
 }
+/** Exclusion reasons `--explain` can report, in gate-priority order. */
+export const CHECK_ADDRESS_GATES = [
+    "company-gate",
+    "provider-dead",
+    "no-coords",
+    "not-enrolled",
+    "radius",
+    "boom",
+];
 /**
  * Anonymous geofence feasibility probe (POST /api/pumppuRequests/checkAddress).
  * Answers "does any provider varikko cover this address?" — the root-cause tool
@@ -184,6 +193,8 @@ export async function runJerryCheckAddress(client, opts) {
         body.requiredPuomi = opts.boom;
     if (opts.explain)
         body.explain = true;
+    if (opts.gate?.length)
+        body.gates = opts.gate;
     if (opts.asiakas !== undefined)
         body.asiakasId = opts.asiakas;
     return client.post("/api/pumppuRequests/checkAddress", body, { read: true });
@@ -562,6 +573,7 @@ export function registerJerryCommands(parent, getClient) {
         .option("--formatted-address <s>", "Google formatted address")
         .option("--boom <m>", "Required boom (m) — filters varikot by their puomiMin/puomiMax range (absent/0 = no boom filter)", Number)
         .option("--explain", "Add considered[] — per-varikko exclusion reasons for non-matching depots (developer/admin only)")
+        .option("--gate <csv>", `With --explain: only these exclusion reasons (${CHECK_ADDRESS_GATES.join("|")}). Default omits company-gate; pass it explicitly to see every candidate`, (v) => v.split(",").map((g) => g.trim()).filter(Boolean))
         .option("--asiakas <id>", "With --explain: force-include this company's varikot even if not yet Jerry-enabled (surfaces company-gate)", Number)
         .action(guarded(async (opts) => {
         // Reject a NaN --boom (e.g. Commander coercing "abc" → NaN) so the probe
@@ -579,6 +591,17 @@ export function registerJerryCommands(parent, getClient) {
             }
             if (!opts.explain) {
                 failWith("--asiakas only applies with --explain", 4);
+            }
+        }
+        if (opts.gate?.length) {
+            if (!opts.explain) {
+                failWith("--gate only applies with --explain", 4);
+            }
+            // Reject an unknown gate here rather than letting the server drop it —
+            // a silently-narrowed diagnostic reads as "nothing else is wrong".
+            const unknown = opts.gate.filter((g) => !CHECK_ADDRESS_GATES.includes(g));
+            if (unknown.length) {
+                failWith(`--gate: unknown reason(s) ${unknown.join(", ")} — valid: ${CHECK_ADDRESS_GATES.join(", ")}`, 4);
             }
         }
         const client = await getClient();

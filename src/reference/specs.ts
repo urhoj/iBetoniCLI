@@ -4215,26 +4215,32 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "formatted-address", type: "string", description: "Google formatted address" },
       { name: "boom", type: "number", description: "Required boom (m) — filters varikot by their puomiMin/puomiMax range (absent/0 = no boom filter)" },
       { name: "explain", type: "boolean", description: "Add considered[] — per-varikko exclusion reasons for non-matching depots (developer/admin only)" },
+      { name: "gate", type: "string", description: "With --explain: CSV of exclusion reasons to include (company-gate|provider-dead|no-coords|not-enrolled|radius|boom). Default omits company-gate" },
       { name: "asiakas", type: "number", description: "With --explain: force-include this company's varikot even if not yet Jerry-enabled (surfaces company-gate)" },
     ],
     outputShape:
-      "{ geocoded: boolean, deliverable?: boolean, lat?, lng?, placeId?, formattedAddress?, providerCount?, nearestVarikkoKm?, providers?: [{ asiakasId, asiakasNimi, distanceKm }], considered?: [{ asiakasId, asiakasNimi, sijaintiId, excludedBy: 'no-coords'|'company-gate'|'not-enrolled'|'radius'|'boom', detail }] }",
+      "{ geocoded: boolean, deliverable?: boolean, lat?, lng?, placeId?, formattedAddress?, providerCount?, nearestVarikkoKm?, providers?: [{ asiakasId, asiakasNimi, distanceKm }], considered?: [{ asiakasId, asiakasNimi, sijaintiId, excludedBy: 'company-gate'|'provider-dead'|'no-coords'|'not-enrolled'|'radius'|'boom', detail }], consideredSuppressed?: { [gate]: count } }",
     errors: [
       apiErr(400, "osoite missing", "pass --address"),
       { origin: "client", exit: 4, match: "--boom", meaning: "--boom not a non-negative number", remedy: "pass metres ≥ 0, or omit for no boom filter" },
       { origin: "client", exit: 4, match: "--asiakas", meaning: "--asiakas without --explain, or not a positive integer", remedy: "add --explain, or pass a positive asiakasId" },
+      { origin: "client", exit: 4, match: "--gate", meaning: "--gate without --explain, or an unknown reason name", remedy: "add --explain; valid reasons are company-gate, provider-dead, no-coords, not-enrolled, radius, boom" },
       apiErr(429, "Rate limit (20/min/IP)", "wait and retry"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     notes: [
       "A varikko counts toward providerCount only when ALL of these hold: the company has isPumppuToimittaja = 1, the company has the HAS_JERRY setting on (ib jerry admin enable), the sijainti is enrolled (jerryActiveUntil in the future, ib sijainti set-jerry --on) with maxDeliveryDistance covering the point, and — when a boom is stated — the sijainti boom range covers it (puomiMin <= boom <= puomiMax, NULL bound = unbounded).",
-      "--explain answers 'why no offers?': considered[] lists the NON-matching varikot (passing ones are in providers[]), each tagged with the FIRST gate it failed — no-coords → company-gate → not-enrolled → radius → boom. Business-sensitive, so returned only to developer/admin tokens, exactly like providers[]. The default candidate set is every isPumppuToimittaja=1 company's varikot; --asiakas <id> additionally pulls in one company's varikot even before it is enabled, so the company-gate reason is visible during onboarding.",
-      "Deploy-gated: --explain / --asiakas are inert until the backend adding considered[] deploys (older backends silently ignore the extra body fields).",
+      "--explain answers 'why no offers?': considered[] lists the NON-matching varikot (passing ones are in providers[]), each tagged with the FIRST gate it failed. Gate priority puts COMPANY-level reasons above DEPOT-level ones — company-gate → provider-dead → no-coords → not-enrolled → radius → boom — so the reason reported is the most upstream blocker, the one to fix first: adding coordinates to a depot changes nothing for a company that was never enrolled. Business-sensitive, so returned only to developer/admin tokens, exactly like providers[].",
+      "company-gate is OMITTED by default: it only says 'this company was never in the programme', and on a live Helsinki probe it was 93 of 110 rows across 17 companies, burying the actionable ones. Whatever is withheld is counted in consideredSuppressed, so nothing disappears silently. Pass --gate company-gate (alone or with others) to see it, or --asiakas <id> to surface it for ONE company during onboarding — which is when it is a real answer.",
+      "--gate narrows further: --gate no-coords,radius answers 'which enrolled depots are misconfigured?' without the rest. An unknown reason name exits 4 rather than silently narrowing the view, since a shorter list reads as 'nothing else is wrong'.",
+      "Deploy-gated: --explain / --gate / --asiakas are inert until the backend adding considered[] deploys (older backends silently ignore the extra body fields).",
     ],
+    seeAlso: ["ib jerry admin list"],
     examples: [
       "ib jerry check-address --address 'Mannerheimintie 1, Helsinki'",
       "ib jerry check-address --address 'Hämeenkatu 1, Tampere' --lat 61.498 --lng 23.761 --place-id ChIJxxxx",
       "ib jerry check-address --address 'Kauppakatu 5, Jyväskylä' --explain",
+      "ib jerry check-address --address 'Kauppakatu 5, Jyväskylä' --explain --gate no-coords,not-enrolled",
       "ib jerry check-address --address 'Kauppakatu 5, Jyväskylä' --explain --asiakas 812",
     ],
   },
@@ -4326,11 +4332,15 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     tier: "developer",
     flags: [],
     outputShape:
-      "ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, matchableVarikkoCount, sijaintiNonJerryCount }>. matchableVarikkoCount counts varikot that pass the REAL fan-out geofence (enrolled AND coords AND maxDeliveryDistance > 0); sijaintiJerryCount counts enrolment only, so matchableVarikkoCount 0 with sijaintiJerryCount > 0 means the company is Jerry-active but invisible to every tarjouspyyntö.",
+      "ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, sijaintiNonJerryCount, ajoneuvotEnabled, matchableVarikkoCount? }>. matchableVarikkoCount counts varikot that pass the REAL fan-out geofence (enrolled AND coords AND maxDeliveryDistance > 0); sijaintiJerryCount counts enrolment only, so matchableVarikkoCount 0 with sijaintiJerryCount > 0 means the company is Jerry-active but invisible to every tarjouspyyntö.",
     errors: [
       apiErr(403, "Not a system admin", "use a system-admin token"),
       ...COMMON_AUTH_ERRORS,
     ],
+    notes: [
+      "matchableVarikkoCount is DEPLOY-GATED (feedback #336): it exists in the backend source but is absent from the response until that deploy ships. Test for it before using the health check — `matchableVarikkoCount === 0` against a backend that omits the field compares undefined === 0, which is never true, so the check silently reports every company healthy. Until then, diagnose per address with `ib jerry check-address --explain`.",
+    ],
+    seeAlso: ["ib jerry check-address"],
     examples: ["ib jerry admin list", "ib jerry admin list --pretty"],
   },
   {
