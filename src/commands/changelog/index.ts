@@ -260,7 +260,7 @@ export function validateEnums(
  * `--vtag`→versionTag(200). description/benefits/files are nvarchar(max)
  * (unbounded, absent here); --sentry is pre-capped by normalizeSentryRef.
  */
-const FIELD_MAX_LENGTHS: Record<string, number> = {
+export const FIELD_MAX_LENGTHS: Record<string, number> = {
   title: 300,
   impact: 500,
   status: 30,
@@ -269,6 +269,22 @@ const FIELD_MAX_LENGTHS: Record<string, number> = {
   sha: 500,
   vtag: 200,
 };
+
+/**
+ * Stamp each bounded flag's cap onto its own spec description (feedback #330).
+ *
+ * The caps were documented ONLY in a trailing NOTES line, so a caller composing
+ * a payload — especially a `--from-json` file, whose key list repeats the field
+ * names without limits — writes an over-length value, gets rejected, trims by
+ * estimate, and can be rejected again. Derived from {@link FIELD_MAX_LENGTHS}
+ * so the help text can never drift from the validator that enforces it.
+ */
+function withMaxLengths(flags: CommandSpec["flags"]): CommandSpec["flags"] {
+  return (flags ?? []).map((f) => {
+    const cap = FIELD_MAX_LENGTHS[f.name];
+    return cap ? { ...f, description: `${f.description} (max ${cap} chars)` } : f;
+  });
+}
 
 /**
  * Reject over-length free-text flags BEFORE POSTing so they exit 4 (validation)
@@ -857,7 +873,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     auth: "any",
     tier: "developer",
     args: [{ name: "description", type: "string", description: "Kuvaus (or pass as --description) — free length, the column is nvarchar(max)" }],
-    flags: [
+    flags: withMaxLengths([
       {
         name: "type",
         type: "string",
@@ -934,9 +950,9 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         name: "from-json",
         type: "string",
         description:
-          "Read the whole entry from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase: description (or summary/body), title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language. files/repo/sha/commit also accept an array of strings. An unknown or wrong-typed key exits 4 (never silently dropped).",
+          "Read the whole entry from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase: description (or summary/body), title (≤300), type, area, benefits, impact (≤500), status (≤30), severity (≤20), files, repo (≤200), sha (≤500), commit, vtag (≤200), bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language. files/repo/sha/commit also accept an array of strings. An unknown or wrong-typed key exits 4 (never silently dropped). The length caps apply to a JSON value exactly as to a flag — --from-json sidesteps shell quoting, not column width.",
       },
-    ],
+    ]),
     writeFlags: true,
     mutates: true,
     outputShape: "{ changelogId } | { dryRun, wouldCreate, validation }",
@@ -1118,7 +1134,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         description: "Entry id — accepts an optional `cl#` anchor (e.g. `cl#858`); a `fb#` id is rejected (exit 4) with the feedback command to use (feedback #230)",
       },
     ],
-    flags: [
+    flags: withMaxLengths([
       {
         name: "type",
         type: "string",
@@ -1177,7 +1193,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         description:
           "Read the patch from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase (description/summary/body, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. An unknown or wrong-typed key exits 4 (never silently dropped).",
       },
-    ],
+    ]),
     writeFlags: true,
     mutates: true,
     outputShape: "entry",

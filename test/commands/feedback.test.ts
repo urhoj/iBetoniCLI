@@ -10,6 +10,7 @@ import {
   runFeedbackCount,
   resolveFeedbackCreateDescription,
   mergeFeedbackCreateInput,
+  mergeFeedbackResolveInput,
   registerFeedbackCommands,
 } from "../../src/commands/feedback/index.js";
 import { writeFileSync, unlinkSync } from "node:fs";
@@ -581,6 +582,68 @@ describe("ib feedback resolve", () => {
       runFeedbackResolve(mockClient, 1, { status: "bogus" })
     ).rejects.toThrowError(CliError);
     expect(put).not.toHaveBeenCalled();
+  });
+
+  // feedback #327: a resolution note quotes commands/SQL/errors, so it hits the
+  // same PowerShell argv-splitting hazard --from-json was added to `create` for.
+  describe("--from-json (feedback #327)", () => {
+    const withJsonFile = async (payload: unknown, fn: (path: string) => Promise<void>) => {
+      const p = join(tmpdir(), `ib-resolve-fromjson-${process.pid}.json`);
+      writeFileSync(p, JSON.stringify(payload), "utf8");
+      try { await fn(p); } finally { unlinkSync(p); }
+    };
+
+    test("precedence: an explicitly-typed flag beats the JSON, JSON beats absent", () => {
+      expect(mergeFeedbackResolveInput({ status: "applied" }, {}).status).toBe("applied");
+      expect(mergeFeedbackResolveInput({ status: "applied" }, { status: "dismissed" }).status).toBe("dismissed");
+      expect(mergeFeedbackResolveInput({}, {}).status).toBeUndefined();
+    });
+
+    test("a note in JSON and a different one on argv are both kept (mergeNoteFlags semantics)", () => {
+      const merged = mergeFeedbackResolveInput({ note: "from file" }, { reason: "from argv" });
+      expect(merged.note).toBe("from file\n\nfrom argv");
+    });
+
+    test("a quote-bearing note round-trips byte-intact through the file", async () => {
+      put.mockResolvedValueOnce({ feedbackId: 320, status: "dismissed" });
+      const note =
+        'Not reproducible. Re-ran \'ib jerry check-address --address "X, Sipoo" --explain\': 665 ms, exit 0.';
+      await withJsonFile({ status: "dismissed", note }, async (p) => {
+        const program = new Command();
+        registerFeedbackCommands(program, async () => mockClient);
+        await program.parseAsync(["feedback", "resolve", "320", "--from-json", p], { from: "user" });
+      });
+      expect(put).toHaveBeenCalledWith("/api/feedback/320", {
+        status: "dismissed",
+        resolution: note,
+      });
+    });
+
+    test("an explicit --status overrides the file's status", async () => {
+      put.mockResolvedValueOnce({ feedbackId: 5, status: "applied" });
+      await withJsonFile({ status: "dismissed", note: "n" }, async (p) => {
+        const program = new Command();
+        registerFeedbackCommands(program, async () => mockClient);
+        await program.parseAsync(
+          ["feedback", "resolve", "5", "--from-json", p, "--status", "applied"],
+          { from: "user" }
+        );
+      });
+      expect(put).toHaveBeenCalledWith("/api/feedback/5", { status: "applied", resolution: "n" });
+    });
+
+    test("`resolution` is accepted as a JSON key (same alias set as the flags)", async () => {
+      put.mockResolvedValueOnce({ feedbackId: 6, status: "applied" });
+      await withJsonFile({ status: "applied", resolution: "via the output field name" }, async (p) => {
+        const program = new Command();
+        registerFeedbackCommands(program, async () => mockClient);
+        await program.parseAsync(["feedback", "resolve", "6", "--from-json", p], { from: "user" });
+      });
+      expect(put).toHaveBeenCalledWith("/api/feedback/6", {
+        status: "applied",
+        resolution: "via the output field name",
+      });
+    });
   });
 
   test("--resolution is an alias for --note (matches the output field name; feedback #203)", async () => {

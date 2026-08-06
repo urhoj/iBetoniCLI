@@ -5588,13 +5588,18 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "note", type: "string", description: "Resolution note stored on the row" },
       { name: "reason", type: "string", description: "Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header" },
       { name: "resolution", type: "string", description: "Alias for --note (matches the output field name); distinct values across the three note flags are merged into one note" },
+      { name: "from-json", type: "string", description: "Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: status, note (or reason/resolution). Shell-safe: the only way to pass a note containing quotes on Windows PowerShell." },
       { name: "dry-run", type: "boolean", description: "Print the update body without sending (client-side)" },
       { name: "full", type: "boolean", description: "Return the full updated row instead of the compact ack" },
     ],
     outputShape:
       "A compact ack { feedbackId, status, updatedAt, resolution } (resolution capped at 200 chars; the full row with --full). A note-only call that leaves the row open/reviewed adds hint naming the closing statuses. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
     errors: [
-      { origin: "client", exit: 4, meaning: "Validation", remedy: "provide --status and/or --note; status must be a known value" },
+      // Both client rows sit at exit 4, so EACH must carry `match` — an
+      // unmatched row would win by exit alone and serve the wrong remedy
+      // (the fb#305/#306 ambiguity).
+      { origin: "client", exit: 4, match: ["provide --status", "--status must be one of"], meaning: "Validation", remedy: "provide --status and/or --note; status must be a known value" },
+      { origin: "client", exit: 4, match: "too many arguments", meaning: "The shell split the note on its inner double-quotes (typical on Windows PowerShell)", remedy: "pass the note via --from-json <file|-> instead of argv" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(404, "Not found", "check the id via `ib dev feedback list` — a bare id that is actually a changelog id 404s here and the error hint names the changelog command (feedback #230)"),
       apiErr(500, "Backend error", "retry with --verbose"),
@@ -5603,11 +5608,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "--note/--reason/--resolution write the SAME stored note. Passing several with different values merges them (joined in note→resolution→reason order) instead of dropping any — so mixing up --reason with the audit header loses nothing.",
       "A note WITHOUT --status does NOT close the row — it stays open/reviewed and the ack carries a hint saying so; pass --status applied|dismissed to close (feedback #270).",
       "The two ways to close a row have OPPOSITE defaults, so don't assume this one closes: `ib dev changelog add --feedback <id>` closes it for you (status=applied plus a `Shipped: changelog #N` resolution), while this command leaves the status alone unless you pass --status. Recording the fix in the changelog is the one-call path (feedback #293).",
+      "SHELL QUOTING (feedback #327): a resolution note explains what was fixed, so it is exactly the text most likely to quote commands, SQL and error strings — and Windows PowerShell splits a native argument on those inner quotes. The CLI then sees extra positionals and exits 4, or (when no split fragment starts with `-`) stores a note TRUNCATED at the first quote. Use --from-json <file|-> for any long or quote-bearing note; it sidesteps argv entirely.",
     ],
     seeAlso: ["ib dev changelog add", "ib dev feedback list"],
     examples: [
       'ib dev feedback resolve 42 --status applied --note "added row counts in CLI v1.3"',
       'ib dev feedback resolve 42 --status dismissed --note "by design"',
+      "ib dev feedback resolve 42 --from-json ./resolution.json",
+      "ib dev feedback resolve 42 --from-json ./resolution.json --status dismissed",
     ],
   },
   {

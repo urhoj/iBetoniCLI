@@ -302,6 +302,27 @@ function compactAck(row) {
         ack.resolution = truncateField(row.resolution).value;
     return ack;
 }
+/** Fields a `resolve --from-json` object may supply (drives explicit-flag detection). */
+export const RESOLVE_FROM_JSON_FIELDS = ["status", "note", "reason", "resolution"];
+/**
+ * Merge a `resolve --from-json` object with the CLI flags (feedback #327).
+ *
+ * Same precedence as `create`: an explicitly-typed flag wins over the JSON.
+ * `resolve` has no Commander defaults, so there is no third rung — an absent
+ * flag is simply absent. The three note aliases are merged AFTER the merge, so
+ * a note supplied in JSON and a different one typed on argv are both kept,
+ * exactly as `mergeNoteFlags` does for three argv flags.
+ */
+export function mergeFeedbackResolveInput(json, explicit) {
+    const pick = (k) => {
+        const v = explicit[k] ?? json[k];
+        return v === undefined || v === null ? undefined : String(v);
+    };
+    return {
+        status: pick("status"),
+        note: mergeNoteFlags(pick("note"), pick("resolution"), pick("reason")),
+    };
+}
 /**
  * --note / --reason / --resolution are aliases for the same stored note. When a
  * caller passes more than one with DIFFERENT values — natural for an AI, since
@@ -468,14 +489,23 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .option("--note <text>", "Resolution note stored on the row")
         .option("--reason <text>", "Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header")
         .option("--resolution <text>", "Alias for --note (matches the output field name); distinct values across the three note flags are merged into one note")
+        .option("--from-json <file>", "Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: status, note (or reason/resolution). Shell-safe: the only way to pass a note containing quotes on Windows PowerShell.")
         .option("--dry-run", "Print the update body without sending (client-side)")
         .option("--full", "Return the full updated row (default: a compact ack)")
-        .action(guarded(async (idStr, opts) => {
+        .action(guarded(async (idStr, opts, cmd) => {
         const id = parseRefId(idStr, "feedback", "resolve");
+        // Only EXPLICITLY-typed flags outrank the JSON object (feedback #327).
+        const explicit = {};
+        for (const k of RESOLVE_FROM_JSON_FIELDS) {
+            if (cmd.getOptionValueSource(k) === "cli") {
+                explicit[k] = opts[k];
+            }
+        }
+        const merged = mergeFeedbackResolveInput(opts.fromJson ? readJsonObjectInput(opts.fromJson) : {}, explicit);
         const client = await getClient();
         writeJson(await runWithSiblingHint(client, id, "changelog", () => runFeedbackResolve(client, id, {
-            status: opts.status,
-            note: mergeNoteFlags(opts.note, opts.resolution, opts.reason),
+            status: merged.status,
+            note: merged.note,
             dryRun: opts.dryRun,
             full: opts.full,
         })));

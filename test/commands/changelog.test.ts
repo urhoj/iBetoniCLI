@@ -2,7 +2,7 @@ import { test, expect, vi, beforeEach, describe } from "vitest";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, runChangelogDelete, normalizeSentryRef, normalizeLanguage, normalizeType, validateEnums, validateFieldLengths, resolveChangelogDescription, resolveShaAlias }
+import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, runChangelogDelete, normalizeSentryRef, normalizeLanguage, normalizeType, validateEnums, validateFieldLengths, resolveChangelogDescription, resolveShaAlias, CHANGELOG_SPECS, FIELD_MAX_LENGTHS }
   from "../../src/commands/changelog/index.js";
 import { readJsonInput } from "../../src/api/parseBody.js";
 import type { ChangelogAddBody } from "../../src/commands/changelog/index.js";
@@ -366,6 +366,30 @@ describe("validateFieldLengths — bounded free-text caps (fb#206)", () => {
     expect(() =>
       validateFieldLengths({ status: "Deployed", title: "short title", repo: "puminet5api" })
     ).not.toThrow();
+  });
+
+  // fb#330: the caps were documented only in a trailing NOTES line, so a payload
+  // was written over-length, rejected, trimmed by estimate, and rejected again.
+  // The help text is derived from the same map the validator uses, so the two
+  // cannot drift — assert that, not the literal numbers.
+  test("every bounded flag states its cap in its own spec description, matching the validator", () => {
+    for (const command of ["ib dev changelog add", "ib dev changelog update"]) {
+      const spec = CHANGELOG_SPECS.find((s) => s.command === command);
+      expect(spec, `${command} spec missing`).toBeDefined();
+      for (const [flag, cap] of Object.entries(FIELD_MAX_LENGTHS)) {
+        const row = spec!.flags?.find((f) => f.name === flag);
+        if (!row) continue; // not every bounded flag exists on both commands
+        expect(row.description, `${command} --${flag}`).toContain(`max ${cap} chars`);
+      }
+    }
+  });
+
+  test("unbounded flags gain no cap text", () => {
+    const spec = CHANGELOG_SPECS.find((s) => s.command === "ib dev changelog add")!;
+    for (const flag of ["description", "benefits", "files"]) {
+      const row = spec.flags?.find((f) => f.name === flag);
+      if (row) expect(row.description).not.toMatch(/max \d+ chars/);
+    }
   });
 
   // fb#305: a hintless failWith here inherited the command's FIRST client exit-4
