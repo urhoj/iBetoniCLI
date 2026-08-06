@@ -273,7 +273,7 @@ export function buildProgram() {
         if (opts.domain)
             assertKnownDomain(COMMAND_SPECS, opts.domain);
         const client = await getClient();
-        writeJson(await runReferenceDetailList(client, opts.stalest, opts.domain, opts.withDetail ?? false, opts.needsReview ?? false, opts.maxConfidence, opts.search, opts.orphans ?? false));
+        writeJson(await runReferenceDetailList(client, opts));
     }));
     const detailSet = detail
         .command("set")

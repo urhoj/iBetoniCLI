@@ -54,21 +54,33 @@ export interface ReferenceDetailListResult {
   count: number;
 }
 
+/**
+ * Filters for {@link runReferenceDetailList}. Keys mirror the Commander option
+ * names of `ib reference detail list` — the eight-positional signature this
+ * replaced made every call site a run of bare `undefined, false, undefined`
+ * placeholders whose meaning could only be read off the declaration.
+ *
+ * `search` / `orphans` are CLIENT-SIDE filters (fb#164) applied after the fetch
+ * so no backend change is needed, mirroring `runReferenceDetailLint`: `search`
+ * keeps rows whose command PATH contains the substring (the `LIKE` an exec-only
+ * caller can't run); `orphans` keeps only rows whose command no longer exists in
+ * the live spec catalogue (the discover half of the discover→delete flow).
+ */
+export interface ReferenceDetailListOptions {
+  stalest?: number;
+  domain?: string;
+  withDetail?: boolean;
+  needsReview?: boolean;
+  maxConfidence?: number;
+  search?: string;
+  orphans?: boolean;
+}
+
 export async function runReferenceDetailList(
   client: ApiClient,
-  stalest?: number,
-  domain?: string,
-  withDetail = false,
-  needsReview = false,
-  maxConfidence?: number,
-  // Client-side discovery filters (fb#164) — applied AFTER the fetch so no
-  // backend change is needed, mirroring `runReferenceDetailLint`. `search` keeps
-  // rows whose command PATH contains the substring (the `LIKE` an exec-only
-  // caller can't run); `orphans` keeps only rows whose command no longer exists
-  // in the live spec catalogue (the discover half of the discover→delete flow).
-  search?: string,
-  orphans = false
+  opts: ReferenceDetailListOptions = {}
 ): Promise<ReferenceDetailListResult> {
+  const { stalest, domain, withDetail, needsReview, maxConfidence, search, orphans } = opts;
   const res = await client.get<ReferenceDetailListResult>(
     `/api/cli/command-catalog${qs({
       stalest: stalest || undefined,

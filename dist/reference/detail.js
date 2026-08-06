@@ -24,13 +24,8 @@ export async function runReferenceDetail(client, commandParts, tier = getCallerT
     const command = resolveCommand(commandParts, tier);
     return client.get(`/api/cli/command-catalog/${encodeURIComponent(command)}`);
 }
-export async function runReferenceDetailList(client, stalest, domain, withDetail = false, needsReview = false, maxConfidence, 
-// Client-side discovery filters (fb#164) — applied AFTER the fetch so no
-// backend change is needed, mirroring `runReferenceDetailLint`. `search` keeps
-// rows whose command PATH contains the substring (the `LIKE` an exec-only
-// caller can't run); `orphans` keeps only rows whose command no longer exists
-// in the live spec catalogue (the discover half of the discover→delete flow).
-search, orphans = false) {
+export async function runReferenceDetailList(client, opts = {}) {
+    const { stalest, domain, withDetail, needsReview, maxConfidence, search, orphans } = opts;
     const res = await client.get(`/api/cli/command-catalog${qs({
         stalest: stalest || undefined,
         domain: domain || undefined,

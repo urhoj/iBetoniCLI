@@ -1,27 +1,18 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { writeJson, failWith } from "../../output/json.js";
+import { writeJson } from "../../output/json.js";
 import { guarded } from "../_shared/action.js";
+import {
+  addPointSourceOptions,
+  assertSinglePointSource,
+  pointSourceParams,
+  selectedPointSources,
+  type PointSourceOptions,
+} from "../_shared/pointSource.js";
 import { qs } from "../../api/query.js";
 
-export interface BuildingLookupOptions {
-  sijainti?: number;
-  worksite?: number;
-  tyomaa?: number;
-  lat?: number;
-  lng?: number;
-  address?: string;
+export interface BuildingLookupOptions extends PointSourceOptions {
   city?: string;
-}
-
-/** Distinct primary coordinate sources the caller supplied (exactly one allowed). */
-function selectedSources(opts: BuildingLookupOptions): string[] {
-  const sources: string[] = [];
-  if (opts.sijainti !== undefined) sources.push("sijainti");
-  if (opts.worksite !== undefined || opts.tyomaa !== undefined) sources.push("worksite");
-  if (opts.lat !== undefined || opts.lng !== undefined) sources.push("coords");
-  if (opts.address !== undefined) sources.push("address");
-  return sources;
 }
 
 /**
@@ -36,11 +27,7 @@ export async function runBuildingLookup(
 ): Promise<Record<string, unknown>> {
   return client.get<Record<string, unknown>>(
     `/api/cli/opendata/building/lookup${qs({
-      sijainti: opts.sijainti,
-      worksite: opts.worksite ?? opts.tyomaa,
-      lat: opts.lat,
-      lng: opts.lng,
-      address: opts.address,
+      ...pointSourceParams(opts),
       city: opts.city,
     })}`
   );
@@ -51,36 +38,16 @@ export function registerBuildingCommands(
   parent: Command,
   getClient: () => Promise<ApiClient>
 ): void {
-  parent
-    .command("building")
-    .option("--sijainti <id>", "Resolve coordinates from a sijainti id", Number)
-    .option("--worksite <tyomaaId>", "Resolve coordinates from a worksite (tenant-scoped)", Number)
-    .option("--tyomaa <tyomaaId>", "Alias for --worksite", Number)
-    .option("--lat <n>", "Latitude (WGS84) — pair with --lng", Number)
-    .option("--lng <n>", "Longitude (WGS84) — pair with --lat", Number)
-    .option("--address <s>", "Street address to geocode")
+  addPointSourceOptions(parent.command("building"))
     .option(
       "--city <name>",
       "Helsinki | Vantaa | Espoo | HSY | Ryhti (override; otherwise derived/auto-tried then national Ryhti fallback)"
     )
     .action(guarded(async (opts: BuildingLookupOptions) => {
-      const sources = selectedSources(opts);
-      if (sources.length === 0) {
-        failWith("provide exactly one of: --sijainti, --worksite, --lat+--lng, or --address", 4);
-      }
-      if (sources.length > 1) {
-        failWith(`provide exactly one primary source (got: ${sources.join(", ")})`, 4);
-      }
-      if (sources[0] === "coords" && (opts.lat === undefined || opts.lng === undefined)) {
-        failWith("--lat and --lng must be provided together", 4);
-      }
-      if (
-        opts.worksite !== undefined &&
-        opts.tyomaa !== undefined &&
-        opts.worksite !== opts.tyomaa
-      ) {
-        failWith("--worksite and --tyomaa disagree; pass only one", 4);
-      }
+      assertSinglePointSource(opts, selectedPointSources(opts), {
+        none: "provide exactly one of: --sijainti, --worksite, --lat+--lng, or --address",
+        multiple: (got) => `provide exactly one primary source (got: ${got})`,
+      });
       const client = await getClient();
       writeJson(await runBuildingLookup(client, opts));
     }));

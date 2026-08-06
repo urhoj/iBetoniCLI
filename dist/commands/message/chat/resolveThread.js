@@ -1,4 +1,21 @@
 import { CliError } from "../../../api/errors.js";
+import { parseOptionalId } from "../../../targets.js";
+/**
+ * Attach `--tarjous <id>` — the alternative to a raw threadId positional that
+ * every thread-targeting leaf in `ib message chat` / `ib message thread`
+ * accepts. One declaration so the flag name and its wording cannot drift
+ * across the dozen leaves that offer it.
+ */
+export function addThreadTargetOption(cmd) {
+    return cmd.option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
+}
+/** Build the {@link ThreadTarget} from a positional threadId + the `--tarjous` option. */
+export function targetFrom(threadIdStr, opts) {
+    return {
+        thread: parseOptionalId(threadIdStr, "threadId"),
+        tarjous: opts.tarjous,
+    };
+}
 /**
  * Resolve a {@link ThreadTarget} to a concrete threadId.
  *

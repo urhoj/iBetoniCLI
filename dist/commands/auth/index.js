@@ -3,7 +3,7 @@ import { createStore, defaultCredentialsPath } from "../../auth/store.js";
 import { performLogin } from "../../auth/login.js";
 import { performLogout } from "../../auth/logout.js";
 import { renderWhoami } from "../../auth/whoami.js";
-import { performSwitch, assertPersistedSwitchAllowed, } from "../../auth/switch.js";
+import { assertPersistedSwitchAllowed, runPersistedSwitch, } from "../../auth/switch.js";
 import { refreshAndPersistSession } from "../../auth/refresh.js";
 import { decodeJwtPayload, impersonationFromClaims } from "../../auth/jwt.js";
 import { resolveAuth } from "../../auth/resolve.js";
@@ -134,30 +134,7 @@ export function registerAuthCommands(parent, isReadOnly) {
         .command("switch")
         .requiredOption("--to <asiakasId>", "Target asiakasId", (v) => Number(v))
         .action(guarded(async (opts) => {
-        assertPersistedSwitchAllowed(isReadOnly());
-        const store = createStore(defaultCredentialsPath());
-        const creds = await store.load();
-        if (!creds) {
-            failWith("Not logged in. Run `ib auth login` first.", 2);
-        }
-        const next = await performSwitch({
-            endpoint: creds.endpoint,
-            jwt: creds.jwt,
-            toAsiakasId: opts.to,
-        });
-        await store.save({
-            ...creds,
-            jwt: next.jwt,
-            ownerAsiakasId: next.ownerAsiakasId,
-            ownerAsiakasName: next.ownerAsiakasName,
-        });
-        writeJson({
-            ok: true,
-            activeCompany: {
-                asiakasId: next.ownerAsiakasId,
-                name: next.ownerAsiakasName,
-            },
-        });
+        writeJson(await runPersistedSwitch(opts.to, isReadOnly()));
     }));
     auth
         .command("refresh")

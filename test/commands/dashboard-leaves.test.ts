@@ -4,7 +4,12 @@ import { describe, test, expect, vi, beforeEach } from "vitest";
 // `runSijaintiDashboard` can be tested as thin forwarding wrappers (the
 // orchestrator itself — point resolution + the 7-panel fan-out — is already
 // covered by src/commands/_shared/__tests__/addressDashboard.test.ts).
-vi.mock("../../src/commands/_shared/addressDashboard.js", () => ({
+//
+// PARTIAL mock: `registerDashboardCommand` lives in the same module and must
+// stay REAL — the exactly-one-of guard it registers is what the `runArgv`
+// block below exercises.
+vi.mock("../../src/commands/_shared/addressDashboard.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/commands/_shared/addressDashboard.js")>()),
   runAddressDashboard: vi.fn(),
 }));
 

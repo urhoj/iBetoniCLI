@@ -1,5 +1,7 @@
+import type { Command } from "commander";
 import type { ApiClient } from "../../../api/client.js";
 import { CliError } from "../../../api/errors.js";
+import { parseOptionalId } from "../../../targets.js";
 
 /** How a command targets a thread: a raw id, or a pumppuRequest to resolve. */
 export interface ThreadTarget {
@@ -7,6 +9,31 @@ export interface ThreadTarget {
   thread?: number;
   /** A pumppuRequestId — resolved to its thread via GET /threads/mine. */
   tarjous?: number;
+}
+
+/**
+ * Attach `--tarjous <id>` — the alternative to a raw threadId positional that
+ * every thread-targeting leaf in `ib message chat` / `ib message thread`
+ * accepts. One declaration so the flag name and its wording cannot drift
+ * across the dozen leaves that offer it.
+ */
+export function addThreadTargetOption(cmd: Command): Command {
+  return cmd.option(
+    "--tarjous <id>",
+    "Resolve the thread from this pumppuRequestId",
+    Number
+  );
+}
+
+/** Build the {@link ThreadTarget} from a positional threadId + the `--tarjous` option. */
+export function targetFrom(
+  threadIdStr: string | undefined,
+  opts: { tarjous?: number }
+): ThreadTarget {
+  return {
+    thread: parseOptionalId(threadIdStr, "threadId"),
+    tarjous: opts.tarjous,
+  };
 }
 
 /** Minimal shape of a /threads/mine row used for resolution. */

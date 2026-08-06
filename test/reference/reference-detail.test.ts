@@ -101,7 +101,7 @@ describe("runReferenceDetail", () => {
 
   test("runReferenceDetailList passes stalest query param", async () => {
     const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
-    await runReferenceDetailList(c, 10);
+    await runReferenceDetailList(c, { stalest: 10 });
     expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10");
   });
 
@@ -113,25 +113,25 @@ describe("runReferenceDetail", () => {
 
   test("runReferenceDetailList forwards the domain filter alongside stalest", async () => {
     const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
-    await runReferenceDetailList(c, 10, "attachment");
+    await runReferenceDetailList(c, { stalest: 10, domain: "attachment" });
     expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10&domain=attachment");
   });
 
   test("runReferenceDetailList sends domain alone when no stalest", async () => {
     const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
-    await runReferenceDetailList(c, undefined, "attachment");
+    await runReferenceDetailList(c, { domain: "attachment" });
     expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog?domain=attachment");
   });
 
   test("runReferenceDetailList appends withDetail=1 when requested", async () => {
     const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
-    await runReferenceDetailList(c, 10, "attachment", true);
+    await runReferenceDetailList(c, { stalest: 10, domain: "attachment", withDetail: true });
     expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10&domain=attachment&withDetail=1");
   });
 
   test("runReferenceDetailList omits withDetail when false (default slim shape)", async () => {
     const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
-    await runReferenceDetailList(c, 10, undefined, false);
+    await runReferenceDetailList(c, { stalest: 10 });
     expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10");
   });
 
@@ -157,14 +157,14 @@ describe("runReferenceDetail", () => {
 
     test("--search keeps only rows whose command PATH contains the substring (case-insensitive) and recomputes count", async () => {
       const c = client({ get: vi.fn().mockResolvedValue(CATALOG) });
-      const out = await runReferenceDetailList(c, undefined, undefined, false, false, undefined, "DEV BUG");
+      const out = await runReferenceDetailList(c, { search: "DEV BUG" });
       expect(out.items.map((r) => r.command)).toEqual(["ib dev bug create", "ib dev bug list"]);
       expect(out.count).toBe(2);
     });
 
     test("--orphans keeps only rows whose command is absent from the live spec catalogue", async () => {
       const c = client({ get: vi.fn().mockResolvedValue(CATALOG) });
-      const out = await runReferenceDetailList(c, undefined, undefined, false, false, undefined, undefined, true);
+      const out = await runReferenceDetailList(c, { orphans: true });
       expect(out.items.map((r) => r.command)).toEqual(["ib dev bug create", "ib dev bug list"]);
       expect(out.count).toBe(2);
       // live commands survive the round-trip and are NOT flagged as orphans
@@ -173,7 +173,7 @@ describe("runReferenceDetail", () => {
 
     test("--search and --orphans compose (AND)", async () => {
       const c = client({ get: vi.fn().mockResolvedValue(CATALOG) });
-      const out = await runReferenceDetailList(c, undefined, undefined, false, false, undefined, "create", true);
+      const out = await runReferenceDetailList(c, { search: "create", orphans: true });
       expect(out.items.map((r) => r.command)).toEqual(["ib dev bug create"]);
       expect(out.count).toBe(1);
     });

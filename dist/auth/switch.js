@@ -1,4 +1,6 @@
 import { CliError, exitCodeFromStatus } from "../api/errors.js";
+import { createStore, defaultCredentialsPath } from "./store.js";
+import { failWith } from "../output/json.js";
 /**
  * Guard for PERSISTED company switches (`ib auth switch` / `ib company switch`)
  * under the session write-lock. These bypass `createApiClient` (credential-store
@@ -42,6 +44,42 @@ export async function performSwitch(opts) {
         jwt: body.token,
         ownerAsiakasId: body.ownerAsiakasId,
         ownerAsiakasName: body.ownerAsiakasName,
+    };
+}
+/**
+ * The whole PERSISTED company switch, end to end: read-only guard → load the
+ * credentials profile → {@link performSwitch} → persist the rotated JWT and the
+ * new owner identity → return the `ok`/`activeCompany` envelope.
+ *
+ * `ib auth switch` and `ib company switch` are the same operation reached from
+ * two groups (the `company` path is the discoverable one; the `auth` path sits
+ * beside the other credential-store commands), so they share this body rather
+ * than each keeping a copy that can drift.
+ */
+export async function runPersistedSwitch(toAsiakasId, isReadOnly) {
+    assertPersistedSwitchAllowed(isReadOnly);
+    const store = createStore(defaultCredentialsPath());
+    const creds = await store.load();
+    if (!creds) {
+        failWith("Not logged in. Run `ib auth login` first.", 2);
+    }
+    const next = await performSwitch({
+        endpoint: creds.endpoint,
+        jwt: creds.jwt,
+        toAsiakasId,
+    });
+    await store.save({
+        ...creds,
+        jwt: next.jwt,
+        ownerAsiakasId: next.ownerAsiakasId,
+        ownerAsiakasName: next.ownerAsiakasName,
+    });
+    return {
+        ok: true,
+        activeCompany: {
+            asiakasId: next.ownerAsiakasId,
+            name: next.ownerAsiakasName,
+        },
     };
 }
 //# sourceMappingURL=switch.js.map

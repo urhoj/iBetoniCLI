@@ -1,5 +1,8 @@
+import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { failWith } from "../../output/json.js";
+import { failWith, writeJson } from "../../output/json.js";
+import { parseId } from "../../targets.js";
+import { guarded } from "./action.js";
 import { extractGeocodeLatLng } from "./geocode.js";
 
 /**
@@ -307,4 +310,47 @@ export async function runAddressDashboard(
       vehicles,
     }),
   };
+}
+
+/**
+ * The per-command half of the dashboard: which entity the positional names, and
+ * how that id reaches {@link runAddressDashboard}'s tagged input.
+ */
+export interface DashboardCommandConfig {
+  /** Positional id argument name, e.g. `tyomaaId` / `sijaintiId`. */
+  idArg: string;
+  /** `--address` description (each command names its own id in the contrast). */
+  addressDescription: string;
+  run: (
+    client: ApiClient,
+    id: number | undefined,
+    address: string | undefined
+  ) => Promise<AddressDashboardReport>;
+}
+
+/**
+ * Register a `dashboard [<idArg>]` leaf. `ib worksite dashboard` and
+ * `ib sijainti dashboard` are the same command over a different entity id, so
+ * they share the exactly-one-of guard — the pair of checks that must stay
+ * symmetrical (neither given, and both given) and had been copied verbatim.
+ */
+export function registerDashboardCommand(
+  parent: Command,
+  getClient: () => Promise<ApiClient>,
+  cfg: DashboardCommandConfig
+): void {
+  parent
+    .command(`dashboard [${cfg.idArg}]`)
+    .option("--address <address>", cfg.addressDescription)
+    .action(guarded(async (idStr: string | undefined, opts: { address?: string }) => {
+      if (idStr !== undefined && opts.address !== undefined) {
+        failWith(`pass exactly one of <${cfg.idArg}> or --address, not both`, 4);
+      }
+      if (idStr === undefined && opts.address === undefined) {
+        failWith(`pass exactly one of <${cfg.idArg}> or --address`, 4);
+      }
+      const id = idStr !== undefined ? parseId(idStr, cfg.idArg) : undefined;
+      const client = await getClient();
+      writeJson(await cfg.run(client, id, opts.address));
+    }));
 }

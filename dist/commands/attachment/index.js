@@ -263,10 +263,7 @@ export function registerAttachmentCommands(parent, getClient) {
     addEntityFlags(listCmd).action(guarded(async (opts) => {
         const client = await getClient();
         const target = resolveEntityTarget(opts);
-        const { groupId, typeId } = await resolveGroupAndType(client, {
-            group: opts.group,
-            type: opts.type,
-        });
+        const { groupId, typeId } = await resolveGroupAndType(client, opts);
         writeJson(await runAttachmentList(client, target, { groupId, typeId, limit: opts.limit }));
     }));
     a.command("get <attachmentId>")
@@ -290,10 +287,7 @@ export function registerAttachmentCommands(parent, getClient) {
     addEntityFlags(uploadCmd);
     addWriteFlagsToCommand(uploadCmd).action(guarded(async (file, opts) => {
         const client = await getClient();
-        const { groupId, typeId } = await resolveGroupAndType(client, {
-            group: opts.group,
-            type: opts.type,
-        });
+        const { groupId, typeId } = await resolveGroupAndType(client, opts);
         writeJson(await runAttachmentUpload(client, file, opts, {
             dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
             comment: opts.comment, mime: opts.mime,
@@ -318,10 +312,7 @@ export function registerAttachmentCommands(parent, getClient) {
     addWriteFlagsToCommand(registerCmd).action(guarded(async (opts) => {
         const client = await getClient();
         const target = resolveEntityTarget(opts);
-        const { groupId, typeId } = await resolveGroupAndType(client, {
-            group: opts.group,
-            type: opts.type,
-        });
+        const { groupId, typeId } = await resolveGroupAndType(client, opts);
         writeJson(await runAttachmentRegister(client, {
             fileName: opts.name, origFileName: opts.origName,
             fileFolder: opts.folder, fileType: opts.mime,
@@ -350,10 +341,7 @@ export function registerAttachmentCommands(parent, getClient) {
         .option("--type <t>", "Attachment type (name or id — see `ib attachment types`)");
     addWriteFlagsToCommand(updateCmd).action(guarded(async (id, opts) => {
         const client = await getClient();
-        const { groupId, typeId } = await resolveGroupAndType(client, {
-            group: opts.group,
-            type: opts.type,
-        });
+        const { groupId, typeId } = await resolveGroupAndType(client, opts);
         writeJson(await runAttachmentUpdate(client, Number(id), {
             fileComment: opts.comment,
             liitaLaskuun: opts.liitaLaskuun,

@@ -1,8 +1,7 @@
 import { addWriteFlagsToCommand, writeFlagsToHeaders } from "../../../api/writeFlags.js";
 import { writeJson } from "../../../output/json.js";
 import { guarded } from "../../_shared/action.js";
-import { resolveThreadId } from "../chat/resolveThread.js";
-import { parseOptionalId } from "../../../targets.js";
+import { addThreadTargetOption, resolveThreadId, targetFrom, } from "../chat/resolveThread.js";
 // --dry-run on every thread write resolves CLIENT-SIDE: the messages routes
 // honour no X-Dry-Run (messageRoutes.js has no guard), so a dry-run that POSTed
 // would actually persist (fb#244; same footgun class as fb#76). Each run* fn
@@ -52,51 +51,41 @@ export function registerMessageThreadCommands(parent, getClient) {
     const t = parent
         .command("thread")
         .description("Thread lifecycle: archive/reopen, rename, participants (manager-gated)");
-    const archiveCmd = t
-        .command("archive [threadId]")
-        .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
+    const archiveCmd = addThreadTargetOption(t.command("archive [threadId]"));
     addWriteFlagsToCommand(archiveCmd).action(guarded(async (idStr, opts) => {
         const client = await getClient();
-        const id = await resolveThreadId(client, { thread: parseOptionalId(idStr, "threadId"), tarjous: opts.tarjous });
+        const id = await resolveThreadId(client, targetFrom(idStr, opts));
         writeJson(await runThreadArchive(client, id, opts));
     }));
-    const reopenCmd = t
-        .command("reopen [threadId]")
-        .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
+    const reopenCmd = addThreadTargetOption(t.command("reopen [threadId]"));
     addWriteFlagsToCommand(reopenCmd).action(guarded(async (idStr, opts) => {
         const client = await getClient();
-        const id = await resolveThreadId(client, { thread: parseOptionalId(idStr, "threadId"), tarjous: opts.tarjous });
+        const id = await resolveThreadId(client, targetFrom(idStr, opts));
         writeJson(await runThreadReopen(client, id, opts));
     }));
-    const renameCmd = t
-        .command("rename [threadId]")
-        .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
+    const renameCmd = addThreadTargetOption(t.command("rename [threadId]"))
         .requiredOption("--title <text>", 'New thread title (max 200 chars; "" clears)');
     addWriteFlagsToCommand(renameCmd).action(guarded(async (idStr, opts) => {
         const client = await getClient();
-        const id = await resolveThreadId(client, { thread: parseOptionalId(idStr, "threadId"), tarjous: opts.tarjous });
+        const id = await resolveThreadId(client, targetFrom(idStr, opts));
         writeJson(await runThreadRename(client, id, String(opts.title ?? "").trim(), opts));
     }));
     const p = t
         .command("participant")
         .description("Add/remove a thread participant (must be a member of the owning company)");
-    const addCmd = p
-        .command("add [threadId]")
-        .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
+    const addCmd = addThreadTargetOption(p.command("add [threadId]"))
         .requiredOption("--person <id>", "personId to add", Number)
         .option("--role <role>", "Participant role (customer|pumppu|betoni|lattia|support|provider; default pumppu)");
     addWriteFlagsToCommand(addCmd).action(guarded(async (idStr, opts) => {
         const client = await getClient();
-        const id = await resolveThreadId(client, { thread: parseOptionalId(idStr, "threadId"), tarjous: opts.tarjous });
+        const id = await resolveThreadId(client, targetFrom(idStr, opts));
         writeJson(await runThreadParticipantAdd(client, id, Number(opts.person), opts));
     }));
-    const remCmd = p
-        .command("remove [threadId]")
-        .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
+    const remCmd = addThreadTargetOption(p.command("remove [threadId]"))
         .requiredOption("--person <id>", "personId to remove", Number);
     addWriteFlagsToCommand(remCmd).action(guarded(async (idStr, opts) => {
         const client = await getClient();
-        const id = await resolveThreadId(client, { thread: parseOptionalId(idStr, "threadId"), tarjous: opts.tarjous });
+        const id = await resolveThreadId(client, targetFrom(idStr, opts));
         writeJson(await runThreadParticipantRemove(client, id, Number(opts.person), opts));
     }));
 }

@@ -1,7 +1,6 @@
 import { listEnvelope } from "../../api/envelopes.js";
-import { createStore, defaultCredentialsPath } from "../../auth/store.js";
-import { performSwitch, assertPersistedSwitchAllowed, } from "../../auth/switch.js";
-import { writeJson, exitWithError, failWith } from "../../output/json.js";
+import { runPersistedSwitch } from "../../auth/switch.js";
+import { writeJson, exitWithError } from "../../output/json.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { CliError } from "../../api/errors.js";
 function companyName(c) {
@@ -54,30 +53,7 @@ export function registerCompanyCommands(parent, getClient, isReadOnly) {
         .command("switch")
         .requiredOption("--to <asiakasId>", "Target asiakasId", (v) => Number(v))
         .action(guarded(async (opts) => {
-        assertPersistedSwitchAllowed(isReadOnly());
-        const store = createStore(defaultCredentialsPath());
-        const creds = await store.load();
-        if (!creds) {
-            failWith("Not logged in. Run `ib auth login` first.", 2);
-        }
-        const next = await performSwitch({
-            endpoint: creds.endpoint,
-            jwt: creds.jwt,
-            toAsiakasId: opts.to,
-        });
-        await store.save({
-            ...creds,
-            jwt: next.jwt,
-            ownerAsiakasId: next.ownerAsiakasId,
-            ownerAsiakasName: next.ownerAsiakasName,
-        });
-        writeJson({
-            ok: true,
-            activeCompany: {
-                asiakasId: next.ownerAsiakasId,
-                name: next.ownerAsiakasName,
-            },
-        });
+        writeJson(await runPersistedSwitch(opts.to, isReadOnly()));
     }));
     // `ib company validate` was renamed to the top-level `ib validate` (clean
     // break, mirrors the ib changes→ib log rename). Old path errors with exit 4.

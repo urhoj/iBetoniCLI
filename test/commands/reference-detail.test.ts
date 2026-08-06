@@ -23,7 +23,7 @@ describe("ib reference detail (DB-backed)", () => {
   });
   test("list passes stalest", async () => {
     const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
-    await runReferenceDetailList(c, 10);
+    await runReferenceDetailList(c, { stalest: 10 });
     expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10");
   });
 
@@ -47,7 +47,7 @@ describe("ib reference detail (DB-backed)", () => {
 
   test("list passes needsReview + maxConfidence", async () => {
     const c = client({ get: vi.fn().mockResolvedValue({ items: [], count: 0 }) });
-    await runReferenceDetailList(c, 10, undefined, false, true, 90);
+    await runReferenceDetailList(c, { stalest: 10, needsReview: true, maxConfidence: 90 });
     expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog?stalest=10&needsReview=1&maxConfidence=90");
   });
 

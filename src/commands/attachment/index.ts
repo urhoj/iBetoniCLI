@@ -29,6 +29,39 @@ const ENTITY_OPTS: { optKey: string; flag: string; entity: string; blurb: string
 ];
 const ENTITY_WORDS = ENTITY_OPTS.map((e) => e.entity);
 
+/**
+ * Base options of any attachment command that targets an entity: the universal
+ * write flags plus the `--<entity> <id>` flags generated from
+ * {@link ENTITY_OPTS}. Those keys are table-driven, so they cannot be spelled
+ * out — hence the index signature, which is also what lets these option objects
+ * be handed to `resolveEntityTarget` / `resolveDetachEntity`. Each command's own
+ * named flags are declared on top of this and are properly typed, so reading
+ * them needs no cast.
+ */
+type AttachmentEntityOpts = WriteFlags & { [entityFlag: string]: unknown };
+
+/** Flags shared by every command that accepts `--group` / `--type` by name or id. */
+type GroupTypeOpts = { group?: string; type?: string };
+
+type AttachmentListOpts = AttachmentEntityOpts & GroupTypeOpts & { limit?: number };
+
+type AttachmentUploadOpts = AttachmentEntityOpts &
+  GroupTypeOpts & { comment?: string; mime?: string };
+
+type AttachmentRegisterOpts = AttachmentEntityOpts &
+  GroupTypeOpts & {
+    name: string;
+    origName: string;
+    folder: string;
+    size: number;
+    mime: string;
+    comment?: string;
+    etag?: string;
+  };
+
+type AttachmentUpdateOpts = WriteFlags &
+  GroupTypeOpts & { comment?: string; liitaLaskuun?: number };
+
 function addEntityFlags(cmd: Command): Command {
   for (const e of ENTITY_OPTS) {
     cmd.option(e.flag, `Target = ${e.blurb}`, (s: string) => Number(s));
@@ -370,14 +403,11 @@ export function registerAttachmentCommands(
     .option("--group <g>", "Filter by attachment group (name or id — see `ib attachment types`)")
     .option("--type <t>", "Filter by attachment type (name or id — see `ib attachment types`)")
     .option("--limit <n>", "Max rows (capped at 500)", cappedInt(500));
-  addEntityFlags(listCmd).action(guarded(async (opts: Record<string, unknown>) => {
+  addEntityFlags(listCmd).action(guarded(async (opts: AttachmentListOpts) => {
     const client = await getClient();
     const target = resolveEntityTarget(opts);
-    const { groupId, typeId } = await resolveGroupAndType(client, {
-      group: opts.group as string | undefined,
-      type: opts.type as string | undefined,
-    });
-    writeJson(await runAttachmentList(client, target, { groupId, typeId, limit: opts.limit as number | undefined }));
+    const { groupId, typeId } = await resolveGroupAndType(client, opts);
+    writeJson(await runAttachmentList(client, target, { groupId, typeId, limit: opts.limit }));
   }));
 
   a.command("get <attachmentId>")
@@ -412,16 +442,13 @@ export function registerAttachmentCommands(
     .option("--mime <mime>", "Override the auto-detected MIME type");
   addEntityFlags(uploadCmd);
   addWriteFlagsToCommand(uploadCmd).action(
-    guarded(async (file: string, opts: WriteFlags & Record<string, unknown>) => {
+    guarded(async (file: string, opts: AttachmentUploadOpts) => {
       const client = await getClient();
-      const { groupId, typeId } = await resolveGroupAndType(client, {
-        group: opts.group as string | undefined,
-        type: opts.type as string | undefined,
-      });
+      const { groupId, typeId } = await resolveGroupAndType(client, opts);
       writeJson(
         await runAttachmentUpload(client, file, opts, {
           dryRun: opts.dryRun, idempotencyKey: opts.idempotencyKey, reason: opts.reason,
-          comment: opts.comment as string | undefined, mime: opts.mime as string | undefined,
+          comment: opts.comment, mime: opts.mime,
           groupId, typeId,
         })
       );
@@ -448,23 +475,20 @@ export function registerAttachmentCommands(
     .option("--type <t>", "Attachment type (name or id)")
     .option("--etag <etag>", "Azure ETag (optional; defaults to FE-parity sentinel)");
   addEntityFlags(registerCmd);
-  addWriteFlagsToCommand(registerCmd).action(guarded(async (opts: WriteFlags & Record<string, unknown>) => {
+  addWriteFlagsToCommand(registerCmd).action(guarded(async (opts: AttachmentRegisterOpts) => {
     const client = await getClient();
     const target = resolveEntityTarget(opts);
-    const { groupId, typeId } = await resolveGroupAndType(client, {
-      group: opts.group as string | undefined,
-      type: opts.type as string | undefined,
-    });
+    const { groupId, typeId } = await resolveGroupAndType(client, opts);
     writeJson(
       await runAttachmentRegister(
         client,
         {
-          fileName: opts.name as string, origFileName: opts.origName as string,
-          fileFolder: opts.folder as string, fileType: opts.mime as string,
-          fileSize: opts.size as number, entity: target.entity, entityId: target.entityId,
-          fileComment: opts.comment as string | undefined,
+          fileName: opts.name, origFileName: opts.origName,
+          fileFolder: opts.folder, fileType: opts.mime,
+          fileSize: opts.size, entity: target.entity, entityId: target.entityId,
+          fileComment: opts.comment,
           attachmentGroupId: groupId, attachmentTypeId: typeId,
-          fileETag: opts.etag as string | undefined,
+          fileETag: opts.etag,
         },
         opts
       )
@@ -475,7 +499,7 @@ export function registerAttachmentCommands(
     .command("attach <attachmentId>");
   addEntityFlags(attachCmd);
   addWriteFlagsToCommand(attachCmd).action(
-    jsonAction(getClient, (client, id: string, opts: WriteFlags & Record<string, unknown>) =>
+    jsonAction(getClient, (client, id: string, opts: AttachmentEntityOpts) =>
       runAttachmentAttach(client, Number(id), opts, opts)
     )
   );
@@ -484,7 +508,7 @@ export function registerAttachmentCommands(
     .command("detach <attachmentId> [entity]");
   addEntityFlags(detachCmd);
   addWriteFlagsToCommand(detachCmd).action(
-    guarded(async (id: string, entity: string | undefined, opts: WriteFlags & Record<string, unknown>) => {
+    guarded(async (id: string, entity: string | undefined, opts: AttachmentEntityOpts) => {
       const entityWord = resolveDetachEntity(entity, opts);
       writeJson(await runAttachmentDetach(await getClient(), Number(id), entityWord, opts));
     })
@@ -497,15 +521,12 @@ export function registerAttachmentCommands(
     .option("--group <g>", "Attachment group (name or id — see `ib attachment types`)")
     .option("--type <t>", "Attachment type (name or id — see `ib attachment types`)");
   addWriteFlagsToCommand(updateCmd).action(
-    guarded(async (id: string, opts: WriteFlags & Record<string, unknown>) => {
+    guarded(async (id: string, opts: AttachmentUpdateOpts) => {
       const client = await getClient();
-      const { groupId, typeId } = await resolveGroupAndType(client, {
-        group: opts.group as string | undefined,
-        type: opts.type as string | undefined,
-      });
+      const { groupId, typeId } = await resolveGroupAndType(client, opts);
       writeJson(await runAttachmentUpdate(client, Number(id), {
-        fileComment: opts.comment as string | undefined,
-        liitaLaskuun: opts.liitaLaskuun as number | undefined,
+        fileComment: opts.comment,
+        liitaLaskuun: opts.liitaLaskuun,
         attachmentGroupId: groupId, attachmentTypeId: typeId,
       }, opts));
     })

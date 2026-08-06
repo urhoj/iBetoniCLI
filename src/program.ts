@@ -48,7 +48,7 @@ import { registerDoctorCommand } from "./commands/doctor/index.js";
 import { registerInboxCommand } from "./commands/inbox/index.js";
 import { registerImpersonationCommands } from "./commands/dev/impersonation/index.js";
 import { runReferenceDump, fetchPrimerGlossary } from "./reference/dump.js";
-import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailEdit, runReferenceDetailDelete, runReferenceDetailLint } from "./reference/detail.js";
+import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailEdit, runReferenceDetailDelete, runReferenceDetailLint, type ReferenceDetailListOptions } from "./reference/detail.js";
 import { addEditFlags, parseEditOp } from "./textEdit.js";
 import { addWriteFlagsToCommand, type WriteFlags, requireReason } from "./api/writeFlags.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "./assess.js";
@@ -316,12 +316,12 @@ export function buildProgram(): Command {
       .option("--with-detail", "Include each entry's full detail text, folding the per-command `reference detail get` into one call (needs the backend deployed)")
       .option("--search <substr>", "Only rows whose command PATH contains this substring (case-insensitive; client-side)")
       .option("--orphans", "Only orphan rows — keys whose command no longer exists in the live catalogue (the discover half of discover→`reference detail delete`)")
-  ).action(guarded(async (opts: { stalest?: number; domain?: string; withDetail?: boolean; needsReview?: boolean; maxConfidence?: number; search?: string; orphans?: boolean }) => {
+  ).action(guarded(async (opts: ReferenceDetailListOptions) => {
     // Validate the domain offline (exit 4 on unknown) before any network call,
     // mirroring `ib commands <domain>`.
     if (opts.domain) assertKnownDomain(COMMAND_SPECS, opts.domain);
     const client = await getClient();
-    writeJson(await runReferenceDetailList(client, opts.stalest, opts.domain, opts.withDetail ?? false, opts.needsReview ?? false, opts.maxConfidence, opts.search, opts.orphans ?? false));
+    writeJson(await runReferenceDetailList(client, opts));
   }));
 
   const detailSet = detail

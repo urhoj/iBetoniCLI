@@ -1,4 +1,6 @@
-import { failWith } from "../../output/json.js";
+import { failWith, writeJson } from "../../output/json.js";
+import { parseId } from "../../targets.js";
+import { guarded } from "./action.js";
 import { extractGeocodeLatLng } from "./geocode.js";
 /**
  * Shared orchestrator behind `ib worksite dashboard` / `ib sijainti dashboard`
@@ -244,5 +246,27 @@ export async function runAddressDashboard(client, input) {
             vehicles,
         }),
     };
+}
+/**
+ * Register a `dashboard [<idArg>]` leaf. `ib worksite dashboard` and
+ * `ib sijainti dashboard` are the same command over a different entity id, so
+ * they share the exactly-one-of guard — the pair of checks that must stay
+ * symmetrical (neither given, and both given) and had been copied verbatim.
+ */
+export function registerDashboardCommand(parent, getClient, cfg) {
+    parent
+        .command(`dashboard [${cfg.idArg}]`)
+        .option("--address <address>", cfg.addressDescription)
+        .action(guarded(async (idStr, opts) => {
+        if (idStr !== undefined && opts.address !== undefined) {
+            failWith(`pass exactly one of <${cfg.idArg}> or --address, not both`, 4);
+        }
+        if (idStr === undefined && opts.address === undefined) {
+            failWith(`pass exactly one of <${cfg.idArg}> or --address`, 4);
+        }
+        const id = idStr !== undefined ? parseId(idStr, cfg.idArg) : undefined;
+        const client = await getClient();
+        writeJson(await cfg.run(client, id, opts.address));
+    }));
 }
 //# sourceMappingURL=addressDashboard.js.map

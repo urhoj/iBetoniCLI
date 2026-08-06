@@ -6,6 +6,7 @@ import { resolveCallerTier } from "../../tier.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { runCombinatorDuplicates, runCombinatorMerge, registerCombinatorCommands, } from "../_shared/combinator.js";
 import { roleNameForTypeId, resolveRoleTypeId, explainRole } from "../../roles.js";
+import { projectHistoryRow, } from "../log/changeRow.js";
 import { parseId, parseOptionalId, resolveSearchQuery, cappedInt, addOwnerOption, } from "../../targets.js";
 import { runCompanyList } from "../company/index.js";
 import { runNotificationFcmSend } from "../notification/index.js";
@@ -653,18 +654,7 @@ export async function runPersonHistory(client, personId, limit, opts = {}) {
     let list = Array.isArray(rows) ? rows : [];
     if (opts.field)
         list = list.filter((r) => r.fieldName === opts.field);
-    return listEnvelope(list.map((r) => ({
-        changeId: r.changeId,
-        field: r.fieldName ?? null,
-        oldValue: r.oldValue ?? null,
-        newValue: r.newValue ?? null,
-        changeType: r.changeType ?? null,
-        personId: r.personId ?? null,
-        personName: r.personFullName ?? null,
-        at: r.timestamp ?? null,
-        description: r.description ?? null,
-        reason: r.reason ?? null,
-    })));
+    return listEnvelope(list.map(projectHistoryRow));
 }
 /** Pull the new personId out of newPerson's response (tolerant of legacy shapes). */
 export function extractPersonId(res) {

@@ -280,6 +280,100 @@ export interface VehicleWriteFields {
  * intentionally excluded — they are carried through unchanged and are not
  * settable from the CLI.
  */
+/** Parse `<n>` as a number — the coercion every numeric vehicle flag uses. */
+const asNumber = (s: string): number => Number(s);
+
+/**
+ * The writable vehicle columns as ONE table: flag spelling, help text, and the
+ * `VehicleWriteFields` key each maps to. `create` and `update` expose
+ * overlapping-but-different subsets of it (and word two flags differently), so
+ * the table carries a `modes` list and an optional per-mode description rather
+ * than each command re-listing the columns.
+ *
+ * ORDER IS THE HELP OUTPUT — filtering this list by mode reproduces exactly the
+ * option order each command declares.
+ */
+const VEHICLE_FIELDS: ReadonlyArray<{
+  flag: string;
+  /** One string, or per-mode text when the two commands word it differently. */
+  description: string | { create: string; update: string };
+  /** Commander's camelCased option key. */
+  optKey: string;
+  /** Target key in {@link VehicleWriteFields}. */
+  field: keyof VehicleWriteFields;
+  parse?: (s: string) => number | boolean;
+  modes: ReadonlyArray<"create" | "update">;
+}> = [
+  { flag: "--reg <s>", description: "Registration number (vehicleRegNo)", optKey: "reg", field: "vehicleRegNo", modes: ["create", "update"] },
+  { flag: "--name <s>", description: "Display name (vehicleNimi)", optKey: "name", field: "vehicleNimi", modes: ["create", "update"] },
+  { flag: "--no <n>", description: "Fleet number (vehicleNo)", optKey: "no", field: "vehicleNo", parse: asNumber, modes: ["create", "update"] },
+  {
+    flag: "--type <n>",
+    description: { create: "vehicleTypeId (see `ib vehicle types`)", update: "vehicleTypeId" },
+    optKey: "type",
+    field: "vehicleTypeId",
+    parse: asNumber,
+    modes: ["create", "update"],
+  },
+  { flag: "--memo <s>", description: "Free-text memo", optKey: "memo", field: "memo", modes: ["create", "update"] },
+  { flag: "--default-driver <pid>", description: "Default driver personId", optKey: "defaultDriver", field: "defaultKuski_personId", parse: asNumber, modes: ["create"] },
+  { flag: "--capacity <m3>", description: "Concrete capacity in m3 (vehicleM3)", optKey: "capacity", field: "vehicleM3", parse: asNumber, modes: ["create", "update"] },
+  {
+    flag: "--puomi <m>",
+    description: "Boom length in metres (vehiclePuomi — BetoniJerry matching field)",
+    optKey: "puomi",
+    field: "vehiclePuomi",
+    parse: asNumber,
+    modes: ["create", "update"],
+  },
+  {
+    flag: "--asiakas <id>",
+    description: {
+      create: "Owning asiakasId (defaults to active company; needs a vehicle-manage role on that tenant)",
+      update: "Owning asiakasId",
+    },
+    optKey: "asiakas",
+    field: "asiakasId",
+    parse: asNumber,
+    modes: ["create", "update"],
+  },
+  { flag: "--show-in-grid <bool>", description: "Whether the vehicle appears in the grid (true/false)", optKey: "showInGrid", field: "showInGrid", parse: parseBoolFlag, modes: ["update"] },
+  { flag: "--first-date <date>", description: "Start of validity window YYYY-MM-DD (firstDate; or today/yesterday/tomorrow)", optKey: "firstDate", field: "firstDate", modes: ["update"] },
+  { flag: "--last-date <date>", description: "End of validity window YYYY-MM-DD (lastDate; or today/yesterday/tomorrow)", optKey: "lastDate", field: "lastDate", modes: ["update"] },
+];
+
+/** Parsed options of `vehicle create` / `vehicle update` — every field flag, all optional. */
+type VehicleFieldOpts = Partial<Record<string, string | number | boolean>>;
+
+/** Attach the field flags this mode exposes, in table order. */
+function addVehicleFieldFlags(cmd: Command, mode: "create" | "update"): Command {
+  for (const f of VEHICLE_FIELDS) {
+    if (!f.modes.includes(mode)) continue;
+    const description = typeof f.description === "string" ? f.description : f.description[mode];
+    if (f.parse) cmd.option(f.flag, description, f.parse);
+    else cmd.option(f.flag, description);
+  }
+  return cmd;
+}
+
+/**
+ * Map parsed options to {@link VehicleWriteFields}. Flags absent for the mode
+ * are simply `undefined`, which both writers already treat as "not supplied"
+ * (create → null, update → keep current). The two date fields go through
+ * `resolveDate` so `today`/`yesterday`/`tomorrow` expand.
+ */
+function vehicleFieldsFromOpts(opts: VehicleFieldOpts): VehicleWriteFields {
+  const fields: Record<string, unknown> = {};
+  for (const f of VEHICLE_FIELDS) {
+    const value = opts[f.optKey];
+    fields[f.field] =
+      f.field === "firstDate" || f.field === "lastDate"
+        ? resolveDate(value as string | undefined)
+        : value;
+  }
+  return fields as VehicleWriteFields;
+}
+
 const VEHICLE_DIFF_FIELDS = [
   "asiakasId",
   "vehicleNo",
@@ -541,130 +635,25 @@ export function registerVehicleCommands(
       )
     );
 
-  const createCmd = v
-    .command("create")
-    .option("--reg <s>", "Registration number (vehicleRegNo)")
-    .option("--name <s>", "Display name (vehicleNimi)")
-    .option("--no <n>", "Fleet number (vehicleNo)", (s: string) => Number(s))
-    .option("--type <n>", "vehicleTypeId (see `ib vehicle types`)", (s: string) =>
-      Number(s)
-    )
-    .option("--memo <s>", "Free-text memo")
-    .option("--default-driver <pid>", "Default driver personId", (s: string) =>
-      Number(s)
-    )
-    .option(
-      "--capacity <m3>",
-      "Concrete capacity in m3 (vehicleM3)",
-      (s: string) => Number(s)
-    )
-    .option(
-      "--puomi <m>",
-      "Boom length in metres (vehiclePuomi — BetoniJerry matching field)",
-      (s: string) => Number(s)
-    )
-    .option(
-      "--asiakas <id>",
-      "Owning asiakasId (defaults to active company; needs a vehicle-manage role on that tenant)",
-      (s: string) => Number(s)
-    );
+  const createCmd = addVehicleFieldFlags(v.command("create"), "create");
   addWriteFlagsToCommand(createCmd).action(
-    guarded(async (
-      opts: WriteFlags & {
-        reg?: string;
-        name?: string;
-        no?: number;
-        type?: number;
-        memo?: string;
-        defaultDriver?: number;
-        capacity?: number;
-        puomi?: number;
-        asiakas?: number;
-      }
-    ) => {
+    guarded(async (opts: WriteFlags & VehicleFieldOpts) => {
       const result = await runVehicleCreate(
         await getClient(),
-        {
-          vehicleRegNo: opts.reg,
-          vehicleNimi: opts.name,
-          vehicleNo: opts.no,
-          vehicleTypeId: opts.type,
-          memo: opts.memo,
-          defaultKuski_personId: opts.defaultDriver,
-          vehicleM3: opts.capacity,
-          vehiclePuomi: opts.puomi,
-          asiakasId: opts.asiakas,
-        },
+        vehicleFieldsFromOpts(opts),
         opts
       );
       writeJson(result);
     })
   );
 
-  const updateCmd = v
-    .command("update <vehicleId>")
-    .option("--reg <s>", "Registration number (vehicleRegNo)")
-    .option("--name <s>", "Display name (vehicleNimi)")
-    .option("--no <n>", "Fleet number (vehicleNo)", (s: string) => Number(s))
-    .option("--type <n>", "vehicleTypeId", (s: string) => Number(s))
-    .option("--memo <s>", "Free-text memo")
-    .option(
-      "--capacity <m3>",
-      "Concrete capacity in m3 (vehicleM3)",
-      (s: string) => Number(s)
-    )
-    .option(
-      "--puomi <m>",
-      "Boom length in metres (vehiclePuomi — BetoniJerry matching field)",
-      (s: string) => Number(s)
-    )
-    .option("--asiakas <id>", "Owning asiakasId", (s: string) => Number(s))
-    .option(
-      "--show-in-grid <bool>",
-      "Whether the vehicle appears in the grid (true/false)",
-      parseBoolFlag
-    )
-    .option(
-      "--first-date <date>",
-      "Start of validity window YYYY-MM-DD (firstDate; or today/yesterday/tomorrow)"
-    )
-    .option(
-      "--last-date <date>",
-      "End of validity window YYYY-MM-DD (lastDate; or today/yesterday/tomorrow)"
-    );
+  const updateCmd = addVehicleFieldFlags(v.command("update <vehicleId>"), "update");
   addWriteFlagsToCommand(updateCmd).action(
-    guarded(async (
-      idStr: string,
-      opts: WriteFlags & {
-        reg?: string;
-        name?: string;
-        no?: number;
-        type?: number;
-        memo?: string;
-        capacity?: number;
-        puomi?: number;
-        asiakas?: number;
-        showInGrid?: boolean;
-        firstDate?: string;
-        lastDate?: string;
-      }
-    ) => {
+    guarded(async (idStr: string, opts: WriteFlags & VehicleFieldOpts) => {
       const result = await runVehicleUpdate(
         await getClient(),
         parseId(idStr, "vehicleId"),
-        {
-          vehicleRegNo: opts.reg,
-          vehicleNimi: opts.name,
-          vehicleNo: opts.no,
-          vehicleTypeId: opts.type,
-          memo: opts.memo,
-          vehicleM3: opts.capacity,
-          vehiclePuomi: opts.puomi,
-          asiakasId: opts.asiakas,
-          showInGrid: opts.showInGrid,
-          firstDate: resolveDate(opts.firstDate),
-          lastDate: resolveDate(opts.lastDate),
-        },
+        vehicleFieldsFromOpts(opts),
         opts
       );
       writeJson(result);

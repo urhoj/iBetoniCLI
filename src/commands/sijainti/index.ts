@@ -17,6 +17,7 @@ import { jsonAction, guarded } from "../_shared/action.js";
 import { extractGeocodeLatLng } from "../_shared/geocode.js";
 import {
   runAddressDashboard,
+  registerDashboardCommand,
   type AddressDashboardReport,
 } from "../_shared/addressDashboard.js";
 import { qs } from "../../api/query.js";
@@ -983,20 +984,11 @@ export function registerSijaintiCommands(
       )
     );
 
-  s.command("dashboard [sijaintiId]")
-    .option("--address <address>", "Resolve the point from a street address instead of sijaintiId")
-    .action(guarded(async (idStr: string | undefined, opts: { address?: string }) => {
-      if (idStr !== undefined && opts.address !== undefined) {
-        failWith("pass exactly one of <sijaintiId> or --address, not both", 4);
-      }
-      if (idStr === undefined && opts.address === undefined) {
-        failWith("pass exactly one of <sijaintiId> or --address", 4);
-      }
-      const sijaintiId = idStr !== undefined ? parseId(idStr, "sijaintiId") : undefined;
-      const client = await getClient();
-      const result = await runSijaintiDashboard(client, { sijaintiId, address: opts.address });
-      writeJson(result);
-    }));
+  registerDashboardCommand(s, getClient, {
+    idArg: "sijaintiId",
+    addressDescription: "Resolve the point from a street address instead of sijaintiId",
+    run: (client, sijaintiId, address) => runSijaintiDashboard(client, { sijaintiId, address }),
+  });
 
   const createCmd = s
     .command("create")

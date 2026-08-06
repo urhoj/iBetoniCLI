@@ -6,32 +6,7 @@ import { parseId, parseOptionalId, cappedInt, addOwnerOption } from "../../targe
 import { guarded, jsonAction } from "../_shared/action.js";
 import { CHANGE_ENTITY_TYPES, findEntityType, isKnownEntityType, runLogTypes, } from "./entityTypes.js";
 import { qs } from "../../api/query.js";
-function projectRow(r) {
-    const item = {
-        changeId: r.changeId,
-        entityType: r.entityType ?? null,
-        entityId: r.entityId ?? null,
-        field: r.fieldName ?? null,
-        oldValue: r.oldValue ?? null,
-        newValue: r.newValue ?? null,
-        changeType: r.changeType ?? null,
-        personId: r.personId ?? null,
-        personName: r.personFullName ?? null,
-        at: r.timestamp ?? null,
-        description: r.description ?? null,
-        reason: r.reason ?? null,
-        impersonatedByPersonName: r.impersonatedByPersonName ?? null,
-        keikkaTilaContext: r.keikkaTilaContext ?? null,
-        deviceType: r.deviceType ?? null,
-    };
-    if (r.entityDisplayName != null)
-        item.entityDisplayName = r.entityDisplayName;
-    if (r.palkkiText != null)
-        item.palkkiText = r.palkkiText;
-    if (r.palkkiVehicleRegNo != null)
-        item.palkkiVehicleRegNo = r.palkkiVehicleRegNo;
-    return item;
-}
+import { projectChangeRow, } from "./changeRow.js";
 function assertKnownEntityType(entityType) {
     if (!isKnownEntityType(entityType)) {
         failWith(`unknown entityType '${entityType}'. Valid: ` +
@@ -57,23 +32,45 @@ function envelope(items, truncated = false) {
         out.truncated = true;
     return out;
 }
+/**
+ * The read every `ib log` subcommand performs: resolve the owner (all five
+ * routes are `/:owner`-scoped, defaulting to the active company), GET, and
+ * normalise a non-array body to `[]`. `path` is a builder because the owner is
+ * part of the route, not a query param.
+ */
+async function getChanges(client, path, owner) {
+    const resolved = owner ?? (await resolveActiveOwnerAsiakasId(client));
+    const rows = await client.get(path(resolved));
+    return Array.isArray(rows) ? rows : [];
+}
+/**
+ * The two date-window routes (`range`, `by-entity-date`) differ only in their
+ * route segment and query params: both have NO server row limit, so both slice
+ * client-side to protect AI context and flag `truncated` when rows were cut.
+ *
+ * Each caller keeps its OWN guards — their order differs (`range` validates
+ * dates then entityType, `by-entity-date` the reverse), and which error a bad
+ * invocation reports is part of the contract.
+ */
+async function runChangeWindow(client, segment, params, opts) {
+    const rows = await getChanges(client, (owner) => `/api/changes/${segment}/${owner}${qs(params)}`, opts.owner);
+    const sliced = rows.slice(0, opts.limit);
+    return envelope(sliced.map(projectChangeRow), sliced.length < rows.length);
+}
 /** GET /api/changes/:entityType/:entityId/:owner — generic entity history. */
 export async function runLogEntity(client, entityType, entityId, limit, opts = {}) {
     assertKnownEntityType(entityType);
-    const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
-    const rows = await client.get(`/api/changes/${entityType}/${entityId}/${owner}?limit=${limit}`);
-    let list = Array.isArray(rows) ? rows : [];
+    let list = await getChanges(client, (owner) => `/api/changes/${entityType}/${entityId}/${owner}?limit=${limit}`, opts.owner);
     if (opts.field)
         list = list.filter((r) => r.fieldName === opts.field);
-    return envelope(list.map(projectRow));
+    return envelope(list.map(projectChangeRow));
 }
 /** GET /api/changes/latest/:owner — admin-only, newest first, server cap 500. */
 export async function runLogLatest(client, limit, opts = {}) {
     if (opts.entityType)
         assertKnownEntityType(opts.entityType);
-    const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
-    const rows = await client.get(`/api/changes/latest/${owner}${qs({ limit, entityType: opts.entityType || undefined })}`);
-    return envelope((Array.isArray(rows) ? rows : []).map(projectRow));
+    const rows = await getChanges(client, (owner) => `/api/changes/latest/${owner}${qs({ limit, entityType: opts.entityType || undefined })}`, opts.owner);
+    return envelope(rows.map(projectChangeRow));
 }
 /** GET /api/changes/range/:owner — admin-only, by change timestamp. */
 export async function runLogRange(client, opts) {
@@ -81,17 +78,12 @@ export async function runLogRange(client, opts) {
     assertIsoDate(opts.to, "--to");
     if (opts.entityType)
         assertKnownEntityType(opts.entityType);
-    const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
-    const rows = await client.get(`/api/changes/range/${owner}${qs({
+    return runChangeWindow(client, "range", {
         startDate: opts.from,
         endDate: opts.to,
         entityType: opts.entityType || undefined,
         personId: opts.person ?? undefined,
-    })}`);
-    const list = Array.isArray(rows) ? rows : [];
-    // The route/proc has NO row limit — slice client-side to protect AI context.
-    const sliced = list.slice(0, opts.limit);
-    return envelope(sliced.map(projectRow), sliced.length < list.length);
+    }, opts);
 }
 /**
  * GET /api/changes/by-entity-date/:owner — admin-only. Filters by the
@@ -104,15 +96,7 @@ export async function runLogByEntityDate(client, opts) {
     }
     assertIsoDate(opts.from, "--from");
     assertIsoDate(opts.to, "--to");
-    const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
-    const rows = await client.get(`/api/changes/by-entity-date/${owner}${qs({
-        startDate: opts.from,
-        endDate: opts.to,
-        entityType: opts.entityType,
-    })}`);
-    const list = Array.isArray(rows) ? rows : [];
-    const sliced = list.slice(0, opts.limit);
-    return envelope(sliced.map(projectRow), sliced.length < list.length);
+    return runChangeWindow(client, "by-entity-date", { startDate: opts.from, endDate: opts.to, entityType: opts.entityType }, opts);
 }
 /**
  * `ib log user [personId]` — no arg: own recent changes
@@ -120,12 +104,10 @@ export async function runLogByEntityDate(client, opts) {
  * (GET /api/changes/user/:personId/:owner — self or admin).
  */
 export async function runLogUser(client, personId, limit, opts = {}) {
-    const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
-    const path = personId == null
+    const rows = await getChanges(client, (owner) => personId == null
         ? `/api/changes/user/recent/${owner}?limit=${limit}`
-        : `/api/changes/user/${personId}/${owner}?limit=${limit}`;
-    const rows = await client.get(path);
-    return envelope((Array.isArray(rows) ? rows : []).map(projectRow));
+        : `/api/changes/user/${personId}/${owner}?limit=${limit}`, opts.owner);
+    return envelope(rows.map(projectChangeRow));
 }
 /** Registers a thin `log <id>` alias on an entity group, delegating to runLogEntity. */
 export function registerLogAlias(group, getClient, entityType, idArgName, fieldExample = "Filter by changeTracker fieldName") {

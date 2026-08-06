@@ -23,6 +23,11 @@ import {
 } from "../_shared/combinator.js";
 import { roleNameForTypeId, resolveRoleTypeId, explainRole } from "../../roles.js";
 import {
+  projectHistoryRow,
+  type ChangeHistoryItem,
+  type RawChangeRow,
+} from "../log/changeRow.js";
+import {
   parseId,
   parseOptionalId,
   resolveSearchQuery,
@@ -956,31 +961,8 @@ export function registerPersonCommands(
     );
 }
 
-interface RawPersonChangeRow {
-  changeId: number;
-  fieldName?: string | null;
-  oldValue?: string | null;
-  newValue?: string | null;
-  changeType?: string | null;
-  personId?: number | null;
-  personFullName?: string | null;
-  timestamp?: string | null;
-  description?: string | null;
-  reason?: string | null;
-}
-
-export interface PersonHistoryItem {
-  changeId: number;
-  field: string | null;
-  oldValue: string | null;
-  newValue: string | null;
-  changeType: string | null;
-  personId: number | null;
-  personName: string | null;
-  at: string | null;
-  description: string | null;
-  reason: string | null;
-}
+/** The narrowed audit row `person history` emits (see {@link projectHistoryRow}). */
+export type PersonHistoryItem = ChangeHistoryItem;
 
 /**
  * GET /api/changes/person/:personId/:ownerAsiakasId — the change-tracker audit
@@ -997,25 +979,12 @@ export async function runPersonHistory(
   opts: { owner?: number; field?: string } = {}
 ): Promise<ListEnvelope<PersonHistoryItem>> {
   const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client));
-  const rows = await client.get<RawPersonChangeRow[]>(
+  const rows = await client.get<RawChangeRow[]>(
     `/api/changes/person/${personId}/${owner}?limit=${limit}`
   );
   let list = Array.isArray(rows) ? rows : [];
   if (opts.field) list = list.filter((r) => r.fieldName === opts.field);
-  return listEnvelope(
-    list.map((r) => ({
-      changeId: r.changeId,
-      field: r.fieldName ?? null,
-      oldValue: r.oldValue ?? null,
-      newValue: r.newValue ?? null,
-      changeType: r.changeType ?? null,
-      personId: r.personId ?? null,
-      personName: r.personFullName ?? null,
-      at: r.timestamp ?? null,
-      description: r.description ?? null,
-      reason: r.reason ?? null,
-    }))
-  );
+  return listEnvelope(list.map(projectHistoryRow));
 }
 
 /** Pull the new personId out of newPerson's response (tolerant of legacy shapes). */

@@ -14,6 +14,7 @@ import { registerLogAlias } from "../log/index.js";
 import { resolveTarget, parseId, resolveSearchQuery, cappedInt } from "../../targets.js";
 import {
   runAddressDashboard,
+  registerDashboardCommand,
   type AddressDashboardReport,
 } from "../_shared/addressDashboard.js";
 import {
@@ -22,6 +23,7 @@ import {
   registerCombinatorCommands,
   type CombinatorMergeOptions,
 } from "../_shared/combinator.js";
+import { registerPersonLinkCommands, type PersonLinkBody } from "../_shared/personLink.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 
@@ -343,23 +345,14 @@ export async function runWorksiteDelete(
 }
 
 /**
- * Shape of the request body for both `worksite person add` and
- * `worksite person remove`. `contactPersonTypeId` defaults to 1 on the CLI
- * surface (matches FE default for tyomaaPerson links).
- */
-export interface WorksitePersonLinkBody {
-  tyomaaId: number;
-  personId: number;
-  contactPersonTypeId: number;
-}
-
-/**
  * POST /api/tyomaa/person/add — attach a person to a worksite.
+ * Body is `{ tyomaaId, personId, contactPersonTypeId }` (the last defaults to 1
+ * on the CLI surface, matching the FE default for tyomaaPerson links).
  * Forwards the universal write-flag headers.
  */
 export async function runWorksitePersonAdd(
   client: ApiClient,
-  body: WorksitePersonLinkBody,
+  body: PersonLinkBody,
   flags: WriteFlags
 ): Promise<unknown> {
   return client.post(
@@ -375,7 +368,7 @@ export async function runWorksitePersonAdd(
  */
 export async function runWorksitePersonRemove(
   client: ApiClient,
-  body: WorksitePersonLinkBody,
+  body: PersonLinkBody,
   flags: WriteFlags
 ): Promise<unknown> {
   return client.post(
@@ -558,20 +551,11 @@ export function registerWorksiteCommands(
       )
     );
 
-  w.command("dashboard [tyomaaId]")
-    .option("--address <address>", "Resolve the point from a street address instead of tyomaaId")
-    .action(guarded(async (idStr: string | undefined, opts: { address?: string }) => {
-      if (idStr !== undefined && opts.address !== undefined) {
-        failWith("pass exactly one of <tyomaaId> or --address, not both", 4);
-      }
-      if (idStr === undefined && opts.address === undefined) {
-        failWith("pass exactly one of <tyomaaId> or --address", 4);
-      }
-      const tyomaaId = idStr !== undefined ? parseId(idStr, "tyomaaId") : undefined;
-      const client = await getClient();
-      const result = await runWorksiteDashboard(client, { tyomaaId, address: opts.address });
-      writeJson(result);
-    }));
+  registerDashboardCommand(w, getClient, {
+    idArg: "tyomaaId",
+    addressDescription: "Resolve the point from a street address instead of tyomaaId",
+    run: (client, tyomaaId, address) => runWorksiteDashboard(client, { tyomaaId, address }),
+  });
 
   const createCmd = w
     .command("create")
@@ -616,18 +600,9 @@ export function registerWorksiteCommands(
       }
     ) => {
       const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
-      const patch = buildWorksiteUpdateBody(parsed, {
-        name: opts.name,
-        num: opts.num,
-        address: opts.address,
-        address2: opts.address2,
-        postalCode: opts.postalCode,
-        city: opts.city,
-        drivingInstructions: opts.drivingInstructions,
-        comment: opts.comment,
-        invoiceRef: opts.invoiceRef,
-        contactPerson: opts.contactPerson,
-      });
+      // `opts` IS a WorksiteUpdateFlags (plus the write/body flags); the builder
+      // reads only the ten named fields, so it takes the options object directly.
+      const patch = buildWorksiteUpdateBody(parsed, opts);
       if (Object.keys(patch).length === 0) {
         failWith(
           "update requires at least one field: typed flags (--name/--num/--address/--address2/--postal-code/--city/--driving-instructions/--comment/--invoice-ref/--contact-person) or a --body/--from-json JSON patch",
@@ -683,39 +658,14 @@ export function registerWorksiteCommands(
     .command("person")
     .description("Manage persons attached to a worksite");
 
-  addWriteFlagsToCommand(
-    worksitePerson
-      .command("add")
-      .requiredOption("--worksite <id>", "Target tyomaaId", Number)
-      .requiredOption("--person <id>", "Target personId", Number)
-      .option("--contact-type <id>", "contactPersonTypeId (default 1)", Number, 1)
-  ).action(guarded(async (opts: WriteFlags & { worksite: number; person: number; contactType: number }) => {
-    requireReason(opts);
-    const client = await getClient();
-    const result = await runWorksitePersonAdd(
-      client,
-      { tyomaaId: opts.worksite, personId: opts.person, contactPersonTypeId: opts.contactType },
-      opts
-    );
-    writeJson(result);
-  }));
-
-  addWriteFlagsToCommand(
-    worksitePerson
-      .command("remove")
-      .requiredOption("--worksite <id>", "Target tyomaaId", Number)
-      .requiredOption("--person <id>", "Target personId", Number)
-      .option("--contact-type <id>", "contactPersonTypeId (default 1)", Number, 1)
-  ).action(guarded(async (opts: WriteFlags & { worksite: number; person: number; contactType: number }) => {
-    requireReason(opts);
-    const client = await getClient();
-    const result = await runWorksitePersonRemove(
-      client,
-      { tyomaaId: opts.worksite, personId: opts.person, contactPersonTypeId: opts.contactType },
-      opts
-    );
-    writeJson(result);
-  }));
+  registerPersonLinkCommands(worksitePerson, getClient, {
+    targetFlag: "worksite",
+    targetDescription: "Target tyomaaId",
+    targetField: "tyomaaId",
+    contactTypeDescription: "contactPersonTypeId (default 1)",
+    add: runWorksitePersonAdd,
+    remove: runWorksitePersonRemove,
+  });
 
   worksitePerson
     .command("list [tyomaaId]")

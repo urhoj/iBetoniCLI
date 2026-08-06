@@ -10,11 +10,13 @@ import { resolveDate } from "../../dates.js";
 import { runPersonRoleList } from "../person/index.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { runCombinatorDuplicates, runCombinatorMerge, registerCombinatorCommands, } from "../_shared/combinator.js";
+import { registerPersonLinkCommands } from "../_shared/personLink.js";
 // PRH lookups live in the shared module (also powers `ib opendata prh`). Aliased
 // to the historical names so internal `--from-prh` call sites and the hidden
 // `ib customer prh` alias are unchanged; re-exported for importers/tests.
 import { runPrhById as runCustomerPrhById, runPrhSearch as runCustomerPrhSearch, } from "../../prh.js";
 import { qs } from "../../api/query.js";
+import { projectHistoryRow, } from "../log/changeRow.js";
 export { runCustomerPrhById, runCustomerPrhSearch };
 /**
  * Client-side fallback for `customer list --fields` / `--sijainti-types`:
@@ -131,19 +133,9 @@ export async function runCustomerUpsert(client, opts, flags) {
     }
     if (matches.length === 1) {
         const current = matches[0];
-        const updateBody = buildAsiakasUpdateBody(current, {
-            name: opts.name,
-            ytunnus: opts.ytunnus,
-            email: opts.email,
-            shortName: opts.shortName,
-            comment: opts.comment,
-            contactPerson: opts.contactPerson,
-            type: opts.type,
-            address: opts.address,
-            postalCode: opts.postalCode,
-            city: opts.city,
-            body: opts.body,
-        });
+        // CustomerUpsertOptions is a superset of CustomerUpdateFlags and the builder
+        // reads only its declared fields, so the options object goes straight in.
+        const updateBody = buildAsiakasUpdateBody(current, opts);
         const res = await runCustomerUpdate(client, current.asiakasId, updateBody, flags);
         if (flags.dryRun)
             return { action: "would-update", asiakasId: current.asiakasId, dryRun: res };
@@ -153,17 +145,9 @@ export async function runCustomerUpsert(client, opts, flags) {
     // No match → create. PRH is fetched only here (not on update).
     const ownerAsiakasId = await resolveCurrentOwnerAsiakasId(client);
     const prh = prhYt ? await runCustomerPrhById(client, prhYt) : undefined;
-    const createBody = buildAsiakasCreateBody({
-        name: opts.name,
-        ytunnus: opts.ytunnus,
-        email: opts.email,
-        shortName: opts.shortName,
-        fromPrh: prhYt,
-        address: opts.address,
-        postalCode: opts.postalCode,
-        city: opts.city,
-        body: opts.body,
-    }, ownerAsiakasId, prh);
+    // Same passthrough as the update branch — `prhYt` IS `opts.fromPrh`, and the
+    // builder takes the registry data via its own `prh` parameter, not the flag.
+    const createBody = buildAsiakasCreateBody(opts, ownerAsiakasId, prh);
     if (createBody.yTunnus === undefined || createBody.yTunnus === null || createBody.yTunnus === "") {
         createBody.yTunnus = key;
     }
@@ -466,7 +450,8 @@ export async function runCustomerDelete(client, asiakasId, ownerAsiakasId, flags
 }
 /**
  * POST /api/asiakas/person/add — attach a person to a customer.
- * Forwards the universal write-flag headers.
+ * Body is `{ asiakasId, personId, contactPersonTypeId }` (the last defaults to
+ * 1 = pumppari on the CLI surface). Forwards the universal write-flag headers.
  */
 export async function runCustomerPersonAdd(client, body, flags) {
     const result = await client.post("/api/asiakas/person/add", body, { headers: writeFlagsToHeaders(flags) });
@@ -488,18 +473,7 @@ export async function runCustomerHistory(client, asiakasId, limit) {
     const owner = await resolveCurrentOwnerAsiakasId(client);
     const rows = await client.get(`/api/changes/asiakas/${asiakasId}/${owner}?limit=${limit}`);
     const list = Array.isArray(rows) ? rows : [];
-    return listEnvelope(list.map((r) => ({
-        changeId: r.changeId,
-        field: r.fieldName ?? null,
-        oldValue: r.oldValue ?? null,
-        newValue: r.newValue ?? null,
-        changeType: r.changeType ?? null,
-        personId: r.personId ?? null,
-        personName: r.personFullName ?? null,
-        at: r.timestamp ?? null,
-        description: r.description ?? null,
-        reason: r.reason ?? null,
-    })));
+    return listEnvelope(list.map(projectHistoryRow));
 }
 /**
  * POST /api/asiakas/person/remove — detach a person from a customer.
@@ -971,26 +945,14 @@ export function registerCustomerCommands(parent, getClient) {
         .description("Manage a customer's person MEMBERSHIPS (asiakasPerson) — distinct from the " +
         "single primary contact set via `customer update --contact-person`, and from " +
         "RBAC roles managed via `person role`. See docs: asiakas-contact-person-model.");
-    addWriteFlagsToCommand(customerPerson
-        .command("add")
-        .requiredOption("--asiakas <id>", "Target asiakasId", Number)
-        .requiredOption("--person <id>", "Target personId", Number)
-        .option("--contact-type <id>", "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)", Number, 1)).action(guarded(async (opts) => {
-        requireReason(opts);
-        const client = await getClient();
-        const result = await runCustomerPersonAdd(client, { asiakasId: opts.asiakas, personId: opts.person, contactPersonTypeId: opts.contactType }, opts);
-        writeJson(result);
-    }));
-    addWriteFlagsToCommand(customerPerson
-        .command("remove")
-        .requiredOption("--asiakas <id>", "Target asiakasId", Number)
-        .requiredOption("--person <id>", "Target personId", Number)
-        .option("--contact-type <id>", "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)", Number, 1)).action(guarded(async (opts) => {
-        requireReason(opts);
-        const client = await getClient();
-        const result = await runCustomerPersonRemove(client, { asiakasId: opts.asiakas, personId: opts.person, contactPersonTypeId: opts.contactType }, opts);
-        writeJson(result);
-    }));
+    registerPersonLinkCommands(customerPerson, getClient, {
+        targetFlag: "asiakas",
+        targetDescription: "Target asiakasId",
+        targetField: "asiakasId",
+        contactTypeDescription: "contactPersonTypeId — membership link type (1=pumppari [default], 2=order-email recipient, 3=manual, 5=auto-from-keikka)",
+        add: runCustomerPersonAdd,
+        remove: runCustomerPersonRemove,
+    });
     addAsiakasTargetOption(customerPerson
         .command("list [asiakasId]"))
         .option("--role <name>", "Filter by role name (e.g. keikkaHandler)")

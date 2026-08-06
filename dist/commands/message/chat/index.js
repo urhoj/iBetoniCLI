@@ -1,8 +1,8 @@
 import { listEnvelope, toListEnvelope } from "../../../api/envelopes.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
-import { resolveThreadId } from "./resolveThread.js";
-import { parseId, parseOptionalId, resolveSearchQuery } from "../../../targets.js";
+import { addThreadTargetOption, resolveThreadId, targetFrom } from "./resolveThread.js";
+import { parseId, resolveSearchQuery } from "../../../targets.js";
 import { jsonAction, guarded } from "../../_shared/action.js";
 import { qs } from "../../../api/query.js";
 /**
@@ -88,6 +88,23 @@ export async function runChatMarkRead(client, threadId) {
     return client.post(`/api/messages/threads/${threadId}/read`, {});
 }
 /**
+ * The dry-run preamble `delete` / `edit` / `restore` share: list the thread and
+ * find the target message, exiting 5 when it is absent. All three resolve
+ * `--dry-run` client-side (none of the routes honour X-Dry-Run), so each needs
+ * the current row before it can describe what WOULD happen.
+ *
+ * `deleted` switches the listing to soft-deleted rows — `restore`'s target only
+ * exists there — and is reflected in the miss message.
+ */
+async function findMessageForDryRun(client, threadId, messageId, opts = {}) {
+    const list = await runChatList(client, threadId, { deleted: opts.deleted });
+    const target = list.items.find((m) => Number(m.messageId) === messageId);
+    if (!target) {
+        failWith(`Message ${messageId} not found ${opts.deleted ? "among deleted " : ""}in thread ${threadId}`, 5);
+    }
+    return target;
+}
+/**
  * DELETE /api/messages/threads/:id/messages/:messageId — soft-delete a message.
  *
  * `--dry-run` is CLIENT-SIDE: it lists the thread (a GET, so it works under
@@ -99,10 +116,7 @@ export async function runChatMarkRead(client, threadId) {
  */
 export async function runChatDelete(client, threadId, messageId, opts) {
     if (opts.dryRun) {
-        const list = await runChatList(client, threadId, {});
-        const target = list.items.find((m) => Number(m.messageId) === messageId);
-        if (!target)
-            failWith(`Message ${messageId} not found in thread ${threadId}`, 5);
+        const target = await findMessageForDryRun(client, threadId, messageId);
         return {
             dryRun: true,
             threadId,
@@ -124,10 +138,7 @@ export async function runChatDelete(client, threadId, messageId, opts) {
  */
 export async function runChatEdit(client, threadId, messageId, opts) {
     if (opts.dryRun) {
-        const list = await runChatList(client, threadId, {});
-        const target = list.items.find((m) => Number(m.messageId) === messageId);
-        if (!target)
-            failWith(`Message ${messageId} not found in thread ${threadId}`, 5);
+        const target = await findMessageForDryRun(client, threadId, messageId);
         return {
             dryRun: true,
             threadId,
@@ -145,20 +156,10 @@ export async function runChatEdit(client, threadId, messageId, opts) {
  */
 export async function runChatRestore(client, threadId, messageId, opts) {
     if (opts.dryRun) {
-        const list = await runChatList(client, threadId, { deleted: true });
-        const target = list.items.find((m) => Number(m.messageId) === messageId);
-        if (!target)
-            failWith(`Message ${messageId} not found among deleted in thread ${threadId}`, 5);
+        await findMessageForDryRun(client, threadId, messageId, { deleted: true });
         return { dryRun: true, threadId, wouldRestore: { messageId } };
     }
     return client.post(`/api/messages/threads/${threadId}/messages/${messageId}/restore`, {}, { headers: writeFlagsToHeaders({ idempotencyKey: opts.idempotencyKey, reason: opts.reason }) });
-}
-/** Resolve the {@link ThreadTarget} from a positional + --tarjous option. */
-function targetFrom(threadIdStr, opts) {
-    return {
-        thread: parseOptionalId(threadIdStr, "threadId"),
-        tarjous: opts.tarjous,
-    };
 }
 /**
  * Register `ib message chat` — conversational threads over /api/messages/*:
@@ -183,15 +184,13 @@ export function registerMessageChatCommands(parent, getClient) {
         .option("--unread", "Only threads with unread messages")
         .option("--tarjous <id>", "Only threads for this pumppuRequestId", Number)
         .action(jsonAction(getClient, (client, opts) => runChatThreads(client, opts)));
-    c.command("thread [threadId]")
-        .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
+    addThreadTargetOption(c.command("thread [threadId]"))
         .action(guarded(async (threadIdStr, opts) => {
         const client = await getClient();
         const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
         writeJson(await runChatThread(client, id));
     }));
-    c.command("list [threadId]")
-        .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
+    addThreadTargetOption(c.command("list [threadId]"))
         .option("--since <iso>", "Only messages created after this ISO timestamp")
         .option("--limit <n>", "Max messages (default 100, server max 500)", Number)
         .option("--deleted", "Include soft-deleted messages (your own; all for developers)")
@@ -204,9 +203,7 @@ export function registerMessageChatCommands(parent, getClient) {
         .option("--search <s>", "Search query (alias for the <query> positional)")
         .option("--limit <n>", "Max results (default 50, server max 200)", Number)
         .action(jsonAction(getClient, (client, query, opts) => runChatSearch(client, resolveSearchQuery(query, opts.search), opts)));
-    const sendCmd = c
-        .command("send [threadId]")
-        .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
+    const sendCmd = addThreadTargetOption(c.command("send [threadId]"))
         .requiredOption("--body <text>", "Message text (max 4000 chars)")
         .option("--source <src>", "Provenance: web|cli|ai (default: IB_SOURCE env or cli)");
     addWriteFlagsToCommand(sendCmd).action(guarded(async (threadIdStr, opts) => {
@@ -229,17 +226,13 @@ export function registerMessageChatCommands(parent, getClient) {
             dryRun: opts.dryRun,
         }));
     }));
-    c.command("mark-read [threadId]")
-        .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
+    addThreadTargetOption(c.command("mark-read [threadId]"))
         .action(guarded(async (threadIdStr, opts) => {
         const client = await getClient();
         const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
         writeJson(await runChatMarkRead(client, id));
     }));
-    const deleteCmd = c
-        .command("delete <messageId>")
-        .option("--thread <id>", "Thread id the message belongs to", Number)
-        .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
+    const deleteCmd = addThreadTargetOption(c.command("delete <messageId>").option("--thread <id>", "Thread id the message belongs to", Number));
     addWriteFlagsToCommand(deleteCmd).action(guarded(async (messageIdStr, opts) => {
         const messageId = parseId(messageIdStr, "messageId");
         const client = await getClient();
@@ -249,10 +242,7 @@ export function registerMessageChatCommands(parent, getClient) {
         });
         writeJson(await runChatDelete(client, id, messageId, opts));
     }));
-    const editCmd = c
-        .command("edit <messageId>")
-        .option("--thread <id>", "Thread id the message belongs to", Number)
-        .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number)
+    const editCmd = addThreadTargetOption(c.command("edit <messageId>").option("--thread <id>", "Thread id the message belongs to", Number))
         .requiredOption("--body <text>", "New message text (max 4000 chars)");
     addWriteFlagsToCommand(editCmd).action(guarded(async (messageIdStr, opts) => {
         const messageId = parseId(messageIdStr, "messageId");
@@ -267,10 +257,7 @@ export function registerMessageChatCommands(parent, getClient) {
             body, reason: opts.reason, idempotencyKey: opts.idempotencyKey, dryRun: opts.dryRun,
         }));
     }));
-    const restoreCmd = c
-        .command("restore <messageId>")
-        .option("--thread <id>", "Thread id the message belongs to", Number)
-        .option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
+    const restoreCmd = addThreadTargetOption(c.command("restore <messageId>").option("--thread <id>", "Thread id the message belongs to", Number));
     addWriteFlagsToCommand(restoreCmd).action(guarded(async (messageIdStr, opts) => {
         const messageId = parseId(messageIdStr, "messageId");
         const client = await getClient();
