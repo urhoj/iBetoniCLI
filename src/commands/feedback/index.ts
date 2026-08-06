@@ -514,8 +514,41 @@ export interface FeedbackUpdateInput {
   severity?: string;
   complexity?: number;
   description?: string;
+  /** Text appended to the CURRENT description (read-merge-write) — never replaces it. */
+  appendDescription?: string;
   dryRun?: boolean;
   full?: boolean;
+}
+
+/** Fields an `update --from-json` object may supply (drives explicit-flag detection). */
+export const UPDATE_FROM_JSON_FIELDS = [
+  "scope", "kind", "severity", "complexity", "description", "body", "appendDescription",
+] as const;
+
+/**
+ * Merge an `update --from-json` object with the CLI flags (feedback #332).
+ * Explicitly-typed flags win; `update` declares no Commander defaults, so an
+ * absent flag is simply absent. `body` folds into `description` (its alias)
+ * exactly as the argv path does.
+ */
+export function mergeFeedbackUpdateInput(
+  json: Record<string, unknown>,
+  explicit: Record<string, unknown>
+): FeedbackUpdateInput {
+  const pick = (k: (typeof UPDATE_FROM_JSON_FIELDS)[number]): unknown =>
+    explicit[k] ?? json[k];
+  const str = (v: unknown): string | undefined =>
+    v === undefined || v === null ? undefined : String(v);
+  const description = str(pick("description")) ?? str(pick("body"));
+  const complexityRaw = pick("complexity");
+  return {
+    scope: str(pick("scope")),
+    kind: str(pick("kind")),
+    severity: str(pick("severity")),
+    complexity: complexityRaw === undefined || complexityRaw === null ? undefined : Number(complexityRaw),
+    description,
+    appendDescription: str(pick("appendDescription")),
+  };
 }
 
 /**
@@ -536,15 +569,33 @@ export async function runFeedbackUpdate(
   if (input.description !== undefined && !input.description.trim()) {
     failWith("--description must be non-empty", 4);
   }
+  if (input.appendDescription !== undefined && !input.appendDescription.trim()) {
+    failWith("--append-description must be non-empty", 4);
+  }
+  // Replace and append are opposite intents on the same field — accepting both
+  // would silently pick one. Exit 4 rather than guess (mirrors the glossary
+  // `--definition` vs `--append-definition` pairing).
+  if (input.description !== undefined && input.appendDescription !== undefined) {
+    failWith("--description and --append-description are mutually exclusive", 4);
+  }
   const body: Record<string, unknown> = {};
   if (input.scope !== undefined) body.scope = input.scope;
   if (input.kind !== undefined) body.kind = input.kind;
   if (input.severity !== undefined) body.severity = input.severity;
   if (input.complexity !== undefined) body.complexity = validateComplexity(input.complexity);
   if (input.description !== undefined) body.description = input.description.trim();
+  // Read-merge-write: --description REPLACES the filed report, which is the
+  // destructive half of feedback #332. Appending keeps the original text and
+  // adds to it, so later commentary can never overwrite the evidence.
+  if (input.appendDescription !== undefined) {
+    const current = await runFeedbackGet(client, id);
+    const existing = typeof current.description === "string" ? current.description : "";
+    const addition = input.appendDescription.trim();
+    body.description = existing ? `${existing.trimEnd()}\n\n${addition}` : addition;
+  }
   if (Object.keys(body).length === 0) {
     failWith(
-      "Provide at least one of --scope / --kind / --severity / --complexity / --description",
+      "Provide at least one of --scope / --kind / --severity / --complexity / --description / --append-description",
       4
     );
   }
@@ -729,8 +780,13 @@ export function registerFeedbackCommands(
     .option("--kind <kind>", "improvement | bug | idea | legal")
     .option("--severity <sev>", "critical | major | minor | cosmetic")
     .option("--complexity <n>", "1-5 agent-triage estimate — promote/downgrade after investigation (see `ib help complexity`)", Number)
-    .option("--description <text>", "Replace the freetext description")
+    .option("--description <text>", "REPLACE the freetext description (destructive — the filed report is overwritten; use --append-description to add to it)")
     .option("--body <text>", "Alias for --description (free text, not JSON); if both are given, they must match")
+    .option("--append-description <text>", "Append to the CURRENT description (read-merge-write, separated by a blank line) — keeps the original report intact")
+    .option(
+      "--from-json <file>",
+      "Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: scope, kind, severity, complexity, description (or body), appendDescription. Shell-safe: the only way to pass prose containing quotes on Windows PowerShell."
+    )
     .option("--dry-run", "Print the update body without sending (client-side)")
     .option("--full", "Return the full updated row (default: a compact ack)")
     .action(
@@ -743,9 +799,12 @@ export function registerFeedbackCommands(
           complexity?: number;
           description?: string;
           body?: string;
+          appendDescription?: string;
+          fromJson?: string;
           dryRun?: boolean;
           full?: boolean;
-        }
+        },
+        cmd: Command
       ) => {
         const id = parseRefId(idStr, "feedback", "update");
         // --body is an alias for --description (feedback #278); fold it in so
@@ -758,9 +817,27 @@ export function registerFeedbackCommands(
             );
           if (opts.description === undefined) opts.description = opts.body;
         }
+        // Only EXPLICITLY-typed flags outrank the JSON object (feedback #332).
+        const explicit: Record<string, unknown> = {};
+        for (const k of UPDATE_FROM_JSON_FIELDS) {
+          if (cmd.getOptionValueSource(k) === "cli") {
+            explicit[k] = (opts as Record<string, unknown>)[k];
+          }
+        }
+        // --body typed on argv resolves to description above, so carry it over
+        // as the explicit description rather than losing it to the JSON.
+        if (explicit.body !== undefined && explicit.description === undefined) {
+          explicit.description = opts.description;
+        }
+        const merged = mergeFeedbackUpdateInput(
+          opts.fromJson ? readJsonObjectInput(opts.fromJson) : {},
+          explicit
+        );
         const client = await getClient();
         writeJson(
-          await runWithSiblingHint(client, id, "changelog", () => runFeedbackUpdate(client, id, opts))
+          await runWithSiblingHint(client, id, "changelog", () =>
+            runFeedbackUpdate(client, id, { ...merged, dryRun: opts.dryRun, full: opts.full })
+          )
         );
       })
     );

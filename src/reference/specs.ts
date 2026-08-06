@@ -5631,24 +5631,37 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "kind", type: "string", description: "improvement | bug | idea | legal" },
       { name: "severity", type: "string", description: "critical | major | minor | cosmetic" },
       { name: "complexity", type: "number", description: "1-5 agent-triage estimate — promote/downgrade after investigation (see `ib help complexity`)" },
-      { name: "description", type: "string", description: "Replace the freetext description" },
+      { name: "description", type: "string", description: "REPLACE the freetext description (destructive — the filed report is overwritten; use --append-description to add to it)" },
       { name: "body", type: "string", description: "Alias for --description (free text, not JSON); if both are passed, they must match" },
+      { name: "append-description", type: "string", description: "Append to the CURRENT description (read-merge-write, separated by a blank line) — keeps the original report intact" },
+      { name: "from-json", type: "string", description: "Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: scope, kind, severity, complexity, description (or body), appendDescription. Shell-safe: the only way to pass prose containing quotes on Windows PowerShell." },
       { name: "dry-run", type: "boolean", description: "Print the update body without sending (client-side)" },
       { name: "full", type: "boolean", description: "Return the full updated row instead of the compact ack" },
     ],
     outputShape:
       "A compact ack { feedbackId, scope, kind, severity, complexity, updatedAt, description? } (description capped at 200 chars; the full row with --full). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
     errors: [
-      { origin: "client", exit: 4, meaning: "Validation", remedy: "provide at least one of --scope/--kind/--severity/--complexity/--description; enum values must be valid; --complexity must be an integer 1-5" },
+      // Three client rows share exit 4, so EACH needs `match` — an unmatched row
+      // wins by exit alone and serves the wrong remedy (the fb#305/#306 ambiguity
+      // that error-origins.test.ts enforces).
+      { origin: "client", exit: 4, match: ["provide at least one of", "must be one of", "must be an integer", "must be non-empty", "mutually exclusive", "not both with different values"], meaning: "Validation", remedy: "provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description; enum values must be valid; --complexity must be an integer 1-5; --description and --append-description are mutually exclusive" },
+      { origin: "client", exit: 4, match: "too many arguments", meaning: "The shell split the description on its inner double-quotes (typical on Windows PowerShell)", remedy: "pass the text via --from-json <file|-> instead of argv" },
+      { origin: "client", exit: 4, match: "--from-json", meaning: "--from-json file is unreadable, not valid JSON, or not a JSON object", remedy: "check the file path and that the root is an object, not an array" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(404, "Not found", "check the id via `ib dev feedback list` — a bare id that is actually a changelog id 404s here and the error hint names the changelog command (feedback #230)"),
       apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    notes: [
+      "--description REPLACES the stored report; --append-description ADDS to it (read-merge-write, blank-line separated). Prefer append for later commentary — a replace that goes wrong destroys the original evidence, and feedback rows have no version history to recover it from. The two are mutually exclusive (exit 4).",
+      "SHELL QUOTING (feedback #332): a feedback description quotes commands, SQL and error strings, and Windows PowerShell splits a native argument on those inner quotes — the CLI then sees extra positionals and exits 4, or (when no split fragment starts with `-`) silently stores text TRUNCATED at the first quote. Since --description overwrites the filed report, that truncation is destructive. Use --from-json <file|-> for any long or quote-bearing text.",
     ],
     seeAlso: ["ib dev feedback resolve"],
     examples: [
       "ib dev feedback update 42 --scope security",
       "ib dev feedback update 42 --kind bug --severity major",
       "ib dev feedback update 42 --complexity 4",
+      "ib dev feedback update 42 --from-json ./correction.json",
+      'ib dev feedback update 42 --append-description "Confirmed on prod 2026-08-06; root cause is the cache key."',
     ],
   },
   {

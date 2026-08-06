@@ -11,6 +11,7 @@ import {
   resolveFeedbackCreateDescription,
   mergeFeedbackCreateInput,
   mergeFeedbackResolveInput,
+  mergeFeedbackUpdateInput,
   registerFeedbackCommands,
 } from "../../src/commands/feedback/index.js";
 import { writeFileSync, unlinkSync } from "node:fs";
@@ -809,6 +810,85 @@ describe("ib feedback update", () => {
       runFeedbackUpdate(mockClient, 1, { description: "   " })
     ).rejects.toThrowError(CliError);
     expect(put).not.toHaveBeenCalled();
+  });
+
+  // feedback #332: --description REPLACES the filed report, so a mangled or
+  // truncated value destroys the original evidence (no version history to
+  // recover it). --from-json removes the shell hazard; --append-description
+  // removes the overwrite risk entirely.
+  describe("--from-json / --append-description (feedback #332)", () => {
+    const withJsonFile = async (payload: unknown, fn: (path: string) => Promise<void>) => {
+      const p = join(tmpdir(), `ib-update-fromjson-${process.pid}.json`);
+      writeFileSync(p, JSON.stringify(payload), "utf8");
+      try { await fn(p); } finally { unlinkSync(p); }
+    };
+
+    test("precedence: an explicitly-typed flag beats the JSON", () => {
+      expect(mergeFeedbackUpdateInput({ scope: "cli" }, {}).scope).toBe("cli");
+      expect(mergeFeedbackUpdateInput({ scope: "cli" }, { scope: "security" }).scope).toBe("security");
+      expect(mergeFeedbackUpdateInput({}, {}).scope).toBeUndefined();
+    });
+
+    test("`body` is accepted as a JSON alias for description", () => {
+      expect(mergeFeedbackUpdateInput({ body: "via body" }, {}).description).toBe("via body");
+    });
+
+    test("a quote-bearing description round-trips byte-intact through the file", async () => {
+      const description =
+        'Root cause: `executeQuery("person","SELECT",...)` returns {recordset} — not an array.';
+      put.mockResolvedValueOnce({ feedbackId: 42 });
+      await withJsonFile({ description, scope: "cli" }, async (p) => {
+        const program = new Command();
+        registerFeedbackCommands(program, async () => mockClient);
+        await program.parseAsync(["feedback", "update", "42", "--from-json", p], { from: "user" });
+      });
+      expect(put).toHaveBeenCalledWith("/api/feedback/42", { scope: "cli", description });
+    });
+
+    test("--append-description reads the current row and appends, preserving the original", async () => {
+      get.mockResolvedValueOnce({ feedbackId: 42, description: "Original report." });
+      put.mockResolvedValueOnce({ feedbackId: 42 });
+      await runFeedbackUpdate(mockClient, 42, { appendDescription: "  Later finding.  " });
+      expect(get).toHaveBeenCalledWith("/api/feedback/42");
+      expect(put).toHaveBeenCalledWith("/api/feedback/42", {
+        description: "Original report.\n\nLater finding.",
+      });
+    });
+
+    test("appending to an empty description does not leave leading blank lines", async () => {
+      get.mockResolvedValueOnce({ feedbackId: 42, description: "" });
+      put.mockResolvedValueOnce({ feedbackId: 42 });
+      await runFeedbackUpdate(mockClient, 42, { appendDescription: "First text." });
+      expect(put).toHaveBeenCalledWith("/api/feedback/42", { description: "First text." });
+    });
+
+    test("--description and --append-description are mutually exclusive (exit 4, no reads/writes)", async () => {
+      await expect(
+        runFeedbackUpdate(mockClient, 42, { description: "replace", appendDescription: "add" })
+      ).rejects.toThrowError(CliError);
+      expect(get).not.toHaveBeenCalled();
+      expect(put).not.toHaveBeenCalled();
+    });
+
+    test("rejects a blank --append-description", async () => {
+      await expect(
+        runFeedbackUpdate(mockClient, 42, { appendDescription: "   " })
+      ).rejects.toThrowError(CliError);
+      expect(put).not.toHaveBeenCalled();
+    });
+
+    test("--dry-run previews the merged append without writing", async () => {
+      get.mockResolvedValueOnce({ feedbackId: 42, description: "Original." });
+      const out = await runFeedbackUpdate(mockClient, 42, {
+        appendDescription: "Added.",
+        dryRun: true,
+      });
+      expect(out).toMatchObject({
+        dryRun: true,
+        wouldSend: { method: "PUT", body: { description: "Original.\n\nAdded." } },
+      });
+      expect(put).not.toHaveBeenCalled();
+    });
   });
 
   test("folds the --body alias into the description patch (feedback #278)", async () => {
