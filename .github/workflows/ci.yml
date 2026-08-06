@@ -36,14 +36,16 @@ jobs:
           node -e "const fs=require('fs');const p=require('./package.json');p.dependencies['@ibetoni/auth']='file:./ibetoni_packages/auth';p.dependencies['@ibetoni/constants']='file:./ibetoni_packages/constants';fs.writeFileSync('./package.json',JSON.stringify(p,null,2)+'\n');"
 
       - run: npm install
-      - run: npm run type-check
-      - run: npm run lint
-      - run: npm test
       # Compiles the same tsconfig as `npm run build` AND fails when the
       # committed dist/ doesn't match the fresh output (stale/unbuilt/orphaned).
       # dist/ is what actually ships (vendored into puminet5api; deploys never
       # build), so a src-only commit must go red here (feedback #135/#136).
+      # This REPLACES a separate `npm run type-check` step: an emitting tsc over
+      # the same tsconfig reports every error `--noEmit` would, so running both
+      # compiled the project twice for one set of diagnostics.
       - run: npm run check:dist
+      - run: npm run lint
+      - run: npm test
 
   # On a green master push, tell puminet5api to move its vendored-CLI
   # submodule pointer (bump-vendored-cli.yml there). Gated on build-and-test

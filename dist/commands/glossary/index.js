@@ -47,32 +47,41 @@ export function mergeSetInput(json, flags) {
         needsHumanReview: flags.needsHumanReview ?? json.needsHumanReview,
     };
 }
+/** Concurrent PUTs during `glossary import` — bounded so a 500-entry grooming
+ *  run doesn't open a socket per entry. Mirrors `person search --my-companies`. */
+const IMPORT_CONCURRENCY = 5;
 /**
- * Bulk-set entries from a pre-parsed JSON array. Runs sequentially (one PUT per
- * entry) so individual failures don't abort the batch — each result records
- * `ok: true/false` and, on failure, the `error` message. The summary counts are
- * returned; callers can check `failed > 0` to decide whether to exit non-zero.
- * Entries missing `term` are recorded as `{ term: null, ok: false }` without a
- * network round-trip.
+ * Bulk-set entries from a pre-parsed JSON array (one PUT per entry, at most
+ * {@link IMPORT_CONCURRENCY} in flight). Individual failures don't abort the
+ * batch — each result records `ok: true/false` and, on failure, the `error`
+ * message, in the entries' input order. The summary counts are returned;
+ * callers can check `failed > 0` to decide whether to exit non-zero. Entries
+ * missing `term` are recorded as `{ term: null, ok: false }` without a network
+ * round-trip.
  */
 export async function runGlossaryImport(client, entries, flags) {
-    const results = [];
-    for (const e of entries) {
-        const term = e.term ?? null;
-        if (!term) {
-            results.push({ term: null, ok: false, error: "missing term" });
-            continue;
+    const results = new Array(entries.length);
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(IMPORT_CONCURRENCY, entries.length) }, async () => {
+        while (next < entries.length) {
+            const i = next++;
+            const e = entries[i];
+            const term = e.term ?? null;
+            if (!term) {
+                results[i] = { term: null, ok: false, error: "missing term" };
+                continue;
+            }
+            const inp = mergeSetInput(e, {});
+            try {
+                await runGlossarySet(client, term, { definition: inp.definition, synonyms: inp.synonyms, related: inp.related, entity: inp.entity, domain: inp.domain,
+                    aiConfidence: inp.aiConfidence, needsHumanReview: inp.needsHumanReview, updateOnly: flags.updateOnly }, flags);
+                results[i] = { term, ok: true };
+            }
+            catch (err) {
+                results[i] = { term, ok: false, error: errorMessage(err) };
+            }
         }
-        const inp = mergeSetInput(e, {});
-        try {
-            await runGlossarySet(client, term, { definition: inp.definition, synonyms: inp.synonyms, related: inp.related, entity: inp.entity, domain: inp.domain,
-                aiConfidence: inp.aiConfidence, needsHumanReview: inp.needsHumanReview, updateOnly: flags.updateOnly }, flags);
-            results.push({ term, ok: true });
-        }
-        catch (err) {
-            results.push({ term, ok: false, error: errorMessage(err) });
-        }
-    }
+    }));
     return { results, ok: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok).length };
 }
 /**

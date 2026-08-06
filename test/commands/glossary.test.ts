@@ -180,6 +180,28 @@ describe("glossary set/import JSON input", () => {
     expect(put).toHaveBeenCalledTimes(1);
     expect(put.mock.calls[0][1]).toMatchObject({ definition: "d1", synonyms: ["lomat"] });
   });
+
+  test("runGlossaryImport: keeps input order and caps concurrency when PUTs finish out of order", async () => {
+    // Entries resolve in REVERSE order (entry 0 slowest), and one rejects — the
+    // results array must still mirror the input order, and the batch must not abort.
+    const entries = Array.from({ length: 12 }, (_, i) => ({ term: `t${i}`, definition: `d${i}` }));
+    let inFlight = 0;
+    let peak = 0;
+    const put = vi.fn(async (p: string) => {
+      peak = Math.max(peak, ++inFlight);
+      await new Promise((r) => setTimeout(r, (entries.length - Number(p.split("/").pop()!.slice(1))) * 2));
+      inFlight--;
+      if (p.endsWith("/t3")) throw new Error("boom");
+      return { term: p.split("/").pop() };
+    });
+    const res = await runGlossaryImport(mkClient({ put }), entries, { reason: "r" });
+    expect(res.results.map((r) => r.term)).toEqual(entries.map((e) => e.term));
+    expect(res.results[3]).toMatchObject({ term: "t3", ok: false });
+    expect(res.ok).toBe(11);
+    expect(res.failed).toBe(1);
+    expect(put).toHaveBeenCalledTimes(12);
+    expect(peak).toBeLessThanOrEqual(5); // bounded pool, not unbounded Promise.all
+  });
 });
 
 describe("glossary list terms-only", () => {

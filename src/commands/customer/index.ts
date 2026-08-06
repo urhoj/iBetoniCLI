@@ -32,6 +32,7 @@ import {
   type PrhCompany,
 } from "../../prh.js";
 import { qs } from "../../api/query.js";
+import { bothInOrder } from "../../parallel.js";
 import {
   projectHistoryRow,
   type ChangeHistoryItem,
@@ -353,7 +354,11 @@ const SETTING_ALIASES: Record<string, string> = {
 let _settingTypeIdMap: Record<string, number> | null = null;
 function settingTypeIdMap(): Record<string, number> {
   if (_settingTypeIdMap) return _settingTypeIdMap;
-  const constants = cjsRequire("@ibetoni/constants") as {
+  // `@ibetoni/constants` is a CommonJS package — pulled in via createRequire so
+  // the ESM build doesn't need a default-export shim. Both the require handle and
+  // the lookup happen on first use: at module scope `createRequire` ran on every
+  // CLI start, and most invocations never read a customer setting.
+  const constants = createRequire(import.meta.url)("@ibetoni/constants") as {
     ASIAKAS_SETTING_TYPE_IDS: Record<string, number>;
   };
   const ids = constants.ASIAKAS_SETTING_TYPE_IDS;
@@ -1278,8 +1283,12 @@ export function registerCustomerCommands(
     guarded(async (idStr: string, opts: CustomerUpdateFlags & WriteFlags & { fromPrh?: string }) => {
       const client = await getClient();
       const asiakasId = parseId(idStr, "asiakasId");
-      const current = await runCustomerGet(client, asiakasId);
-      const prh = opts.fromPrh ? await runCustomerPrhById(client, opts.fromPrh) : undefined;
+      // Keyed on different ids (asiakasId vs the --from-prh ytunnus) — independent
+      // reads, ordered so an unknown asiakasId outranks an unknown ytunnus.
+      const [current, prh] = await bothInOrder(
+        runCustomerGet(client, asiakasId),
+        opts.fromPrh ? runCustomerPrhById(client, opts.fromPrh) : Promise.resolve(undefined)
+      );
       const body = buildAsiakasUpdateBody(current, opts, prh);
       const res = await runCustomerUpdate(client, asiakasId, body, opts);
       if (opts.dryRun) {
@@ -1387,10 +1396,6 @@ export function registerCustomerCommands(
 async function resolveCurrentOwnerAsiakasId(client: ApiClient): Promise<number> {
   return resolveActiveOwnerAsiakasId(client, "run `ib auth switch`");
 }
-
-// `@ibetoni/constants` is a CommonJS package — pulled in via createRequire so
-// the ESM build doesn't need a default-export shim.
-const cjsRequire = createRequire(import.meta.url);
 
 interface PersonRow {
   personId: number;

@@ -172,18 +172,19 @@ export function createApiClient({
     return merged;
   }
 
+  // `payload` is the already-serialized body (undefined = no body) — serialized
+  // ONCE in `request` so the 401-refresh retry re-sends the same bytes instead
+  // of re-running JSON.stringify over the identical object.
   async function doFetch(
     method: string,
     path: string,
-    body: unknown,
+    payload: string | undefined,
     opts: FetchOptions
   ): Promise<Response> {
-    const url = `${endpoint}${path}`;
-    const withBody = method !== "GET" && body !== undefined;
-    return fetch(url, {
+    return fetch(`${endpoint}${path}`, {
       method,
-      headers: buildHeaders(opts.headers, withBody),
-      body: withBody ? JSON.stringify(body) : undefined,
+      headers: buildHeaders(opts.headers, payload !== undefined),
+      body: payload,
     });
   }
 
@@ -194,11 +195,11 @@ export function createApiClient({
   async function fetchOrNetworkError(
     method: string,
     path: string,
-    body: unknown,
+    payload: string | undefined,
     opts: FetchOptions
   ): Promise<Response> {
     try {
-      return await doFetch(method, path, body, opts);
+      return await doFetch(method, path, payload, opts);
     } catch (e) {
       const detail = errorMessage(e);
       throw new CliError(`Network error: ${detail}`, 0, null, 7);
@@ -233,8 +234,10 @@ export function createApiClient({
     // Meta requests skip this — they don't write tenant data under any company lens.
     // Read-over-POST requests skip this — they don't mutate tenant data.
     if (method !== "GET" && !opts.meta && !opts.read) announceActingAs();
+    const payload =
+      method !== "GET" && body !== undefined ? JSON.stringify(body) : undefined;
     const startedAt = Date.now();
-    let res = await fetchOrNetworkError(method, path, body, opts);
+    let res = await fetchOrNetworkError(method, path, payload, opts);
 
     // Single-retry refresh path: only the first 401 triggers a refresh+retry.
     // A second consecutive 401 (post-refresh) falls through to the normal
@@ -260,7 +263,7 @@ export function createApiClient({
         );
       }
       currentToken = newToken;
-      res = await fetchOrNetworkError(method, path, body, opts);
+      res = await fetchOrNetworkError(method, path, payload, opts);
     }
 
     // Per-invocation timing for the global --stats flag (best-effort; never

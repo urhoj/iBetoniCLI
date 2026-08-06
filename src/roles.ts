@@ -2,11 +2,6 @@ import { createRequire } from "node:module";
 import type { ApiClient } from "./api/client.js";
 import { failWith } from "./output/json.js";
 
-// `@ibetoni/constants` is CommonJS — pull in via createRequire so the ESM
-// build needs no default-export shim. ROLE_NAME_BY_TYPEID / ROLE_TYPEID_BY_NAME
-// are the single source of truth for the role typeId↔name mapping.
-const cjsRequire = createRequire(import.meta.url);
-
 interface RoleMaps {
   ROLE_TYPEID_BY_NAME: Record<string, number>;
   ROLE_NAME_BY_TYPEID: Record<number, string>;
@@ -20,13 +15,15 @@ interface RoleMaps {
 }
 
 // Lazily require + cache the role maps from the CommonJS @ibetoni/constants
-// package. Lazy (first call) so test imports don't need the workspace symlink at
-// module-eval time; cached so repeated lookups don't re-destructure. Mirrors the
-// memoized-accessor pattern in commands/customer/index.ts (settingTypeIdMap).
+// package (createRequire included — at module scope it ran on every start, and
+// most invocations never touch a role). Lazy (first call) so test imports don't
+// need the workspace symlink at module-eval time; cached so repeated lookups
+// don't re-destructure. Mirrors the memoized-accessor pattern in
+// commands/customer/index.ts (settingTypeIdMap) and auth/jwt.ts.
 let cachedRoleMaps: RoleMaps | undefined;
 function roleMaps(): RoleMaps {
   if (!cachedRoleMaps) {
-    cachedRoleMaps = cjsRequire("@ibetoni/constants") as RoleMaps;
+    cachedRoleMaps = createRequire(import.meta.url)("@ibetoni/constants") as RoleMaps;
   }
   return cachedRoleMaps;
 }

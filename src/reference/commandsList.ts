@@ -267,20 +267,28 @@ export function buildDomainIndex(
   specs: CommandSpec[] = COMMAND_SPECS,
   tier: CallerTier = getCallerTier()
 ): DomainIndexEnvelope {
-  const visible = visibleSpecs(specs, tier);
-  const items = commandDomains(visible)
-    .map((domain) => {
-      const inDomain = visible.filter(
-        (s) => domainOf(s.command) === domain
-      );
-      return {
-        domain,
-        count: inDomain.length,
-        description: domainBlurb(domain),
-        commands: inDomain.map((s) => s.command.replace(/^ib /, "")),
-      };
-    })
-    .filter((d) => d.count > 0);
+  // One grouping pass: the per-domain `visible.filter(...)` re-scanned the whole
+  // visible catalogue once per domain (~35 × 311), on top of a separate pass to
+  // collect the domain names. Map keys are inserted in catalogue order and
+  // sorted here, matching `commandDomains`; a grouped domain always has ≥ 1 leaf,
+  // so the old `count > 0` filter is subsumed.
+  const byDomain = new Map<string, CommandSpec[]>();
+  for (const s of visibleSpecs(specs, tier)) {
+    const domain = domainOf(s.command);
+    if (!domain) continue;
+    const group = byDomain.get(domain);
+    if (group) group.push(s);
+    else byDomain.set(domain, [s]);
+  }
+  const items = [...byDomain.keys()].sort().map((domain) => {
+    const inDomain = byDomain.get(domain)!;
+    return {
+      domain,
+      count: inDomain.length,
+      description: domainBlurb(domain),
+      commands: inDomain.map((s) => s.command.replace(/^ib /, "")),
+    };
+  });
   return {
     hint: "domain index — one domain's commands: `ib commands <domain>` · full flat list: `ib commands --all` · one command's spec: `ib <command> --help`",
     ...listEnvelope(items),

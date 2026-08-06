@@ -11,18 +11,23 @@
  * schedule, vehicle).
  */
 const COMPANY_TZ = "Europe/Helsinki";
+// Constructing an Intl.DateTimeFormat loads ICU data for the locale + timezone
+// and is the expensive half of `todayHelsinki`. Built on FIRST use (not at
+// import time — most invocations resolve no date at all) and reused after.
+let helsinkiDayFormat;
 /**
  * The current calendar date in Europe/Helsinki as `YYYY-MM-DD`. `en-CA`
  * formats as ISO `YYYY-MM-DD`, and `timeZone` makes the day boundary follow
  * Helsinki wall-clock rather than the host/UTC clock.
  */
 export function todayHelsinki(now = new Date()) {
-    return new Intl.DateTimeFormat("en-CA", {
+    helsinkiDayFormat ??= new Intl.DateTimeFormat("en-CA", {
         timeZone: COMPANY_TZ,
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
-    }).format(now);
+    });
+    return helsinkiDayFormat.format(now);
 }
 /** Shift an ISO `YYYY-MM-DD` by whole days, DST-safe (pure calendar math). */
 export function addDaysISO(iso, days) {

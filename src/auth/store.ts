@@ -60,12 +60,13 @@ export function createStore(path: string): CredentialsStore {
         profiles: {},
         activeProfile: "default",
       };
-      if (existsSync(path)) {
-        try {
-          existing = JSON.parse(await readFile(path, "utf8")) as CredentialsFile;
-        } catch {
-          // corrupt file; overwrite
-        }
+      try {
+        // Read through the cache (an invocation typically loaded the file
+        // already). Unlike `load`, a corrupt file is NOT fatal here — swallow
+        // the parse throw and overwrite, as this path always has.
+        existing = (await readCredentialsFile(path)) ?? existing;
+      } catch {
+        // corrupt file; overwrite
       }
       existing.profiles = { ...existing.profiles, [profile]: creds };
       existing.activeProfile = profile;
@@ -81,13 +82,13 @@ export function createStore(path: string): CredentialsStore {
       fileCache.set(path, null);
     },
     async remove(profile: string): Promise<void> {
-      if (!existsSync(path)) return;
-      let file: CredentialsFile;
+      let file: CredentialsFile | null;
       try {
-        file = JSON.parse(await readFile(path, "utf8")) as CredentialsFile;
+        file = await readCredentialsFile(path); // null when absent
       } catch {
         return; // corrupt — nothing to remove
       }
+      if (!file) return;
       if (file.profiles) delete file.profiles[profile];
       if (file.activeProfile === profile) file.activeProfile = "default";
       await writeFile(path, JSON.stringify(file, null, 2), { mode: 0o600 });

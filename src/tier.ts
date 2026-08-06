@@ -90,6 +90,28 @@ const REDACTED_REMEDY =
   "not available at your access level — run `ib commands` to see what you can run";
 
 /**
+ * One RegExp alternation of the hidden paths, replacing the per-string
+ * `hiddenCommands.some((h) => s.includes(h))` loop (~38 paths × ~6k strings =
+ * 221k `includes` calls for a standard-tier `ib reference dump`). Plain escaped
+ * literals with no anchors or flags, so it matches exactly the same substrings.
+ * Memoized on the ARRAY identity — the dump hoists `hiddenCommandPaths(...)`
+ * once and passes that same array for all ~311 specs, so it compiles once.
+ */
+const hiddenMatcherCache = new WeakMap<string[], RegExp | null>();
+function hiddenMatcher(hiddenCommands: string[]): (s: string) => boolean {
+  let re = hiddenMatcherCache.get(hiddenCommands);
+  if (re === undefined) {
+    // An empty alternation would compile to //, which matches EVERYTHING.
+    re = hiddenCommands.length
+      ? new RegExp(hiddenCommands.map((h) => h.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"))
+      : null;
+    hiddenMatcherCache.set(hiddenCommands, re);
+  }
+  const compiled = re;
+  return compiled ? (s) => compiled.test(s) : () => false;
+}
+
+/**
  * Tier-scrub a spec's ERRORS rows. An error row cannot just be filtered out on
  * any mention the way a note can, so the two fields are handled differently:
  *
@@ -132,8 +154,7 @@ export function scrubSpecForTier(
   hiddenCommands: string[]
 ): CommandSpec {
   if (tier === "developer") return spec;
-  const mentionsHidden = (s: string): boolean =>
-    hiddenCommands.some((h) => s.includes(h));
+  const mentionsHidden = hiddenMatcher(hiddenCommands);
   const out: CommandSpec = { ...spec };
   if (spec.seeAlso) out.seeAlso = spec.seeAlso.filter((r) => !mentionsHidden(r));
   if (spec.notes) out.notes = spec.notes.filter((n) => !mentionsHidden(n));

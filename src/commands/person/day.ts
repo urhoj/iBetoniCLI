@@ -12,6 +12,7 @@ import {
   requireReason,
 } from "../../api/writeFlags.js";
 import { qs } from "../../api/query.js";
+import { bothInOrder } from "../../parallel.js";
 
 type Row = Record<string, unknown>;
 
@@ -140,9 +141,14 @@ export async function runPersonDaySet(
 ): Promise<unknown> {
   const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
   const pvm = toYyyymmdd(date);
-  const statusId = await resolveStatusId(client, statusValue);
-
-  const existing = await runPersonDayGet(client, personId, date, date);
+  // The status lookup (only issued for a non-numeric --status) is keyed on the
+  // status name; the day read on person+date. Independent, so run them together —
+  // ordered so a bad --status still reports the validation error, not whichever
+  // of the two failed first.
+  const [statusId, existing] = await bothInOrder(
+    resolveStatusId(client, statusValue),
+    runPersonDayGet(client, personId, date, date)
+  );
   const current = existing.items[0] as Row | undefined;
   const curStatusId = current ? ((current.statusId as number | null) ?? null) : null;
   const curText = current ? ((current.text as string | null) ?? null) : null;

@@ -384,6 +384,25 @@ describe("runSijaintiListJoined", () => {
     expect(get).toHaveBeenCalledWith("/api/cli/sijainti/list?type=2");
   });
 
+  test("a numeric --type needs no lookup, so both reads are issued together", async () => {
+    // The types lookup is still fetched (it supplies typeName), but the list
+    // query no longer waits on it. The slow types GET records its own
+    // completion, so a sequential implementation would order it BEFORE the list
+    // GET starts; `007` also pins the id normalization (Number("007") → 7).
+    const order: string[] = [];
+    get.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/geocode/sijaintiTypes")) {
+        await new Promise((r) => setTimeout(r, 5));
+        order.push("types-resolved");
+        return TYPE_ROWS;
+      }
+      order.push(`list-started:${path}`);
+      return { items: [], nextCursor: null, count: 0 };
+    });
+    await runSijaintiListJoined(mockClient, { type: "007" });
+    expect(order).toEqual(["list-started:/api/cli/sijainti/list?type=7", "types-resolved"]);
+  });
+
   test("--search fetches at the 500 cap, forwards the query server-side and filters by name/address/typeName", async () => {
     const result = await runSijaintiListJoined(mockClient, { search: "jäte" });
     // search is forwarded for server-side pre-filtering (newer backends);

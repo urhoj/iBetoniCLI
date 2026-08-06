@@ -102,22 +102,23 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
         }
         return merged;
     }
-    async function doFetch(method, path, body, opts) {
-        const url = `${endpoint}${path}`;
-        const withBody = method !== "GET" && body !== undefined;
-        return fetch(url, {
+    // `payload` is the already-serialized body (undefined = no body) — serialized
+    // ONCE in `request` so the 401-refresh retry re-sends the same bytes instead
+    // of re-running JSON.stringify over the identical object.
+    async function doFetch(method, path, payload, opts) {
+        return fetch(`${endpoint}${path}`, {
             method,
-            headers: buildHeaders(opts.headers, withBody),
-            body: withBody ? JSON.stringify(body) : undefined,
+            headers: buildHeaders(opts.headers, payload !== undefined),
+            body: payload,
         });
     }
     // A fetch rejection (DNS failure, connection refused, TLS error, …) is a
     // network problem, not an HTTP status — surface it as a CliError mapped to
     // the documented `7` network exit code instead of letting a raw TypeError
     // escape to the generic exit-1 handler.
-    async function fetchOrNetworkError(method, path, body, opts) {
+    async function fetchOrNetworkError(method, path, payload, opts) {
         try {
-            return await doFetch(method, path, body, opts);
+            return await doFetch(method, path, payload, opts);
         }
         catch (e) {
             const detail = errorMessage(e);
@@ -143,8 +144,9 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
         // Read-over-POST requests skip this — they don't mutate tenant data.
         if (method !== "GET" && !opts.meta && !opts.read)
             announceActingAs();
+        const payload = method !== "GET" && body !== undefined ? JSON.stringify(body) : undefined;
         const startedAt = Date.now();
-        let res = await fetchOrNetworkError(method, path, body, opts);
+        let res = await fetchOrNetworkError(method, path, payload, opts);
         // Single-retry refresh path: only the first 401 triggers a refresh+retry.
         // A second consecutive 401 (post-refresh) falls through to the normal
         // error mapping so callers know to re-run `ib auth login`. A failing
@@ -164,7 +166,7 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
                 throw new CliError(detail, 401, null, 2, "session refresh failed — the stored token is expired/invalid and cannot be refreshed; run `ib auth login` to re-authenticate");
             }
             currentToken = newToken;
-            res = await fetchOrNetworkError(method, path, body, opts);
+            res = await fetchOrNetworkError(method, path, payload, opts);
         }
         // Per-invocation timing for the global --stats flag (best-effort; never
         // alters the result). Records the round-trip incl. any refresh retry, plus

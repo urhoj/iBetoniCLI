@@ -1,5 +1,11 @@
 import { describe, test, expect } from "vitest";
-import { lintEntries, isKnownCommandPath, suggestRelatedForEntry, isEditDistance1 } from "../../src/commands/glossary/lint.js";
+import {
+  lintEntries,
+  isKnownCommandPath,
+  suggestRelatedForEntry,
+  isEditDistance1,
+  nearDuplicateCandidates,
+} from "../../src/commands/glossary/lint.js";
 // Oracle for the O(len) fast path — the CLI's one Levenshtein implementation.
 import { levenshtein } from "../../src/output/unknownCommand.js";
 import type { CommandSpec } from "../../src/output/help.js";
@@ -88,6 +94,49 @@ describe("glossary lint --suggest-related (fb#110)", () => {
     // Uses the real COMMAND_SPECS (default arg) — off by default, on when requested.
     expect(lintEntries(entries).some((f) => f.issue === "stale-related")).toBe(false);
     expect(lintEntries(entries, { suggestRelated: true }).some((f) => f.issue === "stale-related")).toBe(true);
+  });
+});
+
+describe("nearDuplicateCandidates", () => {
+  /** The pre-bucketing all-pairs scan, verbatim — the order + membership oracle. */
+  const allPairs = (terms: string[]): Array<[number, number]> => {
+    const out: Array<[number, number]> = [];
+    for (let i = 0; i < terms.length; i++)
+      for (let j = i + 1; j < terms.length; j++)
+        if (isEditDistance1(terms[i], terms[j])) out.push([i, j]);
+    return out;
+  };
+  const kept = (terms: string[]) =>
+    nearDuplicateCandidates(terms).filter(([i, j]) => isEditDistance1(terms[i], terms[j]));
+
+  test("matches the all-pairs scan exactly on a synthetic glossary", () => {
+    // Mangles, duplicates, prefixes and unrelated terms mixed together.
+    const terms: string[] = [];
+    for (let i = 0; i < 400; i++) {
+      terms.push(`termi${i}`);
+      if (i % 7 === 0) terms.push(`termi${i}x`);   // insertion
+      if (i % 11 === 0) terms.push(`termi${i}`);   // exact duplicate (distance 0 — no finding)
+      if (i % 13 === 0) terms.push(`tarmi${i}`);   // substitution
+    }
+    expect(kept(terms)).toEqual(allPairs(terms));
+  });
+
+  test("matches the all-pairs scan on randomized short terms", () => {
+    let seed = 424242;
+    const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+    const letters = "abcä";
+    for (let round = 0; round < 60; round++) {
+      const terms = Array.from({ length: 40 }, () =>
+        Array.from({ length: 1 + Math.floor(rnd() * 4) }, () => letters[Math.floor(rnd() * letters.length)]).join("")
+      );
+      expect(kept(terms), JSON.stringify(terms)).toEqual(allPairs(terms));
+    }
+  });
+
+  test("handles empty and single-term inputs", () => {
+    expect(nearDuplicateCandidates([])).toEqual([]);
+    expect(nearDuplicateCandidates(["solo"])).toEqual([]);
+    expect(kept(["", "a"])).toEqual([[0, 1]]);
   });
 });
 

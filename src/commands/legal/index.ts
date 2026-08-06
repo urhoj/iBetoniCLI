@@ -29,6 +29,7 @@ import { addEditFlags, applyTextEdit, parseEditOp, textEditDryRunEnvelope, type 
 import { validateStructuredJson } from "./validateJson.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
+import { bothInOrder } from "../../parallel.js";
 
 /** Lifecycle status values on legalDocuments.status (see backend migration). */
 export const LEGAL_STATUSES = ["draft", "active", "archived", "deleted"] as const;
@@ -504,10 +505,14 @@ export async function runLegalAccept(
   personId: number,
   flags: WriteFlags
 ): Promise<unknown> {
-  const doc = await client.get<Row>(
-    `/api/legal-documents/current/${encodeURIComponent(typeName)}`
-  ); // 404 (no active doc) -> exit 5 via CliError
-  const t = await resolveDocumentType(client, typeName);
+  // Both reads are keyed on typeName alone, so they go out together. A BAD
+  // typeName fails both (404 here, "unknown document type" there), so the pair
+  // is ordered — the document 404 stays the reported error, as when these awaits
+  // were sequential. The doc GET 404 maps to exit 5 via CliError.
+  const [doc, t] = await bothInOrder(
+    client.get<Row>(`/api/legal-documents/current/${encodeURIComponent(typeName)}`),
+    resolveDocumentType(client, typeName)
+  );
   if (!t.personSettingTypeId) {
     failWith(
       `Type ${typeName} has no personSettingTypeId mapping — acceptance cannot be tracked`,

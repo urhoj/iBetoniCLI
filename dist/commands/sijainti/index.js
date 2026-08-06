@@ -10,6 +10,7 @@ import { jsonAction, guarded } from "../_shared/action.js";
 import { extractGeocodeLatLng } from "../_shared/geocode.js";
 import { runAddressDashboard, registerDashboardCommand, } from "../_shared/addressDashboard.js";
 import { qs } from "../../api/query.js";
+import { bothInOrder } from "../../parallel.js";
 /**
  * Sentinel `jerryActiveUntil` value meaning "enrolled in BetoniJerry, no end
  * date" — matches the EditSijainti toggle (a future/sentinel datetime = active,
@@ -392,10 +393,19 @@ export function sijaintiRowMatches(row, query) {
  * unknown or ambiguous name throws a validation error (exit 4) listing the
  * valid types so the caller can self-correct.
  */
-export function resolveSijaintiTypeId(types, input) {
+/**
+ * The lookup-free fast path of {@link resolveSijaintiTypeId}: a positive-integer
+ * literal IS the id. `undefined` means the value is a NAME and needs the
+ * sijaintiTypes lookup — the one case `runSijaintiListJoined` must stay sequential.
+ */
+function numericTypeId(input) {
     const n = Number(input);
-    if (Number.isInteger(n) && n > 0)
-        return n;
+    return Number.isInteger(n) && n > 0 ? n : undefined;
+}
+export function resolveSijaintiTypeId(types, input) {
+    const passthrough = numericTypeId(input);
+    if (passthrough !== undefined)
+        return passthrough;
     const q = input.trim().toLowerCase();
     const named = types.filter((t) => !!t.selite);
     const exact = named.filter((t) => t.selite.toLowerCase() === q);
@@ -429,12 +439,8 @@ export function resolveSijaintiTypeId(types, input) {
  * reads as "does not exist".
  */
 export async function runSijaintiListJoined(client, opts) {
-    const types = await runSijaintiTypes(client);
-    const typeId = opts.type !== undefined && opts.type !== ""
-        ? resolveSijaintiTypeId(types.items, opts.type)
-        : undefined;
     const clientFiltered = !!opts.search || opts.owner !== undefined || !!opts.jerry;
-    const env = await runSijaintiList(client, {
+    const list = (typeId) => runSijaintiList(client, {
         type: typeId !== undefined ? String(typeId) : undefined,
         limit: clientFiltered ? SIJAINTI_SEARCH_SCAN_LIMIT : opts.limit,
         validAt: opts.validAt,
@@ -442,6 +448,19 @@ export async function runSijaintiListJoined(client, opts) {
         search: opts.search,
         all: opts.all,
     });
+    const rawType = opts.type !== undefined && opts.type !== "" ? opts.type : undefined;
+    // Only a --type NAME needs the types lookup to build the list query; with no
+    // --type (or a numeric one) the two reads are independent, so issue them together.
+    const knownTypeId = rawType === undefined ? undefined : numericTypeId(rawType);
+    let types;
+    let env;
+    if (rawType !== undefined && knownTypeId === undefined) {
+        types = await runSijaintiTypes(client);
+        env = await list(resolveSijaintiTypeId(types.items, rawType));
+    }
+    else {
+        [types, env] = await bothInOrder(runSijaintiTypes(client), list(knownTypeId));
+    }
     const selite = new Map(types.items.map((t) => [t.sijaintiTypeId, t.selite]));
     let items = env.items.map((r) => ({
         ...r,

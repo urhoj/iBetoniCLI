@@ -5,6 +5,7 @@ import { resolveDate } from "../../dates.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, requireReason, } from "../../api/writeFlags.js";
 import { qs } from "../../api/query.js";
+import { bothInOrder } from "../../parallel.js";
 /** 20260610 → "2026-06-10". */
 function intToDate(n) {
     const s = String(n);
@@ -90,8 +91,11 @@ export async function resolveStatusId(client, value) {
 export async function runPersonDaySet(client, personId, date, statusValue, flags) {
     const asiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
     const pvm = toYyyymmdd(date);
-    const statusId = await resolveStatusId(client, statusValue);
-    const existing = await runPersonDayGet(client, personId, date, date);
+    // The status lookup (only issued for a non-numeric --status) is keyed on the
+    // status name; the day read on person+date. Independent, so run them together —
+    // ordered so a bad --status still reports the validation error, not whichever
+    // of the two failed first.
+    const [statusId, existing] = await bothInOrder(resolveStatusId(client, statusValue), runPersonDayGet(client, personId, date, date));
     const current = existing.items[0];
     const curStatusId = current ? (current.statusId ?? null) : null;
     const curText = current ? (current.text ?? null) : null;

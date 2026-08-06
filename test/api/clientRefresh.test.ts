@@ -51,6 +51,39 @@ describe("ApiClient auto-refresh on 401", () => {
     expect(client.getCurrentToken()).toBe("eyJnew");
   });
 
+  test("the retry re-sends the identical serialized body", async () => {
+    // The body is JSON.stringify'd ONCE in request() and the same string is
+    // handed to both fetches — the retry must be byte-identical to the original.
+    mockFetch.mockResolvedValueOnce(
+      new Response("{}", { status: 401, headers: { "content-type": "application/json" } })
+    );
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } })
+    );
+    const client = createApiClient({
+      endpoint: "https://api.example.com",
+      token: "eyJold",
+      version: "1.0.0",
+      onRefresh: vi.fn().mockResolvedValue("eyJnew"),
+      quiet: true,
+    });
+    await client.post("/api/thing", { reason: "ä ö", nested: { n: 1 } });
+    const [first, second] = mockFetch.mock.calls.map((c) => c[1]);
+    expect(first.body).toBe('{"reason":"ä ö","nested":{"n":1}}');
+    expect(second.body).toBe(first.body);
+    expect(second.headers["Content-Type"]).toBe("application/json");
+  });
+
+  test("a GET carries no body and no Content-Type", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "content-type": "application/json" } })
+    );
+    const client = createApiClient({ endpoint: "https://api.example.com", token: "t", version: "1.0.0" });
+    await client.get("/api/thing");
+    expect(mockFetch.mock.calls[0][1].body).toBeUndefined();
+    expect(mockFetch.mock.calls[0][1].headers["Content-Type"]).toBeUndefined();
+  });
+
   test("double-401 (refresh succeeds but retry still 401) throws CliError", async () => {
     // First call: 401
     mockFetch.mockResolvedValueOnce(

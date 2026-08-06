@@ -6,10 +6,14 @@ import { createRequire } from "node:module";
 // and kept it static). chalk 6 is ESM-only, which `require()` handles from Node
 // 22.12 on; the engines floor (^22.18 || >=24.11) clears that, so both stay
 // synchronous and the render functions below need not become async.
-const require = createRequire(import.meta.url);
+// The `createRequire` handle is lazy for the same reason as its two consumers.
+let _require = null;
+function cjsRequire() {
+    return (_require ??= createRequire(import.meta.url));
+}
 let _Table = null;
 function tableCtor() {
-    return (_Table ??= require("cli-table3"));
+    return (_Table ??= cjsRequire()("cli-table3"));
 }
 let _chalk = null;
 /** Lazily-resolved chalk instance. `require()` of an ESM module yields a
@@ -17,7 +21,7 @@ let _chalk = null;
 function chalk() {
     if (_chalk)
         return _chalk;
-    const mod = require("chalk");
+    const mod = cjsRequire()("chalk");
     return (_chalk = mod.default ?? mod);
 }
 /** cli-table3 colWidth includes the 2 padding spaces; 6 leaves 4 visible chars. */

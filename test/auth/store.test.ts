@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, existsSync, statSync } from "node:fs";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createStore, type CredentialsProfile } from "../../src/auth/store.js";
@@ -107,5 +107,27 @@ describe("store impersonation + remove", () => {
     await s.remove("_impersonator");
     const raw = JSON.parse(await readFile(path, "utf8")) as { activeProfile: string };
     expect(raw.activeProfile).toBe("default");
+  });
+
+  // save/remove read through the module's own file cache, but must NOT inherit
+  // load()'s "a corrupt file throws" contract — they swallow it, as they always have.
+  test("save() overwrites a corrupt file instead of throwing", async () => {
+    await writeFile(path, "{ not json", "utf8");
+    const s = createStore(path);
+    await expect(s.save(base)).resolves.toBeUndefined();
+    expect(await s.load()).toMatchObject({ jwt: "j" });
+  });
+
+  test("remove() is a no-op on a corrupt file (does not throw, does not rewrite)", async () => {
+    await writeFile(path, "{ not json", "utf8");
+    const s = createStore(path);
+    await expect(s.remove("default")).resolves.toBeUndefined();
+    expect(await readFile(path, "utf8")).toBe("{ not json");
+  });
+
+  test("remove() is a no-op when the file does not exist", async () => {
+    const s = createStore(path);
+    await expect(s.remove("default")).resolves.toBeUndefined();
+    expect(existsSync(path)).toBe(false);
   });
 });

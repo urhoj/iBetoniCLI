@@ -8,12 +8,16 @@ import { ListEnvelope } from "../api/envelopes.js";
 // and kept it static). chalk 6 is ESM-only, which `require()` handles from Node
 // 22.12 on; the engines floor (^22.18 || >=24.11) clears that, so both stay
 // synchronous and the render functions below need not become async.
-const require = createRequire(import.meta.url);
+// The `createRequire` handle is lazy for the same reason as its two consumers.
+let _require: NodeJS.Require | null = null;
+function cjsRequire(): NodeJS.Require {
+  return (_require ??= createRequire(import.meta.url));
+}
 
 let _Table: typeof import("cli-table3") | null = null;
 
 function tableCtor(): typeof import("cli-table3") {
-  return (_Table ??= require("cli-table3"));
+  return (_Table ??= cjsRequire()("cli-table3"));
 }
 
 type Chalk = typeof import("chalk").default;
@@ -23,7 +27,7 @@ let _chalk: Chalk | null = null;
  *  namespace object, so unwrap `.default`. */
 function chalk(): Chalk {
   if (_chalk) return _chalk;
-  const mod = require("chalk") as { default?: Chalk };
+  const mod = cjsRequire()("chalk") as { default?: Chalk };
   return (_chalk = mod.default ?? (mod as unknown as Chalk));
 }
 
