@@ -4,6 +4,12 @@ import { createApiClient, sanitizeHeaderValue } from "../../src/api/client.js";
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
+const jsonResponse = (body: unknown, status = 200): Response =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+
 describe("ApiClient", () => {
   beforeEach(() => {
     mockFetch.mockReset();
@@ -133,15 +139,80 @@ describe("ApiClient", () => {
   });
 
   test("network failure throws CliError with exitCode 7", async () => {
-    mockFetch.mockRejectedValueOnce(new TypeError("fetch failed"));
-    const client = createApiClient({
-      endpoint: "https://api.example.com",
-      token: "x",
-      version: "1.0.0",
+    // IB_NO_RETRY keeps this focused on the mapping (and instant) — the retry
+    // behaviour itself is covered in its own suite below.
+    process.env.IB_NO_RETRY = "1";
+    try {
+      mockFetch.mockRejectedValueOnce(new TypeError("fetch failed"));
+      const client = createApiClient({
+        endpoint: "https://api.example.com",
+        token: "x",
+        version: "1.0.0",
+      });
+      await expect(client.get("/api/x")).rejects.toMatchObject({
+        name: "CliError",
+        exitCode: 7,
+      });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    } finally {
+      delete process.env.IB_NO_RETRY;
+    }
+  });
+
+  // feedback #318: three geocode calls failed inside a 22s window and all three
+  // succeeded on an immediate re-run, silently punching holes in a batch that
+  // read as "no result" rather than "never evaluated".
+  describe("transient network retry (feedback #318)", () => {
+    const client = () =>
+      createApiClient({
+        endpoint: "https://api.example.com",
+        token: "x",
+        version: "1.0.0",
+        quiet: true, // suppress the stderr retry diagnostic in tests
+      });
+
+    test("a GET that fails once then succeeds resolves, without surfacing the flap", async () => {
+      mockFetch
+        .mockRejectedValueOnce(new TypeError("fetch failed"))
+        .mockResolvedValueOnce(jsonResponse({ ok: true }));
+      await expect(client().get("/api/x")).resolves.toEqual({ ok: true });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
     });
-    await expect(client.get("/api/x")).rejects.toMatchObject({
-      name: "CliError",
-      exitCode: 7,
+
+    test("a GET failing every attempt exits 7 and reports the attempt count", async () => {
+      mockFetch.mockRejectedValue(new TypeError("fetch failed"));
+      const err = await client().get("/api/x").catch((e) => e as Error);
+      expect(mockFetch).toHaveBeenCalledTimes(3); // initial + 2 retries
+      expect(err.message).toContain("after 3 attempts");
+    });
+
+    // The safety boundary: a rejected fetch cannot distinguish "never sent"
+    // from "processed, reply lost", so a mutation must never be auto-replayed.
+    test("a POST is NOT retried — one attempt, then exit 7", async () => {
+      mockFetch.mockRejectedValue(new TypeError("fetch failed"));
+      await expect(client().post("/api/x", { a: 1 })).rejects.toMatchObject({ exitCode: 7 });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    test("a read-over-POST (opts.read) IS retried — it is idempotent", async () => {
+      mockFetch
+        .mockRejectedValueOnce(new TypeError("fetch failed"))
+        .mockResolvedValueOnce(jsonResponse({ rows: [] }));
+      await expect(client().post("/api/search", { q: "x" }, { read: true })).resolves.toEqual({
+        rows: [],
+      });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    test("IB_NO_RETRY=1 disables retry for deterministic CI runs", async () => {
+      process.env.IB_NO_RETRY = "1";
+      try {
+        mockFetch.mockRejectedValue(new TypeError("fetch failed"));
+        await expect(client().get("/api/x")).rejects.toMatchObject({ exitCode: 7 });
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+      } finally {
+        delete process.env.IB_NO_RETRY;
+      }
     });
   });
 

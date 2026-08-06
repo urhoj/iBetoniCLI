@@ -30,7 +30,7 @@ import { canonicalPath } from "./reference/aliasPaths.js";
 import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, writeErrorEnvelope, setActiveCommandErrors, setExitCode as setExit, errorMessage } from "./output/json.js";
 import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { buildValidationEnvelope, type FlagProblem } from "./output/validationEnvelope.js";
-import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, commandPath } from "./output/unknownCommand.js";
+import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, buildExcessArgumentsEnvelope, commandPath } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { CliError } from "./api/errors.js";
 import { getCallerTier } from "./tier.js";
@@ -606,6 +606,19 @@ export function handleParseRejection(
     const detail = (text || err.message || "usage error")
       .replace(/^error:\s*/gm, "")
       .trim();
+    // Excess positionals → name what was probably meant. Chiefly a date typed
+    // positionally on an `<id> --date` command (feedback #328); Commander's own
+    // message lists the surplus tokens but never points at the flag.
+    if (err.code === "commander.excessArguments" && erroringCommand) {
+      const cmd = erroringCommand();
+      if (cmd) {
+        const declared = cmd.registeredArguments?.length ?? 0;
+        const excess = (cmd.args ?? []).slice(declared).map(String);
+        if (excess.length) {
+          return emitUsageEnvelope(err, buildExcessArgumentsEnvelope(cmd, excess, detail));
+        }
+      }
+    }
     const genericHint =
       "usage error — run `ib <command> --help` for the exact arguments and flags, or `ib commands` to discover commands";
     return emitUsageEnvelope(err, {

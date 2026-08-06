@@ -7,6 +7,8 @@ import {
   visibleSubcommands,
   buildUnknownCommandEnvelope,
   buildUnknownOptionEnvelope,
+  buildExcessArgumentsEnvelope,
+  asDateSuggestion,
   OPTION_REDIRECTS,
 } from "../../src/output/unknownCommand.js";
 
@@ -124,6 +126,70 @@ describe("buildUnknownOptionEnvelope (#235/#236)", () => {
 
   test("OPTION_REDIRECTS is keyed by full command path + flag", () => {
     expect(OPTION_REDIRECTS).toHaveProperty("ib dev cache invalidate --pattern");
+  });
+});
+
+describe("asDateSuggestion (#328)", () => {
+  test("normalizes the forms a caller actually types to YYYY-MM-DD", () => {
+    expect(asDateSuggestion("2026-08-06")).toBe("2026-08-06");
+    expect(asDateSuggestion("20260806")).toBe("2026-08-06"); // both captured instances
+    expect(asDateSuggestion("6.8.2026")).toBe("2026-08-06");
+    expect(asDateSuggestion("06.08.2026")).toBe("2026-08-06");
+  });
+
+  test("passes through the relative keywords resolveDate accepts", () => {
+    expect(asDateSuggestion("today")).toBe("today");
+    expect(asDateSuggestion("Yesterday")).toBe("yesterday");
+  });
+
+  // A wrong suggestion is worse than none, so the bar is "obviously a date".
+  test("rejects non-dates and impossible calendar dates", () => {
+    for (const t of ["52", "abc", "", "2026", "123456789", "20261338", "2026-02-31", "0.0.2026"]) {
+      expect(asDateSuggestion(t), t).toBeNull();
+    }
+  });
+});
+
+describe("buildExcessArgumentsEnvelope (#328)", () => {
+  test("a date positional on an `<id> --date` command suggests the flag, normalized", () => {
+    const env = buildExcessArgumentsEnvelope(
+      leafByPath("vehicle", "timeline"),
+      ["20260806"],
+      "too many arguments for 'timeline'. Expected 1 argument but got 2: 52, 20260806."
+    );
+    expect(env.didYouMean).toBe("--date 2026-08-06");
+    expect(env.hint).toContain("--date 2026-08-06");
+    expect(env.hint).toContain("YYYY-MM-DD"); // the input format was also wrong
+    expect(env.hint).toContain("<vehicleId>");
+    expect(env.code).toBe("USAGE");
+    expect(env.statusCode).toBe(0);
+  });
+
+  test("an already-ISO date suggests the flag without nagging about format", () => {
+    const env = buildExcessArgumentsEnvelope(
+      leafByPath("vehicle", "timeline"),
+      ["2026-08-06"],
+      "too many arguments"
+    );
+    expect(env.didYouMean).toBe("--date 2026-08-06");
+    expect(env.hint).not.toContain("documented format");
+  });
+
+  test("a non-date surplus falls back to the shell-splitting explanation", () => {
+    const env = buildExcessArgumentsEnvelope(
+      leafByPath("vehicle", "timeline"),
+      ["banana"],
+      "too many arguments"
+    );
+    expect(env.didYouMean).toBeNull();
+    expect(env.hint).toMatch(/PowerShell/);
+    expect(env.hint).toContain("<vehicleId>");
+  });
+
+  test("still lists the command's real positionals and flags", () => {
+    const env = buildExcessArgumentsEnvelope(leafByPath("vehicle", "timeline"), ["x"], "e");
+    expect(env.availableOptions).toContain("--date");
+    expect(env.positionals.length).toBeGreaterThan(0);
   });
 });
 

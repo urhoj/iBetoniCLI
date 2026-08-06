@@ -111,6 +111,18 @@ export function sanitizeHeaderValue(value: string): string {
     .replace(/[^\u0020-\u00ff]/g, "?"); // remaining >255 + control chars
 }
 
+/**
+ * Backoff before each retry of an idempotent request whose fetch REJECTED
+ * (feedback #318). Two retries, deliberately short: `ib` is invoked
+ * interactively and in batch loops, so a long backoff would read as a hang.
+ * Covers the observed flap shape — failures ~11s apart that cleared on an
+ * immediate re-run — without turning a genuinely-down endpoint into a stall
+ * (worst case adds ~1s before the same exit 7). `IB_NO_RETRY=1` disables.
+ */
+const NETWORK_RETRY_BACKOFF_MS = [250, 750];
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
 export function createApiClient({
   endpoint,
   token,
@@ -192,18 +204,47 @@ export function createApiClient({
   // network problem, not an HTTP status — surface it as a CliError mapped to
   // the documented `7` network exit code instead of letting a raw TypeError
   // escape to the generic exit-1 handler.
+  //
+  // Transient flaps are retried first (feedback #318): three `sijainti geocode`
+  // calls failed inside a 22-second window and all three succeeded on an
+  // immediate re-run, silently punching holes in a 12-address batch that read
+  // as "no result for this address" rather than "never evaluated".
+  //
+  // ONLY IDEMPOTENT requests are retried — GET, and the read-over-POST reads
+  // that mark themselves `opts.read`. A fetch rejection cannot distinguish
+  // "never left the machine" from "server processed it, reply lost", so
+  // retrying a real mutation risks double-writing. Mutations keep the old
+  // fail-fast behaviour; a caller who wants one retried can supply
+  // --idempotency-key and re-run deliberately.
   async function fetchOrNetworkError(
     method: string,
     path: string,
     payload: string | undefined,
     opts: FetchOptions
   ): Promise<Response> {
-    try {
-      return await doFetch(method, path, payload, opts);
-    } catch (e) {
-      const detail = errorMessage(e);
-      throw new CliError(`Network error: ${detail}`, 0, null, 7);
+    const idempotent = method === "GET" || !!opts.read;
+    const attempts = idempotent && !process.env.IB_NO_RETRY ? NETWORK_RETRY_BACKOFF_MS.length + 1 : 1;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      try {
+        return await doFetch(method, path, payload, opts);
+      } catch (e) {
+        lastError = e;
+        if (attempt === attempts - 1) break;
+        const waitMs = NETWORK_RETRY_BACKOFF_MS[attempt];
+        if (!quiet) {
+          // stderr only — the stdout JSON contract is never polluted. Silence
+          // would make a retried call indistinguishable from a clean one.
+          process.stderr.write(
+            `[ib] network error (${errorMessage(e)}) — retrying ${method} ${path} in ${waitMs}ms (attempt ${attempt + 2}/${attempts})\n`
+          );
+        }
+        await sleep(waitMs);
+      }
     }
+    const detail = errorMessage(lastError);
+    const retried = attempts > 1 ? ` (after ${attempts} attempts)` : "";
+    throw new CliError(`Network error: ${detail}${retried}`, 0, null, 7);
   }
 
   async function request<T = unknown>(

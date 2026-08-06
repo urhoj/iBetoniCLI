@@ -163,6 +163,103 @@ function specPositionals(spec) {
     return (spec.args ?? []).map((a) => a.required === false ? `[<${a.name}>]` : `<${a.name}>`);
 }
 /**
+ * Recognize a surplus positional that is unmistakably a DATE, and normalize it
+ * to the `YYYY-MM-DD` the CLI documents (feedback #328).
+ *
+ * Accepts the forms a caller actually reaches for: the documented `YYYY-MM-DD`,
+ * compact `YYYYMMDD` (what was typed in both captured instances), Finnish
+ * `D.M.YYYY`, and the relative keywords `resolveDate` already expands. Returns
+ * null for anything else — a wrong suggestion is worse than none, so the bar is
+ * "obviously a date", not "might parse as one".
+ */
+export function asDateSuggestion(token) {
+    const t = token.trim();
+    if (/^(today|yesterday|tomorrow)$/i.test(t))
+        return t.toLowerCase();
+    const iso = t.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (iso)
+        return isRealDate(+iso[1], +iso[2], +iso[3]) ? t : null;
+    const compact = t.match(/^(\d{4})(\d{2})(\d{2})$/);
+    if (compact) {
+        const [, y, m, d] = compact;
+        return isRealDate(+y, +m, +d) ? `${y}-${m}-${d}` : null;
+    }
+    const fi = t.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if (fi) {
+        const [, d, m, y] = fi;
+        const pad = (s) => s.padStart(2, "0");
+        return isRealDate(+y, +m, +d) ? `${y}-${pad(m)}-${pad(d)}` : null;
+    }
+    return null;
+}
+/** Calendar-valid check — rejects 20261338 and 2026-02-31 rather than suggesting them. */
+function isRealDate(y, m, d) {
+    if (m < 1 || m > 12 || d < 1 || d > 31)
+        return false;
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+/** The command's date-ish flag, if it declares one (`--date`, or keikka's `--pvm`). */
+function dateFlagOf(spec) {
+    const names = (spec?.flags ?? []).map((f) => f.name);
+    return names.find((n) => n === "date" || n === "pvm") ?? null;
+}
+/**
+ * Enriched "too many arguments" envelope (feedback #328).
+ *
+ * Commander's default says only what was rejected — "Expected 1 argument but
+ * got 2: 52, 20260806" — never what was obviously meant. The captured instance
+ * shows why that matters: the caller repeated the SAME shape on the next call
+ * rather than reading the remedy off the error. When a surplus positional is
+ * recognisably a date and the command declares a `--date`/`--pvm` flag, suggest
+ * it directly, normalised to the documented format so a compact `YYYYMMDD`
+ * (also wrong) is corrected in the same breath.
+ *
+ * Spec-driven, so it covers every `<id> + --date` command rather than being
+ * special-cased to `vehicle timeline`.
+ */
+export function buildExcessArgumentsEnvelope(cmd, excess, parserDetail) {
+    const command = commandPath(cmd);
+    const spec = COMMAND_SPECS.find((s) => s.command === canonicalPath(command));
+    const availableOptions = spec ? specOptionLongs(spec) : commanderOptionLongs(cmd);
+    const positionals = spec ? specPositionals(spec) : [];
+    const dateFlag = dateFlagOf(spec);
+    const dated = excess.map((t) => ({ token: t, date: asDateSuggestion(t) })).find((x) => x.date);
+    const didYouMean = dateFlag && dated ? `--${dateFlag} ${dated.date}` : null;
+    const parts = [];
+    if (didYouMean) {
+        parts.push(`Did you mean \`${didYouMean}\`? A date is passed as a FLAG here, not a positional` +
+            (dated.token !== dated.date ? ` (and the documented format is YYYY-MM-DD)` : "") +
+            ".");
+    }
+    else {
+        // No date to latch onto — the other common cause is the shell splitting a
+        // quoted value on its inner double-quotes (typical on Windows PowerShell).
+        parts.push("Extra positional(s) were passed. On Windows PowerShell this also happens when a quoted flag value is split on its inner double-quotes — check whether one long value became several arguments.");
+    }
+    if (positionals.length) {
+        parts.push(`This command takes positional argument(s): ${positionals.join(" ")}.`);
+    }
+    else {
+        parts.push("This command takes no positional arguments.");
+    }
+    if (availableOptions.length)
+        parts.push(`Accepted flags: ${availableOptions.join(", ")}.`);
+    parts.push(`Run \`${command} --help\` for the full spec.`);
+    return {
+        success: false,
+        error: parserDetail,
+        code: "USAGE",
+        statusCode: 0,
+        command,
+        excess,
+        didYouMean,
+        availableOptions,
+        positionals,
+        hint: parts.join(" "),
+    };
+}
+/**
  * Enriched "unknown option" error envelope — the flag analogue of
  * {@link buildUnknownCommandEnvelope}. When Commander rejects a guessed flag
  * (`ib customer search --search X`) the default USAGE envelope only echoes

@@ -120,7 +120,11 @@ export function hintForError(err, specErrors) {
     if (clientRow?.remedy)
         return clientRow.remedy;
     if (err.exitCode === 7) {
-        return "network failure (DNS/connection/TLS) — check connectivity and the --endpoint URL";
+        // Idempotent reads are already retried twice with backoff before this
+        // surfaces (feedback #318), so by the time a caller sees exit 7 on a GET
+        // the failure has persisted — saying so stops them burning a retry loop of
+        // their own. Writes are NOT retried (a lost reply could mean it landed).
+        return "network failure (DNS/connection/TLS) — check connectivity and the --endpoint URL. Idempotent reads were already retried automatically; a write is not retried, so re-run it only if you can confirm it did not land (or pass --idempotency-key).";
     }
     switch (err.statusCode) {
         case 401:
