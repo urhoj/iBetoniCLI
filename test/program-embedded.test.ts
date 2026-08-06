@@ -11,7 +11,7 @@ describe("embedded parser-error routing", () => {
     const errSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
     const c = ctx();
     await runEmbedded(c, async () => {
-      const program = buildProgram();
+      const program = await buildProgram();
       const { parserText, erroringCommand } = enableParserThrow(program);
       await program.parseAsync(["node", "ib", "definitely-not-a-command"]).catch((e) => handleParseRejection(e, parserText, erroringCommand));
     });

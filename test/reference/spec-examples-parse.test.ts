@@ -128,7 +128,7 @@ interface ParseResult {
  * recorder. Throws whatever Commander throws on a usage error.
  */
 async function parseExample(argv: string[]): Promise<ParseResult> {
-  const program = buildProgram();
+  const program = await buildProgram(argv);
   const result: ParseResult = { invoked: null, invokedIsGroup: false, swallowed: [] };
   // Neuter EVERY command (groups included) so no action can reach the network.
   // A bare-group example therefore parses instead of erroring — the

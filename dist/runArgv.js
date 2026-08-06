@@ -10,7 +10,7 @@ import { setAmbientCommandPath, getAmbientCommandPath, commandPathOf } from "./c
  * replaces). Always JSON output; never touches process stdout/stderr/exitCode.
  */
 export async function runArgv(argv, opts) {
-    const program = buildProgram();
+    const program = await buildProgram(argv);
     const { parserText, erroringCommand } = enableParserThrow(program);
     // Mirror bin/ib.ts: resolve each command's CommandSpec errors for hint output.
     program.hook("preAction", (_t, actionCommand) => {

@@ -10,14 +10,15 @@ import {
   OPTION_REDIRECTS,
 } from "../../src/output/unknownCommand.js";
 
-const legalOf = () => {
-  const program = buildProgram();
-  return program.commands.find((c) => c.name() === "legal")!;
-};
+// Sibling enumeration and did-you-mean read the WHOLE tree, so build it once
+// with no argv hint and inspect it — these assertions never mutate the program.
+const program = await buildProgram();
+
+const legalOf = () => program.commands.find((c) => c.name() === "legal")!;
 
 /** Walk the built program tree to a leaf command by its path (after `ib`). */
 const leafByPath = (...path: string[]): Command => {
-  let cmd: Command = buildProgram();
+  let cmd: Command = program;
   for (const name of path) cmd = cmd.commands.find((c) => c.name() === name)!;
   return cmd;
 };
@@ -75,7 +76,7 @@ describe("buildUnknownCommandEnvelope (#1)", () => {
     expect(env.available).toContain("active");
   });
   test("verb synonym surfaces in the envelope: `add` on a create-group → create (#229)", () => {
-    const keikka = buildProgram().commands.find((c) => c.name() === "keikka")!;
+    const keikka = program.commands.find((c) => c.name() === "keikka")!;
     const env = buildUnknownCommandEnvelope(keikka, "add", "developer");
     expect(env.available).toContain("create");
     expect(env.didYouMean).toBe("create");
@@ -128,7 +129,7 @@ describe("buildUnknownOptionEnvelope (#235/#236)", () => {
 
 describe("verb aliases (#229)", () => {
   const leafOf = (group: string, leaf: string) => {
-    const g = buildProgram().commands.find((c) => c.name() === group)!;
+    const g = program.commands.find((c) => c.name() === group)!;
     return g.commands.find((c) => c.name() === leaf)!;
   };
   test("`feedback create` answers to `add`", () => {
@@ -149,7 +150,7 @@ describe("visibleSubcommands root tier-hiding (#1)", () => {
   test("back-compat aliases (schema/ai/changelog) hidden via Commander at root at both tiers", () => {
     // Hidden Commander commands are filtered regardless of tier — they are
     // runtime-only aliases absent from spec-driven discovery and root --help.
-    const std = visibleSubcommands(buildProgram(), "standard");
+    const std = visibleSubcommands(program, "standard");
     expect(std).not.toContain("schema");
     expect(std).not.toContain("ai");
     expect(std).not.toContain("changelog");
@@ -158,7 +159,7 @@ describe("visibleSubcommands root tier-hiding (#1)", () => {
     expect(std).toContain("dev");
   });
   test("developer tier keeps the dev umbrella at root (not the old hidden aliases)", () => {
-    const names = visibleSubcommands(buildProgram(), "developer");
+    const names = visibleSubcommands(program, "developer");
     expect(names).toContain("dev");
     // back-compat aliases are still Commander-hidden even at developer tier
     expect(names).not.toContain("schema");

@@ -5,9 +5,12 @@ import { renderDomainHelp } from "../src/reference/domain.js";
 
 afterEach(() => setCallerTier("developer"));
 
+// Root help renders the whole Commands list, so this is the full-tree build.
+const program = await buildProgram();
+
 function rootHelp(tier: "developer" | "standard"): string {
   setCallerTier(tier);
-  return buildProgram().helpInformation();
+  return program.helpInformation();
 }
 
 describe("root --help command listing is tier-filtered", () => {

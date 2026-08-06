@@ -28,8 +28,10 @@ function allLongsIncludingAncestors(cmd: Command): Set<string> {
   return longs;
 }
 
+// Every spec is checked, so this needs the full tree (no argv hint).
+const program = await buildProgram();
+
 describe("every documented spec flag is a registered Commander option", () => {
-  const program = buildProgram();
   const byPath = indexCommands(program);
 
   for (const spec of COMMAND_SPECS) {

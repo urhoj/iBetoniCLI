@@ -78,7 +78,7 @@ describe("recordFriction", () => {
     const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const prevExitCode = process.exitCode;
     try {
-      const program = buildProgram();
+      const program = await buildProgram();
       const { parserText, erroringCommand } = enableParserThrow(program);
       await program
         .parseAsync(["node", "ib", "dev", "feedback", "show", "273"])

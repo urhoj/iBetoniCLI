@@ -33,8 +33,11 @@ function paths(root: Command): Set<string> {
 // their specs. This test used to keep its own copy.
 const MOVED: readonly string[] = DEV_ALIAS_DOMAINS;
 
+// No argv hint → the full tree, which is what these tree-shape assertions want.
+const fullProgram = await buildProgram();
+
 describe("ib dev umbrella", () => {
-  const tree = paths(buildProgram());
+  const tree = paths(fullProgram);
 
   test("canonical paths live under `ib dev`", () => {
     expect(tree.has("ib dev changelog")).toBe(true);
@@ -96,7 +99,7 @@ describe("ib dev umbrella", () => {
     // fell through to bare Commander help — losing PERMISSIONS / OUTPUT /
     // ERRORS / EXAMPLES, i.e. the whole "help is self-contained for an AI"
     // contract. Group help was patched for this; leaves were not.
-    const root = buildProgram();
+    const root = fullProgram;
     for (const [alias, canonical] of [
       ["ib feedback create", "ib dev feedback create"],
       ["ib changelog add", "ib dev changelog add"],

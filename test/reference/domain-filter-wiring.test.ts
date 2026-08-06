@@ -11,7 +11,7 @@ async function runCapture(argv: string[]): Promise<string> {
       return true;
     }) as typeof process.stdout.write);
   try {
-    await buildProgram().parseAsync(argv, { from: "user" });
+    await (await buildProgram(argv)).parseAsync(argv, { from: "user" });
   } finally {
     spy.mockRestore();
   }

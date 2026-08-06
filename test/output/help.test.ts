@@ -133,21 +133,24 @@ describe("formatGroupHelp tier filtering", () => {
   });
 });
 
+/** Full path → Command over the whole tree (no argv hint = every domain). */
+const leafIndex = await (async () => {
+  const map = new Map<string, Command>();
+  const walk = (cmd: Command, path: string[]): void => {
+    const full = [...path, cmd.name()].join(" ");
+    map.set(full, cmd);
+    for (const sub of cmd.commands) walk(sub, [...path, cmd.name()]);
+  };
+  walk(await buildProgram(), []);
+  return map;
+})();
+
 describe("leaf --help leaks no hidden command path", () => {
   // The dump has scrubbed cross-references for a while; leaf `--help` did not,
   // so a VISIBLE command's NOTES / SEE ALSO / ERRORS still named hidden commands
   // (10 leaves at standard tier, incl. `ib auth whoami` → `ib auth impersonate`).
   // Both surfaces now share `scrubSpecForTier` (feedback #288).
-  const leaves = (() => {
-    const map = new Map<string, Command>();
-    const walk = (cmd: Command, path: string[]): void => {
-      const full = [...path, cmd.name()].join(" ");
-      map.set(full, cmd);
-      for (const sub of cmd.commands) walk(sub, [...path, cmd.name()]);
-    };
-    walk(buildProgram(), []);
-    return map;
-  })();
+  const leaves = leafIndex;
 
   // The ambient tier is process-global — always hand it back.
   afterEach(() => setCallerTier("developer"));

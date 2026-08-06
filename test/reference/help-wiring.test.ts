@@ -17,8 +17,12 @@ function collectCommands(root: Command): Map<string, Command> {
   return map;
 }
 
+// No argv hint → every domain registered, which is what "every spec maps to a
+// registered command" needs.
+const fullProgram = await buildProgram();
+
 describe("Rich --help wiring — real command tree", () => {
-  const commands = collectCommands(buildProgram());
+  const commands = collectCommands(fullProgram);
 
   test("every COMMAND_SPEC maps to a registered command", () => {
     const orphaned = COMMAND_SPECS.map((s) => s.command).filter(

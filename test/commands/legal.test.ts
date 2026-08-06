@@ -482,8 +482,8 @@ describe("ib legal type writes (feedback #31)", () => {
 });
 
 describe("ib legal list alias (#3)", () => {
-  test("`active` is also reachable as `list`", () => {
-    const program = buildProgram();
+  test("`active` is also reachable as `list`", async () => {
+    const program = await buildProgram();
     const legal = program.commands.find((c) => c.name() === "legal");
     expect(legal).toBeDefined();
     const active = legal!.commands.find((c) => c.name() === "active");

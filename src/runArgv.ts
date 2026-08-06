@@ -26,7 +26,7 @@ export async function runArgv(
   argv: string[],
   opts: RunArgvOpts
 ): Promise<RunArgvResult> {
-  const program = buildProgram();
+  const program = await buildProgram(argv);
   const { parserText, erroringCommand } = enableParserThrow(program);
 
   // Mirror bin/ib.ts: resolve each command's CommandSpec errors for hint output.

@@ -13,7 +13,8 @@ import { defaultCredentialsPath } from "../auth/store.js";
 import { setCallerTier, resolveCallerTier } from "../tier.js";
 import { setAmbientCommandPath, commandPathOf } from "../commandContext.js";
 
-const program = buildProgram();
+// The argv hint lets buildProgram import ONLY the invoked domain's modules.
+const program = await buildProgram(process.argv.slice(2));
 
 // Throw-instead-of-exit for the parser (usage errors become the JSON envelope
 // in handleParseRejection; help/version pass through) + capture its stderr.

@@ -32,7 +32,7 @@ describe("parser errors → JSON envelope", () => {
   });
 
   async function run(argv: string[]): Promise<void> {
-    const program = buildProgram();
+    const program = await buildProgram();
     const { parserText, erroringCommand } = enableParserThrow(program);
     await program
       .parseAsync(["node", "ib", ...argv])

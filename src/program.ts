@@ -1,9 +1,13 @@
 /**
- * Builds the fully-wired `ib` Commander program.
+ * Builds the wired `ib` Commander program.
  *
- * Extracted from `bin/ib.ts` so the entire command tree — including the rich
- * `--help` wiring — is importable by tests without triggering argv parsing.
- * `bin/ib.ts` is now just a thin shell: build, then `parseAsync`.
+ * Extracted from `bin/ib.ts` so the command tree — including the rich `--help`
+ * wiring — is importable by tests without triggering argv parsing. `bin/ib.ts`
+ * is now just a thin shell: build, then `parseAsync`.
+ *
+ * WHICH commands get registered depends on the argv hint — see `domains.ts`.
+ * Only `reference` and `commands` are wired here, because they close over this
+ * function's helpers rather than living in a `commands/<domain>` module.
  */
 import { Command, Help, type Option } from "commander";
 import packageJson from "../package.json" with { type: "json" };
@@ -12,41 +16,7 @@ import { defaultCredentialsPath } from "./auth/store.js";
 import { createCliContext } from "./cliContext.js";
 import { recordFriction } from "./friction.js";
 import type { ApiClient } from "./api/client.js";
-import { registerAuthCommands } from "./commands/auth/index.js";
-import { registerCompanyCommands } from "./commands/company/index.js";
-import { registerFennoaCommands } from "./commands/fennoa/index.js";
-import { registerValidateCommands } from "./commands/validate/index.js";
-import { registerKeikkaCommands } from "./commands/keikka/index.js";
-import { registerCustomerCommands } from "./commands/customer/index.js";
-import { registerWorksiteCommands } from "./commands/worksite/index.js";
-import { registerPersonCommands } from "./commands/person/index.js";
-import { registerVehicleCommands } from "./commands/vehicle/index.js";
-import { registerNotificationCommands } from "./commands/notification/index.js";
-import { registerSijaintiCommands } from "./commands/sijainti/index.js";
-import { registerOhjeCommands } from "./commands/ohje/index.js";
-import { registerLegalCommands } from "./commands/legal/index.js";
-import { registerJerryCommands } from "./commands/jerry/index.js";
-import { registerMessageCommands } from "./commands/message/index.js";
-import { registerScheduleCommands } from "./commands/schedule/index.js";
-import { registerStatsCommands } from "./commands/stats/index.js";
-import { registerPerfCommands } from "./commands/perf/index.js";
-import { registerLogCommands } from "./commands/log/index.js";
-import { registerSearchCommands } from "./commands/search/index.js";
-import { registerAttachmentCommands } from "./commands/attachment/index.js";
-import { registerSchemaCommands } from "./commands/schema/index.js";
-import { registerCacheCommands } from "./commands/cache/index.js";
-import { registerWeatherCommands } from "./commands/weather/index.js";
-import { registerOpendataCommands } from "./commands/opendata/index.js";
-import { registerChangelogCommands } from "./commands/changelog/index.js";
-import { registerFeedbackCommands } from "./commands/feedback/index.js";
-import { registerAiCommands } from "./commands/ai/index.js";
-import { registerGlossaryCommands } from "./commands/glossary/index.js";
-import { registerTaskCommands } from "./commands/task/index.js";
-import { registerHelpCommands } from "./commands/help/index.js";
-import { registerVersionCommand } from "./commands/version/index.js";
-import { registerDoctorCommand } from "./commands/doctor/index.js";
-import { registerInboxCommand } from "./commands/inbox/index.js";
-import { registerImpersonationCommands } from "./commands/dev/impersonation/index.js";
+import { DOMAIN_REGISTRARS, resolveArgvDomain, type DomainDeps } from "./domains.js";
 import { runReferenceDump, fetchPrimerGlossary } from "./reference/dump.js";
 import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailEdit, runReferenceDetailDelete, runReferenceDetailLint, type ReferenceDetailListOptions } from "./reference/detail.js";
 import { addEditFlags, parseEditOp } from "./textEdit.js";
@@ -56,7 +26,7 @@ import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDom
 import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
-import { canonicalPath, DEV_ALIAS_DOMAINS } from "./reference/aliasPaths.js";
+import { canonicalPath } from "./reference/aliasPaths.js";
 import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, writeErrorEnvelope, setActiveCommandErrors, setExitCode as setExit, errorMessage } from "./output/json.js";
 import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { buildValidationEnvelope, type FlagProblem } from "./output/validationEnvelope.js";
@@ -67,10 +37,18 @@ import { CliError } from "./api/errors.js";
 import { getCallerTier } from "./tier.js";
 
 /**
- * Construct the `ib` program with all subcommands registered and rich
- * (`CommandSpec`-driven) `--help` attached. Does not parse argv.
+ * Construct the `ib` program with rich (`CommandSpec`-driven) `--help` attached.
+ * Does not parse argv.
+ *
+ * `argv` is a HINT (the caller's arguments, without node/script): when its first
+ * bare token names a known domain, only that domain's modules are imported and
+ * registered — the rest of the ~40 command modules are never loaded. Omit it, or
+ * pass an argv that starts with a flag or names something unknown, and the whole
+ * tree is registered as before; every surface that needs all the commands (root
+ * help, unknown-command siblings) is reached only through that path. Tests and
+ * library callers that want the full tree simply omit the argument.
  */
-export function buildProgram(): Command {
+export async function buildProgram(argv?: readonly string[]): Promise<Command> {
   const program = new Command();
   program
     .name("ib")
@@ -171,83 +149,19 @@ export function buildProgram(): Command {
   // switch) so read-only mode covers them too, and to `doctor` for reporting.
   const isReadOnly = (): boolean => getGlobalOptions(program).readOnly;
 
-  // `auth` manages credential-store access directly (login/logout/whoami/etc.)
-  // and so doesn't take a `getClient` factory.
-  registerAuthCommands(program, isReadOnly);
-
-  // `help` — concept guides + DB glossary fallback. Registered before
-  // authenticated commands so the spec catalogue and wiring tests can find it.
-  registerHelpCommands(program, getClient);
-
-  registerCompanyCommands(program, getClient, isReadOnly);
-  registerFennoaCommands(program, getClient);
-  registerValidateCommands(program, getClient);
-  registerKeikkaCommands(program, getClient);
-  registerCustomerCommands(program, getClient);
-  registerWorksiteCommands(program, getClient);
-  registerPersonCommands(program, getClient, getClientForAsiakas);
-  registerVehicleCommands(program, getClient);
-  registerNotificationCommands(program, getClient);
-  registerSijaintiCommands(program, getClient);
-  registerOhjeCommands(program, getClient);
-  registerLegalCommands(program, getClient);
-  registerJerryCommands(program, getClient);
-  registerMessageCommands(program, getClient);
-  registerScheduleCommands(program, getClient);
-  registerStatsCommands(program, getClient);
-  registerLogCommands(program, getClient);
-  // `ib opendata` (canonical) houses building + weather + prh. The top-level
-  // `ib weather` is kept as a HIDDEN back-compat alias (runtime-only; absent
-  // from spec-driven discovery and root --help).
-  registerOpendataCommands(program, getClient);
-  registerWeatherCommands(program, getClient, { hidden: true });
-  registerGlossaryCommands(program, getClient);
-  registerTaskCommands(program, getClient);
-  registerSearchCommands(program, getClient);
-  registerAttachmentCommands(program, getClient);
-  registerVersionCommand(program, packageJson.version, getEndpoint);
-  registerDoctorCommand(
-    program,
+  // Load + register the domains this invocation needs — one of them when argv
+  // names a known command, otherwise all of them. `DOMAIN_REGISTRARS` iterates
+  // in registration order, which is what `ib --help` lists.
+  const deps: DomainDeps = {
     getClient,
+    getClientForAsiakas,
+    isReadOnly,
     getEndpoint,
-    packageJson.version,
-    isReadOnly
-  );
-  // `ib dev` — developer/maintainer meta umbrella. The 8 groups below are
-  // canonical under `ib dev …`; their previous top-level paths stay registered
-  // with { hidden: true } as runtime-only back-compat aliases (absent from
-  // spec-driven discovery and root --help), mirroring `ib opendata`/`ib weather`.
-  const dev = program
-    .command("dev")
-    .description(
-      "Developer & maintainer tools — CLI feedback, changelog, perf, cache, schema, AI logs, operator inbox. Filing feedback is open to everyone."
-    );
-  registerFeedbackCommands(dev, getClient);
-  registerChangelogCommands(dev, getClient);
-  registerPerfCommands(dev, getClient);
-  registerCacheCommands(dev, getClient);
-  registerSchemaCommands(dev, getClient);
-  registerAiCommands(dev, getClient);
-  registerInboxCommand(dev, getClient);
-  registerImpersonationCommands(dev, getClient);
-  // Hidden back-compat aliases at the old top-level paths (still executable).
-  // Driven by DEV_ALIAS_DOMAINS so the alias set has ONE definition — the same
-  // table `canonicalPath` uses to resolve those paths back to their specs.
-  // (`dev impersonation` is deliberately absent: it never had a top-level path.)
-  const DEV_ALIAS_REGISTRARS: Record<
-    (typeof DEV_ALIAS_DOMAINS)[number],
-    (parent: Command, gc: typeof getClient, opts?: { hidden?: boolean }) => void
-  > = {
-    feedback: registerFeedbackCommands,
-    changelog: registerChangelogCommands,
-    perf: registerPerfCommands,
-    cache: registerCacheCommands,
-    schema: registerSchemaCommands,
-    ai: registerAiCommands,
-    inbox: registerInboxCommand,
+    version: packageJson.version,
   };
-  for (const domain of DEV_ALIAS_DOMAINS) {
-    DEV_ALIAS_REGISTRARS[domain](program, getClient, { hidden: true });
+  const selected = resolveArgvDomain(argv);
+  for (const [domain, register] of DOMAIN_REGISTRARS) {
+    if (selected === null || selected === domain) await register(program, deps);
   }
 
   const reference = program

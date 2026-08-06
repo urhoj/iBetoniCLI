@@ -1,17 +1,36 @@
 import { CliError } from "./api/errors.js";
 /** Truthy spellings accepted for the IB_READ_ONLY environment variable. */
 const READ_ONLY_ENV_TRUE = new Set(["1", "true", "yes", "on"]);
+/**
+ * The root options, as data. A table rather than a fluent chain because the
+ * argv pre-scanner in `domains.ts` has to know which globals swallow the NEXT
+ * argv token as their value (otherwise `ib --endpoint http://x keikka …` would
+ * read the URL as the command). Deriving that set from these same rows means a
+ * new value-taking global can never desync the scanner. Order is the order they
+ * appear in `ib --help`.
+ */
+const GLOBAL_OPTIONS = [
+    ["--endpoint <url>", "Override the API base URL"],
+    ["--request-id <id>", "Client-supplied request correlation ID"],
+    ["--quiet", "Suppress non-data output to stderr"],
+    ["--verbose", "Print extra diagnostic lines to stderr"],
+    ["--pretty", "Human-readable output (default is JSON)"],
+    ["--json", "Force JSON output (default)"],
+    ["--read-only", "Block all writes this session (also via IB_READ_ONLY=1)"],
+    [
+        "--company <id>",
+        "Run this one command in another company's context (ephemeral switch, not persisted)",
+    ],
+    ["--stats", "Print API, SQL, and cache hit/miss timing for this command to stderr"],
+];
+/** The `-x` / `--xxx` tokens in a Commander flags string (`-e, --endpoint <url>`). */
+const flagTokens = (flags) => flags.split(/[\s,|]+/).filter((t) => t.startsWith("-"));
+/** Globals that take a value, so an argv scanner must skip the token after them. */
+export const GLOBAL_VALUE_FLAGS = new Set(GLOBAL_OPTIONS.filter(([flags]) => /[<[]/.test(flags)).flatMap(([flags]) => flagTokens(flags)));
 export function addGlobalOptions(cmd) {
-    return cmd
-        .option("--endpoint <url>", "Override the API base URL")
-        .option("--request-id <id>", "Client-supplied request correlation ID")
-        .option("--quiet", "Suppress non-data output to stderr")
-        .option("--verbose", "Print extra diagnostic lines to stderr")
-        .option("--pretty", "Human-readable output (default is JSON)")
-        .option("--json", "Force JSON output (default)")
-        .option("--read-only", "Block all writes this session (also via IB_READ_ONLY=1)")
-        .option("--company <id>", "Run this one command in another company's context (ephemeral switch, not persisted)")
-        .option("--stats", "Print API, SQL, and cache hit/miss timing for this command to stderr");
+    for (const [flags, description] of GLOBAL_OPTIONS)
+        cmd.option(flags, description);
+    return cmd;
 }
 export function getGlobalOptions(cmd) {
     const o = cmd.opts();
