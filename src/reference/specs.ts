@@ -2247,8 +2247,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["auth.page.vehicle.read"],
     flags: [],
     outputShape:
-      "ListEnvelope<{ vehicleId|null, plate, objectName, lat, lng, speed, direction, engineState, address, at }> & { gpsAvailable }",
+      "ListEnvelope<{ vehicleId|null, matched, plate, objectName, lat, lng, speed, direction, engineState, address, at, ageMinutes|null, stale }> & { gpsAvailable, staleAfterMinutes }",
     errors: permErrors("auth.page.vehicle.read"),
+    notes: [
+      "Rows are Ecofleet OBJECTS, not vehicles: an object whose plate matches no dbo.vehicle row of the active company (retired truck, subcontractor unit, typo'd reg-no) returns vehicleId:null with matched:false. That is expected data, not an error — filter on `matched`, don't treat the null as a failure.",
+      "`stale:true` means the TRACKER stopped reporting (ageMinutes > staleAfterMinutes, default 60), so the coordinates say where the vehicle was, not where it is. A months-old ping still carries its last speed/direction, so without this flag a dead tracker reads as a truck currently driving.",
+      "`stale` is about the tracker, not the truck: a depot-parked vehicle whose tracker pinged 20 minutes ago is fresh (stale:false) with speed 0. Use `ageMinutes` to apply your own threshold — `staleAfterMinutes` echoes the one behind the boolean.",
+      "A missing or unparseable ping timestamp yields ageMinutes:null and stale:true — freshness cannot be vouched for, so it is never reported fresh.",
+    ],
     examples: ["ib vehicle locations", "ib vehicle locations --pretty"],
   },
   {
