@@ -121,4 +121,29 @@ export function registerCompanyCommands(
         )
       );
     });
+
+  // Your OWN tenant's flags live in the `customer` domain, so `ib company …` is
+  // where an AI looks first and finds nothing (feedback #353). These signposts
+  // turn that dead end into the right command in one round-trip; they carry a
+  // spec, so they also surface in `ib commands company` — the flat list is the
+  // discovery surface that shows no domain blurb.
+  for (const [name, target] of [
+    ["modules", "ib customer modules"],
+    ["settings", "ib customer settings"],
+  ] as const) {
+    company
+      .command(name, { hidden: true })
+      .allowUnknownOption(true)
+      .argument("[args...]")
+      .action(() => {
+        exitWithError(
+          new CliError(
+            `'ib company ${name}' does not exist — company flags are set per TENANT via '${target}'. Use: ${target} --asiakas <id> (your own id: ib company current).`,
+            0,
+            null,
+            4
+          )
+        );
+      });
+  }
 }

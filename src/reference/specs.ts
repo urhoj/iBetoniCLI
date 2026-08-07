@@ -376,6 +376,15 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       {
         origin: "client",
         exit: 2,
+        match: "ib_token is not a jwt",
+        meaning:
+          "IB_TOKEN is not JWT-shaped (not 3 dot-separated segments) — a value problem, not a rejected credential",
+        remedy:
+          "a command substitution (IB_TOKEN=$(…)) captures the whole stdout, banners included — re-set IB_TOKEN to the bare token",
+      },
+      {
+        origin: "client",
+        exit: 2,
         match: "impersonation session expired",
         meaning: "Impersonation session expired (never auto-refreshed — it would escalate)",
         remedy: "ib auth impersonate --end to restore your own login, or re-impersonate",
@@ -510,7 +519,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib fennoa purchases", "ib fennoa purchases --asiakas 8 --months 2", "ib fennoa purchases --all --refresh"],
   },
 
-  // ─── company (4) ─────────────────────────────────────────────────────────
+  // ─── company (6) ─────────────────────────────────────────────────────────
   {
     command: "ib company list",
     description:
@@ -530,6 +539,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [],
     outputShape: "{ asiakasId, name }",
     errors: [...COMMON_AUTH_ERRORS],
+    notes: [
+      "The asiakasId to pass to `ib customer modules` / `ib customer settings` when the tenant you want to configure is your OWN company.",
+    ],
+    seeAlso: ["ib customer modules", "ib customer settings"],
     examples: ["ib company current"],
   },
   {
@@ -621,6 +634,26 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     seeAlso: ["ib validate list"],
     examples: ["ib validate list", "ib validate --asiakas 8 --profile betoni"],
   },
+  ...(["modules", "settings"] as const).map((name) => ({
+    command: `ib company ${name}`,
+    description: `Signpost only — company flags are set per TENANT via \`ib customer ${name}\`, including your OWN company. This path exits 4 with that pointer.`,
+    permissions: ["none (always errors)"],
+    flags: [],
+    outputShape: "(none — always an error envelope)",
+    errors: [
+      {
+        origin: "client" as const,
+        exit: 4,
+        meaning: `'ib company ${name}' does not exist — the flags live in the customer domain`,
+        remedy: `use \`ib customer ${name} --asiakas <id>\` (your own id: \`ib company current\`)`,
+      },
+    ],
+    notes: [
+      "Exists because the `company` domain is where you look to change your own tenant's settings, and the real command sits under `customer` (feedback #353).",
+    ],
+    seeAlso: [`ib customer ${name}`, "ib company current"],
+    examples: [`ib customer ${name} --asiakas 1349`],
+  })),
 
   // ─── keikka (6) ──────────────────────────────────────────────────────────
   {
@@ -1110,7 +1143,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     command: "ib customer modules",
-    description: "Report or toggle a customer's roolit + module flags.",
+    description:
+      "Report or toggle a TENANT's roolit + module flags — any asiakas you administer, your own company included (there is no `ib company modules`).",
     permissions: ["company admin on the target tenant (system admin = any tenant)"],
     args: [{ name: "asiakasId", type: "number", required: false, description: "asiakasId to report/modify (or pass --asiakas)" }],
     flags: [
@@ -1142,8 +1176,9 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       "Field keys: pumppu (isPumppuToimittaja), jerry, henkilot, sijainnit, ajoneuvot, tiedostot, weather, lomaseuranta, shareorders.",
       "Without --set/--unset it is a read-only report (GET /api/cli/customer/modules/:asiakasId); with them it routes pumppu → POST /api/asiakas/setRoolit and modules → POST /api/asiakas/settings/save.",
-      "The target accepts either the positional <asiakasId> or --asiakas <id> (same flag as the rest of customer/*); pass one.",
+      "The target accepts either the positional <asiakasId> or --asiakas <id> (same flag as the rest of customer/*); pass one — including for your own company, whose id is `ib company current`.",
     ],
+    seeAlso: ["ib customer settings", "ib company current"],
     examples: [
       "ib customer modules 1349",
       "ib customer modules --asiakas 1349 --set jerry,weather,pumppu --reason 'enable operator features'",
@@ -1249,7 +1284,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib customer settings",
     description:
-      "Report or toggle ALL asiakasSettings (every canonical ASIAKAS_SETTING_TYPE_IDS name) plus pumppu. Without --set/--unset it is a read-only report. Names are case-insensitive; the 8 module aliases (jerry, weather, …) and pumppu are also accepted. Superset of `customer modules`.",
+      "Report or toggle ALL asiakasSettings (every canonical ASIAKAS_SETTING_TYPE_IDS name) plus pumppu, for any TENANT you administer — your own company included (there is no `ib company settings`). Without --set/--unset it is a read-only report. Names are case-insensitive; the 8 module aliases (jerry, weather, …) and pumppu are also accepted. Superset of `customer modules`.",
     permissions: ["company admin on the target tenant (system admin = any tenant)"],
     args: [{ name: "asiakasId", type: "number", required: false, description: "asiakasId (or pass --asiakas)" }],
     flags: [
@@ -1266,6 +1301,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(404, "Customer not found", "verify asiakasId"),
       ...COMMON_AUTH_ERRORS,
     ],
+    seeAlso: ["ib customer modules", "ib company current"],
     examples: [
       "ib customer settings 1349",
       "ib customer settings --asiakas 1349 --set HAS_FENNOA,ALV --unset HAS_OCR --reason 'billing setup'",

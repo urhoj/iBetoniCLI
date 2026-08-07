@@ -2,7 +2,14 @@ import { describe, test, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Buffer } from "node:buffer";
 import { resolveAuth } from "../../src/auth/resolve.js";
+import { CliError } from "../../src/api/errors.js";
+
+function fakeJwt(payload: Record<string, unknown> = {}): string {
+  const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  return `${b64({ alg: "HS256" })}.${b64(payload)}.sig`;
+}
 
 describe("resolveAuth", () => {
   let dir: string;
@@ -17,13 +24,19 @@ describe("resolveAuth", () => {
     if (origEnv !== undefined) process.env.IB_TOKEN = origEnv;
   });
 
+  // JWT-SHAPED on purpose: since fb#351 an IB_TOKEN that cannot be a JWT is
+  // rejected up front rather than stored (see the shape block below), so the old
+  // "eyJtest" placeholder no longer stands in for a real token here.
   test("returns IB_TOKEN-derived auth when env var is set", async () => {
-    process.env.IB_TOKEN = "eyJtest"; // not a real JWT but the resolver just stores it
+    const token = fakeJwt({ personId: 5, ownerAsiakasId: 1349 });
+    process.env.IB_TOKEN = token;
     const auth = await resolveAuth({ credentialsPath: join(dir, "missing.json") });
     expect(auth).not.toBeNull();
-    expect(auth!.token).toBe("eyJtest");
+    expect(auth!.token).toBe(token);
     expect(auth!.source).toBe("env");
     expect(auth!.refreshable).toBe(false);
+    expect(auth!.personId).toBe(5);
+    expect(auth!.ownerAsiakasId).toBe(1349);
   });
 
   test("falls back to credentials file when IB_TOKEN absent", async () => {
@@ -76,5 +89,30 @@ describe("resolveAuth", () => {
     const auth = await resolveAuth({ credentialsPath: join(dir, "missing.json"), token: "" });
     expect(auth!.token).toBe("");
     expect(auth!.refreshable).toBe(false);
+  });
+
+  // fb#351: an IB_TOKEN that cannot be a JWT is a VALUE problem (a mis-captured
+  // command substitution), not a rejected credential — so it fails fast with a
+  // diagnostic instead of a 401 that names the wrong cause.
+  test("a captured-stdout IB_TOKEN fails fast as an auth error, naming the value problem", async () => {
+    process.env.IB_TOKEN = `✅ DB pool warmed up in 42ms\n${fakeJwt({ personId: 5 })}`;
+    const err = await resolveAuth({ credentialsPath: join(dir, "missing.json") }).catch(
+      (e: unknown) => e
+    );
+    expect(err).toBeInstanceOf(CliError);
+    const cli = err as CliError;
+    expect(cli.exitCode).toBe(2); // auth, not the generic 1
+    expect(cli.message).toMatch(/IB_TOKEN is not a JWT: segment 1 of 3 contains whitespace/);
+    expect(cli.hint).toMatch(/command substitution/);
+  });
+
+  // The embedded caller's token comes from the SERVER, so a 401 is the honest
+  // answer there — no local guess about how it was set.
+  test("an embedded caller's malformed token stays best-effort", async () => {
+    const auth = await resolveAuth({
+      credentialsPath: join(dir, "missing.json"),
+      token: "not-a-jwt",
+    });
+    expect(auth).toMatchObject({ source: "env", personId: null, ownerAsiakasId: null });
   });
 });

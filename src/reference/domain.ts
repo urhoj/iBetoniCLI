@@ -37,7 +37,8 @@ export const DOMAIN_BLURBS: Record<string, string> = {
   sijainti: "Geocoded locations — depots, plants, destinations.",
   vehicle: "Pump and mixer trucks — incl. `vehicle driver` (day-driver dispatch + standing default driver).",
   person: "System users — drivers, admins, office staff (incl. `person absences`).",
-  company: "The tenant company your token acts as (multi-tenancy).",
+  company:
+    "The tenant company your token acts as (multi-tenancy). Its module/roolit + asiakasSettings FLAGS live under `ib customer modules` / `ib customer settings` — target your own asiakasId (`ib company current`).",
   fennoa: "Fennoa accounting integration — PumiNet Oy purchase invoices (system admin).",
   schedule: "Date-scoped views of keikkas: today / a day / a week.",
   stats:

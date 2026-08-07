@@ -749,6 +749,7 @@ ERRORS (stderr, exit non-zero)
   exit 2 (client-side)  Not logged in          → ib auth login first (or set IB_TOKEN)
   exit 2 (client-side)  Session expired and unrefreshable (both the JWT-bearer refresh and the OAuth refresh-token grant failed) → ib auth login to re-authenticate
   exit 2 (client-side)  IB_TOKEN expired (env sessions have no refresh path) → mint a fresh JWT and update IB_TOKEN
+  exit 2 (client-side)  IB_TOKEN is not JWT-shaped (not 3 dot-separated segments) — a value problem, not a rejected credential → a command substitution (IB_TOKEN=$(…)) captures the whole stdout, banners included — re-set IB_TOKEN to the bare token
   exit 2 (client-side)  Impersonation session expired (never auto-refreshed — it would escalate) → ib auth impersonate --end to restore your own login, or re-impersonate
 
 NOTES
@@ -819,6 +820,12 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - The asiakasId to pass to \`ib customer modules\` / \`ib customer settings\` when the tenant you want to configure is your OWN company.
+
+SEE ALSO
+  ib customer modules, ib customer settings
+
 EXAMPLES
   ib company current
 "
@@ -848,6 +855,68 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib company list
   ib company list --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib company modules matches snapshot 1`] = `
+"USAGE
+  ib company modules [flags]
+
+DESCRIPTION
+  Signpost only — company flags are set per TENANT via \`ib customer modules\`, including your OWN company. This path exits 4 with that pointer.
+  Permissions: requires none (always errors).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
+
+OUTPUT (JSON, stdout)
+  (none — always an error envelope)
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  'ib company modules' does not exist — the flags live in the customer domain → use \`ib customer modules --asiakas <id>\` (your own id: \`ib company current\`)
+
+NOTES
+  - Exists because the \`company\` domain is where you look to change your own tenant's settings, and the real command sits under \`customer\` (feedback #353).
+
+SEE ALSO
+  ib customer modules, ib company current
+
+EXAMPLES
+  ib customer modules --asiakas 1349
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib company settings matches snapshot 1`] = `
+"USAGE
+  ib company settings [flags]
+
+DESCRIPTION
+  Signpost only — company flags are set per TENANT via \`ib customer settings\`, including your OWN company. This path exits 4 with that pointer.
+  Permissions: requires none (always errors).
+
+FLAGS
+  (none)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
+
+OUTPUT (JSON, stdout)
+  (none — always an error envelope)
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  'ib company settings' does not exist — the flags live in the customer domain → use \`ib customer settings --asiakas <id>\` (your own id: \`ib company current\`)
+
+NOTES
+  - Exists because the \`company\` domain is where you look to change your own tenant's settings, and the real command sits under \`customer\` (feedback #353).
+
+SEE ALSO
+  ib customer settings, ib company current
+
+EXAMPLES
+  ib customer settings --asiakas 1349
 "
 `;
 
@@ -1273,7 +1342,7 @@ exports[`Help snapshots — contract stability > help for ib customer modules ma
   ib customer modules [<asiakasId>] [flags]
 
 DESCRIPTION
-  Report or toggle a customer's roolit + module flags.
+  Report or toggle a TENANT's roolit + module flags — any asiakas you administer, your own company included (there is no \`ib company modules\`).
   Permissions: requires company admin on the target tenant (system admin = any tenant).
 
 ARGUMENTS
@@ -1305,7 +1374,10 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - Field keys: pumppu (isPumppuToimittaja), jerry, henkilot, sijainnit, ajoneuvot, tiedostot, weather, lomaseuranta, shareorders.
   - Without --set/--unset it is a read-only report (GET /api/cli/customer/modules/:asiakasId); with them it routes pumppu → POST /api/asiakas/setRoolit and modules → POST /api/asiakas/settings/save.
-  - The target accepts either the positional <asiakasId> or --asiakas <id> (same flag as the rest of customer/*); pass one.
+  - The target accepts either the positional <asiakasId> or --asiakas <id> (same flag as the rest of customer/*); pass one — including for your own company, whose id is \`ib company current\`.
+
+SEE ALSO
+  ib customer settings, ib company current
 
 EXAMPLES
   ib customer modules 1349
@@ -1503,7 +1575,7 @@ exports[`Help snapshots — contract stability > help for ib customer settings m
   ib customer settings [<asiakasId>] [flags]
 
 DESCRIPTION
-  Report or toggle ALL asiakasSettings (every canonical ASIAKAS_SETTING_TYPE_IDS name) plus pumppu. Without --set/--unset it is a read-only report. Names are case-insensitive; the 8 module aliases (jerry, weather, …) and pumppu are also accepted. Superset of \`customer modules\`.
+  Report or toggle ALL asiakasSettings (every canonical ASIAKAS_SETTING_TYPE_IDS name) plus pumppu, for any TENANT you administer — your own company included (there is no \`ib company settings\`). Without --set/--unset it is a read-only report. Names are case-insensitive; the 8 module aliases (jerry, weather, …) and pumppu are also accepted. Superset of \`customer modules\`.
   Permissions: requires company admin on the target tenant (system admin = any tenant).
 
 ARGUMENTS
@@ -1531,6 +1603,9 @@ ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Customer not found     → verify asiakasId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib customer modules, ib company current
 
 EXAMPLES
   ib customer settings 1349

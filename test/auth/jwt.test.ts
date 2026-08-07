@@ -1,11 +1,42 @@
 import { describe, test, expect } from "vitest";
 import { Buffer } from "node:buffer";
-import { decodeJwtPayload } from "../../src/auth/jwt.js";
+import { decodeJwtPayload, jwtShapeProblem } from "../../src/auth/jwt.js";
 
 function fakeJwt(payload: Record<string, unknown>): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
   return `${b64({ alg: "HS256" })}.${b64(payload)}.sig`;
 }
+
+describe("jwtShapeProblem", () => {
+  test("passes a well-shaped token", () => {
+    expect(jwtShapeProblem(fakeJwt({ personId: 5 }))).toBeNull();
+  });
+
+  test("catches a captured banner line even when it adds no dots (still 3 segments)", () => {
+    const captured = `✅ DB pool warmed up in 42ms\n${fakeJwt({ personId: 5 })}`;
+    expect(captured.split(".")).toHaveLength(3); // a count-only check would pass
+    const problem = jwtShapeProblem(captured);
+    expect(problem).toMatch(/segment 1 of 3 contains whitespace/);
+    expect(problem).toContain(`${captured.length} chars`);
+  });
+
+  test("names the segment count when the captured text adds dots", () => {
+    const problem = jwtShapeProblem(`v1.1.12 ready\n${fakeJwt({ personId: 5 })}`);
+    expect(problem).toMatch(/expected 3 dot-separated segments, got 5/);
+  });
+
+  test("flags an empty segment", () => {
+    expect(jwtShapeProblem("a..c")).toMatch(/segment 2 of 3 is not base64url/);
+  });
+});
+
+describe("decodeJwtPayload malformed input", () => {
+  test("the throw says WHAT is wrong, not just 'Malformed JWT'", () => {
+    expect(() => decodeJwtPayload("not-a-jwt")).toThrow(
+      /Malformed JWT: expected 3 dot-separated segments, got 1 \(9 chars\)/
+    );
+  });
+});
 
 describe("decodeJwtPayload globalRoles", () => {
   test("extracts isDeveloper/isSystemAdmin from globalRoles", () => {

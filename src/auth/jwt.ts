@@ -61,6 +61,34 @@ function resolveExpandPayload(): ExpandPayload | null {
   return expandPayloadFn;
 }
 
+/**
+ * Non-throwing shape check: does this bearer value even LOOK like a JWT?
+ * Returns a human diagnostic naming what is wrong, or `null` when the shape is
+ * plausible (it says nothing about the signature or expiry).
+ *
+ * A value that fails here can never authenticate, so callers can fail fast with
+ * a message that points at the VALUE rather than at the token's validity —
+ * "Malformed JWT" alone reads like a signature/expiry problem and sends you
+ * looking at the wrong thing (feedback #351, where `IB_TOKEN=$(script)` had
+ * captured the script's banner lines along with the JWT).
+ */
+export function jwtShapeProblem(token: string): string | null {
+  const parts = token.split(".");
+  if (parts.length !== 3)
+    return `expected 3 dot-separated segments, got ${parts.length} (${token.length} chars)`;
+  // The segment CHARSET, not just the dot count: a banner line with no dot in it
+  // ("✅ DB pool warmed up in 42ms\n" + the JWT) still splits into exactly 3
+  // parts and would sail past a count-only check — while the raw string is
+  // rejected by every server that reads it. Whitespace is called out by name
+  // because it is the tell for a captured-stdout value.
+  const bad = parts.findIndex((p) => !/^[A-Za-z0-9_-]+$/.test(p));
+  if (bad !== -1) {
+    const why = /\s/.test(parts[bad]) ? "contains whitespace" : "is not base64url";
+    return `segment ${bad + 1} of 3 ${why} (${token.length} chars)`;
+  }
+  return null;
+}
+
 // One invocation decodes the SAME token several times (tier resolution in
 // bin/ib.ts, the acting-as diagnostic and impersonation check in cliContext) —
 // cache the last decode. Callers treat DecodedClaims as read-only.
@@ -78,8 +106,9 @@ let lastClaims: DecodedClaims | undefined;
  */
 export function decodeJwtPayload(jwt: string): DecodedClaims {
   if (jwt === lastToken && lastClaims) return lastClaims;
+  const problem = jwtShapeProblem(jwt);
+  if (problem) throw new Error(`Malformed JWT: ${problem}`);
   const parts = jwt.split(".");
-  if (parts.length !== 3) throw new Error("Malformed JWT");
   const json = Buffer.from(parts[1], "base64url").toString("utf8");
   const raw = JSON.parse(json) as Record<string, unknown>;
 
