@@ -1,14 +1,12 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import { runStats, resolveStatsPeriod } from "../../src/commands/stats/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
 beforeEach(() => {
-  (mockClient.get as ReturnType<typeof vi.fn>).mockReset();
-  (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({ totals: { orders: 0, m3: 0 } });
+  mockClient.get.mockReset();
+  mockClient.get.mockResolvedValue({ totals: { orders: 0, m3: 0 } });
 });
 
 describe("resolveStatsPeriod", () => {
@@ -49,7 +47,7 @@ describe("runStats", () => {
   });
   test("omits &all when --all not given", async () => {
     await runStats(mockClient, { from: "2026-06-01", to: "2026-06-30" });
-    const url = (mockClient.get as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    const url = mockClient.get.mock.calls[0][0] as string;
     expect(url).not.toContain("all=");
   });
 });

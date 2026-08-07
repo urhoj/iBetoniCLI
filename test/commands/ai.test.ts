@@ -1,16 +1,10 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import { runAiConversation, runAiConversationList } from "../../src/commands/ai/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
-const get = mockClient.get as ReturnType<typeof vi.fn>;
+const get = mockClient.get;
 
 beforeEach(() => {
   get.mockReset();

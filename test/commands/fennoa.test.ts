@@ -1,15 +1,8 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import { runFennoaPurchases } from "../../src/commands/fennoa/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-  endpoint: "http://127.0.0.1:3000",
-} as unknown as ApiClient;
+const mockClient = mockApiClient({ endpoint: "http://127.0.0.1:3000" });
 
 const body = {
   invoices: [
@@ -38,11 +31,11 @@ const body = {
 
 describe("ib fennoa purchases", () => {
   beforeEach(() => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockReset();
+    mockClient.get.mockReset();
   });
 
   test("defaults hit the route with no query params and project an envelope", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce(body);
+    mockClient.get.mockResolvedValueOnce(body);
     const out = await runFennoaPurchases(mockClient, {});
     expect(mockClient.get).toHaveBeenCalledWith("/api/admin/fennoa/purchase-invoices");
     expect(out.items).toHaveLength(1);
@@ -54,7 +47,7 @@ describe("ib fennoa purchases", () => {
   });
 
   test("--all/--months/--asiakas/--refresh map to open=0&months&asiakas&refresh=1", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ...body, cached: true });
+    mockClient.get.mockResolvedValueOnce({ ...body, cached: true });
     const out = await runFennoaPurchases(mockClient, { all: true, months: 2, asiakas: 8, refresh: true });
     expect(mockClient.get).toHaveBeenCalledWith("/api/admin/fennoa/purchase-invoices?open=0&months=2&asiakas=8&refresh=1");
     expect(out.cached).toBe(true);

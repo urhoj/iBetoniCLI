@@ -1,27 +1,21 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runScheduleToday,
   runScheduleDay,
   runScheduleWeek,
 } from "../../src/commands/schedule/index.js";
 import { addDaysISO, todayHelsinki } from "../../src/dates.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
 describe("ib schedule today/day/week", () => {
   beforeEach(() => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockReset();
+    mockClient.get.mockReset();
   });
 
   test("runScheduleToday: calls runKeikkaList with today/today", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
@@ -34,7 +28,7 @@ describe("ib schedule today/day/week", () => {
   });
 
   test("runScheduleDay: calls runKeikkaList with date/date", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
@@ -46,7 +40,7 @@ describe("ib schedule today/day/week", () => {
   });
 
   test("runScheduleWeek: calls runKeikkaList with start..start+6", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,

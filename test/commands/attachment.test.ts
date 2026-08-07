@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import { mkdtemp, readFile as fsReadFile, writeFile as fsWriteFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -20,17 +21,9 @@ import {
   runAttachmentDelete,
   resolveDetachEntity,
 } from "../../src/commands/attachment/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
 
-const c = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  patch: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const c = mockApiClient();
 
 const LIST = { items: [], nextCursor: null, count: 0 };
 
@@ -38,42 +31,42 @@ describe("ib attachment reads", () => {
   beforeEach(() => vi.clearAllMocks());
 
   test("list builds entity query", async () => {
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce(LIST);
+    c.get.mockResolvedValueOnce(LIST);
     await runAttachmentList(c, { entity: "keikka", entityId: 9001 }, {});
     expect(c.get).toHaveBeenCalledWith("/api/cli/attachment/list?entity=keikka&id=9001");
   });
 
   test("list passes resolved numeric group/type + limit", async () => {
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce(LIST);
+    c.get.mockResolvedValueOnce(LIST);
     await runAttachmentList(c, { entity: "vehicle", entityId: 53 }, { groupId: 1, typeId: 7, limit: 10 });
     expect(c.get).toHaveBeenCalledWith("/api/cli/attachment/list?entity=vehicle&id=53&group=1&type=7&limit=10");
   });
 
   test("get hits get/:id", async () => {
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ attachmentId: 4711 });
+    c.get.mockResolvedValueOnce({ attachmentId: 4711 });
     await runAttachmentGet(c, 4711);
     expect(c.get).toHaveBeenCalledWith("/api/cli/attachment/get/4711");
   });
 
   test("types hits /types", async () => {
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ groups: [], types: [] });
+    c.get.mockResolvedValueOnce({ groups: [], types: [] });
     await runAttachmentTypes(c);
     expect(c.get).toHaveBeenCalledWith("/api/cli/attachment/types");
   });
 
   test("search encodes q and missing", async () => {
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce(LIST);
+    c.get.mockResolvedValueOnce(LIST);
     await runAttachmentSearch(c, { q: "kuormakirja äö" });
     expect(c.get).toHaveBeenCalledWith(
       `/api/cli/attachment/search?q=${encodeURIComponent("kuormakirja äö")}`
     );
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce(LIST);
+    c.get.mockResolvedValueOnce(LIST);
     await runAttachmentSearch(c, { missing: true });
     expect(c.get).toHaveBeenCalledWith("/api/cli/attachment/search?missing=1");
   });
 
   test("search with no filter lists all (no query string)", async () => {
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce(LIST);
+    c.get.mockResolvedValueOnce(LIST);
     await runAttachmentSearch(c, {});
     expect(c.get).toHaveBeenCalledWith("/api/cli/attachment/search");
   });
@@ -137,7 +130,7 @@ describe("resolveGroupAndType", () => {
   });
 
   test("resolves names to ids with a single /types fetch", async () => {
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    c.get.mockResolvedValueOnce({
       groups: [{ attachmentGroupId: 1, attachmentGroupName: "Tilaus" }],
       types: [{ attachmentTypeId: 7, attachmentTypeName: "Kuva" }],
     });
@@ -147,7 +140,7 @@ describe("resolveGroupAndType", () => {
   });
 
   test("unknown name throws exit-4 CliError", async () => {
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+    c.get.mockResolvedValue({
       groups: [{ attachmentGroupId: 1, attachmentGroupName: "Tilaus" }],
       types: [],
     });
@@ -162,13 +155,13 @@ describe("ib attachment upload/download", () => {
   });
 
   test("upload-url posts the bare name", async () => {
-    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ uploadUrl: "u", fileFolder: "8/2026", fileName: "x.jpg" });
+    c.post.mockResolvedValueOnce({ uploadUrl: "u", fileFolder: "8/2026", fileName: "x.jpg" });
     await runAttachmentUploadUrl(c, "site.jpg");
     expect(c.post).toHaveBeenCalledWith("/api/cli/attachment/upload-url", { name: "site.jpg" });
   });
 
   test("register posts metadata with write-flag headers", async () => {
-    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true, attachmentId: 4711 });
+    c.post.mockResolvedValueOnce({ ok: true, attachmentId: 4711 });
     await runAttachmentRegister(
       c,
       { fileName: "x.jpg", origFileName: "site.jpg", fileFolder: "8/2026", fileType: "image/jpeg", fileSize: 3, entity: "keikka", entityId: 9001, fileComment: "k" },
@@ -185,7 +178,7 @@ describe("ib attachment upload/download", () => {
     const dir = await mkdtemp(join(tmpdir(), "ib-att-"));
     const file = join(dir, "photo.jpg");
     await fsWriteFile(file, Buffer.from([1, 2, 3]));
-    (c.post as ReturnType<typeof vi.fn>)
+    c.post
       .mockResolvedValueOnce({ uploadUrl: "https://blob/up?sas=1", fileFolder: "8/2026", fileName: "uuid.jpg" })
       .mockResolvedValueOnce({ ok: true, attachmentId: 4711 });
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 201 });
@@ -225,7 +218,7 @@ describe("ib attachment upload/download", () => {
     const dir = await mkdtemp(join(tmpdir(), "ib-att-"));
     const file = join(dir, "photo.jpg");
     await fsWriteFile(file, Buffer.from([1]));
-    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ uploadUrl: "u", fileFolder: "8/2026", fileName: "x.jpg" });
+    c.post.mockResolvedValueOnce({ uploadUrl: "u", fileFolder: "8/2026", fileName: "x.jpg" });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 403 }));
     await expect(runAttachmentUpload(c, file, { keikka: 9001 }, {})).rejects.toThrowError(CliError);
     expect(c.post).toHaveBeenCalledTimes(1); // mint only, no register
@@ -234,7 +227,7 @@ describe("ib attachment upload/download", () => {
   test("download fetches blobUrl and writes the file; refuses overwrite without force", async () => {
     const dir = await mkdtemp(join(tmpdir(), "ib-att-"));
     const out = join(dir, "saved.jpg");
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+    c.get.mockResolvedValue({
       attachmentId: 4711, origFileName: "site.jpg", fileType: "image/jpeg",
       blobUrl: "https://blob/x?sas=1",
     });
@@ -254,7 +247,7 @@ describe("ib attachment upload/download", () => {
   test("download basenames a traversal origFileName into cwd (no --out)", async () => {
     const dir = await mkdtemp(join(tmpdir(), "ib-att-cwd-"));
     const prevCwd = process.cwd();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+    c.get.mockResolvedValue({
       attachmentId: 4711, origFileName: "../../evil.jpg", fileType: "image/jpeg",
       blobUrl: "https://blob/x?sas=1",
     });
@@ -277,7 +270,7 @@ describe("ib attachment link/write commands", () => {
   beforeEach(() => vi.clearAllMocks());
 
   test("attach posts {attachmentId, entity, entityId} with flags", async () => {
-    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });
+    c.post.mockResolvedValueOnce({ ok: true });
     await runAttachmentAttach(c, 4711, { vehicle: 53 }, { reason: "link" });
     expect(c.post).toHaveBeenCalledWith(
       "/api/cli/attachment/attach",
@@ -287,7 +280,7 @@ describe("ib attachment link/write commands", () => {
   });
 
   test("detach posts {attachmentId, entity}", async () => {
-    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });
+    c.post.mockResolvedValueOnce({ ok: true });
     await runAttachmentDetach(c, 4711, "bug-report", {});
     expect(c.post).toHaveBeenCalledWith(
       "/api/cli/attachment/detach",
@@ -297,7 +290,7 @@ describe("ib attachment link/write commands", () => {
   });
 
   test("update PATCHes only provided fields", async () => {
-    (c.patch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });
+    c.patch.mockResolvedValueOnce({ ok: true });
     await runAttachmentUpdate(c, 4711, { fileComment: "x", liitaLaskuun: 1, attachmentGroupId: 2 }, { dryRun: true });
     expect(c.patch).toHaveBeenCalledWith(
       "/api/cli/attachment/4711",
@@ -307,7 +300,7 @@ describe("ib attachment link/write commands", () => {
   });
 
   test("delete sends DELETE with reason header", async () => {
-    (c.delete as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });
+    c.delete.mockResolvedValueOnce({ ok: true });
     await runAttachmentDelete(c, 4711, { reason: "duplicate" });
     expect(c.delete).toHaveBeenCalledWith(
       "/api/cli/attachment/4711",
@@ -321,9 +314,9 @@ describe("ib attachment link/write commands", () => {
   });
 
   test("update forwards NaN liitaLaskuun unchanged (JSON.stringify will null it; backend 400s)", async () => {
-    (c.patch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });
+    c.patch.mockResolvedValueOnce({ ok: true });
     await runAttachmentUpdate(c, 4711, { liitaLaskuun: NaN }, {});
-    const [path, body] = (c.patch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const [path, body] = c.patch.mock.calls[0];
     expect(path).toBe("/api/cli/attachment/4711");
     expect(Number.isNaN((body as { liitaLaskuun: number }).liitaLaskuun)).toBe(true);
   });

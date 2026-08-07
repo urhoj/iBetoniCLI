@@ -1,48 +1,46 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import { runVehicleLocations, runVehicleTimeline, runVehicleRoute, runVehicleVisits } from "../../src/commands/vehicle/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
 describe("ib vehicle locations", () => {
-  beforeEach(() => { (mockClient.get as ReturnType<typeof vi.fn>).mockReset(); });
+  beforeEach(() => { mockClient.get.mockReset(); });
 
   test("runVehicleLocations: GET /api/cli/vehicle/locations", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, gpsAvailable: true });
+    mockClient.get.mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, gpsAvailable: true });
     await runVehicleLocations(mockClient);
     expect(mockClient.get).toHaveBeenCalledWith("/api/cli/vehicle/locations");
   });
 });
 
 describe("ib vehicle timeline", () => {
-  beforeEach(() => { (mockClient.get as ReturnType<typeof vi.fn>).mockReset(); });
+  beforeEach(() => { mockClient.get.mockReset(); });
   test("runVehicleTimeline: GET with resolved date", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, gpsAvailable: true });
+    mockClient.get.mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, gpsAvailable: true });
     await runVehicleTimeline(mockClient, 7, { date: "2026-06-02" });
     expect(mockClient.get).toHaveBeenCalledWith("/api/cli/vehicle/timeline/7?date=2026-06-02");
   });
 });
 
 describe("ib vehicle route", () => {
-  beforeEach(() => { (mockClient.get as ReturnType<typeof vi.fn>).mockReset(); });
+  beforeEach(() => { mockClient.get.mockReset(); });
   test("runVehicleRoute: GET with resolved date", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, gpsAvailable: true });
+    mockClient.get.mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, gpsAvailable: true });
     await runVehicleRoute(mockClient, 7, { date: "2026-06-02" });
     expect(mockClient.get).toHaveBeenCalledWith("/api/cli/vehicle/route/7?date=2026-06-02");
   });
 });
 
 describe("ib vehicle visits", () => {
-  beforeEach(() => { (mockClient.get as ReturnType<typeof vi.fn>).mockReset(); });
+  beforeEach(() => { mockClient.get.mockReset(); });
   test("runVehicleVisits: bare path when no days", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, gpsAvailable: true });
+    mockClient.get.mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, gpsAvailable: true });
     await runVehicleVisits(mockClient, "tyomaa", 17, {});
     expect(mockClient.get).toHaveBeenCalledWith("/api/cli/vehicle/visits/tyomaa/17");
   });
   test("runVehicleVisits: appends days", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, gpsAvailable: true });
+    mockClient.get.mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, gpsAvailable: true });
     await runVehicleVisits(mockClient, "sijainti", 3, { days: 30 });
     expect(mockClient.get).toHaveBeenCalledWith("/api/cli/vehicle/visits/sijainti/3?days=30");
   });
@@ -51,7 +49,7 @@ describe("ib vehicle visits", () => {
     expect(mockClient.get).not.toHaveBeenCalled();
   });
   test("runVehicleVisits: --date filters to the Helsinki-local day and auto-bounds look-back", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [
         // 08:30 Helsinki (EEST = UTC+3) on 15.4 → kept
         { plate: "A", arrived: "2026-04-15T05:30:00.000Z", departed: "2026-04-15T05:40:00.000Z" },
@@ -70,7 +68,7 @@ describe("ib vehicle visits", () => {
     expect(res.count).toBe(2);
   });
   test("runVehicleVisits: explicit --days wins over the derived look-back", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, gpsAvailable: true });
+    mockClient.get.mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, gpsAvailable: true });
     await runVehicleVisits(mockClient, "sijainti", 60, { days: 90, date: "2026-04-15" });
     expect(mockClient.get).toHaveBeenCalledWith("/api/cli/vehicle/visits/sijainti/60?days=90");
   });

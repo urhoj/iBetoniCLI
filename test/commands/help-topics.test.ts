@@ -1,4 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import { runHelpList, runHelpTopic } from "../../src/commands/help/index.js";
 import { CliError } from "../../src/api/errors.js";
 import type { ApiClient } from "../../src/api/client.js";
@@ -6,16 +7,9 @@ import type { ApiClient } from "../../src/api/client.js";
 function makeClient(
   response: unknown | Error
 ): () => Promise<ApiClient> {
-  const client = {
-    get: vi.fn(async () => {
-      if (response instanceof Error) throw response;
-      return response;
-    }),
-    post: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
-    getCurrentToken: vi.fn(),
-  } as unknown as ApiClient;
+  const client = mockApiClient({
+    get: vi.fn(async () => { if (response instanceof Error) throw response; return response; }),
+  });
   return () => Promise.resolve(client);
 }
 

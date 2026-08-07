@@ -1,11 +1,8 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import { runKeikkaSearch } from "../../src/commands/keikka/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
 // Two rows for keikka 1 (two betoni pours) + one for keikka 2 — must dedupe.
 const RAW = [
@@ -16,13 +13,13 @@ const RAW = [
 
 describe("runKeikkaSearch", () => {
   beforeEach(() => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockReset();
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValue(RAW);
+    mockClient.get.mockReset();
+    mockClient.get.mockResolvedValue(RAW);
   });
 
   test("calls /api/keikka/search with searchString, ownerAsiakasId, full-text flag", async () => {
     await runKeikkaSearch(mockClient, "kamppi", 1349);
-    const path = (mockClient.get as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    const path = mockClient.get.mock.calls[0][0] as string;
     expect(path).toContain("/api/keikka/search?");
     expect(path).toContain("searchString=kamppi");
     expect(path).toContain("ownerAsiakasId=1349");
@@ -48,7 +45,7 @@ describe("runKeikkaSearch", () => {
   });
 
   test("tolerates an empty result", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    mockClient.get.mockResolvedValue([]);
     const env = await runKeikkaSearch(mockClient, "nothing", 1349);
     expect(env).toEqual({ items: [], nextCursor: null, count: 0 });
   });

@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runWorksiteCreate,
   runWorksiteUpdate,
@@ -8,28 +9,21 @@ import {
   buildWorksiteUpdateBody,
 } from "../../src/commands/worksite/index.js";
 import { ownerAsiakasIdFromToken } from "../../src/owner.js";
-import type { ApiClient } from "../../src/api/client.js";
 import type { CliError } from "../../src/api/errors.js";
 import { decodeJwtPayload } from "../../src/auth/jwt.js";
 vi.mock("../../src/auth/jwt.js", () => ({
   decodeJwtPayload: vi.fn(),
 }));
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
 describe("ib worksite create/update", () => {
   beforeEach(() => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockReset();
+    mockClient.post.mockReset();
   });
 
   test("runWorksiteCreate forwards body + all three write-flag headers", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.post.mockResolvedValueOnce({
       tyomaaId: 5151,
     });
     const body = { tyomaaNimi: "Helsinki Site A", asiakasId: 1349 };
@@ -49,7 +43,7 @@ describe("ib worksite create/update", () => {
   });
 
   test("runWorksiteUpdate uses explicit yyyymmdd when given, defaults to today's YYYYMMDD otherwise", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
+    mockClient.post.mockResolvedValue({
       success: true,
     });
     const body = { tyomaaNimi: "Helsinki Site A — renamed" };
@@ -76,7 +70,7 @@ describe("ib worksite create/update", () => {
       body,
       {}
     );
-    const lastCall = (mockClient.post as ReturnType<typeof vi.fn>).mock
+    const lastCall = mockClient.post.mock
       .calls[1];
     const url = lastCall[0] as string;
     expect(url).toMatch(/^\/api\/tyomaa\/set\/1349\/5151\/\d{8}$/);
@@ -88,7 +82,7 @@ describe("ib worksite create/update", () => {
   });
 
   test("runWorksiteRefreshLocation: POST refreshLocation with write flags", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ success: true });
+    mockClient.post.mockResolvedValueOnce({ success: true });
     await runWorksiteRefreshLocation(mockClient, 42, { reason: "address fix" });
     expect(mockClient.post).toHaveBeenCalledWith(
       "/api/tyomaa/refreshLocation/42",
@@ -98,7 +92,7 @@ describe("ib worksite create/update", () => {
   });
 
   test("runWorksiteSetGeofence: POST geofence-radius with body + dry-run header", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ success: true });
+    mockClient.post.mockResolvedValueOnce({ success: true });
     await runWorksiteSetGeofence(mockClient, 42, 250, { dryRun: true });
     expect(mockClient.post).toHaveBeenCalledWith(
       "/api/tyomaa/42/geofence-radius",
@@ -108,7 +102,7 @@ describe("ib worksite create/update", () => {
   });
 
   test("runWorksiteHelsinkiFetch: POST helsinki/fetch", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ success: true });
+    mockClient.post.mockResolvedValueOnce({ success: true });
     await runWorksiteHelsinkiFetch(mockClient, 42, {});
     expect(mockClient.post).toHaveBeenCalledWith(
       "/api/tyomaa/helsinki/fetch/42",
@@ -118,13 +112,13 @@ describe("ib worksite create/update", () => {
   });
 
   test("ownerAsiakasIdFromToken decodes the active token's ownerAsiakasId", () => {
-    (mockClient.getCurrentToken as ReturnType<typeof vi.fn>).mockReturnValue("jwt.token.sig");
+    mockClient.getCurrentToken.mockReturnValue("jwt.token.sig");
     (decodeJwtPayload as ReturnType<typeof vi.fn>).mockReturnValue({ ownerAsiakasId: 1349 });
     expect(ownerAsiakasIdFromToken(mockClient)).toBe(1349);
   });
 
   test("ownerAsiakasIdFromToken exits 4 (not 1) when the owner claim is missing", () => {
-    (mockClient.getCurrentToken as ReturnType<typeof vi.fn>).mockReturnValue("jwt.token.sig");
+    mockClient.getCurrentToken.mockReturnValue("jwt.token.sig");
     (decodeJwtPayload as ReturnType<typeof vi.fn>).mockReturnValue({ ownerAsiakasId: NaN });
     try {
       ownerAsiakasIdFromToken(mockClient);

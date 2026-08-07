@@ -1,4 +1,5 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runPersonCreate,
   runPersonUpdate,
@@ -12,21 +13,14 @@ import {
   runPersonByEmail,
 } from "../../src/commands/person/index.js";
 import { CliError } from "../../src/api/errors.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
 describe("runPersonCreate", () => {
-  beforeEach(() => { (mockClient.post as ReturnType<typeof vi.fn>).mockReset(); });
+  beforeEach(() => { mockClient.post.mockReset(); });
 
   test("POSTs /api/person/newPerson with body and write-flag headers", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ personId: 5351 });
+    mockClient.post.mockResolvedValueOnce({ personId: 5351 });
     const body = { personFirstName: "Test", personLastName: "User", personEmail: "test@x.com" };
     await runPersonCreate(mockClient, body, { reason: "lifecycle", idempotencyKey: "k1" });
     expect(mockClient.post).toHaveBeenCalledWith(
@@ -145,9 +139,9 @@ describe("isDuplicateEmailError", () => {
 });
 
 describe("runPersonByEmail", () => {
-  beforeEach(() => { (mockClient.get as ReturnType<typeof vi.fn>).mockReset(); });
+  beforeEach(() => { mockClient.get.mockReset(); });
   test("returns a tidy person from the by-email recordset", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+    mockClient.get.mockResolvedValueOnce([
       { personId: 6263, personFirstName: "Matti", personLastName: "Virtanen", personEmail: "m@x.com" },
     ]);
     const r = await runPersonByEmail(mockClient, "m@x.com");
@@ -155,16 +149,16 @@ describe("runPersonByEmail", () => {
     expect(r).toEqual({ personId: 6263, name: "Matti Virtanen", email: "m@x.com" });
   });
   test("returns null on an empty result", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    mockClient.get.mockResolvedValueOnce([]);
     expect(await runPersonByEmail(mockClient, "x@y.com")).toBeNull();
   });
 });
 
 describe("runPersonUpdate", () => {
-  beforeEach(() => { (mockClient.post as ReturnType<typeof vi.fn>).mockReset(); });
+  beforeEach(() => { mockClient.post.mockReset(); });
 
   test("POSTs /api/person/set with body containing personId", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });
+    mockClient.post.mockResolvedValueOnce({ ok: true });
     await runPersonUpdate(mockClient, 5351, { personPhone: "+358501234567" }, { reason: "phone update" });
     expect(mockClient.post).toHaveBeenCalledWith(
       "/api/person/set",
@@ -175,10 +169,10 @@ describe("runPersonUpdate", () => {
 });
 
 describe("runPersonDelete", () => {
-  beforeEach(() => { (mockClient.delete as ReturnType<typeof vi.fn>).mockReset(); });
+  beforeEach(() => { mockClient.delete.mockReset(); });
 
   test("DELETEs /api/person/delete/<personId> with reason header", async () => {
-    (mockClient.delete as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ deleted: 5351 });
+    mockClient.delete.mockResolvedValueOnce({ deleted: 5351 });
     const result = await runPersonDelete(mockClient, 5351, { reason: "cleanup" });
     expect(mockClient.delete).toHaveBeenCalledWith(
       "/api/person/delete/5351",
@@ -189,10 +183,10 @@ describe("runPersonDelete", () => {
 });
 
 describe("runPersonSetOwner", () => {
-  beforeEach(() => { (mockClient.post as ReturnType<typeof vi.fn>).mockReset(); });
+  beforeEach(() => { mockClient.post.mockReset(); });
 
   test("--asiakas: POSTs /api/person/setOwner/<id> with a numeric owner and reason header", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ personId: 5351, ownerAsiakasId: 8 });
+    mockClient.post.mockResolvedValueOnce({ personId: 5351, ownerAsiakasId: 8 });
     await runPersonSetOwner(mockClient, 5351, 8, { reason: "claim into company" });
     expect(mockClient.post).toHaveBeenCalledWith(
       "/api/person/setOwner/5351",
@@ -202,7 +196,7 @@ describe("runPersonSetOwner", () => {
   });
 
   test("--global: POSTs ownerAsiakasId null", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ personId: 5351, ownerAsiakasId: null });
+    mockClient.post.mockResolvedValueOnce({ personId: 5351, ownerAsiakasId: null });
     await runPersonSetOwner(mockClient, 5351, null, { reason: "make global" });
     expect(mockClient.post).toHaveBeenCalledWith(
       "/api/person/setOwner/5351",

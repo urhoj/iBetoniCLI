@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
+import { mockApiClient, type MockApiClient } from "../helpers/mockClient.js";
 import {
   parseCadence,
   intFlag,
@@ -9,19 +10,16 @@ import {
   runTaskSet,
   runTaskLog,
 } from "../../src/commands/task/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-function mockClient(): ApiClient {
-  return {
+function mockClient(): MockApiClient {
+  return mockApiClient({
     get: vi.fn().mockResolvedValue([]),
     post: vi.fn().mockResolvedValue({ taskId: 7 }),
     put: vi.fn().mockResolvedValue({ taskId: 7 }),
-    delete: vi.fn(),
-    getCurrentToken: vi.fn(),
-  } as unknown as ApiClient;
+  });
 }
 
-let client: ApiClient;
+let client: MockApiClient;
 beforeEach(() => {
   client = mockClient();
 });
@@ -64,13 +62,13 @@ describe("runTaskList", () => {
   });
 
   test("returns the list envelope", async () => {
-    (client.get as ReturnType<typeof vi.fn>).mockResolvedValue([{ taskId: 1 }]);
+    client.get.mockResolvedValue([{ taskId: 1 }]);
     const env = await runTaskList(client, {});
     expect(env).toEqual({ items: [{ taskId: 1 }], nextCursor: null, count: 1 });
   });
 
   test("exactly --limit rows is NOT truncated (probe row absent)", async () => {
-    (client.get as ReturnType<typeof vi.fn>).mockResolvedValue([{ taskId: 1 }, { taskId: 2 }]);
+    client.get.mockResolvedValue([{ taskId: 1 }, { taskId: 2 }]);
     const env = await runTaskList(client, { limit: 2 });
     expect(client.get).toHaveBeenCalledWith("/api/tasks?limit=3");
     expect(env.truncated).toBeUndefined();
@@ -78,7 +76,7 @@ describe("runTaskList", () => {
   });
 
   test("probe row present → truncated and sliced to --limit", async () => {
-    (client.get as ReturnType<typeof vi.fn>).mockResolvedValue([{ taskId: 1 }, { taskId: 2 }, { taskId: 3 }]);
+    client.get.mockResolvedValue([{ taskId: 1 }, { taskId: 2 }, { taskId: 3 }]);
     const env = await runTaskList(client, { limit: 2 });
     expect(env.truncated).toBe(true);
     expect(env.items).toEqual([{ taskId: 1 }, { taskId: 2 }]);
@@ -87,7 +85,7 @@ describe("runTaskList", () => {
 
   test("--limit past the server cap clamps to 200 and flags a full page", async () => {
     const rows = Array.from({ length: 200 }, (_, i) => ({ taskId: i + 1 }));
-    (client.get as ReturnType<typeof vi.fn>).mockResolvedValue(rows);
+    client.get.mockResolvedValue(rows);
     const env = await runTaskList(client, { limit: 500 });
     expect(client.get).toHaveBeenCalledWith("/api/tasks?limit=200");
     expect(env.truncated).toBe(true);
@@ -102,7 +100,7 @@ describe("runTaskList", () => {
 
 describe("runTaskGet", () => {
   test("fetches one task by id", async () => {
-    (client.get as ReturnType<typeof vi.fn>).mockResolvedValue({ taskId: 7, title: "t" });
+    client.get.mockResolvedValue({ taskId: 7, title: "t" });
     const row = await runTaskGet(client, 7);
     expect(client.get).toHaveBeenCalledWith("/api/tasks/7");
     expect(row).toEqual({ taskId: 7, title: "t" });
@@ -111,14 +109,14 @@ describe("runTaskGet", () => {
 
 describe("runTaskLog", () => {
   test("fetches with a probe limit and returns the envelope", async () => {
-    (client.get as ReturnType<typeof vi.fn>).mockResolvedValue([{ logId: 1 }]);
+    client.get.mockResolvedValue([{ logId: 1 }]);
     const env = await runTaskLog(client, 7, {});
     expect(client.get).toHaveBeenCalledWith("/api/tasks/7/log?limit=51");
     expect(env).toEqual({ items: [{ logId: 1 }], nextCursor: null, count: 1 });
   });
 
   test("probe row present → truncated and sliced to --limit", async () => {
-    (client.get as ReturnType<typeof vi.fn>).mockResolvedValue([{ logId: 1 }, { logId: 2 }]);
+    client.get.mockResolvedValue([{ logId: 1 }, { logId: 2 }]);
     const env = await runTaskLog(client, 7, { limit: 1 });
     expect(client.get).toHaveBeenCalledWith("/api/tasks/7/log?limit=2");
     expect(env.truncated).toBe(true);

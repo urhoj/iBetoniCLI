@@ -1,12 +1,10 @@
 import { describe, test, expect, vi } from "vitest";
+import { mockApiClient, type MockApiClient, type MockApiClientOverrides } from "../helpers/mockClient.js";
 import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailLint } from "../../src/reference/detail.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-type MockClient = ApiClient & Record<"get" | "put" | "post" | "delete" | "getCurrentToken", ReturnType<typeof vi.fn>>;
-
-function client(over: Record<string, unknown> = {}): MockClient {
-  return { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn(), ...over } as unknown as MockClient;
+function client(over: MockApiClientOverrides = {}): MockApiClient {
+  return mockApiClient(over);
 }
 
 describe("ib reference detail (DB-backed)", () => {

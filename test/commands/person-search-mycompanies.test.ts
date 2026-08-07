@@ -1,4 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runPersonSearchMyCompanies,
   runPersonSearchMyCompaniesFanout,
@@ -76,14 +77,7 @@ describe("runPersonSearchMyCompaniesFanout (client-side fallback)", () => {
 
 describe("runPersonSearchMyCompanies (server endpoint + graceful fallback)", () => {
   const mkClient = (get: ReturnType<typeof vi.fn>): ApiClient =>
-    ({
-      get,
-      post: vi.fn(),
-      put: vi.fn(),
-      delete: vi.fn(),
-      getCurrentToken: vi.fn(),
-      endpoint: "https://api.example.com",
-    }) as unknown as ApiClient;
+    mockApiClient({ get, endpoint: "https://api.example.com" });
 
   const envelope = {
     items: [
@@ -136,7 +130,7 @@ describe("runPersonSearchMyCompanies (server endpoint + graceful fallback)", () 
 // own memberships, and a silently narrower list would read as complete.
 describe("runPersonSearchAllCompanies (--all-companies)", () => {
   const mkClient = (get: ReturnType<typeof vi.fn>) =>
-    ({ get, post: vi.fn(), put: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn() }) as unknown as ApiClient;
+    mockApiClient({ get });
 
   const envelope = {
     items: [

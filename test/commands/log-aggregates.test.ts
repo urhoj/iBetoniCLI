@@ -1,4 +1,5 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runLogLatest,
   runLogRange,
@@ -6,12 +7,9 @@ import {
   runLogUser,
 } from "../../src/commands/log/index.js";
 import { CliError } from "../../src/api/errors.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
-const get = () => mockClient.get as ReturnType<typeof vi.fn>;
+const mockClient = mockApiClient();
+const get = () => mockClient.get;
 
 const ROW = (id: number) => ({
   changeId: id, entityType: "keikka", entityId: 42, changeType: "info_change",

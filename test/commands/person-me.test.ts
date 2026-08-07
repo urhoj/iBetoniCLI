@@ -1,28 +1,22 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import { runPersonMe, runPersonCompanies } from "../../src/commands/person/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
 const PAYLOAD = Buffer.from(
   JSON.stringify({ personId: 6233, ownerAsiakasId: 1349, email: "sys@x.fi" })
 ).toString("base64url");
 const FAKE_JWT = `eyJhbGciOiJIUzI1NiJ9.${PAYLOAD}.sig`;
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(() => FAKE_JWT),
-} as unknown as ApiClient;
+const mockClient = mockApiClient({ getCurrentToken: vi.fn(() => FAKE_JWT) });
 
 describe("runPersonMe", () => {
   beforeEach(() => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockReset();
-    (mockClient.getCurrentToken as ReturnType<typeof vi.fn>).mockReturnValue(FAKE_JWT);
+    mockClient.get.mockReset();
+    mockClient.getCurrentToken.mockReturnValue(FAKE_JWT);
   });
 
   test("decodes the JWT and composes profile + roles + companies", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>)
+    mockClient.get
       .mockResolvedValueOnce({ personId: 6233, name: "System Jerry", email: "sys@x.fi", phone: "+358", roles: [11, 8] })
       .mockResolvedValueOnce({
         companies: [
@@ -60,10 +54,10 @@ describe("runPersonMe", () => {
         imp_sid: "sess-abc",
       })
     ).toString("base64url");
-    (mockClient.getCurrentToken as ReturnType<typeof vi.fn>).mockReturnValue(
+    mockClient.getCurrentToken.mockReturnValue(
       `eyJhbGciOiJIUzI1NiJ9.${payload}.sig`
     );
-    (mockClient.get as ReturnType<typeof vi.fn>)
+    mockClient.get
       .mockResolvedValueOnce({ personId: 6233, name: "System Jerry", email: "sys@x.fi", phone: "+358", roles: [] })
       .mockResolvedValueOnce({ companies: [{ asiakasId: 1349, asiakasNimi: "BetoniJerry" }], currentCompanyId: 1349 });
     const result = await runPersonMe(mockClient);
@@ -74,12 +68,12 @@ describe("runPersonMe", () => {
 
 describe("runPersonCompanies", () => {
   beforeEach(() => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockReset();
-    (mockClient.getCurrentToken as ReturnType<typeof vi.fn>).mockReturnValue(FAKE_JWT);
+    mockClient.get.mockReset();
+    mockClient.getCurrentToken.mockReturnValue(FAKE_JWT);
   });
 
   test("uses the explicit personId when given", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+    mockClient.get.mockResolvedValueOnce([
       { asiakasId: 26, asiakasNimi: "Kalle Urho Oy" },
     ]);
     const result = await runPersonCompanies(mockClient, 5351);
@@ -89,7 +83,7 @@ describe("runPersonCompanies", () => {
   });
 
   test("defaults to the caller's personId from the JWT", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    mockClient.get.mockResolvedValueOnce([]);
     await runPersonCompanies(mockClient);
     expect(mockClient.get).toHaveBeenCalledWith("/api/person/getUserAsiakasList/6233");
   });

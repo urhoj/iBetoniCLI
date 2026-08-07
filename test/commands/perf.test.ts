@@ -1,29 +1,22 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runPerfSlow,
   runPerfStats,
   runPerfConfig,
   runPerfClear,
 } from "../../src/commands/perf/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-  endpoint: "http://127.0.0.1:3000",
-} as unknown as ApiClient;
+const mockClient = mockApiClient({ endpoint: "http://127.0.0.1:3000" });
 
 describe("ib perf run* functions", () => {
   beforeEach(() => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockReset();
-    (mockClient.delete as ReturnType<typeof vi.fn>).mockReset();
+    mockClient.get.mockReset();
+    mockClient.delete.mockReset();
   });
 
   test("runPerfSlow GETs the route with limit+env and projects an envelope", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       data: {
         queries: [
           { procedure: "keikka_get", duration: 1500, entity: "keikka", params: ["keikkaId"], timestamp: "2026-06-18T00:00:00Z" },
@@ -48,7 +41,7 @@ describe("ib perf run* functions", () => {
   });
 
   test("runPerfSlow flags truncated when the page fills the limit", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       data: { queries: [{ procedure: "p", duration: 1, entity: "e", params: [], timestamp: "t" }, { procedure: "p2", duration: 2, entity: "e", params: [], timestamp: "t" }], count: 2, totalCount: 99, environment: "production" },
     });
     const out = await runPerfSlow(mockClient, { limit: 2 });
@@ -57,14 +50,14 @@ describe("ib perf run* functions", () => {
   });
 
   test("runPerfStats unwraps .data", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ data: { totalSlowQueries: 7, avgDuration: 1200 } });
+    mockClient.get.mockResolvedValueOnce({ data: { totalSlowQueries: 7, avgDuration: 1200 } });
     const out = await runPerfStats(mockClient, { env: "staging" });
     expect(mockClient.get).toHaveBeenCalledWith("/api/admin/slow-queries/stats?env=staging");
     expect(out).toEqual({ totalSlowQueries: 7, avgDuration: 1200 });
   });
 
   test("runPerfConfig folds in availableEnvironments", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>)
+    mockClient.get
       .mockResolvedValueOnce({ data: { enabled: true, threshold: 1000, maxEntries: 100, environment: "production" } })
       .mockResolvedValueOnce({ data: ["production", "staging"] });
     const out = await runPerfConfig(mockClient);
@@ -80,7 +73,7 @@ describe("ib perf run* functions", () => {
   });
 
   test("runPerfClear executes a DELETE with the reason header", async () => {
-    (mockClient.delete as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ success: true, message: "Slow query buffer cleared" });
+    mockClient.delete.mockResolvedValueOnce({ success: true, message: "Slow query buffer cleared" });
     const out = await runPerfClear(mockClient, { env: "staging", reason: "noise" });
     expect(mockClient.delete).toHaveBeenCalledWith(
       "/api/admin/slow-queries?env=staging",

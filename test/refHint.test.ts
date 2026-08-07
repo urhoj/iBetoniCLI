@@ -1,11 +1,12 @@
 import { describe, test, expect, vi } from "vitest";
+import { mockApiClient } from "./helpers/mockClient.js";
 import type { ApiClient } from "../src/api/client.js";
 import { CliError } from "../src/api/errors.js";
 import { siblingRefHint, runWithSiblingHint } from "../src/refHint.js";
 
 /** A minimal ApiClient whose `get` is a controllable vi.fn(). */
 const mockClient = (get: ReturnType<typeof vi.fn>): ApiClient =>
-  ({ get } as unknown as ApiClient);
+  (mockApiClient({ get }));
 
 const notFound = () => new CliError("Feedback not found", 404, null, 5);
 

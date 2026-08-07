@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import { Command } from "commander";
 import {
   runFeedbackCreate,
@@ -14,20 +15,13 @@ import {
 import { writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
-const post = mockClient.post as ReturnType<typeof vi.fn>;
-const get = mockClient.get as ReturnType<typeof vi.fn>;
-const put = mockClient.put as ReturnType<typeof vi.fn>;
+const post = mockClient.post;
+const get = mockClient.get;
+const put = mockClient.put;
 
 beforeEach(() => {
   post.mockReset();

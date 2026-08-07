@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runVehicleDriverBoard,
   runVehicleDriverGaps,
@@ -10,19 +11,12 @@ import {
   runVehicleDefaultGet,
   runVehicleDefaultSet,
 } from "../../src/commands/vehicle/driver.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const c = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const c = mockApiClient();
 
 const LIST = { items: [], nextCursor: null, count: 0 };
-const get = () => c.get as ReturnType<typeof vi.fn>;
-const post = () => c.post as ReturnType<typeof vi.fn>;
+const get = () => c.get;
+const post = () => c.post;
 
 describe("ib vehicle driver reads", () => {
   beforeEach(() => vi.clearAllMocks());

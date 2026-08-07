@@ -1,20 +1,14 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import { runWorksitePersonAdd, runWorksitePersonRemove, runWorksitePersonList } from "../../src/commands/worksite/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
 describe("runWorksitePersonAdd", () => {
-  beforeEach(() => { (mockClient.post as ReturnType<typeof vi.fn>).mockReset(); });
+  beforeEach(() => { mockClient.post.mockReset(); });
 
   test("POSTs /api/tyomaa/person/add with body and reason header", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });
+    mockClient.post.mockResolvedValueOnce({ ok: true });
     await runWorksitePersonAdd(
       mockClient,
       { tyomaaId: 99, personId: 5351, contactPersonTypeId: 1 },
@@ -29,10 +23,10 @@ describe("runWorksitePersonAdd", () => {
 });
 
 describe("runWorksitePersonRemove", () => {
-  beforeEach(() => { (mockClient.post as ReturnType<typeof vi.fn>).mockReset(); });
+  beforeEach(() => { mockClient.post.mockReset(); });
 
   test("POSTs /api/tyomaa/person/remove with body and reason", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });
+    mockClient.post.mockResolvedValueOnce({ ok: true });
     await runWorksitePersonRemove(
       mockClient,
       { tyomaaId: 99, personId: 5351, contactPersonTypeId: 1 },
@@ -47,10 +41,10 @@ describe("runWorksitePersonRemove", () => {
 });
 
 describe("runWorksitePersonList", () => {
-  beforeEach(() => { (mockClient.get as ReturnType<typeof vi.fn>).mockReset(); });
+  beforeEach(() => { mockClient.get.mockReset(); });
 
   test("GETs /api/tyomaa/person/list/<tyomaaId>/0 (second segment ignored)", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+    mockClient.get.mockResolvedValueOnce([
       { personId: 5351, personFirstName: "Juha", personLastName: "Urho", personEmail: "j@example.com" },
     ]);
     const result = await runWorksitePersonList(mockClient, 99);

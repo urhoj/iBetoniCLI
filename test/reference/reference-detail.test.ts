@@ -6,21 +6,12 @@
  * tests use a mock ApiClient so no network is needed.
  */
 import { describe, test, expect, vi } from "vitest";
+import { mockApiClient, type MockApiClient, type MockApiClientOverrides } from "../helpers/mockClient.js";
 import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailEdit, runReferenceDetailDelete } from "../../src/reference/detail.js";
-import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
 
-type MockClient = ApiClient & Record<"get" | "put" | "post" | "delete" | "getCurrentToken", ReturnType<typeof vi.fn>>;
-
-function client(over: Record<string, unknown> = {}): MockClient {
-  return {
-    get: vi.fn(),
-    put: vi.fn(),
-    post: vi.fn(),
-    delete: vi.fn(),
-    getCurrentToken: vi.fn(),
-    ...over,
-  } as unknown as MockClient;
+function client(over: MockApiClientOverrides = {}): MockApiClient {
+  return mockApiClient(over);
 }
 
 describe("runReferenceDetail", () => {
@@ -222,7 +213,10 @@ describe("ib reference detail set — edit mode (in-field partial)", () => {
   const CURRENT = { command: "ib keikka list", summary: "Lists orders", detail: "## Keikka list\nReturns the 14 latest.", hint: "" };
 
   test("--replace on detail (default field) --dry-run returns a diff, no PUT", async () => {
-    const c = { get: vi.fn().mockResolvedValue(CURRENT), put: vi.fn(), post: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn().mockReturnValue("t") } as unknown as ApiClient;
+    const c = mockApiClient({
+      get: vi.fn().mockResolvedValue(CURRENT),
+      getCurrentToken: vi.fn().mockReturnValue("t"),
+    });
     const out = await runReferenceDetailEdit(
       c, ["keikka", "list"], "detail",
       { kind: "replace", find: "14 latest", replacement: "20 latest" },
@@ -234,7 +228,11 @@ describe("ib reference detail set — edit mode (in-field partial)", () => {
   });
 
   test("real edit PUTs only the edited field", async () => {
-    const c = { get: vi.fn().mockResolvedValue(CURRENT), put: vi.fn().mockResolvedValue({ command: "ib keikka list" }), post: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn().mockReturnValue("t") } as unknown as ApiClient;
+    const c = mockApiClient({
+      get: vi.fn().mockResolvedValue(CURRENT),
+      put: vi.fn().mockResolvedValue({ command: "ib keikka list" }),
+      getCurrentToken: vi.fn().mockReturnValue("t"),
+    });
     await runReferenceDetailEdit(
       c, ["keikka", "list"], "summary",
       { kind: "append", text: " (cached)" },

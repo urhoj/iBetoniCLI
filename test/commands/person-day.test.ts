@@ -1,4 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
+import { mockApiClient, type MockApiClient } from "../helpers/mockClient.js";
 import {
   runPersonDayStatuses,
   runPersonDayGet,
@@ -6,27 +7,20 @@ import {
   runPersonDaySet,
   runPersonDayClear,
 } from "../../src/commands/person/day.js";
-import type { ApiClient } from "../../src/api/client.js";
 
 const JWT =
   "e30." +
   Buffer.from(JSON.stringify({ ownerAsiakasId: 1349, personId: 1 })).toString("base64url") +
   ".sig";
 
-function makeClient(): ApiClient {
-  return {
-    get: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
-    getCurrentToken: vi.fn().mockReturnValue(JWT),
-  } as unknown as ApiClient;
+function makeClient(): MockApiClient {
+  return mockApiClient({ getCurrentToken: vi.fn().mockReturnValue(JWT) });
 }
 
 describe("runPersonDayStatuses", () => {
   test("projects statusList rows", async () => {
     const c = makeClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+    c.get.mockResolvedValueOnce([
       { personPvmStatusId: 2, personPvmStatus: "L", personPvmStatusName: "Loma", pois: true, vakioVapaa: false },
       { personPvmStatusId: 5, personPvmStatus: "T", personPvmStatusName: "Töissä", pois: false, vakioVapaa: false },
     ]);
@@ -46,7 +40,7 @@ describe("runPersonDayStatuses", () => {
 describe("runPersonDayGet", () => {
   test("encodes range + personId and projects rows", async () => {
     const c = makeClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+    c.get.mockResolvedValueOnce([
       { personPvmId: 91, personId: 555, vehicleId: null, pvm: 20260610, personPvmStatusId: 2, personPvmText: "ranta", pois: true, personPvmStatus: "L", personPvmStatusName: "Loma" },
     ]);
     const out = await runPersonDayGet(c, 555, "2026-06-10");
@@ -69,7 +63,7 @@ describe("resolveStatusId", () => {
   });
   test("resolves a name case-insensitively via statusList", async () => {
     const c = makeClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+    c.get.mockResolvedValueOnce([
       { personPvmStatusId: 2, personPvmStatus: "L", personPvmStatusName: "Loma", pois: true, vakioVapaa: false },
     ]);
     const id = await resolveStatusId(c, "loma");
@@ -77,7 +71,7 @@ describe("resolveStatusId", () => {
   });
   test("unknown name exits 4", async () => {
     const c = makeClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+    c.get.mockResolvedValueOnce([
       { personPvmStatusId: 2, personPvmStatus: "L", personPvmStatusName: "Loma", pois: true, vakioVapaa: false },
     ]);
     await expect(resolveStatusId(c, "nope")).rejects.toMatchObject({ exitCode: 4 });
@@ -87,7 +81,7 @@ describe("resolveStatusId", () => {
 describe("runPersonDaySet", () => {
   test("dry-run reads current row, computes wouldChange, never POSTs", async () => {
     const c = makeClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+    c.get.mockResolvedValueOnce([
       { personPvmId: 91, personId: 555, vehicleId: null, pvm: 20260610, personPvmStatusId: 5, personPvmText: null, pois: false, personPvmStatus: "T", personPvmStatusName: "Töissä" },
     ]);
     const out = await runPersonDaySet(c, 555, "2026-06-10", "2", { dryRun: true, reason: "vacation", text: "ranta" });
@@ -102,10 +96,10 @@ describe("runPersonDaySet", () => {
 
   test("real write: existing row → POST includes personPvmId (update, not insert)", async () => {
     const c = makeClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+    c.get.mockResolvedValueOnce([
       { personPvmId: 91, personId: 555, vehicleId: null, pvm: 20260610, personPvmStatusId: 5, personPvmText: null, pois: false, personPvmStatus: "T", personPvmStatusName: "Töissä" },
     ]);
-    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ personPvmId: 91 });
+    c.post.mockResolvedValueOnce({ personPvmId: 91 });
     await runPersonDaySet(c, 555, "2026-06-10", "2", { reason: "vacation" });
     expect(c.post).toHaveBeenCalledWith(
       "/api/personPvm/save/1349",
@@ -116,8 +110,8 @@ describe("runPersonDaySet", () => {
 
   test("real write: no existing row → POST omits personPvmId (insert)", async () => {
     const c = makeClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
-    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ personPvmId: 200 });
+    c.get.mockResolvedValueOnce([]);
+    c.post.mockResolvedValueOnce({ personPvmId: 200 });
     await runPersonDaySet(c, 555, "2026-06-10", "2", { reason: "vacation" });
     expect(c.post).toHaveBeenCalledWith(
       "/api/personPvm/save/1349",
@@ -128,10 +122,10 @@ describe("runPersonDaySet", () => {
 
   test("real write: preserves the existing vehicleId (does not wipe day driver)", async () => {
     const c = makeClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+    c.get.mockResolvedValueOnce([
       { personPvmId: 91, personId: 555, vehicleId: 53, pvm: 20260610, personPvmStatusId: 5, personPvmText: null, pois: false, personPvmStatus: "T", personPvmStatusName: "Töissä" },
     ]);
-    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ personPvmId: 91 });
+    c.post.mockResolvedValueOnce({ personPvmId: 91 });
     await runPersonDaySet(c, 555, "2026-06-10", "2", { reason: "vacation" });
     expect(c.post).toHaveBeenCalledWith(
       "/api/personPvm/save/1349",
@@ -148,14 +142,10 @@ function tokenWith(payload: object): string {
 
 describe("statuses --full", () => {
   test("statuses --full surfaces prefix/style/description/active/ownerAsiakasId", async () => {
-    const client = {
-      get: vi.fn().mockResolvedValue([
-        { personPvmStatusId: 4, personPvmStatus: "Pois, loma", personPvmStatusName: "Loma",
-          personPvmStatusDescription: null, pois: true, vakioVapaa: false,
-          prefix: "L", style: "indianred", active: true, ownerAsiakasId: 8 },
-      ]),
+    const client = mockApiClient({
+      get: vi.fn().mockResolvedValue([ { personPvmStatusId: 4, personPvmStatus: "Pois, loma", personPvmStatusName: "Loma", personPvmStatusDescription: null, pois: true, vakioVapaa: false, prefix: "L", style: "indianred", active: true, ownerAsiakasId: 8 }, ]),
       getCurrentToken: vi.fn().mockReturnValue(tokenWith({ ownerAsiakasId: 8 })),
-    } as unknown as ApiClient;
+    });
 
     const full = await runPersonDayStatuses(client, { full: true });
     expect(full.items[0]).toMatchObject({
@@ -171,7 +161,7 @@ describe("statuses --full", () => {
 describe("runPersonDayClear", () => {
   test("dry-run resolves the row, returns wouldDelete, never DELETEs", async () => {
     const c = makeClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+    c.get.mockResolvedValueOnce([
       { personPvmId: 91, personId: 555, vehicleId: null, pvm: 20260610, personPvmStatusId: 2, personPvmText: null, pois: true, personPvmStatus: "L", personPvmStatusName: "Loma" },
     ]);
     const out = await runPersonDayClear(c, 555, "2026-06-10", { dryRun: true, reason: "x" });
@@ -181,10 +171,10 @@ describe("runPersonDayClear", () => {
 
   test("real: existing row → DELETE the resolved id", async () => {
     const c = makeClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+    c.get.mockResolvedValueOnce([
       { personPvmId: 91, personId: 555, vehicleId: null, pvm: 20260610, personPvmStatusId: 2, personPvmText: null, pois: true, personPvmStatus: "L", personPvmStatusName: "Loma" },
     ]);
-    (c.delete as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ deleted: 1 });
+    c.delete.mockResolvedValueOnce({ deleted: 1 });
     await runPersonDayClear(c, 555, "2026-06-10", { reason: "back to work" });
     expect(c.delete).toHaveBeenCalledWith("/api/personPvm/delete/1349/91", {
       headers: { "X-Action-Reason": "back to work" },
@@ -193,7 +183,7 @@ describe("runPersonDayClear", () => {
 
   test("real: no row → no DELETE, returns deleted:false", async () => {
     const c = makeClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    c.get.mockResolvedValueOnce([]);
     const out = await runPersonDayClear(c, 555, "2026-06-10", { reason: "x" });
     expect(c.delete).not.toHaveBeenCalled();
     expect(out).toEqual({ deleted: false, message: "no personPvm row for that person/date" });

@@ -1,30 +1,24 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runCustomerCreate,
   runCustomerUpdate,
   runCustomerByYtunnus,
   runCustomerUpsert,
 } from "../../src/commands/customer/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
-const mGet = () => mockClient.get as ReturnType<typeof vi.fn>;
-const mPost = () => mockClient.post as ReturnType<typeof vi.fn>;
+const mGet = () => mockClient.get;
+const mPost = () => mockClient.post;
 
 describe("ib customer create/update", () => {
   beforeEach(() => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockReset();
+    mockClient.post.mockReset();
   });
 
   test("runCustomerCreate forwards body + all three write-flag headers", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.post.mockResolvedValueOnce({
       asiakasId: 9999,
     });
     const body = { asiakasNimi: "Acme Oy", ytunnus: "1234567-8" };
@@ -48,7 +42,7 @@ describe("ib customer create/update", () => {
   });
 
   test("runCustomerUpdate posts to /api/asiakas/set/:asiakasId with body + flag headers", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.post.mockResolvedValueOnce({
       success: true,
     });
     const body = { asiakasNimi: "Acme Group Oy" };

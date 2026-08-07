@@ -1,25 +1,18 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runSupportInbox,
   runSupportMine,
   runSupportContact,
   runSupportResolve,
 } from "../../src/commands/message/support/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  patch: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
-const get = mockClient.get as ReturnType<typeof vi.fn>;
-const post = mockClient.post as ReturnType<typeof vi.fn>;
-const patch = mockClient.patch as ReturnType<typeof vi.fn>;
+const get = mockClient.get;
+const post = mockClient.post;
+const patch = mockClient.patch;
 
 beforeEach(() => {
   get.mockReset();

@@ -1,4 +1,5 @@
 import { test, expect, vi, beforeEach, describe } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -6,10 +7,9 @@ import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet,
   from "../../src/commands/changelog/index.js";
 import { readJsonInput } from "../../src/api/parseBody.js";
 import type { ChangelogAddBody } from "../../src/commands/changelog/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 import { writeFlagsToHeaders } from "../../src/api/writeFlags.js";
 
-const client = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn() } as unknown as ApiClient;
+const client = mockApiClient();
 
 /** Run a fn expected to throw and return the thrown value for structural assertions. */
 function captureThrow(fn: () => void): { exitCode?: number; body?: { problems?: Array<{ flag: string; got?: string; allowed?: string[]; synonyms?: Record<string, string> }>; sample?: string } } {
@@ -51,9 +51,9 @@ async function captureActionError(
   }
 }
 
-const asPost = () => client.post as ReturnType<typeof vi.fn>;
-const asGet = () => client.get as ReturnType<typeof vi.fn>;
-const asPut = () => client.put as ReturnType<typeof vi.fn>;
+const asPost = () => client.post;
+const asGet = () => client.get;
+const asPut = () => client.put;
 beforeEach(() => vi.clearAllMocks());
 
 test("add posts the entry with feedback link", async () => {
@@ -114,11 +114,11 @@ test("update puts language in the patch body", async () => {
 test("delete --dry-run never issues a DELETE", async () => {
   const r = await runChangelogDelete(client, 7, { dryRun: true });
   expect(r).toEqual({ dryRun: true, wouldDelete: { id: 7 } });
-  expect(client.delete as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
+  expect(client.delete).not.toHaveBeenCalled();
 });
 
 test("delete issues DELETE /api/changelog/:id with the write headers", async () => {
-  const asDelete = client.delete as ReturnType<typeof vi.fn>;
+  const asDelete = client.delete;
   asDelete.mockResolvedValue({ deleted: true });
   const r = await runChangelogDelete(client, 7, { reason: "cleanup" });
   expect(asDelete).toHaveBeenCalledWith("/api/changelog/7",
@@ -218,13 +218,7 @@ test("list normalizes a pasted --sentry url to the short id", async () => {
 });
 
 function mockClient() {
-  return {
-    get: vi.fn(),
-    post: vi.fn().mockResolvedValue({ changelogId: 1 }),
-    put: vi.fn(),
-    delete: vi.fn(),
-    getCurrentToken: vi.fn(),
-  };
+  return mockApiClient({ post: vi.fn().mockResolvedValue({ changelogId: 1 }) });
 }
 
 describe("changelog add bumpLevel", () => {

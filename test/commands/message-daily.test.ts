@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   toYyyymmdd,
   runDailyList,
@@ -11,19 +12,12 @@ import {
   runDailyGrant,
   runDailyPermSet,
 } from "../../src/commands/message/daily/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
-const asGet = () => mockClient.get as ReturnType<typeof vi.fn>;
-const asPost = () => mockClient.post as ReturnType<typeof vi.fn>;
-const asDelete = () => mockClient.delete as ReturnType<typeof vi.fn>;
+const asGet = () => mockClient.get;
+const asPost = () => mockClient.post;
+const asDelete = () => mockClient.delete;
 
 beforeEach(() => {
   vi.clearAllMocks();

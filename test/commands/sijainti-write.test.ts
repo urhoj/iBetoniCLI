@@ -1,4 +1,5 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runSijaintiCreate,
   runSijaintiUpdate,
@@ -13,24 +14,17 @@ import {
   assertPuomiFlags,
 } from "../../src/commands/sijainti/index.js";
 import { extractGeocodeLatLng } from "../../src/commands/_shared/geocode.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
 describe("ib sijainti create/update", () => {
   beforeEach(() => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockReset();
-    (mockClient.get as ReturnType<typeof vi.fn>).mockReset();
+    mockClient.post.mockReset();
+    mockClient.get.mockReset();
   });
 
   test("runSijaintiCreate forwards body + all three write-flag headers", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.post.mockResolvedValueOnce({
       sijaintiId: 4242,
     });
     const body = {
@@ -73,8 +67,8 @@ describe("ib sijainti create/update", () => {
       lng: 24.94,
       placeId: "ChIJxyz",
     };
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce(current);
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce(current);
+    mockClient.post.mockResolvedValueOnce({
       success: true,
     });
     const sparse = { sijaintiId: 4242, sijaintiNimi: "Helsinki HQ — Tower B" };
@@ -106,13 +100,13 @@ describe("ib sijainti create/update", () => {
   });
 
   test("runSijaintiUpdate: explicit null in the sparse body still clears the field", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       sijaintiId: 7,
       sijaintiNimi: "Depot",
       sijaintiOsoite1: "Street 1",
       endDate: "2026-12-31",
     });
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
+    mockClient.post.mockResolvedValueOnce(true);
     const { merged } = await runSijaintiUpdate(
       mockClient,
       { sijaintiId: 7, endDate: null },
@@ -123,14 +117,14 @@ describe("ib sijainti create/update", () => {
   });
 
   test("runSijaintiUpdate: address change without coords auto-geocodes the NEW address", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       sijaintiId: 7,
       sijaintiNimi: "Depot",
       sijaintiOsoite1: "Old Street 1",
       lat: 60.1,
       lng: 24.9,
     });
-    const post = mockClient.post as ReturnType<typeof vi.fn>;
+    const post = mockClient.post;
     post.mockImplementation(async (path: string) => {
       if (path === "/api/geocode/getLatLng") {
         return { results: [{ geometry: { location: { lat: 61.5, lng: 23.75 } } }] };
@@ -153,12 +147,12 @@ describe("ib sijainti create/update", () => {
   });
 
   test("runSijaintiUpdate: auto-geocode failure is soft — update still POSTs, geocodeFailed reported", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       sijaintiId: 7,
       sijaintiNimi: "Depot",
       sijaintiOsoite1: "Old Street 1",
     });
-    const post = mockClient.post as ReturnType<typeof vi.fn>;
+    const post = mockClient.post;
     post.mockImplementation(async (path: string) => {
       if (path === "/api/geocode/getLatLng") return { status: "ZERO_RESULTS" };
       return { success: true };
@@ -178,11 +172,11 @@ describe("ib sijainti create/update", () => {
   });
 
   test("runSijaintiUpdate: explicit --lat/--lng suppress the auto-geocode on address change", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       sijaintiId: 7,
       sijaintiOsoite1: "Old Street 1",
     });
-    const post = mockClient.post as ReturnType<typeof vi.fn>;
+    const post = mockClient.post;
     post.mockResolvedValue({ success: true });
     const { merged } = await runSijaintiUpdate(
       mockClient,
@@ -195,7 +189,7 @@ describe("ib sijainti create/update", () => {
 });
 
 describe("sijainti coordinate persistence (updateLatLng)", () => {
-  const mPost = () => mockClient.post as ReturnType<typeof vi.fn>;
+  const mPost = () => mockClient.post;
   beforeEach(() => {
     mPost().mockReset();
   });
@@ -265,7 +259,7 @@ describe("sijainti coordinate persistence (updateLatLng)", () => {
 });
 
 describe("applyGeocodeToBody (--geocode, shared by create/update)", () => {
-  const mPost = () => mockClient.post as ReturnType<typeof vi.fn>;
+  const mPost = () => mockClient.post;
   beforeEach(() => {
     mPost().mockReset();
   });
@@ -423,8 +417,8 @@ describe("applySijaintiCreateDefaults", () => {
 });
 
 describe("runSijaintiSetJerry (delivery radius)", () => {
-  const mGet = () => mockClient.get as ReturnType<typeof vi.fn>;
-  const mPost = () => mockClient.post as ReturnType<typeof vi.fn>;
+  const mGet = () => mockClient.get;
+  const mPost = () => mockClient.post;
   const SENTINEL = "9999-12-31 23:59:59";
   beforeEach(() => {
     mGet().mockReset();
@@ -500,12 +494,12 @@ describe("extractGeocodeLatLng", () => {
 
 describe("ib sijainti delete/undelete", () => {
   beforeEach(() => {
-    (mockClient.delete as ReturnType<typeof vi.fn>).mockReset();
-    (mockClient.post as ReturnType<typeof vi.fn>).mockReset();
+    mockClient.delete.mockReset();
+    mockClient.post.mockReset();
   });
 
   test("runSijaintiDelete: DELETE /api/geocode/sijainti/delete/:id with flag headers", async () => {
-    (mockClient.delete as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.delete.mockResolvedValueOnce({
       success: true,
     });
     const result = await runSijaintiDelete(mockClient, 42, {
@@ -519,7 +513,7 @@ describe("ib sijainti delete/undelete", () => {
   });
 
   test("runSijaintiUndelete: POST /api/geocode/sijainti/undelete/:id with empty body + flag headers", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.post.mockResolvedValueOnce({
       success: true,
     });
     await runSijaintiUndelete(mockClient, 42, { reason: "restored" });

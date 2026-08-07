@@ -1,18 +1,9 @@
-import { describe, test, expect, vi } from "vitest";
+import { describe, test, expect } from "vitest";
+import { mockApiClient, type MockApiClient, type MockApiClientOverrides } from "../helpers/mockClient.js";
 import { runPersonEmailList, runPersonEmailAdd, runPersonEmailRemove } from "../../src/commands/person/email.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-type MockClient = ApiClient & Record<"get" | "put" | "post" | "delete" | "getCurrentToken", ReturnType<typeof vi.fn>>;
-
-function mockClient(over: Partial<Record<string, unknown>> = {}): MockClient {
-  return {
-    get: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
-    getCurrentToken: vi.fn(),
-    ...over,
-  } as unknown as MockClient;
+function mockClient(over: MockApiClientOverrides = {}): MockApiClient {
+  return mockApiClient(over);
 }
 
 describe("person email", () => {

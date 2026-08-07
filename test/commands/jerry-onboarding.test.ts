@@ -1,23 +1,17 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runJerryOnboardingList,
   runJerryOnboardingAdd,
   runJerryOnboardingSet,
   runJerryOnboardingLog,
 } from "../../src/commands/jerry/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
-const g = mockClient.get as ReturnType<typeof vi.fn>;
-const p = mockClient.post as ReturnType<typeof vi.fn>;
-const u = mockClient.put as ReturnType<typeof vi.fn>;
+const g = mockClient.get;
+const p = mockClient.post;
+const u = mockClient.put;
 
 describe("jerry admin onboarding", () => {
   beforeEach(() => { g.mockReset(); p.mockReset(); u.mockReset(); });

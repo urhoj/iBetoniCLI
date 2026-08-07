@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
+import { mockApiClient, type MockApiClient, type MockApiClientOverrides } from "../helpers/mockClient.js";
 import {
   runOhjeGet,
   runOhjeList,
@@ -9,19 +10,12 @@ import {
   runOhjeEditField,
   runOhjeDelete,
 } from "../../src/commands/ohje/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
-const asGet = () => mockClient.get as ReturnType<typeof vi.fn>;
-const asPut = () => mockClient.put as ReturnType<typeof vi.fn>;
-const asDelete = () => mockClient.delete as ReturnType<typeof vi.fn>;
+const asGet = () => mockClient.get;
+const asPut = () => mockClient.put;
+const asDelete = () => mockClient.delete;
 
 describe("ib ohje get/list", () => {
   beforeEach(() => {
@@ -305,10 +299,8 @@ describe("isValidHelpId", () => {
   });
 });
 
-type MockClient = ApiClient & Record<"get" | "put" | "post" | "delete" | "getCurrentToken", ReturnType<typeof vi.fn>>;
-
-function client(over: Record<string, unknown> = {}): MockClient {
-  return { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn(), ...over } as unknown as MockClient;
+function client(over: MockApiClientOverrides = {}): MockApiClient {
+  return mockApiClient(over);
 }
 
 describe("ib ohje aiConfidence", () => {

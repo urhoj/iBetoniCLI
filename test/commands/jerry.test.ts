@@ -1,4 +1,5 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runJerryRequestList,
   runJerryRequestGet,
@@ -32,20 +33,13 @@ import {
   runJerryAdminSearches,
   runJerryAdminFunnel,
 } from "../../src/commands/jerry/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 import type { WriteFlags } from "../../src/api/writeFlags.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
-const get = mockClient.get as ReturnType<typeof vi.fn>;
-const post = mockClient.post as ReturnType<typeof vi.fn>;
-const put = mockClient.put as ReturnType<typeof vi.fn>;
+const get = mockClient.get;
+const post = mockClient.post;
+const put = mockClient.put;
 
 beforeEach(() => {
   get.mockReset();
@@ -486,7 +480,7 @@ describe("ib jerry offer withdraw", () => {
   });
 
   test("offer delete hits DELETE /:id/offers/:offerId with headers", async () => {
-    const del = mockClient.delete as ReturnType<typeof vi.fn>;
+    const del = mockClient.delete;
     del.mockResolvedValueOnce({ success: true, pumppuOfferId: 5, deleted: true });
     const result = await runJerryOfferDelete(mockClient, 77, 5, { reason: "väärä luonnos" } as WriteFlags);
     expect(del).toHaveBeenCalledWith(
@@ -562,7 +556,7 @@ describe("ib jerry admin request write commands", () => {
   });
 
   test("admin request delete calls DELETE with headers", async () => {
-    const del = mockClient.delete as ReturnType<typeof vi.fn>;
+    const del = mockClient.delete;
     del.mockResolvedValueOnce({ success: true });
     await runJerryAdminRequestDelete(mockClient, 41, { reason: "cleanup" } as WriteFlags);
     expect(del).toHaveBeenCalledWith("/api/admin/jerry-requests/41", expect.objectContaining({ headers: expect.any(Object) }));

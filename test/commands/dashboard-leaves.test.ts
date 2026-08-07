@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 
 // Replace the shared orchestrator with a mock so `runWorksiteDashboard` /
 // `runSijaintiDashboard` can be tested as thin forwarding wrappers (the
@@ -17,15 +18,8 @@ import { runAddressDashboard } from "../../src/commands/_shared/addressDashboard
 import { runWorksiteDashboard } from "../../src/commands/worksite/index.js";
 import { runSijaintiDashboard } from "../../src/commands/sijainti/index.js";
 import { runArgv } from "../../src/runArgv.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
 const mockedDashboard = vi.mocked(runAddressDashboard);
 

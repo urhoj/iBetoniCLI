@@ -1,25 +1,19 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runCompanyList,
   runCompanyCurrent,
 } from "../../src/commands/company/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
 describe("ib company", () => {
   beforeEach(() => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockReset();
+    mockClient.get.mockReset();
   });
 
   test("runCompanyList: GETs /api/company-selection/available and projects envelope", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       companies: [
         { asiakasId: 1, name: "A" },
         { asiakasId: 2, name: "B" },
@@ -41,7 +35,7 @@ describe("ib company", () => {
   });
 
   test("runCompanyCurrent: returns the active company record", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       companies: [
         { asiakasId: 1, name: "A" },
         { asiakasId: 2, name: "B" },
@@ -56,7 +50,7 @@ describe("ib company", () => {
   });
 
   test("runCompanyCurrent: throws when no current company in response", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       companies: [{ asiakasId: 1, name: "A" }],
       currentCompanyId: 99,
     });

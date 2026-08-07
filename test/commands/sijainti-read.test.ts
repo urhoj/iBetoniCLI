@@ -1,4 +1,5 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runSijaintiList,
   runSijaintiListJoined,
@@ -14,24 +15,17 @@ import {
   sijaintiJerryActive,
   sijaintiMatchable,
 } from "../../src/commands/sijainti/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
 describe("ib sijainti list/get", () => {
   beforeEach(() => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockReset();
+    mockClient.get.mockReset();
   });
 
   test("runSijaintiList: hits bare path when no opts set", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
@@ -41,7 +35,7 @@ describe("ib sijainti list/get", () => {
   });
 
   test("runSijaintiList: includes type and limit when set", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [{ sijaintiId: 99, name: "Helsinki Asema" }],
       nextCursor: null,
       count: 1,
@@ -57,7 +51,7 @@ describe("ib sijainti list/get", () => {
   });
 
   test("runSijaintiGet: GET /api/geocode/sijainti/get/99 (geocode route, not /api/cli/)", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       sijaintiId: 99,
       name: "Helsinki Asema",
     });
@@ -69,7 +63,7 @@ describe("ib sijainti list/get", () => {
   });
 
   test("runSijaintiList: includes validAtDate and includeDeleted when set", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
@@ -84,7 +78,7 @@ describe("ib sijainti list/get", () => {
   });
 
   test("runSijaintiList: includes search and scope=all when set", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
@@ -97,8 +91,8 @@ describe("ib sijainti list/get", () => {
 });
 
 describe("ib sijainti set-jerry", () => {
-  const get = mockClient.get as ReturnType<typeof vi.fn>;
-  const post = mockClient.post as ReturnType<typeof vi.fn>;
+  const get = mockClient.get;
+  const post = mockClient.post;
   beforeEach(() => {
     get.mockReset();
     post.mockReset();
@@ -145,7 +139,7 @@ describe("ib sijainti set-jerry", () => {
 });
 
 describe("ib sijainti types", () => {
-  const get = mockClient.get as ReturnType<typeof vi.fn>;
+  const get = mockClient.get;
   beforeEach(() => {
     get.mockReset();
   });
@@ -175,7 +169,7 @@ describe("ib sijainti types", () => {
 });
 
 describe("ib sijainti geocode", () => {
-  const post = mockClient.post as ReturnType<typeof vi.fn>;
+  const post = mockClient.post;
   beforeEach(() => {
     post.mockReset();
   });
@@ -247,7 +241,7 @@ describe("ib sijainti geocode", () => {
 });
 
 describe("ib sijainti closest", () => {
-  const get = mockClient.get as ReturnType<typeof vi.fn>;
+  const get = mockClient.get;
   beforeEach(() => {
     get.mockReset();
   });
@@ -305,7 +299,7 @@ describe("ib sijainti closest", () => {
 });
 
 describe("ib sijainti distance", () => {
-  const get = mockClient.get as ReturnType<typeof vi.fn>;
+  const get = mockClient.get;
   beforeEach(() => {
     get.mockReset();
   });
@@ -401,7 +395,7 @@ describe("sijaintiRowMatches", () => {
 });
 
 describe("runSijaintiListJoined", () => {
-  const get = mockClient.get as ReturnType<typeof vi.fn>;
+  const get = mockClient.get;
   beforeEach(() => {
     get.mockReset();
     get.mockImplementation(async (path: string) => {
@@ -580,7 +574,7 @@ describe("sijaintiJerryActive / sijaintiMatchable (fb#108)", () => {
 });
 
 describe("runSijaintiListJoined --jerry (fb#108)", () => {
-  const get = mockClient.get as ReturnType<typeof vi.fn>;
+  const get = mockClient.get;
   const SENTINEL = "9999-12-31 23:59:59";
   const PAST = "2020-01-01 00:00:00";
   const coords = { lat: 60.1, lng: 24.9 };
@@ -630,7 +624,7 @@ describe("runSijaintiListJoined --jerry (fb#108)", () => {
 });
 
 describe("runSijaintiPlants / --asiakas owner filter", () => {
-  const get = mockClient.get as ReturnType<typeof vi.fn>;
+  const get = mockClient.get;
   beforeEach(() => {
     get.mockReset();
     get.mockImplementation(async (path: string) => {

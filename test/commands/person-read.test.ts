@@ -1,27 +1,21 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runPersonList,
   runPersonGet,
   runPersonSearch,
 } from "../../src/commands/person/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
 describe("ib person list/get/search", () => {
   beforeEach(() => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockReset();
-    (mockClient.post as ReturnType<typeof vi.fn>).mockReset();
+    mockClient.get.mockReset();
+    mockClient.post.mockReset();
   });
 
   test("runPersonList: hits bare path when no opts set", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
@@ -31,7 +25,7 @@ describe("ib person list/get/search", () => {
   });
 
   test("runPersonList: includes role/asiakas/limit when set", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [{ personId: 6233, name: "BetoniJerry System" }],
       nextCursor: null,
       count: 1,
@@ -48,7 +42,7 @@ describe("ib person list/get/search", () => {
   });
 
   test("runPersonList: --owned appends ?owned=1", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
@@ -58,7 +52,7 @@ describe("ib person list/get/search", () => {
   });
 
   test("runPersonGet: GET /api/cli/person/get/6233", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       personId: 6233,
       name: "BetoniJerry System",
     });
@@ -68,7 +62,7 @@ describe("ib person list/get/search", () => {
   });
 
   test("runPersonSearch: POSTs /api/person/search with {searchString} body as a read", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+    mockClient.post.mockResolvedValueOnce([
       { personId: 6233, name: "Jerry" },
     ]);
     await runPersonSearch(mockClient, "Jerry");
@@ -80,7 +74,7 @@ describe("ib person list/get/search", () => {
   });
 
   test("runPersonSearch: forwards raw query untouched (no encoding)", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    mockClient.post.mockResolvedValueOnce([]);
     await runPersonSearch(mockClient, "Doe & Sons");
     expect(mockClient.post).toHaveBeenCalledWith(
       "/api/person/search",
@@ -90,7 +84,7 @@ describe("ib person list/get/search", () => {
   });
 
   test("runPersonSearch forwards limit in the body", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    mockClient.post.mockResolvedValueOnce([]);
     await runPersonSearch(mockClient, "Matti", 10);
     expect(mockClient.post).toHaveBeenCalledWith(
       "/api/person/search",
@@ -103,7 +97,7 @@ describe("ib person list/get/search", () => {
   // with canAccessOwnerAsiakas (any tenant for sysadmin/developer); omitting the
   // field is what keeps the DEFAULT scoped to the caller's active company.
   test("runPersonSearch sends ownerAsiakasId when --asiakas targets another tenant", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    mockClient.post.mockResolvedValueOnce([]);
     await runPersonSearch(mockClient, "Jerry", undefined, 1349);
     expect(mockClient.post).toHaveBeenCalledWith(
       "/api/person/search",
@@ -113,14 +107,14 @@ describe("ib person list/get/search", () => {
   });
 
   test("runPersonSearch omits ownerAsiakasId entirely when no --asiakas is given", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    mockClient.post.mockResolvedValueOnce([]);
     await runPersonSearch(mockClient, "Jerry", 5);
-    const body = (mockClient.post as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    const body = mockClient.post.mock.calls[0][1];
     expect(body).not.toHaveProperty("ownerAsiakasId");
   });
 
   test("runPersonSearch projects rows to a ListEnvelope with asiakasId from ownerAsiakasId", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.post.mockResolvedValueOnce({
       recordset: [
         {
           personId: 100,

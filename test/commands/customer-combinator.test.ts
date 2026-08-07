@@ -1,20 +1,14 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runCustomerDuplicates,
   runCustomerMerge,
 } from "../../src/commands/customer/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
-const asGet = () => mockClient.get as ReturnType<typeof vi.fn>;
-const asPost = () => mockClient.post as ReturnType<typeof vi.fn>;
+const asGet = () => mockClient.get;
+const asPost = () => mockClient.post;
 
 describe("runCustomerDuplicates", () => {
   beforeEach(() => {

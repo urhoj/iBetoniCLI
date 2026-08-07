@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   resolvePersonRef,
   runNotificationFcmSend,
@@ -6,17 +7,10 @@ import {
   resolveEmailHtml,
 } from "../../src/commands/notification/index.js";
 import { parseJsonBodyFlag } from "../../src/api/parseBody.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const c = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const c = mockApiClient();
 
-const post = () => c.post as ReturnType<typeof vi.fn>;
+const post = () => c.post;
 
 beforeEach(() => vi.clearAllMocks());
 

@@ -1,4 +1,5 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   parseModuleChanges,
   runCustomerModulesApply,
@@ -7,18 +8,11 @@ import {
   resolveAsiakasTarget,
   ALL_FIELD_KEYS,
 } from "../../src/commands/customer/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
-const get = () => mockClient.get as ReturnType<typeof vi.fn>;
-const post = () => mockClient.post as ReturnType<typeof vi.fn>;
+const get = () => mockClient.get;
+const post = () => mockClient.post;
 
 /** A baseline report with everything off, used for the roolit-read + re-fetch. */
 const STATE_OFF = {

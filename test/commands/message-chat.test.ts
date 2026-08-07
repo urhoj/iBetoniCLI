@@ -1,4 +1,5 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runChatThreads,
   runChatThread,
@@ -10,17 +11,9 @@ import {
   runChatRestore,
   runChatSearch,
 } from "../../src/commands/message/chat/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  patch: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
-const asGet = () => mockClient.get as ReturnType<typeof vi.fn>;
+const mockClient = mockApiClient();
+const asGet = () => mockClient.get;
 
 const THREADS = [
   { threadId: 10, contextType: "pumppuRequest", contextId: 23, unreadCount: 0 },
@@ -89,7 +82,7 @@ describe("runChatList", () => {
 });
 
 describe("runChatSend", () => {
-  const asPost = () => mockClient.post as ReturnType<typeof vi.fn>;
+  const asPost = () => mockClient.post;
   beforeEach(() => {
     asGet().mockReset();
     asPost().mockReset();
@@ -147,7 +140,7 @@ describe("runChatSend", () => {
 });
 
 describe("runChatMarkRead", () => {
-  const asPost = () => mockClient.post as ReturnType<typeof vi.fn>;
+  const asPost = () => mockClient.post;
   beforeEach(() => asPost().mockReset());
   test("POSTs to the read endpoint with an empty body", async () => {
     asPost().mockResolvedValueOnce({ lastReadAt: "2026-06-14T12:00:00Z" });
@@ -157,7 +150,7 @@ describe("runChatMarkRead", () => {
 });
 
 describe("runChatDelete", () => {
-  const asDelete = () => mockClient.delete as ReturnType<typeof vi.fn>;
+  const asDelete = () => mockClient.delete;
   beforeEach(() => {
     asGet().mockReset();
     asDelete().mockReset();
@@ -206,7 +199,7 @@ describe("runChatDelete", () => {
 });
 
 describe("runChatEdit", () => {
-  const asPatch = () => mockClient.patch as ReturnType<typeof vi.fn>;
+  const asPatch = () => mockClient.patch;
   beforeEach(() => {
     asGet().mockReset();
     asPatch().mockReset();
@@ -242,7 +235,7 @@ describe("runChatEdit", () => {
 });
 
 describe("runChatRestore", () => {
-  const asPost = () => mockClient.post as ReturnType<typeof vi.fn>;
+  const asPost = () => mockClient.post;
   beforeEach(() => {
     asGet().mockReset();
     asPost().mockReset();

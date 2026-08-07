@@ -1,4 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
+import { mockApiClient } from "../../helpers/mockClient.js";
 import type { ApiClient } from "../../../src/api/client.js";
 import {
   runImpersonationSessions,
@@ -6,13 +7,10 @@ import {
 } from "../../../src/commands/dev/impersonation/index.js";
 
 function mockClient(getImpl: (path: string) => unknown): ApiClient {
-  return {
+  return mockApiClient({
     get: vi.fn(async (path: string) => getImpl(path)),
-    post: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
     getCurrentToken: vi.fn(() => "tok"),
-  } as unknown as ApiClient;
+  });
 }
 
 describe("runImpersonationSessions", () => {

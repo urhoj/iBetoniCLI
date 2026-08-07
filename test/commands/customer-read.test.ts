@@ -1,4 +1,5 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runCustomerList,
   runCustomerGet,
@@ -7,23 +8,16 @@ import {
   runCustomerWorksites,
   projectCustomerRow,
 } from "../../src/commands/customer/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
 describe("ib customer list/get/search", () => {
   beforeEach(() => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockReset();
+    mockClient.get.mockReset();
   });
 
   test("runCustomerList: hits bare path when no opts set", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
@@ -33,7 +27,7 @@ describe("ib customer list/get/search", () => {
   });
 
   test("runCustomerList: includes limit and cursor when set", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [{ asiakasId: 1349, name: "BetoniJerry" }],
       nextCursor: "abc",
       count: 1,
@@ -49,7 +43,7 @@ describe("ib customer list/get/search", () => {
   });
 
   test("runCustomerList: appends full=1 and ids when set", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [], nextCursor: null, count: 0,
     });
     await runCustomerList(mockClient, { full: true, ids: [26, 42, 1349] });
@@ -59,7 +53,7 @@ describe("ib customer list/get/search", () => {
   });
 
   test("runCustomerList: appends include (contacts,sijainnit) when set", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [], nextCursor: null, count: 0,
     });
     await runCustomerList(mockClient, { full: true, ids: [1], include: ["contacts", "sijainnit"] });
@@ -69,7 +63,7 @@ describe("ib customer list/get/search", () => {
   });
 
   test("runCustomerGet: GET /api/cli/customer/get/1349", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       asiakasId: 1349,
       name: "BetoniJerry",
     });
@@ -79,7 +73,7 @@ describe("ib customer list/get/search", () => {
   });
 
   test("runCustomerSearch: GET /api/asiakas/search?searchString=<query>", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+    mockClient.get.mockResolvedValueOnce([
       { asiakasId: 1349, name: "BetoniJerry" },
     ]);
     await runCustomerSearch(mockClient, "Betoni");
@@ -89,7 +83,7 @@ describe("ib customer list/get/search", () => {
   });
 
   test("runCustomerSearch: URL-encodes special characters in query", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    mockClient.get.mockResolvedValueOnce([]);
     await runCustomerSearch(mockClient, "Acme & Co");
     expect(mockClient.get).toHaveBeenCalledWith(
       "/api/asiakas/search?searchString=Acme+%26+Co"
@@ -97,7 +91,7 @@ describe("ib customer list/get/search", () => {
   });
 
   test("runCustomerSearch forwards --limit as a query param", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    mockClient.get.mockResolvedValueOnce([]);
     await runCustomerSearch(mockClient, "Example", 25);
     expect(mockClient.get).toHaveBeenCalledWith(
       "/api/asiakas/search?searchString=Example&limit=25"
@@ -105,7 +99,7 @@ describe("ib customer list/get/search", () => {
   });
 
   test("runCustomerWorksites: GET asiakasTyomaaList, wraps array into envelope", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+    mockClient.get.mockResolvedValueOnce([
       { tyomaaId: 7, tyomaaNimi: "Site A", tyomaaOsoite1: "Main 1", tyomaaOsoite4: "Helsinki" },
     ]);
     const result = await runCustomerWorksites(mockClient, 1349);
@@ -117,7 +111,7 @@ describe("ib customer list/get/search", () => {
   });
 
   test("runCustomerList surfaces backend 'truncated' on the envelope", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [{ asiakasId: 1 }],
       truncated: true,
       nextCursor: null,
@@ -128,7 +122,7 @@ describe("ib customer list/get/search", () => {
   });
 
   test("runCustomerList: appends fields and sijaintiTypes when set", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [], nextCursor: null, count: 0,
     });
     await runCustomerList(mockClient, {
@@ -143,7 +137,7 @@ describe("ib customer list/get/search", () => {
   });
 
   test("runCustomerList: appends since and sort when set", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [], nextCursor: null, count: 0,
     });
     await runCustomerList(mockClient, { since: "2026-07-08", sort: "registered" });
@@ -154,7 +148,7 @@ describe("ib customer list/get/search", () => {
 
   test("runCustomerList: re-applies fields/sijainti-types client-side over a full backend row", async () => {
     // Simulate an OLDER backend that ignored the params and returned full rows.
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [
         {
           asiakasId: 26,
@@ -238,7 +232,7 @@ describe("ib customer list/get/search", () => {
         shareorders: false,
       },
     };
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce(state);
+    mockClient.get.mockResolvedValueOnce(state);
     const result = await runCustomerModulesReport(mockClient, 1349);
     expect(mockClient.get).toHaveBeenCalledWith(
       "/api/cli/customer/modules/1349"

@@ -1,4 +1,5 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runWorksiteList,
   runWorksiteGet,
@@ -7,24 +8,17 @@ import {
   runWorksiteDatesList,
   runWorksiteDatesExpiring,
 } from "../../src/commands/worksite/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
 describe("ib worksite list/get/search", () => {
   beforeEach(() => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockReset();
-    (mockClient.post as ReturnType<typeof vi.fn>).mockReset();
+    mockClient.get.mockReset();
+    mockClient.post.mockReset();
   });
 
   test("runWorksiteList: hits bare path when no opts set", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
@@ -34,7 +28,7 @@ describe("ib worksite list/get/search", () => {
   });
 
   test("runWorksiteList: includes limit and cursor when set", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [{ tyomaaId: 42, name: "Helsinki Site" }],
       nextCursor: "next",
       count: 1,
@@ -50,7 +44,7 @@ describe("ib worksite list/get/search", () => {
   });
 
   test("runWorksiteGet: GET /api/cli/worksite/get/42", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       tyomaaId: 42,
       name: "Helsinki Site",
     });
@@ -60,7 +54,7 @@ describe("ib worksite list/get/search", () => {
   });
 
   test("runWorksiteSearch: POSTs /api/tyomaa/search with {searchString} body as a read", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+    mockClient.post.mockResolvedValueOnce([
       { tyomaaId: 42, name: "Helsinki Site" },
     ]);
     await runWorksiteSearch(mockClient, "Helsinki");
@@ -72,7 +66,7 @@ describe("ib worksite list/get/search", () => {
   });
 
   test("runWorksiteSearch: forwards raw query untouched (no encoding)", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    mockClient.post.mockResolvedValueOnce([]);
     await runWorksiteSearch(mockClient, "Acme & Co");
     expect(mockClient.post).toHaveBeenCalledWith(
       "/api/tyomaa/search",
@@ -82,16 +76,16 @@ describe("ib worksite list/get/search", () => {
   });
 
   test("runWorksiteList forwards --customer", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [], nextCursor: null, count: 0,
     });
     await runWorksiteList(mockClient, { customer: 1349 });
-    const path = (mockClient.get as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    const path = mockClient.get.mock.calls[0][0] as string;
     expect(path).toContain("customer=1349");
   });
 
   test("runWorksiteSearch forwards limit in the body", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    mockClient.post.mockResolvedValueOnce([]);
     await runWorksiteSearch(mockClient, "Main", 30);
     expect(mockClient.post).toHaveBeenCalledWith(
       "/api/tyomaa/search",
@@ -101,7 +95,7 @@ describe("ib worksite list/get/search", () => {
   });
 
   test("runWorksiteMetrics: GET /api/cli/worksite/metrics/42", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       tyomaaId: 42, summary: { totalM3: 120 }, monthlyBreakdown: [],
     });
     const result = await runWorksiteMetrics(mockClient, 42);
@@ -110,7 +104,7 @@ describe("ib worksite list/get/search", () => {
   });
 
   test("runWorksiteDatesList: GET /api/cli/worksite/dates/42", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [], nextCursor: null, count: 0,
     });
     await runWorksiteDatesList(mockClient, 42);
@@ -118,7 +112,7 @@ describe("ib worksite list/get/search", () => {
   });
 
   test("runWorksiteDatesExpiring: default days=30", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [], nextCursor: null, count: 0,
     });
     await runWorksiteDatesExpiring(mockClient, undefined);
@@ -126,7 +120,7 @@ describe("ib worksite list/get/search", () => {
   });
 
   test("runWorksiteDatesExpiring: explicit days", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [], nextCursor: null, count: 0,
     });
     await runWorksiteDatesExpiring(mockClient, 14);

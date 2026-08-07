@@ -1,26 +1,20 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runVehicleList,
   runVehicleGet,
   runVehicleStatus,
 } from "../../src/commands/vehicle/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
 describe("ib vehicle list/get", () => {
   beforeEach(() => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockReset();
+    mockClient.get.mockReset();
   });
 
   test("runVehicleList: hits bare path when no opts set", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
@@ -30,7 +24,7 @@ describe("ib vehicle list/get", () => {
   });
 
   test("runVehicleList: includes limit and cursor when set", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [{ vehicleId: 7, name: "Auto 7" }],
       nextCursor: "next",
       count: 1,
@@ -46,7 +40,7 @@ describe("ib vehicle list/get", () => {
   });
 
   test("runVehicleList: maps the narrowing filters to query params", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
@@ -63,7 +57,7 @@ describe("ib vehicle list/get", () => {
   });
 
   test("runVehicleList: falsy filters are omitted from the query", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
@@ -73,7 +67,7 @@ describe("ib vehicle list/get", () => {
   });
 
   test("runVehicleList: appends asiakas for a cross-tenant read", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
@@ -85,7 +79,7 @@ describe("ib vehicle list/get", () => {
   });
 
   test("runVehicleGet: GET /api/cli/vehicle/get/7", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       vehicleId: 7,
       name: "Auto 7",
     });
@@ -95,7 +89,7 @@ describe("ib vehicle list/get", () => {
   });
 
   test("runVehicleGet: appends ?asiakas= for a cross-tenant read", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       vehicleId: 159,
       name: "Pumi 24 m",
     });
@@ -106,7 +100,7 @@ describe("ib vehicle list/get", () => {
   });
 
   test("runVehicleStatus: GET /api/cli/vehicle/status/7", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       vehicleId: 7,
       plate: "ABC-123",
       currentDriver: null,

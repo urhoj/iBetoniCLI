@@ -1,15 +1,9 @@
 import { describe, test, expect, vi } from "vitest";
+import { mockApiClient, type MockApiClient } from "./helpers/mockClient.js";
 import { resolveActiveOwnerAsiakasId } from "../src/owner.js";
-import type { ApiClient } from "../src/api/client.js";
 
-function clientReturning(value: unknown): ApiClient {
-  return {
-    get: vi.fn().mockResolvedValue(value),
-    post: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
-    getCurrentToken: vi.fn(),
-  } as unknown as ApiClient;
+function clientReturning(value: unknown): MockApiClient {
+  return mockApiClient({ get: vi.fn().mockResolvedValue(value) });
 }
 
 /** Unsigned long-shape JWT whose payload carries the given claims. */
@@ -21,7 +15,7 @@ function fakeJwt(claims: Record<string, unknown>): string {
 describe("resolveActiveOwnerAsiakasId", () => {
   test("decodes the JWT's ownerAsiakasId claim without any network call", async () => {
     const client = clientReturning({ currentCompanyId: 999 });
-    (client.getCurrentToken as ReturnType<typeof vi.fn>).mockReturnValue(
+    client.getCurrentToken.mockReturnValue(
       fakeJwt({ ownerAsiakasId: 42 })
     );
     await expect(resolveActiveOwnerAsiakasId(client)).resolves.toBe(42);

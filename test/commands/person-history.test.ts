@@ -1,14 +1,8 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import { runPersonHistory } from "../../src/commands/person/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
 const ROW = {
   changeId: 10,
@@ -26,11 +20,11 @@ const EMAIL_ROW = { changeId: 11, fieldName: "personEmail", newValue: "x@y.fi" }
 
 describe("runPersonHistory", () => {
   beforeEach(() => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockReset();
+    mockClient.get.mockReset();
   });
 
   test("resolves active owner then GETs /api/changes/person/<id>/<owner>; projects rows", async () => {
-    const get = mockClient.get as ReturnType<typeof vi.fn>;
+    const get = mockClient.get;
     get
       .mockResolvedValueOnce({ currentCompanyId: 27 }) // resolveOwnerAsiakasId
       .mockResolvedValueOnce([ROW]); // change rows
@@ -48,7 +42,7 @@ describe("runPersonHistory", () => {
   });
 
   test("--owner skips the company-selection lookup", async () => {
-    const get = mockClient.get as ReturnType<typeof vi.fn>;
+    const get = mockClient.get;
     get.mockResolvedValueOnce([ROW]);
     await runPersonHistory(mockClient, 63, 50, { owner: 27 });
     expect(get).toHaveBeenCalledTimes(1);
@@ -56,7 +50,7 @@ describe("runPersonHistory", () => {
   });
 
   test("--field filters client-side to one changeTracker field", async () => {
-    const get = mockClient.get as ReturnType<typeof vi.fn>;
+    const get = mockClient.get;
     get.mockResolvedValueOnce([ROW, EMAIL_ROW]);
     const result = await runPersonHistory(mockClient, 63, 100, {
       owner: 27,

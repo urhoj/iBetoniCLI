@@ -1,4 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import { explainRole } from "../../src/roles.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -22,13 +23,7 @@ function mockClient(get = vi.fn().mockResolvedValue(TYPES)): {
   client: ApiClient;
   get: ReturnType<typeof vi.fn>;
 } {
-  const client = {
-    get,
-    post: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
-    getCurrentToken: vi.fn(),
-  } as unknown as ApiClient;
+  const client = mockApiClient({ get });
   return { client, get };
 }
 

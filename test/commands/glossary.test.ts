@@ -7,11 +7,10 @@ import {
   runGlossaryLookup, runGlossaryList, runGlossarySet, runGlossaryMisses, runGlossaryLookupBatch,
   mergeSetInput, runGlossaryImport, runGlossaryDelete, runGlossaryDismiss, registerGlossaryCommands,
 } from "../../src/commands/glossary/index.js";
-import type { ApiClient } from "../../src/api/client.js";
+import { mockApiClient, type MockApiClient, type MockApiClientOverrides } from "../helpers/mockClient.js";
 import { CliError } from "../../src/api/errors.js";
 
-const mkClient = (over: Partial<ApiClient> = {}): ApiClient =>
-  ({ get: vi.fn(), put: vi.fn(), delete: vi.fn(), post: vi.fn(), getCurrentToken: vi.fn(), ...over } as unknown as ApiClient);
+const mkClient = (over: MockApiClientOverrides = {}): MockApiClient => mockApiClient(over);
 
 describe("ib glossary", () => {
   test("lookup hits /api/cli/glossary/lookup/<term> (URL-encoded)", async () => {

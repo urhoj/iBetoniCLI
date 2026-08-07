@@ -1,4 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
+import { mockApiClient, type MockApiClient } from "../helpers/mockClient.js";
 import {
   runLegalTypes,
   runLegalShow,
@@ -23,18 +24,10 @@ import {
 } from "../../src/commands/legal/index.js";
 import { buildProgram } from "../../src/program.js";
 import { CliError } from "../../src/api/errors.js";
-import type { ApiClient } from "../../src/api/client.js";
 import type { DecodedClaims } from "../../src/auth/jwt.js";
 
-function mockClient(): ApiClient {
-  return {
-    get: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-    patch: vi.fn(),
-    delete: vi.fn(),
-    getCurrentToken: vi.fn().mockReturnValue("t"),
-  } as unknown as ApiClient;
+function mockClient(): MockApiClient {
+  return mockApiClient({ getCurrentToken: vi.fn().mockReturnValue("t") });
 }
 
 const TYPES = [
@@ -45,7 +38,7 @@ const TYPES = [
 describe("ib legal reads", () => {
   test("types -> ListEnvelope over GET /types", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue(TYPES);
+    c.get.mockResolvedValue(TYPES);
     const out = await runLegalTypes(c);
     expect(c.get).toHaveBeenCalledWith("/api/legal-documents/types");
     expect(out).toEqual({ items: TYPES, nextCursor: null, count: 2 });
@@ -53,7 +46,7 @@ describe("ib legal reads", () => {
 
   test("show --meta strips markdownContent, keeps contentLength", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+    c.get.mockResolvedValue({
       documentId: 1, version: "1.0", markdownContent: "# hello",
     });
     const out = await runLegalShow(c, "TOS", true);
@@ -63,7 +56,7 @@ describe("ib legal reads", () => {
 
   test("show without --meta returns full doc", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+    c.get.mockResolvedValue({
       documentId: 1, version: "1.0", markdownContent: "# hello",
     });
     const out = await runLegalShow(c, "TOS", false);
@@ -73,7 +66,7 @@ describe("ib legal reads", () => {
 
   test("active rolls up every type, marking hasActive and stripping content", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>)
+    c.get
       .mockResolvedValueOnce(TYPES) // /types
       .mockResolvedValueOnce({
         documentId: 3, version: "2.0", title: "Käyttöehdot",
@@ -100,7 +93,7 @@ describe("ib legal reads", () => {
 
   test("active rethrows a non-404 error from a per-type fetch", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>)
+    c.get
       .mockResolvedValueOnce([TYPES[0]]) // single type -> no second fetch to race
       .mockRejectedValueOnce(new CliError("boom", 500, null, 6));
     await expect(runLegalActive(c)).rejects.toMatchObject({ exitCode: 6 });
@@ -108,7 +101,7 @@ describe("ib legal reads", () => {
 
   test("status strips content from missing docs and passes owner", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+    c.get.mockResolvedValue({
       missingAcceptances: [{ typeName: "TOS", version: "2.0", markdownContent: "BIG" }],
       acceptedAcceptances: [{ typeName: "PRIVACY", acceptedVersion: "1.0" }],
       requiresAcceptance: true,
@@ -123,7 +116,7 @@ describe("ib legal reads", () => {
 
   test("status with null owner omits the query string", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+    c.get.mockResolvedValue({
       missingAcceptances: [],
       acceptedAcceptances: [],
       requiresAcceptance: false,
@@ -134,7 +127,7 @@ describe("ib legal reads", () => {
 
   test("versions strips content, returns envelope", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue([
+    c.get.mockResolvedValue([
       { documentId: 1, version: "1.0", isActive: false, markdownContent: "BIG" },
     ]);
     const out = await runLegalVersions(c, "TOS", undefined);
@@ -145,7 +138,7 @@ describe("ib legal reads", () => {
 
   test("versions --status filters client-side", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue([
+    c.get.mockResolvedValue([
       { documentId: 1, status: "active", markdownContent: "A" },
       { documentId: 2, status: "draft", markdownContent: "B" },
       { documentId: 3, status: "archived", markdownContent: "C" },
@@ -158,7 +151,7 @@ describe("ib legal reads", () => {
 
   test("drafts fans out over types and keeps only status=draft", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>)
+    c.get
       .mockResolvedValueOnce(TYPES) // /types
       .mockResolvedValueOnce([
         { documentId: 38, status: "active", markdownContent: "X" },
@@ -176,7 +169,7 @@ describe("ib legal reads", () => {
 
   test("diff (two ids) gets both docs, strips content, returns line counts", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>)
+    c.get
       .mockResolvedValueOnce({ documentId: 4, typeName: "TOS", status: "archived", markdownContent: "a\nb\nc" })
       .mockResolvedValueOnce({ documentId: 38, typeName: "TOS", status: "active", markdownContent: "a\nB\nc\nd" });
     const out = await runLegalDiff(c, { a: 4, b: 38 });
@@ -191,7 +184,7 @@ describe("ib legal reads", () => {
 
   test("diff --type resolves active (old) vs newest draft (new)", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>)
+    c.get
       .mockResolvedValueOnce([
         { documentId: 50, status: "draft" },
         { documentId: 38, status: "active" },
@@ -209,7 +202,7 @@ describe("ib legal reads", () => {
 
   test("diff --type with owner scopes the version lookup to that tenant", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>)
+    c.get
       .mockResolvedValueOnce([
         { documentId: 70, status: "draft" },
         { documentId: 36, status: "active" },
@@ -225,19 +218,19 @@ describe("ib legal reads", () => {
 
   test("diff --type with no draft -> exit 5", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([{ documentId: 38, status: "active" }]);
+    c.get.mockResolvedValueOnce([{ documentId: 38, status: "active" }]);
     await expect(runLegalDiff(c, { type: "TOS" })).rejects.toMatchObject({ exitCode: 5 });
   });
 
   test("diff --type with no active -> exit 5", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([{ documentId: 50, status: "draft" }]);
+    c.get.mockResolvedValueOnce([{ documentId: 50, status: "draft" }]);
     await expect(runLegalDiff(c, { type: "TOS" })).rejects.toMatchObject({ exitCode: 5 });
   });
 
   test("get fetches one document by id", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({ documentId: 9 });
+    c.get.mockResolvedValue({ documentId: 9 });
     await runLegalGet(c, 9);
     expect(c.get).toHaveBeenCalledWith("/api/legal-documents/document/9");
   });
@@ -246,7 +239,7 @@ describe("ib legal reads", () => {
   // PRIVACY` must resolve the type's current ACTIVE document instead of exit 4.
   test("get with a typeName resolves via /current/:typeName", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({ documentId: 12, typeName: "PRIVACY" });
+    c.get.mockResolvedValue({ documentId: 12, typeName: "PRIVACY" });
     const out = await runLegalGet(c, "PRIVACY");
     expect(c.get).toHaveBeenCalledWith("/api/legal-documents/current/PRIVACY");
     expect(out).toEqual({ documentId: 12, typeName: "PRIVACY" });
@@ -254,7 +247,7 @@ describe("ib legal reads", () => {
 
   test("get with a typeName and no active doc -> exit 5 with versions hint", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockRejectedValue(new CliError("Asiakirjaa ei löytynyt.", 404, null, 5));
+    c.get.mockRejectedValue(new CliError("Asiakirjaa ei löytynyt.", 404, null, 5));
     await expect(runLegalGet(c, "COOKIES")).rejects.toMatchObject({
       exitCode: 5,
       message: expect.stringContaining('no active document of type "COOKIES"'),
@@ -264,7 +257,7 @@ describe("ib legal reads", () => {
 
   test("get with a typeName rethrows non-404 errors untouched", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockRejectedValue(new CliError("boom", 500, null, 6));
+    c.get.mockRejectedValue(new CliError("boom", 500, null, 6));
     await expect(runLegalGet(c, "TOS")).rejects.toMatchObject({ exitCode: 6, message: "boom" });
   });
 
@@ -303,7 +296,7 @@ describe("ib legal reads", () => {
 
   test("acceptances projects server payload into envelope with truncated", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+    c.get.mockResolvedValue({
       typeName: "TOS", personSettingTypeId: 40, count: 1, truncated: true,
       acceptances: [{ personId: 5, acceptedVersion: "1.0" }],
     });
@@ -318,7 +311,7 @@ describe("ib legal reads", () => {
 
   test("acceptances emits truncated:false as a present boolean (not undefined)", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+    c.get.mockResolvedValue({
       typeName: "TOS", personSettingTypeId: 40, count: 1, truncated: false,
       acceptances: [{ personId: 5, acceptedVersion: "1.0" }],
     });
@@ -330,8 +323,8 @@ describe("ib legal reads", () => {
 describe("ib legal writes", () => {
   test("save resolves typeName -> documentTypeId, forwards X-Dry-Run", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue(TYPES);
-    (c.post as ReturnType<typeof vi.fn>).mockResolvedValue({ documentId: 11, success: true });
+    c.get.mockResolvedValue(TYPES);
+    c.post.mockResolvedValue({ documentId: 11, success: true });
     await runLegalSave(c, {
       typeName: "TOS", version: "2.0", title: "T", markdownContent: "# x", activate: false,
     }, { dryRun: true, reason: "preview" });
@@ -344,7 +337,7 @@ describe("ib legal writes", () => {
 
   test("save with unknown typeName -> exit-5 CliError, no POST", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue(TYPES);
+    c.get.mockResolvedValue(TYPES);
     await expect(runLegalSave(c, {
       typeName: "NOPE", version: "1.0", title: "T", markdownContent: "x",
     }, {})).rejects.toMatchObject({ exitCode: 5 });
@@ -353,7 +346,7 @@ describe("ib legal writes", () => {
 
   test("activate PUTs with write headers", async () => {
     const c = mockClient();
-    (c.put as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true });
+    c.put.mockResolvedValue({ success: true });
     await runLegalActivate(c, 7, { reason: "publish v2" });
     expect(c.put).toHaveBeenCalledWith(
       "/api/legal-documents/activate/7", {}, { headers: { "X-Action-Reason": "publish v2" } });
@@ -361,7 +354,7 @@ describe("ib legal writes", () => {
 
   test("delete DELETEs with write headers", async () => {
     const c = mockClient();
-    (c.delete as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true });
+    c.delete.mockResolvedValue({ success: true });
     await runLegalDelete(c, 7, { dryRun: true });
     expect(c.delete).toHaveBeenCalledWith(
       "/api/legal-documents/7", { headers: { "X-Dry-Run": "1" } });
@@ -369,10 +362,10 @@ describe("ib legal writes", () => {
 
   test("accept composes current doc + settingTypeId and posts self-acceptance", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>)
+    c.get
       .mockResolvedValueOnce({ documentId: 3, version: "2.0" })
       .mockResolvedValueOnce(TYPES);
-    (c.post as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true });
+    c.post.mockResolvedValue({ success: true });
     await runLegalAccept(c, "TOS", 5, { reason: "e2e test" });
     expect(c.post).toHaveBeenCalledWith(
       "/api/legal-documents/record-acceptance",
@@ -383,7 +376,7 @@ describe("ib legal writes", () => {
 
   test("accept on type with null settingTypeId -> exit 4, no POST", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>)
+    c.get
       .mockResolvedValueOnce({ documentId: 8, version: "1.0" })
       .mockResolvedValueOnce(TYPES);
     await expect(runLegalAccept(c, "GLOBAL", 5, {})).rejects.toMatchObject({ exitCode: 4 });
@@ -430,7 +423,7 @@ describe("ib legal type writes (feedback #31)", () => {
   test("type create POSTs typeName + provided fields with write headers", async () => {
     const c = mockClient();
     const row = { documentTypeId: 8, typeName: "TOS_EN" };
-    (c.post as ReturnType<typeof vi.fn>).mockResolvedValue(row);
+    c.post.mockResolvedValue(row);
     const out = await runLegalTypeCreate(
       c,
       "TOS_EN",
@@ -447,7 +440,7 @@ describe("ib legal type writes (feedback #31)", () => {
 
   test("type create with only required fields sends a minimal body", async () => {
     const c = mockClient();
-    (c.post as ReturnType<typeof vi.fn>).mockResolvedValue({ documentTypeId: 9 });
+    c.post.mockResolvedValue({ documentTypeId: 9 });
     await runLegalTypeCreate(c, "AUP_FI", { displayName: "Hyvaksyttavan kayton periaatteet" }, { dryRun: true });
     expect(c.post).toHaveBeenCalledWith(
       "/api/legal-documents/types",
@@ -458,7 +451,7 @@ describe("ib legal type writes (feedback #31)", () => {
 
   test("type update PUTs only provided fields with dry-run header", async () => {
     const c = mockClient();
-    (c.put as ReturnType<typeof vi.fn>).mockResolvedValue({ documentTypeId: 5, personSettingTypeId: 44 });
+    c.put.mockResolvedValue({ documentTypeId: 5, personSettingTypeId: 44 });
     await runLegalTypeUpdate(c, "GLOBAL", { personSettingTypeId: 44 }, { dryRun: true });
     expect(c.put).toHaveBeenCalledWith(
       "/api/legal-documents/types/GLOBAL",
@@ -500,7 +493,7 @@ describe("ib legal save — edit mode (in-field partial)", () => {
 
   test("--replace --dry-run returns a field diff and never POSTs", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValue(ACTIVE);
+    c.get.mockResolvedValue(ACTIVE);
     const out = await runLegalSaveWithEdit(
       c, "TOS",
       { kind: "replace", find: "14 vrk", replacement: "30 vrk" },
@@ -515,19 +508,19 @@ describe("ib legal save — edit mode (in-field partial)", () => {
 
   test("real edit saves a NEW version with the merged content; title defaults to current", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockImplementation((url: string) =>
+    c.get.mockImplementation((url: string) =>
       url.includes("/current/")
         ? Promise.resolve(ACTIVE)
         : Promise.resolve(TYPES) // resolveDocumentType inside runLegalSave
     );
-    (c.post as ReturnType<typeof vi.fn>).mockResolvedValue({ documentId: 8, success: true });
+    c.post.mockResolvedValue({ documentId: 8, success: true });
     await runLegalSaveWithEdit(
       c, "TOS",
       { kind: "append", text: "\n\n## Liite\nUusi kohta." },
       { version: "2.1" }, // no title → defaults to ACTIVE.title
       { reason: "add appendix" }
     );
-    const [path, body] = (c.post as ReturnType<typeof vi.fn>).mock.calls[0];
+    const [path, body] = c.post.mock.calls[0];
     expect(path).toBe("/api/legal-documents/save");
     expect(body).toMatchObject({ version: "2.1", title: "Käyttöehdot" });
     expect(String((body as Record<string, unknown>).markdownContent)).toContain("## Liite");
@@ -535,7 +528,7 @@ describe("ib legal save — edit mode (in-field partial)", () => {
 
   test("no active version → exit 5", async () => {
     const c = mockClient();
-    (c.get as ReturnType<typeof vi.fn>).mockRejectedValue(new CliError("not found", 404, null, 5));
+    c.get.mockRejectedValue(new CliError("not found", 404, null, 5));
     await expect(
       runLegalSaveWithEdit(c, "TOS", { kind: "append", text: "x" }, { version: "2.1" }, { reason: "r" })
     ).rejects.toMatchObject({ exitCode: 5 });

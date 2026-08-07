@@ -1,26 +1,20 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runKeikkaCreate,
   runKeikkaUpdate,
   runKeikkaDriversAssign,
 } from "../../src/commands/keikka/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
 describe("ib keikka create/update/drivers", () => {
   beforeEach(() => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockReset();
+    mockClient.post.mockReset();
   });
 
   test("runKeikkaCreate forwards body + all three write-flag headers", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.post.mockResolvedValueOnce({
       keikkaId: 12345,
     });
     const body = { pvm: "2026-06-15", asiakasId: 1349, vehicleId: 7 };
@@ -44,7 +38,7 @@ describe("ib keikka create/update/drivers", () => {
   });
 
   test("runKeikkaUpdate posts numeric keikkaTilaId to /tila/set (NOT /setStatus); guards bad input", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.post.mockResolvedValueOnce({
       success: true,
     });
     await runKeikkaUpdate(mockClient, 9001, { status: "9" }, {});
@@ -60,7 +54,7 @@ describe("ib keikka create/update/drivers", () => {
     ).rejects.toThrow(/v1\.0 only supports --status/);
 
     // Non-numeric status → exit-4 validation error (failWith), no POST.
-    (mockClient.post as ReturnType<typeof vi.fn>).mockClear();
+    mockClient.post.mockClear();
     await expect(
       runKeikkaUpdate(mockClient, 9001, { status: "done" }, {})
     ).rejects.toThrow(/numeric keikkaTilaId/);
@@ -68,7 +62,7 @@ describe("ib keikka create/update/drivers", () => {
   });
 
   test("runKeikkaDriversAssign posts empty body to /defaultDriver/assign/:id", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.post.mockResolvedValueOnce({
       assigned: true,
     });
     await runKeikkaDriversAssign(mockClient, 9001, {

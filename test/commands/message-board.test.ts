@@ -1,4 +1,5 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   toBoardQueryDate,
   buildBoardFields,
@@ -11,20 +12,13 @@ import {
   runBoardDelete,
   type BoardMessage,
 } from "../../src/commands/message/board/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
-const asGet = () => mockClient.get as ReturnType<typeof vi.fn>;
-const asPost = () => mockClient.post as ReturnType<typeof vi.fn>;
-const asPut = () => mockClient.put as ReturnType<typeof vi.fn>;
-const asDelete = () => mockClient.delete as ReturnType<typeof vi.fn>;
+const asGet = () => mockClient.get;
+const asPost = () => mockClient.post;
+const asPut = () => mockClient.put;
+const asDelete = () => mockClient.delete;
 
 const row = (over: Partial<BoardMessage> = {}): BoardMessage => ({
   messageId: 7,

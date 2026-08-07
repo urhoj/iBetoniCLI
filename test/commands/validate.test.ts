@@ -1,4 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runValidateProfiles,
   runValidateCompany,
@@ -7,11 +8,10 @@ import {
 import type { ApiClient } from "../../src/api/client.js";
 
 function mockClient(getImpl: (path: string) => unknown): ApiClient {
-  return {
+  return mockApiClient({
     get: vi.fn(async (path: string) => getImpl(path)),
-    post: vi.fn(), put: vi.fn(), delete: vi.fn(),
     getCurrentToken: vi.fn(() => "x.y.z"),
-  } as unknown as ApiClient;
+  });
 }
 
 describe("ib validate handlers", () => {

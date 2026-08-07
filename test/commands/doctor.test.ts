@@ -1,4 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import { Buffer } from "node:buffer";
 import { runDoctor } from "../../src/commands/doctor/index.js";
 import type { ApiClient } from "../../src/api/client.js";
@@ -26,13 +27,7 @@ function claims(exp: number) {
 }
 
 function mockClient(token: string, getImpl: () => Promise<unknown>): ApiClient {
-  return {
-    get: vi.fn(getImpl),
-    post: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
-    getCurrentToken: () => token,
-  } as unknown as ApiClient;
+  return mockApiClient({ get: vi.fn(getImpl), getCurrentToken: vi.fn(() => token) });
 }
 
 function reachableFetch(): typeof fetch {

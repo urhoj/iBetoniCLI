@@ -5,10 +5,10 @@
  * (nothing recognized), not on a whole-CSV membership test.
  */
 import { test, expect, vi, beforeEach, afterEach, describe } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import { Command } from "commander";
 import { registerChangelogCommands } from "../../src/commands/changelog/index.js";
 import { COORDINATED, normalizeRepoToken, normalizeRepoCsv } from "../../src/commands/changelog/repos.js";
-import type { ApiClient } from "../../src/api/client.js";
 
 describe("normalizeRepoCsv (mirror of puminet5api/modules/changelog/repos.js)", () => {
   test("mixed CSV: coordinated + @ibetoni passthrough, nothing unknown (the fb#228 case)", () => {
@@ -57,12 +57,12 @@ describe("normalizeRepoCsv (mirror of puminet5api/modules/changelog/repos.js)", 
 });
 
 describe("changelog add --repo fail-safe warning (fb#228)", () => {
-  const client = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn() } as unknown as ApiClient;
+  const client = mockApiClient();
   let errSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (client.post as ReturnType<typeof vi.fn>).mockResolvedValue({ changelogId: 1 });
+    client.post.mockResolvedValue({ changelogId: 1 });
     // The warnings flow through warnNote → emitStderr (ctx-aware channel).
     errSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
   });

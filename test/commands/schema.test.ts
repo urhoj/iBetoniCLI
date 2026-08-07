@@ -1,4 +1,5 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runSchemaTables,
   runSchemaTable,
@@ -9,18 +10,11 @@ import {
   runSchemaDump,
   runSchemaBatch,
 } from "../../src/commands/schema/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
-const get = () => mockClient.get as ReturnType<typeof vi.fn>;
+const get = () => mockClient.get;
 
 describe("ib schema", () => {
   beforeEach(() => {

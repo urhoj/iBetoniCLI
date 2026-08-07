@@ -1,16 +1,10 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import { resolveThreadId } from "../../src/commands/message/chat/resolveThread.js";
 import { CliError } from "../../src/api/errors.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
-const asGet = () => mockClient.get as ReturnType<typeof vi.fn>;
+const mockClient = mockApiClient();
+const asGet = () => mockClient.get;
 
 const MINE = [
   { threadId: 10, contextType: "pumppuRequest", contextId: 23, ownerAsiakasId: 100 },

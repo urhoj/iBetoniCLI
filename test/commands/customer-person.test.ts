@@ -1,23 +1,17 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import { runCustomerPersonAdd, runCustomerPersonRemove, runCustomerPersonList } from "../../src/commands/customer/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
 describe("runCustomerPersonAdd", () => {
   beforeEach(() => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockReset();
+    mockClient.post.mockReset();
   });
 
   test("POSTs /api/asiakas/person/add and projects raw result to { added }", async () => {
     // Backend returns the raw mssql result on a real write (feedback #16).
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.post.mockResolvedValueOnce({
       recordsets: [],
       output: {},
       rowsAffected: [1],
@@ -37,7 +31,7 @@ describe("runCustomerPersonAdd", () => {
   });
 
   test("forwards --dry-run header and passes the dry-run preview through", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.post.mockResolvedValueOnce({
       dryRun: true,
       wouldCreate: { asiakasId: 26, personId: 5351, contactPersonTypeId: 1 },
     });
@@ -46,7 +40,7 @@ describe("runCustomerPersonAdd", () => {
       { asiakasId: 26, personId: 5351, contactPersonTypeId: 1 },
       { reason: "test", dryRun: true }
     );
-    const call = (mockClient.post as ReturnType<typeof vi.fn>).mock.calls[0];
+    const call = mockClient.post.mock.calls[0];
     expect(call[2].headers["X-Dry-Run"]).toBe("1");
     expect(out).toEqual({
       dryRun: true,
@@ -57,11 +51,11 @@ describe("runCustomerPersonAdd", () => {
 
 describe("runCustomerPersonRemove", () => {
   beforeEach(() => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockReset();
+    mockClient.post.mockReset();
   });
 
   test("POSTs /api/asiakas/person/remove with body and reason header", async () => {
-    (mockClient.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });
+    mockClient.post.mockResolvedValueOnce({ ok: true });
     await runCustomerPersonRemove(
       mockClient,
       { asiakasId: 26, personId: 5351, contactPersonTypeId: 1 },
@@ -77,11 +71,11 @@ describe("runCustomerPersonRemove", () => {
 
 describe("runCustomerPersonList", () => {
   beforeEach(() => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockReset();
+    mockClient.get.mockReset();
   });
 
   test("GETs /api/asiakas/person/list/<asiakasId>/0 when no role filter; roleTypeId null", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+    mockClient.get.mockResolvedValueOnce([
       { personId: 5351, personFirstName: "Juha", personLastName: "Urho", personEmail: "j@example.com" },
     ]);
     const result = await runCustomerPersonList(mockClient, 26);
@@ -94,7 +88,7 @@ describe("runCustomerPersonList", () => {
   });
 
   test("GETs with role typeId in URL when --role given", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    mockClient.get.mockResolvedValueOnce([]);
     await runCustomerPersonList(mockClient, 26, "keikkaHandler");
     expect(mockClient.get).toHaveBeenCalledWith("/api/asiakas/person/list/26/11");
   });
@@ -104,7 +98,7 @@ describe("runCustomerPersonList", () => {
   });
 
   test("--include-roles fans out per person and resolves permissionRoles (unnamed typeIds dropped)", async () => {
-    const get = mockClient.get as ReturnType<typeof vi.fn>;
+    const get = mockClient.get;
     // 1st GET = the person list; 2nd GET = that person's asiakasPersonSettings.
     get
       .mockResolvedValueOnce([

@@ -1,19 +1,16 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runUnifiedSearch,
   parseEntityFilter,
   SEARCH_ENTITIES,
   buildSearchSources,
 } from "../../src/commands/search/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 import { CliError } from "../../src/api/errors.js";
 
 // mockClient is not used directly in tests (sources stubs are injected instead),
 // but it exists to satisfy the ApiClient type for buildSearchSources.
-const _mockClient = {
-  get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(),
-  getCurrentToken: vi.fn(() => "h.e.s"),
-} as unknown as ApiClient;
+const _mockClient = mockApiClient({ getCurrentToken: vi.fn(() => "h.e.s") });
 void _mockClient; // suppress unused-var lint
 
 // One source stub per entity, injected so the test controls each branch.
@@ -140,24 +137,11 @@ describe("runUnifiedSearch", () => {
 describe("ib search --my-companies wiring", () => {
   test("buildSearchSources forwards myCompanies to customer/worksite/person, NOT vehicle/keikka/sijainti", async () => {
     const calls: Record<string, boolean> = {};
-    const client = {
-      get: vi.fn(async (path: string) => {
-        if (path.includes("/api/asiakas/search")) calls.customer = path.includes("myCompanies=1");
-        if (path.includes("/api/cli/person/search")) calls.person = true;
-        if (path.includes("/api/cli/vehicle/list")) calls.vehicleHadMy = path.includes("myCompanies");
-        if (path.includes("/api/geocode/sijaintiTypes")) return [];
-        if (path.includes("/api/cli/sijainti/list")) {
-          calls.sijaintiAtCap = path.includes("limit=500") && !path.includes("myCompanies");
-          return { items: [], nextCursor: null, count: 0 };
-        }
-        return path.includes("vehicle") ? { items: [], nextCursor: null, count: 0 } : [];
-      }),
-      post: vi.fn(async (_p: string, body: Record<string, unknown>) => {
-        calls.worksite = body?.myCompanies === true;
-        return [];
-      }),
+    const client = mockApiClient({
+      get: vi.fn(async (path: string) => { if (path.includes("/api/asiakas/search")) calls.customer = path.includes("myCompanies=1"); if (path.includes("/api/cli/person/search")) calls.person = true; if (path.includes("/api/cli/vehicle/list")) calls.vehicleHadMy = path.includes("myCompanies"); if (path.includes("/api/geocode/sijaintiTypes")) return []; if (path.includes("/api/cli/sijainti/list")) { calls.sijaintiAtCap = path.includes("limit=500") && !path.includes("myCompanies"); return { items: [], nextCursor: null, count: 0 }; } return path.includes("vehicle") ? { items: [], nextCursor: null, count: 0 } : []; }),
+      post: vi.fn(async (_p: string, body: Record<string, unknown>) => { calls.worksite = body?.myCompanies === true; return []; }),
       getCurrentToken: vi.fn(() => "h.e.s"),
-    } as unknown as ApiClient;
+    });
 
     const srcs = buildSearchSources(client, "x", 5, true /* myCompanies */);
     await srcs.customer();

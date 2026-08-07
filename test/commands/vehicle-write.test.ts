@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
+import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runVehicleTypes,
   runVehicleSearch,
@@ -7,23 +8,16 @@ import {
   runVehicleDatesList,
   runVehicleDatesExpiring,
 } from "../../src/commands/vehicle/index.js";
-import type { ApiClient } from "../../src/api/client.js";
 
-const mockClient = {
-  get: vi.fn(),
-  post: vi.fn(),
-  put: vi.fn(),
-  delete: vi.fn(),
-  getCurrentToken: vi.fn(),
-} as unknown as ApiClient;
+const mockClient = mockApiClient();
 
 describe("ib vehicle types/search", () => {
   beforeEach(() => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockReset();
+    mockClient.get.mockReset();
   });
 
   test("runVehicleTypes hits /api/cli/vehicle/types", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
@@ -33,7 +27,7 @@ describe("ib vehicle types/search", () => {
   });
 
   test("runVehicleTypes appends asiakas for a cross-tenant type list", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
@@ -45,7 +39,7 @@ describe("ib vehicle types/search", () => {
   });
 
   test("runVehicleSearch encodes search + limit", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
@@ -57,7 +51,7 @@ describe("ib vehicle types/search", () => {
   });
 
   test("runVehicleSearch appends asiakas for a cross-tenant search", async () => {
-    (mockClient.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    mockClient.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
@@ -70,13 +64,7 @@ describe("ib vehicle types/search", () => {
 });
 
 describe("runVehicleCreate", () => {
-  const c = {
-    get: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
-    getCurrentToken: vi.fn(),
-  } as unknown as ApiClient;
+  const c = mockApiClient();
   const JWT =
     "e30." +
     Buffer.from(
@@ -85,11 +73,11 @@ describe("runVehicleCreate", () => {
     ".sig";
   beforeEach(() => {
     vi.clearAllMocks();
-    (c.getCurrentToken as ReturnType<typeof vi.fn>).mockReturnValue(JWT);
+    c.getCurrentToken.mockReturnValue(JWT);
   });
 
   test("non-dry-run: new then save with merged body", async () => {
-    (c.post as ReturnType<typeof vi.fn>)
+    c.post
       .mockResolvedValueOnce({ vehicleId: 88 })
       .mockResolvedValueOnce({ vehicleId: 88 });
     await runVehicleCreate(
@@ -114,7 +102,7 @@ describe("runVehicleCreate", () => {
   });
 
   test("dry-run: only /new with X-Dry-Run, no save", async () => {
-    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    c.post.mockResolvedValueOnce({
       dryRun: true,
       wouldCreate: { vehicleId: null },
     });
@@ -126,7 +114,7 @@ describe("runVehicleCreate", () => {
   });
 
   test("--asiakas rides the /new path param so the stub is owned by the target tenant (fb#94)", async () => {
-    (c.post as ReturnType<typeof vi.fn>)
+    c.post
       .mockResolvedValueOnce({ vehicleId: 91 })
       .mockResolvedValueOnce({ vehicleId: 91 });
     await runVehicleCreate(
@@ -150,7 +138,7 @@ describe("runVehicleCreate", () => {
   });
 
   test("--asiakas dry-run also targets the tenant's /new path", async () => {
-    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    c.post.mockResolvedValueOnce({
       dryRun: true,
       wouldCreate: { vehicleId: null },
     });
@@ -162,17 +150,11 @@ describe("runVehicleCreate", () => {
 });
 
 describe("runVehicleUpdate", () => {
-  const c = {
-    get: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
-    getCurrentToken: vi.fn(),
-  } as unknown as ApiClient;
+  const c = mockApiClient();
   beforeEach(() => vi.clearAllMocks());
 
   test("reads current, merges changes, posts full body", async () => {
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+    c.get.mockResolvedValueOnce([
       {
         vehicleId: 70,
         asiakasId: 1349,
@@ -197,7 +179,7 @@ describe("runVehicleUpdate", () => {
         vehicleNo: 5,
       },
     ]);
-    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    c.post.mockResolvedValueOnce({
       vehicleId: 70,
     });
     await runVehicleUpdate(
@@ -221,7 +203,7 @@ describe("runVehicleUpdate", () => {
   });
 
   test("throws 404 CliError when vehicle absent", async () => {
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
+    c.get.mockResolvedValueOnce([]);
     await expect(
       runVehicleUpdate(c, 999, { memo: "x" }, {})
     ).rejects.toMatchObject({ exitCode: 5 });
@@ -252,7 +234,7 @@ describe("runVehicleUpdate", () => {
   };
 
   test("dryRun: does not POST and returns the field-level diff", async () => {
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([CURRENT_53]);
+    c.get.mockResolvedValueOnce([CURRENT_53]);
     const out = await runVehicleUpdate(
       c,
       53,
@@ -268,7 +250,7 @@ describe("runVehicleUpdate", () => {
   });
 
   test("dryRun: empty diff when nothing changes (vehicleM3 '8' vs 8)", async () => {
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([CURRENT_53]);
+    c.get.mockResolvedValueOnce([CURRENT_53]);
     // String "8" must not read as a change vs the DB's numeric 8.
     const out = await runVehicleUpdate(
       c,
@@ -280,7 +262,7 @@ describe("runVehicleUpdate", () => {
   });
 
   test("dryRun: diffs showInGrid and lastDate", async () => {
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([CURRENT_53]);
+    c.get.mockResolvedValueOnce([CURRENT_53]);
     const out = await runVehicleUpdate(
       c,
       53,
@@ -298,8 +280,8 @@ describe("runVehicleUpdate", () => {
   });
 
   test("real write: showInGrid/lastDate land in the saved body", async () => {
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([CURRENT_53]);
-    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ vehicleId: 53 });
+    c.get.mockResolvedValueOnce([CURRENT_53]);
+    c.post.mockResolvedValueOnce({ vehicleId: 53 });
     await runVehicleUpdate(
       c,
       53,
@@ -318,7 +300,7 @@ describe("runVehicleUpdate", () => {
   });
 
   test("--puomi updates vehiclePuomi (merge + dry-run diff)", async () => {
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([CURRENT_53]);
+    c.get.mockResolvedValueOnce([CURRENT_53]);
     const out = await runVehicleUpdate(
       c,
       53,
@@ -330,8 +312,8 @@ describe("runVehicleUpdate", () => {
       vehicleId: 53,
       wouldChange: { vehiclePuomi: { from: 0, to: 32 } },
     });
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce([CURRENT_53]);
-    (c.post as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ vehicleId: 53 });
+    c.get.mockResolvedValueOnce([CURRENT_53]);
+    c.post.mockResolvedValueOnce({ vehicleId: 53 });
     await runVehicleUpdate(c, 53, { vehiclePuomi: 32 }, { reason: "boom fix" });
     expect(c.post).toHaveBeenCalledWith(
       "/api/vehicle/save",
@@ -342,16 +324,10 @@ describe("runVehicleUpdate", () => {
 });
 
 describe("ib vehicle dates", () => {
-  const c = {
-    get: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
-    getCurrentToken: vi.fn(),
-  } as unknown as ApiClient;
-  beforeEach(() => (c.get as ReturnType<typeof vi.fn>).mockReset());
+  const c = mockApiClient();
+  beforeEach(() => c.get.mockReset());
   test("list hits /dates/:id", async () => {
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    c.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
@@ -360,7 +336,7 @@ describe("ib vehicle dates", () => {
     expect(c.get).toHaveBeenCalledWith("/api/cli/vehicle/dates/7");
   });
   test("expiring without days hits bare path", async () => {
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    c.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
@@ -369,7 +345,7 @@ describe("ib vehicle dates", () => {
     expect(c.get).toHaveBeenCalledWith("/api/cli/vehicle/dates/expiring");
   });
   test("expiring with days appends ?days=", async () => {
-    (c.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    c.get.mockResolvedValueOnce({
       items: [],
       nextCursor: null,
       count: 0,
