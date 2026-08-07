@@ -5,7 +5,6 @@ import {
   addWriteFlagsToCommand,
   writeFlagsToHeaders,
   type WriteFlags,
-  requireReason,
 } from "../../api/writeFlags.js";
 import { writeJson } from "../../output/json.js";
 import { resolvePersonRef } from "../notification/index.js";
@@ -91,7 +90,6 @@ export function registerPersonEmailCommands(
     .command("add <person> <email>");
   addWriteFlagsToCommand(addCmd).action(
     guarded(async (personRef: string, emailAddr: string, opts: WriteFlags) => {
-      requireReason(opts);
       writeJson(
         await runPersonEmailAdd(await getClient(), personRef, emailAddr, opts)
       );
@@ -102,7 +100,6 @@ export function registerPersonEmailCommands(
     .command("set-main <person> <email>");
   addWriteFlagsToCommand(setMainCmd).action(
     guarded(async (personRef: string, emailAddr: string, opts: WriteFlags) => {
-      requireReason(opts);
       writeJson(
         await runPersonEmailSetMain(await getClient(), personRef, emailAddr, opts)
       );
@@ -113,7 +110,6 @@ export function registerPersonEmailCommands(
     .command("remove <person> <email>");
   addWriteFlagsToCommand(removeCmd).action(
     guarded(async (personRef: string, emailAddr: string, opts: WriteFlags) => {
-      requireReason(opts);
       writeJson(
         await runPersonEmailRemove(await getClient(), personRef, emailAddr, opts)
       );

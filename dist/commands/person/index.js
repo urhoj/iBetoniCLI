@@ -1,5 +1,5 @@
 import { unwrapRows, listEnvelope } from "../../api/envelopes.js";
-import { writeFlagsToHeaders, addWriteFlagsToCommand, requireReason, } from "../../api/writeFlags.js";
+import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, failWith, failUsage, errorMessage } from "../../output/json.js";
 import { decodeJwtPayload, impersonationFromClaims, } from "../../auth/jwt.js";
 import { resolveCallerTier } from "../../tier.js";
@@ -415,7 +415,6 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .option("--body <json>", "Raw JSON body (merged under typed flags)")
         .option("--from-json <file>", "Read the JSON body from a file (or - for stdin) — shell-safe alternative to --body");
     addWriteFlagsToCommand(createCmd).action(guarded(async (opts) => {
-        requireReason(opts);
         // --global and --asiakas are mutually exclusive owner directives.
         if (opts.global && opts.asiakas !== undefined) {
             failWith("--global and --asiakas are mutually exclusive", 4);
@@ -521,7 +520,6 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .option("--memo <s>", "personMemo — free-text note/comment")
         .option("--body <json>", "Patch body (JSON), merged under the typed flags")
         .option("--from-json <file>", "Read the patch body from a file (or - for stdin) — shell-safe alternative to --body")).action(guarded(async (personIdStr, opts) => {
-        requireReason(opts);
         const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
         const patch = buildPersonUpdateBody(parsed, {
             first: opts.first,
@@ -541,7 +539,6 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .command("owner <personId>")
         .option("--global", "Make the person GLOBAL (ownerAsiakasId=null)")
         .option("--asiakas <id>", "Set owner to this asiakasId", Number)).action(guarded(async (personIdStr, opts) => {
-        requireReason(opts);
         const hasGlobal = !!opts.global;
         const hasAsiakas = opts.asiakas !== undefined;
         if (hasGlobal === hasAsiakas) {
@@ -554,7 +551,6 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
     }));
     addWriteFlagsToCommand(p
         .command("delete <personId>")).action(guarded(async (personIdStr, opts) => {
-        requireReason(opts);
         const client = await getClient();
         const result = await runPersonDelete(client, parseId(personIdStr, "personId"), opts);
         writeJson(result);
@@ -571,7 +567,6 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .command("grant <personId>")
         .requiredOption("--role <name>", "Role name (see ROLE_TYPEID_BY_NAME)")
         .requiredOption("--asiakas <id>", "Target asiakasId", (v) => Number(v))).action(guarded(async (personIdStr, opts) => {
-        requireReason(opts);
         let roleTypeId;
         try {
             roleTypeId = resolveRoleTypeId(opts.role);
@@ -593,7 +588,6 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .command("revoke <personId>")
         .requiredOption("--role <name>", "Role name (see ROLE_TYPEID_BY_NAME)")
         .requiredOption("--asiakas <id>", "Target asiakasId", (v) => Number(v))).action(guarded(async (personIdStr, opts) => {
-        requireReason(opts);
         let roleTypeId;
         try {
             roleTypeId = resolveRoleTypeId(opts.role);

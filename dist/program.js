@@ -76,6 +76,11 @@ export async function buildProgram(argv) {
         },
     });
     addGlobalOptions(program);
+    // Spec-declared `--reason` requirements fire before any action, for every
+    // consumer of the built tree (bin, runArgv, tests) — see enforceSpecReasonPolicy.
+    program.hook("preAction", (_thisCommand, actionCommand) => {
+        enforceSpecReasonPolicy(actionCommand);
+    });
     // The acting context of this invocation: the parsed root globals, plus the
     // EMBEDDED caller's identity when this process is serving an in-process
     // `/api/cli/exec` call. This is the ONE place `getEmbeddedCtx()` is consulted,
@@ -251,6 +256,9 @@ export async function buildProgram(argv) {
             if (field !== "summary" && field !== "detail") {
                 failUsage("--field must be one of: summary, detail");
             }
+            // Deliberate exception to the spec-declared reasonPolicy migration:
+            // --reason is required only in EDIT mode (a conditional the spec cannot
+            // express), so this one guard stays hand-called.
             requireReason(opts, { allowDryRun: true });
             try {
                 const client = await getClient();
@@ -273,7 +281,6 @@ export async function buildProgram(argv) {
         .command("delete")
         .argument("<command...>", "The exact stored command key after `ib` (e.g. ai conversation)");
     addWriteFlagsToCommand(detailDelete).action(guarded(async (commandParts, opts) => {
-        requireReason(opts, { allowDryRun: true });
         const client = await getClient();
         writeJson(await runReferenceDetailDelete(client, commandParts, opts));
     }));
@@ -333,6 +340,25 @@ export function applySpecErrors(actionCommand) {
     const spec = COMMAND_SPECS.find((s) => s.command === path);
     setActiveCommandErrors(spec?.errors ?? null);
     setListColumns(spec?.prettyColumns ?? null);
+}
+/**
+ * Enforce a spec-declared `--reason` requirement ({@link CommandSpec.reasonPolicy})
+ * before the action runs. Installed as a preAction hook by `buildProgram`, so
+ * EVERY consumer of the built tree (bin, runArgv, tests) gets the guard — the
+ * declaration lives in the spec instead of a hand-called `requireReason` in
+ * each action (~44 sites, where a new write command could silently omit it).
+ * `failWith` from a hook propagates to the CliError-aware catch either way —
+ * same envelope, same exit 4 as the in-action call it replaces.
+ */
+export function enforceSpecReasonPolicy(actionCommand) {
+    const path = canonicalPath(commandPath(actionCommand));
+    const spec = COMMAND_SPECS.find((s) => s.command === path);
+    if (!spec?.reasonPolicy)
+        return;
+    requireReason(actionCommand.opts(), {
+        allowDryRun: spec.reasonPolicy === "unless-dry-run",
+        detail: spec.reasonDetail,
+    });
 }
 export function enableParserThrow(program) {
     let captured = "";

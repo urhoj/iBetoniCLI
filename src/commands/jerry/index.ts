@@ -5,7 +5,6 @@ import {
   type WriteFlags,
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
-  requireReason,
 } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
@@ -859,7 +858,6 @@ export function registerJerryCommands(
         asiakas?: number;
       }
     ) => {
-      requireReason(opts);
       const osoite = resolveAddress(addressPositional, opts.address);
       const maaraM3 = Number(opts.m3);
       if (!Number.isFinite(maaraM3) || maaraM3 <= 0) {
@@ -884,7 +882,6 @@ export function registerJerryCommands(
   ): void => {
     addWriteFlagsToCommand(request.command(`${name} <requestId>`)).action(
       guarded(async (idStr: string, opts: WriteOpts) => {
-        requireReason(opts);
         const client = await getClient();
         writeJson(await run(client, parseId(idStr, "requestId"), opts));
       })
@@ -927,7 +924,6 @@ export function registerJerryCommands(
         maintainsOrderInfo?: boolean;
       }
     ) => {
-      requireReason(opts);
       const priceCents = Number(opts.priceCents);
       if (!Number.isInteger(priceCents) || priceCents < 1 || priceCents > 99_999_900) {
         failWith("--price-cents must be an integer in 1..99999900", 4);
@@ -960,7 +956,6 @@ export function registerJerryCommands(
   ): void => {
     addWriteFlagsToCommand(offer.command(`${name} <requestId> <offerId>`)).action(
       guarded(async (idStr: string, offerIdStr: string, opts: WriteOpts) => {
-        requireReason(opts);
         const client = await getClient();
         writeJson(
           await run(client, parseId(idStr, "requestId"), parseId(offerIdStr, "offerId"), opts)
@@ -983,7 +978,6 @@ export function registerJerryCommands(
       offerIdStr: string,
       opts: WriteOpts & { scheduledAt: string; pumppu?: number }
     ) => {
-      requireReason(opts);
       const body: { scheduledAt: string; pumppuId?: number } = { scheduledAt: opts.scheduledAt };
       if (opts.pumppu !== undefined) body.pumppuId = opts.pumppu;
       const client = await getClient();
@@ -1099,7 +1093,6 @@ export function registerJerryCommands(
       )
       .option("--asiakas <id>", "Target company asiakasId", Number)
   ).action(guarded(async (opts: WriteOpts & { body?: string; fromJson?: string; asiakas?: number }) => {
-    requireReason(opts);
     const client = await getClient();
     const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) as Row | null;
     if (!parsed) {
@@ -1142,7 +1135,6 @@ export function registerJerryCommands(
       addAsiakasTargetOption(admin.command(`${name} [asiakasId]`))
     ).action(
       guarded(async (idStr: string | undefined, opts: WriteOpts & { asiakas?: number }) => {
-        requireReason(opts);
         const client = await getClient();
         writeJson(
           await runJerryAdminToggle(client, resolveAsiakasTarget(idStr, opts.asiakas), enable, opts)
@@ -1293,7 +1285,6 @@ export function registerJerryCommands(
   const adminReqAction = (name: string, run: (c: ApiClient, id: number, f: WriteOpts) => Promise<unknown>) =>
     addWriteFlagsToCommand(adminRequest.command(`${name} <requestId>`))
       .action(guarded(async (idStr: string, opts: WriteOpts) => {
-        requireReason(opts);
         const client = await getClient();
         writeJson(await run(client, parseId(idStr, "requestId"), opts));
       }));
@@ -1310,7 +1301,6 @@ export function registerJerryCommands(
       .option("--days <n>", "Make it valid for N more days from now (default 14)", Number)
       .option("--until <date>", "Absolute new expiry (ISO date/datetime)")
   ).action(guarded(async (idStr: string, opts: { days?: number; until?: string } & WriteOpts) => {
-    requireReason(opts);
     if (opts.days != null && opts.until) failWith("Pass either --days or --until, not both", 4);
     const client = await getClient();
     writeJson(await runJerryAdminRequestExtend(client, parseId(idStr, "requestId"), opts));

@@ -7,7 +7,6 @@ import {
   type WriteFlags,
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
-  requireReason,
 } from "../../api/writeFlags.js";
 import { parseId } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
@@ -217,7 +216,6 @@ export function registerVehicleDriverCommands(
       .command("assign <vehicleId> <date>")
       .requiredOption("--person <pid>", "Driver personId", (s: string) => Number(s))
   ).action(guarded(async (vehicleIdStr: string, date: string, opts: WriteFlags & { person: number }) => {
-    requireReason(opts);
     writeJson(
       await runVehicleDriverAssign(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts.person, date, opts)
     );
@@ -227,7 +225,6 @@ export function registerVehicleDriverCommands(
     driver
       .command("clear <vehicleId> <date>")
   ).action(guarded(async (vehicleIdStr: string, date: string, opts: WriteFlags) => {
-    requireReason(opts);
     writeJson(
       await runVehicleDriverClear(await getClient(), parseId(vehicleIdStr, "vehicleId"), date, opts)
     );
@@ -251,7 +248,6 @@ export function registerVehicleDriverCommands(
       .command("set <vehicleId>")
       .requiredOption("--person <pid>", "Default driver personId", (s: string) => Number(s))
   ).action(guarded(async (vehicleIdStr: string, opts: WriteFlags & { person: number }) => {
-    requireReason(opts);
     writeJson(
       await runVehicleDefaultSet(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts.person, opts)
     );
@@ -261,7 +257,6 @@ export function registerVehicleDriverCommands(
     def
       .command("clear <vehicleId>")
   ).action(guarded(async (vehicleIdStr: string, opts: WriteFlags) => {
-    requireReason(opts);
     writeJson(
       await runVehicleDefaultSet(await getClient(), parseId(vehicleIdStr, "vehicleId"), null, opts)
     );

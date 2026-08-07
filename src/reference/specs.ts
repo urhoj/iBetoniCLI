@@ -277,6 +277,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "attachmentId", type: "number", description: "attachments.attachmentId" }],
     flags: [],
     writeFlags: true,
+    reasonPolicy: "always",
+    reasonDetail: "(blob deletion is irreversible)",
     mutates: true,
     outputShape: "{ ok: true, attachmentId, deleted: true, blobDeleted } | { dryRun: true, wouldDelete: { attachmentId, blobName, origFileName } }",
     errors: [{ origin: "client", exit: 4, meaning: "Missing --reason", remedy: "pass --reason 'why'" }, apiErr(400, "Missing X-Action-Reason header", "pass --reason"), apiErr(403, "Not owner company or missing manager role", "switch to the owner company"), apiErr(404, "Attachment not found or already deleted", "verify attachmentId"), ...COMMON_AUTH_ERRORS],
@@ -1248,6 +1250,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "allow-big-merge", type: "boolean", description: "System-admin: permit a merge above the safety row cap" },
     ],
     writeFlags: true,
+    reasonPolicy: "unless-dry-run",
+    reasonDetail: "(customer merge is irreversible; --dry-run previews via /validate)",
     dryRunKind: "client",
     outputShape:
       "real: { success, safetyValidation, timestamp, ... } | dry-run: { dryRun: true, validation: { success, ... } }",
@@ -1602,6 +1606,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
     ],
     writeFlags: true,
+    reasonPolicy: "unless-dry-run",
+    reasonDetail: "(worksite merge is irreversible; --dry-run previews via /validate)",
     dryRunKind: "client",
     outputShape:
       "real: { success, safetyValidation, timestamp, ... } | dry-run: { dryRun: true, validation: { success, ... } }",
@@ -1787,6 +1793,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ granted: { personId, asiakasId, roleTypeId } } | { dryRun:true, wouldCreate:{ personId, asiakasId, personSettingTypeId, personSettingString }, validation }",
     errors: [
       apiErr(400, "Unknown role / company limit reached", "use a name from ROLE_TYPEID_BY_NAME"),
@@ -1809,6 +1816,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ removed: 1 } | { removed: 0 } (absent) | { dryRun:true, wouldDelete:{ asiakasPersonSettingId }, validation }",
     errors: [
       apiErr(400, "Unknown role", "use a name from ROLE_TYPEID_BY_NAME"),
@@ -1905,6 +1913,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
     ],
     writeFlags: true,
+    reasonPolicy: "unless-dry-run",
+    reasonDetail: "(person merge is irreversible; --dry-run previews via /validate)",
     dryRunKind: "client",
     outputShape:
       "real: { success, safetyValidation, timestamp, ... } | dry-run: { dryRun: true, validation: { success, ... } }",
@@ -1970,6 +1980,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "text", type: "string", description: "Free-text note on the day row" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     mutates: true,
     dryRunKind: "client",
     outputShape: "personPvm save result | { dryRun:true, personId, date, wouldChange:{ status?, text? } } (with --dry-run)",
@@ -1999,6 +2010,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)", required: true },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     mutates: true,
     dryRunKind: "client",
     outputShape: "delete result | { dryRun:true, wouldDelete:{ personPvmId, date, status } | null } (with --dry-run)",
@@ -2498,6 +2510,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "person", type: "number", description: "Driver personId", required: true },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape:
       "{ success, vehicleId, date, personId, oldPersonId, oldDriverName, newDriverName, clearedFromVehicleId, keikkaIds, palkkiIds } | { dryRun:true, vehicleId, date, personId, oldPersonId, keikkaIds, palkkiIds, wouldClearFromVehicleId } (with --dry-run)",
     errors: [
@@ -2528,6 +2541,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     flags: [],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape:
       "{ success, vehicleId, date, personId:null, oldPersonId, oldDriverName, newDriverName:null, clearedFromVehicleId:null, keikkaIds, palkkiIds } | { dryRun:true, ... } (with --dry-run)",
     errors: [
@@ -2564,6 +2578,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "person", type: "number", description: "Default driver personId", required: true },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape:
       "{ success, vehicleId, defaultDriverPersonId, cascade: { futureKeikkaIds, futureKeikkaCount, personPvmDaysUpdated } } | { dryRun:true, wouldUpdate } (with --dry-run)",
     errors: [
@@ -2587,6 +2602,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "vehicleId", type: "number", description: "Target vehicleId" }],
     flags: [],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape:
       "{ success, vehicleId, defaultDriverPersonId:null, cascade: { futureKeikkaIds, futureKeikkaCount, personPvmDaysUpdated } } | { dryRun:true, wouldUpdate } (with --dry-run)",
     errors: [
@@ -2770,6 +2786,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ personId, personEmail, added: boolean } · dry-run: { dryRun:true, wouldAdd:{ personId, personEmail } }",
     errors: [
       apiErr(400, "Equals the primary email, or invalid/too-long email", "manage the primary via `ib person update`; check the address"),
@@ -2793,6 +2810,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape:
       "{ personId, personEmail, main:true, changed:boolean } · dry-run: { dryRun:true, wouldSetMain:{ personId, personEmail } }",
     errors: [
@@ -2819,6 +2837,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "backend delete result · dry-run: { dryRun:true, wouldDelete:{ personId, personEmail } }",
     errors: [
       apiErr(404, "Person not found / out of your tenant", "verify the person is in your active company (or switch company)"),
@@ -3066,6 +3085,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ success: true }",
     errors: [
       apiErr(404, "Sijainti not found", "verify sijaintiId"),
@@ -3082,6 +3102,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ success: true }",
     errors: [
       apiErr(404, "Sijainti not found", "verify sijaintiId"),
@@ -3223,6 +3244,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "all", type: "boolean", description: "With --replace: substitute every occurrence" },
     ],
     writeFlags: true,
+    reasonPolicy: "unless-dry-run",
     dryRunKind: "client",
     outputShape:
       "{ success: true, helpId, created, written: {helpId,title,shorttext,htmltext,img, aiConfidence?, needsHumanReview?}, htmltextLength, response } — `created` is true when no prior row existed (a parallel groomer can spot an unexpected insert); aiConfidence/needsHumanReview present in `written` only when those flags were passed; or { dryRun: true, helpId, created, current, proposed } | edit dry-run: {dryRun:true, helpId, field, matchCount?, addedLines, removedLines, sameContent, unified}",
@@ -3248,6 +3270,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "helpId", type: "string", description: "the helpId to delete" }],
     flags: [],
     writeFlags: true,
+    reasonPolicy: "unless-dry-run",
     dryRunKind: "client",
     outputShape:
       "{ success: true, helpId, deleted: boolean } — deleted is false when no row existed (idempotent); or { dryRun: true, helpId, wouldDelete: {helpId,title,shorttext,htmltext,img}|null } with --dry-run",
@@ -3432,6 +3455,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "all", type: "boolean", description: "With --replace: substitute every occurrence instead of erroring on multiple matches" },
     ],
     writeFlags: true,
+    reasonPolicy: "unless-dry-run",
     mutates: true,
     outputShape: "{documentId, success} | dry-run: {dryRun: true, wouldCreate: {...}, validation} | edit dry-run: {dryRun:true, type, field:\"markdownContent\", matchCount?, addedLines, removedLines, sameContent, unified}",
     errors: [
@@ -3459,6 +3483,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "documentId", type: "number", description: "legalDocuments.documentId to activate" }],
     flags: [],
     writeFlags: true,
+    reasonPolicy: "unless-dry-run",
     mutates: true,
     outputShape: "{success} | dry-run: {dryRun: true, wouldActivate: {documentId}, validation}",
     errors: [
@@ -3477,6 +3502,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "documentId", type: "number", description: "legalDocuments.documentId to soft-delete" }],
     flags: [],
     writeFlags: true,
+    reasonPolicy: "unless-dry-run",
     mutates: true,
     outputShape: "{success} | dry-run: {dryRun: true, wouldDelete: {documentId}, validation}",
     errors: [
@@ -3520,6 +3546,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "type", type: "string", description: "Document type name (alias for the positional)" },
     ],
     writeFlags: true,
+    reasonPolicy: "unless-dry-run",
     mutates: true,
     outputShape: "{success} | dry-run: {dryRun: true, wouldAccept: {...}, validation}",
     errors: [
@@ -3551,6 +3578,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "setting-type-id", type: "number", description: "personSettingTypeId for acceptance tracking (must exist and be unmapped)" },
     ],
     writeFlags: true,
+    reasonPolicy: "unless-dry-run",
     mutates: true,
     outputShape: "the created legalDocumentTypes row | dry-run: {dryRun: true, wouldCreateType: {...}, validation}",
     errors: [
@@ -3581,6 +3609,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "setting-type-id", type: "number", description: "personSettingTypeId for acceptance tracking (must exist in personSettingTypes and not be mapped to another type)" },
     ],
     writeFlags: true,
+    reasonPolicy: "unless-dry-run",
     mutates: true,
     outputShape: "the updated legalDocumentTypes row | dry-run: {dryRun: true, wouldUpdateType: {typeName, fields}, validation}",
     errors: [
@@ -3645,6 +3674,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: number }",
     errors: [
       apiErr(404, "Customer not found", "verify asiakasId"),
@@ -3663,6 +3693,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ added: { asiakasId, personId } } or { dryRun: true, wouldCreate: { asiakasId, personId, contactPersonTypeId } }",
     errors: [
       apiErr(400, "Company limit (26) reached", "remove an existing link first"),
@@ -3681,6 +3712,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ removed: { asiakasId, personId } } or { dryRun: true, wouldDelete: { asiakasId, personId } }",
     errors: [
       apiErr(404, "Link not found", "verify asiakasId+personId combination"),
@@ -3716,6 +3748,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: { tyomaaId } }",
     errors: [
       apiErr(404, "Worksite not found", "verify tyomaaId"),
@@ -3778,6 +3811,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ added: { tyomaaId, personId } } or { dryRun: true, wouldCreate: { tyomaaId, personId, contactPersonTypeId } }",
     errors: permErrors("auth.page.tyomaa.edit"),
     examples: ['ib worksite person add --worksite 99 --person 5351 --reason "assign foreman"'],
@@ -3793,6 +3827,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ removed: { tyomaaId, personId } } or { dryRun: true, wouldDelete: { tyomaaId, personId } }",
     errors: [
       apiErr(404, "Link not found", "verify tyomaaId+personId combination"),
@@ -3831,6 +3866,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ personId, name, email, ... } (re-fetched) · with --get-or-create adds reused:boolean · dry-run: { dryRun: true, wouldCreate: ... }",
     errors: [
       apiErr(400, "Missing required field, or duplicate email without --get-or-create", "provide --first and --last (email is optional); add --get-or-create to reuse an existing visible person, or use a different email"),
@@ -3864,6 +3900,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ ok: true, updated: { personId } } or { dryRun: true, wouldUpdate: { personId, ... } }",
     errors: [
       apiErr(400, "No fields to update", "pass at least one typed flag (--first/--last/--phone/--email/--memo) or a --body/--from-json patch"),
@@ -3898,6 +3935,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ personId, ownerAsiakasId } or { dryRun: true, wouldSetOwner: { personId, from, to } }",
     errors: [
       apiErr(403, "Not allowed to change this person's owner", "see the authz rules above (developer/self/company-admin)"),
@@ -3919,6 +3957,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: { personId } }",
     errors: [
       apiErr(404, "Person not found", "verify personId"),
@@ -4005,6 +4044,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape:
       "{ pumppuRequestId, status:'open', asiakasId, personId, tyomaaId, geocoded } · { dryRun:true, wouldCreate:{ asiakasId, osoite, pumppuAika, totalM3, requiredPuomi, pumppuKesto, requiredLinja, notes }, validation:{ ok:true } } on --dry-run",
     errors: [
@@ -4031,6 +4071,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId you own" }],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape:
       "{ success: true, status: 'cancelled' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
     errors: [
@@ -4048,6 +4089,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId you were sent" }],
     flags: [{ name: "reason", type: "string", description: "Decline reason — stored, shown to the customer, and audited (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape:
       "{ success: true, declined: true, hasOtherProviders } (or { …, alreadyDeclined: true }) · { dryRun: true, wouldDecline: { pumppuRequestId, reason } } on --dry-run",
     errors: [
@@ -4066,6 +4108,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId you previously declined" }],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape:
       "{ success: true, undeclined: boolean } · { dryRun: true, wouldUndecline: { pumppuRequestId } } on --dry-run",
     errors: [
@@ -4093,6 +4136,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape:
       "{ pumppuOfferId, status:'draft', created, messageThreadId } · { dryRun:true, wouldUpsert:{ pumppuRequestId, priceCents, vatPercent, priceTerms, validUntil, availableFrom, extraNotes, cancellationTerms, maintainsOrderInfo } } on --dry-run",
     errors: [
@@ -4122,6 +4166,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape:
       "{ pumppuOfferId, status:'pending' } · { dryRun:true, wouldUpdate:{ pumppuRequestId, pumppuOfferId, status:'pending' } } on --dry-run",
     errors: [
@@ -4144,6 +4189,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape:
       "{ pumppuRequestId, pumppuOfferId, keikkaId:null, status:'accepted' } · { dryRun:true, wouldAccept:{ pumppuRequestId, pumppuOfferId, status:'accepted' } } on --dry-run",
     errors: [
@@ -4168,6 +4214,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape:
       "{ pumppuRequestId, pumppuOfferId, status:'confirmed', keikkaId, scheduledAt } · { dryRun:true, wouldConfirm:{ pumppuRequestId, pumppuOfferId, status:'confirmed', scheduledAt, pumppuId } } on --dry-run",
     errors: [
@@ -4200,6 +4247,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape:
       "{ success: true, status: 'withdrawn' } or { dryRun: true, wouldUpdate: { pumppuOfferId, status } }",
     errors: [
@@ -4221,6 +4269,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape:
       "{ success: true, pumppuOfferId, deleted: true } or { dryRun: true, wouldDelete: { pumppuOfferId, status } }",
     errors: [
@@ -4355,6 +4404,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, openingHours, companyDescription, maintainsOrderInfo, changed } · { dryRun: true, wouldUpdate: {...} } on --dry-run",
     errors: [
       apiErr(400, "Invalid field / contact not in company", "check jerryPersonId belongs to the company"),
@@ -4437,6 +4487,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: true } }",
     errors: [
       apiErr(400, "Invalid asiakasId", "pass a numeric asiakasId"),
@@ -4444,7 +4495,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(404, "Company not found", "verify asiakasId"),
       ...COMMON_AUTH_ERRORS,
     ],
-    examples: ['ib jerry admin enable 1402 --reason "onboard provider"', "ib jerry admin enable --asiakas 1402 --dry-run"],
+    examples: ['ib jerry admin enable 1402 --reason "onboard provider"', "ib jerry admin enable --asiakas 1402 --dry-run --reason preview"],
   },
   {
     command: "ib jerry admin disable",
@@ -4458,6 +4509,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: false } }",
     errors: [
       apiErr(400, "Invalid asiakasId", "pass a numeric asiakasId"),
@@ -4465,7 +4517,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(404, "Company not found", "verify asiakasId"),
       ...COMMON_AUTH_ERRORS,
     ],
-    examples: ['ib jerry admin disable 1402 --reason "offboard provider"', "ib jerry admin disable --asiakas 1402 --dry-run"],
+    examples: ['ib jerry admin disable 1402 --reason "offboard provider"', "ib jerry admin disable --asiakas 1402 --dry-run --reason preview"],
   },
   {
     command: "ib jerry admin onboarding list",
@@ -4688,6 +4740,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ success: true, status: 'expired' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
     errors: [SYSADMIN_403, apiErr(409, "Wrong state", "request not in an expirable state"), ...COMMON_AUTH_ERRORS],
     examples: ['ib jerry admin request expire 41 --reason "abandoned"'],
@@ -4701,6 +4754,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ success: true, status: 'cancelled' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
     errors: [SYSADMIN_403, apiErr(409, "Wrong state", "request not in a cancellable state"), ...COMMON_AUTH_ERRORS],
     examples: ['ib jerry admin request cancel 41 --reason "customer request"'],
@@ -4714,6 +4768,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ success: true, status: 'open' | 'no_supply', providerCount, notifiedCount } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
     notes: [
       "providerCount = companies matching the worksite now; notifiedCount = of those, how many were newly added and emailed.",
@@ -4735,6 +4790,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ success: true, status, expiresAt } or { dryRun: true, wouldUpdate: { pumppuRequestId, expiresAt } }",
     errors: [
       apiErr(400, "Bad date/days", "use a positive --days or a future --until"),
@@ -4753,6 +4809,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    reasonPolicy: "always",
     outputShape: "{ success: true } or { dryRun: true, wouldDelete: { pumppuRequestId } }",
     errors: [
       SYSADMIN_403,
@@ -5351,6 +5408,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     auth: "any",
     mutates: true,
     writeFlags: true,
+    reasonPolicy: "unless-dry-run",
     args: [
       {
         name: "command...",

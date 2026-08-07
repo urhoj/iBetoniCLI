@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { listEnvelope } from "../../api/envelopes.js";
-import { writeFlagsToHeaders, addWriteFlagsToCommand, requireReason, } from "../../api/writeFlags.js";
+import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith, errorMessage, setExitCode } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
@@ -935,7 +935,6 @@ export function registerCustomerCommands(parent, getClient) {
     });
     addWriteFlagsToCommand(c
         .command("delete <asiakasId>")).action(guarded(async (asiakasIdStr, opts) => {
-        requireReason(opts);
         const client = await getClient();
         const ownerAsiakasId = await resolveCurrentOwnerAsiakasId(client);
         const result = await runCustomerDelete(client, parseId(asiakasIdStr, "asiakasId"), ownerAsiakasId, opts);

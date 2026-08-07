@@ -72,7 +72,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED (blob deletion is irreversible).
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -1063,7 +1063,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -1247,7 +1247,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run (customer merge is irreversible; --dry-run previews via /validate).
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -1383,7 +1383,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -1457,7 +1457,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -3461,7 +3461,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -3478,7 +3478,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib jerry admin disable 1402 --reason "offboard provider"
-  ib jerry admin disable --asiakas 1402 --dry-run
+  ib jerry admin disable --asiakas 1402 --dry-run --reason preview
 "
 `;
 
@@ -3500,7 +3500,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -3517,7 +3517,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib jerry admin enable 1402 --reason "onboard provider"
-  ib jerry admin enable --asiakas 1402 --dry-run
+  ib jerry admin enable --asiakas 1402 --dry-run --reason preview
 "
 `;
 
@@ -3730,7 +3730,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -3766,7 +3766,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -3802,7 +3802,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -3840,7 +3840,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -3976,7 +3976,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -4288,7 +4288,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -4327,7 +4327,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -4383,7 +4383,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -4425,7 +4425,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -4463,7 +4463,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -4501,7 +4501,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -4566,7 +4566,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -4606,7 +4606,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -4650,7 +4650,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -4696,7 +4696,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -4831,7 +4831,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -5210,7 +5210,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -5291,7 +5291,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -5364,7 +5364,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -5520,7 +5520,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -5636,7 +5636,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -5683,7 +5683,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -6033,7 +6033,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -6072,7 +6072,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -6183,7 +6183,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -7509,7 +7509,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -7624,7 +7624,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -8198,7 +8198,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -8240,7 +8240,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -8322,7 +8322,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -8403,7 +8403,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -8476,7 +8476,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -8548,7 +8548,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -8586,7 +8586,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -8757,7 +8757,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run (person merge is irreversible; --dry-run previews via /validate).
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -8851,7 +8851,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -8923,7 +8923,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -8991,7 +8991,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -9077,7 +9077,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -9122,7 +9122,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -9604,7 +9604,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -9911,7 +9911,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -10426,7 +10426,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -10554,7 +10554,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -10597,7 +10597,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -10677,7 +10677,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -11404,7 +11404,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -11609,7 +11609,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run (worksite merge is irreversible; --dry-run previews via /validate).
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -11686,7 +11686,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -11752,7 +11752,7 @@ FLAGS
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
-  --reason TEXT        Free-text justification. Stored in audit log.
+  --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV

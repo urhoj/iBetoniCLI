@@ -1,5 +1,5 @@
 import { listEnvelope } from "../../api/envelopes.js";
-import { addWriteFlagsToCommand, writeFlagsToHeaders, requireReason, } from "../../api/writeFlags.js";
+import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { guarded } from "./action.js";
@@ -50,9 +50,11 @@ export async function runCombinatorMerge(client, base, idFields, opts, flags) {
 /**
  * Register the `duplicates` + `merge` leaves of one combinator on its group.
  *
- * `merge` is IRREVERSIBLE, so it keeps all three guards before any network call:
- * both ids positive integers, the two ids distinct, and `--reason` mandatory
- * unless `--dry-run` (which routes to the read-only /validate preview instead).
+ * `merge` is IRREVERSIBLE, so both id guards run before any network call
+ * (positive integers, distinct ids). The third guard — `--reason` mandatory
+ * unless `--dry-run` (which routes to the read-only /validate preview instead)
+ * — is spec-declared (`reasonPolicy: "unless-dry-run"` on each entity's merge
+ * spec) and enforced centrally by the preAction hook.
  */
 export function registerCombinatorCommands(parent, getClient, cfg) {
     parent
@@ -78,10 +80,6 @@ export function registerCombinatorCommands(parent, getClient, cfg) {
         if (opts.main === opts.secondary) {
             failWith("--main and --secondary must differ", 4);
         }
-        requireReason(opts, {
-            allowDryRun: true,
-            detail: `(${cfg.entityNoun} merge is irreversible; --dry-run previews via /validate)`,
-        });
         const client = await getClient();
         const owner = opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));
         writeJson(await runCombinatorMerge(client, cfg.base, cfg.idFields, {

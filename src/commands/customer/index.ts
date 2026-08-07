@@ -6,7 +6,6 @@ import {
   type WriteFlags,
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
-  requireReason,
 } from "../../api/writeFlags.js";
 import { writeJson, exitWithError, failWith, errorMessage, setExitCode } from "../../output/json.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
@@ -1333,7 +1332,6 @@ export function registerCustomerCommands(
     c
       .command("delete <asiakasId>")
   ).action(guarded(async (asiakasIdStr: string, opts: WriteFlags) => {
-    requireReason(opts);
     const client = await getClient();
     const ownerAsiakasId = await resolveCurrentOwnerAsiakasId(client);
     const result = await runCustomerDelete(client, parseId(asiakasIdStr, "asiakasId"), ownerAsiakasId, opts);

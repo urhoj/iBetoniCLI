@@ -5,7 +5,6 @@ import {
   type WriteFlags,
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
-  requireReason,
 } from "../../api/writeFlags.js";
 import { writeJson, failWith, errorMessage } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
@@ -1254,7 +1253,6 @@ export function registerSijaintiCommands(
   ] as const) {
     addWriteFlagsToCommand(s.command(`${name} <sijaintiId>`)).action(
       guarded(async (idStr: string, opts: WriteFlags) => {
-        requireReason(opts);
         const client = await getClient();
         writeJson(await run(client, parseId(idStr, "sijaintiId"), opts));
       })

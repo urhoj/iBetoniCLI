@@ -1,5 +1,5 @@
 import { listEnvelope } from "../../api/envelopes.js";
-import { addWriteFlagsToCommand, writeFlagsToHeaders, requireReason, } from "../../api/writeFlags.js";
+import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
 import { writeJson } from "../../output/json.js";
 import { resolvePersonRef } from "../notification/index.js";
 import { jsonAction, guarded } from "../_shared/action.js";
@@ -35,19 +35,16 @@ export function registerPersonEmailCommands(person, getClient) {
     const addCmd = email
         .command("add <person> <email>");
     addWriteFlagsToCommand(addCmd).action(guarded(async (personRef, emailAddr, opts) => {
-        requireReason(opts);
         writeJson(await runPersonEmailAdd(await getClient(), personRef, emailAddr, opts));
     }));
     const setMainCmd = email
         .command("set-main <person> <email>");
     addWriteFlagsToCommand(setMainCmd).action(guarded(async (personRef, emailAddr, opts) => {
-        requireReason(opts);
         writeJson(await runPersonEmailSetMain(await getClient(), personRef, emailAddr, opts));
     }));
     const removeCmd = email
         .command("remove <person> <email>");
     addWriteFlagsToCommand(removeCmd).action(guarded(async (personRef, emailAddr, opts) => {
-        requireReason(opts);
         writeJson(await runPersonEmailRemove(await getClient(), personRef, emailAddr, opts));
     }));
 }

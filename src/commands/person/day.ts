@@ -9,7 +9,6 @@ import {
   type WriteFlags,
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
-  requireReason,
 } from "../../api/writeFlags.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
@@ -250,7 +249,6 @@ export function registerPersonDayCommands(
     .option("--text <s>", "Free-text note on the day row");
   addWriteFlagsToCommand(setCmd).action(
     guarded(async (opts: WriteFlags & { person: number; date: string; status: string; text?: string }) => {
-      requireReason(opts);
       const result = await runPersonDaySet(await getClient(), opts.person, opts.date, opts.status, opts);
       writeJson(result);
     })
@@ -262,7 +260,6 @@ export function registerPersonDayCommands(
     .requiredOption("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)");
   addWriteFlagsToCommand(clearCmd).action(
     guarded(async (opts: WriteFlags & { person: number; date: string }) => {
-      requireReason(opts);
       const result = await runPersonDayClear(await getClient(), opts.person, opts.date, opts);
       writeJson(result);
     })

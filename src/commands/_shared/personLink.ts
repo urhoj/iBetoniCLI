@@ -2,7 +2,6 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import {
   addWriteFlagsToCommand,
-  requireReason,
   type WriteFlags,
 } from "../../api/writeFlags.js";
 import { writeJson } from "../../output/json.js";
@@ -46,7 +45,9 @@ export interface PersonLinkCommandsConfig {
  *
  * Both are lifecycle writes, so `--reason` is mandatory (no `--dry-run`
  * exemption) — the link change lands in changeTracker and an unexplained
- * membership edit is exactly what the audit trail exists to catch.
+ * membership edit is exactly what the audit trail exists to catch. The
+ * requirement is spec-declared (`reasonPolicy: "always"` on all four
+ * person-link specs) and enforced centrally by the preAction hook.
  */
 export function registerPersonLinkCommands(
   parent: Command,
@@ -65,7 +66,6 @@ export function registerPersonLinkCommands(
         .option("--contact-type <id>", cfg.contactTypeDescription, Number, 1)
     ).action(
       guarded(async (opts: PersonLinkOptions) => {
-        requireReason(opts);
         const client = await getClient();
         writeJson(
           await run(

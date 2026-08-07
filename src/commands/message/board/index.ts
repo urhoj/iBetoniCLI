@@ -5,7 +5,6 @@ import {
   type WriteFlags,
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
-  requireReason,
 } from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
 import { resolveDate, todayHelsinki } from "../../../dates.js";
@@ -311,7 +310,6 @@ export function registerMessageBoardCommands(
       startDate?: string;
       expiresAt?: string;
     }) => {
-      requireReason(opts, { allowDryRun: true });
       if (!opts.startDate) failWith("Missing required flag: --start-date", 4);
       assertEnum(opts.priority, PRIORITIES, "--priority");
       const client = await getClient();
@@ -339,7 +337,6 @@ export function registerMessageBoardCommands(
       }
     ) => {
       const messageId = parseId(raw, "messageId");
-      requireReason(opts, { allowDryRun: true });
       assertEnum(opts.priority, PRIORITIES, "--priority");
       const client = await getClient();
       const fields = buildBoardFields(opts);
@@ -352,7 +349,6 @@ export function registerMessageBoardCommands(
   addWriteFlagsToCommand(deleteCmd).action(
     guarded(async (raw: string, opts: WriteFlags) => {
       const messageId = parseId(raw, "messageId");
-      requireReason(opts, { allowDryRun: true });
       const client = await getClient();
       writeJson(await runBoardDelete(client, messageId, opts));
     })
@@ -454,6 +450,7 @@ export const MESSAGE_BOARD_SPECS: CommandSpec[] = [
       },
     ],
     writeFlags: true,
+    reasonPolicy: "unless-dry-run",
     mutates: true,
     dryRunKind: "client",
     outputShape: `${BOARD_ROW} · { dryRun: true, proposed: {...} } on --dry-run`,
@@ -485,6 +482,7 @@ export const MESSAGE_BOARD_SPECS: CommandSpec[] = [
       },
     ],
     writeFlags: true,
+    reasonPolicy: "unless-dry-run",
     mutates: true,
     dryRunKind: "client",
     outputShape: `${BOARD_ROW} · { dryRun: true, messageId, current, proposed } on --dry-run`,
@@ -500,6 +498,7 @@ export const MESSAGE_BOARD_SPECS: CommandSpec[] = [
     args: [{ name: "messageId", type: "number", description: "Notice to delete" }],
     flags: [],
     writeFlags: true,
+    reasonPolicy: "unless-dry-run",
     mutates: true,
     dryRunKind: "client",
     outputShape:

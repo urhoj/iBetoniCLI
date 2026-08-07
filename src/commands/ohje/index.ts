@@ -5,7 +5,6 @@ import {
   type WriteFlags,
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
-  requireReason,
 } from "../../api/writeFlags.js";
 import { writeJson, failWith, failUsage } from "../../output/json.js";
 import { guarded, jsonAction } from "../_shared/action.js";
@@ -407,7 +406,6 @@ export function registerOhjeCommands(
           failUsage(`--field must be one of: ${OHJE_EDITABLE_FIELDS.join(", ")}`);
         }
         const field = rawField as OhjeEditableField;
-        requireReason(opts, { allowDryRun: true });
         assertAiConfidence(opts.aiConfidence);
         const client = await getClient();
         writeJson(
@@ -419,9 +417,6 @@ export function registerOhjeCommands(
         return;
       }
       assertAiConfidence(opts.aiConfidence);
-      // --reason is required for an actual write; a --dry-run preview is
-      // read-only, so it does not need a justification.
-      requireReason(opts, { allowDryRun: true });
       const client = await getClient();
       const fields = buildOhjeFields(opts);
       const result = await runOhjeUpdate(
@@ -443,7 +438,6 @@ export function registerOhjeCommands(
       if (!isValidHelpId(helpId)) {
         failWith(`Invalid helpId "${helpId}" — must be 1–250 characters`, 4);
       }
-      requireReason(opts, { allowDryRun: true });
       const client = await getClient();
       writeJson(await runOhjeDelete(client, helpId, opts));
     })

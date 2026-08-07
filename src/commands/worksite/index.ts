@@ -5,7 +5,6 @@ import {
   type WriteFlags,
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
-  requireReason,
 } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
@@ -625,7 +624,6 @@ export function registerWorksiteCommands(
     w
       .command("delete <tyomaaId>")
   ).action(guarded(async (tyomaaIdStr: string, opts: WriteFlags) => {
-    requireReason(opts);
     const client = await getClient();
     const result = await runWorksiteDelete(client, parseId(tyomaaIdStr, "tyomaaId"), opts);
     writeJson(result);

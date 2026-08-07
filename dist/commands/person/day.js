@@ -3,7 +3,7 @@ import { writeJson, failWith } from "../../output/json.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { resolveDate } from "../../dates.js";
 import { jsonAction, guarded } from "../_shared/action.js";
-import { writeFlagsToHeaders, addWriteFlagsToCommand, requireReason, } from "../../api/writeFlags.js";
+import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { qs } from "../../api/query.js";
 import { bothInOrder } from "../../parallel.js";
 /** 20260610 → "2026-06-10". */
@@ -175,7 +175,6 @@ export function registerPersonDayCommands(person, getClient) {
         .requiredOption("--status <id|name>", "personPvmStatusId or status name (see `ib person day statuses`)")
         .option("--text <s>", "Free-text note on the day row");
     addWriteFlagsToCommand(setCmd).action(guarded(async (opts) => {
-        requireReason(opts);
         const result = await runPersonDaySet(await getClient(), opts.person, opts.date, opts.status, opts);
         writeJson(result);
     }));
@@ -184,7 +183,6 @@ export function registerPersonDayCommands(person, getClient) {
         .requiredOption("--person <id>", "personId", (s) => Number(s))
         .requiredOption("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)");
     addWriteFlagsToCommand(clearCmd).action(guarded(async (opts) => {
-        requireReason(opts);
         const result = await runPersonDayClear(await getClient(), opts.person, opts.date, opts);
         writeJson(result);
     }));

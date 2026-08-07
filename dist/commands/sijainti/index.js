@@ -1,5 +1,5 @@
 import { listEnvelope } from "../../api/envelopes.js";
-import { writeFlagsToHeaders, addWriteFlagsToCommand, requireReason, } from "../../api/writeFlags.js";
+import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, failWith, errorMessage } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
@@ -885,7 +885,6 @@ export function registerSijaintiCommands(parent, getClient) {
         ["undelete", runSijaintiUndelete],
     ]) {
         addWriteFlagsToCommand(s.command(`${name} <sijaintiId>`)).action(guarded(async (idStr, opts) => {
-            requireReason(opts);
             const client = await getClient();
             writeJson(await run(client, parseId(idStr, "sijaintiId"), opts));
         }));

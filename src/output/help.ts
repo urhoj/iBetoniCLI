@@ -193,6 +193,19 @@ export interface CommandSpec {
    * `ib reference dump` / `ib commands`.
    */
   dryRunKind?: "server" | "client";
+  /**
+   * Declares that this write REQUIRES `--reason` (the X-Action-Reason audit
+   * string). Enforced CENTRALLY — buildProgram installs a preAction hook that
+   * calls `requireReason` for any spec declaring a policy — so a new write
+   * command states the requirement here instead of hand-calling the guard in
+   * its action. `"always"` demands `--reason` unconditionally;
+   * `"unless-dry-run"` lets `--dry-run` stand in (nothing is persisted, so
+   * there is nothing to audit). Anti-drift: reason-policy.test.ts fails a spec
+   * whose ERRORS prose names a missing `--reason` but declares no policy.
+   */
+  reasonPolicy?: "always" | "unless-dry-run";
+  /** Optional parenthetical appended to the missing-`--reason` message (e.g. why the write is irreversible). */
+  reasonDetail?: string;
   /** One-line description of the JSON response shape on stdout. */
   outputShape: string;
   /**
@@ -306,7 +319,11 @@ export function formatHelp(spec: CommandSpec): string {
       "  --idempotency-key K  Replay protection. Cached for 24h."
     );
     lines.push(
-      "  --reason TEXT        Free-text justification. Stored in audit log."
+      spec.reasonPolicy
+        ? `  --reason TEXT        Free-text justification, stored in audit log. REQUIRED${
+            spec.reasonPolicy === "unless-dry-run" ? " unless --dry-run" : ""
+          }${spec.reasonDetail ? ` ${spec.reasonDetail}` : ""}.`
+        : "  --reason TEXT        Free-text justification. Stored in audit log."
     );
   }
 

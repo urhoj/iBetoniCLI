@@ -1,5 +1,5 @@
 import { listEnvelope } from "../../api/envelopes.js";
-import { writeFlagsToHeaders, addWriteFlagsToCommand, requireReason, } from "../../api/writeFlags.js";
+import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { parseJsonBodyFlag, resolveJsonObjectBody } from "../../api/parseBody.js";
@@ -374,7 +374,6 @@ export function registerWorksiteCommands(parent, getClient) {
     }));
     addWriteFlagsToCommand(w
         .command("delete <tyomaaId>")).action(guarded(async (tyomaaIdStr, opts) => {
-        requireReason(opts);
         const client = await getClient();
         const result = await runWorksiteDelete(client, parseId(tyomaaIdStr, "tyomaaId"), opts);
         writeJson(result);

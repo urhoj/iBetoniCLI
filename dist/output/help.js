@@ -99,7 +99,9 @@ export function formatHelp(spec) {
             ? "  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only)."
             : "  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.");
         lines.push("  --idempotency-key K  Replay protection. Cached for 24h.");
-        lines.push("  --reason TEXT        Free-text justification. Stored in audit log.");
+        lines.push(spec.reasonPolicy
+            ? `  --reason TEXT        Free-text justification, stored in audit log. REQUIRED${spec.reasonPolicy === "unless-dry-run" ? " unless --dry-run" : ""}${spec.reasonDetail ? ` ${spec.reasonDetail}` : ""}.`
+            : "  --reason TEXT        Free-text justification. Stored in audit log.");
     }
     lines.push("");
     lines.push("GLOBAL FLAGS");

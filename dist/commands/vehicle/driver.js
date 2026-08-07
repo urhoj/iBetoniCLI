@@ -1,6 +1,6 @@
 import { writeJson } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
-import { writeFlagsToHeaders, addWriteFlagsToCommand, requireReason, } from "../../api/writeFlags.js";
+import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { parseId } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
@@ -117,12 +117,10 @@ export function registerVehicleDriverCommands(parent, getClient) {
     addWriteFlagsToCommand(driver
         .command("assign <vehicleId> <date>")
         .requiredOption("--person <pid>", "Driver personId", (s) => Number(s))).action(guarded(async (vehicleIdStr, date, opts) => {
-        requireReason(opts);
         writeJson(await runVehicleDriverAssign(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts.person, date, opts));
     }));
     addWriteFlagsToCommand(driver
         .command("clear <vehicleId> <date>")).action(guarded(async (vehicleIdStr, date, opts) => {
-        requireReason(opts);
         writeJson(await runVehicleDriverClear(await getClient(), parseId(vehicleIdStr, "vehicleId"), date, opts));
     }));
     // ── standing default driver ──
@@ -135,12 +133,10 @@ export function registerVehicleDriverCommands(parent, getClient) {
     addWriteFlagsToCommand(def
         .command("set <vehicleId>")
         .requiredOption("--person <pid>", "Default driver personId", (s) => Number(s))).action(guarded(async (vehicleIdStr, opts) => {
-        requireReason(opts);
         writeJson(await runVehicleDefaultSet(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts.person, opts));
     }));
     addWriteFlagsToCommand(def
         .command("clear <vehicleId>")).action(guarded(async (vehicleIdStr, opts) => {
-        requireReason(opts);
         writeJson(await runVehicleDefaultSet(await getClient(), parseId(vehicleIdStr, "vehicleId"), null, opts));
     }));
 }

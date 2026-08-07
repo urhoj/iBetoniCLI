@@ -19,7 +19,6 @@ import {
   addWriteFlagsToCommand,
   writeFlagsToHeaders,
   type WriteFlags,
-  requireReason,
 } from "../../api/writeFlags.js";
 import { writeJson, failWith, failUsage } from "../../output/json.js";
 import { parseId, cappedInt } from "../../targets.js";
@@ -666,7 +665,6 @@ export function registerLegalCommands(
         if (opts.file !== undefined || opts.content !== undefined) {
           failUsage("edit mode (--replace/--append/--prepend) is mutually exclusive with --file/--content");
         }
-        requireReason(opts, { allowDryRun: true });
         const client = await getClient();
         writeJson(
           await runLegalSaveWithEdit(
@@ -689,7 +687,6 @@ export function registerLegalCommands(
       if (!opts.file && !opts.content) failWith("Provide --file <path> or --content <markdown>", 4);
       if (!opts.title) failWith("Missing required flag: --title", 4);
       if (opts.file && opts.content) failWith("--file and --content are mutually exclusive", 4);
-      requireReason(opts, { allowDryRun: true });
       let markdownContent = opts.content ?? "";
       if (opts.file) {
         try {
@@ -727,7 +724,6 @@ export function registerLegalCommands(
   addWriteFlagsToCommand(activateCmd).action(
     guarded(async (documentIdStr: string, opts: WriteFlags) => {
       const documentId = parseId(documentIdStr, "documentId");
-      requireReason(opts, { allowDryRun: true });
       const client = await getClient();
       writeJson(await runLegalActivate(client, documentId, opts));
     })
@@ -738,7 +734,6 @@ export function registerLegalCommands(
   addWriteFlagsToCommand(deleteCmd).action(
     guarded(async (documentIdStr: string, opts: WriteFlags) => {
       const documentId = parseId(documentIdStr, "documentId");
-      requireReason(opts, { allowDryRun: true });
       const client = await getClient();
       writeJson(await runLegalDelete(client, documentId, opts));
     })
@@ -768,7 +763,6 @@ export function registerLegalCommands(
       opts: WriteFlags & { type?: string }
     ) => {
       const typeName = resolveTypeNameTarget(typeNameArg, opts.type);
-      requireReason(opts, { allowDryRun: true });
       const client = await getClient();
       const claims = decodeJwtPayload(client.getCurrentToken());
       assertDeveloperClaims(claims);
@@ -798,7 +792,6 @@ export function registerLegalCommands(
       sortOrder?: number;
       settingTypeId?: number;
     }) => {
-      requireReason(opts, { allowDryRun: true });
       const client = await getClient();
       writeJson(await runLegalTypeCreate(client, opts.name, pickTypeFields(opts), opts));
     })
@@ -820,7 +813,6 @@ export function registerLegalCommands(
         settingTypeId?: number;
       }
     ) => {
-      requireReason(opts, { allowDryRun: true });
       const client = await getClient();
       writeJson(await runLegalTypeUpdate(client, typeName, pickTypeFields(opts), opts));
     })
