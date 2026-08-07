@@ -103,9 +103,9 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
   //
   // Embedded values WIN over argv: the endpoint is the server's own base URL, so
   // an argv `--endpoint` from a remote caller cannot redirect their JWT to a host
-  // of their choosing, and the write-lock can only be tightened. `quiet` is
-  // forced because the acting-as write diagnostic writes to `process.stderr` —
-  // the HOST's, which the embedded caller never sees.
+  // of their choosing, and the write-lock can only be tightened. Diagnostics
+  // (acting-as, retry notes) go through the ctx-aware `warnNote`/`emitStderr`,
+  // so they reach the embedded CALLER's stderr — no forced `quiet` needed.
   function invocation(): Invocation {
     const global = getGlobalOptions(program);
     const emb = getEmbeddedCtx();
@@ -115,7 +115,6 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
         ...global,
         endpoint: emb.endpoint,
         readOnly: global.readOnly || emb.readOnly,
-        quiet: true,
       },
       embeddedToken: emb.token,
     };

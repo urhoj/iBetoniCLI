@@ -8,6 +8,8 @@
  * SQL time and cache hit/miss counts cover the executeQuery (cache-runner) path
  * only and are always labelled as such.
  */
+import { warnNote } from "./output/json.js";
+
 interface StatsAccumulator {
   enabled: boolean;
   apiMs: number;
@@ -130,5 +132,5 @@ export function buildStatsLine(pretty: boolean): string | null {
 
 export function flushStats(opts: { pretty: boolean }): void {
   const line = buildStatsLine(opts.pretty);
-  if (line) process.stderr.write(line + "\n");
+  if (line) warnNote(line);
 }

@@ -1,3 +1,14 @@
+/**
+ * Per-invocation timing accumulator for the global `--stats` flag.
+ *
+ * A process singleton (fan-out commands mint multiple clients but share one
+ * stats line). The API client feeds `recordRequest` per request; `bin/ib.ts`
+ * (and runArgv, if wired) calls `flushStats` once after the command resolves.
+ * Output is one stderr line — never stdout (preserves the JSON data contract).
+ * SQL time and cache hit/miss counts cover the executeQuery (cache-runner) path
+ * only and are always labelled as such.
+ */
+import { warnNote } from "./output/json.js";
 function empty() {
     return {
         enabled: false,
@@ -110,6 +121,6 @@ export function buildStatsLine(pretty) {
 export function flushStats(opts) {
     const line = buildStatsLine(opts.pretty);
     if (line)
-        process.stderr.write(line + "\n");
+        warnNote(line);
 }
 //# sourceMappingURL=stats.js.map

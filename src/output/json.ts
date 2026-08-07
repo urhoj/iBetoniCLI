@@ -177,6 +177,18 @@ export function setExitCode(code: number): void {
   else process.exitCode = code;
 }
 
+/**
+ * One-line stderr diagnostic — the "[ib] …" notes, warnings, and retry/
+ * acting-as lines. Ctx-aware via {@link emitStderr}: in embedded
+ * (`/api/cli/exec` in-process) mode the note reaches the CALLER's stderr
+ * instead of the host server's, where a bare `console.error` /
+ * `process.stderr.write` is invisible to exactly the callers the notes
+ * exist for. Never stdout — the JSON data contract is untouched.
+ */
+export function warnNote(message: string): void {
+  emitStderr(message + "\n");
+}
+
 export { emitStdout, emitStderr };
 
 /** Re-export: `errorMessage` now lives in `api/errors.ts` (usable below the

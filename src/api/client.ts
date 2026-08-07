@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { CliError, errorMessage, exitCodeFromStatus } from "./errors.js";
 import { recordRequest, statsEnabled } from "../stats.js";
 import { getAmbientCommandPath } from "../commandContext.js";
+import { warnNote } from "../output/json.js";
 
 /**
  * BetoniJerry umbrella tenant (`@ibetoni/constants` BETONIJERRY.OWNER_ASIAKAS_ID).
@@ -156,8 +157,8 @@ export function createApiClient({
       actingAs.ownerAsiakasId === BETONIJERRY_UMBRELLA_ASIAKAS_ID
         ? "  ⚠ BetoniJerry umbrella tenant"
         : "";
-    process.stderr.write(
-      `[ib] write · acting as asiakasId ${actingAs.ownerAsiakasId}${name}${umbrella}\n`
+    warnNote(
+      `[ib] write · acting as asiakasId ${actingAs.ownerAsiakasId}${name}${umbrella}`
     );
   }
 
@@ -235,8 +236,8 @@ export function createApiClient({
         if (!quiet) {
           // stderr only — the stdout JSON contract is never polluted. Silence
           // would make a retried call indistinguishable from a clean one.
-          process.stderr.write(
-            `[ib] network error (${errorMessage(e)}) — retrying ${method} ${path} in ${waitMs}ms (attempt ${attempt + 2}/${attempts})\n`
+          warnNote(
+            `[ib] network error (${errorMessage(e)}) — retrying ${method} ${path} in ${waitMs}ms (attempt ${attempt + 2}/${attempts})`
           );
         }
         await sleep(waitMs);

@@ -1,7 +1,7 @@
 import { toListEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { readJsonInput, readJsonObjectInput } from "../../api/parseBody.js";
-import { writeJson, failWith, failUsage, failValidation } from "../../output/json.js";
+import { writeJson, failWith, failUsage, failValidation, warnNote } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { parseRefId, assertEnum, intFlag } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
@@ -522,7 +522,7 @@ const DEPLOY_GATED_PATCH_FIELDS = ["bumpLevel", "feedbackId", "sentryIssue"];
  * means that column is not in the deployed allowlist. stderr only — the stdout
  * JSON contract is untouched. No-op under --dry-run (no row comes back).
  */
-export function warnIfPatchIgnored(patch, result, warn = (m) => console.error(m)) {
+export function warnIfPatchIgnored(patch, result, warn = warnNote) {
     if (!result || typeof result !== "object" || result.dryRun)
         return;
     const row = result;
@@ -545,7 +545,7 @@ export function warnIfPatchIgnored(patch, result, warn = (m) => console.error(m)
  *
  * stderr only — the stdout JSON contract is untouched.
  */
-export function warnIfFeedbackRelinked(result, warn = (m) => console.error(m)) {
+export function warnIfFeedbackRelinked(result, warn = warnNote) {
     if (!result || typeof result !== "object")
         return;
     const { relinkedFrom, changelogId } = result;
@@ -625,13 +625,13 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         if (o.repo && (o.bumpLevel || "patch") !== "none") {
             const { coordinated, canonical } = normalizeRepoCsv(o.repo);
             if (coordinated.length === 0 && canonical.length === 0)
-                console.error(`[ib] ⚠ --repo "${o.repo}" resolves to no known repo (coordinated: ${COORDINATED_REPOS.join(", ")}) — on next deploy this fail-safe-bumps ALL coordinated repos. For the standalone lane (betonicli, @ibetoni/*) add --bump-level none.`);
+                warnNote(`[ib] ⚠ --repo "${o.repo}" resolves to no known repo (coordinated: ${COORDINATED_REPOS.join(", ")}) — on next deploy this fail-safe-bumps ALL coordinated repos. For the standalone lane (betonicli, @ibetoni/*) add --bump-level none.`);
             // Recognized standalone lane: the planner skips it entirely, so the
             // --bump-level just recorded will never move a version. Silent today,
             // and the caller has no way to tell it apart from a coordinated entry
             // that WILL bump (feedback #354). One line, same shape as the ⚠ above.
             else if (coordinated.length === 0)
-                console.error(`[ib] note: --repo "${o.repo}" is the standalone lane, so --bump-level ${o.bumpLevel || "patch"} is inert — no repo is bumped by this entry. Coordinated repos are ${COORDINATED_REPOS.join(", ")}; pass --bump-level none to say so explicitly.`);
+                warnNote(`[ib] note: --repo "${o.repo}" is the standalone lane, so --bump-level ${o.bumpLevel || "patch"} is inert — no repo is bumped by this entry. Coordinated repos are ${COORDINATED_REPOS.join(", ")}; pass --bump-level none to say so explicitly.`);
         }
         if (o.sha)
             body.commitShas = o.sha;

@@ -1,5 +1,5 @@
 import { listEnvelope } from "../../api/envelopes.js";
-import { writeJson, failWith } from "../../output/json.js";
+import { writeJson, failWith, warnNote } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseId, parseOptionalId, cappedInt, addOwnerOption } from "../../targets.js";
@@ -16,7 +16,7 @@ function assertKnownEntityType(entityType) {
     const info = findEntityType(entityType);
     if (info.deprecated) {
         // Diagnostic on stderr (stdout stays pure JSON data).
-        process.stderr.write(`note: entityType '${entityType}' is deprecated — ${info.notes}\n`);
+        warnNote(`note: entityType '${entityType}' is deprecated — ${info.notes}`);
     }
 }
 /** Accepts YYYY-MM-DD or a full ISO datetime; anything else is exit 4. */

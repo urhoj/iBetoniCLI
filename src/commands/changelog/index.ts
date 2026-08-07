@@ -26,7 +26,7 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { readJsonInput, readJsonObjectInput } from "../../api/parseBody.js";
-import { writeJson, failWith, failUsage, failValidation } from "../../output/json.js";
+import { writeJson, failWith, failUsage, failValidation, warnNote } from "../../output/json.js";
 import type { FlagProblem } from "../../output/validationEnvelope.js";
 import { resolveDate } from "../../dates.js";
 import { parseRefId, assertEnum, intFlag } from "../../targets.js";
@@ -659,7 +659,7 @@ const DEPLOY_GATED_PATCH_FIELDS = ["bumpLevel", "feedbackId", "sentryIssue"] as 
 export function warnIfPatchIgnored(
   patch: Partial<ChangelogAddBody>,
   result: unknown,
-  warn: (msg: string) => void = (m) => console.error(m)
+  warn: (msg: string) => void = warnNote
 ): void {
   if (!result || typeof result !== "object" || (result as Record<string, unknown>).dryRun) return;
   const row = result as Record<string, unknown>;
@@ -689,7 +689,7 @@ export function warnIfPatchIgnored(
  */
 export function warnIfFeedbackRelinked(
   result: unknown,
-  warn: (msg: string) => void = (m) => console.error(m)
+  warn: (msg: string) => void = warnNote
 ): void {
   if (!result || typeof result !== "object") return;
   const { relinkedFrom, changelogId } = result as Record<string, unknown>;
@@ -785,7 +785,7 @@ export function registerChangelogCommands(
       if (o.repo && (o.bumpLevel || "patch") !== "none") {
         const { coordinated, canonical } = normalizeRepoCsv(o.repo);
         if (coordinated.length === 0 && canonical.length === 0)
-          console.error(
+          warnNote(
             `[ib] ⚠ --repo "${o.repo}" resolves to no known repo (coordinated: ${COORDINATED_REPOS.join(
               ", "
             )}) — on next deploy this fail-safe-bumps ALL coordinated repos. For the standalone lane (betonicli, @ibetoni/*) add --bump-level none.`
@@ -795,7 +795,7 @@ export function registerChangelogCommands(
         // and the caller has no way to tell it apart from a coordinated entry
         // that WILL bump (feedback #354). One line, same shape as the ⚠ above.
         else if (coordinated.length === 0)
-          console.error(
+          warnNote(
             `[ib] note: --repo "${o.repo}" is the standalone lane, so --bump-level ${o.bumpLevel || "patch"} is inert — no repo is bumped by this entry. Coordinated repos are ${COORDINATED_REPOS.join(", ")}; pass --bump-level none to say so explicitly.`
           );
       }

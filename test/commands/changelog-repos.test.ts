@@ -63,7 +63,8 @@ describe("changelog add --repo fail-safe warning (fb#228)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (client.post as ReturnType<typeof vi.fn>).mockResolvedValue({ changelogId: 1 });
-    errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    // The warnings flow through warnNote → emitStderr (ctx-aware channel).
+    errSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
   });
   afterEach(() => errSpy.mockRestore());
 
