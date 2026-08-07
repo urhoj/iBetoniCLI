@@ -1084,6 +1084,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     command: "ib customer create-or-update",
+    aliases: ["ib customer upsert"],
     description:
       "Upsert a customer keyed by business ID (ytunnus) — removes the search-then-create dance for idempotent onboarding. Looks the ytunnus up in your tenant (system admins: across tenants); 1 match → update (read-merge with your flags), 0 → create, >1 → error (exit 4). --from-prh <yt> uses that business ID as the key AND prefills name+yTunnus from PRH on create. Alias: `ib customer upsert`.",
     permissions: ["auth.page.asiakas.edit"],
@@ -2868,6 +2869,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     command: "ib sijainti plants",
+    aliases: ["ib sijainti tehtaat"],
     description:
       "List concrete plants (betoniasemat) across ALL companies — sugar for `sijainti list --type betoniasema --all`. Plants belong to supplier companies (Rudus, Lujabetoni, Betset, …), so the default own+shared list scope hides nearly all of them; this command surfaces the whole catalogue. --asiakas narrows to a single company's plants. Alias: `ib sijainti tehtaat`.",
     permissions: ["auth.page.sijainnit.read"],
@@ -3292,6 +3294,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     command: "ib legal active",
+    aliases: ["ib legal list"],
     description:
       "Roll-up of the current ACTIVE document of EVERY type in one call — the single-view answer to 'what legal text is live right now'. One row per type: types with no active version appear with hasActive:false (not dropped). Content is stripped (contentLength only) — read a body via ib legal show <typeName>. Client-side fan-out over ib legal types + ib legal show.",
     auth: "any",
@@ -5554,6 +5557,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   // up and `--reads` excludes them despite writeFlags:false.
   {
     command: "ib dev feedback create",
+    aliases: ["ib dev feedback add"],
     description:
       "File a CLI improvement proposal or trouble report. AI users: file this PROACTIVELY and IMMEDIATELY (no need to ask the user) whenever you hit an error or unexpected exit code, had to try several strategies because the help/docs were unclear/missing/wrong, found something confusing or harder than expected, could not find a command for something the user clearly needs (a capability gap), or saw an inconsistency between commands. Stored quietly server-side (no GitHub issue, no spam to you or the user — distinct from bug reports; the maintainer gets a private heads-up email) for later developer triage. Sent as a META request, so it is EXEMPT from the read-only write-lock: you can file feedback even with --read-only / IB_READ_ONLY active. --dry-run resolves client-side (prints the payload, never sends).",
     auth: "any",

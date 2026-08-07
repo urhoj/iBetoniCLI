@@ -42,10 +42,36 @@ describe("Rich --help wiring — real command tree", () => {
   test("non-root group commands render computed group help", () => {
     for (const [path, cmd] of commands) {
       if (path === "ib" || cmd.commands.length === 0) continue;
+      const parent = path.split(" ").slice(0, -1);
+      const groupAliases = cmd.aliases().map((a) => [...parent, a].join(" "));
       expect(cmd.helpInformation(), path).toBe(
-        formatGroupHelp(path, cmd.description(), COMMAND_SPECS)
+        formatGroupHelp(path, cmd.description(), COMMAND_SPECS, "developer", groupAliases)
       );
     }
+  });
+
+  // Commander resolves an alias to the canonical command and then every surface
+  // reports the CANONICAL name, so `ib legal list --type X` answered "unknown
+  // option on `ib legal active`" — a command the caller never typed (feedback
+  // #342). `spec.aliases` is what `formatHelp` and the unknown-option envelope
+  // use to bridge the two names, so it has to mirror the wiring exactly: an
+  // undeclared `.alias()` silently reinstates the identity swap, and a declared
+  // alias that is not wired advertises a command that exits 4.
+  test("spec.aliases matches the registered Commander .alias() calls", () => {
+    const drift: string[] = [];
+    for (const spec of COMMAND_SPECS) {
+      const cmd = commands.get(spec.command);
+      if (!cmd) continue; // covered by the orphan test above
+      const parent = spec.command.split(" ").slice(0, -1);
+      const wired = cmd.aliases().map((a) => [...parent, a].join(" ")).sort();
+      const declared = [...(spec.aliases ?? [])].sort();
+      if (wired.join("|") !== declared.join("|")) {
+        drift.push(`${spec.command}: wired=[${wired.join(", ")}] spec=[${declared.join(", ")}]`);
+      }
+    }
+    expect(drift).toEqual([]);
+    // Not vacuous: the known aliased leaves must actually be carrying one.
+    expect(COMMAND_SPECS.filter((s) => s.aliases?.length).length).toBeGreaterThanOrEqual(5);
   });
 
   test("each spec'd command's Commander description equals spec.description", () => {

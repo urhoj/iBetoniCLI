@@ -133,6 +133,25 @@ export interface CommandFlag {
 export interface CommandSpec {
   /** Full command path, e.g. `ib keikka list`. */
   command: string;
+  /**
+   * Other FULL paths this same command answers to, via a Commander `.alias()`
+   * on its leaf (e.g. `ib legal active` also runs as `ib legal list`).
+   *
+   * Load-bearing for identity, not decoration: Commander resolves an alias to
+   * the canonical command and every downstream surface then reports the
+   * CANONICAL name, so a caller who typed `ib legal list` was told "unknown
+   * option on `ib legal active`" — a command they never named — and `--help`
+   * headed itself `ib legal active` too. The momentary read is that the CLI
+   * dispatched them somewhere else (feedback #342). {@link formatHelp} and
+   * `buildUnknownOptionEnvelope` both name these so the two spellings are
+   * visibly ONE command.
+   *
+   * Distinct from `reference/aliasPaths.ts`, which re-homes a whole PREFIX
+   * (`ib feedback *` → `ib dev feedback *`); this is a per-leaf alias.
+   * `help-wiring.test.ts` asserts these match the registered `.alias()` calls
+   * exactly, so neither side can drift.
+   */
+  aliases?: string[];
   /** One-paragraph description of what the command does. */
   description: string;
   /** Backend permission strings (e.g. `auth.page.grid.tilaus.read`). */
@@ -210,6 +229,13 @@ export function formatHelp(spec: CommandSpec): string {
     .join(" ");
   const usageParts = [spec.command, argSig, requiredFlagSig, "[flags]"].filter(Boolean);
   lines.push(`  ${usageParts.join(" ")}`);
+  // Name the leaf's other spellings HERE rather than only in a trailing NOTES
+  // paragraph: a caller who typed the alias sees the canonical path as the very
+  // first line of its own `--help` and has no way to tell it is the same
+  // command until they read to the bottom (feedback #342).
+  if (spec.aliases?.length) {
+    lines.push(`  (also: ${spec.aliases.join(" · ")})`);
+  }
   lines.push("");
 
   lines.push("DESCRIPTION");
@@ -344,7 +370,8 @@ export function formatGroupHelp(
   groupPath: string,
   fallbackDescription: string,
   specs: CommandSpec[],
-  tier: CallerTier = getCallerTier()
+  tier: CallerTier = getCallerTier(),
+  aliases: string[] = []
 ): string {
   const prefix = groupPath + " ";
   const depth = groupPath.split(" ").length; // child = token at this index
@@ -377,6 +404,10 @@ export function formatGroupHelp(
   const lines: string[] = [];
   lines.push("USAGE");
   lines.push(`  ${groupPath} <command> [flags]`);
+  // Same identity bridge a leaf gets from `spec.aliases` (feedback #342) — a
+  // group reached as `ib message ilmoitustaulu` otherwise heads its own help
+  // `ib message board` with nothing tying the two names together.
+  if (aliases.length) lines.push(`  (also: ${aliases.join(" · ")})`);
   lines.push("");
   lines.push("DESCRIPTION");
   lines.push(`  ${blurb}`);
@@ -445,9 +476,12 @@ export function attachRichHelp(root: Command, specs: CommandSpec[]): void {
     } else if (path.length > 0 && cmd.commands.length > 0) {
       // Non-root group: computed group help (root keeps the domain primer).
       const fallback = cmd.description();
+      // Groups have no spec to carry `aliases`, so read them off Commander
+      // itself — same source `help-wiring.test.ts` checks the leaf specs against.
+      const groupAliases = cmd.aliases().map((a) => [...path, a].join(" "));
       cmd.configureHelp({
         formatHelp: () =>
-          formatGroupHelp(full, fallback, specs),
+          formatGroupHelp(full, fallback, specs, getCallerTier(), groupAliases),
       });
     }
     for (const sub of cmd.commands) walk(sub, [...path, cmd.name()]);

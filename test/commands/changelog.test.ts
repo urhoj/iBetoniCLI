@@ -2,7 +2,7 @@ import { test, expect, vi, beforeEach, describe } from "vitest";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, runChangelogDelete, normalizeSentryRef, normalizeLanguage, normalizeType, validateEnums, validateFieldLengths, resolveChangelogDescription, resolveShaAlias, CHANGELOG_SPECS, FIELD_MAX_LENGTHS }
+import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet, runChangelogUpdate, runChangelogDelete, normalizeSentryRef, normalizeLanguage, normalizeType, normalizeSeverity, validateEnums, validateFieldLengths, resolveChangelogDescription, resolveShaAlias, CHANGELOG_SPECS, FIELD_MAX_LENGTHS }
   from "../../src/commands/changelog/index.js";
 import { readJsonInput } from "../../src/api/parseBody.js";
 import type { ChangelogAddBody } from "../../src/commands/changelog/index.js";
@@ -747,10 +747,19 @@ describe("changelog add/update --from-json (fb#300)", () => {
   test("an unknown key exits 4 and lists the accepted keys (never silently dropped)", () => {
     // fb#298 was exactly a silently-ignored JSON key destroying a stored value;
     // a changelog entry is the permanent record the monthly report is built from.
-    const err = captureThrow(() => normalizeChangelogJson({ versionTag: "1.2.3" }, addKeyMap()));
+    // `changelogId` is the read shape's PRIMARY KEY: it comes back on every row
+    // yet is not writable, so it proves the fb#357 read-shape aliases are a
+    // curated table and not "accept whatever `changelog list` emits".
+    const err = captureThrow(() => normalizeChangelogJson({ changelogId: 1049 }, addKeyMap()));
     expect(err.exitCode).toBe(4);
-    expect((err as unknown as Error).message).toMatch(/unknown key versionTag/);
-    expect((err as unknown as Error).message).toMatch(/vtag/);
+    expect((err as unknown as Error).message).toMatch(/unknown key changelogId/);
+    expect((err as unknown as Error).message).toMatch(/accepted: /);
+  });
+
+  test("the read-shape spelling of a writable field is accepted (fb#357)", () => {
+    // The twin of the case above, and the reason it changed: `versionTag` used
+    // to be rejected here, which is what broke read-a-row → edit → post-it-back.
+    expect(normalizeChangelogJson({ versionTag: "1.2.3" }, addKeyMap())).toEqual({ vtag: "1.2.3" });
   });
 
   test("wrong-typed values are rejected by name instead of crashing downstream", () => {
@@ -859,11 +868,12 @@ describe("changelog add/update --from-json (fb#300)", () => {
     );
   });
 
-  test("a genuinely add-only key in an update payload exits 4 without PUTting", async () => {
-    // `entryDate` is add-only spelling — update's flag is --date. The key map is
-    // derived per-command, so a key the update command has no flag for is still
-    // rejected rather than silently dropped (fb#298).
-    await withJsonFile({ entryDate: "2026-08-05" }, async (p) => {
+  test("an unknown key in an update payload exits 4 without PUTting", async () => {
+    // The key map is derived per-command, so a key no flag backs is rejected
+    // rather than silently dropped (fb#298) — checked here through the real
+    // parse, not just normalizeChangelogJson, so nothing reaches the PUT.
+    // (Was `entryDate`, which fb#357 made a legitimate alias for --date.)
+    await withJsonFile({ changelogId: 386 }, async (p) => {
       const program = new Command();
       registerChangelogCommands(program, async () => client);
       const { exitCode } = await captureActionError(() =>
@@ -964,5 +974,113 @@ describe("warnIfPatchIgnored — deploy gate (fb#303)", () => {
     expect(warn.mock.calls[0][0]).toMatch(/--bump-level/);
     expect(warn.mock.calls[0][0]).toMatch(/--feedback/);
     expect(warn.mock.calls[0][0]).toMatch(/--sentry/);
+  });
+});
+
+describe("normalizeSeverity — one flag name, two different ladders (fb#359)", () => {
+  test("passes the canonical Finnish urgency values through", () => {
+    for (const v of ["Kriittinen", "Korkea", "Normaali", "Matala"]) {
+      expect(normalizeSeverity(v)).toBe(v);
+    }
+  });
+
+  test("maps the English urgency words a caller reaches for", () => {
+    expect(normalizeSeverity("critical")).toBe("Kriittinen");
+    expect(normalizeSeverity("high")).toBe("Korkea");
+    expect(normalizeSeverity("normal")).toBe("Normaali");
+    expect(normalizeSeverity("low")).toBe("Matala");
+  });
+
+  test("maps the sibling feedback IMPACT enum onto the urgency ladder", () => {
+    // The reported failure exactly: one session writing up a single fix touches
+    // both commands, so the value in hand is whichever the other one took.
+    expect(normalizeSeverity("major")).toBe("Korkea");
+    expect(normalizeSeverity("minor")).toBe("Matala");
+    expect(normalizeSeverity("cosmetic")).toBe("Matala");
+  });
+
+  test("trims and is case-insensitive", () => {
+    expect(normalizeSeverity("  KORKEA ")).toBe("Korkea");
+    expect(normalizeSeverity("Normal")).toBe("Normaali");
+  });
+
+  test("undefined and blank stay unset rather than becoming a value", () => {
+    expect(normalizeSeverity(undefined)).toBeUndefined();
+    expect(normalizeSeverity("   ")).toBeUndefined();
+  });
+
+  test("rejects an unknown value instead of silently persisting it (exit 4)", () => {
+    // Was free text capped at 20 chars: a typo landed in the permanent record.
+    const err = captureThrow(() => normalizeSeverity("Korkeaa"));
+    expect(err.exitCode).toBe(4);
+  });
+
+  test("the rejection names both ladders, so the caller does not re-guess", () => {
+    expect(() => normalizeSeverity("blah")).toThrow(/Kriittinen, Korkea, Normaali, Matala/);
+    expect(() => normalizeSeverity("blah")).toThrow(/ib dev feedback --severity/);
+  });
+});
+
+describe("payloadKeyMap accepts the READ shape as input (fb#357)", () => {
+  /** `add`'s key map, built the same way the other --from-json tests do. */
+  const addKeys = (): Map<string, string> => {
+    const program = new Command();
+    registerChangelogCommands(program, async () => mockClient() as never);
+    const add = program.commands
+      .find((c) => c.name() === "changelog")!
+      .commands.find((c) => c.name() === "add")!;
+    return payloadKeyMap(add);
+  };
+
+  test("every read-shape column name resolves to its write flag", () => {
+    const keys = addKeys();
+    // The five names that differ between what `changelog list` EMITS and what
+    // `add --from-json` accepted — the round-trip that used to exit 4.
+    expect(keys.get("commitShas")).toBe("sha");
+    expect(keys.get("versionTag")).toBe("vtag");
+    expect(keys.get("feedbackId")).toBe("feedback");
+    expect(keys.get("sentryIssue")).toBe("sentry");
+    expect(keys.get("entryDate")).toBe("date");
+  });
+
+  test("the canonical spellings still resolve unchanged", () => {
+    const keys = addKeys();
+    expect(keys.get("sha")).toBe("sha");
+    expect(keys.get("bumpLevel")).toBe("bumpLevel");
+    expect(keys.get("bump-level")).toBe("bumpLevel");
+  });
+
+  test("a read row round-trips through normalizeChangelogJson", () => {
+    // The actual reported workflow: template the JSON off a row you just read.
+    const row = {
+      title: "t", type: "bugfix", area: "cli",
+      commitShas: "abc123", versionTag: "betonicli@1.1.12",
+      feedbackId: 357, sentryIssue: "IB-1", entryDate: "2026-08-07",
+    };
+    const out = normalizeChangelogJson(row, addKeys());
+    expect(out).toMatchObject({
+      sha: "abc123", vtag: "betonicli@1.1.12",
+      feedback: 357, sentry: "IB-1", date: "2026-08-07",
+    });
+  });
+
+  test("the accepted-key list stays the FLAG names, not the read aliases", () => {
+    // Aliases are map KEYS, never values — the unknown-key error enumerates
+    // values, so it must not start advertising commitShas as a writable name.
+    const accepted = new Set(addKeys().values());
+    expect(accepted.has("sha")).toBe(true);
+    expect(accepted.has("commitShas")).toBe(false);
+    expect(accepted.has("versionTag")).toBe(false);
+  });
+
+  test("update only accepts read keys whose flag it actually registers", () => {
+    const program = new Command();
+    registerChangelogCommands(program, async () => mockClient() as never);
+    const group = program.commands.find((c) => c.name() === "changelog")!;
+    const update = payloadKeyMap(group.commands.find((c) => c.name() === "update")!);
+    // update has --sha/--vtag, so their read spellings map; it has no --date,
+    // so entryDate must NOT resolve to a flag update cannot apply.
+    expect(update.get("commitShas")).toBe("sha");
+    expect(update.has("entryDate")).toBe(update.has("date"));
   });
 });

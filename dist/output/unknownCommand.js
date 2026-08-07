@@ -352,6 +352,47 @@ export function buildExcessArgumentsEnvelope(cmd, excess, parserDetail) {
         hint: parts.join(" "),
     };
 }
+/** Longest an echoed unknown-option token stays readable inside an error payload. */
+const MAX_OPTION_ECHO = 80;
+/**
+ * Clamp the echoed token to something readable.
+ *
+ * Commander labels ANY dash-led argv element an "unknown option", including a
+ * whole quoted prose block that merely STARTS with one. Filing a report whose
+ * text opened with `--severity` therefore echoed ~3 KB of that report back
+ * twice — once in `error`, once in `unknownOption` — burying the remedy in the
+ * payload it was meant to fix (feedback #359).
+ */
+export function truncateOptionToken(token) {
+    const flat = token.replace(/\s+/g, " ").trim();
+    return flat.length > MAX_OPTION_ECHO ? `${flat.slice(0, MAX_OPTION_ECHO)}…` : flat;
+}
+/**
+ * Lead the hint with "that was prose, not a flag" when the rejected token is
+ * plainly a sentence.
+ *
+ * A real flag is a single dash-led word; a description that merely OPENS with a
+ * flag name (`--severity means two different things in two commands…`) is not,
+ * and any internal whitespace settles it. Worth special-casing because the two
+ * commands that accept long prose are also the two whose prose is most likely
+ * to quote a flag first: a bug report ABOUT `--severity` naturally begins with
+ * `--severity` (feedback #359 — the report describing this hit it while being
+ * filed). Without this the caller only sees a did-you-mean over flag names,
+ * which is advice for a mistake they did not make.
+ */
+export function prosePrefixHint(token, availableOptions) {
+    if (!/\s/.test(token.trim()))
+        return [];
+    if (!availableOptions.includes("--description")) {
+        return ["That token contains whitespace, so it reads as prose rather than a flag — bind it to the flag it belongs to."];
+    }
+    const viaJson = availableOptions.includes("--from-json")
+        ? " Or pass the whole payload via `--from-json <file|->`, which sidesteps argv quoting entirely."
+        : "";
+    return [
+        `That token contains whitespace, so it reads as prose rather than a flag: if it is your description text, bind it explicitly with \`--description "<text>"\` instead of leaving it positional.${viaJson}`,
+    ];
+}
 /**
  * Enriched "unknown option" error envelope — the flag analogue of
  * {@link buildUnknownCommandEnvelope}. When Commander rejects a guessed flag
@@ -400,18 +441,25 @@ export function buildUnknownOptionEnvelope(cmd, unknownOption, tier = "developer
         ? `Accepted flags: ${availableOptions.join(", ")}.`
         : "This command takes no command-specific flags.");
     parts.push(`Run ${discover} for the full spec.`);
+    // A leaf reached through a Commander `.alias()` reports its CANONICAL name
+    // here, so `ib legal list --type X` answers "on `ib legal active`" — naming a
+    // command the caller never typed, with nothing saying the two are one
+    // (feedback #342). Name the other spellings so the identity is explicit.
+    const aliasBridge = spec?.aliases?.length
+        ? ` (also invocable as ${spec.aliases.map((a) => `\`${a}\``).join(", ")})`
+        : "";
     return {
         success: false,
-        error: `unknown option "${unknownOption}" on \`${command}\``,
+        error: `unknown option "${truncateOptionToken(unknownOption)}" on \`${command}\`${aliasBridge}`,
         code: "USAGE",
         statusCode: 0,
         command,
-        unknownOption,
+        unknownOption: truncateOptionToken(unknownOption),
         didYouMean,
         availableOptions,
         positionals,
         acceptedBy,
-        hint: parts.join(" "),
+        hint: [...prosePrefixHint(unknownOption, availableOptions), ...parts].join(" "),
     };
 }
 //# sourceMappingURL=unknownCommand.js.map

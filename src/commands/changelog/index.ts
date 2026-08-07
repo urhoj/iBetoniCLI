@@ -49,10 +49,27 @@ const SOURCES = ["human", "routine"];
 // resolves to NO known repo at all fail-safe-bumps EVERY coordinated repo
 // (unless --bump-level none). The standalone lane (betonicli, @ibetoni/*)
 // versions separately via `npm run final` — target it with --bump-level none.
+//
+// The lane is decided per-token by computeReleasePlan, NOT by coordinated-set
+// membership: `recognizedAny` (canonical.length > 0) short-circuits before the
+// fail-safe, so a recognized-but-non-coordinated repo bumps nothing whatever
+// --bump-level says. Keep that distinction visible in the help text — collapsing
+// it into "unrecognized" is what made fb#354 mis-read a safe call as dangerous.
+// The old wording said "an UNRECOGNIZED value fail-safe-bumps ALL coordinated
+// repos … for the standalone lane also pass --bump-level none", which reads as
+// "not in the coordinated list" and so describes `--repo betonicli` — a value
+// that is recognized, bumps nothing, and needs no --bump-level none. A reporter
+// believed a routine standalone-lane entry had armed a five-repo bump and filed
+// it (feedback #354). Spell the three tiers out, since only the third is armed.
 const REPO_FLAG_DESC =
-  "Repo this entry ships in — coordinated: puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace. ⚠ An unrecognized value fail-safe-bumps ALL coordinated repos on next deploy; for the standalone lane (betonicli, @ibetoni/*) also pass --bump-level none.";
+  "Repo this entry ships in. THREE tiers: (1) coordinated — puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace — each bumped independently on next deploy from the max --bump-level naming it; (2) recognized standalone — betonicli, @ibetoni/*, dbo.*, ibetoni-site, bsg2 — NO app bump at all (--bump-level is inert here; these version via `npm run final`); (3) ⚠ a value resolving to NO known repo at all, which fail-safe-bumps ALL coordinated repos unless --bump-level none.";
 const AREA_FLAG_DESC =
   "Technical layer: frontend|backend|cli|database|cicd (repo granularity goes in --repo, not here)";
+// Named once and used by both the Commander options and the specs, so the
+// "these two --severity flags are different scales" warning cannot survive on
+// one surface and go missing on the other (feedback #359).
+const SEVERITY_FLAG_DESC =
+  "Bug severity — Kriittinen|Korkea|Normaali|Matala (an URGENCY ladder; English critical/high/normal/low and the feedback impact words major/minor/cosmetic are accepted and mapped). ⚠ NOT interchangeable with `ib dev feedback --severity` (critical|major|minor|cosmetic), which is an IMPACT ladder with no counterpart for Normaali.";
 
 /**
  * Repo-shaped values agents predictably pass to --area (feedback #212 —
@@ -372,6 +389,65 @@ export function normalizeType(type?: string): string | undefined {
   return TYPE_SYNONYMS[v] ?? v;
 }
 
+/**
+ * The canonical `--severity` vocabulary — an URGENCY ladder, in Finnish, because
+ * that is what the ~90 non-null rows in `devChangelog` already hold.
+ *
+ * Deliberately NOT the same ladder as `ib dev feedback --severity`
+ * (critical|major|minor|cosmetic), which measures IMPACT: `Normaali` has no
+ * counterpart there at all, so a value cannot be carried between the two
+ * commands by lookup — it has to be re-judged (feedback #359).
+ */
+const SEVERITIES = ["Kriittinen", "Korkea", "Normaali", "Matala"];
+
+/**
+ * Accepted spellings → the canonical Finnish value.
+ *
+ * Covers the caller's own casing, the English urgency words, and the sibling
+ * `feedback --severity` impact enum, which is the vocabulary an agent is most
+ * likely to be holding: writing up one fix touches both commands, and guessing
+ * wrong on the second cost a round-trip every time (feedback #359 — `Korkea`
+ * was carried across as `normal` and rejected). Exactly the forgiveness
+ * {@link TYPE_SYNONYMS} already grants `--type` on this same command.
+ *
+ * `major`→Korkea and `minor`/`cosmetic`→Matala are the honest 4→4 mapping of
+ * the impact ladder onto the urgency one; `normal` has no impact-side source
+ * and is reachable only from the English urgency word.
+ */
+const SEVERITY_SYNONYMS: Record<string, string> = {
+  kriittinen: "Kriittinen", critical: "Kriittinen", blocker: "Kriittinen",
+  korkea: "Korkea", high: "Korkea", major: "Korkea",
+  normaali: "Normaali", normal: "Normaali", medium: "Normaali", moderate: "Normaali",
+  matala: "Matala", low: "Matala", minor: "Matala", cosmetic: "Matala",
+};
+
+/**
+ * Normalize --severity to a canonical Finnish value, or undefined when not passed.
+ * Exits 4 on an unknown value.
+ *
+ * This flag used to be unvalidated free text capped at 20 chars, so a typo — or
+ * an English value carried over from `ib dev feedback` — was accepted SILENTLY
+ * and persisted into the permanent record the monthly report is generated from.
+ * The command with the weaker guarantee was the one whose values were harder to
+ * guess (feedback #359). Safe to tighten: the last 400 entries are 100% clean
+ * Finnish (Normaali 44 · Korkea 33 · Matala 13 · Kriittinen 1), so validation
+ * rejects nothing that is actually in use.
+ */
+export function normalizeSeverity(severity?: string): string | undefined {
+  if (severity === undefined) return undefined;
+  const v = severity.trim();
+  if (!v) return undefined;
+  const canonical = SEVERITY_SYNONYMS[v.toLowerCase()];
+  if (!canonical)
+    failWith(
+      `--severity must be one of: ${SEVERITIES.join(", ")} (an urgency ladder; ` +
+        `English critical/high/normal/low and the feedback impact words major/minor/cosmetic are accepted and mapped). ` +
+        `Note this is NOT the same scale as \`ib dev feedback --severity\` (critical|major|minor|cosmetic, an IMPACT ladder) — got "${v}"`,
+      4
+    );
+  return canonical;
+}
+
 /** Normalize --language to a validated lowercase fi|en, or undefined when not passed. Exits 4 on a bad code. */
 export function normalizeLanguage(lang?: string): string | undefined {
   if (lang === undefined) return undefined;
@@ -404,11 +480,34 @@ const CSV_FIELDS = new Set(["files", "repo", "sha", "commit"]);
 const NUMERIC_FIELDS = new Set(["feedback"]);
 
 /**
+ * Column name as the READ commands emit it → the write flag that sets it.
+ *
+ * `--from-json` exists so long prose survives argv (fb#299/#300), and the
+ * natural way to author one of those files is to template it off a row from
+ * `ib dev changelog list` — that listing is the only place the field set is
+ * visible at all. But the read shape is the DB column names and the write keys
+ * are the flag names, and five of them differ, so the obvious round-trip
+ * (`read a row → edit it → post it back`) exits 4 on the first mismatched key
+ * (feedback #357). Accepting the read spelling as INPUT costs one table and
+ * changes no output: the emitted shape is untouched, and the flag names stay
+ * canonical.
+ */
+const READ_SHAPE_KEY_ALIASES: Record<string, string> = {
+  commitShas: "sha",
+  versionTag: "vtag",
+  feedbackId: "feedback",
+  sentryIssue: "sentry",
+  entryDate: "date",
+};
+
+/**
  * JSON key → canonical option attribute name, for every payload flag registered
  * on `cmd`. Derived from the command itself instead of a hand-kept list, so `add`
  * and `update` (different flag sets) each accept exactly the keys they can apply,
- * and a flag added later cannot drift out of --from-json. Both spellings resolve:
- * the camelCase attribute (`bumpLevel`) and the literal flag (`bump-level`).
+ * and a flag added later cannot drift out of --from-json. Three spellings
+ * resolve: the camelCase attribute (`bumpLevel`), the literal flag
+ * (`bump-level`), and the read-shape column name ({@link READ_SHAPE_KEY_ALIASES})
+ * when that flag is registered on this command.
  */
 export function payloadKeyMap(cmd: Command): Map<string, string> {
   const m = new Map<string, string>();
@@ -417,6 +516,11 @@ export function payloadKeyMap(cmd: Command): Map<string, string> {
     if (!opt.long || NON_PAYLOAD_OPTS.has(attr)) continue;
     m.set(attr, attr);
     m.set(opt.long.replace(/^--/, ""), attr);
+  }
+  // Gated on the target flag actually existing, so `update` (a different flag
+  // set) never silently accepts a read key it cannot apply.
+  for (const [readKey, flag] of Object.entries(READ_SHAPE_KEY_ALIASES)) {
+    if (m.has(flag) && !m.has(readKey)) m.set(readKey, m.get(flag)!);
   }
   return m;
 }
@@ -602,7 +706,7 @@ export function registerChangelogCommands(
       .option("--benefits <s>", "Hyödyt")
       .option("--impact <s>", "Vaikutus")
       .option("--status <s>", "Tila (Julkaistu/Korjattu/...)")
-      .option("--severity <s>", "Bug severity")
+      .option("--severity <s>", SEVERITY_FLAG_DESC)
       .option("--files <csv>", "Comma-separated file paths")
       .option("--repo <r>", REPO_FLAG_DESC)
       .option("--sha <csv>", "Commit SHAs (CSV)")
@@ -626,6 +730,7 @@ export function registerChangelogCommands(
     ) => {
       applyFromJson(cmd, o as Record<string, unknown>);
       o.type = normalizeType(o.type)!;
+      o.severity = normalizeSeverity(o.severity)!;
       requireAddFields(description, o as Record<string, unknown>);
       validateEnums(o.type, o.area, o.bumpLevel, o.source);
       o.sha = resolveShaAlias(o.sha, o.commit)!;
@@ -660,6 +765,14 @@ export function registerChangelogCommands(
             `[ib] ⚠ --repo "${o.repo}" resolves to no known repo (coordinated: ${COORDINATED_REPOS.join(
               ", "
             )}) — on next deploy this fail-safe-bumps ALL coordinated repos. For the standalone lane (betonicli, @ibetoni/*) add --bump-level none.`
+          );
+        // Recognized standalone lane: the planner skips it entirely, so the
+        // --bump-level just recorded will never move a version. Silent today,
+        // and the caller has no way to tell it apart from a coordinated entry
+        // that WILL bump (feedback #354). One line, same shape as the ⚠ above.
+        else if (coordinated.length === 0)
+          console.error(
+            `[ib] note: --repo "${o.repo}" is the standalone lane, so --bump-level ${o.bumpLevel || "patch"} is inert — no repo is bumped by this entry. Coordinated repos are ${COORDINATED_REPOS.join(", ")}; pass --bump-level none to say so explicitly.`
           );
       }
       if (o.sha) body.commitShas = o.sha;
@@ -734,7 +847,7 @@ export function registerChangelogCommands(
       .option("--benefits <s>", "Hyödyt")
       .option("--impact <s>", "Vaikutus")
       .option("--status <s>", "Status update (e.g. mark deployed)")
-      .option("--severity <s>", "Bug severity")
+      .option("--severity <s>", SEVERITY_FLAG_DESC)
       .option("--files <csv>", "Comma-separated file paths")
       .option("--repo <r>", "Repo/submodule")
       .option("--sha <csv>", "Commit SHAs (CSV)")
@@ -758,6 +871,7 @@ export function registerChangelogCommands(
     const id = parseRefId(idStr, "changelog", "update");
     applyFromJson(cmd, o as Record<string, unknown>);
     if (o.type !== undefined) o.type = normalizeType(o.type)!;
+    if (o.severity !== undefined) o.severity = normalizeSeverity(o.severity)!;
     validateEnums(o.type, o.area, o.bumpLevel, o.source, "ib dev changelog update");
     // --summary/--body are aliases for --description (feedback #205/#278); fold
     // them in before the patch build so the loop below picks them up. Several may
@@ -868,6 +982,7 @@ export function registerChangelogCommands(
 export const CHANGELOG_SPECS: CommandSpec[] = [
   {
     command: "ib dev changelog add",
+    aliases: ["ib dev changelog create"],
     description:
       "Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row to status=applied.",
     auth: "any",
@@ -916,7 +1031,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       {
         name: "severity",
         type: "string",
-        description: "Bug severity (Kriittinen/Korkea/Normaali/Matala)",
+        description: SEVERITY_FLAG_DESC,
       },
       { name: "files", type: "string", description: "CSV of file paths" },
       { name: "repo", type: "string", description: REPO_FLAG_DESC },
@@ -950,7 +1065,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         name: "from-json",
         type: "string",
         description:
-          "Read the whole entry from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase: description (or summary/body), title (≤300), type, area, benefits, impact (≤500), status (≤30), severity (≤20), files, repo (≤200), sha (≤500), commit, vtag (≤200), bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language. files/repo/sha/commit also accept an array of strings. An unknown or wrong-typed key exits 4 (never silently dropped). The length caps apply to a JSON value exactly as to a flag — --from-json sidesteps shell quoting, not column width.",
+          "Read the whole entry from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase: description (or summary/body), title (≤300), type, area, benefits, impact (≤500), status (≤30), severity (≤20), files, repo (≤200), sha (≤500), commit, vtag (≤200), bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language. files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input, so a row from `ib dev changelog list` can be edited and posted straight back: commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date. An unknown or wrong-typed key exits 4 (never silently dropped). The length caps apply to a JSON value exactly as to a flag — --from-json sidesteps shell quoting, not column width.",
       },
     ]),
     writeFlags: true,
@@ -1156,7 +1271,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         type: "string",
         description: "Status update (e.g. mark deployed)",
       },
-      { name: "severity", type: "string", description: "Bug severity" },
+      { name: "severity", type: "string", description: SEVERITY_FLAG_DESC },
       { name: "files", type: "string", description: "CSV of file paths" },
       { name: "repo", type: "string", description: "Repo/submodule" },
       { name: "sha", type: "string", description: "Commit SHAs (CSV)" },
@@ -1191,7 +1306,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         name: "from-json",
         type: "string",
         description:
-          "Read the patch from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase (description/summary/body, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. An unknown or wrong-typed key exits 4 (never silently dropped).",
+          "Read the patch from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase (description/summary/body, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a row from `ib dev changelog list` can be edited and posted straight back. An unknown or wrong-typed key exits 4 (never silently dropped).",
       },
     ]),
     writeFlags: true,

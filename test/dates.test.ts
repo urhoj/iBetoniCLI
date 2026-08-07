@@ -51,3 +51,26 @@ describe("addDaysISO / monthRange / weekRange", () => {
     expect(weekRange("2026-06-08")).toEqual({ from: "2026-06-08", to: "2026-06-14" });
   });
 });
+
+describe("resolveDate accepts a read-shape date column (fb#357)", () => {
+  test("reduces UTC midnight to the calendar day, with or without ms", () => {
+    expect(resolveDate("2026-08-07T00:00:00.000Z")).toBe("2026-08-07");
+    expect(resolveDate("2026-08-07T00:00:00Z")).toBe("2026-08-07");
+  });
+
+  test("leaves a plain YYYY-MM-DD untouched", () => {
+    expect(resolveDate("2026-08-07")).toBe("2026-08-07");
+  });
+
+  test("passes a REAL timestamp through rather than guessing a timezone", () => {
+    // 22:00Z is already the next day in Helsinki, so slicing would be a silent
+    // off-by-one on exactly the boundary todayHelsinki exists to get right.
+    // Let the backend validator reject it instead.
+    expect(resolveDate("2026-08-06T22:00:00.000Z")).toBe("2026-08-06T22:00:00.000Z");
+    expect(resolveDate("2026-08-07T13:45:00.000Z")).toBe("2026-08-07T13:45:00.000Z");
+  });
+
+  test("does not swallow a local-time midnight (no Z)", () => {
+    expect(resolveDate("2026-08-07T00:00:00")).toBe("2026-08-07T00:00:00");
+  });
+});

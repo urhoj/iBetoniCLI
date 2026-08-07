@@ -197,7 +197,12 @@ export function mergeFeedbackCreateInput(
     kind: explicit.kind ?? s("kind") ?? defaults.kind,
     scope: explicit.scope ?? s("scope") ?? defaults.scope,
     command: explicit.command ?? s("command"),
-    error: explicit.error ?? s("error"),
+    // `errorText` is what the READ commands emit for this field, and templating
+    // a --from-json file off a row from `ib dev feedback get` is the natural way
+    // to author one. Here the mismatch is worse than changelog's exit-4: unknown
+    // keys are simply ignored, so `errorText` would be silently DROPPED and the
+    // row stored without it (feedback #357 asked for this command to be checked).
+    error: explicit.error ?? s("error") ?? s("errorText"),
     severity: explicit.severity ?? s("severity"),
     complexity: explicit.complexity ?? (json.complexity as number | undefined),
   };

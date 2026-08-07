@@ -7,6 +7,8 @@ import {
   visibleSubcommands,
   buildUnknownCommandEnvelope,
   buildUnknownOptionEnvelope,
+  truncateOptionToken,
+  prosePrefixHint,
   buildExcessArgumentsEnvelope,
   asDateSuggestion,
   dateFlagSuggestion,
@@ -348,5 +350,36 @@ describe("visibleSubcommands root tier-hiding (#1)", () => {
     // back-compat aliases are still Commander-hidden even at developer tier
     expect(names).not.toContain("schema");
     expect(names).not.toContain("ai");
+  });
+});
+
+describe("unknown option — alias identity and prose tokens (fb#342 / fb#359)", () => {
+  test("truncateOptionToken flattens and clamps a prose block", () => {
+    const prose = "--severity means two different things in two commands\n\n" + "x".repeat(500);
+    const out = truncateOptionToken(prose);
+    expect(out.length).toBeLessThanOrEqual(81); // 80 + the ellipsis
+    expect(out).not.toContain("\n");
+    expect(out.endsWith("…")).toBe(true);
+  });
+
+  test("truncateOptionToken leaves a real flag untouched", () => {
+    expect(truncateOptionToken("--search")).toBe("--search");
+  });
+
+  test("prosePrefixHint fires on whitespace and names --description", () => {
+    const [hint] = prosePrefixHint("--severity means two things", ["--description", "--from-json"]);
+    expect(hint).toMatch(/reads as prose rather than a flag/);
+    expect(hint).toMatch(/--description/);
+    expect(hint).toMatch(/--from-json/);
+  });
+
+  test("prosePrefixHint stays silent for a genuine unknown flag", () => {
+    expect(prosePrefixHint("--serverity", ["--description"])).toEqual([]);
+  });
+
+  test("prosePrefixHint does not advertise --description on a command lacking it", () => {
+    const [hint] = prosePrefixHint("--foo bar baz", ["--limit"]);
+    expect(hint).toMatch(/reads as prose/);
+    expect(hint).not.toMatch(/--description/);
   });
 });

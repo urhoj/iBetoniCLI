@@ -1031,6 +1031,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib customer create-or-update matches snapshot 1`] = `
 "USAGE
   ib customer create-or-update [flags]
+  (also: ib customer upsert)
 
 DESCRIPTION
   Upsert a customer keyed by business ID (ytunnus) — removes the search-then-create dance for idempotent onboarding. Looks the ytunnus up in your tenant (system admins: across tenants); 1 match → update (read-merge with your flags), 0 → create, >1 → error (exit 4). --from-prh <yt> uses that business ID as the key AND prefills name+yTunnus from PRH on create. Alias: \`ib customer upsert\`.
@@ -1966,6 +1967,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib dev changelog add matches snapshot 1`] = `
 "USAGE
   ib dev changelog add <description> --type <type> --area <area> --title <title> [flags]
+  (also: ib dev changelog create)
 
 DESCRIPTION
   Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row to status=applied.
@@ -1985,9 +1987,9 @@ FLAGS
   --benefits STRING    Hyödyt
   --impact STRING    Vaikutus (max 500 chars)
   --status STRING    Tila (Julkaistu/Korjattu/...) (max 30 chars)
-  --severity STRING    Bug severity (Kriittinen/Korkea/Normaali/Matala) (max 20 chars)
+  --severity STRING    Bug severity — Kriittinen|Korkea|Normaali|Matala (an URGENCY ladder; English critical/high/normal/low and the feedback impact words major/minor/cosmetic are accepted and mapped). ⚠ NOT interchangeable with \`ib dev feedback --severity\` (critical|major|minor|cosmetic), which is an IMPACT ladder with no counterpart for Normaali. (max 20 chars)
   --files STRING    CSV of file paths
-  --repo STRING    Repo this entry ships in — coordinated: puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace. ⚠ An unrecognized value fail-safe-bumps ALL coordinated repos on next deploy; for the standalone lane (betonicli, @ibetoni/*) also pass --bump-level none. (max 200 chars)
+  --repo STRING    Repo this entry ships in. THREE tiers: (1) coordinated — puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace — each bumped independently on next deploy from the max --bump-level naming it; (2) recognized standalone — betonicli, @ibetoni/*, dbo.*, ibetoni-site, bsg2 — NO app bump at all (--bump-level is inert here; these version via \`npm run final\`); (3) ⚠ a value resolving to NO known repo at all, which fail-safe-bumps ALL coordinated repos unless --bump-level none. (max 200 chars)
   --sha STRING    Commit SHAs (CSV) (max 500 chars)
   --commit STRING    Alias for --sha — Commit SHAs (CSV); if both are given, they must match
   --vtag STRING    Version tag (max 200 chars)
@@ -1997,7 +1999,7 @@ FLAGS
   --source STRING    Source: human (default) | routine (automated AI-routine entry)
   --date DATE    Entry date (YYYY-MM-DD|today)
   --language STRING    Entry language (fi|en), default en
-  --from-json STRING    Read the whole entry from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase: description (or summary/body), title (≤300), type, area, benefits, impact (≤500), status (≤30), severity (≤20), files, repo (≤200), sha (≤500), commit, vtag (≤200), bumpLevel (\`bump-level\` also accepted), feedback, sentry, source, date, language. files/repo/sha/commit also accept an array of strings. An unknown or wrong-typed key exits 4 (never silently dropped). The length caps apply to a JSON value exactly as to a flag — --from-json sidesteps shell quoting, not column width.
+  --from-json STRING    Read the whole entry from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase: description (or summary/body), title (≤300), type, area, benefits, impact (≤500), status (≤30), severity (≤20), files, repo (≤200), sha (≤500), commit, vtag (≤200), bumpLevel (\`bump-level\` also accepted), feedback, sentry, source, date, language. files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input, so a row from \`ib dev changelog list\` can be edited and posted straight back: commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date. An unknown or wrong-typed key exits 4 (never silently dropped). The length caps apply to a JSON value exactly as to a flag — --from-json sidesteps shell quoting, not column width.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -2286,7 +2288,7 @@ FLAGS
   --benefits STRING    Hyödyt
   --impact STRING    Vaikutus (max 500 chars)
   --status STRING    Status update (e.g. mark deployed) (max 30 chars)
-  --severity STRING    Bug severity (max 20 chars)
+  --severity STRING    Bug severity — Kriittinen|Korkea|Normaali|Matala (an URGENCY ladder; English critical/high/normal/low and the feedback impact words major/minor/cosmetic are accepted and mapped). ⚠ NOT interchangeable with \`ib dev feedback --severity\` (critical|major|minor|cosmetic), which is an IMPACT ladder with no counterpart for Normaali. (max 20 chars)
   --files STRING    CSV of file paths
   --repo STRING    Repo/submodule (max 200 chars)
   --sha STRING    Commit SHAs (CSV) (max 500 chars)
@@ -2298,7 +2300,7 @@ FLAGS
   --source STRING    Source: human|routine
   --date DATE    Entry date (YYYY-MM-DD|today)
   --language STRING    Entry language (fi|en)
-  --from-json STRING    Read the patch from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase (description/summary/body, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (\`bump-level\` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. An unknown or wrong-typed key exits 4 (never silently dropped).
+  --from-json STRING    Read the patch from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase (description/summary/body, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (\`bump-level\` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a row from \`ib dev changelog list\` can be edited and posted straight back. An unknown or wrong-typed key exits 4 (never silently dropped).
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting. Returns the would-be response.
@@ -2369,6 +2371,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib dev feedback create matches snapshot 1`] = `
 "USAGE
   ib dev feedback create <description> [flags]
+  (also: ib dev feedback add)
 
 DESCRIPTION
   File a CLI improvement proposal or trouble report. AI users: file this PROACTIVELY and IMMEDIATELY (no need to ask the user) whenever you hit an error or unexpected exit code, had to try several strategies because the help/docs were unclear/missing/wrong, found something confusing or harder than expected, could not find a command for something the user clearly needs (a capability gap), or saw an inconsistency between commands. Stored quietly server-side (no GitHub issue, no spam to you or the user — distinct from bug reports; the maintainer gets a private heads-up email) for later developer triage. Sent as a META request, so it is EXEMPT from the read-only write-lock: you can file feedback even with --read-only / IB_READ_ONLY active. --dry-run resolves client-side (prints the payload, never sends).
@@ -5377,6 +5380,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib legal active matches snapshot 1`] = `
 "USAGE
   ib legal active [flags]
+  (also: ib legal list)
 
 DESCRIPTION
   Roll-up of the current ACTIVE document of EVERY type in one call — the single-view answer to 'what legal text is live right now'. One row per type: types with no active version appear with hasActive:false (not dropped). Content is stripped (contentLength only) — read a body via ib legal show <typeName>. Client-side fan-out over ib legal types + ib legal show.
@@ -9847,6 +9851,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib sijainti plants matches snapshot 1`] = `
 "USAGE
   ib sijainti plants [flags]
+  (also: ib sijainti tehtaat)
 
 DESCRIPTION
   List concrete plants (betoniasemat) across ALL companies — sugar for \`sijainti list --type betoniasema --all\`. Plants belong to supplier companies (Rudus, Lujabetoni, Betset, …), so the default own+shared list scope hides nearly all of them; this command surfaces the whole catalogue. --asiakas narrows to a single company's plants. Alias: \`ib sijainti tehtaat\`.

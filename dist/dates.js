@@ -35,6 +35,17 @@ export function addDaysISO(iso, days) {
     d.setUTCDate(d.getUTCDate() + days);
     return d.toISOString().slice(0, 10);
 }
+/**
+ * A SQL `DATE` column as it comes back over JSON: UTC midnight, ms optional.
+ *
+ * Deliberately anchored to `T00:00:00` rather than matching any ISO datetime.
+ * A real timestamp cannot be reduced to a calendar day without choosing a
+ * timezone (22:00Z is already tomorrow in Helsinki), so guessing would be a
+ * silent off-by-one on the exact boundary `todayHelsinki` exists to get right.
+ * UTC midnight has no such ambiguity — it is what a date-only column serializes
+ * to, and nothing else.
+ */
+const UTC_MIDNIGHT_RE = /^(\d{4}-\d{2}-\d{2})T00:00:00(?:\.000)?Z$/;
 export function resolveDate(input) {
     if (!input)
         return undefined;
@@ -44,6 +55,13 @@ export function resolveDate(input) {
         return addDaysISO(todayHelsinki(), -1);
     if (input === "tomorrow")
         return addDaysISO(todayHelsinki(), 1);
+    // Accept a date column in the shape the READ commands emit it, so a row can be
+    // edited and posted back without hand-trimming every date (feedback #357).
+    // Without this the read-shape key aliases only move the rejection from a clean
+    // client-side exit 4 to a backend 400 — one step later and harder to act on.
+    const utcMidnight = UTC_MIDNIGHT_RE.exec(input);
+    if (utcMidnight)
+        return utcMidnight[1];
     return input;
 }
 const MONTH_RE = /^\d{4}-\d{2}$/;
