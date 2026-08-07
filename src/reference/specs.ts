@@ -24,7 +24,14 @@ import { exitCodeFromStatus } from "../api/errors.js";
 import { MESSAGE_DAILY_SPECS } from "../commands/message/daily/index.js";
 import { MESSAGE_BOARD_SPECS } from "../commands/message/board/index.js";
 import { CHANGELOG_SPECS } from "../commands/changelog/index.js";
-import { ONBOARDING_STATUS_KEYS } from "../commands/jerry/index.js";
+import { ONBOARDING_STATUS_KEYS, CHECK_ADDRESS_GATES, REQUEST_STATS_GROUPS } from "../commands/jerry/index.js";
+import {
+  KINDS as FEEDBACK_KINDS,
+  SCOPES as FEEDBACK_SCOPES,
+  STATUSES as FEEDBACK_STATUSES,
+  SEVERITIES as FEEDBACK_SEVERITIES,
+} from "../commands/feedback/index.js";
+import { EXECUTORS as TASK_EXECUTORS, AGENTS as TASK_AGENTS } from "../commands/task/index.js";
 
 /** API error row: derive the exit code from the HTTP status. */
 const apiErr = (http: number, meaning: string, remedy: string): CommandError => ({
@@ -644,26 +651,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     seeAlso: ["ib validate list"],
     examples: ["ib validate list", "ib validate --asiakas 8 --profile betoni"],
   },
-  ...(["modules", "settings"] as const).map((name) => ({
-    command: `ib company ${name}`,
-    description: `Signpost only — company flags are set per TENANT via \`ib customer ${name}\`, including your OWN company. This path exits 4 with that pointer.`,
-    permissions: ["none (always errors)"],
-    flags: [],
-    outputShape: "(none — always an error envelope)",
-    errors: [
-      {
-        origin: "client" as const,
-        exit: 4,
-        meaning: `'ib company ${name}' does not exist — the flags live in the customer domain`,
-        remedy: `use \`ib customer ${name} --asiakas <id>\` (your own id: \`ib company current\`)`,
-      },
-    ],
-    notes: [
-      "Exists because the `company` domain is where you look to change your own tenant's settings, and the real command sits under `customer` (feedback #353).",
-    ],
-    seeAlso: [`ib customer ${name}`, "ib company current"],
-    examples: [`ib customer ${name} --asiakas 1349`],
-  })),
+  // (The `ib company modules|settings` signpost specs were retired with their
+  // commands — the sibling-group resolver in unknownCommand.ts answers now.)
 
   // ─── keikka (6) ──────────────────────────────────────────────────────────
   {
@@ -926,7 +915,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "today", type: "boolean", description: "Shortcut for --from today --to today" },
       { name: "month", type: "string", description: "Whole calendar month YYYY-MM (expands to first→last day)" },
       { name: "week", type: "date", description: "7-day window starting <start>" },
-      { name: "by", type: "string", description: "Single breakdown: customer|vehicle|driver|worksite|status|day (omit for full bundle)" },
+      { name: "by", type: "string", description: "Single breakdown: customer|vehicle|driver|worksite|status|day (omit for full bundle)", allowed: ["customer", "vehicle", "driver", "worksite", "status", "day"] },
       { name: "all", type: "boolean", description: "All tenants (requires developer/system-admin access; 403 otherwise)" },
     ],
     outputShape:
@@ -966,7 +955,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "fields", type: "string", description: "Project each customer to just these columns (CSV; asiakasId always kept, contacts/sijainnit arrays preserved) — cuts the diff payload" },
       { name: "sijainti-types", type: "string", description: "With --include sijainnit: keep only these sijaintiTypeId rows (CSV, e.g. 1,2) — filtered server-side so a 45-location supplier's irrelevant rows are never fetched" },
       { name: "since", type: "string", description: "Only customers registered on/after this day (YYYY-MM-DD, or today/yesterday) — 'new customers since X'. Server-side filter on the registration timestamp." },
-      { name: "sort", type: "string", description: "Result ordering: name (default) or registered (newest-registered first). Server-side." },
+      { name: "sort", type: "string", description: "Result ordering: name (default) or registered (newest-registered first). Server-side.", allowed: ["name", "registered"] },
     ],
     outputShape:
       "ListEnvelope<{ asiakasId, name, yTunnus, type, registeredAt }> + truncated:boolean · with --full the items add { address, postalCode, city, email, contactPersonId, shortName, comment, companyDescription } · with --include each item adds contacts:[{personId,name,phone,email,contactPersonTypeId}] and/or sijainnit:[{sijaintiId,name,lyh,address,sijaintiTypeId,maxDeliveryDistance,jerryActiveUntil}] · with --ids the response adds missing:[{asiakasId, reason:'not_owned'|'not_found'}] for requested ids that didn't return",
@@ -3343,7 +3332,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "typeName", type: "string", description: "Document type name (see ib legal types)" }],
     flags: [
       { name: "owner", type: "number", description: "Filter by ownerAsiakasId tenant scope" },
-      { name: "status", type: "string", description: "Filter by lifecycle status: draft|active|archived|deleted" },
+      { name: "status", type: "string", description: "Filter by lifecycle status: draft|active|archived|deleted", allowed: ["draft", "active", "archived", "deleted"] },
     ],
     outputShape:
       "ListEnvelope<{documentId, version, title, status, isActive, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>",
@@ -3940,7 +3929,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [
       { name: "open", type: "boolean", description: "Provider inbox of open requests in your delivery area (provider role)" },
       { name: "mine", type: "boolean", description: "Your own requests (default)" },
-      { name: "status", type: "string", description: "Filter --mine by status (CSV: open,pending_verification,accepted,cancelled,expired,no_supply)" },
+      { name: "status", type: "string", description: "Filter --mine by status (CSV: open,pending_verification,accepted,cancelled,expired,no_supply)", allowed: ["open", "pending_verification", "accepted", "cancelled", "expired", "no_supply"] },
       { name: "limit", type: "number", default: "100", description: "Max rows for --mine (server caps at 200)" },
       { name: "provider", type: "boolean", description: "Provider lifecycle view via /provider-list (incl. sent offers)" },
       { name: "tab", type: "string", description: "With --provider: avoimet|tarjotut|voitetut|paattyneet" },
@@ -4265,7 +4254,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "formatted-address", type: "string", description: "Google formatted address" },
       { name: "boom", type: "number", description: "Required boom (m) — filters varikot by their puomiMin/puomiMax range (absent/0 = no boom filter)" },
       { name: "explain", type: "boolean", description: "Add considered[] — per-varikko exclusion reasons for non-matching depots (developer/admin only)" },
-      { name: "gate", type: "string", description: "With --explain: CSV of exclusion reasons to include (company-gate|provider-dead|no-coords|not-enrolled|radius|boom). Default omits company-gate" },
+      { name: "gate", type: "string", description: "With --explain: CSV of exclusion reasons to include (company-gate|provider-dead|no-coords|not-enrolled|radius|boom). Default omits company-gate", allowed: [...CHECK_ADDRESS_GATES] },
       { name: "asiakas", type: "number", description: "With --explain: force-include this company's varikot even if not yet Jerry-enabled (surfaces company-gate)" },
     ],
     outputShape:
@@ -4593,7 +4582,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [
       { name: "from", type: "string", description: "createdAt from (YYYY-MM-DD/today/yesterday)" },
       { name: "to", type: "string", description: "createdAt to (inclusive)" },
-      { name: "group-by", type: "string", default: "week", description: "Bucket by week | month | status" },
+      { name: "group-by", type: "string", default: "week", description: "Bucket by week | month | status", allowed: [...REQUEST_STATS_GROUPS] },
     ],
     outputShape:
       "{ groupBy, from, to, buckets: [{ bucket, total, byStatus: { [status]: count }, offerCount, withOffers }], totals: { total, byStatus, offerCount, withOffers } }",
@@ -5578,11 +5567,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "description", type: "string", description: "Alias for the positional description; if both are passed, they must match" },
       { name: "body", type: "string", description: "Alias for --description (free text — NOT the raw-JSON --body of the entity update commands); if several are passed, they must match" },
       { name: "title", type: "string", description: "Optional title, folded into the description as its first line (feedback rows have no stored title column). Alone it becomes the whole description." },
-      { name: "kind", type: "string", default: "improvement", description: "improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal)" },
-      { name: "scope", type: "string", default: "cli", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — which product surface this targets (routing key for triage; orthogonal to --kind; impeccable = auto-piped design-hook findings)" },
+      { name: "kind", type: "string", default: "improvement", description: "improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal)", allowed: [...FEEDBACK_KINDS] },
+      { name: "scope", type: "string", default: "cli", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — which product surface this targets (routing key for triage; orthogonal to --kind; impeccable = auto-piped design-hook findings)", allowed: [...FEEDBACK_SCOPES] },
       { name: "command", type: "string", description: "The ib command/argv that triggered the friction" },
       { name: "error", type: "string", description: "Error message you hit, if any" },
-      { name: "severity", type: "string", description: "critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug" },
+      { name: "severity", type: "string", description: "critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug", allowed: [...FEEDBACK_SEVERITIES] },
       { name: "complexity", type: "number", description: "1-5 agent-triage estimate (orthogonal to --severity): 1 simple+autonomous · 2 simple+wants-input · 3 complex+autonomous · 4 complex+needs-user · 5 very-complex+needs-user & heavier model. Lets a batch-fix agent pull `list --max-complexity 3`. See `ib help complexity`." },
       { name: "from-json", type: "string", description: "Read the whole payload from a JSON object file (or - for stdin); explicit flags override. Keys: description, body, title, kind, scope, command, error, severity, complexity." },
       { name: "dry-run", type: "boolean", description: "Print the payload without sending (client-side)" },
@@ -5625,11 +5614,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     flags: [
-      { name: "status", type: "string", description: "open | reviewed | applied | dismissed, or a comma-separated list (e.g. open,reviewed)" },
+      { name: "status", type: "string", description: "open | reviewed | applied | dismissed, or a comma-separated list (e.g. open,reviewed)", allowed: [...FEEDBACK_STATUSES] },
       { name: "unresolved", type: "boolean", description: "Shortcut for --status open,reviewed (un-closed items) — same as the default; mutually exclusive with --status/--all" },
       { name: "all", type: "boolean", description: "Include every status (open,reviewed,applied,dismissed); overrides the open+reviewed default; mutually exclusive with --status/--unresolved" },
-      { name: "kind", type: "string", description: "improvement | bug | idea | legal" },
-      { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other" },
+      { name: "kind", type: "string", description: "improvement | bug | idea | legal", allowed: [...FEEDBACK_KINDS] },
+      { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other", allowed: [...FEEDBACK_SCOPES] },
       { name: "search", type: "string", description: "Substring match over description/command/resolution/errorText (deploy-gated)" },
       { name: "complexity", type: "number", description: "Only items with this exact complexity 1-5 (deploy-gated). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex." },
       { name: "max-complexity", type: "number", description: "Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls (deploy-gated). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex." },
@@ -5702,7 +5691,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     mutates: true,
     args: [{ name: "id", type: "number", description: "feedbackId — accepts an optional `fb#` anchor (e.g. `fb#42`); a `cl#` id is rejected (exit 4) with the changelog command to use (feedback #230)" }],
     flags: [
-      { name: "status", type: "string", description: "open | reviewed | applied | dismissed" },
+      { name: "status", type: "string", description: "open | reviewed | applied | dismissed", allowed: [...FEEDBACK_STATUSES] },
       { name: "note", type: "string", description: "Resolution note stored on the row" },
       { name: "reason", type: "string", description: "Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header" },
       { name: "resolution", type: "string", description: "Alias for --note (matches the output field name); distinct values across the three note flags are merged into one note" },
@@ -5745,9 +5734,9 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     mutates: true,
     args: [{ name: "id", type: "number", description: "feedbackId — accepts an optional `fb#` anchor (e.g. `fb#42`); a `cl#` id is rejected (exit 4) with the changelog command to use (feedback #230)" }],
     flags: [
-      { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other" },
-      { name: "kind", type: "string", description: "improvement | bug | idea | legal" },
-      { name: "severity", type: "string", description: "critical | major | minor | cosmetic" },
+      { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other", allowed: [...FEEDBACK_SCOPES] },
+      { name: "kind", type: "string", description: "improvement | bug | idea | legal", allowed: [...FEEDBACK_KINDS] },
+      { name: "severity", type: "string", description: "critical | major | minor | cosmetic", allowed: [...FEEDBACK_SEVERITIES] },
       { name: "complexity", type: "number", description: "1-5 agent-triage estimate — promote/downgrade after investigation (see `ib help complexity`)" },
       { name: "description", type: "string", description: "REPLACE the freetext description (destructive — the filed report is overwritten; use --append-description to add to it)" },
       { name: "body", type: "string", description: "Alias for --description (free text, not JSON); if both are passed, they must match" },
@@ -5789,8 +5778,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     flags: [
-      { name: "kind", type: "string", description: "improvement | bug | idea | legal — count only this kind" },
-      { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — count only this scope" },
+      { name: "kind", type: "string", description: "improvement | bug | idea | legal — count only this kind", allowed: [...FEEDBACK_KINDS] },
+      { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — count only this scope", allowed: [...FEEDBACK_SCOPES] },
     ],
     outputShape:
       "{ total, byStatus: { open, reviewed, applied, dismissed }, byKind, byScope, truncated?, hint? }",
@@ -6473,7 +6462,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     flags: [
-      { name: "status", type: "string", default: "open", description: "open | resolved | all" },
+      { name: "status", type: "string", default: "open", description: "open | resolved | all", allowed: ["open", "resolved", "all"] },
       { name: "limit", type: "number", description: "Max rows" },
     ],
     outputShape: "{ items: SupportThreadRow[], nextCursor: null, count, truncated }",
@@ -6497,7 +6486,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     description:
       "Your own company's support threads (audience='support', owned by your active company), newest first. The operator-facing companion to the developer-only inbox — any member of the owning company may list them. Filter by lifecycle status. Projects GET /api/messages/support/mine into the list envelope; each row carries a caller-scoped unreadCount.",
     flags: [
-      { name: "status", type: "string", default: "open", description: "open | resolved | all" },
+      { name: "status", type: "string", default: "open", description: "open | resolved | all", allowed: ["open", "resolved", "all"] },
       { name: "limit", type: "number", description: "Max rows" },
     ],
     outputShape: "{ items: SupportThreadRow[], nextCursor: null, count, truncated }",
@@ -6907,8 +6896,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     tier: "developer",
     flags: [
       { name: "due", type: "boolean", description: "Only tasks due now (nextDueAt <= now)" },
-      { name: "executor", type: "string", description: "human | ai" },
-      { name: "agent", type: "string", description: "claude | hermes — recommendedAgent filter (AI tasks)" },
+      { name: "executor", type: "string", description: "human | ai", allowed: [...TASK_EXECUTORS] },
+      { name: "agent", type: "string", description: "claude | hermes — recommendedAgent filter (AI tasks)", allowed: [...TASK_AGENTS] },
       { name: "assignee", type: "number", description: "Only tasks assigned to this personId" },
       { name: "asiakas", type: "number", description: "Only tasks scoped to this company (asiakasId); internal/global tasks have asiakasId NULL" },
       { name: "inactive", type: "boolean", description: "Include deactivated tasks (default: active only)" },
@@ -6957,11 +6946,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     mutates: true,
     flags: [
       { name: "title", type: "string", description: "Task title, max 200 chars (required)" },
-      { name: "executor", type: "string", description: "human | ai (required)" },
+      { name: "executor", type: "string", description: "human | ai (required)", allowed: [...TASK_EXECUTORS] },
       { name: "cadence", type: "string", description: "<count>/<unit>, unit day|week|month, count 1-120, e.g. 1/month or 2/week (required)" },
       { name: "instructions", type: "string", description: "Freetext checklist for humans / prompt context for the AI runner" },
       { name: "skill", type: "string", description: "Workspace skill the AI runner invokes (e.g. cleanup-docs); omit for human tasks" },
-      { name: "agent", type: "string", description: "claude | hermes — recommended AI executor tier (claude = code/advanced, hermes = light local-LLM work)" },
+      { name: "agent", type: "string", description: "claude | hermes — recommended AI executor tier (claude = code/advanced, hermes = light local-LLM work)", allowed: [...TASK_AGENTS] },
       { name: "assignee", type: "number", description: "Human assignee personId" },
       { name: "asiakas", type: "number", description: "Company (asiakasId) the task is scoped to; omit = internal/global" },
       { name: "first-due", type: "string", description: "First due date (YYYY-MM-DD or today/tomorrow); default: due immediately" },
@@ -6992,7 +6981,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "notes", type: "string", description: "Result summary stored on the log row" },
       { name: "skipped", type: "boolean", description: "Log outcome=skipped (advances nextDueAt); mutually exclusive with --failed" },
       { name: "failed", type: "boolean", description: "Log outcome=failed — nextDueAt untouched, task stays due" },
-      { name: "agent", type: "string", description: "claude | hermes — set when an AI completes the task" },
+      { name: "agent", type: "string", description: "claude | hermes — set when an AI completes the task", allowed: [...TASK_AGENTS] },
     ],
     outputShape:
       "{ logId, task } (task = the updated row; nextDueAt advanced unless --failed). With --dry-run: { dryRun:true, wouldComplete:{ taskId, outcome, advancesNextDue } }.",
@@ -7021,8 +7010,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "title", type: "string", description: "New title" },
       { name: "instructions", type: "string", description: 'New instructions ("" clears)' },
       { name: "skill", type: "string", description: 'New skillRef ("" clears)' },
-      { name: "executor", type: "string", description: "human | ai" },
-      { name: "agent", type: "string", description: 'claude | hermes ("" clears)' },
+      { name: "executor", type: "string", description: "human | ai", allowed: [...TASK_EXECUTORS] },
+      { name: "agent", type: "string", description: 'claude | hermes ("" clears)', allowed: [...TASK_AGENTS] },
       { name: "assignee", type: "number", description: "New assignee personId" },
       { name: "asiakas", type: "number", description: "New company scope (asiakasId)" },
       { name: "cadence", type: "string", description: "<count>/<unit>, unit day|week|month, count 1-120" },

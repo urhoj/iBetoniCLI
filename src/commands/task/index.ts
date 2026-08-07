@@ -21,9 +21,10 @@ import { resolveDate } from "../../dates.js";
 import { jsonAction } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 
-const EXECUTORS = ["human", "ai"] as const;
+// EXECUTORS/AGENTS exported for specs.ts `allowed:` sets (validation envelopes).
+export const EXECUTORS = ["human", "ai"] as const;
 type Executor = (typeof EXECUTORS)[number];
-const AGENTS = ["claude", "hermes"] as const;
+export const AGENTS = ["claude", "hermes"] as const;
 type Agent = (typeof AGENTS)[number];
 const SERVER_LIST_CAP = 200;
 // Uncapped cadenceCount only fails at COMPLETE time (SQL DATEADD overflow 517,

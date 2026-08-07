@@ -23,12 +23,14 @@ import { guarded, jsonAction } from "../_shared/action.js";
 import { explicitFlags, foldAliases } from "../_shared/flags.js";
 import { qs } from "../../api/query.js";
 
-const KINDS = ["improvement", "bug", "idea", "legal"] as const;
+// Exported for specs.ts: the spec flags declare these as machine-readable
+// `allowed:` sets (validation envelopes), single-sourced from here.
+export const KINDS = ["improvement", "bug", "idea", "legal"] as const;
 type Kind = (typeof KINDS)[number];
-const SCOPES = ["cli", "app", "jerry", "bsg2", "workspace", "security", "ops", "impeccable", "other"] as const;
+export const SCOPES = ["cli", "app", "jerry", "bsg2", "workspace", "security", "ops", "impeccable", "other"] as const;
 type Scope = (typeof SCOPES)[number];
-const STATUSES = ["open", "reviewed", "applied", "dismissed"] as const;
-const SEVERITIES = ["critical", "major", "minor", "cosmetic"] as const;
+export const STATUSES = ["open", "reviewed", "applied", "dismissed"] as const;
+export const SEVERITIES = ["critical", "major", "minor", "cosmetic"] as const;
 type Severity = (typeof SEVERITIES)[number];
 
 // complexity = an AI-agent triage estimate (1-5), orthogonal to severity

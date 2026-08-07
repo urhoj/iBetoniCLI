@@ -236,9 +236,20 @@ export function validateEnums(
   area?: string,
   bumpLevel?: string,
   source?: string,
+  severity?: string,
   commandPath = "ib dev changelog add"
 ): void {
   const problems: FlagProblem[] = [];
+  if (severity !== undefined && !SEVERITIES.includes(severity))
+    problems.push({
+      flag: "--severity",
+      issue: "invalid",
+      got: severity,
+      allowed: SEVERITIES,
+      synonyms: SEVERITY_SYNONYMS,
+      remedy:
+        "an URGENCY ladder — NOT `ib dev feedback --severity`'s impact scale (critical|major|minor|cosmetic); English urgency words and the impact words are accepted and mapped",
+    });
   if (type !== undefined && !TYPES.includes(type))
     problems.push({ flag: "--type", issue: "invalid", got: type, allowed: TYPES, synonyms: TYPE_SYNONYMS });
   if (area !== undefined && !AREAS.includes(area)) {
@@ -422,8 +433,11 @@ const SEVERITY_SYNONYMS: Record<string, string> = {
 };
 
 /**
- * Normalize --severity to a canonical Finnish value, or undefined when not passed.
- * Exits 4 on an unknown value.
+ * Normalize --severity to a canonical Finnish value, or undefined when not
+ * passed. An UNKNOWN value passes through unchanged for {@link validateEnums}
+ * to reject — same split as {@link normalizeType}, so `--severity nonsense`
+ * and `--type nonsense` return the same structured problems[] envelope
+ * (allowed + synonyms machine fields) instead of two different error shapes.
  *
  * This flag used to be unvalidated free text capped at 20 chars, so a typo — or
  * an English value carried over from `ib dev feedback` — was accepted SILENTLY
@@ -437,15 +451,7 @@ export function normalizeSeverity(severity?: string): string | undefined {
   if (severity === undefined) return undefined;
   const v = severity.trim();
   if (!v) return undefined;
-  const canonical = SEVERITY_SYNONYMS[v.toLowerCase()];
-  if (!canonical)
-    failWith(
-      `--severity must be one of: ${SEVERITIES.join(", ")} (an urgency ladder; ` +
-        `English critical/high/normal/low and the feedback impact words major/minor/cosmetic are accepted and mapped). ` +
-        `Note this is NOT the same scale as \`ib dev feedback --severity\` (critical|major|minor|cosmetic, an IMPACT ladder) — got "${v}"`,
-      4
-    );
-  return canonical;
+  return SEVERITY_SYNONYMS[v.toLowerCase()] ?? v;
 }
 
 /** Normalize --language to a validated lowercase fi|en, or undefined when not passed. Exits 4 on a bad code. */
@@ -752,7 +758,7 @@ export function registerChangelogCommands(
       o.type = normalizeType(o.type)!;
       o.severity = normalizeSeverity(o.severity)!;
       requireAddFields(description, o as Record<string, unknown>);
-      validateEnums(o.type, o.area, o.bumpLevel, o.source);
+      validateEnums(o.type, o.area, o.bumpLevel, o.source, o.severity);
       o.sha = resolveShaAlias(o.sha, o.commit)!;
       validateFieldLengths(o);
       const entryDate = resolveDate(o.date || "today")!;
@@ -888,7 +894,7 @@ export function registerChangelogCommands(
     applyFromJson(cmd, o as Record<string, unknown>);
     if (o.type !== undefined) o.type = normalizeType(o.type)!;
     if (o.severity !== undefined) o.severity = normalizeSeverity(o.severity)!;
-    validateEnums(o.type, o.area, o.bumpLevel, o.source, "ib dev changelog update");
+    validateEnums(o.type, o.area, o.bumpLevel, o.source, o.severity, "ib dev changelog update");
     // --summary/--body are aliases for --description (feedback #205/#278); fold
     // them in before the patch build so the loop below picks them up. Several may
     // be given only when they agree.
@@ -1042,6 +1048,8 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         name: "severity",
         type: "string",
         description: SEVERITY_FLAG_DESC,
+        allowed: [...SEVERITIES],
+        synonyms: SEVERITY_SYNONYMS,
       },
       { name: "files", type: "string", description: "CSV of file paths" },
       { name: "repo", type: "string", description: REPO_FLAG_DESC },
@@ -1285,7 +1293,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         type: "string",
         description: "Status update (e.g. mark deployed)",
       },
-      { name: "severity", type: "string", description: SEVERITY_FLAG_DESC },
+      { name: "severity", type: "string", description: SEVERITY_FLAG_DESC, allowed: [...SEVERITIES], synonyms: SEVERITY_SYNONYMS },
       { name: "files", type: "string", description: "CSV of file paths" },
       { name: "repo", type: "string", description: "Repo/submodule" },
       { name: "sha", type: "string", description: "Commit SHAs (CSV)" },

@@ -6,10 +6,12 @@ import { runWithSiblingHint } from "../../refHint.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { explicitFlags, foldAliases } from "../_shared/flags.js";
 import { qs } from "../../api/query.js";
-const KINDS = ["improvement", "bug", "idea", "legal"];
-const SCOPES = ["cli", "app", "jerry", "bsg2", "workspace", "security", "ops", "impeccable", "other"];
-const STATUSES = ["open", "reviewed", "applied", "dismissed"];
-const SEVERITIES = ["critical", "major", "minor", "cosmetic"];
+// Exported for specs.ts: the spec flags declare these as machine-readable
+// `allowed:` sets (validation envelopes), single-sourced from here.
+export const KINDS = ["improvement", "bug", "idea", "legal"];
+export const SCOPES = ["cli", "app", "jerry", "bsg2", "workspace", "security", "ops", "impeccable", "other"];
+export const STATUSES = ["open", "reviewed", "applied", "dismissed"];
+export const SEVERITIES = ["critical", "major", "minor", "cosmetic"];
 // complexity = an AI-agent triage estimate (1-5), orthogonal to severity
 // (severity = urgency/impact; complexity = effort + how autonomously an agent
 // can act). 1 simple/autonomous · 2 simple/wants-input-proceeds-on-recommendation

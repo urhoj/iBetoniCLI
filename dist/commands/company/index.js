@@ -65,22 +65,10 @@ export function registerCompanyCommands(parent, getClient, isReadOnly) {
         .action(() => {
         exitWithError(new CliError("'ib company validate' was renamed. Use: ib validate --asiakas <id> --profile <p> (company) or ib validate --asiakas <id> --person <id> (employee).", 0, null, 4));
     });
-    // Your OWN tenant's flags live in the `customer` domain, so `ib company …` is
-    // where an AI looks first and finds nothing (feedback #353). These signposts
-    // turn that dead end into the right command in one round-trip; they carry a
-    // spec, so they also surface in `ib commands company` — the flat list is the
-    // discovery surface that shows no domain blurb.
-    for (const [name, target] of [
-        ["modules", "ib customer modules"],
-        ["settings", "ib customer settings"],
-    ]) {
-        company
-            .command(name, { hidden: true })
-            .allowUnknownOption(true)
-            .argument("[args...]")
-            .action(() => {
-            exitWithError(new CliError(`'ib company ${name}' does not exist — company flags are set per TENANT via '${target}'. Use: ${target} --asiakas <id> (your own id: ib company current).`, 0, null, 4));
-        });
-    }
+    // NOTE: `ib company modules|settings` used to be registered signpost commands
+    // (feedback #353). They were retired in favour of the general sibling-group
+    // resolver (GROUP_SIBLING_DOMAINS company↔customer in unknownCommand.ts): as
+    // registered commands they SHADOWED it, answering with a plainer error than
+    // the machine-readable envelope the unknown-subcommand path now builds.
 }
 //# sourceMappingURL=index.js.map

@@ -5,8 +5,9 @@ import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFla
 import { resolveDate } from "../../dates.js";
 import { jsonAction } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
-const EXECUTORS = ["human", "ai"];
-const AGENTS = ["claude", "hermes"];
+// EXECUTORS/AGENTS exported for specs.ts `allowed:` sets (validation envelopes).
+export const EXECUTORS = ["human", "ai"];
+export const AGENTS = ["claude", "hermes"];
 const SERVER_LIST_CAP = 200;
 // Uncapped cadenceCount only fails at COMPLETE time (SQL DATEADD overflow 517,
 // far from the bad input) — cap it where it is typed. 120 months = 10 years.

@@ -1046,15 +1046,32 @@ describe("normalizeSeverity — one flag name, two different ladders (fb#359)", 
     expect(normalizeSeverity("   ")).toBeUndefined();
   });
 
-  test("rejects an unknown value instead of silently persisting it (exit 4)", () => {
+  test("passes an unknown value through for validateEnums to reject (exit 4)", () => {
     // Was free text capped at 20 chars: a typo landed in the permanent record.
-    const err = captureThrow(() => normalizeSeverity("Korkeaa"));
+    // The rejection channel is validateEnums so --severity gets the same
+    // structured problems[] envelope as --type (allowed + synonyms fields).
+    expect(normalizeSeverity("Korkeaa")).toBe("Korkeaa");
+    const err = captureThrow(() =>
+      validateEnums(undefined, undefined, undefined, undefined, normalizeSeverity("Korkeaa"))
+    );
     expect(err.exitCode).toBe(4);
   });
 
-  test("the rejection names both ladders, so the caller does not re-guess", () => {
-    expect(() => normalizeSeverity("blah")).toThrow(/Kriittinen, Korkea, Normaali, Matala/);
-    expect(() => normalizeSeverity("blah")).toThrow(/ib dev feedback --severity/);
+  test("the rejection carries both ladders as machine fields, so the caller does not re-guess", () => {
+    const err = captureThrow(() =>
+      validateEnums(undefined, undefined, undefined, undefined, "blah")
+    );
+    const body = err.body as { problems: Array<{ flag: string; allowed?: string[]; synonyms?: Record<string, string>; remedy?: string }> };
+    const p = body.problems.find((x) => x.flag === "--severity")!;
+    expect(p.allowed).toEqual(["Kriittinen", "Korkea", "Normaali", "Matala"]);
+    expect(p.synonyms?.critical).toBe("Kriittinen");
+    expect(p.remedy).toMatch(/ib dev feedback --severity/);
+  });
+
+  test("the mapped synonym then passes validateEnums", () => {
+    expect(() =>
+      validateEnums(undefined, undefined, undefined, undefined, normalizeSeverity("critical"))
+    ).not.toThrow();
   });
 });
 

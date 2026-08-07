@@ -858,68 +858,6 @@ EXAMPLES
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib company modules matches snapshot 1`] = `
-"USAGE
-  ib company modules [flags]
-
-DESCRIPTION
-  Signpost only — company flags are set per TENANT via \`ib customer modules\`, including your OWN company. This path exits 4 with that pointer.
-  Permissions: requires none (always errors).
-
-FLAGS
-  (none)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
-
-OUTPUT (JSON, stdout)
-  (none — always an error envelope)
-
-ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  'ib company modules' does not exist — the flags live in the customer domain → use \`ib customer modules --asiakas <id>\` (your own id: \`ib company current\`)
-
-NOTES
-  - Exists because the \`company\` domain is where you look to change your own tenant's settings, and the real command sits under \`customer\` (feedback #353).
-
-SEE ALSO
-  ib customer modules, ib company current
-
-EXAMPLES
-  ib customer modules --asiakas 1349
-"
-`;
-
-exports[`Help snapshots — contract stability > help for ib company settings matches snapshot 1`] = `
-"USAGE
-  ib company settings [flags]
-
-DESCRIPTION
-  Signpost only — company flags are set per TENANT via \`ib customer settings\`, including your OWN company. This path exits 4 with that pointer.
-  Permissions: requires none (always errors).
-
-FLAGS
-  (none)
-
-GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
-
-OUTPUT (JSON, stdout)
-  (none — always an error envelope)
-
-ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  'ib company settings' does not exist — the flags live in the customer domain → use \`ib customer settings --asiakas <id>\` (your own id: \`ib company current\`)
-
-NOTES
-  - Exists because the \`company\` domain is where you look to change your own tenant's settings, and the real command sits under \`customer\` (feedback #353).
-
-SEE ALSO
-  ib customer settings, ib company current
-
-EXAMPLES
-  ib customer settings --asiakas 1349
-"
-`;
-
 exports[`Help snapshots — contract stability > help for ib company switch matches snapshot 1`] = `
 "USAGE
   ib company switch [flags]

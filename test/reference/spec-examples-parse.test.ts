@@ -26,10 +26,6 @@ const CROSS_COMMAND_EXAMPLES = new Set([
   // Rename stub: the command only emits "renamed to `ib validate`", so its
   // examples must show the replacement, not the dead path.
   "ib company validate",
-  // Same for the two signposts pointing out of `company` into `customer`
-  // (feedback #353) — their whole job is to name the command that DOES work.
-  "ib company modules",
-  "ib company settings",
 ]);
 
 /** Split a command line into argv, honouring '…' and "…" quoting. */
