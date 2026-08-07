@@ -20,7 +20,7 @@ export interface ThreadTarget {
 export function addThreadTargetOption(cmd: Command): Command {
   return cmd.option(
     "--tarjous <id>",
-    "Resolve the thread from this pumppuRequestId",
+    "",
     Number
   );
 }

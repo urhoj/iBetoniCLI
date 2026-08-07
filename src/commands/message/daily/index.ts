@@ -296,7 +296,7 @@ export function registerMessageDailyCommands(
     d
       .command("list [asiakasId]")
   )
-    .option("--date <date>", "Date for messages: YYYYMMDD | YYYY-MM-DD | today/yesterday/tomorrow")
+    .option("--date <date>")
     .action(
       guarded(async (idStr: string | undefined, opts: { asiakas?: number; date?: string }) => {
         const asiakasId = resolveAsiakasTarget(idStr, opts.asiakas);
@@ -306,8 +306,8 @@ export function registerMessageDailyCommands(
     );
 
   d.command("get <boxId>")
-    .requiredOption("--asiakas <id>", "Company that the box is listed for (asiakasId)", Number)
-    .option("--date <date>", "Date for the message: YYYYMMDD | YYYY-MM-DD | today")
+    .requiredOption("--asiakas <id>", "", Number)
+    .option("--date <date>")
     .action(
       jsonAction(getClient, (client, boxIdStr: string, opts: { asiakas: number; date?: string }) =>
         runDailyGet(client, opts.asiakas, parseId(boxIdStr, "boxId"), opts.date ? toYyyymmdd(opts.date) : undefined)
@@ -318,9 +318,9 @@ export function registerMessageDailyCommands(
   addWriteFlagsToCommand(
     d
       .command("set <boxId>")
-      .requiredOption("--date <date>", "Date the message applies to (YYYYMMDD | YYYY-MM-DD | today)")
-      .option("--message <text>", "Message text to store")
-      .option("--clear", "Clear the message for the date (mutually exclusive with --message)")
+      .requiredOption("--date <date>")
+      .option("--message <text>")
+      .option("--clear")
   ).action(
     guarded(async (
       boxIdStr: string,
@@ -346,8 +346,8 @@ export function registerMessageDailyCommands(
   addWriteFlagsToCommand(
     d
       .command("save <boxId>")
-      .requiredOption("--title <text>", "New box title")
-      .option("--lisatieto <text>", "Optional sub-text shown under the title")
+      .requiredOption("--title <text>")
+      .option("--lisatieto <text>")
   ).action(
     jsonAction(getClient, (client, boxIdStr: string, opts: { title: string; lisatieto?: string } & WriteFlags) =>
       runDailySaveBox(client, { boxId: parseId(boxIdStr, "boxId"), boxTitle: opts.title, boxLisatieto: opts.lisatieto ?? null }, opts)
@@ -358,10 +358,10 @@ export function registerMessageDailyCommands(
   addWriteFlagsToCommand(
     d
       .command("add [asiakasId]")
-      .option("--asiakas <id>", "Owner asiakasId (alias for the positional)", Number)
-      .option("--date <date>", "Date the box is for (default 00000000 = undated default box)")
-      .option("--title <text>", "Box title")
-      .option("--init", "Use /box/initialize: the caller's OWN company's first box (no asiakasId)")
+      .option("--asiakas <id>", "", Number)
+      .option("--date <date>")
+      .option("--title <text>")
+      .option("--init")
   ).action(
     guarded(async (
       idStr: string | undefined,
@@ -395,7 +395,7 @@ export function registerMessageDailyCommands(
   addWriteFlagsToCommand(
     d
       .command("share <boxId>")
-      .requiredOption("--to <asiakasId>", "Tenant to share the box with", Number)
+      .requiredOption("--to <asiakasId>", "", Number)
   ).action(
     jsonAction(getClient, (client, boxIdStr: string, opts: { to: number } & WriteFlags) =>
       runDailyShare(client, { boxId: parseId(boxIdStr, "boxId"), asiakasId: opts.to }, opts)
@@ -414,9 +414,9 @@ export function registerMessageDailyCommands(
   addWriteFlagsToCommand(
     d
       .command("grant <boxId>")
-      .requiredOption("--to <asiakasId>", "Tenant the role belongs to", Number)
-      .requiredOption("--role <typeId>", "asiakasPersonSettingTypeId the rule applies to", Number)
-      .requiredOption("--box-asiakas <id>", "dailyMessageBoxAsiakasId of the share row", Number)
+      .requiredOption("--to <asiakasId>", "", Number)
+      .requiredOption("--role <typeId>", "", Number)
+      .requiredOption("--box-asiakas <id>", "", Number)
   ).action(
     jsonAction(getClient, (client, boxIdStr: string, opts: { to: number; role: number; boxAsiakas: number } & WriteFlags) =>
       runDailyGrant(
@@ -444,8 +444,8 @@ export function registerMessageDailyCommands(
   addWriteFlagsToCommand(
     d
       .command("perm-set <dailyMessageBoxAsiakasPermissionsId>")
-      .requiredOption("--role <typeId>", "asiakasPersonSettingTypeId", Number)
-      .requiredOption("--access <mode>", "read = read-only, edit = read/write")
+      .requiredOption("--role <typeId>", "", Number)
+      .requiredOption("--access <mode>")
   ).action(
     guarded(async (idStr: string, opts: { role: number; access: string } & WriteFlags) => {
       if (opts.access !== "read" && opts.access !== "edit") {

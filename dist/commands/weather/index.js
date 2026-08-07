@@ -144,40 +144,40 @@ export function registerWeatherCommands(parent, getClient, opts = {}) {
         .description("FMI weather forecasts (requires the company weather module)");
     w.command("forecast")
         .description("Point forecast for a lat/lng at a given time")
-        .requiredOption("--lat <n>", "Latitude (Finland: 59.5–70.1)", Number)
-        .requiredOption("--lng <n>", "Longitude (Finland: 19.0–31.6)", Number)
-        .requiredOption("--time <iso>", "Forecast time (ISO 8601, or 'now')")
+        .requiredOption("--lat <n>", "", Number)
+        .requiredOption("--lng <n>", "", Number)
+        .requiredOption("--time <iso>")
         .action(jsonAction(getClient, (client, opts) => runWeatherForecast(client, opts)));
     w.command("day")
         .description("Daily aggregate forecast (min/max/avg temp, wind, precipitation)")
-        .requiredOption("--lat <n>", "Latitude", Number)
-        .requiredOption("--lng <n>", "Longitude", Number)
-        .requiredOption("--date <d>", "Date (YYYY-MM-DD, or today/tomorrow)")
+        .requiredOption("--lat <n>", "", Number)
+        .requiredOption("--lng <n>", "", Number)
+        .requiredOption("--date <d>")
         .action(jsonAction(getClient, (client, opts) => runWeatherDay(client, opts)));
     w.command("pumping")
         .description("Weather over a concrete-pumping window (start + duration minutes)")
-        .requiredOption("--lat <n>", "Latitude", Number)
-        .requiredOption("--lng <n>", "Longitude", Number)
-        .requiredOption("--start <iso>", "Pumping start (ISO 8601, or 'now')")
-        .requiredOption("--duration <min>", "Pumping duration in minutes", Number)
-        .option("--keikka <id>", "Keikka id (for backend error correlation only)", Number)
+        .requiredOption("--lat <n>", "", Number)
+        .requiredOption("--lng <n>", "", Number)
+        .requiredOption("--start <iso>")
+        .requiredOption("--duration <min>", "", Number)
+        .option("--keikka <id>", "", Number)
         .action(jsonAction(getClient, (client, opts) => runWeatherPumping(client, opts)));
     w.command("worksite <tyomaaId>")
         .description("Forecast for a worksite (resolves coordinates from the tyomaa)")
-        .option("--force-refresh", "Bypass the cache and refetch from FMI")
+        .option("--force-refresh")
         .action(jsonAction(getClient, (client, idStr, opts) => runWeatherWorksite(client, parseId(idStr, "tyomaaId"), !!opts.forceRefresh)));
     w.command("sijainti <sijaintiId>")
         .description("Point forecast for a sijainti (resolves coordinates from the location)")
-        .option("--time <iso>", "Forecast time (ISO 8601, or 'now')", "now")
+        .option("--time <iso>", "", "now")
         .action(jsonAction(getClient, (client, idStr, opts) => runWeatherSijainti(client, parseId(idStr, "sijaintiId"), opts.time)));
     w.command("keikka <keikkaId>")
         .description("Forecast for a keikka (resolves coordinates from its worksite)")
-        .option("--force-refresh", "Bypass the cache and refetch from FMI")
+        .option("--force-refresh")
         .action(jsonAction(getClient, (client, idStr, opts) => runWeatherKeikka(client, parseId(idStr, "keikkaId"), !!opts.forceRefresh)));
     w.command("address")
         .description("Point forecast for a street address (geocodes via Google, then FMI)")
-        .requiredOption("--address <s>", "Street address (min 5 chars)")
-        .requiredOption("--time <iso>", "Forecast time (ISO 8601, or 'now')")
+        .requiredOption("--address <s>")
+        .requiredOption("--time <iso>")
         .action(jsonAction(getClient, (client, opts) => runWeatherAddress(client, opts)));
     w.command("status")
         .description("Whether the weather module is enabled for the active company")
@@ -185,8 +185,8 @@ export function registerWeatherCommands(parent, getClient, opts = {}) {
     const toggleCmd = w
         .command("toggle")
         .description("Enable/disable the weather module (admin)")
-        .option("--on", "Enable the module")
-        .option("--off", "Disable the module");
+        .option("--on")
+        .option("--off");
     addWriteFlagsToCommand(toggleCmd).action(guarded(async (opts) => {
         // Covers both "neither" and "both" — failWith keeps the envelope honest
         // (statusCode 0: no HTTP request happened) and matches the spec's exit-4

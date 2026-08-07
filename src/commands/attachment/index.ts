@@ -14,18 +14,18 @@ import { qs } from "../../api/query.js";
 type Row = Record<string, unknown>;
 
 /** Wire entity names ↔ commander option keys. Mirrors backend ENTITY_COLUMNS. */
-const ENTITY_OPTS: { optKey: string; flag: string; entity: string; blurb: string }[] = [
-  { optKey: "keikka", flag: "--keikka <id>", entity: "keikka", blurb: "keikkaId" },
-  { optKey: "vehicle", flag: "--vehicle <id>", entity: "vehicle", blurb: "vehicleId" },
-  { optKey: "person", flag: "--person <id>", entity: "person", blurb: "personId" },
-  { optKey: "customer", flag: "--customer <id>", entity: "customer", blurb: "asiakasId" },
-  { optKey: "worksite", flag: "--worksite <id>", entity: "worksite", blurb: "tyomaaId" },
-  { optKey: "sijainti", flag: "--sijainti <id>", entity: "sijainti", blurb: "sijaintiId" },
-  { optKey: "tuote", flag: "--tuote <id>", entity: "tuote", blurb: "tuoteId" },
-  { optKey: "bugReport", flag: "--bug-report <id>", entity: "bugReport", blurb: "bugReportId" },
-  { optKey: "request", flag: "--request <id>", entity: "request", blurb: "Jerry pumppuRequestId" },
-  { optKey: "offer", flag: "--offer <id>", entity: "offer", blurb: "Jerry pumppuOfferId" },
-  { optKey: "message", flag: "--message <id>", entity: "message", blurb: "chat messageId (attach = message author)" },
+const ENTITY_OPTS: { optKey: string; flag: string; entity: string }[] = [
+  { optKey: "keikka", flag: "--keikka <id>", entity: "keikka" },
+  { optKey: "vehicle", flag: "--vehicle <id>", entity: "vehicle" },
+  { optKey: "person", flag: "--person <id>", entity: "person" },
+  { optKey: "customer", flag: "--customer <id>", entity: "customer" },
+  { optKey: "worksite", flag: "--worksite <id>", entity: "worksite" },
+  { optKey: "sijainti", flag: "--sijainti <id>", entity: "sijainti" },
+  { optKey: "tuote", flag: "--tuote <id>", entity: "tuote" },
+  { optKey: "bugReport", flag: "--bug-report <id>", entity: "bugReport" },
+  { optKey: "request", flag: "--request <id>", entity: "request" },
+  { optKey: "offer", flag: "--offer <id>", entity: "offer" },
+  { optKey: "message", flag: "--message <id>", entity: "message" },
 ];
 const ENTITY_WORDS = ENTITY_OPTS.map((e) => e.entity);
 
@@ -64,7 +64,7 @@ type AttachmentUpdateOpts = WriteFlags &
 
 function addEntityFlags(cmd: Command): Command {
   for (const e of ENTITY_OPTS) {
-    cmd.option(e.flag, `Target = ${e.blurb}`, (s: string) => Number(s));
+    cmd.option(e.flag, "", (s: string) => Number(s));
   }
   return cmd;
 }
@@ -400,9 +400,9 @@ export function registerAttachmentCommands(
 
   const listCmd = a
     .command("list")
-    .option("--group <g>", "Filter by attachment group (name or id — see `ib attachment types`)")
-    .option("--type <t>", "Filter by attachment type (name or id — see `ib attachment types`)")
-    .option("--limit <n>", "Max rows (capped at 500)", cappedInt(500));
+    .option("--group <g>")
+    .option("--type <t>")
+    .option("--limit <n>", "", cappedInt(500));
   addEntityFlags(listCmd).action(guarded(async (opts: AttachmentListOpts) => {
     const client = await getClient();
     const target = resolveEntityTarget(opts);
@@ -417,8 +417,8 @@ export function registerAttachmentCommands(
     .action(jsonAction(getClient, runAttachmentTypes));
 
   a.command("search [text]")
-    .option("--missing", "Only attachments with NO linked entity (orphans)")
-    .option("--limit <n>", "Max rows (capped at 500)", cappedInt(500))
+    .option("--missing")
+    .option("--limit <n>", "", cappedInt(500))
     .action(
       jsonAction(getClient, (client, text: string | undefined, opts: { missing?: boolean; limit?: number }) =>
         runAttachmentSearch(client, { q: text, missing: opts.missing, limit: opts.limit })
@@ -426,8 +426,8 @@ export function registerAttachmentCommands(
     );
 
   a.command("download <attachmentId>")
-    .option("--out <path>", "Output path (default: original file name in cwd)")
-    .option("--force", "Overwrite an existing file")
+    .option("--out <path>")
+    .option("--force")
     .action(
       jsonAction(getClient, (client, id: string, opts: { out?: string; force?: boolean }) =>
         runAttachmentDownload(client, Number(id), opts.out, !!opts.force)
@@ -436,10 +436,10 @@ export function registerAttachmentCommands(
 
   const uploadCmd = a
     .command("upload <file>")
-    .option("--comment <text>", "fileComment shown in the UI")
-    .option("--group <g>", "Attachment group (name or id — see `ib attachment types`)")
-    .option("--type <t>", "Attachment type (name or id — see `ib attachment types`)")
-    .option("--mime <mime>", "Override the auto-detected MIME type");
+    .option("--comment <text>")
+    .option("--group <g>")
+    .option("--type <t>")
+    .option("--mime <mime>");
   addEntityFlags(uploadCmd);
   addWriteFlagsToCommand(uploadCmd).action(
     guarded(async (file: string, opts: AttachmentUploadOpts) => {
@@ -456,7 +456,7 @@ export function registerAttachmentCommands(
   );
 
   a.command("upload-url")
-    .requiredOption("--name <fileName>", "Original file name WITH extension (server derives the blob name)")
+    .requiredOption("--name <fileName>")
     .action(
       jsonAction(getClient, (client, opts: { name: string }) =>
         runAttachmentUploadUrl(client, opts.name)
@@ -465,15 +465,15 @@ export function registerAttachmentCommands(
 
   const registerCmd = a
     .command("register")
-    .requiredOption("--name <fileName>", "fileName returned by upload-url")
-    .requiredOption("--orig-name <name>", "Original file name")
-    .requiredOption("--folder <fileFolder>", "fileFolder returned by upload-url")
-    .requiredOption("--size <bytes>", "File size in bytes", (s: string) => Number(s))
-    .requiredOption("--mime <mime>", "MIME type (fileType)")
-    .option("--comment <text>", "fileComment")
-    .option("--group <g>", "Attachment group (name or id)")
-    .option("--type <t>", "Attachment type (name or id)")
-    .option("--etag <etag>", "Azure ETag (optional; defaults to FE-parity sentinel)");
+    .requiredOption("--name <fileName>")
+    .requiredOption("--orig-name <name>")
+    .requiredOption("--folder <fileFolder>")
+    .requiredOption("--size <bytes>", "", (s: string) => Number(s))
+    .requiredOption("--mime <mime>")
+    .option("--comment <text>")
+    .option("--group <g>")
+    .option("--type <t>")
+    .option("--etag <etag>");
   addEntityFlags(registerCmd);
   addWriteFlagsToCommand(registerCmd).action(guarded(async (opts: AttachmentRegisterOpts) => {
     const client = await getClient();
@@ -516,10 +516,10 @@ export function registerAttachmentCommands(
 
   const updateCmd = a
     .command("update <attachmentId>")
-    .option("--comment <text>", "New fileComment")
-    .option("--liita-laskuun <0|1>", "Invoice-attachment flag (lasku/asiakas admin only)", (s: string) => Number(s))
-    .option("--group <g>", "Attachment group (name or id — see `ib attachment types`)")
-    .option("--type <t>", "Attachment type (name or id — see `ib attachment types`)");
+    .option("--comment <text>")
+    .option("--liita-laskuun <0|1>", "", (s: string) => Number(s))
+    .option("--group <g>")
+    .option("--type <t>");
   addWriteFlagsToCommand(updateCmd).action(
     guarded(async (id: string, opts: AttachmentUpdateOpts) => {
       const client = await getClient();

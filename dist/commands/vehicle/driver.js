@@ -111,12 +111,12 @@ export function registerVehicleDriverCommands(parent, getClient) {
         .action(jsonAction(getClient, (client, vehicleIdStr, date) => runVehicleDriverWho(client, parseId(vehicleIdStr, "vehicleId"), date)));
     driver
         .command("history <vehicleId>")
-        .requiredOption("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)")
-        .requiredOption("--to <date>", "End date YYYY-MM-DD (or today/yesterday/tomorrow)")
+        .requiredOption("--from <date>")
+        .requiredOption("--to <date>")
         .action(jsonAction(getClient, (client, vehicleIdStr, opts) => runVehicleDriverHistory(client, parseId(vehicleIdStr, "vehicleId"), opts)));
     addWriteFlagsToCommand(driver
         .command("assign <vehicleId> <date>")
-        .requiredOption("--person <pid>", "Driver personId", (s) => Number(s))).action(guarded(async (vehicleIdStr, date, opts) => {
+        .requiredOption("--person <pid>", "", (s) => Number(s))).action(guarded(async (vehicleIdStr, date, opts) => {
         writeJson(await runVehicleDriverAssign(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts.person, date, opts));
     }));
     addWriteFlagsToCommand(driver
@@ -132,7 +132,7 @@ export function registerVehicleDriverCommands(parent, getClient) {
         .action(jsonAction(getClient, (client, vehicleIdStr) => runVehicleDefaultGet(client, parseId(vehicleIdStr, "vehicleId"))));
     addWriteFlagsToCommand(def
         .command("set <vehicleId>")
-        .requiredOption("--person <pid>", "Default driver personId", (s) => Number(s))).action(guarded(async (vehicleIdStr, opts) => {
+        .requiredOption("--person <pid>", "", (s) => Number(s))).action(guarded(async (vehicleIdStr, opts) => {
         writeJson(await runVehicleDefaultSet(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts.person, opts));
     }));
     addWriteFlagsToCommand(def

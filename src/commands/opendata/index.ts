@@ -31,8 +31,8 @@ export function registerOpendataCommands(
   registerWeatherCommands(od, getClient);
 
   od.command("prh [ytunnus]")
-    .option("--search <name>", "Search by company name instead of business ID")
-    .option("--page <n>", "Result page for --search (default 1)", (v: string) => Number(v), 1)
+    .option("--search <name>")
+    .option("--page <n>", "", (v: string) => Number(v), 1)
     .action(
       guarded(async (ytunnus: string | undefined, opts: { search?: string; page: number }) => {
         const client = await getClient();

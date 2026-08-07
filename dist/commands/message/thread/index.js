@@ -64,7 +64,7 @@ export function registerMessageThreadCommands(parent, getClient) {
         writeJson(await runThreadReopen(client, id, opts));
     }));
     const renameCmd = addThreadTargetOption(t.command("rename [threadId]"))
-        .requiredOption("--title <text>", 'New thread title (max 200 chars; "" clears)');
+        .requiredOption("--title <text>");
     addWriteFlagsToCommand(renameCmd).action(guarded(async (idStr, opts) => {
         const client = await getClient();
         const id = await resolveThreadId(client, targetFrom(idStr, opts));
@@ -74,15 +74,15 @@ export function registerMessageThreadCommands(parent, getClient) {
         .command("participant")
         .description("Add/remove a thread participant (must be a member of the owning company)");
     const addCmd = addThreadTargetOption(p.command("add [threadId]"))
-        .requiredOption("--person <id>", "personId to add", Number)
-        .option("--role <role>", "Participant role (customer|pumppu|betoni|lattia|support|provider; default pumppu)");
+        .requiredOption("--person <id>", "", Number)
+        .option("--role <role>");
     addWriteFlagsToCommand(addCmd).action(guarded(async (idStr, opts) => {
         const client = await getClient();
         const id = await resolveThreadId(client, targetFrom(idStr, opts));
         writeJson(await runThreadParticipantAdd(client, id, Number(opts.person), opts));
     }));
     const remCmd = addThreadTargetOption(p.command("remove [threadId]"))
-        .requiredOption("--person <id>", "personId to remove", Number);
+        .requiredOption("--person <id>", "", Number);
     addWriteFlagsToCommand(remCmd).action(guarded(async (idStr, opts) => {
         const client = await getClient();
         const id = await resolveThreadId(client, targetFrom(idStr, opts));

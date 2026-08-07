@@ -78,18 +78,18 @@ export function registerCacheCommands(parent: Command, getClient: () => Promise<
     .action(jsonAction(getClient, runCacheStats));
 
   c.command("keys")
-    .option("--pattern <glob>", "SCAN match pattern", "*")
+    .option("--pattern <glob>", "", "*")
     .action(
       jsonAction(getClient, (client, opts: { pattern?: string }) => runCacheKeys(client, opts))
     );
 
   c.command("invalidate <entityType>")
-    .option("--id <n>", "Entity id (e.g. keikkaId)", (v: string) => Number(v))
-    .option("--asiakas-id <n>", "Tenant scope (developers only; non-devs use their own)", (v: string) => Number(v))
-    .option("--cascade", "Also invalidate related families (keikka only)")
-    .option("--confirm", "Execute the invalidation (default is dry-run preview)")
-    .option("--force-prod", "Allow execution against a deployed (shared-cache) endpoint")
-    .option("--reason <text>", "Audit reason (X-Action-Reason)")
+    .option("--id <n>", "", (v: string) => Number(v))
+    .option("--asiakas-id <n>", "", (v: string) => Number(v))
+    .option("--cascade")
+    .option("--confirm")
+    .option("--force-prod")
+    .option("--reason <text>")
     .action(
       jsonAction(getClient, (client, entityType: string, opts: { id?: number; asiakasId?: number; cascade?: boolean; confirm?: boolean; forceProd?: boolean; reason?: string }) =>
         runCacheInvalidate(
@@ -101,9 +101,9 @@ export function registerCacheCommands(parent: Command, getClient: () => Promise<
     );
 
   c.command("clear")
-    .option("--confirm", "Execute the full flush (default is dry-run preview)")
-    .option("--force-prod", "Allow execution against a deployed (shared-cache) endpoint")
-    .option("--reason <text>", "Audit reason (X-Action-Reason)")
+    .option("--confirm")
+    .option("--force-prod")
+    .option("--reason <text>")
     .action(
       jsonAction(getClient, (client, opts: { confirm?: boolean; forceProd?: boolean; reason?: string }) =>
         runCacheClear(client, { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason })
@@ -111,9 +111,9 @@ export function registerCacheCommands(parent: Command, getClient: () => Promise<
     );
 
   c.command("pattern <glob>")
-    .option("--confirm", "Execute the invalidation (default is dry-run preview)")
-    .option("--force-prod", "Allow execution against a deployed (shared-cache) endpoint")
-    .option("--reason <text>", "Audit reason (X-Action-Reason)")
+    .option("--confirm")
+    .option("--force-prod")
+    .option("--reason <text>")
     .action(
       jsonAction(getClient, (client, glob: string, opts: { confirm?: boolean; forceProd?: boolean; reason?: string }) =>
         runCachePattern(client, glob, { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason })

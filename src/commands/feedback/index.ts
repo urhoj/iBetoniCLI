@@ -581,31 +581,29 @@ export function registerFeedbackCommands(
     // group using `add` to create a top-level entry) naturally types
     // `feedback add`; accept it instead of dead-ending on exit 4 (feedback #229).
     .alias("add")
-    .option("--description <text>", "Alias for the positional description")
-    .option("--body <text>", "Alias for --description (free text, not JSON); if several are given, they must match")
+    .option("--description <text>")
+    .option("--body <text>")
     .option(
-      "--title <text>",
-      "Optional title, folded into the description as its first line (no stored title column)"
+      "--title <text>"
     )
-    .option("--kind <kind>", "improvement | bug | idea | legal", "improvement")
+    .option("--kind <kind>", "", "improvement")
     .option(
       "--scope <scope>",
-      "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — product surface this feedback targets (impeccable = auto-piped design-hook findings)",
+      "",
       "cli"
     )
-    .option("--command <argv>", "The ib command/argv that triggered the friction")
-    .option("--error <msg>", "Error message you hit, if any")
-    .option("--severity <sev>", "critical | major | minor | cosmetic (optional; most useful for --kind bug)")
+    .option("--command <argv>")
+    .option("--error <msg>")
+    .option("--severity <sev>")
     .option(
       "--complexity <n>",
-      "1-5 agent-triage estimate: 1 simple+autonomous · 2 simple+wants-input · 3 complex+autonomous · 4 complex+needs-user · 5 very-complex+needs-user & heavier model (see `ib help complexity`)",
+      "",
       Number
     )
     .option(
-      "--from-json <file>",
-      "Read the whole payload from a JSON object file (or - for stdin); explicit flags override. Shell-safe: the only way to pass text containing quotes on Windows PowerShell."
+      "--from-json <file>"
     )
-    .option("--dry-run", "Print the payload without sending (client-side)")
+    .option("--dry-run")
     .action(
       guarded(async (
         description: string | undefined,
@@ -650,18 +648,18 @@ export function registerFeedbackCommands(
     );
 
   f.command("list")
-    .option("--status <status>", "open | reviewed | applied | dismissed (or a comma-separated list, e.g. open,reviewed)")
-    .option("--unresolved", "Shortcut for --status open,reviewed (un-closed items) — same as the default")
-    .option("--all", "Include every status (open,reviewed,applied,dismissed); overrides the open+reviewed default")
-    .option("--full", "Return untruncated description/resolution (default: capped at 200 chars)")
-    .option("--kind <kind>", "improvement | bug | idea | legal")
-    .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other")
-    .option("--search <text>", "Substring match over description/command/resolution/errorText (deploy-gated)")
-    .option("--complexity <n>", "Only items with this exact complexity (1-5). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex.", Number)
-    .option("--max-complexity <n>", "Only items with complexity <= n — the autonomously-workable slice (deploy-gated). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex.", Number)
-    .option("--oldest", "Oldest-first (createdAt ASC) — FIFO drain order for the triage loop; default is newest-first")
-    .option("--limit <n>", "Max rows (default 50, cap 200)", Number)
-    .option("--offset <n>", "Pagination offset", Number)
+    .option("--status <status>")
+    .option("--unresolved")
+    .option("--all")
+    .option("--full")
+    .option("--kind <kind>")
+    .option("--scope <scope>")
+    .option("--search <text>")
+    .option("--complexity <n>", "", Number)
+    .option("--max-complexity <n>", "", Number)
+    .option("--oldest")
+    .option("--limit <n>", "", Number)
+    .option("--offset <n>", "", Number)
     .action(
       jsonAction(getClient, (client, opts: { status?: string; kind?: string; scope?: string; search?: string; complexity?: number; maxComplexity?: number; limit?: number; offset?: number; unresolved?: boolean; all?: boolean; full?: boolean; oldest?: boolean; }) =>
         runFeedbackList(client, opts)
@@ -669,7 +667,7 @@ export function registerFeedbackCommands(
     );
 
   f.command("get <id>")
-    .option("--full", "Accepted for cross-command consistency; get always returns the full row (no-op)")
+    .option("--full")
     .action(
       guarded(async (idStr: string) => {
         const id = parseRefId(idStr, "feedback", "get");
@@ -679,16 +677,15 @@ export function registerFeedbackCommands(
     );
 
   f.command("resolve <id>")
-    .option("--status <status>", "open | reviewed | applied | dismissed")
-    .option("--note <text>", "Resolution note stored on the row")
-    .option("--reason <text>", "Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header")
-    .option("--resolution <text>", "Alias for --note (matches the output field name); distinct values across the three note flags are merged into one note")
+    .option("--status <status>")
+    .option("--note <text>")
+    .option("--reason <text>")
+    .option("--resolution <text>")
     .option(
-      "--from-json <file>",
-      "Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: status, note (or reason/resolution). Shell-safe: the only way to pass a note containing quotes on Windows PowerShell."
+      "--from-json <file>"
     )
-    .option("--dry-run", "Print the update body without sending (client-side)")
-    .option("--full", "Return the full updated row (default: a compact ack)")
+    .option("--dry-run")
+    .option("--full")
     .action(
       guarded(async (
         idStr: string,
@@ -716,19 +713,18 @@ export function registerFeedbackCommands(
     );
 
   f.command("update <id>")
-    .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other")
-    .option("--kind <kind>", "improvement | bug | idea | legal")
-    .option("--severity <sev>", "critical | major | minor | cosmetic")
-    .option("--complexity <n>", "1-5 agent-triage estimate — promote/downgrade after investigation (see `ib help complexity`)", Number)
-    .option("--description <text>", "REPLACE the freetext description (destructive — the filed report is overwritten; use --append-description to add to it)")
-    .option("--body <text>", "Alias for --description (free text, not JSON); if both are given, they must match")
-    .option("--append-description <text>", "Append to the CURRENT description (read-merge-write, separated by a blank line) — keeps the original report intact")
+    .option("--scope <scope>")
+    .option("--kind <kind>")
+    .option("--severity <sev>")
+    .option("--complexity <n>", "", Number)
+    .option("--description <text>")
+    .option("--body <text>")
+    .option("--append-description <text>")
     .option(
-      "--from-json <file>",
-      "Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: scope, kind, severity, complexity, description (or body), appendDescription. Shell-safe: the only way to pass prose containing quotes on Windows PowerShell."
+      "--from-json <file>"
     )
-    .option("--dry-run", "Print the update body without sending (client-side)")
-    .option("--full", "Return the full updated row (default: a compact ack)")
+    .option("--dry-run")
+    .option("--full")
     .action(
       guarded(async (
         idStr: string,
@@ -778,8 +774,8 @@ export function registerFeedbackCommands(
     );
 
   f.command("count")
-    .option("--kind <kind>", "improvement | bug | idea | legal")
-    .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other")
+    .option("--kind <kind>")
+    .option("--scope <scope>")
     .action(
       jsonAction(getClient, (client, opts: { kind?: string; scope?: string }) =>
         runFeedbackCount(client, opts)

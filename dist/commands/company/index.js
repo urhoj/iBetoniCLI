@@ -52,7 +52,7 @@ export function registerCompanyCommands(parent, getClient, isReadOnly) {
         .action(jsonAction(getClient, runCompanyCurrent));
     company
         .command("switch")
-        .requiredOption("--to <asiakasId>", "Target asiakasId", intFlag("--to"))
+        .requiredOption("--to <asiakasId>", "", intFlag("--to"))
         .action(guarded(async (opts) => {
         writeJson(await runPersistedSwitch(opts.to, isReadOnly()));
     }));

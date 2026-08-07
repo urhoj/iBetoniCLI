@@ -319,18 +319,18 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
   addNeedsReviewFlags(
     glossary
       .command("list")
-      .option("--search <s>", "Filter by term/definition/synonym substring")
-      .option("--stalest <n>", "Return up to N entries, stalest first", (v: string) => Number(v))
-      .option("--domain <d>", "Filter to a domain (exact match)")
-      .option("--related <substr>", "Filter to terms whose relatedCommands contain this substring")
-      .option("--terms-only", "Return only {term, synonyms} per entry (cheap index view; strips definitions)")
+      .option("--search <s>")
+      .option("--stalest <n>", "", (v: string) => Number(v))
+      .option("--domain <d>")
+      .option("--related <substr>")
+      .option("--terms-only")
   ).action(jsonAction(getClient, (client, opts: { search?: string; stalest?: number; domain?: string; related?: string; termsOnly?: boolean; needsReview?: boolean; maxConfidence?: number }) =>
     runGlossaryList(client, opts)
   ));
 
   glossary
     .command("misses")
-    .option("--top <n>", "Return up to N", (v: string) => Number(v))
+    .option("--top <n>", "", (v: string) => Number(v))
     .action(jsonAction(getClient, (client, opts: { top?: number }) => runGlossaryMisses(client, opts.top)));
 
   const dismiss = glossary
@@ -343,8 +343,8 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
 
   glossary
     .command("lint")
-    .option("--strict", "Exit 1 if any warn-level finding exists (for CI)")
-    .option("--suggest-related", "Also suggest candidate relatedCommands: specs mentioning a term/synonym/entity but not yet linked (info-level, fb#110)")
+    .option("--strict")
+    .option("--suggest-related")
     .action(guarded(async (opts: { strict?: boolean; suggestRelated?: boolean }) => {
       const res = await runGlossaryLint(await getClient(), { suggestRelated: opts.suggestRelated });
       writeJson(res);
@@ -354,16 +354,16 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
   const set = glossary
     .command("set")
     .argument("<term>", "Canonical term")
-    .option("--definition <d>", "One-paragraph definition (omit to keep current)")
-    .option("--synonyms <list>", 'Comma-separated aliases incl. inflections (omit to keep; "" to clear)')
-    .option("--related <list>", 'Comma-separated command paths, e.g. "ib person,ib vehicle driver board" (omit to keep; "" to clear)')
-    .option("--entity <e>", "Related DB entity, e.g. Person / personId (omit to keep)")
-    .option("--domain <d>", "Domain grouping (e.g. vacation) (omit to keep)")
-    .option("--update-only", "Only update an existing term; do not create a new one (404 if absent)")
-    .option("--from-json <file>", "Read fields from a JSON object file (or - for stdin); explicit flags override")
-    .option("--add-synonyms <list>", "Comma-separated synonyms to ADD (no full resend; excl. --synonyms)")
-    .option("--remove-synonyms <list>", "Comma-separated synonyms to REMOVE by name (excl. --synonyms)")
-    .option("--append-definition <text>", "Append a clause to the current definition (excl. --definition)");
+    .option("--definition <d>")
+    .option("--synonyms <list>")
+    .option("--related <list>")
+    .option("--entity <e>")
+    .option("--domain <d>")
+    .option("--update-only")
+    .option("--from-json <file>")
+    .option("--add-synonyms <list>")
+    .option("--remove-synonyms <list>")
+    .option("--append-definition <text>");
   addWriteFlagsToCommand(addAssessWriteFlags(set)).action(
     guarded(async (term: string, opts: WriteFlags & { definition?: string; synonyms?: string; related?: string; entity?: string; domain?: string; updateOnly?: boolean; fromJson?: string; addSynonyms?: string; removeSynonyms?: string; appendDefinition?: string; aiConfidence?: number; needsHumanReview?: boolean }) => {
       const flagFields: GlossarySetFields = {
@@ -393,7 +393,7 @@ export function registerGlossaryCommands(program: Command, getClient: () => Prom
     .description("Bulk create/update entries from a JSON array file (developer only). Avoids shell argv mangling of Finnish ä/ö.")
     .argument("<file>", "JSON array file of {term, definition, synonyms?, related?, entity?} (or - for stdin)");
   addWriteFlagsToCommand(imp)
-    .option("--update-only", "Only update existing terms; never insert")
+    .option("--update-only")
     .action(guarded(async (file: string, opts: WriteFlags & { updateOnly?: boolean }) => {
       let arr: unknown;
       try { arr = readJsonInput(file); } catch { failWith("import: file is not valid JSON", 4); }

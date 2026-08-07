@@ -112,7 +112,7 @@ export async function runLogUser(client, personId, limit, opts = {}) {
 /** Registers a thin `log <id>` alias on an entity group, delegating to runLogEntity. */
 export function registerLogAlias(group, getClient, entityType, idArgName, fieldExample = "Filter by changeTracker fieldName") {
     addOwnerOption(group.command(`log <${idArgName}>`))
-        .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)
+        .option("--limit <n>", "", cappedInt(500), 100)
         .option("--field <name>", fieldExample)
         .action(jsonAction(getClient, (client, idStr, opts) => runLogEntity(client, entityType, parseId(idStr, "entityId"), opts.limit, {
         owner: opts.owner,
@@ -122,22 +122,22 @@ export function registerLogAlias(group, getClient, entityType, idArgName, fieldE
 export function registerLogCommands(parent, getClient) {
     const c = parent.command("log").description("ChangeTracker (audit trail) reads");
     addOwnerOption(c.command("entity <entityType> <entityId>"))
-        .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)
-        .option("--field <name>", "Filter by changeTracker fieldName (client-side)")
+        .option("--limit <n>", "", cappedInt(500), 100)
+        .option("--field <name>")
         .action(jsonAction(getClient, (client, entityType, entityIdStr, opts) => runLogEntity(client, entityType, parseId(entityIdStr, "entityId"), opts.limit, { owner: opts.owner, field: opts.field })));
-    addOwnerOption(c.command("latest").option("--entity-type <type>", "Filter to one entityType"))
-        .option("--limit <n>", "Max rows (default 100, server cap 500)", cappedInt(500), 100)
+    addOwnerOption(c.command("latest").option("--entity-type <type>"))
+        .option("--limit <n>", "", cappedInt(500), 100)
         .action(jsonAction(getClient, (client, opts) => runLogLatest(client, opts.limit, {
         entityType: opts.entityType,
         owner: opts.owner,
     })));
     addOwnerOption(c
         .command("range")
-        .requiredOption("--from <iso>", "Window start YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)")
-        .requiredOption("--to <iso>", "Window end YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)")
-        .option("--entity-type <type>", "Filter to one entityType")
-        .option("--person <personId>", "Filter to one actor", (v) => Number(v)))
-        .option("--limit <n>", "Max rows kept client-side (default 200, cap 2000)", cappedInt(2000), 200)
+        .requiredOption("--from <iso>")
+        .requiredOption("--to <iso>")
+        .option("--entity-type <type>")
+        .option("--person <personId>", "", (v) => Number(v)))
+        .option("--limit <n>", "", cappedInt(2000), 200)
         .action(jsonAction(getClient, (client, opts) => runLogRange(client, {
         from: resolveDate(opts.from) ?? opts.from,
         to: resolveDate(opts.to) ?? opts.to,
@@ -148,10 +148,10 @@ export function registerLogCommands(parent, getClient) {
     })));
     addOwnerOption(c
         .command("by-entity-date")
-        .requiredOption("--entity-type <type>", "keikka or palkki")
-        .requiredOption("--from <iso>", "Entity-date window start YYYY-MM-DD (or today/yesterday/tomorrow)")
-        .requiredOption("--to <iso>", "Entity-date window end YYYY-MM-DD (or today/yesterday/tomorrow)"))
-        .option("--limit <n>", "Max rows kept client-side (default 200, cap 2000)", cappedInt(2000), 200)
+        .requiredOption("--entity-type <type>")
+        .requiredOption("--from <iso>")
+        .requiredOption("--to <iso>"))
+        .option("--limit <n>", "", cappedInt(2000), 200)
         .action(jsonAction(getClient, (client, opts) => runLogByEntityDate(client, {
         entityType: opts.entityType,
         from: resolveDate(opts.from) ?? opts.from,
@@ -160,7 +160,7 @@ export function registerLogCommands(parent, getClient) {
         limit: opts.limit,
     })));
     addOwnerOption(c.command("user [personId]"))
-        .option("--limit <n>", "Max rows (default 100)", cappedInt(500), 100)
+        .option("--limit <n>", "", cappedInt(500), 100)
         .action(jsonAction(getClient, (client, personIdStr, opts) => runLogUser(client, parseOptionalId(personIdStr, "personId") ?? null, opts.limit, { owner: opts.owner })));
     c.command("types")
         .action(guarded(() => {

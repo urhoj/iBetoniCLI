@@ -97,7 +97,7 @@ export function registerCompanyCommands(
 
   company
     .command("switch")
-    .requiredOption("--to <asiakasId>", "Target asiakasId", intFlag("--to"))
+    .requiredOption("--to <asiakasId>", "", intFlag("--to"))
     .action(
       guarded(async (opts: { to: number }) => {
         writeJson(await runPersistedSwitch(opts.to, isReadOnly()));

@@ -14,7 +14,7 @@ export async function runInbox(client, opts = {}) {
 export function registerInboxCommand(parent, getClient, opts = {}) {
     parent
         .command("inbox", { hidden: !!opts.hidden })
-        .option("--details", "Include slimmed top-items per signal, not just counts")
+        .option("--details")
         .action(jsonAction(getClient, (client, opts) => runInbox(client, { details: opts.details })));
 }
 //# sourceMappingURL=index.js.map

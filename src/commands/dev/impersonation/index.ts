@@ -85,11 +85,11 @@ export function registerImpersonationCommands(
 
   imp
     .command("sessions")
-    .option("--actor <id>", "Filter to sessions run BY this actor personId", (s: string) => Number(s))
-    .option("--target <id>", "Filter to sessions run AS this target personId", (s: string) => Number(s))
-    .option("--end-reason <r>", "Filter by endReason (manual|timeout|error|logout)")
-    .option("--active", "Only still-open sessions (no end row)")
-    .option("--limit <n>", "Max sessions (default 100, max 1000)", (s: string) => Number(s))
+    .option("--actor <id>", "", (s: string) => Number(s))
+    .option("--target <id>", "", (s: string) => Number(s))
+    .option("--end-reason <r>")
+    .option("--active")
+    .option("--limit <n>", "", (s: string) => Number(s))
     .action(jsonAction(getClient, runImpersonationSessions));
 
   imp

@@ -45,13 +45,11 @@ export function registerParcelCommands(
     parent
       .command("parcel")
       .option(
-        "--kiinteistotunnus <tunnus>",
-        "Property identifier, dashed or 14-digit — direct lookup (no geocode)"
+        "--kiinteistotunnus <tunnus>"
       )
   )
     .option(
-      "--with-buildings",
-      "Also count buildings on the parcel (national Ryhti; permit-based, best-effort)"
+      "--with-buildings"
     )
     .action(guarded(async (opts: ParcelLookupOptions) => {
       // kiinteistotunnus is a DIRECT lookup, not a point source, so it is added

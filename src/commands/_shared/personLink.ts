@@ -62,7 +62,7 @@ export function registerPersonLinkCommands(
       parent
         .command(name)
         .requiredOption(`--${cfg.targetFlag} <id>`, cfg.targetDescription, Number)
-        .requiredOption("--person <id>", "Target personId", Number)
+        .requiredOption("--person <id>", "", Number)
         .option("--contact-type <id>", cfg.contactTypeDescription, Number, 1)
     ).action(
       guarded(async (opts: PersonLinkOptions) => {

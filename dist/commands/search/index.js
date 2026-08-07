@@ -195,10 +195,10 @@ export function buildSearchSources(client, query, limit, myCompanies = false) {
 export function registerSearchCommands(parent, getClient) {
     parent
         .command("search [query]")
-        .option("--search <s>", "Search query (alias for the <query> positional)")
-        .option("--in <entities>", `Comma-separated subset of: ${SEARCH_ENTITIES.join(",")}`)
-        .option("--limit <n>", "Max hits per entity", (v) => Number(v), DEFAULT_LIMIT)
-        .option("--my-companies", "Also search every company you belong to (customer/worksite/person only; vehicle, keikka & sijainti stay active-company)")
+        .option("--search <s>")
+        .option("--in <entities>")
+        .option("--limit <n>", "", (v) => Number(v), DEFAULT_LIMIT)
+        .option("--my-companies")
         .action(guarded(async (query, opts) => {
         const q = resolveSearchQuery(query, opts.search);
         const entities = parseEntityFilter(opts.in);

@@ -38,9 +38,9 @@ export function registerPersonAbsencesCommand(
 ): void {
   parent
     .command("absences")
-    .requiredOption("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)")
-    .requiredOption("--to <date>", "End date YYYY-MM-DD (or today/yesterday/tomorrow)")
-    .option("--person <pid>", "Filter to one personId", (s: string) => Number(s))
+    .requiredOption("--from <date>")
+    .requiredOption("--to <date>")
+    .option("--person <pid>", "", (s: string) => Number(s))
     .action(
       jsonAction(getClient, (client, opts: PersonAbsencesFilter) => runPersonAbsences(client, opts))
     );

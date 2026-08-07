@@ -804,12 +804,12 @@ export function registerJerryCommands(
 
   request
     .command("list")
-    .option("--open", "Provider inbox: open requests (requires provider role)")
-    .option("--mine", "Your own requests (default)")
-    .option("--status <csv>", "Filter --mine by status (CSV)")
-    .option("--limit <n>", "Max rows for --mine", cappedInt(200))
-    .option("--provider", "Provider lifecycle view via /provider-list (incl. your sent offers)")
-    .option("--tab <tab>", "With --provider: avoimet|tarjotut|voitetut|paattyneet (default avoimet)")
+    .option("--open")
+    .option("--mine")
+    .option("--status <csv>")
+    .option("--limit <n>", "", cappedInt(200))
+    .option("--provider")
+    .option("--tab <tab>")
     .action(
       jsonAction(getClient, (client, opts: JerryRequestListOpts) =>
         runJerryRequestList(client, opts)
@@ -818,7 +818,7 @@ export function registerJerryCommands(
 
   request
     .command("get <requestId>")
-    .option("--provider", "Use the provider-facing detail view (requires provider role)")
+    .option("--provider")
     .action(
       jsonAction(getClient, (client, idStr: string, opts: { provider?: boolean }) =>
         runJerryRequestGet(client, parseId(idStr, "requestId"), !!opts.provider)
@@ -836,14 +836,14 @@ export function registerJerryCommands(
   addWriteFlagsToCommand(
     request
       .command("create [address]")
-      .option("--address <s>", "Worksite address (osoite); alias for the positional")
-      .requiredOption("--pump-at <iso>", "Pump datetime (pumppausaika; ISO, e.g. 2026-06-17T09:00:00+03:00)")
-      .requiredOption("--m3 <n>", "Concrete volume m³ (maaraM3; > 0)", Number)
-      .option("--boom <m>", "Required boom reach m (puomi; default 0)", Number)
-      .option("--duration <h>", "Pump duration hours (kesto)", Number)
-      .option("--line-length <m>", "Hose line length m (linjanPituus)", Number)
-      .option("--notes <s>", "Free-text description shown to providers (kuvaus)")
-      .option("--asiakas <id>", "Customer asiakasId (omit → your private BetoniJerry account)", Number)
+      .option("--address <s>")
+      .requiredOption("--pump-at <iso>")
+      .requiredOption("--m3 <n>", "", Number)
+      .option("--boom <m>", "", Number)
+      .option("--duration <h>", "", Number)
+      .option("--line-length <m>", "", Number)
+      .option("--notes <s>")
+      .option("--asiakas <id>", "", Number)
   ).action(
     guarded(async (
       addressPositional: string | undefined,
@@ -902,14 +902,14 @@ export function registerJerryCommands(
   addWriteFlagsToCommand(
     offer
       .command("create <requestId>")
-      .requiredOption("--price-cents <n>", "Offer price in cents (integer 1..99999900)", Number)
-      .option("--vat-percent <n>", "VAT percent (default 25.5)", Number)
-      .option("--price-terms <s>", "Price-estimate terms (Hinta-arvion ehdot) shown to the customer")
-      .option("--valid-until <iso>", "Offer valid-until (ISO datetime)")
-      .option("--available-from <iso>", "Earliest availability (ISO datetime; stored, not shown on the BetoniJerry customer card)")
-      .option("--extra-notes <s>", "Free-text notes shown to the customer")
-      .option("--cancellation-terms <s>", "Per-offer cancellation terms (stored; BetoniJerry shows a platform-standard peruutusehdot, so this is NOT rendered on the customer card)")
-      .option("--maintains-order-info <bool>", "Override provider default (true|false)", parseBool)
+      .requiredOption("--price-cents <n>", "", Number)
+      .option("--vat-percent <n>", "", Number)
+      .option("--price-terms <s>")
+      .option("--valid-until <iso>")
+      .option("--available-from <iso>")
+      .option("--extra-notes <s>")
+      .option("--cancellation-terms <s>")
+      .option("--maintains-order-info <bool>", "", parseBool)
   ).action(
     guarded(async (
       idStr: string,
@@ -970,8 +970,8 @@ export function registerJerryCommands(
   addWriteFlagsToCommand(
     offer
       .command("confirm <requestId> <offerId>")
-      .requiredOption("--scheduled-at <iso>", "Scheduled keikka start (future ISO datetime)")
-      .option("--pumppu <vehicleId>", "Pin one of your vehicles to the keikka", Number)
+      .requiredOption("--scheduled-at <iso>")
+      .option("--pumppu <vehicleId>", "", Number)
   ).action(
     guarded(async (
       idStr: string,
@@ -990,8 +990,8 @@ export function registerJerryCommands(
 
   // counts ─────────────────────────────────────────────────────────────────────
   j.command("counts")
-    .option("--provider", "Provider badge counts (requires provider role)")
-    .option("--mine", "Customer counts (default)")
+    .option("--provider")
+    .option("--mine")
     .action(
       jsonAction(getClient, (client, opts: { provider?: boolean }) =>
         runJerryCounts(client, !!opts.provider)
@@ -1000,19 +1000,19 @@ export function registerJerryCommands(
 
   // check-address ────────────────────────────────────────────────────────────
   j.command("check-address")
-    .requiredOption("--address <s>", "Street address to check (maps to `osoite`)")
-    .option("--lat <n>", "Latitude (trusted only with --lng + --place-id)", Number)
-    .option("--lng <n>", "Longitude (trusted only with --lat + --place-id)", Number)
-    .option("--place-id <s>", "Google placeId (lets the server trust client coords)")
-    .option("--formatted-address <s>", "Google formatted address")
-    .option("--boom <m>", "Required boom (m) — filters varikot by their puomiMin/puomiMax range (absent/0 = no boom filter)", Number)
-    .option("--explain", "Add considered[] — per-varikko exclusion reasons for non-matching depots (developer/admin only)")
+    .requiredOption("--address <s>")
+    .option("--lat <n>", "", Number)
+    .option("--lng <n>", "", Number)
+    .option("--place-id <s>")
+    .option("--formatted-address <s>")
+    .option("--boom <m>", "", Number)
+    .option("--explain")
     .option(
       "--gate <csv>",
-      `With --explain: only these exclusion reasons (${CHECK_ADDRESS_GATES.join("|")}). Default omits company-gate; pass it explicitly to see every candidate`,
+      "",
       (v: string) => v.split(",").map((g) => g.trim()).filter(Boolean)
     )
-    .option("--asiakas <id>", "With --explain: force-include this company's varikot even if not yet Jerry-enabled (surfaces company-gate)", Number)
+    .option("--asiakas <id>", "", Number)
     .action(
       guarded(async (opts: {
         address: string;
@@ -1059,8 +1059,8 @@ export function registerJerryCommands(
 
   // email-activity ─────────────────────────────────────────────────────────────
   j.command("email-activity")
-    .option("--days <n>", "Window in days (1..90, default 7)", (v: string) => Math.min(90, Math.max(1, Number(v))))
-    .option("--domain <d>", "Sending domain (default betonijerry.fi)")
+    .option("--days <n>", "", (v: string) => Math.min(90, Math.max(1, Number(v))))
+    .option("--domain <d>")
     .action(
       jsonAction(getClient, (client, opts: JerryEmailActivityOpts) =>
         runJerryEmailActivity(client, opts)
@@ -1073,7 +1073,7 @@ export function registerJerryCommands(
     .description("Per-provider BetoniJerry settings (contact, opening hours, description)");
 
   ps.command("get")
-    .option("--asiakas <id>", "Target company asiakasId", Number)
+    .option("--asiakas <id>", "", Number)
     .action(
       jsonAction(getClient, (client, opts: { asiakas?: number }) =>
         runJerryProviderSettingsGet(client, opts.asiakas)
@@ -1084,14 +1084,12 @@ export function registerJerryCommands(
     ps
       .command("set")
       .option(
-        "--body <json>",
-        "JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo? }"
+        "--body <json>"
       )
       .option(
-        "--from-json <file>",
-        "Read the JSON body from a file (or - for stdin) — shell-safe alternative to --body"
+        "--from-json <file>"
       )
-      .option("--asiakas <id>", "Target company asiakasId", Number)
+      .option("--asiakas <id>", "", Number)
   ).action(guarded(async (opts: WriteOpts & { body?: string; fromJson?: string; asiakas?: number }) => {
     const client = await getClient();
     const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) as Row | null;
@@ -1114,7 +1112,7 @@ export function registerJerryCommands(
 
   admin
     .command("search [query]")
-    .option("--search <s>", "Search query (alias for the <query> positional)")
+    .option("--search <s>")
     .action(
       jsonAction(getClient, (client, query: string | undefined, opts: { search?: string }) =>
         runJerryAdminSearch(client, resolveSearchQuery(query, opts.search))
@@ -1150,10 +1148,10 @@ export function registerJerryCommands(
 
   onboarding
     .command("list")
-    .option("--status <key>", `Filter by pipeline status key: ${ONBOARDING_STATUS_KEYS}`)
-    .option("--tier <n>", "Filter by tier (1/2)", Number)
-    .option("--due", "Only rows where the email1b reminder is due")
-    .option("--search <text>", "Case-insensitive substring on company name / outreach / contact fields")
+    .option("--status <key>")
+    .option("--tier <n>", "", Number)
+    .option("--due")
+    .option("--search <text>")
     .action(
       jsonAction(getClient, (client, opts: JerryOnboardingListOpts) =>
         runJerryOnboardingList(client, opts)
@@ -1178,12 +1176,12 @@ export function registerJerryCommands(
   addWriteFlagsToCommand(
     onboarding
       .command("add <asiakasId>")
-      .option("--tier <n>", "1 = priority, 2 = secondary", Number)
-      .option("--malli <v>", "Email variant (A/B)")
-      .option("--kanava <text>", "Preferred channel")
-      .option("--alue <text>", "Operating area ({alue} merge field)")
-      .option("--company-type <t>", "pumppu | betoni | all | owner")
-      .option("--source <s>", "manual|import|scheduled (default manual)")
+      .option("--tier <n>", "", Number)
+      .option("--malli <v>")
+      .option("--kanava <text>")
+      .option("--alue <text>")
+      .option("--company-type <t>")
+      .option("--source <s>")
   ).action(
     jsonAction(getClient, (client, idStr: string, opts: WriteOpts & Record<string, unknown>) =>
       runJerryOnboardingAdd(
@@ -1198,16 +1196,16 @@ export function registerJerryCommands(
   addWriteFlagsToCommand(
     onboarding
       .command("set <asiakasId>")
-      .option("--status <key>", `Pipeline status key: ${ONBOARDING_STATUS_KEYS}`)
-      .option("--tier <n>", "1/2", Number)
-      .option("--malli <v>", "Email variant (A/B)")
-      .option("--kanava <text>", "Preferred channel")
-      .option("--alue <text>", "Operating area")
-      .option("--company-type <t>", "pumppu | betoni | all | owner")
-      .option("--notes <text>", "muistiinpanot")
-      .option("--outreach-name <text>", "Contact override name")
-      .option("--outreach-email <email>", "Contact override email")
-      .option("--outreach-phone <phone>", "Contact override phone")
+      .option("--status <key>")
+      .option("--tier <n>", "", Number)
+      .option("--malli <v>")
+      .option("--kanava <text>")
+      .option("--alue <text>")
+      .option("--company-type <t>")
+      .option("--notes <text>")
+      .option("--outreach-name <text>")
+      .option("--outreach-email <email>")
+      .option("--outreach-phone <phone>")
   ).action(
     jsonAction(getClient, (client, idStr: string, opts: WriteOpts & Record<string, unknown>) =>
       runJerryOnboardingSet(client, resolveAsiakasTarget(idStr, undefined), pickProspectFields(opts), opts)
@@ -1217,10 +1215,10 @@ export function registerJerryCommands(
   addWriteFlagsToCommand(
     onboarding
       .command("log <asiakasId>")
-      .requiredOption("--type <t>", "call | response | note")
-      .requiredOption("--text <text>", "Event text")
-      .option("--time <iso>", "Backdated event time (ISO 8601)")
-      .option("--set-status <key>", `Also set the pipeline status. Keys: ${ONBOARDING_STATUS_KEYS}`)
+      .requiredOption("--type <t>")
+      .requiredOption("--text <text>")
+      .option("--time <iso>")
+      .option("--set-status <key>")
   ).action(
     guarded(async (idStr: string, opts: WriteOpts & Record<string, unknown>) => {
       const client = await getClient();
@@ -1238,12 +1236,12 @@ export function registerJerryCommands(
 
   adminRequest
     .command("list")
-    .option("--status <csv>", "Status filter CSV (open,accepted,...)")
-    .option("--from <date>", "createdAt from (YYYY-MM-DD / today / yesterday)", resolveDate)
-    .option("--to <date>", "createdAt to (inclusive)", resolveDate)
-    .option("--customer <id>", "Filter by customer asiakasId", Number)
-    .option("--provider <id>", "Filter by provider asiakasId", Number)
-    .option("--limit <n>", "Max rows (max 300)", cappedInt(300))
+    .option("--status <csv>")
+    .option("--from <date>", "", resolveDate)
+    .option("--to <date>", "", resolveDate)
+    .option("--customer <id>", "", Number)
+    .option("--provider <id>", "", Number)
+    .option("--limit <n>", "", cappedInt(300))
     .action(
       jsonAction(getClient, (client, opts: JerryAdminRequestsOpts) =>
         runJerryAdminRequests(client, opts)
@@ -1252,9 +1250,9 @@ export function registerJerryCommands(
 
   adminRequest
     .command("stats")
-    .option("--from <date>", "createdAt from (YYYY-MM-DD / today / yesterday)", resolveDate)
-    .option("--to <date>", "createdAt to (inclusive)", resolveDate)
-    .option("--group-by <mode>", `Bucket by ${REQUEST_STATS_GROUPS.join("|")} (default week)`)
+    .option("--from <date>", "", resolveDate)
+    .option("--to <date>", "", resolveDate)
+    .option("--group-by <mode>")
     .action(
       guarded(async (opts: JerryAdminRequestStatsOpts) => {
         // Reject an unknown mode here: the server defaults to `week` on anything
@@ -1298,8 +1296,8 @@ export function registerJerryCommands(
   addWriteFlagsToCommand(
     adminRequest
       .command("extend <requestId>")
-      .option("--days <n>", "Make it valid for N more days from now (default 14)", Number)
-      .option("--until <date>", "Absolute new expiry (ISO date/datetime)")
+      .option("--days <n>", "", Number)
+      .option("--until <date>")
   ).action(guarded(async (idStr: string, opts: { days?: number; until?: string } & WriteOpts) => {
     if (opts.days != null && opts.until) failWith("Pass either --days or --until, not both", 4);
     const client = await getClient();
@@ -1313,11 +1311,11 @@ export function registerJerryCommands(
 
   adminSearches
     .command("list")
-    .option("--from <date>", "createdAt from (YYYY-MM-DD / today / yesterday)", resolveDate)
-    .option("--to <date>", "createdAt to (inclusive)", resolveDate)
-    .option("--deliverable <k>", "Filter: covered | no_supply (never covered)")
-    .option("--q <text>", "Address substring filter")
-    .option("--limit <n>", "Max rows (max 500)", cappedInt(500))
+    .option("--from <date>", "", resolveDate)
+    .option("--to <date>", "", resolveDate)
+    .option("--deliverable <k>")
+    .option("--q <text>")
+    .option("--limit <n>", "", cappedInt(500))
     .action(
       jsonAction(getClient, (client, opts: JerryAdminSearchesOpts) =>
         runJerryAdminSearches(client, opts)
@@ -1326,8 +1324,8 @@ export function registerJerryCommands(
 
   adminSearches
     .command("funnel")
-    .option("--from <date>", "createdAt from (YYYY-MM-DD / today / yesterday)", resolveDate)
-    .option("--to <date>", "createdAt to (inclusive)", resolveDate)
+    .option("--from <date>", "", resolveDate)
+    .option("--to <date>", "", resolveDate)
     .action(
       jsonAction(getClient, (client, opts: JerryAdminFunnelOpts) =>
         runJerryAdminFunnel(client, opts)

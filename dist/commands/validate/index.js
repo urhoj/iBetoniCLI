@@ -34,10 +34,10 @@ export async function runValidatePerson(client, profile, asiakasId, personId) {
 export function registerValidateCommands(parent, getClient) {
     parent
         .command("validate [action]")
-        .option("--asiakas <id>", "Target asiakasId (default: active company)", Number)
-        .option("--person <id>", "Validate this person as an employee of the company", Number)
-        .option("--profile <p>", "Profile id (company: jerry|betoni; person: onboarding [default])")
-        .option("--keikka <id>", "Validate this keikka against the reminders-drawer rules (alias of ib keikka validate <id>)", Number)
+        .option("--asiakas <id>", "", Number)
+        .option("--person <id>", "", Number)
+        .option("--profile <p>")
+        .option("--keikka <id>", "", Number)
         .action(guarded(async (action, opts) => {
         const client = await getClient();
         if (opts.keikka != null) {

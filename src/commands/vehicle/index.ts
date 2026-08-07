@@ -543,18 +543,17 @@ export function registerVehicleCommands(
   const v = parent.command("vehicle").description("Vehicle commands");
 
   v.command("list")
-    .option("--limit <n>", "Max rows", cappedInt(500))
-    .option("--cursor <c>", "Pagination cursor")
-    .option("--deleted", "Include soft-deleted vehicles (default: excluded)")
-    .option("--grid-only", "Only vehicles shown in the grid (showInGrid=1)")
+    .option("--limit <n>", "", cappedInt(500))
+    .option("--cursor <c>")
+    .option("--deleted")
+    .option("--grid-only")
     .option(
-      "--valid-on <date>",
-      "Only vehicles valid on this day YYYY-MM-DD (or today/yesterday/tomorrow)"
+      "--valid-on <date>"
     )
-    .option("--type <id>", "Only this vehicleTypeId", (val: string) => Number(val))
+    .option("--type <id>", "", (val: string) => Number(val))
     .option(
       "--asiakas <id>",
-      "Read another company's fleet (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant). Default: active company.",
+      "",
       (val: string) => Number(val)
     )
     .action(
@@ -587,7 +586,7 @@ export function registerVehicleCommands(
   v.command("get <vehicleId>")
     .option(
       "--asiakas <id>",
-      "Read a vehicle owned by another company (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant)",
+      "",
       (val: string) => Number(val)
     )
     .action(
@@ -607,7 +606,7 @@ export function registerVehicleCommands(
   v.command("types")
     .option(
       "--asiakas <id>",
-      "List another company's vehicle types (cross-tenant; needed for `vehicle create --asiakas` since types are tenant-defined)",
+      "",
       (val: string) => Number(val)
     )
     .action(
@@ -620,11 +619,11 @@ export function registerVehicleCommands(
     .action(jsonAction(getClient, runVehicleLocations));
 
   v.command("search [query]")
-    .option("--search <s>", "Search query (alias for the <query> positional)")
-    .option("--limit <n>", "Max rows", cappedInt(500))
+    .option("--search <s>")
+    .option("--limit <n>", "", cappedInt(500))
     .option(
       "--asiakas <id>",
-      "Search another company's fleet (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant)",
+      "",
       (val: string) => Number(val)
     )
     .action(
@@ -634,7 +633,7 @@ export function registerVehicleCommands(
     );
 
   v.command("timeline <vehicleId>")
-    .option("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
+    .option("--date <date>", "", "today")
     .action(
       jsonAction(getClient, (client, idStr: string, opts: VehicleDayFilter) =>
         runVehicleTimeline(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) })
@@ -678,7 +677,7 @@ export function registerVehicleCommands(
     );
   dates
     .command("expiring")
-    .option("--days <n>", "Days-ahead window (default 30)", (s: string) =>
+    .option("--days <n>", "", (s: string) =>
       Number(s)
     )
     .action(
@@ -688,7 +687,7 @@ export function registerVehicleCommands(
     );
 
   v.command("route <vehicleId>")
-    .option("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
+    .option("--date <date>", "", "today")
     .action(
       jsonAction(getClient, (client, idStr: string, opts: VehicleDayFilter) =>
         runVehicleRoute(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) })
@@ -696,10 +695,9 @@ export function registerVehicleCommands(
     );
 
   v.command("visits <filterType> <id>")
-    .option("--days <n>", "Look-back window in days (omit for all-time)", (val: string) => Number(val))
+    .option("--days <n>", "", (val: string) => Number(val))
     .option(
-      "--date <d>",
-      "Only visits on this day (YYYY-MM-DD or today/yesterday/tomorrow; Europe/Helsinki)"
+      "--date <d>"
     )
     .action(
       jsonAction(getClient, (client, filterType: string, idStr: string, opts: VehicleVisitsFilter) =>

@@ -1010,15 +1010,15 @@ export function registerCustomerCommands(
   const c = parent.command("customer").description("Customer commands");
 
   c.command("list")
-    .option("--limit <n>", "Max rows", cappedInt(500))
-    .option("--cursor <c>", "Pagination cursor")
-    .option("--full", "Return full customer fields + companyDescription (not just id/name/ytunnus/type)")
-    .option("--ids <csv>", "Comma-separated asiakasIds to return (e.g. 1,2,3)")
-    .option("--include <csv>", "Expand each row with per-customer arrays: contacts and/or sijainnit (best with --full)")
-    .option("--fields <csv>", "Project each customer to just these columns (asiakasId always kept; contacts/sijainnit arrays preserved) — trims the diff payload")
-    .option("--sijainti-types <csv>", "With --include sijainnit: keep only these sijaintiTypeId rows (e.g. 1,2) — filtered server-side")
-    .option("--since <date>", "Only customers registered on/after this date (YYYY-MM-DD, or today/yesterday) — 'new customers since X', server-side")
-    .option("--sort <field>", "Order results: name (default) or registered (newest-registered first) — server-side")
+    .option("--limit <n>", "", cappedInt(500))
+    .option("--cursor <c>")
+    .option("--full")
+    .option("--ids <csv>")
+    .option("--include <csv>")
+    .option("--fields <csv>")
+    .option("--sijainti-types <csv>")
+    .option("--since <date>")
+    .option("--sort <field>")
     .action(
       guarded(async (opts: CustomerListFilter & { full?: boolean; ids?: string; include?: string; fields?: string; sijaintiTypes?: string; since?: string; sort?: string }) => {
         const client = await getClient();
@@ -1055,7 +1055,7 @@ export function registerCustomerCommands(
     );
 
   c.command("dead-list")
-    .option("--limit <n>", "Max rows", cappedInt(500))
+    .option("--limit <n>", "", cappedInt(500))
     .action(
       jsonAction(getClient, (client, opts: { limit?: number }) =>
         runCustomerDeadList(client, { limit: opts.limit })
@@ -1080,10 +1080,9 @@ export function registerCustomerCommands(
     c.command("modules [asiakasId]")
   )
     .option(
-      "--set <keys>",
-      "Comma-separated field keys to turn ON (e.g. jerry,weather,pumppu)"
+      "--set <keys>"
     )
-    .option("--unset <keys>", "Comma-separated field keys to turn OFF");
+    .option("--unset <keys>");
   addWriteFlagsToCommand(modulesCmd).action(
     guarded(async (
       idStr: string | undefined,
@@ -1109,8 +1108,8 @@ export function registerCustomerCommands(
   const operatorCmd = addAsiakasTargetOption(
     c.command("operator [asiakasId]")
   )
-    .option("--set", "Turn ALL 9 operator flags ON")
-    .option("--reset", "Turn ALL 9 operator flags OFF");
+    .option("--set")
+    .option("--reset");
   addWriteFlagsToCommand(operatorCmd).action(
     guarded(async (
       idStr: string | undefined,
@@ -1137,8 +1136,8 @@ export function registerCustomerCommands(
   const settingsCmd = addAsiakasTargetOption(
     c.command("settings [asiakasId]")
   )
-    .option("--set <keys>", "Comma-separated setting names to turn ON")
-    .option("--unset <keys>", "Comma-separated setting names to turn OFF");
+    .option("--set <keys>")
+    .option("--unset <keys>");
   addWriteFlagsToCommand(settingsCmd).action(
     guarded(async (
       idStr: string | undefined,
@@ -1161,9 +1160,9 @@ export function registerCustomerCommands(
   );
 
   c.command("search [query]")
-    .option("--search <s>", "Search query (alias for the <query> positional)")
-    .option("--limit <n>", "Max results", cappedInt(500))
-    .option("--my-companies", "Search across every company you belong to (rows tagged with ownerAsiakasId)")
+    .option("--search <s>")
+    .option("--limit <n>", "", cappedInt(500))
+    .option("--my-companies")
     .action(
       jsonAction(getClient, (client, query: string | undefined, opts: { search?: string; limit?: number; myCompanies?: boolean }) =>
         runCustomerSearch(client, resolveSearchQuery(query, opts.search), opts.limit, !!opts.myCompanies)
@@ -1175,8 +1174,8 @@ export function registerCustomerCommands(
     .description(
       "Deprecated alias for `ib opendata prh` (still works). Look up a company in the Finnish business registry (PRH) by <ytunnus> or --search <name>."
     )
-    .option("--search <name>", "Search by company name instead of business ID")
-    .option("--page <n>", "Result page for --search (default 1)", (v: string) => Number(v), 1)
+    .option("--search <name>")
+    .option("--page <n>", "", (v: string) => Number(v), 1)
     .action(
       guarded(async (ytunnus: string | undefined, opts: { search?: string; page: number }) => {
         const client = await getClient();
@@ -1192,7 +1191,7 @@ export function registerCustomerCommands(
     );
 
   c.command("log <asiakasId>")
-    .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)
+    .option("--limit <n>", "", cappedInt(500), 100)
     .action(
       jsonAction(getClient, (client, idStr: string, opts: { limit: number }) =>
         runCustomerHistory(client, parseId(idStr, "asiakasId"), opts.limit)
@@ -1201,19 +1200,18 @@ export function registerCustomerCommands(
 
   const createCmd = c
     .command("create")
-    .option("--name <s>", "Customer name (asiakasNimi)")
-    .option("--ytunnus <s>", "Business ID (yTunnus) — REQUIRED unless --from-prh/--body supplies it")
-    .option("--email <s>", "Invoicing email (laskutusEmail)")
-    .option("--short-name <s>", "Short display name (asiakasShortNimi)")
-    .option("--from-prh <ytunnus>", "Prefill name + yTunnus + billing address from PRH for this business ID")
-    .option("--address <s>", "Billing street address (laskutusOsoite)")
-    .option("--postal-code <s>", "Billing postal code (laskutusPostinumero)")
-    .option("--city <s>", "Billing city (laskutusKaupunki)")
+    .option("--name <s>")
+    .option("--ytunnus <s>")
+    .option("--email <s>")
+    .option("--short-name <s>")
+    .option("--from-prh <ytunnus>")
+    .option("--address <s>")
+    .option("--postal-code <s>")
+    .option("--city <s>")
     .option(
-      "--get-or-create",
-      "If a customer with this yTunnus already exists, return it (reused:true) instead of creating a duplicate"
+      "--get-or-create"
     )
-    .option("--body <json>", "Raw JSON body forwarded verbatim (overrides typed flags)");
+    .option("--body <json>");
   addWriteFlagsToCommand(createCmd).action(
     guarded(async (opts: CustomerCreateFlags & WriteFlags & { getOrCreate?: boolean }) => {
       const client = await getClient();
@@ -1258,18 +1256,18 @@ export function registerCustomerCommands(
 
   const updateCmd = c
     .command("update <asiakasId>")
-    .option("--name <s>", "Customer name (asiakasNimi)")
-    .option("--ytunnus <s>", "Business ID (ytunnus)")
-    .option("--email <s>", "Invoicing email (laskutusEmail)")
-    .option("--short-name <s>", "Short display name (asiakasShortNimi)")
-    .option("--comment <s>", "Comment (kommentti)")
-    .option("--contact-person <id>", "Single PRIMARY contact personId (asiakasContactPersonId) — for memberships use `customer person add`", (v: string) => Number(v))
-    .option("--type <id>", "Customer type id (asiakasTypeId)", (v: string) => Number(v))
-    .option("--address <s>", "Billing street address (laskutusOsoite)")
-    .option("--postal-code <s>", "Billing postal code (laskutusPostinumero)")
-    .option("--city <s>", "Billing city (laskutusKaupunki)")
-    .option("--from-prh <ytunnus>", "Refresh name + yTunnus + billing address from PRH (explicit flags still win)")
-    .option("--body <json>", "Raw JSON body forwarded verbatim (overrides typed flags)");
+    .option("--name <s>")
+    .option("--ytunnus <s>")
+    .option("--email <s>")
+    .option("--short-name <s>")
+    .option("--comment <s>")
+    .option("--contact-person <id>", "", (v: string) => Number(v))
+    .option("--type <id>", "", (v: string) => Number(v))
+    .option("--address <s>")
+    .option("--postal-code <s>")
+    .option("--city <s>")
+    .option("--from-prh <ytunnus>")
+    .option("--body <json>");
   addWriteFlagsToCommand(updateCmd).action(
     guarded(async (idStr: string, opts: CustomerUpdateFlags & WriteFlags & { fromPrh?: string }) => {
       const client = await getClient();
@@ -1296,18 +1294,18 @@ export function registerCustomerCommands(
   const upsertCmd = c
     .command("create-or-update")
     .alias("upsert")
-    .option("--ytunnus <s>", "Business ID key (yTunnus) — required unless --from-prh/--body supplies it")
-    .option("--from-prh <ytunnus>", "Use this business ID as the key AND prefill from PRH on create")
-    .option("--name <s>", "Customer name (asiakasNimi)")
-    .option("--email <s>", "Invoicing email (laskutusEmail)")
-    .option("--short-name <s>", "Short display name (asiakasShortNimi)")
-    .option("--comment <s>", "Comment (kommentti) — applied on update")
-    .option("--contact-person <id>", "Contact person id — applied on update", (v: string) => Number(v))
-    .option("--type <id>", "Customer type id — applied on update", (v: string) => Number(v))
-    .option("--address <s>", "Billing street address (laskutusOsoite)")
-    .option("--postal-code <s>", "Billing postal code (laskutusPostinumero)")
-    .option("--city <s>", "Billing city (laskutusKaupunki)")
-    .option("--body <json>", "Raw JSON body forwarded verbatim (overrides typed flags)");
+    .option("--ytunnus <s>")
+    .option("--from-prh <ytunnus>")
+    .option("--name <s>")
+    .option("--email <s>")
+    .option("--short-name <s>")
+    .option("--comment <s>")
+    .option("--contact-person <id>", "", (v: string) => Number(v))
+    .option("--type <id>", "", (v: string) => Number(v))
+    .option("--address <s>")
+    .option("--postal-code <s>")
+    .option("--city <s>")
+    .option("--body <json>");
   addWriteFlagsToCommand(upsertCmd).action(
     async (opts: CustomerUpsertOptions & WriteFlags) => {
       try {
@@ -1360,8 +1358,8 @@ export function registerCustomerCommands(
     customerPerson
       .command("list [asiakasId]")
   )
-    .option("--role <name>", "Filter by role name (e.g. keikkaHandler)")
-    .option("--include-roles", "Add permissionRoles[] (full per-company role names) to each person — N extra GETs")
+    .option("--role <name>")
+    .option("--include-roles")
     .action(
       jsonAction(getClient, (client, asiakasIdStr: string | undefined, opts: { asiakas?: number; role?: string; includeRoles?: boolean }) =>
         runCustomerPersonList(client, resolveAsiakasTarget(asiakasIdStr, opts.asiakas), opts.role, opts.includeRoles)

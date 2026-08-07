@@ -366,13 +366,13 @@ export async function runVehicleUpdate(client, vehicleId, changes, flags) {
 export function registerVehicleCommands(parent, getClient) {
     const v = parent.command("vehicle").description("Vehicle commands");
     v.command("list")
-        .option("--limit <n>", "Max rows", cappedInt(500))
-        .option("--cursor <c>", "Pagination cursor")
-        .option("--deleted", "Include soft-deleted vehicles (default: excluded)")
-        .option("--grid-only", "Only vehicles shown in the grid (showInGrid=1)")
-        .option("--valid-on <date>", "Only vehicles valid on this day YYYY-MM-DD (or today/yesterday/tomorrow)")
-        .option("--type <id>", "Only this vehicleTypeId", (val) => Number(val))
-        .option("--asiakas <id>", "Read another company's fleet (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant). Default: active company.", (val) => Number(val))
+        .option("--limit <n>", "", cappedInt(500))
+        .option("--cursor <c>")
+        .option("--deleted")
+        .option("--grid-only")
+        .option("--valid-on <date>")
+        .option("--type <id>", "", (val) => Number(val))
+        .option("--asiakas <id>", "", (val) => Number(val))
         .action(jsonAction(getClient, (client, opts) => runVehicleList(client, {
         limit: opts.limit,
         cursor: opts.cursor,
@@ -383,22 +383,22 @@ export function registerVehicleCommands(parent, getClient) {
         asiakas: opts.asiakas,
     })));
     v.command("get <vehicleId>")
-        .option("--asiakas <id>", "Read a vehicle owned by another company (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant)", (val) => Number(val))
+        .option("--asiakas <id>", "", (val) => Number(val))
         .action(jsonAction(getClient, (client, idStr, opts) => runVehicleGet(client, parseId(idStr, "vehicleId"), opts.asiakas)));
     v.command("status <vehicleId>")
         .action(jsonAction(getClient, (client, idStr) => runVehicleStatus(client, parseId(idStr, "vehicleId"))));
     v.command("types")
-        .option("--asiakas <id>", "List another company's vehicle types (cross-tenant; needed for `vehicle create --asiakas` since types are tenant-defined)", (val) => Number(val))
+        .option("--asiakas <id>", "", (val) => Number(val))
         .action(jsonAction(getClient, (client, opts) => runVehicleTypes(client, opts.asiakas)));
     v.command("locations")
         .action(jsonAction(getClient, runVehicleLocations));
     v.command("search [query]")
-        .option("--search <s>", "Search query (alias for the <query> positional)")
-        .option("--limit <n>", "Max rows", cappedInt(500))
-        .option("--asiakas <id>", "Search another company's fleet (cross-tenant; sysadmin/developer or a vehicle-manage role on that tenant)", (val) => Number(val))
+        .option("--search <s>")
+        .option("--limit <n>", "", cappedInt(500))
+        .option("--asiakas <id>", "", (val) => Number(val))
         .action(jsonAction(getClient, (client, query, opts) => runVehicleSearch(client, resolveSearchQuery(query, opts.search), opts.limit, opts.asiakas)));
     v.command("timeline <vehicleId>")
-        .option("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
+        .option("--date <date>", "", "today")
         .action(jsonAction(getClient, (client, idStr, opts) => runVehicleTimeline(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) })));
     const createCmd = addVehicleFieldFlags(v.command("create"), "create");
     addWriteFlagsToCommand(createCmd).action(guarded(async (opts) => {
@@ -418,14 +418,14 @@ export function registerVehicleCommands(parent, getClient) {
         .action(jsonAction(getClient, (client, idStr) => runVehicleDatesList(client, parseId(idStr, "vehicleId"))));
     dates
         .command("expiring")
-        .option("--days <n>", "Days-ahead window (default 30)", (s) => Number(s))
+        .option("--days <n>", "", (s) => Number(s))
         .action(jsonAction(getClient, (client, opts) => runVehicleDatesExpiring(client, opts.days)));
     v.command("route <vehicleId>")
-        .option("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
+        .option("--date <date>", "", "today")
         .action(jsonAction(getClient, (client, idStr, opts) => runVehicleRoute(client, parseId(idStr, "vehicleId"), { date: resolveDate(opts.date) })));
     v.command("visits <filterType> <id>")
-        .option("--days <n>", "Look-back window in days (omit for all-time)", (val) => Number(val))
-        .option("--date <d>", "Only visits on this day (YYYY-MM-DD or today/yesterday/tomorrow; Europe/Helsinki)")
+        .option("--days <n>", "", (val) => Number(val))
+        .option("--date <d>")
         .action(jsonAction(getClient, (client, filterType, idStr, opts) => runVehicleVisits(client, filterType, parseId(idStr, "vehicleId"), {
         days: opts.days,
         date: opts.date ? resolveDate(opts.date) : undefined,

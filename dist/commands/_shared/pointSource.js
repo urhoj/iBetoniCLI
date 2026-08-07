@@ -2,12 +2,12 @@ import { failWith } from "../../output/json.js";
 /** Attach the six point-source options, in the order both commands declare them. */
 export function addPointSourceOptions(cmd) {
     return cmd
-        .option("--sijainti <id>", "Resolve coordinates from a sijainti id", Number)
-        .option("--worksite <tyomaaId>", "Resolve coordinates from a worksite (tenant-scoped)", Number)
-        .option("--tyomaa <tyomaaId>", "Alias for --worksite", Number)
-        .option("--lat <n>", "Latitude (WGS84) — pair with --lng", Number)
-        .option("--lng <n>", "Longitude (WGS84) — pair with --lat", Number)
-        .option("--address <s>", "Street address to geocode");
+        .option("--sijainti <id>", "", Number)
+        .option("--worksite <tyomaaId>", "", Number)
+        .option("--tyomaa <tyomaaId>", "", Number)
+        .option("--lat <n>", "", Number)
+        .option("--lng <n>", "", Number)
+        .option("--address <s>");
 }
 /**
  * Distinct point sources the caller supplied — `--worksite`/`--tyomaa` count as

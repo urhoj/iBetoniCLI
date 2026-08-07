@@ -48,19 +48,19 @@ export function registerPerfCommands(parent, getClient, opts = {}) {
     const perf = parent.command("perf", { hidden: !!opts.hidden }).description("SQL slow-query monitoring (developer)");
     perf
         .command("slow")
-        .option("--limit <n>", "Max rows (default 50)", (v) => Number(v))
-        .option("--env <name>", "Environment buffer to read (default: backend's current env)")
+        .option("--limit <n>", "", (v) => Number(v))
+        .option("--env <name>")
         .action(jsonAction(getClient, (client, opts) => runPerfSlow(client, opts)));
     perf
         .command("stats")
-        .option("--env <name>", "Environment buffer to read (default: backend's current env)")
+        .option("--env <name>")
         .action(jsonAction(getClient, runPerfStats));
     perf
         .command("config")
         .action(jsonAction(getClient, runPerfConfig));
     const clear = perf
         .command("clear")
-        .option("--env <name>", "Environment buffer to clear (default: backend's current env)");
+        .option("--env <name>");
     addWriteFlagsToCommand(clear).action(jsonAction(getClient, (client, opts) => runPerfClear(client, opts)));
 }
 //# sourceMappingURL=index.js.map

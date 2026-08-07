@@ -63,10 +63,10 @@ export function registerValidateCommands(
 ): void {
   parent
     .command("validate [action]")
-    .option("--asiakas <id>", "Target asiakasId (default: active company)", Number)
-    .option("--person <id>", "Validate this person as an employee of the company", Number)
-    .option("--profile <p>", "Profile id (company: jerry|betoni; person: onboarding [default])")
-    .option("--keikka <id>", "Validate this keikka against the reminders-drawer rules (alias of ib keikka validate <id>)", Number)
+    .option("--asiakas <id>", "", Number)
+    .option("--person <id>", "", Number)
+    .option("--profile <p>")
+    .option("--keikka <id>", "", Number)
     .action(
       guarded(async (action: string | undefined, opts: { asiakas?: number; person?: number; profile?: string; keikka?: number }) => {
         const client = await getClient();

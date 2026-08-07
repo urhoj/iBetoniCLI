@@ -15,7 +15,7 @@ export function registerPersonLinkCommands(parent, getClient, cfg) {
         addWriteFlagsToCommand(parent
             .command(name)
             .requiredOption(`--${cfg.targetFlag} <id>`, cfg.targetDescription, Number)
-            .requiredOption("--person <id>", "Target personId", Number)
+            .requiredOption("--person <id>", "", Number)
             .option("--contact-type <id>", cfg.contactTypeDescription, Number, 1)).action(guarded(async (opts) => {
             const client = await getClient();
             writeJson(await run(client, {

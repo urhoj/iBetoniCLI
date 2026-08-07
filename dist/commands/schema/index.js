@@ -57,8 +57,8 @@ export async function runSchemaBatch(client, single, names) {
 export function registerSchemaCommands(parent, getClient, opts = {}) {
     const s = parent.command("schema", { hidden: !!opts.hidden }).description("SQL schema introspection (developer-only)");
     const listOpt = (cmd) => cmd
-        .option("--search <substr>", "Filter object names by substring")
-        .option("--limit <n>", "Max rows (default 200, max 1000)", cappedInt(1000));
+        .option("--search <substr>")
+        .option("--limit <n>", "", cappedInt(1000));
     // Single object by default; a comma in <name> switches to batch mode
     // (`ib dev schema proc a,b,c`) — parallel fan-out, deduped, 404-tolerant.
     const runOneOrBatch = (fn) => guarded(async (name) => {

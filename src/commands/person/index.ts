@@ -541,13 +541,12 @@ export function registerPersonCommands(
   registerPersonActivityCommand(p, getClient);
 
   p.command("list")
-    .option("--role <role>", "Filter by role name")
-    .option("--asiakas <id>", "Filter by asiakasId", (v: string) => Number(v))
+    .option("--role <role>")
+    .option("--asiakas <id>", "", (v: string) => Number(v))
     .option(
-      "--owned",
-      "List persons the company OWNS instead of its members (the default)"
+      "--owned"
     )
-    .option("--limit <n>", "Max rows", cappedInt(500))
+    .option("--limit <n>", "", cappedInt(500))
     .action(jsonAction(getClient, (client, opts: PersonListFilter) => runPersonList(client, opts)));
 
   p.command("get <personId>")
@@ -558,20 +557,18 @@ export function registerPersonCommands(
     );
 
   p.command("search [query]")
-    .option("--search <s>", "Search query (alias for the <query> positional)")
-    .option("--limit <n>", "Max results", cappedInt(500))
+    .option("--search <s>")
+    .option("--limit <n>", "", cappedInt(500))
     .option(
-      "--my-companies",
-      "Search across every company you belong to (each hit tagged with its asiakasId)"
+      "--my-companies"
     )
     .option(
       "--asiakas <id>",
-      "Search this company instead of your active one (cross-tenant: sysadmin/developer, or a company you belong to)",
+      "",
       (v: string) => Number(v)
     )
     .option(
-      "--all-companies",
-      "Search EVERY tenant (developer/sysadmin only; deploy-gated)"
+      "--all-companies"
     )
     .action(
       guarded(async (
@@ -639,11 +636,11 @@ export function registerPersonCommands(
 
   const notifyCmd = p
     .command("notify <person>")
-    .requiredOption("--title <text>", "Notification title")
-    .requiredOption("--body <text>", "Notification body")
+    .requiredOption("--title <text>")
+    .requiredOption("--body <text>")
     .option(
       "--data <json>",
-      "Extra FCM data payload as a JSON object",
+      "",
       (raw: string) => parseJsonBodyFlag(raw, "--data")
     );
   addWriteFlagsToCommand(notifyCmd).action(
@@ -666,24 +663,21 @@ export function registerPersonCommands(
 
   const createCmd = p
     .command("create")
-    .option("--first <s>", "personFirstName (required)")
-    .option("--last <s>", "personLastName (required)")
-    .option("--phone <s>", "personPhone")
-    .option("--email <s>", "personEmail (optional)")
-    .option("--memo <s>", "personMemo — free-text note/comment (optional)")
-    .option("--asiakas <id>", "Owner asiakasId (defaults to your active company)", Number)
+    .option("--first <s>")
+    .option("--last <s>")
+    .option("--phone <s>")
+    .option("--email <s>")
+    .option("--memo <s>")
+    .option("--asiakas <id>", "", Number)
     .option(
-      "--global",
-      "Create a GLOBAL, self-managing person with no owner (ownerAsiakasId=null), discoverable across companies. Mutually exclusive with --asiakas."
+      "--global"
     )
     .option(
-      "--get-or-create",
-      "On a duplicate email, return the existing person (reused:true) when visible to you; an email owned by a company you can't access errors with guidance"
+      "--get-or-create"
     )
-    .option("--body <json>", "Raw JSON body (merged under typed flags)")
+    .option("--body <json>")
     .option(
-      "--from-json <file>",
-      "Read the JSON body from a file (or - for stdin) — shell-safe alternative to --body"
+      "--from-json <file>"
     );
   addWriteFlagsToCommand(createCmd).action(
     guarded(async (
@@ -791,15 +785,14 @@ export function registerPersonCommands(
   addWriteFlagsToCommand(
     p
       .command("update <personId>")
-      .option("--first <s>", "personFirstName")
-      .option("--last <s>", "personLastName")
-      .option("--phone <s>", "personPhone")
-      .option("--email <s>", "personEmail")
-      .option("--memo <s>", "personMemo — free-text note/comment")
-      .option("--body <json>", "Patch body (JSON), merged under the typed flags")
+      .option("--first <s>")
+      .option("--last <s>")
+      .option("--phone <s>")
+      .option("--email <s>")
+      .option("--memo <s>")
+      .option("--body <json>")
       .option(
-        "--from-json <file>",
-        "Read the patch body from a file (or - for stdin) — shell-safe alternative to --body"
+        "--from-json <file>"
       )
   ).action(
     guarded(async (
@@ -829,8 +822,8 @@ export function registerPersonCommands(
   addWriteFlagsToCommand(
     p
       .command("owner <personId>")
-      .option("--global", "Make the person GLOBAL (ownerAsiakasId=null)")
-      .option("--asiakas <id>", "Set owner to this asiakasId", Number)
+      .option("--global")
+      .option("--asiakas <id>", "", Number)
   ).action(guarded(async (personIdStr: string, opts: WriteFlags & { global?: boolean; asiakas?: number }) => {
     const hasGlobal = !!opts.global;
     const hasAsiakas = opts.asiakas !== undefined;
@@ -859,7 +852,7 @@ export function registerPersonCommands(
 
   personRole
     .command("list <personId>")
-    .requiredOption("--asiakas <id>", "Target asiakasId", (v: string) => Number(v))
+    .requiredOption("--asiakas <id>", "", (v: string) => Number(v))
     .action(
       jsonAction(getClient, (client, personIdStr: string, opts: { asiakas: number }) =>
         runPersonRoleList(client, parseId(personIdStr, "personId"), opts.asiakas)
@@ -869,8 +862,8 @@ export function registerPersonCommands(
   addWriteFlagsToCommand(
     personRole
       .command("grant <personId>")
-      .requiredOption("--role <name>", "Role name (see ROLE_TYPEID_BY_NAME)")
-      .requiredOption("--asiakas <id>", "Target asiakasId", (v: string) => Number(v))
+      .requiredOption("--role <name>")
+      .requiredOption("--asiakas <id>", "", (v: string) => Number(v))
   ).action(guarded(async (personIdStr: string, opts: WriteFlags & { role: string; asiakas: number }) => {
     let roleTypeId: number;
     try {
@@ -892,8 +885,8 @@ export function registerPersonCommands(
   addWriteFlagsToCommand(
     personRole
       .command("revoke <personId>")
-      .requiredOption("--role <name>", "Role name (see ROLE_TYPEID_BY_NAME)")
-      .requiredOption("--asiakas <id>", "Target asiakasId", (v: string) => Number(v))
+      .requiredOption("--role <name>")
+      .requiredOption("--asiakas <id>", "", (v: string) => Number(v))
   ).action(guarded(async (personIdStr: string, opts: WriteFlags & { role: string; asiakas: number }) => {
     let roleTypeId: number;
     try {
@@ -943,8 +936,8 @@ export function registerPersonCommands(
   });
 
   addOwnerOption(p.command("log <personId>"))
-    .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)
-    .option("--field <name>", "Filter by changeTracker fieldName (e.g. asiakasPersonSetting)")
+    .option("--limit <n>", "", cappedInt(500), 100)
+    .option("--field <name>")
     .action(
       jsonAction(getClient, (client, personIdStr: string, opts: { owner?: number; limit: number; field?: string }) =>
         runPersonHistory(client, parseId(personIdStr, "personId"), opts.limit, {

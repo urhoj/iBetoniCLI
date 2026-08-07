@@ -137,7 +137,7 @@ export function registerCombinatorCommands(
 ): void {
   parent
     .command("duplicates")
-    .option("--owner <id>", "ownerAsiakasId to scan (default: active company)", Number)
+    .option("--owner <id>", "", Number)
     .action(
       guarded(async (opts: { owner?: number }) => {
         const client = await getClient();
@@ -150,15 +150,15 @@ export function registerCombinatorCommands(
   const mergeCmd = addOwnerOption(
     parent
       .command("merge")
-      .requiredOption("--main <id>", `${cfg.idLabel} to KEEP (references merge into this)`, Number)
+      .requiredOption("--main <id>", "", Number)
       .requiredOption(
         "--secondary <id>",
-        `${cfg.idLabel} to REMOVE (merged away, then deleted)`,
+        "",
         Number
       )
   );
   if (cfg.allowBigMerge) {
-    mergeCmd.option("--allow-big-merge", "System-admin: permit a merge above the safety row cap");
+    mergeCmd.option("--allow-big-merge");
   }
   addWriteFlagsToCommand(mergeCmd).action(
     guarded(async (

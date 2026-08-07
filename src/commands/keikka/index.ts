@@ -353,18 +353,17 @@ export function registerKeikkaCommands(
   const k = parent.command("keikka").description("Keikka commands");
 
   k.command("list")
-    .option("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
-    .option("--to <date>", "End date YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
+    .option("--from <date>", "", "today")
+    .option("--to <date>", "", "today")
     .option(
-      "--date <date>",
-      "Single-day shorthand: sets --from and --to to this one day (YYYY-MM-DD or today/yesterday/tomorrow). Mutually exclusive with --from/--to."
+      "--date <date>"
     )
-    .option("--customer <id>", "Filter by asiakasId", (v: string) => Number(v))
-    .option("--vehicle <id>", "Filter by vehicleId", (v: string) => Number(v))
-    .option("--worksite <id>", "Filter by worksite (tyomaaId)", (v: string) => Number(v))
-    .option("--status <s>", "Filter by status")
-    .option("--limit <n>", "Max rows", cappedInt(500))
-    .option("--cursor <c>", "Pagination cursor")
+    .option("--customer <id>", "", (v: string) => Number(v))
+    .option("--vehicle <id>", "", (v: string) => Number(v))
+    .option("--worksite <id>", "", (v: string) => Number(v))
+    .option("--status <s>")
+    .option("--limit <n>", "", cappedInt(500))
+    .option("--cursor <c>")
     .action(
       guarded(async (rawOpts: KeikkaListFilter & { date?: string }, command: Command) => {
         const client = await getClient();
@@ -399,13 +398,13 @@ export function registerKeikkaCommands(
     );
 
   k.command("latest")
-    .option("--status <s>", "Filter by status (keikkaTilaId, e.g. 9 = Toimitettu)")
-    .option("--customer <id>", "Filter by asiakasId", (v: string) => Number(v))
-    .option("--vehicle <id>", "Filter by vehicleId", (v: string) => Number(v))
-    .option("--worksite <id>", "Filter by worksite (tyomaaId)", (v: string) => Number(v))
+    .option("--status <s>")
+    .option("--customer <id>", "", (v: string) => Number(v))
+    .option("--vehicle <id>", "", (v: string) => Number(v))
+    .option("--worksite <id>", "", (v: string) => Number(v))
     .option(
       "--lookback <days>",
-      "How far back from today to search (default 365, max 3650)",
+      "",
       (v: string) => Number(v)
     )
     .action(
@@ -420,8 +419,8 @@ export function registerKeikkaCommands(
     );
 
   k.command("search [query]")
-    .option("--search <s>", "Search query (alias for the <query> positional)")
-    .option("--limit <n>", "Max hits (client-side; backend caps at 100)", (v: string) => Number(v))
+    .option("--search <s>")
+    .option("--limit <n>", "", (v: string) => Number(v))
     .action(
       guarded(async (query: string | undefined, opts: { search?: string; limit?: number }) => {
         const client = await getClient();
@@ -432,7 +431,7 @@ export function registerKeikkaCommands(
     );
 
   k.command("validate [keikkaId]")
-    .option("--date <date>", "Validate every keikka for this date (YYYY-MM-DD or today/yesterday/tomorrow)")
+    .option("--date <date>")
     .action(
       guarded(async (idStr: string | undefined, opts: { date?: string }) => {
         const client = await getClient();
@@ -450,8 +449,7 @@ export function registerKeikkaCommands(
   const createCmd = k
     .command("create")
     .requiredOption(
-      "--body <json>",
-      "JSON object forwarded verbatim as the request body"
+      "--body <json>"
     );
   addWriteFlagsToCommand(createCmd).action(
     guarded(async (opts: WriteFlags & { body: string }) => {
@@ -464,7 +462,7 @@ export function registerKeikkaCommands(
 
   const updateCmd = k
     .command("update <keikkaId>")
-    .option("--status <s>", "New keikkaTilaId (numeric, e.g. 9 = Toimitettu)");
+    .option("--status <s>");
   addWriteFlagsToCommand(updateCmd).action(
     guarded(async (idStr: string, opts: WriteFlags & { status?: string }) => {
       if (opts.status === undefined) {

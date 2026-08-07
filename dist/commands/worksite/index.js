@@ -304,13 +304,13 @@ export function runWorksiteMerge(client, opts, flags) {
 export function registerWorksiteCommands(parent, getClient) {
     const w = parent.command("worksite").description("Worksite commands");
     w.command("list")
-        .option("--limit <n>", "Max rows", cappedInt(500))
-        .option("--cursor <c>", "Pagination cursor")
-        .option("--customer <n>", "Filter by parent asiakasId", (v) => Number(v))
+        .option("--limit <n>", "", cappedInt(500))
+        .option("--cursor <c>")
+        .option("--customer <n>", "", (v) => Number(v))
         .action(jsonAction(getClient, (client, opts) => runWorksiteList(client, { limit: opts.limit, cursor: opts.cursor, customer: opts.customer })));
     w.command("get <tyomaaId>")
-        .option("--include-building", "Attach the parsed Helsinki building data (rakennusData)")
-        .option("--include-cameras", "Attach the nearby traffic cameras (cameras[])")
+        .option("--include-building")
+        .option("--include-cameras")
         .action(jsonAction(getClient, (client, idStr, opts) => runWorksiteGet(client, parseId(idStr, "tyomaaId"), {
         includeBuilding: opts.includeBuilding,
         includeCameras: opts.includeCameras,
@@ -323,12 +323,12 @@ export function registerWorksiteCommands(parent, getClient) {
         .action(jsonAction(getClient, (client, idStr) => runWorksiteDatesList(client, parseId(idStr, "tyomaaId"))));
     dates
         .command("expiring")
-        .option("--days <n>", "Look-ahead window in days (default 30)", (v) => Number(v))
+        .option("--days <n>", "", (v) => Number(v))
         .action(jsonAction(getClient, (client, opts) => runWorksiteDatesExpiring(client, opts.days)));
     w.command("search [query]")
-        .option("--search <s>", "Search query (alias for the <query> positional)")
-        .option("--limit <n>", "Max results", cappedInt(500))
-        .option("--my-companies", "Search across every company you belong to (rows tagged with ownerAsiakasId)")
+        .option("--search <s>")
+        .option("--limit <n>", "", cappedInt(500))
+        .option("--my-companies")
         .action(jsonAction(getClient, (client, query, opts) => runWorksiteSearch(client, resolveSearchQuery(query, opts.search), opts.limit, !!opts.myCompanies)));
     registerDashboardCommand(w, getClient, {
         idArg: "tyomaaId",
@@ -337,7 +337,7 @@ export function registerWorksiteCommands(parent, getClient) {
     });
     const createCmd = w
         .command("create")
-        .requiredOption("--body <json>", "JSON object forwarded verbatim as the request body");
+        .requiredOption("--body <json>");
     addWriteFlagsToCommand(createCmd).action(guarded(async (opts) => {
         const client = await getClient();
         const parsed = parseJsonBodyFlag(opts.body);
@@ -346,19 +346,19 @@ export function registerWorksiteCommands(parent, getClient) {
     }));
     const updateCmd = w
         .command("update <tyomaaId>")
-        .option("--name <s>", "Worksite name (tyomaaNimi)")
-        .option("--num <s>", "Worksite number (tyomaaNum)")
-        .option("--address <s>", "Street address (tyomaaOsoite1)")
-        .option("--address2 <s>", "Address line 2 (tyomaaOsoite2)")
-        .option("--postal-code <s>", "Postal code (tyomaaOsoite3)")
-        .option("--city <s>", "City (tyomaaOsoite4)")
-        .option("--driving-instructions <s>", "Driving instructions (tyomaaAjoOhje)")
-        .option("--comment <s>", "Free-text memo (tyomaaMemo)")
-        .option("--invoice-ref <s>", "Invoice reference (laskuViite)")
-        .option("--contact-person <id>", "Contact personId (tyomaaContactPersonId; 0 = none)", (v) => Number(v))
-        .option("--body <json>", "Patch body (JSON), merged under the typed flags")
-        .option("--from-json <file>", "Read the patch body from a file (or - for stdin) — shell-safe alternative to --body")
-        .option("--yyyymmdd <date>", "Date segment YYYYMMDD (defaults to today)");
+        .option("--name <s>")
+        .option("--num <s>")
+        .option("--address <s>")
+        .option("--address2 <s>")
+        .option("--postal-code <s>")
+        .option("--city <s>")
+        .option("--driving-instructions <s>")
+        .option("--comment <s>")
+        .option("--invoice-ref <s>")
+        .option("--contact-person <id>", "", (v) => Number(v))
+        .option("--body <json>")
+        .option("--from-json <file>")
+        .option("--yyyymmdd <date>");
     addWriteFlagsToCommand(updateCmd).action(guarded(async (idStr, opts) => {
         const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) ?? {};
         // `opts` IS a WorksiteUpdateFlags (plus the write/body flags); the builder
@@ -380,7 +380,7 @@ export function registerWorksiteCommands(parent, getClient) {
     }));
     addWriteFlagsToCommand(w.command("refresh-location <tyomaaId>")).action(jsonAction(getClient, (client, idStr, opts) => runWorksiteRefreshLocation(client, parseId(idStr, "tyomaaId"), opts)));
     addWriteFlagsToCommand(w.command("set-geofence <tyomaaId>")
-        .requiredOption("--radius <m>", "Geofence radius in metres", Number)).action(guarded(async (idStr, opts) => {
+        .requiredOption("--radius <m>", "", Number)).action(guarded(async (idStr, opts) => {
         if (!Number.isInteger(opts.radius) || opts.radius < 1 || opts.radius > 10000) {
             failWith("--radius must be an integer between 1 and 10000", 4);
         }
@@ -401,7 +401,7 @@ export function registerWorksiteCommands(parent, getClient) {
     });
     worksitePerson
         .command("list [tyomaaId]")
-        .option("--worksite <id>", "Target tyomaaId (alias for the positional; same flag as person add/remove)", Number)
+        .option("--worksite <id>", "", Number)
         .action(jsonAction(getClient, (client, tyomaaIdStr, opts) => runWorksitePersonList(client, resolveTarget(tyomaaIdStr, opts.worksite, "tyomaaId", "worksite"))));
     registerLogAlias(w, getClient, "tyomaa", "tyomaaId");
     registerCombinatorCommands(w, getClient, {

@@ -17,7 +17,7 @@ export async function runBuildingLookup(client, opts) {
 /** Register `ib opendata building`. */
 export function registerBuildingCommands(parent, getClient) {
     addPointSourceOptions(parent.command("building"))
-        .option("--city <name>", "Helsinki | Vantaa | Espoo | HSY | Ryhti (override; otherwise derived/auto-tried then national Ryhti fallback)")
+        .option("--city <name>")
         .action(guarded(async (opts) => {
         assertSinglePointSource(opts, selectedPointSources(opts), {
             none: "provide exactly one of: --sijainti, --worksite, --lat+--lng, or --address",

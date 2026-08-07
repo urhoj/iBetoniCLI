@@ -226,15 +226,15 @@ export async function runKeikkaValidate(client, opts) {
 export function registerKeikkaCommands(parent, getClient) {
     const k = parent.command("keikka").description("Keikka commands");
     k.command("list")
-        .option("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
-        .option("--to <date>", "End date YYYY-MM-DD (or today/yesterday/tomorrow)", "today")
-        .option("--date <date>", "Single-day shorthand: sets --from and --to to this one day (YYYY-MM-DD or today/yesterday/tomorrow). Mutually exclusive with --from/--to.")
-        .option("--customer <id>", "Filter by asiakasId", (v) => Number(v))
-        .option("--vehicle <id>", "Filter by vehicleId", (v) => Number(v))
-        .option("--worksite <id>", "Filter by worksite (tyomaaId)", (v) => Number(v))
-        .option("--status <s>", "Filter by status")
-        .option("--limit <n>", "Max rows", cappedInt(500))
-        .option("--cursor <c>", "Pagination cursor")
+        .option("--from <date>", "", "today")
+        .option("--to <date>", "", "today")
+        .option("--date <date>")
+        .option("--customer <id>", "", (v) => Number(v))
+        .option("--vehicle <id>", "", (v) => Number(v))
+        .option("--worksite <id>", "", (v) => Number(v))
+        .option("--status <s>")
+        .option("--limit <n>", "", cappedInt(500))
+        .option("--cursor <c>")
         .action(guarded(async (rawOpts, command) => {
         const client = await getClient();
         const { date, ...opts } = rawOpts;
@@ -261,17 +261,17 @@ export function registerKeikkaCommands(parent, getClient) {
         writeJson(result);
     }));
     k.command("latest")
-        .option("--status <s>", "Filter by status (keikkaTilaId, e.g. 9 = Toimitettu)")
-        .option("--customer <id>", "Filter by asiakasId", (v) => Number(v))
-        .option("--vehicle <id>", "Filter by vehicleId", (v) => Number(v))
-        .option("--worksite <id>", "Filter by worksite (tyomaaId)", (v) => Number(v))
-        .option("--lookback <days>", "How far back from today to search (default 365, max 3650)", (v) => Number(v))
+        .option("--status <s>")
+        .option("--customer <id>", "", (v) => Number(v))
+        .option("--vehicle <id>", "", (v) => Number(v))
+        .option("--worksite <id>", "", (v) => Number(v))
+        .option("--lookback <days>", "", (v) => Number(v))
         .action(jsonAction(getClient, (client, opts) => runKeikkaLatest(client, opts)));
     k.command("get <keikkaId>")
         .action(jsonAction(getClient, (client, idStr) => runKeikkaGet(client, parseId(idStr, "keikkaId"))));
     k.command("search [query]")
-        .option("--search <s>", "Search query (alias for the <query> positional)")
-        .option("--limit <n>", "Max hits (client-side; backend caps at 100)", (v) => Number(v))
+        .option("--search <s>")
+        .option("--limit <n>", "", (v) => Number(v))
         .action(guarded(async (query, opts) => {
         const client = await getClient();
         const ownerAsiakasId = ownerAsiakasIdFromToken(client, "run `ib auth switch`");
@@ -279,7 +279,7 @@ export function registerKeikkaCommands(parent, getClient) {
         writeJson(result);
     }));
     k.command("validate [keikkaId]")
-        .option("--date <date>", "Validate every keikka for this date (YYYY-MM-DD or today/yesterday/tomorrow)")
+        .option("--date <date>")
         .action(guarded(async (idStr, opts) => {
         const client = await getClient();
         if (opts.date && idStr) {
@@ -293,7 +293,7 @@ export function registerKeikkaCommands(parent, getClient) {
     }));
     const createCmd = k
         .command("create")
-        .requiredOption("--body <json>", "JSON object forwarded verbatim as the request body");
+        .requiredOption("--body <json>");
     addWriteFlagsToCommand(createCmd).action(guarded(async (opts) => {
         const client = await getClient();
         const parsed = parseJsonBodyFlag(opts.body);
@@ -302,7 +302,7 @@ export function registerKeikkaCommands(parent, getClient) {
     }));
     const updateCmd = k
         .command("update <keikkaId>")
-        .option("--status <s>", "New keikkaTilaId (numeric, e.g. 9 = Toimitettu)");
+        .option("--status <s>");
     addWriteFlagsToCommand(updateCmd).action(guarded(async (idStr, opts) => {
         if (opts.status === undefined) {
             failWith("Nothing to update: pass --status (v1.0 supports --status only)", 4);

@@ -543,7 +543,7 @@ export function registerLegalCommands(
 
   legal
     .command("show <typeName>")
-    .option("--meta", "Omit markdownContent (returns contentLength instead)")
+    .option("--meta")
     .action(
       jsonAction(getClient, (client, typeName: string, opts: { meta?: boolean }) =>
         runLegalShow(client, typeName, !!opts.meta)
@@ -557,8 +557,8 @@ export function registerLegalCommands(
 
   legal
     .command("status")
-    .option("--person <id>", "Check another person (developer/sysadmin only)", Number)
-    .option("--owner <id>", "ownerAsiakasId scope (default: your company from the token)", Number)
+    .option("--person <id>", "", Number)
+    .option("--owner <id>", "", Number)
     .action(
       guarded(async (opts: { person?: number; owner?: number }) => {
         const client = await getClient();
@@ -574,8 +574,8 @@ export function registerLegalCommands(
 
   legal
     .command("versions <typeName>")
-    .option("--owner <id>", "Filter by ownerAsiakasId tenant scope", Number)
-    .option("--status <status>", `Filter by lifecycle status (${LEGAL_STATUSES.join("|")})`)
+    .option("--owner <id>", "", Number)
+    .option("--status <status>")
     .action(
       guarded(async (typeName: string, opts: { owner?: number; status?: string }) => {
         if (opts.status && !LEGAL_STATUSES.includes(opts.status as (typeof LEGAL_STATUSES)[number])) {
@@ -592,8 +592,8 @@ export function registerLegalCommands(
 
   legal
     .command("diff [a] [b]")
-    .option("--type <typeName>", "Diff the newest DRAFT vs the current ACTIVE version of this type")
-    .option("--owner <id>", "ownerAsiakasId scope for --type resolution (e.g. 1349 = BetoniJerry)", Number)
+    .option("--type <typeName>")
+    .option("--owner <id>", "", Number)
     .action(
       guarded(async (aStr: string | undefined, bStr: string | undefined, opts: { type?: string; owner?: number }) => {
         let input: { a: number; b: number } | { type: string; owner?: number };
@@ -628,19 +628,19 @@ export function registerLegalCommands(
 
   const saveCmd = legal
     .command("save")
-    .requiredOption("--type <typeName>", "Document type name (see ib legal types)")
+    .requiredOption("--type <typeName>")
     // NOT --version: the root global -V/--version is recognised anywhere in argv
     // and would shadow it (enforced by the root-option reuse test in
     // test/reference/help-wiring.test.ts).
-    .requiredOption("--doc-version <v>", "Version string, e.g. 2.0")
-    .option("--title <title>", "Document title (required for a full save; defaults to the current doc's title in --replace/--append/--prepend edit mode)")
-    .option("--file <path>", "Read markdown content from a local file")
-    .option("--content <markdown>", "Inline markdown content (use over /api/cli/exec — no local FS there)")
-    .option("--owner <id>", "ownerAsiakasId tenant scope (e.g. 1349 = BetoniJerry); omit for global", Number)
-    .option("--notes <text>", "Internal notes")
-    .option("--effective-date <date>", "Effective date YYYY-MM-DD (default: now)")
-    .option("--activate", "Publish immediately (deactivates prior versions). Default: inactive draft")
-    .option("--validate-json", "Validate the embedded ```json block parses to an object before saving (recommended for BETONIJERRY_* structured types)");
+    .requiredOption("--doc-version <v>")
+    .option("--title <title>")
+    .option("--file <path>")
+    .option("--content <markdown>")
+    .option("--owner <id>", "", Number)
+    .option("--notes <text>")
+    .option("--effective-date <date>")
+    .option("--activate")
+    .option("--validate-json");
   addEditFlags(saveCmd);
   addWriteFlagsToCommand(saveCmd).action(
     guarded(async (opts: WriteFlags & {
@@ -743,8 +743,8 @@ export function registerLegalCommands(
     .command("acceptances <typeName>")
     // NOT --version: shadowed by the root global -V/--version (enforced by the
     // root-option reuse test in test/reference/help-wiring.test.ts).
-    .option("--doc-version <v>", "Only acceptances of this version string")
-    .option("--limit <n>", "Max rows (default 500, cap 500)", cappedInt(500))
+    .option("--doc-version <v>")
+    .option("--limit <n>", "", cappedInt(500))
     .action(
       jsonAction(getClient, (client, typeName: string, opts: { docVersion?: string; limit?: number }) =>
         runLegalAcceptances(client, typeName, {
@@ -756,7 +756,7 @@ export function registerLegalCommands(
 
   const acceptCmd = legal
     .command("accept [typeName]")
-    .option("--type <typeName>", "Document type name (alias for the positional)");
+    .option("--type <typeName>");
   addWriteFlagsToCommand(acceptCmd).action(
     guarded(async (
       typeNameArg: string | undefined,
@@ -779,11 +779,11 @@ export function registerLegalCommands(
 
   const typeCreateCmd = typeGroup
     .command("create")
-    .requiredOption("--name <typeName>", "Type name, UPPER_SNAKE, max 50 (e.g. TOS_EN); immutable after creation")
-    .requiredOption("--display-name <s>", "Human-readable name (max 100)")
-    .option("--description <s>", "Short description (max 200)")
-    .option("--sort-order <n>", "List position (default 0)", Number)
-    .option("--setting-type-id <n>", "personSettingTypeId for acceptance tracking (must exist and be unmapped)", Number);
+    .requiredOption("--name <typeName>")
+    .requiredOption("--display-name <s>")
+    .option("--description <s>")
+    .option("--sort-order <n>", "", Number)
+    .option("--setting-type-id <n>", "", Number);
   addWriteFlagsToCommand(typeCreateCmd).action(
     guarded(async (opts: WriteFlags & {
       name: string;
@@ -799,10 +799,10 @@ export function registerLegalCommands(
 
   const typeUpdateCmd = typeGroup
     .command("update <typeName>")
-    .option("--display-name <s>", "Human-readable name (max 100)")
-    .option("--description <s>", "Short description (max 200)")
-    .option("--sort-order <n>", "List position", Number)
-    .option("--setting-type-id <n>", "personSettingTypeId for acceptance tracking (must exist and be unmapped)", Number);
+    .option("--display-name <s>")
+    .option("--description <s>")
+    .option("--sort-order <n>", "", Number)
+    .option("--setting-type-id <n>", "", Number);
   addWriteFlagsToCommand(typeUpdateCmd).action(
     guarded(async (
       typeName: string,

@@ -181,8 +181,8 @@ export function registerMessageChatCommands(parent, getClient) {
         .command("chat")
         .description("Conversational message threads (Jerry tarjous now, keikka later)");
     c.command("threads")
-        .option("--unread", "Only threads with unread messages")
-        .option("--tarjous <id>", "Only threads for this pumppuRequestId", Number)
+        .option("--unread")
+        .option("--tarjous <id>", "", Number)
         .action(jsonAction(getClient, (client, opts) => runChatThreads(client, opts)));
     addThreadTargetOption(c.command("thread [threadId]"))
         .action(guarded(async (threadIdStr, opts) => {
@@ -191,21 +191,21 @@ export function registerMessageChatCommands(parent, getClient) {
         writeJson(await runChatThread(client, id));
     }));
     addThreadTargetOption(c.command("list [threadId]"))
-        .option("--since <iso>", "Only messages created after this ISO timestamp")
-        .option("--limit <n>", "Max messages (default 100, server max 500)", Number)
-        .option("--deleted", "Include soft-deleted messages (your own; all for developers)")
+        .option("--since <iso>")
+        .option("--limit <n>", "", Number)
+        .option("--deleted")
         .action(guarded(async (threadIdStr, opts) => {
         const client = await getClient();
         const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
         writeJson(await runChatList(client, id, opts));
     }));
     c.command("search [query]")
-        .option("--search <s>", "Search query (alias for the <query> positional)")
-        .option("--limit <n>", "Max results (default 50, server max 200)", Number)
+        .option("--search <s>")
+        .option("--limit <n>", "", Number)
         .action(jsonAction(getClient, (client, query, opts) => runChatSearch(client, resolveSearchQuery(query, opts.search), opts)));
     const sendCmd = addThreadTargetOption(c.command("send [threadId]"))
-        .requiredOption("--body <text>", "Message text (max 4000 chars)")
-        .option("--source <src>", "Provenance: web|cli|ai (default: IB_SOURCE env or cli)");
+        .requiredOption("--body <text>")
+        .option("--source <src>");
     addWriteFlagsToCommand(sendCmd).action(guarded(async (threadIdStr, opts) => {
         const body = String(opts.body ?? "").trim();
         if (!body)
@@ -232,7 +232,7 @@ export function registerMessageChatCommands(parent, getClient) {
         const id = await resolveThreadId(client, targetFrom(threadIdStr, opts));
         writeJson(await runChatMarkRead(client, id));
     }));
-    const deleteCmd = addThreadTargetOption(c.command("delete <messageId>").option("--thread <id>", "Thread id the message belongs to", Number));
+    const deleteCmd = addThreadTargetOption(c.command("delete <messageId>").option("--thread <id>", "", Number));
     addWriteFlagsToCommand(deleteCmd).action(guarded(async (messageIdStr, opts) => {
         const messageId = parseId(messageIdStr, "messageId");
         const client = await getClient();
@@ -242,8 +242,8 @@ export function registerMessageChatCommands(parent, getClient) {
         });
         writeJson(await runChatDelete(client, id, messageId, opts));
     }));
-    const editCmd = addThreadTargetOption(c.command("edit <messageId>").option("--thread <id>", "Thread id the message belongs to", Number))
-        .requiredOption("--body <text>", "New message text (max 4000 chars)");
+    const editCmd = addThreadTargetOption(c.command("edit <messageId>").option("--thread <id>", "", Number))
+        .requiredOption("--body <text>");
     addWriteFlagsToCommand(editCmd).action(guarded(async (messageIdStr, opts) => {
         const messageId = parseId(messageIdStr, "messageId");
         const body = String(opts.body ?? "").trim();
@@ -257,7 +257,7 @@ export function registerMessageChatCommands(parent, getClient) {
             body, reason: opts.reason, idempotencyKey: opts.idempotencyKey, dryRun: opts.dryRun,
         }));
     }));
-    const restoreCmd = addThreadTargetOption(c.command("restore <messageId>").option("--thread <id>", "Thread id the message belongs to", Number));
+    const restoreCmd = addThreadTargetOption(c.command("restore <messageId>").option("--thread <id>", "", Number));
     addWriteFlagsToCommand(restoreCmd).action(guarded(async (messageIdStr, opts) => {
         const messageId = parseId(messageIdStr, "messageId");
         const client = await getClient();

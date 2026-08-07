@@ -13,7 +13,7 @@ export async function runPersonActivity(client, personId, opts) {
 export function registerPersonActivityCommand(parent, getClient) {
     parent
         .command("activity <personId>")
-        .option("--limit <n>", "Max rows per list (default 100, max 1000)", (s) => Number(s))
+        .option("--limit <n>", "", (s) => Number(s))
         .action(guarded(async (personIdStr, opts) => {
         const personId = parseId(personIdStr, "personId");
         writeJson(await runPersonActivity(await getClient(), personId, opts));

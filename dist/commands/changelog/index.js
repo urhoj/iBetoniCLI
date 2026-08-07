@@ -478,28 +478,28 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         // Required, but declared as plain options so --from-json can supply them:
         // Commander enforces a .requiredOption before the action runs. Enforced
         // post-merge by requireAddFields (fb#300).
-        .option("--type <t>", "feature|improvement|bugfix (accepts fix→bugfix, feat→feature) — required, via flag or --from-json")
+        .option("--type <t>")
         .option("--area <a>", AREA_FLAG_DESC)
-        .option("--title <s>", "Entry title — required, via flag or --from-json")
-        .option("--description <s>", "Kuvaus — alias for the positional; if both are given, they must match")
-        .option("--summary <s>", "Alias for --description (the entry body); if both are given, they must match")
-        .option("--body <s>", "Alias for --description (free text, not JSON); if both are given, they must match")
-        .option("--benefits <s>", "Hyödyt")
-        .option("--impact <s>", "Vaikutus")
-        .option("--status <s>", "Tila (Julkaistu/Korjattu/...)")
+        .option("--title <s>")
+        .option("--description <s>")
+        .option("--summary <s>")
+        .option("--body <s>")
+        .option("--benefits <s>")
+        .option("--impact <s>")
+        .option("--status <s>")
         .option("--severity <s>", SEVERITY_FLAG_DESC)
-        .option("--files <csv>", "Comma-separated file paths")
+        .option("--files <csv>")
         .option("--repo <r>", REPO_FLAG_DESC)
-        .option("--sha <csv>", "Commit SHAs (CSV)")
-        .option("--commit <csv>", "Alias for --sha — Commit SHAs (CSV); if both are given, they must match")
-        .option("--vtag <s>", "Version tag")
-        .option("--bump-level <l>", "App version bump this implies: none|patch|minor|major", "patch")
-        .option("--feedback <id>", "cliFeedback id this resolves", intFlag("--feedback"))
-        .option("--sentry <ref>", "Sentry issue short id or URL this fixes")
-        .option("--source <s>", "Source: human|routine (default: human)")
-        .option("--date <d>", "Entry date (YYYY-MM-DD|today), default today")
-        .option("--language <l>", "Entry language (fi|en), default en")
-        .option("--from-json <file>", "Read the whole entry from a JSON object file (or - for stdin); explicitly-typed flags override. Shell-safe: the only way to pass prose containing double quotes on Windows PowerShell.")).action(guarded(async (description, o, cmd) => {
+        .option("--sha <csv>")
+        .option("--commit <csv>")
+        .option("--vtag <s>")
+        .option("--bump-level <l>", "", "patch")
+        .option("--feedback <id>", "", intFlag("--feedback"))
+        .option("--sentry <ref>")
+        .option("--source <s>")
+        .option("--date <d>")
+        .option("--language <l>")
+        .option("--from-json <file>")).action(guarded(async (description, o, cmd) => {
         applyFromJson(cmd, o);
         o.type = normalizeType(o.type);
         o.severity = normalizeSeverity(o.severity);
@@ -560,20 +560,20 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         writeJson(added);
     }));
     c.command("list")
-        .option("--month <YYYY-MM>", "Filter to a month")
-        .option("--type <t>", "feature|improvement|bugfix")
+        .option("--month <YYYY-MM>")
+        .option("--type <t>")
         .option("--area <a>", AREA_FLAG_DESC)
-        .option("--repo <r>", "Repo/submodule")
-        .option("--feedback <id>", "Entries linked to a feedback id", intFlag("--feedback"))
-        .option("--sentry <ref>", "Entries linked to a Sentry issue short id")
-        .option("--source <s>", "human|routine")
-        .option("--search <text>", "Substring match over title/description/files/commitShas (deploy-gated)")
-        .option("--status <substr>", "Substring match on the free-text status field, e.g. 'Deployed' (deploy-gated)")
-        .option("--has-feedback", "Only entries linked to a feedback id (deploy-gated)")
-        .option("--has-sentry", "Only entries linked to a Sentry issue (deploy-gated)")
-        .option("--unreleased", "List only UNRELEASED/pending entries (versionTag IS NULL) staged for the next release, + the max bump level — routes to `changelog pending`")
-        .option("--pending", "Alias for --unreleased")
-        .option("--limit <n>", "Max rows", Number)
+        .option("--repo <r>")
+        .option("--feedback <id>", "", intFlag("--feedback"))
+        .option("--sentry <ref>")
+        .option("--source <s>")
+        .option("--search <text>")
+        .option("--status <substr>")
+        .option("--has-feedback")
+        .option("--has-sentry")
+        .option("--unreleased")
+        .option("--pending")
+        .option("--limit <n>", "", Number)
         .action(guarded(async (o) => {
         // --unreleased/--pending is the pending-queue view, not a month filter;
         // route it to the dedicated endpoint so the literal command an agent
@@ -598,32 +598,32 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
     }));
     addWriteFlagsToCommand(c
         .command("update <changelogId>")
-        .option("--type <t>", "feature|improvement|bugfix (accepts fix→bugfix, feat→feature)")
+        .option("--type <t>")
         .option("--area <a>", AREA_FLAG_DESC)
-        .option("--title <s>", "New title")
-        .option("--description <s>", "New description")
-        .option("--summary <s>", "Alias for --description; if both are given, they must match")
-        .option("--body <s>", "Alias for --description (free text, not JSON); if both are given, they must match")
-        .option("--benefits <s>", "Hyödyt")
-        .option("--impact <s>", "Vaikutus")
-        .option("--status <s>", "Status update (e.g. mark deployed)")
+        .option("--title <s>")
+        .option("--description <s>")
+        .option("--summary <s>")
+        .option("--body <s>")
+        .option("--benefits <s>")
+        .option("--impact <s>")
+        .option("--status <s>")
         .option("--severity <s>", SEVERITY_FLAG_DESC)
-        .option("--files <csv>", "Comma-separated file paths")
-        .option("--repo <r>", "Repo/submodule")
-        .option("--sha <csv>", "Commit SHAs (CSV)")
-        .option("--commit <csv>", "Alias for --sha — Commit SHAs (CSV); if both are given, they must match")
-        .option("--vtag <s>", "Version tag")
+        .option("--files <csv>")
+        .option("--repo <r>")
+        .option("--sha <csv>")
+        .option("--commit <csv>")
+        .option("--vtag <s>")
         // NO default, unlike `add`'s --bump-level (feedback #303). A Commander
         // default here would ride along on every unrelated patch — `update 7
         // --status Deployed` would silently rewrite a deliberate `minor` back to
         // `patch` and mis-drive the next deploy. Absent flag = field untouched.
-        .option("--bump-level <l>", "Correct the app version bump this entry implies: none|patch|minor|major. Refused once the entry is RELEASED (has a versionTag) — that bump already shipped.")
-        .option("--feedback <id>", "cliFeedback id this entry resolves — also marks that row applied and points it back here (repairs a link orphaned by delete + re-add). Takes the link from a prior resolver, noting it on stderr (fb#366)", intFlag("--feedback"))
-        .option("--sentry <ref>", "Sentry issue short id or URL this entry fixes")
-        .option("--source <s>", "Source: human|routine")
-        .option("--date <d>", "Entry date (YYYY-MM-DD|today)")
-        .option("--language <l>", "Entry language (fi|en)")
-        .option("--from-json <file>", "Read the patch from a JSON object file (or - for stdin); explicitly-typed flags override. Shell-safe: the only way to pass prose containing double quotes on Windows PowerShell.")).action(guarded(async (idStr, o, cmd) => {
+        .option("--bump-level <l>")
+        .option("--feedback <id>", "", intFlag("--feedback"))
+        .option("--sentry <ref>")
+        .option("--source <s>")
+        .option("--date <d>")
+        .option("--language <l>")
+        .option("--from-json <file>")).action(guarded(async (idStr, o, cmd) => {
         const id = parseRefId(idStr, "changelog", "update");
         applyFromJson(cmd, o);
         if (o.type !== undefined)
@@ -679,10 +679,10 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         writeJson(result);
     }));
     c.command("report")
-        .option("--month <YYYY-MM>", "Month to render")
-        .option("--unreleased", "Report UNRELEASED/pending entries staged for the next release instead of a month — routes to `changelog pending`")
-        .option("--pending", "Alias for --unreleased")
-        .option("--format <f>", "md|json", "md")
+        .option("--month <YYYY-MM>")
+        .option("--unreleased")
+        .option("--pending")
+        .option("--format <f>", "", "md")
         .action(guarded(async (o) => {
         // `report` covers already-RELEASED months; the unreleased/pending queue
         // has its own endpoint. Accept --unreleased/--pending here so the
@@ -703,8 +703,8 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .action(jsonAction(getClient, runChangelogPending));
     addWriteFlagsToCommand(c
         .command("release")
-        .option("--vtag <v>", "Single version tag to stamp on every pending entry (e.g. 1.0.8)")
-        .option("--map <file>", "JSON file (or - for stdin): [{changelogId, versionTag}] for precise per-entry stamping")).action(guarded(async (o) => {
+        .option("--vtag <v>")
+        .option("--map <file>")).action(guarded(async (o) => {
         if ((o.vtag ? 1 : 0) + (o.map ? 1 : 0) !== 1) {
             failWith("provide exactly one of --vtag or --map", 4);
         }

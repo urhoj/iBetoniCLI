@@ -266,14 +266,14 @@ export function registerTaskCommands(
     .description("Recurring operator tasks — weekly/monthly work for humans + AI (due-since + done-log)");
 
   t.command("list")
-    .option("--due", "Only tasks due now (nextDueAt <= now)")
-    .option("--executor <executor>", "human | ai")
-    .option("--agent <agent>", "claude | hermes (recommendedAgent filter)")
-    .option("--assignee <personId>", "Only tasks assigned to this person", intFlag("--assignee"))
-    .option("--asiakas <id>", "Only tasks scoped to this company", intFlag("--asiakas"))
-    .option("--inactive", "Include deactivated tasks (default: active only)")
-    .option("--limit <n>", "Max rows (default 50, cap 200)", intFlag("--limit"))
-    .option("--offset <n>", "Pagination offset", intFlag("--offset", 0))
+    .option("--due")
+    .option("--executor <executor>")
+    .option("--agent <agent>")
+    .option("--assignee <personId>", "", intFlag("--assignee"))
+    .option("--asiakas <id>", "", intFlag("--asiakas"))
+    .option("--inactive")
+    .option("--limit <n>", "", intFlag("--limit"))
+    .option("--offset <n>", "", intFlag("--offset", 0))
     .action(jsonAction(getClient, (client, opts: TaskListOptions) => runTaskList(client, opts)));
 
   t.command("get <id>")
@@ -285,16 +285,16 @@ export function registerTaskCommands(
 
   addWriteFlagsToCommand(
     t.command("add")
-      .requiredOption("--title <text>", "Task title (max 200 chars)")
-      .option("--executor <executor>", "human | ai (required)")
-      .option("--instructions <text>", "Freetext checklist / AI prompt context")
-      .option("--skill <ref>", "Skill the AI runner invokes (e.g. cleanup-docs); omit for human tasks")
-      .option("--agent <agent>", "claude | hermes — recommended AI executor tier")
-      .option("--assignee <personId>", "Human assignee personId", intFlag("--assignee"))
-      .option("--asiakas <id>", "Company (asiakas) the task is scoped to; omit = internal/global", intFlag("--asiakas"))
-      .option("--cadence <spec>", "<count>/<unit>, unit day|week|month, count 1-120 (e.g. 1/month, 2/week) — required")
-      .option("--first-due <date>", "First due date (YYYY-MM-DD or today/tomorrow); default: due immediately")
-      .option("--feedback <id>", "cliFeedback id this task graduated from (provenance)", intFlag("--feedback"))
+      .requiredOption("--title <text>")
+      .option("--executor <executor>")
+      .option("--instructions <text>")
+      .option("--skill <ref>")
+      .option("--agent <agent>")
+      .option("--assignee <personId>", "", intFlag("--assignee"))
+      .option("--asiakas <id>", "", intFlag("--asiakas"))
+      .option("--cadence <spec>")
+      .option("--first-due <date>")
+      .option("--feedback <id>", "", intFlag("--feedback"))
   ).action(
     jsonAction(getClient, (client, opts: TaskAddInput & WriteFlags) =>
       runTaskAdd(client, opts, opts)
@@ -303,10 +303,10 @@ export function registerTaskCommands(
 
   addWriteFlagsToCommand(
     t.command("complete <id>")
-      .option("--notes <text>", "Result summary stored on the log row")
-      .option("--skipped", "Log outcome=skipped (advances nextDueAt)")
-      .option("--failed", "Log outcome=failed (task STAYS due)")
-      .option("--agent <agent>", "claude | hermes — set when an AI completes the task")
+      .option("--notes <text>")
+      .option("--skipped")
+      .option("--failed")
+      .option("--agent <agent>")
   ).action(
     jsonAction(getClient, (client, idStr: string, opts: TaskCompleteInput & WriteFlags) =>
       runTaskComplete(client, parseTaskId(idStr, "complete"), opts, opts)
@@ -315,17 +315,17 @@ export function registerTaskCommands(
 
   addWriteFlagsToCommand(
     t.command("set <id>")
-      .option("--title <text>", "New title")
-      .option("--instructions <text>", 'New instructions ("" clears)')
-      .option("--skill <ref>", 'New skillRef ("" clears)')
-      .option("--executor <executor>", "human | ai")
-      .option("--agent <agent>", 'claude | hermes ("" clears)')
-      .option("--assignee <personId>", "New assignee personId", intFlag("--assignee"))
-      .option("--asiakas <id>", "New company scope", intFlag("--asiakas"))
-      .option("--cadence <spec>", "<count>/<unit>, unit day|week|month, count 1-120")
-      .option("--next-due <date>", "Override nextDueAt (YYYY-MM-DD or today/tomorrow)")
-      .option("--activate", "Reactivate the task")
-      .option("--deactivate", "Deactivate (soft-retire) the task")
+      .option("--title <text>")
+      .option("--instructions <text>")
+      .option("--skill <ref>")
+      .option("--executor <executor>")
+      .option("--agent <agent>")
+      .option("--assignee <personId>", "", intFlag("--assignee"))
+      .option("--asiakas <id>", "", intFlag("--asiakas"))
+      .option("--cadence <spec>")
+      .option("--next-due <date>")
+      .option("--activate")
+      .option("--deactivate")
   ).action(
     jsonAction(getClient, (client, idStr: string, opts: TaskSetInput & WriteFlags) =>
       runTaskSet(client, parseTaskId(idStr, "set"), opts, opts)
@@ -333,7 +333,7 @@ export function registerTaskCommands(
   );
 
   t.command("log <id>")
-    .option("--limit <n>", "Max rows (default 50, cap 200)", intFlag("--limit"))
+    .option("--limit <n>", "", intFlag("--limit"))
     .action(
       jsonAction(getClient, (client, idStr: string, opts: { limit?: number }) =>
         runTaskLog(client, parseTaskId(idStr, "log"), opts)

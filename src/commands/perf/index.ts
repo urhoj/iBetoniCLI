@@ -96,8 +96,8 @@ export function registerPerfCommands(parent: Command, getClient: () => Promise<A
 
   perf
     .command("slow")
-    .option("--limit <n>", "Max rows (default 50)", (v: string) => Number(v))
-    .option("--env <name>", "Environment buffer to read (default: backend's current env)")
+    .option("--limit <n>", "", (v: string) => Number(v))
+    .option("--env <name>")
     .action(
       jsonAction(getClient, (client, opts: { limit?: number; env?: string }) =>
         runPerfSlow(client, opts)
@@ -106,7 +106,7 @@ export function registerPerfCommands(parent: Command, getClient: () => Promise<A
 
   perf
     .command("stats")
-    .option("--env <name>", "Environment buffer to read (default: backend's current env)")
+    .option("--env <name>")
     .action(jsonAction(getClient, runPerfStats));
 
   perf
@@ -115,7 +115,7 @@ export function registerPerfCommands(parent: Command, getClient: () => Promise<A
 
   const clear = perf
     .command("clear")
-    .option("--env <name>", "Environment buffer to clear (default: backend's current env)");
+    .option("--env <name>");
   addWriteFlagsToCommand(clear).action(
     jsonAction(getClient, (client, opts: WriteFlags & { env?: string }) =>
       runPerfClear(client, opts)

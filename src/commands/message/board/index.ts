@@ -270,7 +270,7 @@ export function registerMessageBoardCommands(
     );
 
   b.command("list")
-    .option("--date <d>", "Day to query: today|yesterday|tomorrow|YYYYMMDD (default today)")
+    .option("--date <d>")
     .action(guarded(async (opts: { date?: string }) => {
       const date = toBoardQueryDate(opts.date);
       if (!date) {
@@ -297,11 +297,11 @@ export function registerMessageBoardCommands(
 
   const createCmd = b
     .command("create")
-    .requiredOption("--title <s>", "Notice title")
-    .requiredOption("--text <s>", "Notice body text")
-    .option("--priority <p>", `Priority: ${PRIORITIES.join("|")} (default info)`)
-    .option("--start-date <d>", "Day the notice becomes visible: today|YYYY-MM-DD")
-    .option("--expires-at <d>", "Last day visible: YYYY-MM-DD (omit = never expires)");
+    .requiredOption("--title <s>")
+    .requiredOption("--text <s>")
+    .option("--priority <p>")
+    .option("--start-date <d>")
+    .option("--expires-at <d>");
   addWriteFlagsToCommand(createCmd).action(
     guarded(async (opts: WriteFlags & {
       title: string;
@@ -320,11 +320,11 @@ export function registerMessageBoardCommands(
 
   const updateCmd = b
     .command("update <messageId>")
-    .option("--title <s>", "Notice title")
-    .option("--text <s>", "Notice body text")
-    .option("--priority <p>", `Priority: ${PRIORITIES.join("|")}`)
-    .option("--start-date <d>", "Day the notice becomes visible: today|YYYY-MM-DD")
-    .option("--expires-at <d>", 'Last day visible: YYYY-MM-DD (pass "" to clear the expiry)');
+    .option("--title <s>")
+    .option("--text <s>")
+    .option("--priority <p>")
+    .option("--start-date <d>")
+    .option("--expires-at <d>");
   addWriteFlagsToCommand(updateCmd).action(
     guarded(async (
       raw: string,

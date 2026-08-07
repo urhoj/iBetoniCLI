@@ -334,14 +334,14 @@ export function registerOhjeCommands(
 
   addNeedsReviewFlags(
     o.command("list")
-      .option("--limit <n>", "Max rows to return (client-side cap, after filter+sort)", (v: string) => Number(v))
-      .option("--empty-shorttext", "Only rows whose shorttext is blank (grooming backfill targets)")
+      .option("--limit <n>", "", (v: string) => Number(v))
+      .option("--empty-shorttext")
       .option(
         "--fields <cols>",
-        "Comma-separated columns to keep, e.g. helpId,title,shorttext,accessCount (drops the large htmltext)",
+        "",
         (v: string) => v.split(",").map((s) => s.trim()).filter(Boolean)
       )
-      .option("--sort <field:dir>", "Sort by a column, e.g. accessCount:desc (numeric fields compare numerically)")
+      .option("--sort <field:dir>")
   )
     .action(
       jsonAction(getClient, (client, opts: { limit?: number; emptyShorttext?: boolean; fields?: string[]; sort?: string; needsReview?: boolean; maxConfidence?: number; }) =>
@@ -352,19 +352,16 @@ export function registerOhjeCommands(
   const updateCmd = o
     .command("update <helpId>")
     .option(
-      "--body <json>",
-      "JSON object with any of title/shorttext/htmltext/img (typed flags win)"
+      "--body <json>"
     )
-    .option("--title <s>", "Help title (otsikko)")
-    .option("--shorttext <s>", "Short text (shorttext)")
-    .option("--htmltext <s>", "HTML body shown in the modal (htmltext)")
-    .option("--img <s>", "Image reference (img)")
+    .option("--title <s>")
+    .option("--shorttext <s>")
+    .option("--htmltext <s>")
+    .option("--img <s>")
     .option(
-      "--must-exist",
-      "Fail (exit 4) if no row exists for this helpId instead of upserting a new one " +
-        "(guards against a typo'd helpId silently creating a junk row)"
+      "--must-exist"
     )
-    .option("--field <name>", "Edit-mode target field: title | shorttext | htmltext (default htmltext)");
+    .option("--field <name>");
   addEditFlags(updateCmd);
   addWriteFlagsToCommand(addAssessWriteFlags(updateCmd)).action(
     guarded(async (

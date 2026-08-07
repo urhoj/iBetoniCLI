@@ -81,8 +81,8 @@ export function registerSchemaCommands(
 
   const listOpt = (cmd: Command) =>
     cmd
-      .option("--search <substr>", "Filter object names by substring")
-      .option("--limit <n>", "Max rows (default 200, max 1000)", cappedInt(1000));
+      .option("--search <substr>")
+      .option("--limit <n>", "", cappedInt(1000));
 
   // Single object by default; a comma in <name> switches to batch mode
   // (`ib dev schema proc a,b,c`) — parallel fan-out, deduped, 404-tolerant.

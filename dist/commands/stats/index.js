@@ -50,13 +50,13 @@ export async function runStats(client, opts) {
 export function registerStatsCommands(parent, getClient) {
     parent
         .command("stats")
-        .option("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)")
-        .option("--to <date>", "End date YYYY-MM-DD (or today/yesterday/tomorrow)")
-        .option("--today", "Shortcut for --from today --to today")
-        .option("--month <YYYY-MM>", "Whole calendar month (expands to first→last day)")
-        .option("--week <start>", "7-day window starting <start> (YYYY-MM-DD)")
-        .option("--by <dim>", `Single breakdown: ${STATS_DIMS.join("|")} (omit for full bundle)`)
-        .option("--all", "All tenants (requires developer/system-admin access; 403 otherwise)")
+        .option("--from <date>")
+        .option("--to <date>")
+        .option("--today")
+        .option("--month <YYYY-MM>")
+        .option("--week <start>")
+        .option("--by <dim>")
+        .option("--all")
         .action(jsonAction(getClient, (client, opts) => runStats(client, opts)));
 }
 //# sourceMappingURL=index.js.map

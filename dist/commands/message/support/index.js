@@ -94,22 +94,22 @@ export function registerMessageSupportCommands(parent, getClient) {
         .description("Operator → platform support escalations");
     support
         .command("inbox")
-        .option("--status <status>", "open | resolved | all", "open")
-        .option("--limit <n>", "Max rows", Number)
+        .option("--status <status>", "", "open")
+        .option("--limit <n>", "", Number)
         .action(jsonAction(getClient, (client, opts) => runSupportInbox(client, opts)));
     support
         .command("mine")
-        .option("--status <status>", "open | resolved | all", "open")
-        .option("--limit <n>", "Max rows", Number)
+        .option("--status <status>", "", "open")
+        .option("--limit <n>", "", Number)
         .action(jsonAction(getClient, (client, opts) => runSupportMine(client, opts)));
     support
         .command("contact")
-        .option("--tarjous <id>", "pumppuRequestId this escalation is about", Number)
-        .option("--keikka <id>", "keikkaId this escalation is about", Number)
-        .requiredOption("--body <text>", "The message to support")
+        .option("--tarjous <id>", "", Number)
+        .option("--keikka <id>", "", Number)
+        .requiredOption("--body <text>")
         // client-side --dry-run (the /support routes have no server X-Dry-Run guard); no
         // audit headers — contact persists no reason and ensureSupportThread is idempotent.
-        .option("--dry-run", "Print the payload without sending (client-side)")
+        .option("--dry-run")
         .action(guarded(async (opts) => {
         // Number-coerced flags turn "abc" into NaN (which is !== undefined), so a
         // bare presence check would skip this guard and fire a misleading downstream
@@ -128,10 +128,10 @@ export function registerMessageSupportCommands(parent, getClient) {
     }));
     support
         .command("resolve <threadId>")
-        .option("--reopen", "Set status back to open instead of resolved")
+        .option("--reopen")
         // client-side --dry-run (the status PATCH has no server X-Dry-Run guard); no
         // audit headers — the status change persists no reason.
-        .option("--dry-run", "Print the update body without sending (client-side)")
+        .option("--dry-run")
         .action(jsonAction(getClient, (client, threadIdStr, opts) => runSupportResolve(client, parseId(threadIdStr, "threadId"), opts)));
 }
 //# sourceMappingURL=index.js.map

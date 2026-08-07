@@ -20,8 +20,8 @@ export async function runParcelLookup(client, opts) {
 export function registerParcelCommands(parent, getClient) {
     addPointSourceOptions(parent
         .command("parcel")
-        .option("--kiinteistotunnus <tunnus>", "Property identifier, dashed or 14-digit — direct lookup (no geocode)"))
-        .option("--with-buildings", "Also count buildings on the parcel (national Ryhti; permit-based, best-effort)")
+        .option("--kiinteistotunnus <tunnus>"))
+        .option("--with-buildings")
         .action(guarded(async (opts) => {
         // kiinteistotunnus is a DIRECT lookup, not a point source, so it is added
         // here rather than inside selectedPointSources — it is still mutually

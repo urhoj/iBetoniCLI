@@ -40,8 +40,7 @@ export function registerBuildingCommands(
 ): void {
   addPointSourceOptions(parent.command("building"))
     .option(
-      "--city <name>",
-      "Helsinki | Vantaa | Espoo | HSY | Ryhti (override; otherwise derived/auto-tried then national Ryhti fallback)"
+      "--city <name>"
     )
     .action(guarded(async (opts: BuildingLookupOptions) => {
       assertSinglePointSource(opts, selectedPointSources(opts), {

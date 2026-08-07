@@ -272,10 +272,10 @@ export function registerSearchCommands(
 ): void {
   parent
     .command("search [query]")
-    .option("--search <s>", "Search query (alias for the <query> positional)")
-    .option("--in <entities>", `Comma-separated subset of: ${SEARCH_ENTITIES.join(",")}`)
-    .option("--limit <n>", "Max hits per entity", (v: string) => Number(v), DEFAULT_LIMIT)
-    .option("--my-companies", "Also search every company you belong to (customer/worksite/person only; vehicle, keikka & sijainti stay active-company)")
+    .option("--search <s>")
+    .option("--in <entities>")
+    .option("--limit <n>", "", (v: string) => Number(v), DEFAULT_LIMIT)
+    .option("--my-companies")
     .action(
       guarded(async (query: string | undefined, opts: { search?: string; in?: string; limit: number; myCompanies?: boolean }) => {
         const q = resolveSearchQuery(query, opts.search);

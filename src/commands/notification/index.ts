@@ -153,14 +153,13 @@ export function registerNotificationCommands(
   const sendCmd = fcm
     .command("send")
     .requiredOption(
-      "--person <idOrName>",
-      "Recipient personId, or a name resolved within your company"
+      "--person <idOrName>"
     )
-    .requiredOption("--title <text>", "Notification title")
-    .requiredOption("--body <text>", "Notification body")
+    .requiredOption("--title <text>")
+    .requiredOption("--body <text>")
     .option(
       "--data <json>",
-      "Extra FCM data payload as a JSON object",
+      "",
       (raw: string) => parseJsonBodyFlag(raw, "--data")
     );
   addWriteFlagsToCommand(sendCmd).action(
@@ -192,16 +191,15 @@ export function registerNotificationCommands(
 
   const emailSend = email
     .command("send <recipient>")
-    .requiredOption("--subject <text>", "Email subject")
-    .option("--body <text>", "Plain-text body (auto-wrapped to HTML)")
-    .option("--html <file>", "Path to an HTML file to send as the HTML body")
+    .requiredOption("--subject <text>")
+    .option("--body <text>")
+    .option("--html <file>")
     .option(
-      "--html-body <html>",
-      "Inline raw HTML body — use instead of --html for MCP/remote callers (argv-safe, no local file read)"
+      "--html-body <html>"
     )
     .option(
       "--from-brand <brand>",
-      "Sender identity: betoni (default, noreply@ibetoni.fi) or betonijerry (noreply@betonijerry.fi)",
+      "",
       "betoni"
     );
   addWriteFlagsToCommand(emailSend).action(

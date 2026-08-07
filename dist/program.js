@@ -192,9 +192,9 @@ export async function buildProgram(argv) {
     reference
         .command("dump")
         .argument("[domain...]", "Restrict the commands map to one or more domains — the token after `ib` (e.g. keikka). Multiple domains share a single primer.")
-        .option("--glossary", "Include the term+synonyms vocabulary index (DB fetch). Off by default to keep the dump small; look up definitions on demand with `ib glossary lookup`/`list`")
-        .option("--commands-only", "Emit only { version, generatedAt, commonErrors, commands } — drop the overview/topics/feedbackGuidance primer (and skip the glossary fetch)")
-        .option("--lean", "Drop each command's notes/seeAlso prose (keeps examples) — ~7.6k fewer tokens on the full surface; fetch the dropped prose per-command via `ib <command> --help`")
+        .option("--glossary")
+        .option("--commands-only")
+        .option("--lean")
         .action(guarded(async (domains, opts) => {
         let glossary = [];
         // The glossary is now OPT-IN: only fetch it when --glossary is asked
@@ -224,11 +224,11 @@ export async function buildProgram(argv) {
         .action(jsonAction(getClient, (client, commandParts) => runReferenceDetail(client, commandParts)));
     addNeedsReviewFlags(detail
         .command("list")
-        .option("--stalest <n>", "Return up to N entries sorted by least-recently reviewed", (v) => Number(v))
-        .option("--domain <d>", "Only commands in this ib domain (e.g. attachment) — narrows BEFORE --stalest")
-        .option("--with-detail", "Include each entry's full detail text, folding the per-command `reference detail get` into one call (needs the backend deployed)")
-        .option("--search <substr>", "Only rows whose command PATH contains this substring (case-insensitive; client-side)")
-        .option("--orphans", "Only orphan rows — keys whose command no longer exists in the live catalogue (the discover half of discover→`reference detail delete`)")).action(guarded(async (opts) => {
+        .option("--stalest <n>", "", (v) => Number(v))
+        .option("--domain <d>")
+        .option("--with-detail")
+        .option("--search <substr>")
+        .option("--orphans")).action(guarded(async (opts) => {
         // Validate the domain offline (exit 4 on unknown) before any network call,
         // mirroring `ib commands <domain>`.
         if (opts.domain)
@@ -239,9 +239,9 @@ export async function buildProgram(argv) {
     const detailSet = detail
         .command("set")
         .argument("<command...>", "Command path after `ib` (e.g. keikka latest)")
-        .option("--summary <text>", "Short one-line summary stored in the catalog")
-        .option("--detail <text>", "Full markdown business-context detail")
-        .option("--field <name>", "Edit-mode target field: summary | detail (default detail)");
+        .option("--summary <text>")
+        .option("--detail <text>")
+        .option("--field <name>");
     addEditFlags(detailSet);
     addWriteFlagsToCommand(addAssessWriteFlags(detailSet)).action(guarded(async (commandParts, opts) => {
         const editOp = parseEditOp(opts);
@@ -288,7 +288,7 @@ export async function buildProgram(argv) {
     // by a rename/re-home). Read-only (one GET + local diff); --strict is a CI gate.
     detail
         .command("lint")
-        .option("--strict", "Exit 1 if any orphan row exists (for CI)")
+        .option("--strict")
         .action(guarded(async (opts) => {
         const res = await runReferenceDetailLint(await getClient());
         writeJson(res);
@@ -301,10 +301,10 @@ export async function buildProgram(argv) {
     program
         .command("commands")
         .argument("[domain]", "Only commands in this domain — the token after `ib` (e.g. keikka)")
-        .option("--mutations", "Only commands that write (carry write-safety flags)")
-        .option("--reads", "Only read-only commands (no writes)")
-        .option("--permission <substr>", "Only commands whose required permissions contain this substring")
-        .option("--all", "Full flat list of every command (default is the domain index)")
+        .option("--mutations")
+        .option("--reads")
+        .option("--permission <substr>")
+        .option("--all")
         .action(guarded((domain, opts) => {
         // Bare `ib commands` = cheap domain index; any narrowing argument
         // (domain, filter flag, or explicit --all) = flat leaf list.

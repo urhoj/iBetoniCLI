@@ -223,7 +223,7 @@ export function registerLogAlias(
   fieldExample = "Filter by changeTracker fieldName"
 ): void {
   addOwnerOption(group.command(`log <${idArgName}>`))
-    .option("--limit <n>", "Max rows (default 100, cap 500)", cappedInt(500), 100)
+    .option("--limit <n>", "", cappedInt(500), 100)
     .option("--field <name>", fieldExample)
     .action(
       jsonAction(getClient, (client, idStr: string, opts: { owner?: number; limit: number; field?: string }) =>
@@ -244,11 +244,11 @@ export function registerLogCommands(
   addOwnerOption(c.command("entity <entityType> <entityId>"))
     .option(
       "--limit <n>",
-      "Max rows (default 100, cap 500)",
+      "",
       cappedInt(500),
       100
     )
-    .option("--field <name>", "Filter by changeTracker fieldName (client-side)")
+    .option("--field <name>")
     .action(
       jsonAction(getClient, (client, entityType: string, entityIdStr: string, opts: { owner?: number; limit: number; field?: string }) =>
         runLogEntity(client, entityType, parseId(entityIdStr, "entityId"), opts.limit, { owner: opts.owner, field: opts.field })
@@ -256,11 +256,11 @@ export function registerLogCommands(
     );
 
   addOwnerOption(
-    c.command("latest").option("--entity-type <type>", "Filter to one entityType")
+    c.command("latest").option("--entity-type <type>")
   )
     .option(
       "--limit <n>",
-      "Max rows (default 100, server cap 500)",
+      "",
       cappedInt(500),
       100
     )
@@ -277,19 +277,17 @@ export function registerLogCommands(
     c
       .command("range")
       .requiredOption(
-        "--from <iso>",
-        "Window start YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)"
+        "--from <iso>"
       )
       .requiredOption(
-        "--to <iso>",
-        "Window end YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)"
+        "--to <iso>"
       )
-      .option("--entity-type <type>", "Filter to one entityType")
-      .option("--person <personId>", "Filter to one actor", (v: string) => Number(v))
+      .option("--entity-type <type>")
+      .option("--person <personId>", "", (v: string) => Number(v))
   )
     .option(
       "--limit <n>",
-      "Max rows kept client-side (default 200, cap 2000)",
+      "",
       cappedInt(2000),
       200
     )
@@ -321,19 +319,17 @@ export function registerLogCommands(
   addOwnerOption(
     c
       .command("by-entity-date")
-      .requiredOption("--entity-type <type>", "keikka or palkki")
+      .requiredOption("--entity-type <type>")
       .requiredOption(
-        "--from <iso>",
-        "Entity-date window start YYYY-MM-DD (or today/yesterday/tomorrow)"
+        "--from <iso>"
       )
       .requiredOption(
-        "--to <iso>",
-        "Entity-date window end YYYY-MM-DD (or today/yesterday/tomorrow)"
+        "--to <iso>"
       )
   )
     .option(
       "--limit <n>",
-      "Max rows kept client-side (default 200, cap 2000)",
+      "",
       cappedInt(2000),
       200
     )
@@ -363,7 +359,7 @@ export function registerLogCommands(
   addOwnerOption(c.command("user [personId]"))
     .option(
       "--limit <n>",
-      "Max rows (default 100)",
+      "",
       cappedInt(500),
       100
     )

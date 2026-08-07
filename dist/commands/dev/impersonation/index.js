@@ -32,11 +32,11 @@ export function registerImpersonationCommands(parent, getClient) {
         .description("Impersonation audit trail — reconstructed sessions + grants (developer-only)");
     imp
         .command("sessions")
-        .option("--actor <id>", "Filter to sessions run BY this actor personId", (s) => Number(s))
-        .option("--target <id>", "Filter to sessions run AS this target personId", (s) => Number(s))
-        .option("--end-reason <r>", "Filter by endReason (manual|timeout|error|logout)")
-        .option("--active", "Only still-open sessions (no end row)")
-        .option("--limit <n>", "Max sessions (default 100, max 1000)", (s) => Number(s))
+        .option("--actor <id>", "", (s) => Number(s))
+        .option("--target <id>", "", (s) => Number(s))
+        .option("--end-reason <r>")
+        .option("--active")
+        .option("--limit <n>", "", (s) => Number(s))
         .action(jsonAction(getClient, runImpersonationSessions));
     imp
         .command("grants <personId>")

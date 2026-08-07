@@ -160,28 +160,28 @@ export function registerPersonDayCommands(person, getClient) {
         .description("Person-day availability (personPvm status) management");
     day
         .command("statuses")
-        .option("--full", "Include prefix/style/description/active/ownerAsiakasId")
+        .option("--full")
         .action(jsonAction(getClient, (client, opts) => runPersonDayStatuses(client, { full: opts.full })));
     day
         .command("get")
-        .requiredOption("--person <id>", "personId", (s) => Number(s))
-        .requiredOption("--from <date>", "Start date YYYY-MM-DD (or today/yesterday/tomorrow)")
-        .option("--to <date>", "End date YYYY-MM-DD (default: --from)")
+        .requiredOption("--person <id>", "", (s) => Number(s))
+        .requiredOption("--from <date>")
+        .option("--to <date>")
         .action(jsonAction(getClient, (client, opts) => runPersonDayGet(client, opts.person, opts.from, opts.to)));
     const setCmd = day
         .command("set")
-        .requiredOption("--person <id>", "personId", (s) => Number(s))
-        .requiredOption("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)")
-        .requiredOption("--status <id|name>", "personPvmStatusId or status name (see `ib person day statuses`)")
-        .option("--text <s>", "Free-text note on the day row");
+        .requiredOption("--person <id>", "", (s) => Number(s))
+        .requiredOption("--date <date>")
+        .requiredOption("--status <id|name>")
+        .option("--text <s>");
     addWriteFlagsToCommand(setCmd).action(guarded(async (opts) => {
         const result = await runPersonDaySet(await getClient(), opts.person, opts.date, opts.status, opts);
         writeJson(result);
     }));
     const clearCmd = day
         .command("clear")
-        .requiredOption("--person <id>", "personId", (s) => Number(s))
-        .requiredOption("--date <date>", "Day YYYY-MM-DD (or today/yesterday/tomorrow)");
+        .requiredOption("--person <id>", "", (s) => Number(s))
+        .requiredOption("--date <date>");
     addWriteFlagsToCommand(clearCmd).action(guarded(async (opts) => {
         const result = await runPersonDayClear(await getClient(), opts.person, opts.date, opts);
         writeJson(result);

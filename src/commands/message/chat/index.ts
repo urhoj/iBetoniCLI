@@ -278,8 +278,8 @@ export function registerMessageChatCommands(
     .description("Conversational message threads (Jerry tarjous now, keikka later)");
 
   c.command("threads")
-    .option("--unread", "Only threads with unread messages")
-    .option("--tarjous <id>", "Only threads for this pumppuRequestId", Number)
+    .option("--unread")
+    .option("--tarjous <id>", "", Number)
     .action(
       jsonAction(getClient, (client, opts: { unread?: boolean; tarjous?: number }) =>
         runChatThreads(client, opts)
@@ -296,9 +296,9 @@ export function registerMessageChatCommands(
     );
 
   addThreadTargetOption(c.command("list [threadId]"))
-    .option("--since <iso>", "Only messages created after this ISO timestamp")
-    .option("--limit <n>", "Max messages (default 100, server max 500)", Number)
-    .option("--deleted", "Include soft-deleted messages (your own; all for developers)")
+    .option("--since <iso>")
+    .option("--limit <n>", "", Number)
+    .option("--deleted")
     .action(
       guarded(async (
         threadIdStr: string | undefined,
@@ -311,8 +311,8 @@ export function registerMessageChatCommands(
     );
 
   c.command("search [query]")
-    .option("--search <s>", "Search query (alias for the <query> positional)")
-    .option("--limit <n>", "Max results (default 50, server max 200)", Number)
+    .option("--search <s>")
+    .option("--limit <n>", "", Number)
     .action(
       jsonAction(getClient, (client, query: string | undefined, opts: { search?: string; limit?: number }) =>
         runChatSearch(client, resolveSearchQuery(query, opts.search), opts)
@@ -320,8 +320,8 @@ export function registerMessageChatCommands(
     );
 
   const sendCmd = addThreadTargetOption(c.command("send [threadId]"))
-    .requiredOption("--body <text>", "Message text (max 4000 chars)")
-    .option("--source <src>", "Provenance: web|cli|ai (default: IB_SOURCE env or cli)");
+    .requiredOption("--body <text>")
+    .option("--source <src>");
   addWriteFlagsToCommand(sendCmd).action(
     guarded(async (
       threadIdStr: string | undefined,
@@ -362,7 +362,7 @@ export function registerMessageChatCommands(
     );
 
   const deleteCmd = addThreadTargetOption(
-    c.command("delete <messageId>").option("--thread <id>", "Thread id the message belongs to", Number)
+    c.command("delete <messageId>").option("--thread <id>", "", Number)
   );
   addWriteFlagsToCommand(deleteCmd).action(
     guarded(async (
@@ -380,9 +380,9 @@ export function registerMessageChatCommands(
   );
 
   const editCmd = addThreadTargetOption(
-    c.command("edit <messageId>").option("--thread <id>", "Thread id the message belongs to", Number)
+    c.command("edit <messageId>").option("--thread <id>", "", Number)
   )
-    .requiredOption("--body <text>", "New message text (max 4000 chars)");
+    .requiredOption("--body <text>");
   addWriteFlagsToCommand(editCmd).action(
     guarded(async (
       messageIdStr: string,
@@ -401,7 +401,7 @@ export function registerMessageChatCommands(
   );
 
   const restoreCmd = addThreadTargetOption(
-    c.command("restore <messageId>").option("--thread <id>", "Thread id the message belongs to", Number)
+    c.command("restore <messageId>").option("--thread <id>", "", Number)
   );
   addWriteFlagsToCommand(restoreCmd).action(
     guarded(async (

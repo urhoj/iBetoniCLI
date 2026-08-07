@@ -55,8 +55,7 @@ export function registerInboxCommand(
   parent
     .command("inbox", { hidden: !!opts.hidden })
     .option(
-      "--details",
-      "Include slimmed top-items per signal, not just counts"
+      "--details"
     )
     .action(
       jsonAction(getClient, (client, opts: { details?: boolean }) =>

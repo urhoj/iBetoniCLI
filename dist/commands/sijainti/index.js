@@ -704,14 +704,14 @@ export async function runSijaintiDashboard(client, opts) {
 export function registerSijaintiCommands(parent, getClient) {
     const s = parent.command("sijainti").description("Sijainti (location) commands");
     s.command("list")
-        .option("--type <t>", "Filter by sijaintiTypeId or type name (e.g. betoniasema)")
-        .option("--search <text>", "Case-insensitive substring over name/address/typeName (newer backends also pre-filter server-side)")
-        .option("--limit <n>", "Max rows", cappedInt(500))
-        .option("--valid-at <date>", "Only sijainnit valid on this date (YYYY-MM-DD or today/yesterday/tomorrow)")
-        .option("--include-deleted", "Include soft-deleted sijainnit")
-        .option("--all", "Include all companies' sijainnit (supplier plants etc.), not just own + shared")
-        .option("--asiakas <id>", "Only rows owned by this asiakasId (combine with --all for another company's rows)", Number)
-        .option("--jerry", "Only BetoniJerry-enrolled varikot; adds a derived `matchable` boolean (enrolment active + coords + delivery radius > 0)")
+        .option("--type <t>")
+        .option("--search <text>")
+        .option("--limit <n>", "", cappedInt(500))
+        .option("--valid-at <date>")
+        .option("--include-deleted")
+        .option("--all")
+        .option("--asiakas <id>", "", Number)
+        .option("--jerry")
         .action(guarded(async (opts) => {
         assertValidAsiakasFlag(opts.asiakas);
         const client = await getClient();
@@ -729,9 +729,9 @@ export function registerSijaintiCommands(parent, getClient) {
     }));
     s.command("plants")
         .alias("tehtaat")
-        .option("--asiakas <id>", "Only this company's plants (numeric asiakasId)", Number)
-        .option("--search <text>", "Case-insensitive substring over name/address (same semantics as `list --search`)")
-        .option("--limit <n>", "Max rows", cappedInt(500))
+        .option("--asiakas <id>", "", Number)
+        .option("--search <text>")
+        .option("--limit <n>", "", cappedInt(500))
         .action(guarded(async (opts) => {
         assertValidAsiakasFlag(opts.asiakas);
         const client = await getClient();
@@ -751,18 +751,18 @@ export function registerSijaintiCommands(parent, getClient) {
     });
     const createCmd = s
         .command("create")
-        .option("--body <json>", "JSON object forwarded as the request body")
-        .option("--name <n>", "sijaintiNimi (required)")
-        .option("--address <a>", "sijaintiOsoite1 (street)")
-        .option("--type <id>", "sijaintiTypeId (required; see `ib sijainti types`)", Number)
-        .option("--lat <n>", "Latitude", Number)
-        .option("--lng <n>", "Longitude", Number)
-        .option("--lyh <s>", "sijaintiLyh — short code/abbreviation (≤50 chars; defaults to --name)")
-        .option("--max-distance <n>", "Delivery radius in km, stored as maxDeliveryDistance (default 50; not Jerry-only)", Number)
-        .option("--asiakas <id>", "Owner asiakasId (defaults to your active company)", Number)
-        .option("--puomi-min <m>", "puomiMin — smallest boom (m) served from this sijainti (BetoniJerry matching)", Number)
-        .option("--puomi-max <m>", "puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching)", Number)
-        .option("--geocode", "Resolve lat/lng from the address via Google Maps when coordinates are not given (then persisted + echoed)");
+        .option("--body <json>")
+        .option("--name <n>")
+        .option("--address <a>")
+        .option("--type <id>", "", Number)
+        .option("--lat <n>", "", Number)
+        .option("--lng <n>", "", Number)
+        .option("--lyh <s>")
+        .option("--max-distance <n>", "", Number)
+        .option("--asiakas <id>", "", Number)
+        .option("--puomi-min <m>", "", Number)
+        .option("--puomi-max <m>", "", Number)
+        .option("--geocode");
     addWriteFlagsToCommand(createCmd).action(guarded(async (opts) => {
         assertPuomiFlags(opts.puomiMin, opts.puomiMax);
         const client = await getClient();
@@ -808,18 +808,18 @@ export function registerSijaintiCommands(parent, getClient) {
     }));
     const updateCmd = s
         .command("update")
-        .option("--body <json>", "JSON object forwarded as the request body")
-        .option("--id <sijaintiId>", "Target sijaintiId", Number)
-        .option("--name <n>", "sijaintiNimi")
-        .option("--address <a>", "sijaintiOsoite1 (street)")
-        .option("--type <id>", "sijaintiTypeId", Number)
-        .option("--lat <n>", "Latitude", Number)
-        .option("--lng <n>", "Longitude", Number)
-        .option("--lyh <s>", "sijaintiLyh — short code/abbreviation (≤50 chars)")
-        .option("--max-distance <n>", "Delivery radius in km, stored as maxDeliveryDistance (not Jerry-only)", Number)
-        .option("--puomi-min <m>", "puomiMin — smallest boom (m) served from this sijainti (BetoniJerry matching)", Number)
-        .option("--puomi-max <m>", "puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching)", Number)
-        .option("--geocode", "Re-resolve lat/lng from the (changed) address via Google Maps when coordinates are not given (then persisted + echoed)");
+        .option("--body <json>")
+        .option("--id <sijaintiId>", "", Number)
+        .option("--name <n>")
+        .option("--address <a>")
+        .option("--type <id>", "", Number)
+        .option("--lat <n>", "", Number)
+        .option("--lng <n>", "", Number)
+        .option("--lyh <s>")
+        .option("--max-distance <n>", "", Number)
+        .option("--puomi-min <m>", "", Number)
+        .option("--puomi-max <m>", "", Number)
+        .option("--geocode");
     addWriteFlagsToCommand(updateCmd).action(guarded(async (opts) => {
         assertPuomiFlags(opts.puomiMin, opts.puomiMax);
         const client = await getClient();
@@ -858,11 +858,11 @@ export function registerSijaintiCommands(parent, getClient) {
     }));
     const setJerryCmd = s
         .command("set-jerry <sijaintiId>")
-        .option("--on", "Enrol: jerryActiveUntil = sentinel + ensure a delivery radius")
-        .option("--off", "Unenrol: jerryActiveUntil = null")
-        .option("--radius <km>", "Delivery radius in km (maxDeliveryDistance) to set when enrolling", Number)
-        .option("--puomi-min <m>", "puomiMin (m) to set while enrolling (BetoniJerry boom-range matching)", Number)
-        .option("--puomi-max <m>", "puomiMax (m) to set while enrolling (BetoniJerry boom-range matching)", Number);
+        .option("--on")
+        .option("--off")
+        .option("--radius <km>", "", Number)
+        .option("--puomi-min <m>", "", Number)
+        .option("--puomi-max <m>", "", Number);
     addWriteFlagsToCommand(setJerryCmd).action(guarded(async (idStr, opts) => {
         if (opts.on === opts.off) {
             // neither or both given — ambiguous
@@ -890,16 +890,16 @@ export function registerSijaintiCommands(parent, getClient) {
         }));
     }
     s.command("types")
-        .option("--jerry", "Use the BetoniJerry sijainti type set")
+        .option("--jerry")
         .action(jsonAction(getClient, (client, opts) => runSijaintiTypes(client, opts.jerry)));
     s.command("geocode")
-        .requiredOption("--address <a>", "Free-form address to geocode")
+        .requiredOption("--address <a>")
         .action(jsonAction(getClient, (client, opts) => runSijaintiGeocode(client, opts.address)));
     s.command("closest")
-        .option("--worksite <id>", "Target tyomaaId (same flag as the rest of the CLI)", Number)
-        .option("--tyomaa <id>", "Target tyomaaId (Finnish alias of --worksite)", Number)
-        .requiredOption("--type <id>", "sijaintiTypeId to search within", Number)
-        .option("--asiakas <id>", "Owner asiakasId (defaults to active company)", Number)
+        .option("--worksite <id>", "", Number)
+        .option("--tyomaa <id>", "", Number)
+        .requiredOption("--type <id>", "", Number)
+        .option("--asiakas <id>", "", Number)
         .action(guarded(async (opts) => {
         const client = await getClient();
         if (opts.worksite !== undefined && opts.tyomaa !== undefined && opts.worksite !== opts.tyomaa) {
@@ -917,8 +917,8 @@ export function registerSijaintiCommands(parent, getClient) {
         writeJson(result);
     }));
     s.command("distance")
-        .requiredOption("--from <point>", "Origin: 'lat,lng' or a sijaintiId")
-        .requiredOption("--to <point>", "Destination: 'lat,lng' or a sijaintiId")
+        .requiredOption("--from <point>")
+        .requiredOption("--to <point>")
         .action(jsonAction(getClient, (client, opts) => runSijaintiDistance(client, opts.from, opts.to)));
 }
 //# sourceMappingURL=index.js.map

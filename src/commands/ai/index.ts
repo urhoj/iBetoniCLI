@@ -65,8 +65,8 @@ export function registerAiCommands(
 
   ai
     .command("conversations")
-    .option("--limit <n>", "Max rows to return (1-100, default 20)", (v) => Number(v))
-    .option("--person <personId>", "Filter to one person's conversations", (v) => Number(v))
+    .option("--limit <n>", "", (v) => Number(v))
+    .option("--person <personId>", "", (v) => Number(v))
     .action(
       jsonAction(getClient, (client, opts: { limit?: number; person?: number }) =>
         runAiConversationList(client, {

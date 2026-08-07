@@ -22,8 +22,8 @@ export function registerOpendataCommands(parent, getClient) {
     registerParcelCommands(od, getClient);
     registerWeatherCommands(od, getClient);
     od.command("prh [ytunnus]")
-        .option("--search <name>", "Search by company name instead of business ID")
-        .option("--page <n>", "Result page for --search (default 1)", (v) => Number(v), 1)
+        .option("--search <name>")
+        .option("--page <n>", "", (v) => Number(v), 1)
         .action(guarded(async (ytunnus, opts) => {
         const client = await getClient();
         if (opts.search) {

@@ -110,10 +110,10 @@ export function registerNotificationCommands(parent, getClient) {
         .description("Firebase Cloud Messaging push notifications");
     const sendCmd = fcm
         .command("send")
-        .requiredOption("--person <idOrName>", "Recipient personId, or a name resolved within your company")
-        .requiredOption("--title <text>", "Notification title")
-        .requiredOption("--body <text>", "Notification body")
-        .option("--data <json>", "Extra FCM data payload as a JSON object", (raw) => parseJsonBodyFlag(raw, "--data"));
+        .requiredOption("--person <idOrName>")
+        .requiredOption("--title <text>")
+        .requiredOption("--body <text>")
+        .option("--data <json>", "", (raw) => parseJsonBodyFlag(raw, "--data"));
     addWriteFlagsToCommand(sendCmd).action(guarded(async (opts) => {
         const result = await runNotificationFcmSend(await getClient(), {
             person: opts.person,
@@ -128,11 +128,11 @@ export function registerNotificationCommands(parent, getClient) {
         .description("Email channel — send an email to a person or address");
     const emailSend = email
         .command("send <recipient>")
-        .requiredOption("--subject <text>", "Email subject")
-        .option("--body <text>", "Plain-text body (auto-wrapped to HTML)")
-        .option("--html <file>", "Path to an HTML file to send as the HTML body")
-        .option("--html-body <html>", "Inline raw HTML body — use instead of --html for MCP/remote callers (argv-safe, no local file read)")
-        .option("--from-brand <brand>", "Sender identity: betoni (default, noreply@ibetoni.fi) or betonijerry (noreply@betonijerry.fi)", "betoni");
+        .requiredOption("--subject <text>")
+        .option("--body <text>")
+        .option("--html <file>")
+        .option("--html-body <html>")
+        .option("--from-brand <brand>", "", "betoni");
     addWriteFlagsToCommand(emailSend).action(guarded(async (recipient, opts) => {
         if (!opts.body && !opts.html && !opts.htmlBody) {
             failWith("one of --body, --html, or --html-body is required", 4);

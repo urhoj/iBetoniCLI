@@ -57,25 +57,25 @@ export function registerCacheCommands(parent, getClient, opts = {}) {
     c.command("stats")
         .action(jsonAction(getClient, runCacheStats));
     c.command("keys")
-        .option("--pattern <glob>", "SCAN match pattern", "*")
+        .option("--pattern <glob>", "", "*")
         .action(jsonAction(getClient, (client, opts) => runCacheKeys(client, opts)));
     c.command("invalidate <entityType>")
-        .option("--id <n>", "Entity id (e.g. keikkaId)", (v) => Number(v))
-        .option("--asiakas-id <n>", "Tenant scope (developers only; non-devs use their own)", (v) => Number(v))
-        .option("--cascade", "Also invalidate related families (keikka only)")
-        .option("--confirm", "Execute the invalidation (default is dry-run preview)")
-        .option("--force-prod", "Allow execution against a deployed (shared-cache) endpoint")
-        .option("--reason <text>", "Audit reason (X-Action-Reason)")
+        .option("--id <n>", "", (v) => Number(v))
+        .option("--asiakas-id <n>", "", (v) => Number(v))
+        .option("--cascade")
+        .option("--confirm")
+        .option("--force-prod")
+        .option("--reason <text>")
         .action(jsonAction(getClient, (client, entityType, opts) => runCacheInvalidate(client, { entityType, id: opts.id, asiakasId: opts.asiakasId, cascade: opts.cascade }, { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason })));
     c.command("clear")
-        .option("--confirm", "Execute the full flush (default is dry-run preview)")
-        .option("--force-prod", "Allow execution against a deployed (shared-cache) endpoint")
-        .option("--reason <text>", "Audit reason (X-Action-Reason)")
+        .option("--confirm")
+        .option("--force-prod")
+        .option("--reason <text>")
         .action(jsonAction(getClient, (client, opts) => runCacheClear(client, { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason })));
     c.command("pattern <glob>")
-        .option("--confirm", "Execute the invalidation (default is dry-run preview)")
-        .option("--force-prod", "Allow execution against a deployed (shared-cache) endpoint")
-        .option("--reason <text>", "Audit reason (X-Action-Reason)")
+        .option("--confirm")
+        .option("--force-prod")
+        .option("--reason <text>")
         .action(jsonAction(getClient, (client, glob, opts) => runCachePattern(client, glob, { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason })));
     c.command("entities")
         .action(guarded(() => {

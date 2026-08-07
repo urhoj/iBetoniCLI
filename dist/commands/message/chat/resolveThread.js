@@ -7,7 +7,7 @@ import { parseOptionalId } from "../../../targets.js";
  * across the dozen leaves that offer it.
  */
 export function addThreadTargetOption(cmd) {
-    return cmd.option("--tarjous <id>", "Resolve the thread from this pumppuRequestId", Number);
+    return cmd.option("--tarjous <id>", "", Number);
 }
 /** Build the {@link ThreadTarget} from a positional threadId + the `--tarjous` option. */
 export function targetFrom(threadIdStr, opts) {

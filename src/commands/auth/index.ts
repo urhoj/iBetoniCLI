@@ -167,7 +167,7 @@ export function registerAuthCommands(
 
   auth
     .command("switch")
-    .requiredOption("--to <asiakasId>", "Target asiakasId", intFlag("--to"))
+    .requiredOption("--to <asiakasId>", "", intFlag("--to"))
     .action(
       guarded(async (opts: { to: number }) => {
         writeJson(await runPersistedSwitch(opts.to, isReadOnly()));
@@ -216,9 +216,9 @@ export function registerAuthCommands(
   auth
     .command("impersonate")
     .argument("[personId]", "Target personId (or use --email)", (v: string) => Number(v))
-    .option("--email <email>", "Target email (alternative to the personId positional)")
-    .option("--end", "End the active impersonation session and restore your own login")
-    .option("--extend", "Extend the active impersonation session by 10 minutes")
+    .option("--email <email>")
+    .option("--end")
+    .option("--extend")
     .action(guarded(async (
       personId: number | undefined,
       opts: { email?: string; end?: boolean; extend?: boolean },

@@ -71,10 +71,10 @@ export function registerFennoaCommands(parent: Command, getClient: () => Promise
 
   fennoa
     .command("purchases")
-    .option("--all", "Include settled invoices in the window, not only open (total_due > 0)")
-    .option("--months <n>", "Created-after window in months (default 6, max 12)", (v: string) => Number(v))
-    .option("--asiakas <id>", "Target company override (e.g. 8 = Kalle Urho Oy verification path)", (v: string) => Number(v))
-    .option("--refresh", "Bypass the server's 15-minute cache")
+    .option("--all")
+    .option("--months <n>", "", (v: string) => Number(v))
+    .option("--asiakas <id>", "", (v: string) => Number(v))
+    .option("--refresh")
     .action(
       jsonAction(getClient, (client, opts: { all?: boolean; months?: number; asiakas?: number; refresh?: boolean }) =>
         runFennoaPurchases(client, opts)

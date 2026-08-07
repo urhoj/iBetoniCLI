@@ -27,7 +27,7 @@ export function registerPersonActivityCommand(
 ): void {
   parent
     .command("activity <personId>")
-    .option("--limit <n>", "Max rows per list (default 100, max 1000)", (s: string) => Number(s))
+    .option("--limit <n>", "", (s: string) => Number(s))
     .action(
       guarded(async (personIdStr: string, opts: PersonActivityOpts) => {
         const personId = parseId(personIdStr, "personId");
