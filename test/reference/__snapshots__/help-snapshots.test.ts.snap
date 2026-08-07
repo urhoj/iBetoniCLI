@@ -2329,7 +2329,7 @@ FLAGS
   --error STRING    Error message you hit, if any
   --severity STRING    critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug
   --complexity NUMBER    1-5 agent-triage estimate (orthogonal to --severity): 1 simple+autonomous · 2 simple+wants-input · 3 complex+autonomous · 4 complex+needs-user · 5 very-complex+needs-user & heavier model. Lets a batch-fix agent pull \`list --max-complexity 3\`. See \`ib help complexity\`.
-  --from-json STRING    Read the whole payload from a JSON object file (or - for stdin); explicit flags override. Keys: description, body, title, kind, scope, command, error, severity, complexity.
+  --from-json STRING    Read the whole payload from a JSON object file (or - for stdin); explicit flags override. Keys: description (or body), title, kind, scope, command, error, severity, complexity. The READ shape's \`errorText\` is also accepted for \`error\`, so a stored feedback row can template the file. An unknown or wrong-typed key exits 4 (never silently dropped).
   --dry-run    Print the payload without sending (client-side)
 
 GLOBAL FLAGS
@@ -2341,7 +2341,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Validation             → description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (STRICT — unknown exits 4); --severity, when given, must be critical|major|minor|cosmetic; --complexity, when given, must be an integer 1-5
   exit 4 (client-side)  too many arguments — the shell split the description on its inner double-quotes (typical on Windows PowerShell) → Pass the report via --from-json <file|-> instead of argv
-  exit 4 (client-side)  --from-json file is unreadable, not valid JSON, or not a JSON object → Check the file path and that the root is an object, not an array
+  exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → Check the path; the root must be an object and every key an accepted field name (the error lists them)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -2472,7 +2472,7 @@ FLAGS
   --note STRING    Resolution note stored on the row
   --reason STRING    Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header
   --resolution STRING    Alias for --note (matches the output field name); distinct values across the three note flags are merged into one note
-  --from-json STRING    Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: status, note (or reason/resolution). Shell-safe: the only way to pass a note containing quotes on Windows PowerShell.
+  --from-json STRING    Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: status, note (or reason/resolution). An unknown or wrong-typed key exits 4 (never silently dropped). Shell-safe: the only way to pass a note containing quotes on Windows PowerShell.
   --dry-run    Print the update body without sending (client-side)
   --full    Return the full updated row instead of the compact ack
 
@@ -2525,7 +2525,7 @@ FLAGS
   --description STRING    REPLACE the freetext description (destructive — the filed report is overwritten; use --append-description to add to it)
   --body STRING    Alias for --description (free text, not JSON); if both are passed, they must match
   --append-description STRING    Append to the CURRENT description (read-merge-write, separated by a blank line) — keeps the original report intact
-  --from-json STRING    Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: scope, kind, severity, complexity, description (or body), appendDescription. Shell-safe: the only way to pass prose containing quotes on Windows PowerShell.
+  --from-json STRING    Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: scope, kind, severity, complexity, description (or body), appendDescription. An unknown or wrong-typed key exits 4 (never silently dropped). Shell-safe: the only way to pass prose containing quotes on Windows PowerShell.
   --dry-run    Print the update body without sending (client-side)
   --full    Return the full updated row instead of the compact ack
 
@@ -2538,7 +2538,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Validation             → provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description; enum values must be valid; --complexity must be an integer 1-5; --description and --append-description are mutually exclusive
   exit 4 (client-side)  The shell split the description on its inner double-quotes (typical on Windows PowerShell) → pass the text via --from-json <file|-> instead of argv
-  exit 4 (client-side)  --from-json file is unreadable, not valid JSON, or not a JSON object → check the file path and that the root is an object, not an array
+  exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → check the path; the root must be an object and every key an accepted field name (the error lists them)
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\` — a bare id that is actually a changelog id 404s here and the error hint names the changelog command (feedback #230)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose

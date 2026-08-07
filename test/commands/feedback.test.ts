@@ -9,9 +9,6 @@ import {
   runFeedbackUpdate,
   runFeedbackCount,
   resolveFeedbackCreateDescription,
-  mergeFeedbackCreateInput,
-  mergeFeedbackResolveInput,
-  mergeFeedbackUpdateInput,
   registerFeedbackCommands,
 } from "../../src/commands/feedback/index.js";
 import { writeFileSync, unlinkSync } from "node:fs";
@@ -37,6 +34,34 @@ beforeEach(() => {
   get.mockReset();
   put.mockReset();
 });
+
+/**
+ * Run a parse whose in-action guard fails, and return what the CALLER sees: the
+ * JSON error envelope on stderr plus the mapped exit code (same helper as the
+ * changelog tests). `process.exitCode` is restored so a guard assertion never
+ * leaks into the runner's own exit code.
+ */
+async function captureActionError(
+  run: () => Promise<unknown>
+): Promise<{ exitCode: number | undefined; envelope: Record<string, unknown> }> {
+  const prevExit = process.exitCode;
+  process.exitCode = undefined;
+  const chunks: string[] = [];
+  const spy = vi.spyOn(process.stderr, "write").mockImplementation((s: unknown) => {
+    chunks.push(String(s));
+    return true;
+  });
+  try {
+    await run();
+    return {
+      exitCode: process.exitCode as number | undefined,
+      envelope: JSON.parse(chunks.join("")) as Record<string, unknown>,
+    };
+  } finally {
+    spy.mockRestore();
+    process.exitCode = prevExit;
+  }
+}
 
 // ─── create ──────────────────────────────────────────────────────────────────
 
@@ -93,14 +118,68 @@ describe("ib feedback create", () => {
       try { await fn(p); } finally { unlinkSync(p); }
     };
 
-    test("precedence is explicit flag > JSON > Commander default", () => {
+    test("precedence is explicit flag > JSON > Commander default (shared merge)", async () => {
       // The middle rung is the trap: --kind/--scope declare defaults, so a naive
       // "flags win" would let a default the caller never typed beat the JSON.
-      expect(mergeFeedbackCreateInput({ kind: "bug" }, {}, { kind: "improvement" }).kind).toBe("bug");
-      expect(mergeFeedbackCreateInput({ kind: "bug" }, { kind: "idea" }, { kind: "improvement" }).kind).toBe("idea");
-      expect(mergeFeedbackCreateInput({}, {}, { kind: "improvement" }).kind).toBe("improvement");
-      expect(mergeFeedbackCreateInput({ description: "d", command: "ib x", error: "boom" }, {}, {}))
-        .toMatchObject({ description: "d", command: "ib x", error: "boom" });
+      const parse = async (payload: unknown, extra: string[] = []) => {
+        await withJsonFile(payload, async (p) => {
+          const program = new Command();
+          registerFeedbackCommands(program, async () => mockClient);
+          await program.parseAsync(["feedback", "create", "--from-json", p, ...extra], { from: "user" });
+        });
+      };
+      post.mockResolvedValue({ feedbackId: 1 });
+      await parse({ description: "d", kind: "bug" }); // JSON beats the default
+      expect(post.mock.calls[0][1]).toMatchObject({ kind: "bug" });
+      await parse({ description: "d", kind: "bug" }, ["--kind", "idea"]); // explicit beats JSON
+      expect(post.mock.calls[1][1]).toMatchObject({ kind: "idea" });
+      await parse({ description: "d" }); // default survives when neither supplies the key
+      expect(post.mock.calls[2][1]).toMatchObject({ kind: "improvement", scope: "cli" });
+    });
+
+    test("an unknown JSON key exits 4 naming it and the accepted keys (never silently dropped)", async () => {
+      // The fb#298 silent-drop class: the old hand merger IGNORED unknown keys,
+      // so `status` here would have been dropped without a trace. Now the shared
+      // pipeline rejects it aggregated with the accepted-key list.
+      await withJsonFile({ description: "d", status: "applied" }, async (p) => {
+        const program = new Command();
+        registerFeedbackCommands(program, async () => mockClient);
+        const { exitCode, envelope } = await captureActionError(() =>
+          program.parseAsync(["feedback", "create", "--from-json", p], { from: "user" })
+        );
+        expect(exitCode).toBe(4);
+        expect(String(envelope.error)).toMatch(/unknown key status/);
+        expect(String(envelope.error)).toMatch(/accepted: .*description.*severity/);
+      });
+      expect(post).not.toHaveBeenCalled();
+    });
+
+    test("a wrong-typed JSON value is rejected by name (exit 4, no POST)", async () => {
+      await withJsonFile({ description: "d", complexity: "high", kind: 5 }, async (p) => {
+        const program = new Command();
+        registerFeedbackCommands(program, async () => mockClient);
+        const { exitCode, envelope } = await captureActionError(() =>
+          program.parseAsync(["feedback", "create", "--from-json", p], { from: "user" })
+        );
+        expect(exitCode).toBe(4);
+        expect(String(envelope.error)).toMatch(/"complexity" must be a number/);
+        expect(String(envelope.error)).toMatch(/"kind" must be a string/);
+      });
+      expect(post).not.toHaveBeenCalled();
+    });
+
+    test("the read-shape `errorText` key is accepted for --error (fb#357)", async () => {
+      // `ib dev feedback get` emits the field as errorText; templating a
+      // --from-json file off a read row is the natural way to author one, and
+      // the old merger only caught this via an inline `?? s("errorText")` patch.
+      // The declared read-shape alias table now carries it.
+      post.mockResolvedValueOnce({ feedbackId: 357 });
+      await withJsonFile({ description: "d", errorText: "boom" }, async (p) => {
+        const program = new Command();
+        registerFeedbackCommands(program, async () => mockClient);
+        await program.parseAsync(["feedback", "create", "--from-json", p], { from: "user" });
+      });
+      expect(post.mock.calls[0][1]).toMatchObject({ error: "boom" });
     });
 
     test("a quote-bearing payload round-trips, and JSON kind/scope beat the flag defaults", async () => {
@@ -594,15 +673,56 @@ describe("ib feedback resolve", () => {
       try { await fn(p); } finally { unlinkSync(p); }
     };
 
-    test("precedence: an explicitly-typed flag beats the JSON, JSON beats absent", () => {
-      expect(mergeFeedbackResolveInput({ status: "applied" }, {}).status).toBe("applied");
-      expect(mergeFeedbackResolveInput({ status: "applied" }, { status: "dismissed" }).status).toBe("dismissed");
-      expect(mergeFeedbackResolveInput({}, {}).status).toBeUndefined();
+    test("precedence: an explicitly-typed flag beats the JSON, JSON beats absent", async () => {
+      // resolve declares no Commander defaults, so the ladder is two rungs.
+      put.mockResolvedValue({ feedbackId: 4, status: "applied" });
+      await withJsonFile({ status: "applied", note: "n" }, async (p) => {
+        const program = new Command();
+        registerFeedbackCommands(program, async () => mockClient);
+        await program.parseAsync(["feedback", "resolve", "4", "--from-json", p], { from: "user" });
+      });
+      expect(put.mock.calls[0][1]).toMatchObject({ status: "applied" }); // JSON beats absent
+      await withJsonFile({ status: "applied", note: "n" }, async (p) => {
+        const program = new Command();
+        registerFeedbackCommands(program, async () => mockClient);
+        await program.parseAsync(
+          ["feedback", "resolve", "4", "--from-json", p, "--status", "dismissed"],
+          { from: "user" }
+        );
+      });
+      expect(put.mock.calls[1][1]).toMatchObject({ status: "dismissed" }); // explicit beats JSON
     });
 
-    test("a note in JSON and a different one on argv are both kept (mergeNoteFlags semantics)", () => {
-      const merged = mergeFeedbackResolveInput({ note: "from file" }, { reason: "from argv" });
-      expect(merged.note).toBe("from file\n\nfrom argv");
+    test("a note in JSON and a different one on argv are both kept (mergeNoteFlags semantics)", async () => {
+      put.mockResolvedValueOnce({ feedbackId: 9, status: "applied" });
+      await withJsonFile({ status: "applied", note: "from file" }, async (p) => {
+        const program = new Command();
+        registerFeedbackCommands(program, async () => mockClient);
+        await program.parseAsync(
+          ["feedback", "resolve", "9", "--from-json", p, "--reason", "from argv"],
+          { from: "user" }
+        );
+      });
+      expect(put).toHaveBeenCalledWith("/api/feedback/9", {
+        status: "applied",
+        resolution: "from file\n\nfrom argv",
+      });
+    });
+
+    test("an unknown JSON key exits 4 naming it and the accepted keys (no PUT)", async () => {
+      // The old hand merger silently ignored anything outside its four keys —
+      // the fb#298 class the shared pipeline closes.
+      await withJsonFile({ status: "applied", resolutionNote: "typo" }, async (p) => {
+        const program = new Command();
+        registerFeedbackCommands(program, async () => mockClient);
+        const { exitCode, envelope } = await captureActionError(() =>
+          program.parseAsync(["feedback", "resolve", "12", "--from-json", p], { from: "user" })
+        );
+        expect(exitCode).toBe(4);
+        expect(String(envelope.error)).toMatch(/unknown key resolutionNote/);
+        expect(String(envelope.error)).toMatch(/accepted: note, reason, resolution, status/);
+      });
+      expect(put).not.toHaveBeenCalled();
     });
 
     test("a quote-bearing note round-trips byte-intact through the file", async () => {
@@ -823,14 +943,50 @@ describe("ib feedback update", () => {
       try { await fn(p); } finally { unlinkSync(p); }
     };
 
-    test("precedence: an explicitly-typed flag beats the JSON", () => {
-      expect(mergeFeedbackUpdateInput({ scope: "cli" }, {}).scope).toBe("cli");
-      expect(mergeFeedbackUpdateInput({ scope: "cli" }, { scope: "security" }).scope).toBe("security");
-      expect(mergeFeedbackUpdateInput({}, {}).scope).toBeUndefined();
+    test("precedence: an explicitly-typed flag beats the JSON", async () => {
+      // update declares no Commander defaults, so the ladder is two rungs.
+      put.mockResolvedValue({ feedbackId: 42 });
+      await withJsonFile({ scope: "cli" }, async (p) => {
+        const program = new Command();
+        registerFeedbackCommands(program, async () => mockClient);
+        await program.parseAsync(["feedback", "update", "42", "--from-json", p], { from: "user" });
+      });
+      expect(put.mock.calls[0][1]).toMatchObject({ scope: "cli" }); // JSON beats absent
+      await withJsonFile({ scope: "cli" }, async (p) => {
+        const program = new Command();
+        registerFeedbackCommands(program, async () => mockClient);
+        await program.parseAsync(
+          ["feedback", "update", "42", "--from-json", p, "--scope", "security"],
+          { from: "user" }
+        );
+      });
+      expect(put.mock.calls[1][1]).toMatchObject({ scope: "security" }); // explicit beats JSON
     });
 
-    test("`body` is accepted as a JSON alias for description", () => {
-      expect(mergeFeedbackUpdateInput({ body: "via body" }, {}).description).toBe("via body");
+    test("`body` is accepted as a JSON alias for description", async () => {
+      put.mockResolvedValueOnce({ feedbackId: 42 });
+      await withJsonFile({ body: "via body" }, async (p) => {
+        const program = new Command();
+        registerFeedbackCommands(program, async () => mockClient);
+        await program.parseAsync(["feedback", "update", "42", "--from-json", p], { from: "user" });
+      });
+      expect(put).toHaveBeenCalledWith("/api/feedback/42", { description: "via body" });
+    });
+
+    test("an unknown JSON key exits 4 naming it and the accepted keys (no PUT)", async () => {
+      // `status` belongs to `resolve`, not `update` — the old hand merger would
+      // have silently dropped it and PUT the rest (the fb#298 class).
+      await withJsonFile({ scope: "cli", status: "applied" }, async (p) => {
+        const program = new Command();
+        registerFeedbackCommands(program, async () => mockClient);
+        const { exitCode, envelope } = await captureActionError(() =>
+          program.parseAsync(["feedback", "update", "42", "--from-json", p], { from: "user" })
+        );
+        expect(exitCode).toBe(4);
+        expect(String(envelope.error)).toMatch(/unknown key status/);
+        expect(String(envelope.error)).toMatch(/accepted: appendDescription, body, complexity, description, kind, scope, severity/);
+      });
+      expect(put).not.toHaveBeenCalled();
     });
 
     test("a quote-bearing description round-trips byte-intact through the file", async () => {

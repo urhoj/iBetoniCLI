@@ -15,12 +15,12 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
-import { readJsonObjectInput } from "../../api/parseBody.js";
 import { failWith, writeJson } from "../../output/json.js";
 import { assertEnum, assertEnumCsv, parseRefId } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { guarded, jsonAction } from "../_shared/action.js";
-import { explicitFlags, foldAliases } from "../_shared/flags.js";
+import { foldAliases } from "../_shared/flags.js";
+import { applyFromJson, type FromJsonConfig } from "../_shared/fromJson.js";
 import { qs } from "../../api/query.js";
 
 // Exported for specs.ts: the spec flags declare these as machine-readable
@@ -169,57 +169,22 @@ export function resolveFeedbackCreateDescription(input: {
   return title ? `${title}\n\n${description}` : description;
 }
 
-/** Flags that a `--from-json` object can also supply (drives explicit-flag detection). */
-export const FROM_JSON_FIELDS = [
-  "description", "body", "title", "kind", "scope", "command", "error", "severity", "complexity",
-] as const;
-
-/** Field set `create` accepts from a flag or a `--from-json` object. */
-export interface FeedbackCreateFields {
-  description?: string;
-  body?: string;
-  title?: string;
-  kind?: string;
-  scope?: string;
-  command?: string;
-  error?: string;
-  severity?: string;
-  complexity?: number;
-}
-
 /**
- * Merge a `--from-json` object with the CLI flags (fb#299).
+ * `create`'s `--from-json` config — the shared pipeline (_shared/fromJson.ts)
+ * derives the accepted keys from the command's own registered flags, rejects
+ * unknown/wrong-typed keys aggregated (exit 4 — the fb#298 silent-drop class is
+ * gone), and merges explicit flag > JSON > Commander default (fb#299: --kind/
+ * --scope declare defaults, which must not outrank a JSON-supplied value).
  *
- * Precedence: an EXPLICITLY-typed flag wins, then the JSON object, then the
- * Commander default. That middle rung is why `explicit` is passed separately
- * from the raw opts — `--kind`/`--scope` declare defaults ("improvement"/"cli"),
- * so feeding the raw opts in would let a default the caller never typed silently
- * outrank a JSON-supplied value. Callers detect "actually typed" with
- * `cmd.getOptionValueSource(name) === "cli"` (same idiom as `keikka list`).
+ * readShapeAliases: `errorText` is what the READ commands emit for the --error
+ * field, and templating a --from-json file off a row from `ib dev feedback get`
+ * is the natural way to author one (feedback #357).
  */
-export function mergeFeedbackCreateInput(
-  json: Record<string, unknown>,
-  explicit: FeedbackCreateFields,
-  defaults: FeedbackCreateFields
-): FeedbackCreateFields {
-  const s = (k: string): string | undefined => json[k] as string | undefined;
-  return {
-    description: explicit.description ?? s("description"),
-    body: explicit.body ?? s("body"),
-    title: explicit.title ?? s("title"),
-    kind: explicit.kind ?? s("kind") ?? defaults.kind,
-    scope: explicit.scope ?? s("scope") ?? defaults.scope,
-    command: explicit.command ?? s("command"),
-    // `errorText` is what the READ commands emit for this field, and templating
-    // a --from-json file off a row from `ib dev feedback get` is the natural way
-    // to author one. Here the mismatch is worse than changelog's exit-4: unknown
-    // keys are simply ignored, so `errorText` would be silently DROPPED and the
-    // row stored without it (feedback #357 asked for this command to be checked).
-    error: explicit.error ?? s("error") ?? s("errorText"),
-    severity: explicit.severity ?? s("severity"),
-    complexity: explicit.complexity ?? (json.complexity as number | undefined),
-  };
-}
+const CREATE_FROM_JSON: FromJsonConfig = {
+  nonPayload: new Set(["fromJson", "dryRun", "help"]),
+  readShapeAliases: { errorText: "error" },
+  numericFields: new Set(["complexity"]),
+};
 
 interface FeedbackCreateBody {
   kind: Kind;
@@ -447,31 +412,17 @@ export interface FeedbackResolveInput {
   full?: boolean;
 }
 
-/** Fields a `resolve --from-json` object may supply (drives explicit-flag detection). */
-export const RESOLVE_FROM_JSON_FIELDS = ["status", "note", "reason", "resolution"] as const;
-
 /**
- * Merge a `resolve --from-json` object with the CLI flags (feedback #327).
- *
- * Same precedence as `create`: an explicitly-typed flag wins over the JSON.
- * `resolve` has no Commander defaults, so there is no third rung — an absent
- * flag is simply absent. The three note aliases are merged AFTER the merge, so
- * a note supplied in JSON and a different one typed on argv are both kept,
- * exactly as `mergeNoteFlags` does for three argv flags.
+ * `resolve`'s `--from-json` config (feedback #327) — the shared pipeline with
+ * no Commander defaults, so the precedence collapses to explicit flag > JSON.
+ * The three note aliases (--note/--reason/--resolution) are merged AFTER the
+ * per-key merge via {@link mergeNoteFlags}, so a note supplied in JSON and a
+ * different one typed on argv are both kept, exactly as for three argv flags.
+ * Unknown/wrong-typed JSON keys exit 4 (shared contract, fb#298 class).
  */
-export function mergeFeedbackResolveInput(
-  json: Record<string, unknown>,
-  explicit: Record<string, string | undefined>
-): { status?: string; note?: string } {
-  const pick = (k: (typeof RESOLVE_FROM_JSON_FIELDS)[number]): string | undefined => {
-    const v = explicit[k] ?? json[k];
-    return v === undefined || v === null ? undefined : String(v);
-  };
-  return {
-    status: pick("status"),
-    note: mergeNoteFlags(pick("note"), pick("resolution"), pick("reason")),
-  };
-}
+const RESOLVE_FROM_JSON: FromJsonConfig = {
+  nonPayload: new Set(["fromJson", "dryRun", "full", "help"]),
+};
 
 /**
  * --note / --reason / --resolution are aliases for the same stored note. When a
@@ -540,36 +491,18 @@ export interface FeedbackUpdateInput {
   full?: boolean;
 }
 
-/** Fields an `update --from-json` object may supply (drives explicit-flag detection). */
-export const UPDATE_FROM_JSON_FIELDS = [
-  "scope", "kind", "severity", "complexity", "description", "body", "appendDescription",
-] as const;
-
 /**
- * Merge an `update --from-json` object with the CLI flags (feedback #332).
- * Explicitly-typed flags win; `update` declares no Commander defaults, so an
- * absent flag is simply absent. `body` folds into `description` (its alias)
- * exactly as the argv path does.
+ * `update`'s `--from-json` config (feedback #332) — the shared pipeline with no
+ * Commander defaults, so the precedence collapses to explicit flag > JSON.
+ * `body` (JSON or argv) folds into `description` AFTER the merge via
+ * {@link foldAliases}, mirroring `changelog update` — differing values across
+ * the two spellings exit 4 instead of one silently winning. Unknown/wrong-typed
+ * JSON keys exit 4 (shared contract, fb#298 class).
  */
-export function mergeFeedbackUpdateInput(
-  json: Record<string, unknown>,
-  explicit: Record<string, unknown>
-): FeedbackUpdateInput {
-  const pick = (k: (typeof UPDATE_FROM_JSON_FIELDS)[number]): unknown =>
-    explicit[k] ?? json[k];
-  const str = (v: unknown): string | undefined =>
-    v === undefined || v === null ? undefined : String(v);
-  const description = str(pick("description")) ?? str(pick("body"));
-  const complexityRaw = pick("complexity");
-  return {
-    scope: str(pick("scope")),
-    kind: str(pick("kind")),
-    severity: str(pick("severity")),
-    complexity: complexityRaw === undefined || complexityRaw === null ? undefined : Number(complexityRaw),
-    description,
-    appendDescription: str(pick("appendDescription")),
-  };
-}
+const UPDATE_FROM_JSON: FromJsonConfig = {
+  nonPayload: new Set(["fromJson", "dryRun", "full", "help"]),
+  numericFields: new Set(["complexity"]),
+};
 
 /**
  * PUT /api/feedback/:id — developer edit of a filed row's classification
@@ -691,29 +624,25 @@ export function registerFeedbackCommands(
         },
         cmd: Command
       ) => {
-        // Only the flags the caller ACTUALLY typed outrank the JSON object —
-        // see mergeFeedbackCreateInput (--kind/--scope carry defaults).
-        const explicit = explicitFlags(cmd, opts as Record<string, unknown>, FROM_JSON_FIELDS);
-        const merged = mergeFeedbackCreateInput(
-          opts.fromJson ? readJsonObjectInput(opts.fromJson) : {},
-          explicit as FeedbackCreateFields,
-          { kind: opts.kind, scope: opts.scope }
-        );
+        // Shared merge: only the flags the caller ACTUALLY typed outrank the
+        // JSON object (--kind/--scope carry defaults, fb#299); unknown or
+        // wrong-typed JSON keys exit 4 (fb#298).
+        applyFromJson(cmd, opts as Record<string, unknown>, CREATE_FROM_JSON);
         const client = await getClient();
         writeJson(
           await runFeedbackCreate(client, {
             description: resolveFeedbackCreateDescription({
               description,
-              descriptionFlag: merged.description,
-              bodyFlag: merged.body,
-              title: merged.title,
+              descriptionFlag: opts.description,
+              bodyFlag: opts.body,
+              title: opts.title,
             }),
-            kind: merged.kind,
-            scope: merged.scope,
-            command: merged.command,
-            error: merged.error,
-            severity: merged.severity,
-            complexity: merged.complexity,
+            kind: opts.kind,
+            scope: opts.scope,
+            command: opts.command,
+            error: opts.error,
+            severity: opts.severity,
+            complexity: opts.complexity,
             dryRun: opts.dryRun,
           })
         );
@@ -767,22 +696,17 @@ export function registerFeedbackCommands(
         cmd: Command
       ) => {
         const id = parseRefId(idStr, "feedback", "resolve");
-        // Only EXPLICITLY-typed flags outrank the JSON object (feedback #327).
-        const explicit = explicitFlags(
-          cmd,
-          opts as Record<string, unknown>,
-          RESOLVE_FROM_JSON_FIELDS
-        ) as Record<string, string | undefined>;
-        const merged = mergeFeedbackResolveInput(
-          opts.fromJson ? readJsonObjectInput(opts.fromJson) : {},
-          explicit
-        );
+        // Shared merge: only EXPLICITLY-typed flags outrank the JSON object
+        // (feedback #327); unknown or wrong-typed JSON keys exit 4 (fb#298).
+        applyFromJson(cmd, opts as Record<string, unknown>, RESOLVE_FROM_JSON);
         const client = await getClient();
         writeJson(
           await runWithSiblingHint(client, id, "changelog", () =>
             runFeedbackResolve(client, id, {
-              status: merged.status,
-              note: merged.note,
+              status: opts.status,
+              // The three note aliases merge AFTER the per-key merge, so a note
+              // from JSON and a different one typed on argv are both kept.
+              note: mergeNoteFlags(opts.note, opts.resolution, opts.reason),
               dryRun: opts.dryRun,
               full: opts.full,
             })
@@ -823,28 +747,31 @@ export function registerFeedbackCommands(
         cmd: Command
       ) => {
         const id = parseRefId(idStr, "feedback", "update");
-        // --body is an alias for --description (feedback #278); fold it in so
-        // runFeedbackUpdate sees one field. Both only when they agree.
+        // Shared merge: only EXPLICITLY-typed flags outrank the JSON object
+        // (feedback #332); unknown or wrong-typed JSON keys exit 4 (fb#298).
+        applyFromJson(cmd, opts as Record<string, unknown>, UPDATE_FROM_JSON);
+        // --body (argv or JSON) is an alias for --description (feedback #278);
+        // fold AFTER the merge so both sources are agreement-checked, mirroring
+        // `changelog update` — differing values exit 4 instead of one silently
+        // winning.
         const desc = foldAliases(
           [opts.description, opts.body],
           "Provide the description via --description or --body, not both with different values"
         );
         if (desc !== undefined) opts.description = desc;
-        // Only EXPLICITLY-typed flags outrank the JSON object (feedback #332).
-        const explicit = explicitFlags(cmd, opts as Record<string, unknown>, UPDATE_FROM_JSON_FIELDS);
-        // --body typed on argv resolves to description above, so carry it over
-        // as the explicit description rather than losing it to the JSON.
-        if (explicit.body !== undefined && explicit.description === undefined) {
-          explicit.description = opts.description;
-        }
-        const merged = mergeFeedbackUpdateInput(
-          opts.fromJson ? readJsonObjectInput(opts.fromJson) : {},
-          explicit
-        );
         const client = await getClient();
         writeJson(
           await runWithSiblingHint(client, id, "changelog", () =>
-            runFeedbackUpdate(client, id, { ...merged, dryRun: opts.dryRun, full: opts.full })
+            runFeedbackUpdate(client, id, {
+              scope: opts.scope,
+              kind: opts.kind,
+              severity: opts.severity,
+              complexity: opts.complexity,
+              description: opts.description,
+              appendDescription: opts.appendDescription,
+              dryRun: opts.dryRun,
+              full: opts.full,
+            })
           )
         );
       })

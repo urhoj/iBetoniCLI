@@ -25,7 +25,7 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { readJsonInput, readJsonObjectInput } from "../../api/parseBody.js";
+import { readJsonInput } from "../../api/parseBody.js";
 import { writeJson, failWith, failUsage, failValidation, warnNote } from "../../output/json.js";
 import type { FlagProblem } from "../../output/validationEnvelope.js";
 import { resolveDate } from "../../dates.js";
@@ -34,6 +34,12 @@ import { runWithSiblingHint } from "../../refHint.js";
 import { COORDINATED as COORDINATED_REPOS, normalizeRepoCsv } from "./repos.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { explicitFlags, foldAliases } from "../_shared/flags.js";
+import {
+  type FromJsonConfig,
+  payloadKeyMap as sharedPayloadKeyMap,
+  normalizeFromJson,
+  applyFromJson as sharedApplyFromJson,
+} from "../_shared/fromJson.js";
 import { qs } from "../../api/query.js";
 
 type Row = Record<string, unknown>;
@@ -471,32 +477,18 @@ export function normalizeLanguage(lang?: string): string | undefined {
 // after every quote was stripped from the prose, silently degrading the
 // permanent record the monthly report is generated from. --from-json <file|->
 // sidesteps argv entirely, mirroring `ib dev feedback create` (fb#299).
+//
+// The pipeline itself (key-map derivation, unknown-key/wrong-type rejection,
+// explicit>JSON>default precedence) is the SHARED implementation in
+// _shared/fromJson.ts — this file only supplies changelog's config and keeps
+// its historical export names as thin wrappers.
 
 /**
- * Option attribute names that are NOT part of the entry payload: the JSON source
- * itself, the write-safety trio, and help. Everything else a command registers is
- * a payload field (see {@link payloadKeyMap}).
- */
-const NON_PAYLOAD_OPTS = new Set(["fromJson", "dryRun", "idempotencyKey", "reason", "help"]);
-
-/** Payload fields whose flag takes a CSV — a --from-json array is joined for these. */
-const CSV_FIELDS = new Set(["files", "repo", "sha", "commit"]);
-
-/** Payload fields Commander parses with Number. */
-const NUMERIC_FIELDS = new Set(["feedback"]);
-
-/**
- * Column name as the READ commands emit it → the write flag that sets it.
- *
- * `--from-json` exists so long prose survives argv (fb#299/#300), and the
- * natural way to author one of those files is to template it off a row from
- * `ib dev changelog list` — that listing is the only place the field set is
- * visible at all. But the read shape is the DB column names and the write keys
- * are the flag names, and five of them differ, so the obvious round-trip
- * (`read a row → edit it → post it back`) exits 4 on the first mismatched key
- * (feedback #357). Accepting the read spelling as INPUT costs one table and
- * changes no output: the emitted shape is untouched, and the flag names stay
- * canonical.
+ * The five column names `ib dev changelog list` emits that differ from the
+ * write flags, so a read row can be edited and posted straight back
+ * (feedback #357) — the emitted shape is untouched, and the flag names stay
+ * canonical. Also used (reversed) by {@link warnIfPatchIgnored} to name the
+ * flag for a deploy-gated column the backend ignored.
  */
 const READ_SHAPE_KEY_ALIASES: Record<string, string> = {
   commitShas: "sha",
@@ -507,117 +499,40 @@ const READ_SHAPE_KEY_ALIASES: Record<string, string> = {
 };
 
 /**
- * JSON key → canonical option attribute name, for every payload flag registered
- * on `cmd`. Derived from the command itself instead of a hand-kept list, so `add`
- * and `update` (different flag sets) each accept exactly the keys they can apply,
- * and a flag added later cannot drift out of --from-json. Three spellings
- * resolve: the camelCase attribute (`bumpLevel`), the literal flag
- * (`bump-level`), and the read-shape column name ({@link READ_SHAPE_KEY_ALIASES})
- * when that flag is registered on this command.
+ * Changelog's `--from-json` config (see {@link FromJsonConfig}):
+ * - nonPayload: the JSON source itself, the write-safety trio, and help;
+ * - readShapeAliases: {@link READ_SHAPE_KEY_ALIASES};
+ * - numericFields/csvFields: how Commander parses the matching flags.
  */
+const CHANGELOG_FROM_JSON: FromJsonConfig = {
+  nonPayload: new Set(["fromJson", "dryRun", "idempotencyKey", "reason", "help"]),
+  readShapeAliases: READ_SHAPE_KEY_ALIASES,
+  numericFields: new Set(["feedback"]),
+  csvFields: new Set(["files", "repo", "sha", "commit"]),
+};
+
+/** Changelog's key map — the shared {@link sharedPayloadKeyMap} with {@link CHANGELOG_FROM_JSON}. */
 export function payloadKeyMap(cmd: Command): Map<string, string> {
-  const m = new Map<string, string>();
-  for (const opt of cmd.options) {
-    const attr = opt.attributeName();
-    if (!opt.long || NON_PAYLOAD_OPTS.has(attr)) continue;
-    m.set(attr, attr);
-    m.set(opt.long.replace(/^--/, ""), attr);
-  }
-  // Gated on the target flag actually existing, so `update` (a different flag
-  // set) never silently accepts a read key it cannot apply.
-  for (const [readKey, flag] of Object.entries(READ_SHAPE_KEY_ALIASES)) {
-    if (m.has(flag) && !m.has(readKey)) m.set(readKey, m.get(flag)!);
-  }
-  return m;
+  return sharedPayloadKeyMap(cmd, CHANGELOG_FROM_JSON);
 }
 
-/**
- * Normalize a --from-json object into flag-shaped fields.
- *
- * Unknown keys are REJECTED (exit 4), not ignored: the entry is a permanent
- * record, and fb#298 was precisely a silently-dropped JSON key destroying a
- * stored value. Wrong-typed values are rejected by name too — `files: [...]`
- * would otherwise reach `.split(",")` and surface as a raw TypeError (exit 1);
- * the CSV fields therefore also ACCEPT an array, which is what a JSON author
- * naturally writes. Every problem is reported together so one re-run fixes all.
- */
+/** Changelog's normalizer — the shared {@link normalizeFromJson} with {@link CHANGELOG_FROM_JSON}. */
 export function normalizeChangelogJson(
   json: Record<string, unknown>,
   keys: Map<string, string>
 ): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  const unknown: string[] = [];
-  const problems: string[] = [];
-  for (const [rawKey, value] of Object.entries(json)) {
-    const key = keys.get(rawKey);
-    if (!key) {
-      unknown.push(rawKey);
-      continue;
-    }
-    if (value === null || value === undefined) continue;
-    if (NUMERIC_FIELDS.has(key)) {
-      const n = typeof value === "number" ? value : Number(value);
-      if (!Number.isFinite(n)) problems.push(`"${rawKey}" must be a number`);
-      else out[key] = n;
-      continue;
-    }
-    if (CSV_FIELDS.has(key) && Array.isArray(value)) {
-      if (!value.every((v) => typeof v === "string")) problems.push(`"${rawKey}" array must contain only strings`);
-      else out[key] = value.map((v) => v.trim()).filter(Boolean).join(",");
-      continue;
-    }
-    if (typeof value !== "string") {
-      problems.push(
-        `"${rawKey}" must be a string${CSV_FIELDS.has(key) ? " or an array of strings" : ""} (got ${Array.isArray(value) ? "array" : typeof value})`
-      );
-      continue;
-    }
-    out[key] = value;
-  }
-  if (unknown.length)
-    problems.push(
-      `unknown key${unknown.length > 1 ? "s" : ""} ${unknown.join(", ")} — accepted: ${[...new Set(keys.values())].sort().join(", ")}`
-    );
-  if (problems.length) failUsage(`--from-json: ${problems.join("; ")}`);
-  return out;
+  return normalizeFromJson(json, keys, CHANGELOG_FROM_JSON);
 }
 
-// explicitFlags moved to _shared/flags.ts (feedback adopted it too); re-exported
-// for existing importers.
+// explicitFlags moved to _shared/flags.ts (feedback adopted it too); the merge
+// rung is the shared mergeFromJsonInput. Both re-exported under their historical
+// names for existing importers.
 export { explicitFlags };
+export { mergeFromJsonInput as mergeChangelogInput } from "../_shared/fromJson.js";
 
-/**
- * Merge a --from-json object with the CLI flags. Precedence: an EXPLICITLY-typed
- * flag wins, then the JSON object, then whatever the option already holds (its
- * Commander default). That middle rung is why `explicit` is passed separately
- * from the raw opts — `--bump-level` declares a default ("patch"), so a naive
- * flags-win merge would let a default the caller never typed outrank a
- * JSON-supplied value (the precedence trap fb#299 hit on --kind/--scope).
- */
-export function mergeChangelogInput(
-  json: Record<string, unknown>,
-  explicit: Record<string, unknown>,
-  defaults: Record<string, unknown> = {}
-): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const k of new Set([...Object.keys(defaults), ...Object.keys(json), ...Object.keys(explicit)])) {
-    const v = explicit[k] ?? json[k] ?? defaults[k];
-    if (v !== undefined) out[k] = v;
-  }
-  return out;
-}
-
-/**
- * Apply a `--from-json <file|->` payload onto the action's options object, in
- * place. No-op without the flag. Reads the file (or stdin) via the shared
- * shell-safe reader, validates the object against the command's OWN flags, and
- * merges it UNDER the explicitly-typed flags.
- */
+/** Changelog's composed apply — the shared {@link sharedApplyFromJson} with {@link CHANGELOG_FROM_JSON}. */
 export function applyFromJson(cmd: Command, o: Record<string, unknown>): void {
-  if (o.fromJson === undefined) return;
-  const keys = payloadKeyMap(cmd);
-  const json = normalizeChangelogJson(readJsonObjectInput(String(o.fromJson)), keys);
-  Object.assign(o, mergeChangelogInput(json, explicitFlags(cmd, o, new Set(keys.values())), o));
+  sharedApplyFromJson(cmd, o, CHANGELOG_FROM_JSON);
 }
 
 /**
