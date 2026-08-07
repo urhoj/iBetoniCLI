@@ -5,6 +5,7 @@ import { runPersistedSwitch } from "../../auth/switch.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { CliError } from "../../api/errors.js";
+import { intFlag } from "../../targets.js";
 
 interface AvailableCompany {
   asiakasId: number;
@@ -96,9 +97,7 @@ export function registerCompanyCommands(
 
   company
     .command("switch")
-    .requiredOption("--to <asiakasId>", "Target asiakasId", (v: string) =>
-      Number(v)
-    )
+    .requiredOption("--to <asiakasId>", "Target asiakasId", intFlag("--to"))
     .action(
       guarded(async (opts: { to: number }) => {
         writeJson(await runPersistedSwitch(opts.to, isReadOnly()));

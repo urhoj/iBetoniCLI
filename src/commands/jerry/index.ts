@@ -10,7 +10,7 @@ import {
 import { writeJson, failWith } from "../../output/json.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { resolveAsiakasTarget } from "../customer/index.js";
-import { parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption } from "../../targets.js";
+import { parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption, assertEnum, assertEnumCsv, assertPositiveInt } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
@@ -1053,9 +1053,7 @@ export function registerJerryCommands(
         // universe); reject a positive id without --explain so the operator isn't
         // silently ignored, and reject a non-positive-integer id like other targets.
         if (opts.asiakas !== undefined) {
-          if (!Number.isInteger(opts.asiakas) || opts.asiakas <= 0) {
-            failWith("--asiakas must be a positive integer asiakasId", 4);
-          }
+          assertPositiveInt(opts.asiakas, "--asiakas");
           if (!opts.explain) {
             failWith("--asiakas only applies with --explain", 4);
           }
@@ -1066,13 +1064,7 @@ export function registerJerryCommands(
           }
           // Reject an unknown gate here rather than letting the server drop it —
           // a silently-narrowed diagnostic reads as "nothing else is wrong".
-          const unknown = opts.gate.filter((g) => !CHECK_ADDRESS_GATES.includes(g as never));
-          if (unknown.length) {
-            failWith(
-              `--gate: unknown reason(s) ${unknown.join(", ")} — valid: ${CHECK_ADDRESS_GATES.join(", ")}`,
-              4
-            );
-          }
+          assertEnumCsv(opts.gate, CHECK_ADDRESS_GATES, "--gate");
         }
         const client = await getClient();
         writeJson(await runJerryCheckAddress(client, opts));
@@ -1288,12 +1280,7 @@ export function registerJerryCommands(
         // Reject an unknown mode here: the server defaults to `week` on anything
         // it does not recognise, which would answer a DIFFERENT question than the
         // one asked without saying so.
-        if (opts.groupBy && !REQUEST_STATS_GROUPS.includes(opts.groupBy as never)) {
-          failWith(
-            `--group-by must be one of: ${REQUEST_STATS_GROUPS.join(", ")}`,
-            4
-          );
-        }
+        assertEnum(opts.groupBy, REQUEST_STATS_GROUPS, "--group-by");
         const client = await getClient();
         writeJson(await runJerryAdminRequestStats(client, opts));
       })

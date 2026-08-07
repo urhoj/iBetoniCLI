@@ -5,7 +5,7 @@ import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { CliError } from "../../api/errors.js";
-import { parseId, cappedInt } from "../../targets.js";
+import { parseId, cappedInt, assertPositiveInt } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { flattenGeocodeResult } from "../_shared/geocode.js";
 import { runAddressDashboard, registerDashboardCommand, } from "../_shared/addressDashboard.js";
@@ -662,9 +662,8 @@ export async function runSijaintiDistance(client, fromToken, toToken) {
  * client-side owner filter silently matches against nothing.
  */
 function assertValidAsiakasFlag(asiakas) {
-    if (asiakas !== undefined && (!Number.isInteger(asiakas) || asiakas <= 0)) {
-        failWith("--asiakas must be a positive integer asiakasId", 4);
-    }
+    if (asiakas !== undefined)
+        assertPositiveInt(asiakas, "--asiakas");
 }
 /**
  * `ib sijainti dashboard` — resolve the caller's point from exactly one of

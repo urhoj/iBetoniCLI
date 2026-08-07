@@ -3,6 +3,7 @@ import { runPersistedSwitch } from "../../auth/switch.js";
 import { writeJson, exitWithError } from "../../output/json.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { CliError } from "../../api/errors.js";
+import { intFlag } from "../../targets.js";
 function companyName(c) {
     return c.asiakasNimi ?? c.name ?? "";
 }
@@ -51,7 +52,7 @@ export function registerCompanyCommands(parent, getClient, isReadOnly) {
         .action(jsonAction(getClient, runCompanyCurrent));
     company
         .command("switch")
-        .requiredOption("--to <asiakasId>", "Target asiakasId", (v) => Number(v))
+        .requiredOption("--to <asiakasId>", "Target asiakasId", intFlag("--to"))
         .action(guarded(async (opts) => {
         writeJson(await runPersistedSwitch(opts.to, isReadOnly()));
     }));

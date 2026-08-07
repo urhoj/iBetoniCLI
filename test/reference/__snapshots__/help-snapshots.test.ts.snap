@@ -11288,7 +11288,8 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleId, plate, objectName, arrived, departed, durationMin }> & { gpsAvailable }
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Invalid filterType     → use tyomaa or sijainti
+  exit 4 (client-side)  Invalid filterType     → use tyomaa or sijainti
+  exit 4 (client-side)  Bad --date             → YYYY-MM-DD or today/yesterday/tomorrow
   exit 5 (HTTP 404)  tyomaa not found / not owned → verify tyomaaId belongs to the active company
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read

@@ -2352,7 +2352,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ vehicleId, plate, objectName, arrived, departed, durationMin }> & { gpsAvailable }",
     errors: [
-      apiErr(400, "Invalid filterType", "use tyomaa or sijainti"),
+      { origin: "client", exit: 4, match: "filterType", meaning: "Invalid filterType", remedy: "use tyomaa or sijainti" },
+      { origin: "client", exit: 4, match: "date must be", meaning: "Bad --date", remedy: "YYYY-MM-DD or today/yesterday/tomorrow" },
       apiErr(404, "tyomaa not found / not owned", "verify tyomaaId belongs to the active company"),
       ...permErrors("auth.page.vehicle.read"),
     ],

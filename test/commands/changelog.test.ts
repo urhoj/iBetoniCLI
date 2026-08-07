@@ -141,7 +141,7 @@ test("normalizeLanguage lowercases, trims, and passes undefined through", () => 
 });
 
 test("normalizeLanguage rejects an unsupported code (exit 4)", () => {
-  expect(() => normalizeLanguage("de")).toThrow(/fi\|en/);
+  expect(() => normalizeLanguage("de")).toThrow(/--language must be one of: fi, en/);
 });
 
 describe("normalizeType conventional-commit synonyms (fb#188)", () => {

@@ -1,9 +1,9 @@
-import { listEnvelope } from "../../api/envelopes.js";
+import { toListEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { readJsonInput, readJsonObjectInput } from "../../api/parseBody.js";
 import { writeJson, failWith, failUsage, failValidation } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
-import { parseRefId } from "../../targets.js";
+import { parseRefId, assertEnum, intFlag } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { COORDINATED as COORDINATED_REPOS, normalizeRepoCsv } from "./repos.js";
 import { jsonAction, guarded } from "../_shared/action.js";
@@ -91,8 +91,7 @@ export async function runChangelogList(client, opts) {
     if (opts.hasSentry)
         p.hasSentry = "1";
     const rows = await client.get(`/api/changelog${qs(p)}`);
-    const items = Array.isArray(rows) ? rows : [];
-    return listEnvelope(items);
+    return toListEnvelope(rows);
 }
 export async function runChangelogGet(client, id) {
     return client.get(`/api/changelog/${id}`);
@@ -117,7 +116,7 @@ export async function runChangelogDelete(client, id, flags) {
     });
 }
 export async function runChangelogReport(client, month, format) {
-    return client.get(`/api/changelog/report?month=${month}&format=${format}`);
+    return client.get(`/api/changelog/report${qs({ month, format })}`);
 }
 export async function runChangelogPending(client) {
     return client.get("/api/changelog/pending");
@@ -331,8 +330,7 @@ export function normalizeLanguage(lang) {
     if (lang === undefined)
         return undefined;
     const v = lang.trim().toLowerCase();
-    if (!LANGUAGES.includes(v))
-        failWith(`--language must be ${LANGUAGES.join("|")}`, 4);
+    assertEnum(v, LANGUAGES, "--language");
     return v;
 }
 // ─── --from-json (fb#300) ────────────────────────────────────────────────────
@@ -585,7 +583,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--commit <csv>", "Alias for --sha — Commit SHAs (CSV); if both are given, they must match")
         .option("--vtag <s>", "Version tag")
         .option("--bump-level <l>", "App version bump this implies: none|patch|minor|major", "patch")
-        .option("--feedback <id>", "cliFeedback id this resolves", Number)
+        .option("--feedback <id>", "cliFeedback id this resolves", intFlag("--feedback"))
         .option("--sentry <ref>", "Sentry issue short id or URL this fixes")
         .option("--source <s>", "Source: human|routine (default: human)")
         .option("--date <d>", "Entry date (YYYY-MM-DD|today), default today")
@@ -640,7 +638,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         if (o.vtag)
             body.versionTag = o.vtag;
         if (o.feedback !== undefined)
-            body.feedbackId = Number(o.feedback);
+            body.feedbackId = o.feedback;
         if (o.sentry)
             body.sentryIssue = normalizeSentryRef(o.sentry);
         if (o.source)
@@ -658,7 +656,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--type <t>", "feature|improvement|bugfix")
         .option("--area <a>", AREA_FLAG_DESC)
         .option("--repo <r>", "Repo/submodule")
-        .option("--feedback <id>", "Entries linked to a feedback id", Number)
+        .option("--feedback <id>", "Entries linked to a feedback id", intFlag("--feedback"))
         .option("--sentry <ref>", "Entries linked to a Sentry issue short id")
         .option("--source <s>", "human|routine")
         .option("--search <text>", "Substring match over title/description/files/commitShas (deploy-gated)")
@@ -712,7 +710,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         // --status Deployed` would silently rewrite a deliberate `minor` back to
         // `patch` and mis-drive the next deploy. Absent flag = field untouched.
         .option("--bump-level <l>", "Correct the app version bump this entry implies: none|patch|minor|major. Refused once the entry is RELEASED (has a versionTag) — that bump already shipped.")
-        .option("--feedback <id>", "cliFeedback id this entry resolves — also marks that row applied and points it back here (repairs a link orphaned by delete + re-add). Takes the link from a prior resolver, noting it on stderr (fb#366)", Number)
+        .option("--feedback <id>", "cliFeedback id this entry resolves — also marks that row applied and points it back here (repairs a link orphaned by delete + re-add). Takes the link from a prior resolver, noting it on stderr (fb#366)", intFlag("--feedback"))
         .option("--sentry <ref>", "Sentry issue short id or URL this entry fixes")
         .option("--source <s>", "Source: human|routine")
         .option("--date <d>", "Entry date (YYYY-MM-DD|today)")
@@ -769,7 +767,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         if (o.bumpLevel !== undefined)
             patch.bumpLevel = o.bumpLevel;
         if (o.feedback !== undefined)
-            patch.feedbackId = Number(o.feedback);
+            patch.feedbackId = o.feedback;
         if (o.sentry)
             patch.sentryIssue = normalizeSentryRef(o.sentry);
         const updLang = normalizeLanguage(o.language);
@@ -799,6 +797,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
             failWith("--month <YYYY-MM> is required for a monthly report. For UNRELEASED/pending entries staged for the next release, use `ib dev changelog pending` (or `report --unreleased`).", 4);
         if (!/^\d{4}-\d{2}$/.test(o.month))
             failWith("--month must be YYYY-MM", 4);
+        assertEnum(o.format, ["md", "json"], "--format");
         writeJson(await runChangelogReport(await getClient(), o.month, o.format));
     }));
     c.command("pending")

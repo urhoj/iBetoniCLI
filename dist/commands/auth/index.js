@@ -12,6 +12,7 @@ import { CliError } from "../../api/errors.js";
 import { guarded } from "../_shared/action.js";
 import { performImpersonate, performImpersonateExtend, performImpersonateEnd, buildImpersonationProfile, IMPERSONATOR_PROFILE, } from "../../auth/impersonate.js";
 import { writeJson, failWith, errorMessage } from "../../output/json.js";
+import { intFlag } from "../../targets.js";
 /**
  * Register `ib auth` subcommands on the parent commander instance:
  *   - login    OAuth 2.1 + PKCE flow with local 127.0.0.1 callback
@@ -132,7 +133,7 @@ export function registerAuthCommands(parent, isReadOnly) {
     }));
     auth
         .command("switch")
-        .requiredOption("--to <asiakasId>", "Target asiakasId", (v) => Number(v))
+        .requiredOption("--to <asiakasId>", "Target asiakasId", intFlag("--to"))
         .action(guarded(async (opts) => {
         writeJson(await runPersistedSwitch(opts.to, isReadOnly()));
     }));

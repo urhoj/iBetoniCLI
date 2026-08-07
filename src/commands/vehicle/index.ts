@@ -9,7 +9,7 @@ import {
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
 import { ownerAsiakasIdFromToken } from "../../owner.js";
-import { parseId, resolveSearchQuery, cappedInt } from "../../targets.js";
+import { parseId, resolveSearchQuery, cappedInt, assertEnum } from "../../targets.js";
 import { diffFields } from "../../diff.js";
 import { registerVehicleDriverCommands } from "./driver.js";
 import { registerLogAlias } from "../log/index.js";
@@ -174,13 +174,11 @@ export async function runVehicleVisits(
   filterId: number,
   opts: VehicleVisitsFilter
 ): Promise<GpsListEnvelope> {
-  if (!(VISIT_FILTER_TYPES as readonly string[]).includes(filterType)) {
-    throw new Error(`filterType must be one of: ${VISIT_FILTER_TYPES.join(", ")}`);
-  }
+  assertEnum(filterType, VISIT_FILTER_TYPES, "filterType");
   let days = opts.days;
   if (opts.date !== undefined) {
     if (!VISIT_DATE_RE.test(opts.date)) {
-      throw new Error("date must be YYYY-MM-DD (or today/yesterday/tomorrow)");
+      failWith("date must be YYYY-MM-DD (or today/yesterday/tomorrow)", 4);
     }
     if (days === undefined) {
       // +2 covers the UTC↔Helsinki offset and the partial current day.

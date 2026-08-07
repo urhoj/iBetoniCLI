@@ -1,7 +1,7 @@
 import { listEnvelope } from "../../api/envelopes.js";
 import { readJsonObjectInput } from "../../api/parseBody.js";
 import { failWith, writeJson } from "../../output/json.js";
-import { assertEnum, parseRefId } from "../../targets.js";
+import { assertEnum, assertEnumCsv, parseRefId } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
@@ -205,9 +205,7 @@ function resolveStatuses(opts) {
             .split(",")
             .map((s) => s.trim())
             .filter(Boolean);
-        for (const s of list) {
-            assertEnum(s, STATUSES, "--status");
-        }
+        assertEnumCsv(list, STATUSES, "--status");
         if (list.length)
             return list;
     }

@@ -11,7 +11,7 @@ import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { failWith } from "../../output/json.js";
-import { assertEnum, assertPositiveInt } from "../../targets.js";
+import { assertEnum, assertPositiveInt, intFlag } from "../../targets.js";
 import {
   addWriteFlagsToCommand,
   writeFlagsToHeaders,
@@ -43,20 +43,9 @@ export function parseCadence(value: string): { cadenceCount: number; cadenceUnit
   return { cadenceCount: count, cadenceUnit: m[2] };
 }
 
-/**
- * Commander argParser: strict integer >= min; exit 4 otherwise. Bare `Number`
- * lets NaN through — the backend silently drops a NaN filter and returns ALL
- * rows (fb#249).
- */
-export function intFlag(flag: string, min = 1): (value: string) => number {
-  return (value: string) => {
-    const n = Number((value ?? "").trim());
-    if (!Number.isSafeInteger(n) || n < min) {
-      failWith(`${flag} must be an integer >= ${min}`, 4);
-    }
-    return n;
-  };
-}
+// intFlag was born here (fb#249) and moved to targets.ts once other domains
+// needed it; re-exported so existing importers/tests keep working.
+export { intFlag };
 
 /**
  * Envelope from a probe-limit fetch: the request asked for one row PAST

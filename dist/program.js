@@ -286,7 +286,7 @@ export async function buildProgram(argv) {
         const res = await runReferenceDetailLint(await getClient());
         writeJson(res);
         if (opts.strict && res.items.length > 0)
-            process.exitCode = 1;
+            setExit(1);
     }));
     // `ib commands` — filtered, offline discovery over the same spec catalogue.
     // Note: the filter is `--reads` (not `--read-only`) because `--read-only` is

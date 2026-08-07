@@ -134,7 +134,7 @@ describe("ambiguous client rows no longer serve an unrelated remedy", () => {
 
   test("`jerry check-address` bad --asiakas is not answered with the boom remedy", () => {
     const hint = hintForError(
-      client4("--asiakas must be a positive integer asiakasId"),
+      client4("--asiakas must be a positive integer"),
       rowsOf("ib jerry check-address")
     );
     expect(hint).toMatch(/--explain/i);

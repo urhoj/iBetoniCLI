@@ -22,6 +22,7 @@ import {
   IMPERSONATOR_PROFILE,
 } from "../../auth/impersonate.js";
 import { writeJson, failWith, errorMessage } from "../../output/json.js";
+import { intFlag } from "../../targets.js";
 
 /**
  * Register `ib auth` subcommands on the parent commander instance:
@@ -166,7 +167,7 @@ export function registerAuthCommands(
 
   auth
     .command("switch")
-    .requiredOption("--to <asiakasId>", "Target asiakasId", (v: string) => Number(v))
+    .requiredOption("--to <asiakasId>", "Target asiakasId", intFlag("--to"))
     .action(
       guarded(async (opts: { to: number }) => {
         writeJson(await runPersistedSwitch(opts.to, isReadOnly()));

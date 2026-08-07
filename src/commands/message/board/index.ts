@@ -11,6 +11,7 @@ import { writeJson, failWith } from "../../../output/json.js";
 import { resolveDate, todayHelsinki } from "../../../dates.js";
 import type { CommandSpec } from "../../../output/help.js";
 import { jsonAction, guarded } from "../../_shared/action.js";
+import { parseId, assertEnum } from "../../../targets.js";
 
 /**
  * `ib message board` (alias `ib message ilmoitustaulu`) — the company
@@ -242,21 +243,6 @@ export async function runBoardDelete(
   });
 }
 
-/** Validate a positive-integer messageId positional, or exit 4. */
-function parseMessageId(raw: string): number {
-  const id = Number(raw);
-  if (!Number.isInteger(id) || id <= 0) {
-    failWith(`Invalid messageId "${raw}" — expected a positive integer`, 4);
-  }
-  return id;
-}
-
-/** Validate priority against the {info,warning,urgent} enum, or exit 4. */
-function assertPriority(priority: string | undefined): void {
-  if (priority !== undefined && !PRIORITIES.includes(priority as (typeof PRIORITIES)[number])) {
-    failWith(`Invalid --priority "${priority}" — use ${PRIORITIES.join("|")}`, 4);
-  }
-}
 
 /**
  * Register the `board` sub-group on the `ib message` umbrella parent.
@@ -303,7 +289,7 @@ export function registerMessageBoardCommands(
 
   b.command("get <messageId>")
     .action(guarded(async (raw: string) => {
-      const messageId = parseMessageId(raw);
+      const messageId = parseId(raw, "messageId");
       const client = await getClient();
       const row = await runBoardGet(client, messageId);
       if (!row) failWith(`No board message with id ${messageId}`, 5);
@@ -327,7 +313,7 @@ export function registerMessageBoardCommands(
     }) => {
       requireReason(opts, { allowDryRun: true });
       if (!opts.startDate) failWith("Missing required flag: --start-date", 4);
-      assertPriority(opts.priority);
+      assertEnum(opts.priority, PRIORITIES, "--priority");
       const client = await getClient();
       const fields = buildBoardFields(opts);
       writeJson(await runBoardCreate(client, fields, opts));
@@ -352,9 +338,9 @@ export function registerMessageBoardCommands(
         expiresAt?: string;
       }
     ) => {
-      const messageId = parseMessageId(raw);
+      const messageId = parseId(raw, "messageId");
       requireReason(opts, { allowDryRun: true });
-      assertPriority(opts.priority);
+      assertEnum(opts.priority, PRIORITIES, "--priority");
       const client = await getClient();
       const fields = buildBoardFields(opts);
       writeJson(await runBoardUpdate(client, messageId, fields, opts));
@@ -365,7 +351,7 @@ export function registerMessageBoardCommands(
     .command("delete <messageId>");
   addWriteFlagsToCommand(deleteCmd).action(
     guarded(async (raw: string, opts: WriteFlags) => {
-      const messageId = parseMessageId(raw);
+      const messageId = parseId(raw, "messageId");
       requireReason(opts, { allowDryRun: true });
       const client = await getClient();
       writeJson(await runBoardDelete(client, messageId, opts));

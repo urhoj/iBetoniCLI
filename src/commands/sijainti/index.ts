@@ -12,7 +12,7 @@ import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { CliError } from "../../api/errors.js";
-import { parseId, cappedInt } from "../../targets.js";
+import { parseId, cappedInt, assertPositiveInt } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { flattenGeocodeResult, type FlatGeocode } from "../_shared/geocode.js";
 import {
@@ -912,9 +912,7 @@ export async function runSijaintiDistance(
  * client-side owner filter silently matches against nothing.
  */
 function assertValidAsiakasFlag(asiakas: number | undefined): void {
-  if (asiakas !== undefined && (!Number.isInteger(asiakas) || asiakas <= 0)) {
-    failWith("--asiakas must be a positive integer asiakasId", 4);
-  }
+  if (asiakas !== undefined) assertPositiveInt(asiakas, "--asiakas");
 }
 
 /**

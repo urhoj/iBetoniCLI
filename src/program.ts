@@ -357,7 +357,7 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
     .action(guarded(async (opts: { strict?: boolean }) => {
       const res = await runReferenceDetailLint(await getClient());
       writeJson(res);
-      if (opts.strict && res.items.length > 0) process.exitCode = 1;
+      if (opts.strict && res.items.length > 0) setExit(1);
     }));
 
   // `ib commands` — filtered, offline discovery over the same spec catalogue.

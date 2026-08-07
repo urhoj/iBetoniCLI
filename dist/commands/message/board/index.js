@@ -3,6 +3,7 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, requireReason, } from "../
 import { writeJson, failWith } from "../../../output/json.js";
 import { resolveDate, todayHelsinki } from "../../../dates.js";
 import { jsonAction, guarded } from "../../_shared/action.js";
+import { parseId, assertEnum } from "../../../targets.js";
 /** Priority levels the board UI renders (info=primary, warning=warning, urgent=error). */
 const PRIORITIES = ["info", "warning", "urgent"];
 /**
@@ -138,20 +139,6 @@ export async function runBoardDelete(client, messageId, flags) {
         headers: writeFlagsToHeaders(flags),
     });
 }
-/** Validate a positive-integer messageId positional, or exit 4. */
-function parseMessageId(raw) {
-    const id = Number(raw);
-    if (!Number.isInteger(id) || id <= 0) {
-        failWith(`Invalid messageId "${raw}" — expected a positive integer`, 4);
-    }
-    return id;
-}
-/** Validate priority against the {info,warning,urgent} enum, or exit 4. */
-function assertPriority(priority) {
-    if (priority !== undefined && !PRIORITIES.includes(priority)) {
-        failWith(`Invalid --priority "${priority}" — use ${PRIORITIES.join("|")}`, 4);
-    }
-}
 /**
  * Register the `board` sub-group on the `ib message` umbrella parent.
  * `ilmoitustaulu` is an alias so both `ib message board` and the
@@ -186,7 +173,7 @@ export function registerMessageBoardCommands(parent, getClient) {
         .action(jsonAction(getClient, runBoardAll));
     b.command("get <messageId>")
         .action(guarded(async (raw) => {
-        const messageId = parseMessageId(raw);
+        const messageId = parseId(raw, "messageId");
         const client = await getClient();
         const row = await runBoardGet(client, messageId);
         if (!row)
@@ -204,7 +191,7 @@ export function registerMessageBoardCommands(parent, getClient) {
         requireReason(opts, { allowDryRun: true });
         if (!opts.startDate)
             failWith("Missing required flag: --start-date", 4);
-        assertPriority(opts.priority);
+        assertEnum(opts.priority, PRIORITIES, "--priority");
         const client = await getClient();
         const fields = buildBoardFields(opts);
         writeJson(await runBoardCreate(client, fields, opts));
@@ -217,9 +204,9 @@ export function registerMessageBoardCommands(parent, getClient) {
         .option("--start-date <d>", "Day the notice becomes visible: today|YYYY-MM-DD")
         .option("--expires-at <d>", 'Last day visible: YYYY-MM-DD (pass "" to clear the expiry)');
     addWriteFlagsToCommand(updateCmd).action(guarded(async (raw, opts) => {
-        const messageId = parseMessageId(raw);
+        const messageId = parseId(raw, "messageId");
         requireReason(opts, { allowDryRun: true });
-        assertPriority(opts.priority);
+        assertEnum(opts.priority, PRIORITIES, "--priority");
         const client = await getClient();
         const fields = buildBoardFields(opts);
         writeJson(await runBoardUpdate(client, messageId, fields, opts));
@@ -227,7 +214,7 @@ export function registerMessageBoardCommands(parent, getClient) {
     const deleteCmd = b
         .command("delete <messageId>");
     addWriteFlagsToCommand(deleteCmd).action(guarded(async (raw, opts) => {
-        const messageId = parseMessageId(raw);
+        const messageId = parseId(raw, "messageId");
         requireReason(opts, { allowDryRun: true });
         const client = await getClient();
         writeJson(await runBoardDelete(client, messageId, opts));

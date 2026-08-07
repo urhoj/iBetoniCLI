@@ -4,6 +4,7 @@ import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import {
   addWriteFlagsToCommand,
   writeFlagsToHeaders,
+  requireReason,
   type WriteFlags,
 } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
@@ -176,12 +177,10 @@ export function registerCombinatorCommands(
       if (opts.main === opts.secondary) {
         failWith("--main and --secondary must differ", 4);
       }
-      if (!opts.dryRun && !opts.reason) {
-        failWith(
-          `${cfg.entityNoun} merge is irreversible — pass --reason (or --dry-run to preview via /validate)`,
-          4
-        );
-      }
+      requireReason(opts, {
+        allowDryRun: true,
+        detail: `(${cfg.entityNoun} merge is irreversible; --dry-run previews via /validate)`,
+      });
       const client = await getClient();
       const owner =
         opts.owner ?? (await resolveActiveOwnerAsiakasId(client, "pass --owner <id>"));

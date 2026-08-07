@@ -26,6 +26,18 @@ export function assertEnum(value, allowed, flag) {
     }
 }
 /**
+ * Guard a CSV-expanded list of enum values — the multi-valued sibling of
+ * {@link assertEnum}. Reports ALL unknown values at once (failing on just the
+ * first bad token invites a retry-per-token loop), exit 4, client-origin via
+ * {@link failWith}. `undefined`/empty in → no-op.
+ */
+export function assertEnumCsv(values, allowed, flag) {
+    const unknown = values?.filter((v) => !allowed.includes(v)) ?? [];
+    if (unknown.length) {
+        failWith(`${flag}: unknown value(s) ${unknown.join(", ")} — must be one of: ${allowed.join(", ")}`, 4);
+    }
+}
+/**
  * Guard an already-coerced value that must be a positive integer, emitting the
  * canonical `<label> must be a positive integer` (exit 4, client-origin). `NaN`
  * — what a bare `Number(v)` yields for a typo — fails the `Number.isInteger`
@@ -39,6 +51,20 @@ export function assertPositiveInt(value, label) {
     if (!Number.isInteger(value) || value <= 0) {
         failWith(`${label} must be a positive integer`, 4);
     }
+}
+/**
+ * Commander argParser: strict integer >= min; exit 4 otherwise. Bare `Number`
+ * lets NaN through — the backend silently drops a NaN filter and returns ALL
+ * rows (fb#249), and a NaN id serialises as `null` in a JSON body.
+ */
+export function intFlag(flag, min = 1) {
+    return (value) => {
+        const n = Number((value ?? "").trim());
+        if (!Number.isSafeInteger(n) || n < min) {
+            failWith(`${flag} must be an integer >= ${min}`, 4);
+        }
+        return n;
+    };
 }
 /**
  * Attach the `--asiakas <id>` alias for an optional `[asiakasId]` positional —
