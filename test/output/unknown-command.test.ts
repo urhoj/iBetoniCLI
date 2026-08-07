@@ -293,10 +293,12 @@ describe("buildExcessArgumentsEnvelope (#328)", () => {
 // probing `ib message daily get 5 today` (--asiakas is required there).
 describe("dateFlagSuggestion — shared by both parse-error paths (#328)", () => {
   test("suggests the date flag for a surplus date token", () => {
-    expect(dateFlagSuggestion(leafByPath("message", "daily", "get"), ["today"])).toBe("--date today");
-    expect(dateFlagSuggestion(leafByPath("vehicle", "timeline"), ["20260806"])).toBe(
-      "--date 2026-08-06"
-    );
+    expect(dateFlagSuggestion(leafByPath("message", "daily", "get"), ["today"])).toEqual({
+      suggestion: "--date today", token: "today", date: "today",
+    });
+    expect(dateFlagSuggestion(leafByPath("vehicle", "timeline"), ["20260806"])).toEqual({
+      suggestion: "--date 2026-08-06", token: "20260806", date: "2026-08-06",
+    });
   });
 
   test("null when the command declares no date flag, or nothing looks like a date", () => {
@@ -309,7 +311,7 @@ describe("dateFlagSuggestion — shared by both parse-error paths (#328)", () =>
     // unparsed Command (which would silently yield null in every unit test).
     const cmd = leafByPath("vehicle", "route");
     expect(dateFlagSuggestion(cmd, [])).toBeNull();
-    expect(dateFlagSuggestion(cmd, ["6.8.2026"])).toBe("--date 2026-08-06");
+    expect(dateFlagSuggestion(cmd, ["6.8.2026"])?.suggestion).toBe("--date 2026-08-06");
   });
 });
 

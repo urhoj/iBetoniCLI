@@ -595,7 +595,7 @@ export function handleParseRejection(
         const dateHint = dateFlagSuggestion(cmd, excessPositionals(cmd));
         if (dateHint) {
           const base = (envelope.hint ?? "").trim().replace(/[.\s]*$/, "");
-          envelope.hint = `${base}. Also: a surplus positional looks like a date — pass it as \`${dateHint}\`, not as a positional.`;
+          envelope.hint = `${base}. Also: a surplus positional looks like a date — pass it as \`${dateHint.suggestion}\`, not as a positional.`;
         }
         return emitUsageEnvelope(err, envelope);
       }

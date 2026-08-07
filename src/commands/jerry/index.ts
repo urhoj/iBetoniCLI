@@ -10,7 +10,7 @@ import {
 import { writeJson, failWith } from "../../output/json.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { resolveAsiakasTarget } from "../customer/index.js";
-import { parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption, assertEnum, assertEnumCsv, assertPositiveInt } from "../../targets.js";
+import { parseId, resolveSearchQuery, resolveDualString, cappedInt, addAsiakasTargetOption, assertEnum, assertEnumCsv, assertPositiveInt } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
@@ -45,7 +45,7 @@ export async function runJerryRequestList(
   if (opts.provider) {
     const tab = opts.tab || "avoimet";
     const data = await client.get<{ requests?: unknown }>(
-      `/api/pumppuRequests/provider-list?tab=${encodeURIComponent(tab)}`
+      `/api/pumppuRequests/provider-list${qs({ tab })}`
     );
     const items = Array.isArray(data?.requests) ? (data.requests as Row[]) : [];
     return listEnvelope(items);
@@ -465,9 +465,7 @@ export async function runJerryAdminSearch(
   q: string
 ): Promise<ListEnvelope<Row>> {
   return toListEnvelope<Row>(
-    await client.get<unknown>(
-      `/api/admin/jerry-companies/search?q=${encodeURIComponent(q)}`
-    )
+    await client.get<unknown>(`/api/admin/jerry-companies/search${qs({ q })}`)
   );
 }
 
@@ -774,20 +772,11 @@ function parseBool(v: string): boolean {
 }
 
 /**
- * Resolve the worksite address from the positional OR the --address flag.
- * Exactly one is required; both are allowed only if they agree. (resolveTarget
- * is integer-only, so the dual-input is handled inline for this string field.)
+ * Resolve the worksite address from the positional OR the --address flag —
+ * {@link resolveDualString} with this command's names.
  */
 function resolveAddress(positional: string | undefined, flag: string | undefined): string {
-  const p = positional?.trim();
-  const f = flag?.trim();
-  if (p && f) {
-    if (p !== f) failWith("Address given twice and they differ (positional vs --address)", 4);
-    return p;
-  }
-  const v = p || f;
-  if (!v) failWith("Missing required address (positional <address> or --address)", 4);
-  return v;
+  return resolveDualString(positional, flag, "address", "address");
 }
 
 /**

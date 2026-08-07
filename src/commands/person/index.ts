@@ -44,6 +44,7 @@ import { registerPersonAbsencesCommand } from "./absences.js";
 import { registerPersonActivityCommand } from "./activity.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
+import { bothInOrder } from "../../parallel.js";
 
 export interface PersonListFilter {
   role?: string;
@@ -426,14 +427,14 @@ export async function runPersonMe(client: ApiClient): Promise<PersonMeOutput> {
   const impersonating = impersonationFromClaims(claims);
   const personId =
     claims.personId ?? failWith("could not resolve personId from the active token", 4);
-  const [profile, available] = await Promise.all([
+  const [profile, available] = await bothInOrder(
     client.get<{
       personId: number; name: string | null; email: string | null; phone: string | null; roles: number[];
     }>(`/api/cli/person/get/${personId}`),
     client.get<{
       companies: { asiakasId: number; asiakasNimi?: string; name?: string }[]; currentCompanyId: number;
-    }>(`/api/company-selection/available`),
-  ]);
+    }>(`/api/company-selection/available`)
+  );
   const companies = available.companies || [];
   const active = companies.find((c) => c.asiakasId === available.currentCompanyId);
   return {

@@ -172,16 +172,10 @@ export async function runLegalDiff(client, input) {
             failWith(`Type "${input.type}" has no draft version to diff`, 5);
         }
         // Independent fetches — issue them together (saves one full round-trip).
-        [docA, docB] = await Promise.all([
-            runLegalGet(client, Number(active.documentId)),
-            runLegalGet(client, Number(draft.documentId)),
-        ]);
+        [docA, docB] = await bothInOrder(runLegalGet(client, Number(active.documentId)), runLegalGet(client, Number(draft.documentId)));
     }
     else {
-        [docA, docB] = await Promise.all([
-            runLegalGet(client, input.a),
-            runLegalGet(client, input.b),
-        ]);
+        [docA, docB] = await bothInOrder(runLegalGet(client, input.a), runLegalGet(client, input.b));
     }
     const contentA = typeof docA.markdownContent === "string" ? docA.markdownContent : "";
     const contentB = typeof docB.markdownContent === "string" ? docB.markdownContent : "";

@@ -102,6 +102,16 @@ const VEHICLE_ASIAKAS_403: CommandError = apiErr(
   "use a tenant you have a vehicle-manage role on, or a developer token"
 );
 
+// ─── cross-domain shared fragments ───────────────────────────────────────────
+/** The system-admin 403 every `jerry admin` / admin-gated row repeats. */
+const SYSADMIN_403: CommandError = apiErr(403, "Not a system admin", "use a system-admin token");
+/** The dual-target `--asiakas` alias flag (see targets.ts addAsiakasTargetOption). */
+const ASIAKAS_TARGET_FLAG: CommandFlag = {
+  name: "asiakas",
+  type: "number",
+  description: "Target asiakasId (alias for the positional)",
+};
+
 const BASE_COMMAND_SPECS: CommandSpec[] = [
   // ─── attachment (12) ─────────────────────────────────────────────────────
   {
@@ -1193,7 +1203,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["company admin on the target tenant (system admin = any tenant)"],
     args: [{ name: "asiakasId", type: "number", required: false, description: "asiakasId to verify/provision (or pass --asiakas)" }],
     flags: [
-      { name: "asiakas", type: "number", description: "Target asiakasId (alias for the positional)" },
+      ASIAKAS_TARGET_FLAG,
       { name: "set", type: "boolean", description: "Turn ALL 9 operator flags ON" },
       { name: "reset", type: "boolean", description: "Turn ALL 9 operator flags OFF" },
     ],
@@ -1289,7 +1299,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["company admin on the target tenant (system admin = any tenant)"],
     args: [{ name: "asiakasId", type: "number", required: false, description: "asiakasId (or pass --asiakas)" }],
     flags: [
-      { name: "asiakas", type: "number", description: "Target asiakasId (alias for the positional)" },
+      ASIAKAS_TARGET_FLAG,
       { name: "set", type: "string", description: "Comma-separated setting names to turn ON" },
       { name: "unset", type: "string", description: "Comma-separated setting names to turn OFF" },
     ],
@@ -4374,7 +4384,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, sijaintiNonJerryCount, ajoneuvotEnabled, matchableVarikkoCount? }>. matchableVarikkoCount counts varikot that pass the REAL fan-out geofence (enrolled AND coords AND maxDeliveryDistance > 0); sijaintiJerryCount counts enrolment only, so matchableVarikkoCount 0 with sijaintiJerryCount > 0 means the company is Jerry-active but invisible to every tarjouspyyntö.",
     errors: [
-      apiErr(403, "Not a system admin", "use a system-admin token"),
+      SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
@@ -4395,7 +4405,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "ListEnvelope<{ asiakasId, name }>",
     errors: [
-      apiErr(403, "Not a system admin", "use a system-admin token"),
+      SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ["ib jerry admin search Betoni"],
@@ -4408,13 +4418,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     tier: "developer",
     args: [{ name: "asiakasId", type: "number", required: false, description: "company asiakasId (or pass --asiakas)" }],
     flags: [
-      { name: "asiakas", type: "number", description: "Target asiakasId (alias for the positional)" },
+      ASIAKAS_TARGET_FLAG,
     ],
     outputShape:
       "{ admins:[{personId,name}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,isJerry}] }",
     errors: [
       apiErr(400, "Invalid asiakasId", "pass a numeric asiakasId"),
-      apiErr(403, "Not a system admin", "use a system-admin token"),
+      SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ["ib jerry admin detail 1402", "ib jerry admin detail --asiakas 1402"],
@@ -4427,14 +4437,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     tier: "developer",
     args: [{ name: "asiakasId", type: "number", required: false, description: "company asiakasId (or pass --asiakas)" }],
     flags: [
-      { name: "asiakas", type: "number", description: "Target asiakasId (alias for the positional)" },
+      ASIAKAS_TARGET_FLAG,
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
     outputShape: "{ success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: true } }",
     errors: [
       apiErr(400, "Invalid asiakasId", "pass a numeric asiakasId"),
-      apiErr(403, "Not a system admin", "use a system-admin token"),
+      SYSADMIN_403,
       apiErr(404, "Company not found", "verify asiakasId"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -4448,14 +4458,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     tier: "developer",
     args: [{ name: "asiakasId", type: "number", required: false, description: "company asiakasId (or pass --asiakas)" }],
     flags: [
-      { name: "asiakas", type: "number", description: "Target asiakasId (alias for the positional)" },
+      ASIAKAS_TARGET_FLAG,
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
     outputShape: "{ success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: false } }",
     errors: [
       apiErr(400, "Invalid asiakasId", "pass a numeric asiakasId"),
-      apiErr(403, "Not a system admin", "use a system-admin token"),
+      SYSADMIN_403,
       apiErr(404, "Company not found", "verify asiakasId"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -4475,7 +4485,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ asiakasId, asiakasNimi, tier, status, alue, outreachEmail, jerryActive, lastEventTime, muistutusDue }>",
-    errors: [apiErr(403, "Not a system admin", "use a system-admin token"), ...COMMON_AUTH_ERRORS],
+    errors: [SYSADMIN_403, ...COMMON_AUTH_ERRORS],
     examples: ["ib jerry admin onboarding list --due", "ib jerry admin onboarding list --search transsinkko"],
   },
   {
@@ -4497,7 +4507,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape: "{ jerryOnboardingId } · { dryRun: true, wouldCreate: { asiakasId } } on --dry-run",
     errors: [
       apiErr(400, "Prospect already exists / company not found", "check asiakasId"),
-      apiErr(403, "Not a system admin", "use a system-admin token"),
+      SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ['ib jerry admin onboarding add 1389 --tier 2 --alue "Oulu" --source scheduled --reason "uusi yritys rekisterista"'],
@@ -4526,7 +4536,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     errors: [
       apiErr(400, "Unknown status", "use one of the status keys listed on --status"),
       apiErr(404, "Prospect not found", "add it first: ib jerry admin onboarding add"),
-      apiErr(403, "Not a system admin", "use a system-admin token"),
+      SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ['ib jerry admin onboarding set 1389 --status vastasi_kylla --reason "vastasi puhelimessa"'],
@@ -4549,7 +4559,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     errors: [
       apiErr(400, "Invalid eventType / missing text", "type must be call, response or note"),
       apiErr(404, "Prospect not found", "add it first: ib jerry admin onboarding add"),
-      apiErr(403, "Not a system admin", "use a system-admin token"),
+      SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
     ],
     examples: ['ib jerry admin onboarding log 1389 --type call --text "puhuttiin Jussin kanssa, kiinnostunut" --set-status vastasi_kylla'],
@@ -4570,7 +4580,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ pumppuRequestId, status, createdAt, customerNimi, operatorName, osoite, totalM3, offerCount, acceptedPriceCents, bestPriceCents }>",
-    errors: [apiErr(403, "Not a system admin", "use a system-admin token"), ...COMMON_AUTH_ERRORS],
+    errors: [SYSADMIN_403, ...COMMON_AUTH_ERRORS],
     seeAlso: ["ib jerry admin request stats"],
     examples: ["ib jerry admin request list --status open,accepted", "ib jerry admin request list --provider 1402 --from 2026-06-01"],
   },
@@ -4590,7 +4600,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     errors: [
       apiErr(400, "Invalid groupBy", "use week, month or status"),
       { origin: "client", exit: 4, match: "--group-by", meaning: "--group-by is not week/month/status", remedy: "pass one of week, month, status" },
-      apiErr(403, "Not a system admin", "use a system-admin token"),
+      SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
@@ -4618,7 +4628,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "{ pumppuRequestId, status, createdAt, sentAt, expiresAt, totalM3, kayttokohde, customerAsiakasId, customerNimi, operatorName, osoite, offerCount, acceptedPriceCents, bestPriceCents, recipients: [{ asiakasId, asiakasNimi, notifiedAt, viewedAt, declinedAt, declineReason, hasOffer }] }",
     errors: [
       apiErr(400, "Invalid id", "pass a numeric requestId"),
-      apiErr(403, "Not a system admin", "use a system-admin token"),
+      SYSADMIN_403,
       apiErr(404, "Request not found", "verify pumppuRequestId"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -4634,7 +4644,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [],
     outputShape:
       "ListEnvelope<{ pumppuOfferId, providerAsiakasId, providerNimi, providerContactName, priceCents, vatPercent, status, scheduledAt, keikkaId }>",
-    errors: [apiErr(400, "Invalid id", "pass a numeric requestId"), apiErr(403, "Not a system admin", "use a system-admin token"), ...COMMON_AUTH_ERRORS],
+    errors: [apiErr(400, "Invalid id", "pass a numeric requestId"), SYSADMIN_403, ...COMMON_AUTH_ERRORS],
     examples: ["ib jerry admin request offers 41"],
   },
   {
@@ -4652,7 +4662,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ label, osoite, formattedAddress, placeId, lat, lng, searchCount, noSupplyCount, notGeocodedCount, deliverableEver, maxProviderCount, nearestVarikkoKm, lastSearchedAt }>",
-    errors: [apiErr(403, "Not a system admin", "use a system-admin token"), ...COMMON_AUTH_ERRORS],
+    errors: [SYSADMIN_403, ...COMMON_AUTH_ERRORS],
     examples: [
       "ib jerry admin searches list --deliverable no_supply",
       "ib jerry admin searches list --from 2026-07-01 --q Vihti",
@@ -4670,7 +4680,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "{ coverageChecks: { total, deliverable, notDeliverable, notGeocoded }, wizard: { sessions, step1, step2, step3, step4, step5, claimed }, outcomes: { [status]: count } }",
-    errors: [apiErr(403, "Not a system admin", "use a system-admin token"), ...COMMON_AUTH_ERRORS],
+    errors: [SYSADMIN_403, ...COMMON_AUTH_ERRORS],
     examples: ["ib jerry admin searches funnel --from 2026-07-01 --to 2026-07-24"],
   },
   {
@@ -4683,7 +4693,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
     outputShape: "{ success: true, status: 'expired' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
-    errors: [apiErr(403, "Not a system admin", "use a system-admin token"), apiErr(409, "Wrong state", "request not in an expirable state"), ...COMMON_AUTH_ERRORS],
+    errors: [SYSADMIN_403, apiErr(409, "Wrong state", "request not in an expirable state"), ...COMMON_AUTH_ERRORS],
     examples: ['ib jerry admin request expire 41 --reason "abandoned"'],
   },
   {
@@ -4696,7 +4706,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
     outputShape: "{ success: true, status: 'cancelled' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
-    errors: [apiErr(403, "Not a system admin", "use a system-admin token"), apiErr(409, "Wrong state", "request not in a cancellable state"), ...COMMON_AUTH_ERRORS],
+    errors: [SYSADMIN_403, apiErr(409, "Wrong state", "request not in a cancellable state"), ...COMMON_AUTH_ERRORS],
     examples: ['ib jerry admin request cancel 41 --reason "customer request"'],
   },
   {
@@ -4713,7 +4723,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "providerCount = companies matching the worksite now; notifiedCount = of those, how many were newly added and emailed.",
       "Use it to reach a provider that only just became eligible — it will not spam the ones that already ignored the request.",
     ],
-    errors: [apiErr(403, "Not a system admin", "use a system-admin token"), apiErr(409, "Wrong state", "request not in a resendable state"), ...COMMON_AUTH_ERRORS],
+    errors: [SYSADMIN_403, apiErr(409, "Wrong state", "request not in a resendable state"), ...COMMON_AUTH_ERRORS],
     examples: ['ib jerry admin request resend 41 --reason "uusi tarjoaja alueelle"'],
   },
   {
@@ -4732,7 +4742,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape: "{ success: true, status, expiresAt } or { dryRun: true, wouldUpdate: { pumppuRequestId, expiresAt } }",
     errors: [
       apiErr(400, "Bad date/days", "use a positive --days or a future --until"),
-      apiErr(403, "Not a system admin", "use a system-admin token"),
+      SYSADMIN_403,
       apiErr(409, "Wrong state", "request not in an extendable state (draft/cancelled/accepted)"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -4749,7 +4759,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     outputShape: "{ success: true } or { dryRun: true, wouldDelete: { pumppuRequestId } }",
     errors: [
-      apiErr(403, "Not a system admin", "use a system-admin token"),
+      SYSADMIN_403,
       apiErr(404, "Not a draft / not found", "only status='draft' rows are deletable; non-draft or missing id → 404"),
       ...COMMON_AUTH_ERRORS,
     ],

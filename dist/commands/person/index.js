@@ -18,6 +18,7 @@ import { registerPersonAbsencesCommand } from "./absences.js";
 import { registerPersonActivityCommand } from "./activity.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
+import { bothInOrder } from "../../parallel.js";
 /**
  * Merge typed create flags over a parsed --body object (typed flags win) into the
  * /api/person/newPerson body. Email is intentionally optional: person.personEmail
@@ -260,10 +261,7 @@ export async function runPersonMe(client) {
     const claims = decodeJwtPayload(token);
     const impersonating = impersonationFromClaims(claims);
     const personId = claims.personId ?? failWith("could not resolve personId from the active token", 4);
-    const [profile, available] = await Promise.all([
-        client.get(`/api/cli/person/get/${personId}`),
-        client.get(`/api/company-selection/available`),
-    ]);
+    const [profile, available] = await bothInOrder(client.get(`/api/cli/person/get/${personId}`), client.get(`/api/company-selection/available`));
     const companies = available.companies || [];
     const active = companies.find((c) => c.asiakasId === available.currentCompanyId);
     return {

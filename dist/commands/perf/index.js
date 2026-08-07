@@ -2,6 +2,7 @@ import { listEnvelope } from "../../api/envelopes.js";
 import { qs } from "../../api/query.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
 import { jsonAction } from "../_shared/action.js";
+import { bothInOrder } from "../../parallel.js";
 /** GET recent slow queries → ListEnvelope. `truncated` when the page filled the limit. */
 export async function runPerfSlow(client, opts) {
     const res = await client.get(`/api/admin/slow-queries${qs({ limit: opts.limit, env: opts.env })}`);
@@ -27,10 +28,7 @@ export async function runPerfStats(client, opts) {
 }
 /** GET collector config + the list of environments that have data. */
 export async function runPerfConfig(client) {
-    const [cfg, envs] = await Promise.all([
-        client.get(`/api/admin/slow-queries/config`),
-        client.get(`/api/admin/slow-queries/environments`),
-    ]);
+    const [cfg, envs] = await bothInOrder(client.get(`/api/admin/slow-queries/config`), client.get(`/api/admin/slow-queries/environments`));
     return { ...(cfg.data ?? {}), availableEnvironments: envs.data ?? [] };
 }
 /** DELETE the buffer. --dry-run resolves CLIENT-SIDE (the route honours no X-Dry-Run). */

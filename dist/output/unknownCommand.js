@@ -274,6 +274,21 @@ export function excessPositionals(cmd) {
     return (cmd.args ?? []).slice(declared).map(String);
 }
 /**
+ * A command's spec-backed surface, resolved once: rendered path, matching spec
+ * (if any), flag longs, and declared positionals. Both error-envelope builders
+ * and the date-flag hint used to derive this triple independently.
+ */
+function commandSurface(cmd) {
+    const command = commandPath(cmd);
+    const spec = COMMAND_SPECS.find((s) => s.command === canonicalPath(command));
+    return {
+        command,
+        spec,
+        availableOptions: spec ? specOptionLongs(spec) : commanderOptionLongs(cmd),
+        positionals: spec ? specPositionals(spec) : [],
+    };
+}
+/**
  * `--date <normalized>` when one of `excess` is recognisably a date and this
  * command declares a date flag — otherwise null. Takes the tokens explicitly
  * (rather than re-deriving them) so the caller that already computed them and
@@ -287,14 +302,13 @@ export function excessPositionals(cmd) {
  * fb#309 hit with unknown options.
  */
 export function dateFlagSuggestion(cmd, excess) {
-    const spec = COMMAND_SPECS.find((s) => s.command === canonicalPath(commandPath(cmd)));
-    const dateFlag = dateFlagOf(spec);
+    const dateFlag = dateFlagOf(commandSurface(cmd).spec);
     if (!dateFlag)
         return null;
     for (const token of excess) {
         const date = asDateSuggestion(token);
         if (date)
-            return `--${dateFlag} ${date}`;
+            return { suggestion: `--${dateFlag} ${date}`, token, date };
     }
     return null;
 }
@@ -313,15 +327,12 @@ export function dateFlagSuggestion(cmd, excess) {
  * special-cased to `vehicle timeline`.
  */
 export function buildExcessArgumentsEnvelope(cmd, excess, parserDetail) {
-    const command = commandPath(cmd);
-    const spec = COMMAND_SPECS.find((s) => s.command === canonicalPath(command));
-    const availableOptions = spec ? specOptionLongs(spec) : commanderOptionLongs(cmd);
-    const positionals = spec ? specPositionals(spec) : [];
-    const dated = excess.map((t) => ({ token: t, date: asDateSuggestion(t) })).find((x) => x.date);
-    const didYouMean = dateFlagSuggestion(cmd, excess);
+    const { command, availableOptions, positionals } = commandSurface(cmd);
+    const dated = dateFlagSuggestion(cmd, excess);
+    const didYouMean = dated?.suggestion ?? null;
     const parts = [];
-    if (didYouMean) {
-        parts.push(`Did you mean \`${didYouMean}\`? A date is passed as a FLAG here, not a positional` +
+    if (dated) {
+        parts.push(`Did you mean \`${dated.suggestion}\`? A date is passed as a FLAG here, not a positional` +
             (dated.token !== dated.date ? ` (and the documented format is YYYY-MM-DD)` : "") +
             ".");
     }
@@ -406,10 +417,7 @@ export function prosePrefixHint(token, availableOptions) {
  * dashes (e.g. `--search`).
  */
 export function buildUnknownOptionEnvelope(cmd, unknownOption, tier = "developer") {
-    const command = commandPath(cmd);
-    const spec = COMMAND_SPECS.find((s) => s.command === canonicalPath(command));
-    const availableOptions = spec ? specOptionLongs(spec) : commanderOptionLongs(cmd);
-    const positionals = spec ? specPositionals(spec) : [];
+    const { command, spec, availableOptions, positionals } = commandSurface(cmd);
     const bare = unknownOption.replace(/^-+/, "");
     const guess = closestName(bare, availableOptions.map((o) => o.replace(/^-+/, "")));
     const didYouMean = guess ? `--${guess}` : null;

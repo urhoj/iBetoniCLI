@@ -102,9 +102,9 @@ export async function runGlossaryLookup(client, term) {
             try {
                 const prefix = term.length > 5 ? term.slice(0, 5) : term;
                 const [full, partial] = await Promise.all([
-                    client.get(`/api/cli/glossary?search=${encodeURIComponent(term)}`).catch(() => ({ items: [] })),
+                    client.get(`/api/cli/glossary${qs({ search: term })}`).catch(() => ({ items: [] })),
                     term.length > 5
-                        ? client.get(`/api/cli/glossary?search=${encodeURIComponent(prefix)}`).catch(() => ({ items: [] }))
+                        ? client.get(`/api/cli/glossary${qs({ search: prefix })}`).catch(() => ({ items: [] }))
                         : Promise.resolve({ items: [] }),
                 ]);
                 const seen = new Set();
@@ -230,7 +230,7 @@ export async function runGlossaryDelete(client, term, flags = {}) {
     if (flags.dryRun) {
         let wouldDelete = null;
         try {
-            const res = await client.get(`/api/cli/glossary?search=${encodeURIComponent(term)}`);
+            const res = await client.get(`/api/cli/glossary${qs({ search: term })}`);
             const norm = term.trim().toLowerCase();
             wouldDelete = (res.items ?? []).find((e) => String(e.term).toLowerCase() === norm) ?? null;
         }

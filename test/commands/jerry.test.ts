@@ -328,8 +328,9 @@ describe("ib jerry admin", () => {
   test("search url-encodes the query", async () => {
     get.mockResolvedValueOnce([]);
     await runJerryAdminSearch(mockClient, "Betoni Oy");
+    // qs() (URLSearchParams) encodes a space as `+` — same decode on Express.
     expect(get).toHaveBeenCalledWith(
-      "/api/admin/jerry-companies/search?q=Betoni%20Oy"
+      "/api/admin/jerry-companies/search?q=Betoni+Oy"
     );
   });
 

@@ -33,6 +33,7 @@ import { parseRefId, assertEnum, intFlag } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { COORDINATED as COORDINATED_REPOS, normalizeRepoCsv } from "./repos.js";
 import { jsonAction, guarded } from "../_shared/action.js";
+import { explicitFlags, foldAliases } from "../_shared/flags.js";
 import { qs } from "../../api/query.js";
 
 type Row = Record<string, unknown>;
@@ -137,15 +138,14 @@ export async function runChangelogAdd(
 
 export async function runChangelogList(client: ApiClient, opts: Record<string, string | number | boolean | undefined>): Promise<ListEnvelope<Row>> {
   if (typeof opts.sentry === "string") opts.sentry = normalizeSentryRef(opts.sentry);
-  const p: Record<string, string | number | boolean | undefined> = {};
-  // CLI option key → API query key. --feedback maps to the backend's `feedbackId`
-  // filter; --search/--status are substring LIKE filters (the controller passes
-  // req.query straight to listEntries). --has-feedback/--has-sentry are handled below.
-  const keyMap: Record<string, string> = {
-    month: "month", type: "type", area: "area", repo: "repo", feedback: "feedbackId",
-    sentry: "sentryIssue", source: "source", search: "search", status: "status", limit: "limit",
+  // --feedback maps to the backend's `feedbackId` filter; --search/--status are
+  // substring LIKE filters (the controller passes req.query straight to
+  // listEntries). qs() drops the undefined ones.
+  const p: Record<string, string | number | boolean | undefined> = {
+    month: opts.month, type: opts.type, area: opts.area, repo: opts.repo,
+    feedbackId: opts.feedback, sentryIssue: opts.sentry, source: opts.source,
+    search: opts.search, status: opts.status, limit: opts.limit,
   };
-  for (const [optKey, apiKey] of Object.entries(keyMap)) p[apiKey] = opts[optKey];
   if (opts.hasFeedback) p.hasFeedback = "1";
   if (opts.hasSentry) p.hasSentry = "1";
   const rows = await client.get<Row[]>(`/api/changelog${qs(p)}`);
@@ -346,14 +346,17 @@ export function resolveChangelogDescription(
   summary?: string,
   body?: string
 ): string {
-  const given = [positional, flag, summary, body]
-    .map((s) => s?.trim())
-    .filter((s): s is string => !!s);
-  if (new Set(given).size > 1)
-    failWith("Provide the description once — via the positional, --description, --summary, or --body; if several are given they must match", 4);
-  const description = given[0];
+  const description = foldAliases(
+    [positional, flag, summary, body],
+    "Provide the description once — via the positional, --description, --summary, or --body; if several are given they must match"
+  );
   if (!description) failWith("--description (or --summary/--body, or a positional description) is required", 4);
   return description;
+}
+
+/** CSV `--files` → the stored JSON array string. Shared by `add` and `update`. */
+function filesToJson(csv: string): string {
+  return JSON.stringify(csv.split(",").map((s) => s.trim()).filter(Boolean));
 }
 
 /**
@@ -573,16 +576,9 @@ export function normalizeChangelogJson(
   return out;
 }
 
-/** The subset of `o` the caller ACTUALLY typed (as opposed to a Commander default). */
-export function explicitFlags(
-  cmd: Command,
-  o: Record<string, unknown>,
-  keys: Iterable<string>
-): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const k of keys) if (cmd.getOptionValueSource(k) === "cli") out[k] = o[k];
-  return out;
-}
+// explicitFlags moved to _shared/flags.ts (feedback adopted it too); re-exported
+// for existing importers.
+export { explicitFlags };
 
 /**
  * Merge a --from-json object with the CLI flags. Precedence: an EXPLICITLY-typed
@@ -668,7 +664,7 @@ export function warnIfPatchIgnored(
   );
   if (ignored.length)
     warn(
-      `[ib] ⚠ the backend did not apply ${ignored.map((f) => `--${f === "feedbackId" ? "feedback" : f === "sentryIssue" ? "sentry" : "bump-level"}`).join(", ")} — ` +
+      `[ib] ⚠ the backend did not apply ${ignored.map((f) => `--${READ_SHAPE_KEY_ALIASES[f] ?? f.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase())}`).join(", ")} — ` +
         `these became editable in a later puminet5api version, so this endpoint is silently ignoring them (fb#303). The rest of the patch was applied.`
     );
 }
@@ -771,13 +767,7 @@ export function registerChangelogCommands(
       if (o.impact) body.impact = o.impact;
       if (o.status) body.status = o.status;
       if (o.severity) body.severity = o.severity;
-      if (o.files)
-        body.files = JSON.stringify(
-          o.files
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-        );
+      if (o.files) body.files = filesToJson(o.files);
       if (o.repo) body.repo = o.repo;
       // fb#228: warn only when the deploy planner would actually fail-safe-bump
       // (computeReleasePlan: coordinated=[] AND canonical=[] — nothing in the
@@ -902,13 +892,11 @@ export function registerChangelogCommands(
     // --summary/--body are aliases for --description (feedback #205/#278); fold
     // them in before the patch build so the loop below picks them up. Several may
     // be given only when they agree.
-    for (const alias of ["summary", "body"] as const) {
-      const v = o[alias];
-      if (v === undefined) continue;
-      if (o.description !== undefined && o.description.trim() !== v.trim())
-        failWith("Provide the description via --description, --summary, or --body, not several with different values", 4);
-      if (o.description === undefined) o.description = v;
-    }
+    const desc = foldAliases(
+      [o.description, o.summary, o.body],
+      "Provide the description via --description, --summary, or --body, not several with different values"
+    );
+    if (desc !== undefined) o.description = desc;
     o.sha = resolveShaAlias(o.sha, o.commit)!;
     validateFieldLengths(o);
     const patch: Partial<ChangelogAddBody> = {};
@@ -927,13 +915,7 @@ export function registerChangelogCommands(
       if (o[k] !== undefined)
         (patch as Record<string, unknown>)[k] = o[k];
     }
-    if (o.files)
-      patch.files = JSON.stringify(
-        o.files
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)
-      );
+    if (o.files) patch.files = filesToJson(o.files);
     if (o.sha) patch.commitShas = o.sha;
     if (o.vtag) patch.versionTag = o.vtag;
     if (o.date) patch.entryDate = resolveDate(o.date)!;

@@ -184,28 +184,34 @@ export function resolveTarget(positional, flag, positionalName, flagName) {
     return id;
 }
 /**
- * Resolve a free-text search query that may arrive as a positional `<query>`
- * OR the `--search <s>` flag alias — the string sibling of {@link resolveTarget}
- * (feedback #235). AIs learn the `--search` convention from list commands
- * (`glossary list`, `dev schema tables`) and reach for it on search-style
- * commands too; accepting both spellings removes that friction. Exactly one is
+ * Resolve a free-TEXT value that may arrive as a positional OR a `--flag`
+ * alias — the string sibling of {@link resolveTarget}. Exactly one is
  * required; passing both is allowed only when they match (after trim). A
- * missing / whitespace-only query exits 4.
+ * missing / whitespace-only value exits 4.
  */
-export function resolveSearchQuery(positional, flag) {
+export function resolveDualString(positional, flag, positionalName, flagName) {
     const norm = (s) => {
         const t = s?.trim();
         return t ? t : undefined;
     };
     const pos = norm(positional);
     const fl = norm(flag);
-    const query = pos ?? fl;
-    if (query === undefined) {
-        failWith("missing search query: pass <query> positionally or via --search <s>", 4);
+    const value = pos ?? fl;
+    if (value === undefined) {
+        failWith(`missing ${positionalName}: pass <${positionalName}> positionally or via --${flagName} <s>`, 4);
     }
     if (pos !== undefined && fl !== undefined && pos !== fl) {
-        failWith(`positional query ("${pos}") and --search ("${fl}") differ — pass only one`, 4);
+        failWith(`positional ${positionalName} ("${pos}") and --${flagName} ("${fl}") differ — pass only one`, 4);
     }
-    return query;
+    return value;
+}
+/**
+ * `<query>` / `--search <s>` via {@link resolveDualString} (feedback #235).
+ * AIs learn the `--search` convention from list commands (`glossary list`,
+ * `dev schema tables`) and reach for it on search-style commands too;
+ * accepting both spellings removes that friction.
+ */
+export function resolveSearchQuery(positional, flag) {
+    return resolveDualString(positional, flag, "query", "search");
 }
 //# sourceMappingURL=targets.js.map

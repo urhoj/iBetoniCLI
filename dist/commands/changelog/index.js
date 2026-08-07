@@ -7,6 +7,7 @@ import { parseRefId, assertEnum, intFlag } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { COORDINATED as COORDINATED_REPOS, normalizeRepoCsv } from "./repos.js";
 import { jsonAction, guarded } from "../_shared/action.js";
+import { explicitFlags, foldAliases } from "../_shared/flags.js";
 import { qs } from "../../api/query.js";
 const TYPES = ["feature", "improvement", "bugfix"];
 const AREAS = ["frontend", "backend", "cli", "database", "cicd"];
@@ -76,16 +77,14 @@ export async function runChangelogAdd(client, body, flags) {
 export async function runChangelogList(client, opts) {
     if (typeof opts.sentry === "string")
         opts.sentry = normalizeSentryRef(opts.sentry);
-    const p = {};
-    // CLI option key → API query key. --feedback maps to the backend's `feedbackId`
-    // filter; --search/--status are substring LIKE filters (the controller passes
-    // req.query straight to listEntries). --has-feedback/--has-sentry are handled below.
-    const keyMap = {
-        month: "month", type: "type", area: "area", repo: "repo", feedback: "feedbackId",
-        sentry: "sentryIssue", source: "source", search: "search", status: "status", limit: "limit",
+    // --feedback maps to the backend's `feedbackId` filter; --search/--status are
+    // substring LIKE filters (the controller passes req.query straight to
+    // listEntries). qs() drops the undefined ones.
+    const p = {
+        month: opts.month, type: opts.type, area: opts.area, repo: opts.repo,
+        feedbackId: opts.feedback, sentryIssue: opts.sentry, source: opts.source,
+        search: opts.search, status: opts.status, limit: opts.limit,
     };
-    for (const [optKey, apiKey] of Object.entries(keyMap))
-        p[apiKey] = opts[optKey];
     if (opts.hasFeedback)
         p.hasFeedback = "1";
     if (opts.hasSentry)
@@ -232,15 +231,14 @@ export function validateFieldLengths(o) {
  * agree. Exits 4 on conflict or absence.
  */
 export function resolveChangelogDescription(positional, flag, summary, body) {
-    const given = [positional, flag, summary, body]
-        .map((s) => s?.trim())
-        .filter((s) => !!s);
-    if (new Set(given).size > 1)
-        failWith("Provide the description once — via the positional, --description, --summary, or --body; if several are given they must match", 4);
-    const description = given[0];
+    const description = foldAliases([positional, flag, summary, body], "Provide the description once — via the positional, --description, --summary, or --body; if several are given they must match");
     if (!description)
         failWith("--description (or --summary/--body, or a positional description) is required", 4);
     return description;
+}
+/** CSV `--files` → the stored JSON array string. Shared by `add` and `update`. */
+function filesToJson(csv) {
+    return JSON.stringify(csv.split(",").map((s) => s.trim()).filter(Boolean));
 }
 /**
  * Resolve --sha from itself or its --commit alias (feedback #210 — commit SHAs
@@ -447,14 +445,9 @@ export function normalizeChangelogJson(json, keys) {
         failUsage(`--from-json: ${problems.join("; ")}`);
     return out;
 }
-/** The subset of `o` the caller ACTUALLY typed (as opposed to a Commander default). */
-export function explicitFlags(cmd, o, keys) {
-    const out = {};
-    for (const k of keys)
-        if (cmd.getOptionValueSource(k) === "cli")
-            out[k] = o[k];
-    return out;
-}
+// explicitFlags moved to _shared/flags.ts (feedback adopted it too); re-exported
+// for existing importers.
+export { explicitFlags };
 /**
  * Merge a --from-json object with the CLI flags. Precedence: an EXPLICITLY-typed
  * flag wins, then the JSON object, then whatever the option already holds (its
@@ -528,7 +521,7 @@ export function warnIfPatchIgnored(patch, result, warn = warnNote) {
     const row = result;
     const ignored = DEPLOY_GATED_PATCH_FIELDS.filter((f) => patch[f] !== undefined && f in row && row[f] !== patch[f]);
     if (ignored.length)
-        warn(`[ib] ⚠ the backend did not apply ${ignored.map((f) => `--${f === "feedbackId" ? "feedback" : f === "sentryIssue" ? "sentry" : "bump-level"}`).join(", ")} — ` +
+        warn(`[ib] ⚠ the backend did not apply ${ignored.map((f) => `--${READ_SHAPE_KEY_ALIASES[f] ?? f.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase())}`).join(", ")} — ` +
             `these became editable in a later puminet5api version, so this endpoint is silently ignoring them (fb#303). The rest of the patch was applied.`);
 }
 /**
@@ -613,10 +606,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         if (o.severity)
             body.severity = o.severity;
         if (o.files)
-            body.files = JSON.stringify(o.files
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean));
+            body.files = filesToJson(o.files);
         if (o.repo)
             body.repo = o.repo;
         // fb#228: warn only when the deploy planner would actually fail-safe-bump
@@ -726,15 +716,9 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         // --summary/--body are aliases for --description (feedback #205/#278); fold
         // them in before the patch build so the loop below picks them up. Several may
         // be given only when they agree.
-        for (const alias of ["summary", "body"]) {
-            const v = o[alias];
-            if (v === undefined)
-                continue;
-            if (o.description !== undefined && o.description.trim() !== v.trim())
-                failWith("Provide the description via --description, --summary, or --body, not several with different values", 4);
-            if (o.description === undefined)
-                o.description = v;
-        }
+        const desc = foldAliases([o.description, o.summary, o.body], "Provide the description via --description, --summary, or --body, not several with different values");
+        if (desc !== undefined)
+            o.description = desc;
         o.sha = resolveShaAlias(o.sha, o.commit);
         validateFieldLengths(o);
         const patch = {};
@@ -754,10 +738,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
                 patch[k] = o[k];
         }
         if (o.files)
-            patch.files = JSON.stringify(o.files
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean));
+            patch.files = filesToJson(o.files);
         if (o.sha)
             patch.commitShas = o.sha;
         if (o.vtag)

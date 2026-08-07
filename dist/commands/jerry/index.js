@@ -3,7 +3,7 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, requireReason, } from "../
 import { writeJson, failWith } from "../../output/json.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { resolveAsiakasTarget } from "../customer/index.js";
-import { parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption, assertEnum, assertEnumCsv, assertPositiveInt } from "../../targets.js";
+import { parseId, resolveSearchQuery, resolveDualString, cappedInt, addAsiakasTargetOption, assertEnum, assertEnumCsv, assertPositiveInt } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
@@ -20,7 +20,7 @@ import { qs } from "../../api/query.js";
 export async function runJerryRequestList(client, opts) {
     if (opts.provider) {
         const tab = opts.tab || "avoimet";
-        const data = await client.get(`/api/pumppuRequests/provider-list?tab=${encodeURIComponent(tab)}`);
+        const data = await client.get(`/api/pumppuRequests/provider-list${qs({ tab })}`);
         const items = Array.isArray(data?.requests) ? data.requests : [];
         return listEnvelope(items);
     }
@@ -261,7 +261,7 @@ export async function runJerryAdminList(client) {
 }
 /** Search non-Jerry companies for the Add picker (GET /api/admin/jerry-companies/search?q=). System-admin only. */
 export async function runJerryAdminSearch(client, q) {
-    return toListEnvelope(await client.get(`/api/admin/jerry-companies/search?q=${encodeURIComponent(q)}`));
+    return toListEnvelope(await client.get(`/api/admin/jerry-companies/search${qs({ q })}`));
 }
 /** Company drill-down: people by role, vehicles, sijainnit Jerry status (GET /api/admin/jerry-companies/:id/detail). System-admin only. */
 export async function runJerryAdminDetail(client, asiakasId) {
@@ -420,22 +420,11 @@ function parseBool(v) {
     return v === "true" || v === "1";
 }
 /**
- * Resolve the worksite address from the positional OR the --address flag.
- * Exactly one is required; both are allowed only if they agree. (resolveTarget
- * is integer-only, so the dual-input is handled inline for this string field.)
+ * Resolve the worksite address from the positional OR the --address flag —
+ * {@link resolveDualString} with this command's names.
  */
 function resolveAddress(positional, flag) {
-    const p = positional?.trim();
-    const f = flag?.trim();
-    if (p && f) {
-        if (p !== f)
-            failWith("Address given twice and they differ (positional vs --address)", 4);
-        return p;
-    }
-    const v = p || f;
-    if (!v)
-        failWith("Missing required address (positional <address> or --address)", 4);
-    return v;
+    return resolveDualString(positional, flag, "address", "address");
 }
 /**
  * Register the `ib jerry` command group — the BetoniJerry marketplace surface:

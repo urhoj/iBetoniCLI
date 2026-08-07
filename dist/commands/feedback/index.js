@@ -4,6 +4,7 @@ import { failWith, writeJson } from "../../output/json.js";
 import { assertEnum, assertEnumCsv, parseRefId } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { guarded, jsonAction } from "../_shared/action.js";
+import { explicitFlags, foldAliases } from "../_shared/flags.js";
 import { qs } from "../../api/query.js";
 const KINDS = ["improvement", "bug", "idea", "legal"];
 const SCOPES = ["cli", "app", "jerry", "bsg2", "workspace", "security", "ops", "impeccable", "other"];
@@ -94,16 +95,8 @@ async function fetchRows(client, params) {
  * feedback #240/#241).
  */
 export function resolveFeedbackCreateDescription(input) {
-    const positional = input.description?.trim();
-    const given = [input.descriptionFlag, input.bodyFlag]
-        .map((s) => s?.trim())
-        .filter((s) => !!s);
-    const flagged = given[0];
-    if (new Set(given).size > 1 || (positional && flagged && positional !== flagged)) {
-        failWith("Provide the description once — positionally, with --description, or with --body; if several are given, they must match", 4);
-    }
+    const description = foldAliases([input.description, input.descriptionFlag, input.bodyFlag], "Provide the description once — positionally, with --description, or with --body; if several are given, they must match");
     const title = input.title?.trim();
-    const description = positional ?? flagged;
     if (!description) {
         if (title)
             return title;
@@ -506,11 +499,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .action(guarded(async (description, opts, cmd) => {
         // Only the flags the caller ACTUALLY typed outrank the JSON object —
         // see mergeFeedbackCreateInput (--kind/--scope carry defaults).
-        const explicit = {};
-        for (const k of FROM_JSON_FIELDS) {
-            if (cmd.getOptionValueSource(k) === "cli")
-                explicit[k] = opts[k];
-        }
+        const explicit = explicitFlags(cmd, opts, FROM_JSON_FIELDS);
         const merged = mergeFeedbackCreateInput(opts.fromJson ? readJsonObjectInput(opts.fromJson) : {}, explicit, { kind: opts.kind, scope: opts.scope });
         const client = await getClient();
         writeJson(await runFeedbackCreate(client, {
@@ -561,12 +550,7 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .action(guarded(async (idStr, opts, cmd) => {
         const id = parseRefId(idStr, "feedback", "resolve");
         // Only EXPLICITLY-typed flags outrank the JSON object (feedback #327).
-        const explicit = {};
-        for (const k of RESOLVE_FROM_JSON_FIELDS) {
-            if (cmd.getOptionValueSource(k) === "cli") {
-                explicit[k] = opts[k];
-            }
-        }
+        const explicit = explicitFlags(cmd, opts, RESOLVE_FROM_JSON_FIELDS);
         const merged = mergeFeedbackResolveInput(opts.fromJson ? readJsonObjectInput(opts.fromJson) : {}, explicit);
         const client = await getClient();
         writeJson(await runWithSiblingHint(client, id, "changelog", () => runFeedbackResolve(client, id, {
@@ -591,19 +575,11 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         const id = parseRefId(idStr, "feedback", "update");
         // --body is an alias for --description (feedback #278); fold it in so
         // runFeedbackUpdate sees one field. Both only when they agree.
-        if (opts.body !== undefined) {
-            if (opts.description !== undefined && opts.description.trim() !== opts.body.trim())
-                failWith("Provide the description via --description or --body, not both with different values", 4);
-            if (opts.description === undefined)
-                opts.description = opts.body;
-        }
+        const desc = foldAliases([opts.description, opts.body], "Provide the description via --description or --body, not both with different values");
+        if (desc !== undefined)
+            opts.description = desc;
         // Only EXPLICITLY-typed flags outrank the JSON object (feedback #332).
-        const explicit = {};
-        for (const k of UPDATE_FROM_JSON_FIELDS) {
-            if (cmd.getOptionValueSource(k) === "cli") {
-                explicit[k] = opts[k];
-            }
-        }
+        const explicit = explicitFlags(cmd, opts, UPDATE_FROM_JSON_FIELDS);
         // --body typed on argv resolves to description above, so carry it over
         // as the explicit description rather than losing it to the JSON.
         if (explicit.body !== undefined && explicit.description === undefined) {

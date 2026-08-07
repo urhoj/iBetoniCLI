@@ -16,6 +16,7 @@ import {
   type WriteFlags,
 } from "../../api/writeFlags.js";
 import { jsonAction } from "../_shared/action.js";
+import { bothInOrder } from "../../parallel.js";
 
 interface RawSlow {
   procedure: string;
@@ -66,10 +67,10 @@ export async function runPerfStats(client: ApiClient, opts: { env?: string }): P
 
 /** GET collector config + the list of environments that have data. */
 export async function runPerfConfig(client: ApiClient): Promise<Record<string, unknown>> {
-  const [cfg, envs] = await Promise.all([
+  const [cfg, envs] = await bothInOrder(
     client.get<{ data: Record<string, unknown> }>(`/api/admin/slow-queries/config`),
-    client.get<{ data: string[] }>(`/api/admin/slow-queries/environments`),
-  ]);
+    client.get<{ data: string[] }>(`/api/admin/slow-queries/environments`)
+  );
   return { ...(cfg.data ?? {}), availableEnvironments: envs.data ?? [] };
 }
 
