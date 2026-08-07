@@ -1,7 +1,7 @@
 import { buildProgram, enableParserThrow, handleParseRejection, applySpecErrors } from "./program.js";
 import { runEmbedded, type EmbeddedCtx } from "./embedded.js";
-import { setCallerTier, resolveCallerTier, getCallerTier } from "./tier.js";
-import { setAmbientCommandPath, getAmbientCommandPath, commandPathOf } from "./commandContext.js";
+import { resolveCallerTier } from "./tier.js";
+import { setAmbientCommandPath, commandPathOf } from "./commandContext.js";
 
 export interface RunArgvOpts {
   token: string;
@@ -35,20 +35,11 @@ export async function runArgv(
     applySpecErrors(actionCommand);
   });
 
-  // Set the caller's visibility tier for this run; restore it in finally so the
-  // module-global never leaks across calls. NOTE: the ambient tier is a module
-  // global (unlike stdout/exitCode, which are per-call via AsyncLocalStorage).
-  // When IB_EXEC_INPROCESS is ON and two runArgv calls interleave at an await,
-  // a developer-tier call's setCallerTier can clobber a concurrent standard-tier
-  // call's discovery RENDER window (wrong tier in `ib commands`/`--help` output;
-  // actual API calls are unaffected — they use per-call tokens via EmbeddedCtx).
-  // To fix when that path goes live, thread `tier` through EmbeddedCtx instead of
-  // this module global. The live path currently spawns a fresh process per call,
-  // so there is no race today.
-  const priorTier = getCallerTier();
-  const priorCommandPath = getAmbientCommandPath();
-  setCallerTier(resolveCallerTier(opts.token));
-
+  // The caller's tier and the running command path ride in the EmbeddedCtx
+  // (per-call via AsyncLocalStorage) — getCallerTier/getAmbientCommandPath read
+  // them ahead of the module-global ambient holders, so interleaved in-process
+  // calls can never clobber each other's discovery render or X-Ib-Command
+  // header. (This used to be a documented set/restore race on module globals.)
   const ctx: EmbeddedCtx = {
     token: opts.token,
     endpoint: opts.endpoint,
@@ -56,23 +47,20 @@ export async function runArgv(
     outputMode: "json",
     activeCommandErrors: null,
     listColumns: null,
+    tier: resolveCallerTier(opts.token),
+    commandPath: null,
     stdout: [],
     stderr: [],
     exitCode: null,
   };
 
-  try {
-    await runEmbedded(ctx, async () => {
-      try {
-        await program.parseAsync(["node", "ib", ...argv]);
-      } catch (err) {
-        handleParseRejection(err, parserText, erroringCommand);
-      }
-    });
-  } finally {
-    setCallerTier(priorTier);
-    setAmbientCommandPath(priorCommandPath);
-  }
+  await runEmbedded(ctx, async () => {
+    try {
+      await program.parseAsync(["node", "ib", ...argv]);
+    } catch (err) {
+      handleParseRejection(err, parserText, erroringCommand);
+    }
+  });
 
   return {
     exitCode: ctx.exitCode ?? 0,

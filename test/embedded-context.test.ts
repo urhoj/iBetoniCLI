@@ -127,6 +127,26 @@ describe("embedded invocation context", () => {
     expect(readFileSync(credentialsPath, "utf8")).toBe(before);
   });
 
+  // The tier used to be a module-global set/restore dance around each runArgv
+  // call — two interleaved in-process calls could clobber each other's
+  // discovery render window. It now rides in the EmbeddedCtx (AsyncLocalStorage),
+  // so concurrent calls each render at their OWN tier.
+  test("two concurrent runArgv calls render discovery at their own tiers", async () => {
+    const developer = jwt({ personId: 1, globalRoles: { isDeveloper: true } });
+    const [dev, std] = await Promise.all([
+      runArgv(["commands", "dev"], { token: developer, endpoint: EMB_ENDPOINT }),
+      runArgv(["commands", "dev"], { token: "not-a-jwt", endpoint: EMB_ENDPOINT }),
+    ]);
+    expect(dev.exitCode).toBe(0);
+    expect(std.exitCode).toBe(0);
+    // `ib dev schema *` leaves are developer-tier: listed for the developer,
+    // absent (fail-closed) for the invalid-token/standard caller.
+    const commands = (out: string): string[] =>
+      (JSON.parse(out).items as Array<{ command: string }>).map((i) => i.command);
+    expect(commands(dev.stdout).some((c) => c.startsWith("ib dev schema"))).toBe(true);
+    expect(commands(std.stdout).some((c) => c.startsWith("ib dev schema"))).toBe(false);
+  });
+
   test("the per-company client is derived from the embedded token and persists nothing", async () => {
     const seen: Array<{ url: string; method: string; auth?: string }> = [];
     const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {

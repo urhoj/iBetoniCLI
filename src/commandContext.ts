@@ -7,9 +7,11 @@
  *
  * COMMAND NAMES ONLY: the value is derived from Commander command names,
  * never positionals or flag values, so no user data can leak into the header.
- * Module-global like the ambient tier (same interleave caveat — see the
- * runArgv.ts comment on setCallerTier).
+ * Ctx-aware like the ambient tier: an embedded invocation reads/writes its
+ * EmbeddedCtx.commandPath (per-call via AsyncLocalStorage), so interleaved
+ * in-process calls cannot clobber each other's header.
  */
+import { getEmbeddedCtx } from "./embedded.js";
 export interface NamedCommand {
   name(): string;
   parent?: NamedCommand | null;
@@ -29,9 +31,12 @@ export function commandPathOf(cmd: NamedCommand | null | undefined): string {
 let ambientCommandPath: string | null = null;
 
 export function setAmbientCommandPath(path: string | null): void {
-  ambientCommandPath = path || null;
+  const ctx = getEmbeddedCtx();
+  if (ctx) ctx.commandPath = path || null;
+  else ambientCommandPath = path || null;
 }
 
 export function getAmbientCommandPath(): string | null {
-  return ambientCommandPath;
+  const ctx = getEmbeddedCtx();
+  return ctx ? ctx.commandPath : ambientCommandPath;
 }

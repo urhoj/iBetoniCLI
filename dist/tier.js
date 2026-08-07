@@ -14,6 +14,7 @@
  * the real per-caller tier is always set before argv is parsed.
  */
 import { decodeJwtPayload } from "./auth/jwt.js";
+import { getEmbeddedCtx } from "./embedded.js";
 const CALLER_RANK = { standard: 0, admin: 1, developer: 2 };
 const specRank = (tier) => tier === "developer" ? 2 : tier === "admin" ? 1 : 0;
 /** Stateless: map a JWT (or none) to a visibility tier. Fail-closed on missing/bad token. */
@@ -139,10 +140,13 @@ export function scrubSpecForTier(spec, tier, hiddenCommands) {
 }
 // Ambient holder — see module docstring. Default "developer" = full surface.
 let ambientTier = "developer";
+/** Set the module-global ambient tier — the non-embedded (bin/ib.ts) path.
+ * Embedded invocations carry their tier in EmbeddedCtx instead (per-call via
+ * AsyncLocalStorage), which `getCallerTier` reads first. */
 export function setCallerTier(tier) {
     ambientTier = tier;
 }
 export function getCallerTier() {
-    return ambientTier;
+    return getEmbeddedCtx()?.tier ?? ambientTier;
 }
 //# sourceMappingURL=tier.js.map

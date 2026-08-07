@@ -14,6 +14,7 @@
  * the real per-caller tier is always set before argv is parsed.
  */
 import { decodeJwtPayload } from "./auth/jwt.js";
+import { getEmbeddedCtx } from "./embedded.js";
 import type { CommandError, CommandSpec } from "./output/help.js";
 
 export type CallerTier = "developer" | "admin" | "standard";
@@ -165,9 +166,12 @@ export function scrubSpecForTier(
 
 // Ambient holder — see module docstring. Default "developer" = full surface.
 let ambientTier: CallerTier = "developer";
+/** Set the module-global ambient tier — the non-embedded (bin/ib.ts) path.
+ * Embedded invocations carry their tier in EmbeddedCtx instead (per-call via
+ * AsyncLocalStorage), which `getCallerTier` reads first. */
 export function setCallerTier(tier: CallerTier): void {
   ambientTier = tier;
 }
 export function getCallerTier(): CallerTier {
-  return ambientTier;
+  return getEmbeddedCtx()?.tier ?? ambientTier;
 }
