@@ -12,7 +12,7 @@ import { writeJson, exitWithError, failWith, errorMessage, setExitCode } from ".
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveRoleTypeId } from "../../roles.js";
-import { assertEnum, resolveTarget, resolveAsiakasTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption } from "../../targets.js";
+import { assertEnum, resolveAsiakasTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
 import { runPersonRoleList } from "../person/index.js";
 import { jsonAction, guarded } from "../_shared/action.js";
