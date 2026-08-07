@@ -243,7 +243,7 @@ describe("changelog add bumpLevel", () => {
   });
 });
 
-import { runChangelogPending, runChangelogRelease, runChangelogReleaseMap, registerChangelogCommands, payloadKeyMap, normalizeChangelogJson, mergeChangelogInput, warnIfPatchIgnored } from "../../src/commands/changelog/index.js";
+import { runChangelogPending, runChangelogRelease, runChangelogReleaseMap, registerChangelogCommands, payloadKeyMap, normalizeChangelogJson, mergeChangelogInput, warnIfPatchIgnored, warnIfFeedbackRelinked } from "../../src/commands/changelog/index.js";
 import { Command } from "commander";
 
 describe("changelog pending/release", () => {
@@ -974,6 +974,43 @@ describe("warnIfPatchIgnored — deploy gate (fb#303)", () => {
     expect(warn.mock.calls[0][0]).toMatch(/--bump-level/);
     expect(warn.mock.calls[0][0]).toMatch(/--feedback/);
     expect(warn.mock.calls[0][0]).toMatch(/--sentry/);
+  });
+});
+
+describe("warnIfFeedbackRelinked — silent link theft (fb#366)", () => {
+  test("warns when the entry took the link from a different entry", () => {
+    // The reported case: fb#362 was fixed by cl#1054, then a follow-up entry
+    // passed --feedback 362 to cross-reference it and silently became the
+    // row's resolver. Anyone following the feedback row afterwards lands on
+    // the follow-up instead of the fix.
+    const warn = vi.fn();
+    warnIfFeedbackRelinked({ changelogId: 1062, relinkedFrom: 1054 }, warn);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toMatch(/cl#1054/);
+    expect(warn.mock.calls[0][0]).toMatch(/cl#1062/);
+    // The note must carry the recovery command, not just the bad news —
+    // the loss is only reachable if you knew the link changed.
+    expect(warn.mock.calls[0][0]).toMatch(/changelog update 1054 --feedback/);
+  });
+
+  test("stays silent on a first resolve, which is the overwhelmingly common case", () => {
+    const warn = vi.fn();
+    warnIfFeedbackRelinked({ changelogId: 1062 }, warn);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test("stays silent under --dry-run and on a non-object result", () => {
+    const warn = vi.fn();
+    warnIfFeedbackRelinked({ dryRun: true, wouldCreate: {} }, warn);
+    warnIfFeedbackRelinked(null, warn);
+    warnIfFeedbackRelinked("nope", warn);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test("ignores a non-numeric relinkedFrom rather than printing 'cl#undefined'", () => {
+    const warn = vi.fn();
+    warnIfFeedbackRelinked({ changelogId: 1062, relinkedFrom: null }, warn);
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 

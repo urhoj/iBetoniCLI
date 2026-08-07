@@ -676,6 +676,33 @@ export function warnIfPatchIgnored(
     );
 }
 
+/**
+ * Warn on stderr when --feedback took a row's resolvedByChangelogId away from a
+ * DIFFERENT entry.
+ *
+ * A row's work often lands in more than one entry — a fix, then a follow-up, a
+ * revert, a doc pass — and `--feedback` reads as "this entry relates to fb#N",
+ * not "this entry is now the sole resolver of fb#N". Re-pointing is still
+ * allowed (it is the correction path when the FIRST link was wrong), but it
+ * used to be completely silent: the response was a bare {"changelogId":N} and
+ * the only way to notice was to go and look. Anyone following the feedback row
+ * afterwards lands on the follow-up instead of the fix (fb#366).
+ *
+ * stderr only — the stdout JSON contract is untouched.
+ */
+export function warnIfFeedbackRelinked(
+  result: unknown,
+  warn: (msg: string) => void = (m) => console.error(m)
+): void {
+  if (!result || typeof result !== "object") return;
+  const { relinkedFrom, changelogId } = result as Record<string, unknown>;
+  if (typeof relinkedFrom !== "number") return;
+  warn(
+    `[ib] note: that feedback row was already resolved by cl#${relinkedFrom}; cl#${changelogId} now owns the link. ` +
+      `If you meant to cross-reference rather than re-resolve, restore it with \`ib dev changelog update ${relinkedFrom} --feedback <id>\`.`
+  );
+}
+
 export function registerChangelogCommands(
   parent: Command,
   getClient: () => Promise<ApiClient>,
@@ -783,7 +810,9 @@ export function registerChangelogCommands(
       const addLang = normalizeLanguage(o.language);
       if (addLang) body.language = addLang;
       body.bumpLevel = o.bumpLevel || "patch";
-      writeJson(await runChangelogAdd(await getClient(), body, o));
+      const added = await runChangelogAdd(await getClient(), body, o);
+      warnIfFeedbackRelinked(added);
+      writeJson(added);
     })
   );
 
@@ -858,7 +887,7 @@ export function registerChangelogCommands(
       // --status Deployed` would silently rewrite a deliberate `minor` back to
       // `patch` and mis-drive the next deploy. Absent flag = field untouched.
       .option("--bump-level <l>", "Correct the app version bump this entry implies: none|patch|minor|major. Refused once the entry is RELEASED (has a versionTag) — that bump already shipped.")
-      .option("--feedback <id>", "cliFeedback id this entry resolves — also marks that row applied and points it back here (repairs a link orphaned by delete + re-add)", Number)
+      .option("--feedback <id>", "cliFeedback id this entry resolves — also marks that row applied and points it back here (repairs a link orphaned by delete + re-add). Takes the link from a prior resolver, noting it on stderr (fb#366)", Number)
       .option("--sentry <ref>", "Sentry issue short id or URL this entry fixes")
       .option("--source <s>", "Source: human|routine")
       .option("--date <d>", "Entry date (YYYY-MM-DD|today)")
@@ -921,6 +950,7 @@ export function registerChangelogCommands(
       runChangelogUpdate(client, id, patch, o)
     );
     warnIfPatchIgnored(patch, result);
+    warnIfFeedbackRelinked(result);
     writeJson(result);
   }));
 
@@ -1042,7 +1072,8 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       {
         name: "feedback",
         type: "number",
-        description: "cliFeedback id this entry resolves",
+        description:
+          "cliFeedback id this entry resolves — also marks that row applied and points resolvedByChangelogId here. If the row was ALREADY resolved by another entry, this TAKES the link (the correction path for a wrong first link) and says so on stderr; any hand-written resolution note is preserved (fb#366).",
       },
       {
         name: "sentry",
@@ -1070,7 +1101,8 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     ]),
     writeFlags: true,
     mutates: true,
-    outputShape: "{ changelogId } | { dryRun, wouldCreate, validation }",
+    outputShape:
+      "{ changelogId, relinkedFrom? } | { dryRun, wouldCreate, validation }. `relinkedFrom` appears only when --feedback named a row already resolved by a DIFFERENT entry, and carries that entry's id; a one-line note also goes to stderr.",
     errors: [
       {
         http: 403,
@@ -1118,6 +1150,8 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib dev changelog add --type bugfix --area cli --title "x" -- "-5% render time". Everything after `--` is taken as positional text.',
       "--dry-run is SERVER-side (X-Dry-Run): the backend validates the payload then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s under --dry-run.",
       "Bounded free-text flags are length-checked client-side (exit 4) before POSTing: --status ≤30, --severity ≤20, --title ≤300, --impact ≤500, --repo/--vtag ≤200, --sha ≤500. (--description/--benefits/--files are unbounded.)",
+      "--feedback on a row that is ALREADY resolved TAKES the link from the earlier entry. That is intended (it is how a wrong first link gets corrected), but a row's work often spans several entries — a fix, then a follow-up, a revert, a doc pass — so a cross-reference silently becomes the sole resolver and a reader following the feedback row lands on the follow-up instead of the fix. The response now carries `relinkedFrom` and stderr names the displaced entry; restore it with `ib dev changelog update <thatId> --feedback <id>` (fb#366).",
+      "DEPLOY-GATED (fb#366): `relinkedFrom` and its stderr note come from a later puminet5api version. Against an older backend the re-link still happens and is still SILENT — check the row with `ib dev feedback get <id>` after linking an already-resolved one.",
       "Developer-gated.",
     ],
     seeAlso: ["ib dev changelog report", "ib dev feedback resolve"],
@@ -1288,7 +1322,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         name: "feedback",
         type: "number",
         description:
-          "cliFeedback id this entry resolves — also marks that row applied and sets resolvedByChangelogId back to this entry",
+          "cliFeedback id this entry resolves — also marks that row applied and sets resolvedByChangelogId back to this entry. Taking the link from a prior resolver is noted on stderr and echoed as `relinkedFrom`; a hand-written resolution note is preserved (fb#366).",
       },
       {
         name: "sentry",

@@ -1994,7 +1994,7 @@ FLAGS
   --commit STRING    Alias for --sha — Commit SHAs (CSV); if both are given, they must match
   --vtag STRING    Version tag (max 200 chars)
   --bump-level STRING    App version bump this implies: none|patch|minor|major (default: patch)
-  --feedback NUMBER    cliFeedback id this entry resolves
+  --feedback NUMBER    cliFeedback id this entry resolves — also marks that row applied and points resolvedByChangelogId here. If the row was ALREADY resolved by another entry, this TAKES the link (the correction path for a wrong first link) and says so on stderr; any hand-written resolution note is preserved (fb#366).
   --sentry STRING    Sentry issue short id or URL this entry fixes (stored, not sent to Sentry)
   --source STRING    Source: human (default) | routine (automated AI-routine entry)
   --date DATE    Entry date (YYYY-MM-DD|today)
@@ -2010,7 +2010,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
-  { changelogId } | { dryRun, wouldCreate, validation }
+  { changelogId, relinkedFrom? } | { dryRun, wouldCreate, validation }. \`relinkedFrom\` appears only when --feedback named a row already resolved by a DIFFERENT entry, and carries that entry's id; a one-line note also goes to stderr.
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer access required → use a developer token
@@ -2026,6 +2026,8 @@ NOTES
   - A description starting with "-" is parsed as an option (exit 4) — put a bare \`--\` terminator before it: ib dev changelog add --type bugfix --area cli --title "x" -- "-5% render time". Everything after \`--\` is taken as positional text.
   - --dry-run is SERVER-side (X-Dry-Run): the backend validates the payload then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s under --dry-run.
   - Bounded free-text flags are length-checked client-side (exit 4) before POSTing: --status ≤30, --severity ≤20, --title ≤300, --impact ≤500, --repo/--vtag ≤200, --sha ≤500. (--description/--benefits/--files are unbounded.)
+  - --feedback on a row that is ALREADY resolved TAKES the link from the earlier entry. That is intended (it is how a wrong first link gets corrected), but a row's work often spans several entries — a fix, then a follow-up, a revert, a doc pass — so a cross-reference silently becomes the sole resolver and a reader following the feedback row lands on the follow-up instead of the fix. The response now carries \`relinkedFrom\` and stderr names the displaced entry; restore it with \`ib dev changelog update <thatId> --feedback <id>\` (fb#366).
+  - DEPLOY-GATED (fb#366): \`relinkedFrom\` and its stderr note come from a later puminet5api version. Against an older backend the re-link still happens and is still SILENT — check the row with \`ib dev feedback get <id>\` after linking an already-resolved one.
   - Developer-gated.
 
 SEE ALSO
@@ -2295,7 +2297,7 @@ FLAGS
   --commit STRING    Alias for --sha — Commit SHAs (CSV); if both are given, they must match
   --vtag STRING    Version tag (max 200 chars)
   --bump-level STRING    Correct the app version bump this entry implies: none|patch|minor|major. NO default — omitting it leaves the recorded level untouched. Refused once the entry is RELEASED (has a versionTag).
-  --feedback NUMBER    cliFeedback id this entry resolves — also marks that row applied and sets resolvedByChangelogId back to this entry
+  --feedback NUMBER    cliFeedback id this entry resolves — also marks that row applied and sets resolvedByChangelogId back to this entry. Taking the link from a prior resolver is noted on stderr and echoed as \`relinkedFrom\`; a hand-written resolution note is preserved (fb#366).
   --sentry STRING    Sentry issue short id or URL this entry fixes (stored, not sent to Sentry)
   --source STRING    Source: human|routine
   --date DATE    Entry date (YYYY-MM-DD|today)
