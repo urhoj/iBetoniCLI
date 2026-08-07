@@ -28,6 +28,22 @@ const MAX_FREETEXT = 200;
 const CAP = 200;
 const TRUNCATED_FIELDS = ["description", "resolution", "errorText"];
 const TRUNCATE_HINT = "description/resolution truncated to 200 chars; ib dev feedback get <id> for full text";
+/**
+ * Emitted whenever a complexity filter is active, because that filter's blind
+ * spot is invisible in its own result.
+ *
+ * `complexity` is optional on `create` and most filing paths (the friction
+ * auto-capture included) never set it, so the column is mostly NULL — a
+ * measured 176 of 200 scope=cli rows. NULL there means "nobody estimated", but
+ * a `complexity <= n` predicate excludes it as if it meant "too hard", and
+ * nothing in the envelope records the omission. The flag is documented as the
+ * autonomously-workable slice a batch-fix agent pulls, so the failure lands
+ * exactly where it hurts: a batch that returned 21 of ~40 real candidates looks
+ * like a complete answer (feedback #362 — of the four items fixed in the run
+ * that found this, three were NULL-complexity and genuinely 1-2, so trusting
+ * the filter would have surfaced one of four and reported the batch done).
+ */
+const COMPLEXITY_NULL_HINT = "a complexity filter is active and EXCLUDES rows with no estimate (complexity is optional on create, so most rows are unset — absent means unestimated, not complex); re-run without --complexity/--max-complexity to see the full candidate set";
 /** Cap a string at MAX_FREETEXT chars, appending "..." when cut. Non-strings
  * pass through untouched. */
 function truncateField(v) {
@@ -261,8 +277,13 @@ export async function runFeedbackList(client, opts) {
     const env = listEnvelope(items);
     if (truncated)
         env.truncated = true;
+    const hints = [];
     if (cut)
-        env.hint = TRUNCATE_HINT;
+        hints.push(TRUNCATE_HINT);
+    if (opts.complexity !== undefined || opts.maxComplexity !== undefined)
+        hints.push(COMPLEXITY_NULL_HINT);
+    if (hints.length)
+        env.hint = hints.join("; ");
     return env;
 }
 /** GET /api/feedback/:id — developer-only single row. */
@@ -518,8 +539,8 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .option("--kind <kind>", "improvement | bug | idea | legal")
         .option("--scope <scope>", "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other")
         .option("--search <text>", "Substring match over description/command/resolution/errorText (deploy-gated)")
-        .option("--complexity <n>", "Only items with this exact complexity (1-5)", Number)
-        .option("--max-complexity <n>", "Only items with complexity <= n — the autonomously-workable slice (deploy-gated)", Number)
+        .option("--complexity <n>", "Only items with this exact complexity (1-5). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex.", Number)
+        .option("--max-complexity <n>", "Only items with complexity <= n — the autonomously-workable slice (deploy-gated). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex.", Number)
         .option("--oldest", "Oldest-first (createdAt ASC) — FIFO drain order for the triage loop; default is newest-first")
         .option("--limit <n>", "Max rows (default 50, cap 200)", Number)
         .option("--offset <n>", "Pagination offset", Number)

@@ -990,3 +990,32 @@ describe("ib feedback count", () => {
     expect(out.hint).toMatch(/lower bound/);
   });
 });
+
+describe("complexity filters announce their NULL blind spot (fb#362)", () => {
+  test("--max-complexity adds the exclusion hint", async () => {
+    get.mockResolvedValue([{ feedbackId: 1, complexity: 2, status: "open" }]);
+    const env = await runFeedbackList(mockClient as never, { maxComplexity: 2, all: true });
+    expect(env.hint).toMatch(/EXCLUDES rows with no estimate/);
+  });
+
+  test("--complexity adds it too", async () => {
+    get.mockResolvedValue([{ feedbackId: 1, complexity: 1, status: "open" }]);
+    const env = await runFeedbackList(mockClient as never, { complexity: 1, all: true });
+    expect(env.hint).toMatch(/EXCLUDES rows with no estimate/);
+  });
+
+  test("an unfiltered list carries no complexity hint", async () => {
+    get.mockResolvedValue([{ feedbackId: 1, complexity: null, status: "open" }]);
+    const env = await runFeedbackList(mockClient as never, { all: true });
+    expect(env.hint).toBeUndefined();
+  });
+
+  test("the truncation hint and the complexity hint coexist", async () => {
+    get.mockResolvedValue([
+      { feedbackId: 1, complexity: 2, status: "open", description: "x".repeat(300) },
+    ]);
+    const env = await runFeedbackList(mockClient as never, { maxComplexity: 2, all: true });
+    expect(env.hint).toMatch(/truncated to 200 chars/);
+    expect(env.hint).toMatch(/EXCLUDES rows with no estimate/);
+  });
+});

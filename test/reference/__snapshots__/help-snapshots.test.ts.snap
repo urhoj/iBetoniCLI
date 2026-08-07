@@ -2481,8 +2481,8 @@ FLAGS
   --kind STRING    improvement | bug | idea | legal
   --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other
   --search STRING    Substring match over description/command/resolution/errorText (deploy-gated)
-  --complexity NUMBER    Only items with this exact complexity 1-5 (deploy-gated)
-  --max-complexity NUMBER    Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls (deploy-gated)
+  --complexity NUMBER    Only items with this exact complexity 1-5 (deploy-gated). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex.
+  --max-complexity NUMBER    Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls (deploy-gated). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex.
   --oldest    Oldest-first (createdAt ASC) — FIFO drain order so the triage loop clears the backlog before newer arrivals; default is newest-first
   --limit NUMBER    Max rows (cap 200) (default: 50)
   --offset NUMBER    Pagination offset (default: 0)
