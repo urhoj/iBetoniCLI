@@ -38,7 +38,7 @@ export const DOMAIN_BLURBS: Record<string, string> = {
   vehicle: "Pump and mixer trucks — incl. `vehicle driver` (day-driver dispatch + standing default driver).",
   person: "System users — drivers, admins, office staff (incl. `person absences`).",
   company:
-    "The tenant company your token acts as (multi-tenancy). Its module/roolit + asiakasSettings FLAGS live under `ib customer modules` / `ib customer settings` — target your own asiakasId (`ib company current`).",
+    "The tenant company your token acts as (multi-tenancy) — a LENS (list/current/switch), not the record. The `asiakas` RECORD and its flags live under `ib customer`: `get <id>`, `modules`, `settings` — target your own asiakasId (`ib company current`).",
   fennoa: "Fennoa accounting integration — PumiNet Oy purchase invoices (system admin).",
   schedule: "Date-scoped views of keikkas: today / a day / a week.",
   stats:

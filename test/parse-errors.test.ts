@@ -112,6 +112,20 @@ describe("parser errors → JSON envelope", () => {
     expect(process.exitCode).toBe(4);
   });
 
+  // feedback #343 — the reported invocation. `ib company` and `ib customer` are
+  // both `asiakas`; the record the caller wanted was one group over, and the
+  // envelope listed only company's own three subcommands.
+  test("unknown subcommand available in the sibling group → runnable cross-group hint", async () => {
+    await run(["company", "get", "8"]);
+    const parsed = lastStderrJson();
+    expect(parsed.availableElsewhere).toEqual(["ib customer get"]);
+    // …carrying the caller's own args, so the hint is copy-paste runnable.
+    expect(String(parsed.hint)).toContain("`ib customer get 8` does");
+    expect(String(parsed.hint)).toContain("same `asiakas` entity");
+    expect(parsed.available).toEqual(["list", "current", "switch"]);
+    expect(process.exitCode).toBe(4);
+  });
+
   test("unknown flag → USAGE envelope, exit 4", async () => {
     await run(["company", "list", "--nope"]);
     const parsed = lastStderrJson();

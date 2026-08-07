@@ -11,6 +11,7 @@ import {
   asDateSuggestion,
   dateFlagSuggestion,
   siblingsAcceptingOption,
+  siblingGroupsWithCommand,
   OPTION_REDIRECTS,
 } from "../../src/output/unknownCommand.js";
 
@@ -178,6 +179,46 @@ describe("sibling-command flag redirect (#308)", () => {
     expect(devOnly.length).toBeGreaterThan(0); // feedback list/resolve take --status
     expect(standard).toEqual([]); // …and are tier:"developer"
   });
+});
+
+// feedback #343 — `ib company get 8` dead-ended on a group that has no `get`,
+// while `ib customer get 8` (the same asiakas) is exactly what was wanted.
+describe("sibling-GROUP subcommand redirect (#343)", () => {
+  const companyOf = () => program.commands.find((c) => c.name() === "company")!;
+
+  test("the reported case: company/get → ib customer get", () => {
+    const env = buildUnknownCommandEnvelope(companyOf(), "get", "developer");
+    expect(env.availableElsewhere).toEqual(["ib customer get"]);
+    expect(env.hint).toContain("`ib customer get` does");
+    // the in-group list is still reported, as context behind the answer
+    expect(env.available).toEqual(["list", "current", "switch"]);
+  });
+
+  test("only fires when the sibling command really exists", () => {
+    expect(siblingGroupsWithCommand("ib company", "get", "developer")).toEqual([
+      { path: "ib customer get", why: expect.stringContaining("asiakas") },
+    ]);
+    expect(siblingGroupsWithCommand("ib company", "nosuch", "developer")).toEqual([]);
+    // …and the envelope invents nothing for an unrelated token
+    const env = buildUnknownCommandEnvelope(companyOf(), "nosuch", "developer");
+    expect(env.availableElsewhere).toEqual([]);
+    expect(env.hint).not.toContain("ib customer");
+  });
+
+  test("declared pairs only — an undeclared domain never redirects", () => {
+    // `ib customer get` exists, but keikka is not paired with customer, so a
+    // cross-domain guess is not offered (every domain owns a `get`).
+    expect(siblingGroupsWithCommand("ib keikka", "get", "developer")).toEqual([]);
+    // nested groups are not domain pairs either
+    expect(siblingGroupsWithCommand("ib jerry offer", "get", "developer")).toEqual([]);
+  });
+
+  test("the pair is declared both ways", () => {
+    expect(siblingGroupsWithCommand("ib customer", "switch", "developer")).toEqual([
+      { path: "ib company switch", why: expect.any(String) },
+    ]);
+  });
+
 });
 
 describe("asDateSuggestion (#328)", () => {

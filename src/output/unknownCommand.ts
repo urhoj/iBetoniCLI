@@ -82,6 +82,62 @@ export function closestName(target: string, names: string[]): string | null {
   return null;
 }
 
+/**
+ * Group pairs that are two views of the SAME entity, where an unknown
+ * subcommand under one is usually available VERBATIM under the other
+ * (feedback #343). `ib company` is the tenant LENS the token acts through
+ * (list/current/switch); `ib customer` is the asiakas RECORD (get/update/…) —
+ * so `ib company get 8` dead-ends while `ib customer get 8` is exactly what the
+ * caller wanted, and the in-group sibling list is correct but useless.
+ *
+ * The subcommand analogue of {@link siblingsAcceptingOption}, but CURATED
+ * rather than derived: nearly every domain owns a `get`/`list`, so scanning all
+ * domains for the token would suggest noise instead of the one right answer.
+ */
+interface SiblingGroup {
+  /** Domain token of the sibling group, e.g. `customer`. */
+  domain: string;
+  /** Why the two are interchangeable — rendered verbatim into the hint. */
+  why: string;
+}
+
+const ASIAKAS_PAIR_WHY =
+  "both name the same `asiakas` entity: `ib company` is the tenant LENS your token acts through, `ib customer` is the record";
+
+export const GROUP_SIBLING_DOMAINS: Record<string, SiblingGroup> = {
+  company: { domain: "customer", why: ASIAKAS_PAIR_WHY },
+  customer: { domain: "company", why: ASIAKAS_PAIR_WHY },
+};
+
+export interface SiblingGroupMatch {
+  path: string;
+  why: string;
+}
+
+/**
+ * The sibling group's `ib <domain> <token>` command, when the pair is declared
+ * in {@link GROUP_SIBLING_DOMAINS} AND that command actually exists and is
+ * visible at `tier`. Empty otherwise — a suggestion that 404s at the parser, or
+ * names a command hidden at the caller's access level, is worse than none.
+ *
+ * `group` is a top-level domain group path (`ib company`); nested groups
+ * (`ib jerry offer`) never match, so `parts.length !== 2` returns early.
+ */
+export function siblingGroupsWithCommand(
+  group: string,
+  token: string,
+  tier: CallerTier
+): SiblingGroupMatch[] {
+  const parts = group.split(" ");
+  if (parts.length !== 2) return [];
+  const sibling = GROUP_SIBLING_DOMAINS[parts[1]];
+  if (!sibling) return [];
+  const path = `ib ${sibling.domain} ${token}`;
+  const spec = COMMAND_SPECS.find((s) => s.command === path);
+  if (!spec || isHiddenAtTier(spec, tier)) return [];
+  return [{ path, why: sibling.why }];
+}
+
 /** Space-joined path of a command up its parent chain (e.g. "ib legal"). */
 export function commandPath(cmd: Command): string {
   const parts: string[] = [];
@@ -122,6 +178,8 @@ export interface UnknownCommandEnvelope {
   unknownCommand: string;
   didYouMean: string | null;
   available: string[];
+  /** Sibling-GROUP command(s) that own this subcommand name (feedback #343). */
+  availableElsewhere: string[];
   hint: string;
 }
 
@@ -146,6 +204,15 @@ export function buildUnknownCommandEnvelope(
     available.length > 0
       ? `Available ${cmd.name()} subcommands: ${available.join(", ")}. `
       : "";
+  // Cross-group redirect first — it is the actionable answer, where the
+  // in-group list is only context. Rendered with the caller's remaining args
+  // (`ib customer get 8`, not `ib customer get`) so it is copy-paste runnable;
+  // cmd.args holds the bad token followed by whatever came after it.
+  const elsewhere = siblingGroupsWithCommand(group, unknownToken, tier);
+  const rest = (cmd.args ?? []).slice(1).map(String);
+  const crossGroup = elsewhere.length
+    ? `\`${group} ${unknownToken}\` does not exist, but \`${[elsewhere[0].path, ...rest].join(" ")}\` does — ${elsewhere[0].why}. `
+    : "";
   return {
     success: false,
     error:
@@ -158,7 +225,8 @@ export function buildUnknownCommandEnvelope(
     unknownCommand: unknownToken,
     didYouMean,
     available,
-    hint: `${suggestion}${availableStr}Run ${discover} to discover them.`,
+    availableElsewhere: elsewhere.map((e) => e.path),
+    hint: `${crossGroup}${suggestion}${availableStr}Run ${discover} to discover them.`,
   };
 }
 
