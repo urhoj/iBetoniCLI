@@ -1145,6 +1145,7 @@ export const CHANGELOG_SPECS = [
         ]),
         writeFlags: true,
         mutates: true,
+        dryRunKind: "client",
         outputShape: "entry",
         errors: [
             {
@@ -1204,6 +1205,7 @@ export const CHANGELOG_SPECS = [
         flags: [],
         writeFlags: true,
         mutates: true,
+        dryRunKind: "client",
         outputShape: "{ deleted: true } | { dryRun, wouldDelete }",
         errors: [
             { http: 403, exit: 3, meaning: "Developer only", remedy: "dev token" },
@@ -1212,7 +1214,6 @@ export const CHANGELOG_SPECS = [
         notes: [
             "Soft-delete: sets isDeleted=1 — the row is kept for audit but hidden from every read (get/list/report/pending), and there is no CLI undelete.",
             "Deleting an already-released entry (one with a versionTag) removes it from that month's generated report.",
-            "--dry-run resolves CLIENT-side (echoes wouldDelete, issues no DELETE); the backend route has no X-Dry-Run guard.",
             "Deleting an already-deleted/missing id returns 404 (exit 5), not a no-op.",
             "Developer-gated.",
         ],

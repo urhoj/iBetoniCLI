@@ -182,6 +182,17 @@ export interface CommandSpec {
    * writeFlags for ib commands filtering.
    */
   mutates?: boolean;
+  /**
+   * How `--dry-run` resolves for this mutation — machine-readable, replacing
+   * the per-spec prose restatements. ABSENT on a writeFlags command means
+   * `"server"`: the `X-Dry-Run` header is sent and the BACKEND skips
+   * persistence (a route whose guard is not deployed will still persist).
+   * `"client"`: the CLI resolves the preview locally and NEVER issues the
+   * write — safe-by-construction, and it works under `--read-only`. Drives
+   * the WRITE-SAFETY `--dry-run` help line and rides verbatim in
+   * `ib reference dump` / `ib commands`.
+   */
+  dryRunKind?: "server" | "client";
   /** One-line description of the JSON response shape on stdout. */
   outputShape: string;
   /**
@@ -287,7 +298,9 @@ export function formatHelp(spec: CommandSpec): string {
     lines.push("");
     lines.push("WRITE-SAFETY FLAGS");
     lines.push(
-      "  --dry-run            Validate without persisting. Returns the would-be response."
+      spec.dryRunKind === "client"
+        ? "  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only)."
+        : "  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response."
     );
     lines.push(
       "  --idempotency-key K  Replay protection. Cached for 24h."

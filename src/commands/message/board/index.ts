@@ -455,11 +455,9 @@ export const MESSAGE_BOARD_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     mutates: true,
+    dryRunKind: "client",
     outputShape: `${BOARD_ROW} · { dryRun: true, proposed: {...} } on --dry-run`,
     errors: BOARD_AUTH_ERRORS,
-    notes: [
-      "--dry-run previews the payload CLIENT-SIDE without writing (the route has no X-Dry-Run guard).",
-    ],
     seeAlso: ["ib message board update", "ib message board delete"],
     examples: [
       'ib message board create --title "Asema kiinni" --text "Perjantaina suljettu" --start-date today --priority warning --reason "tiedote"',
@@ -488,11 +486,9 @@ export const MESSAGE_BOARD_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     mutates: true,
+    dryRunKind: "client",
     outputShape: `${BOARD_ROW} · { dryRun: true, messageId, current, proposed } on --dry-run`,
     errors: [BOARD_NOT_FOUND, ...BOARD_AUTH_ERRORS],
-    notes: [
-      "--dry-run previews the merged row CLIENT-SIDE without writing (no server X-Dry-Run guard).",
-    ],
     seeAlso: ["ib message board get"],
     examples: ['ib message board update 7 --priority urgent --reason "nostettu kiireelliseksi"'],
   },
@@ -505,10 +501,10 @@ export const MESSAGE_BOARD_SPECS: CommandSpec[] = [
     flags: [],
     writeFlags: true,
     mutates: true,
+    dryRunKind: "client",
     outputShape:
       "204 no content · { dryRun: true, messageId, wouldDelete: {...} } on --dry-run",
     errors: [BOARD_NOT_FOUND, ...BOARD_AUTH_ERRORS],
-    notes: ["--dry-run previews what would be deleted CLIENT-SIDE without writing."],
     examples: ['ib message board delete 7 --reason "vanhentunut"'],
   },
 ];

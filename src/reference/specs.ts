@@ -177,6 +177,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "mime", type: "string", description: "Override auto-detected MIME (fallback application/octet-stream)" },
     ],
     writeFlags: true,
+    dryRunKind: "client",
     outputShape: "{ ok: true, attachmentId } | { dryRun: true, wouldUpload: {...} }",
     errors: [{ origin: "client", exit: 4, meaning: "File unreadable / bad entity flags", remedy: "check the path and pass exactly one entity flag" }, { origin: "client", exit: 6, meaning: "Azure PUT failed", remedy: "re-run; SAS expires in 1h" }, apiErr(403, "Not a member of the target entity's company", "check active company"), ...COMMON_AUTH_ERRORS],
     notes: [ENTITY_FLAG_NOTE, "No image compression — the file uploads as-is (the web UI compresses to ~1MB).", "Remote contexts: use upload-url + PUT yourself + register.", DEPLOY_NOTE],
@@ -1247,6 +1248,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "allow-big-merge", type: "boolean", description: "System-admin: permit a merge above the safety row cap" },
     ],
     writeFlags: true,
+    dryRunKind: "client",
     outputShape:
       "real: { success, safetyValidation, timestamp, ... } | dry-run: { dryRun: true, validation: { success, ... } }",
     errors: [
@@ -1600,6 +1602,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
     ],
     writeFlags: true,
+    dryRunKind: "client",
     outputShape:
       "real: { success, safetyValidation, timestamp, ... } | dry-run: { dryRun: true, validation: { success, ... } }",
     errors: [
@@ -1902,6 +1905,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
     ],
     writeFlags: true,
+    dryRunKind: "client",
     outputShape:
       "real: { success, safetyValidation, timestamp, ... } | dry-run: { dryRun: true, validation: { success, ... } }",
     errors: [
@@ -1967,6 +1971,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     mutates: true,
+    dryRunKind: "client",
     outputShape: "personPvm save result | { dryRun:true, personId, date, wouldChange:{ status?, text? } } (with --dry-run)",
     errors: [
       apiErr(400, "Missing --reason or unknown/ambiguous --status", "supply --reason; check `ib person day statuses`"),
@@ -1977,7 +1982,6 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "Requires Admin or HR Admin (server-enforced) — Keikka Handler is NOT sufficient.",
       "--status accepts an id or a name (resolved via `ib person day statuses`).",
       "--reason is hard-required (exits 4 without it).",
-      "--dry-run is CLIENT-side (the save endpoint has no server X-Dry-Run guard): it previews wouldChange and never writes.",
       "Read-merges the existing row so a re-set updates in place (no duplicate) and PRESERVES the existing vehicle assignment. It cannot CHANGE the vehicle — use `ib vehicle driver assign` for that (atomic).",
     ],
     seeAlso: ["ib person day statuses", "ib person day clear", "ib vehicle driver assign"],
@@ -1996,6 +2000,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     writeFlags: true,
     mutates: true,
+    dryRunKind: "client",
     outputShape: "delete result | { dryRun:true, wouldDelete:{ personPvmId, date, status } | null } (with --dry-run)",
     errors: [
       apiErr(400, "Missing --reason", "supply --reason"),
@@ -2005,7 +2010,6 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       "Requires Admin or HR Admin (server-enforced).",
       "--reason is hard-required (exits 4 without it).",
-      "--dry-run is CLIENT-side: previews wouldDelete and never deletes.",
       "Resolves the personPvmId via the day list; when no row exists it's a no-op (deleted:false).",
     ],
     seeAlso: ["ib person day set", "ib person day get"],
@@ -2253,6 +2257,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "last-date", type: "date", description: "End of validity window (lastDate); YYYY-MM-DD or today/yesterday/tomorrow" },
     ],
     writeFlags: true,
+    dryRunKind: "client",
     outputShape: "On write: the saved vehicle record. With --dry-run: { dryRun: true, vehicleId, wouldChange: { field: { from, to } } } — the field-level diff, computed client-side without POSTing (the save route ignores X-Dry-Run, so the preview cannot persist).",
     errors: [
       apiErr(404, "Vehicle not found", "verify vehicleId"),
@@ -3194,7 +3199,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib ohje update",
     description:
-      "Update a UI help-text entry (PUT /api/helps/update). The CLI GET-merges the current row first, so fields you omit are PRESERVED (helps_save overwrites the whole row). Provide typed flags or --body JSON; typed flags win. --reason is required for a write. --dry-run previews the merged row CLIENT-SIDE without writing — the backend does not honour X-Dry-Run on this route. Mirrors the HelperIcon in-place editor.",
+      "Update a UI help-text entry (PUT /api/helps/update). The CLI GET-merges the current row first, so fields you omit are PRESERVED (helps_save overwrites the whole row). Provide typed flags or --body JSON; typed flags win. --reason is required for a write. Mirrors the HelperIcon in-place editor.",
     permissions: ["isHelperEditor (or system-admin/developer)"],
     args: [{ name: "helpId", type: "string", description: "the helpId to update (created if it does not exist)" }],
     flags: [
@@ -3218,6 +3223,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "all", type: "boolean", description: "With --replace: substitute every occurrence" },
     ],
     writeFlags: true,
+    dryRunKind: "client",
     outputShape:
       "{ success: true, helpId, created, written: {helpId,title,shorttext,htmltext,img, aiConfidence?, needsHumanReview?}, htmltextLength, response } — `created` is true when no prior row existed (a parallel groomer can spot an unexpected insert); aiConfidence/needsHumanReview present in `written` only when those flags were passed; or { dryRun: true, helpId, created, current, proposed } | edit dry-run: {dryRun:true, helpId, field, matchCount?, addedLines, removedLines, sameContent, unified}",
     errors: [
@@ -3242,6 +3248,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "helpId", type: "string", description: "the helpId to delete" }],
     flags: [],
     writeFlags: true,
+    dryRunKind: "client",
     outputShape:
       "{ success: true, helpId, deleted: boolean } — deleted is false when no row existed (idempotent); or { dryRun: true, helpId, wouldDelete: {helpId,title,shorttext,htmltext,img}|null } with --dry-run",
     errors: [
@@ -5562,6 +5569,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "File a CLI improvement proposal or trouble report. AI users: file this PROACTIVELY and IMMEDIATELY (no need to ask the user) whenever you hit an error or unexpected exit code, had to try several strategies because the help/docs were unclear/missing/wrong, found something confusing or harder than expected, could not find a command for something the user clearly needs (a capability gap), or saw an inconsistency between commands. Stored quietly server-side (no GitHub issue, no spam to you or the user — distinct from bug reports; the maintainer gets a private heads-up email) for later developer triage. Sent as a META request, so it is EXEMPT from the read-only write-lock: you can file feedback even with --read-only / IB_READ_ONLY active. --dry-run resolves client-side (prints the payload, never sends).",
     auth: "any",
     mutates: true,
+    dryRunKind: "client",
     args: [{ name: "description", type: "string", description: "freetext description of the friction, gap, or bug" }],
     flags: [
       { name: "description", type: "string", description: "Alias for the positional description; if both are passed, they must match" },
@@ -5689,6 +5697,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     mutates: true,
+    dryRunKind: "client",
     args: [{ name: "id", type: "number", description: "feedbackId — accepts an optional `fb#` anchor (e.g. `fb#42`); a `cl#` id is rejected (exit 4) with the changelog command to use (feedback #230)" }],
     flags: [
       { name: "status", type: "string", description: "open | reviewed | applied | dismissed", allowed: [...FEEDBACK_STATUSES] },
@@ -5732,6 +5741,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     mutates: true,
+    dryRunKind: "client",
     args: [{ name: "id", type: "number", description: "feedbackId — accepts an optional `fb#` anchor (e.g. `fb#42`); a `cl#` id is rejected (exit 4) with the changelog command to use (feedback #230)" }],
     flags: [
       { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other", allowed: [...FEEDBACK_SCOPES] },
@@ -6014,13 +6024,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         tier: "developer",
         mutates: true,
         writeFlags: true,
+        dryRunKind: "client",
         flags: [{ name: "env", type: "string", description: "Environment buffer to clear (default: backend's current env)" }],
         outputShape: "execute: { cleared:true, environment, message } | --dry-run: { dryRun:true, wouldClear:{ method, path } }",
         errors: [
           ...devErrors,
           { origin: "client", exit: 3, meaning: "Blocked by read-only mode", remedy: "clearing needs a session without --read-only/IB_READ_ONLY" },
         ],
-        notes: ["The DELETE route honours no server-side X-Dry-Run — --dry-run is resolved CLIENT-SIDE (never sends)."],
         seeAlso: ["ib dev perf stats"],
         examples: ['ib dev perf clear --env staging --reason "reset after load test"', "ib dev perf clear --dry-run"],
       },
@@ -6290,6 +6300,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "source", type: "string", description: "Provenance: web|cli|ai (default: IB_SOURCE env or cli)" },
     ],
     writeFlags: true,
+    dryRunKind: "client",
     outputShape:
       "{ messageId, threadId, senderPersonId, senderAsiakasId, kind, body, source, sourceNote, createdAt } · { dryRun:true, threadId, wouldSend:{ body, source, sourceNote, recipients:[{ personId, name, role }] } } on --dry-run",
     errors: [
@@ -6336,7 +6347,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib message chat delete",
     description:
-      "Soft-delete a chat message (DELETE /api/messages/threads/:id/messages/:messageId; sets isDeleted=1, so it vanishes from every read). The author may delete their OWN message only while it is unanswered (no later reply from another participant); a sysadmin/developer may moderate any message in a thread they can access. --dry-run previews CLIENT-SIDE.",
+      "Soft-delete a chat message (DELETE /api/messages/threads/:id/messages/:messageId; sets isDeleted=1, so it vanishes from every read). The author may delete their OWN message only while it is unanswered (no later reply from another participant); a sysadmin/developer may moderate any message in a thread they can access.",
     auth: "any",
     args: [
       { name: "messageId", type: "number", required: true, description: "Message id to delete (the message PK)" },
@@ -6346,6 +6357,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId (one match required)" },
     ],
     writeFlags: true,
+    dryRunKind: "client",
     outputShape:
       "{ messageId, threadId, deleted:true } (+ alreadyDeleted:true if already gone) · { dryRun:true, threadId, wouldDelete:{ messageId, body, senderPersonId } } on --dry-run",
     errors: [
@@ -6378,6 +6390,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "body", type: "string", required: true, description: "New message text (max 4000 chars)" },
     ],
     writeFlags: true,
+    dryRunKind: "client",
     outputShape:
       "{ messageId, threadId, senderPersonId, body, editedAt, ... } (enriched row) · { messageId, threadId, unchanged:true } on no-op · { dryRun:true, threadId, wouldEdit:{ messageId, from, to } } on --dry-run",
     errors: [
@@ -6409,6 +6422,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
     ],
     writeFlags: true,
+    dryRunKind: "client",
     outputShape:
       "{ messageId, threadId, restored:true } (+ alreadyActive:true if not deleted) · { dryRun:true, threadId, wouldRestore:{ messageId } } on --dry-run",
     errors: [
@@ -6511,6 +6525,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "Open (or append to) a support thread escalating a tarjous (pumppuRequest) or keikka to the platform. Any authenticated user. A REAL write — honours the read-only write-lock. --dry-run resolves CLIENT-SIDE (prints the payload, never POSTs). Reply later with `ib message chat send <threadId> --body ...`.",
     auth: "any",
     mutates: true,
+    dryRunKind: "client",
     flags: [
       { name: "tarjous", type: "number", description: "pumppuRequestId this escalation is about" },
       { name: "keikka", type: "number", description: "keikkaId this escalation is about" },
@@ -6541,6 +6556,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     mutates: true,
+    dryRunKind: "client",
     args: [{ name: "threadId", type: "number", description: "support messageThread id" }],
     flags: [
       { name: "reopen", type: "boolean", description: "Set status back to open instead of resolved" },
@@ -6572,6 +6588,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
     ],
     writeFlags: true,
+    dryRunKind: "client",
     outputShape: "{ threadId, archived:true } (+ alreadyArchived:true if already archived)",
     errors: [
       apiErr(403, "Not a manager of this thread", "requires owning-company admin role or sysadmin/developer"),
@@ -6601,6 +6618,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "tarjous", type: "number", description: "Resolve the thread from this pumppuRequestId" },
     ],
     writeFlags: true,
+    dryRunKind: "client",
     outputShape: "{ threadId, archived:false } (+ alreadyOpen:true if already open)",
     errors: [
       apiErr(403, "Not a manager of this thread", "requires owning-company admin role or sysadmin/developer"),
@@ -6630,6 +6648,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "title", type: "string", required: true, description: 'New thread title (max 200 chars; "" clears)' },
     ],
     writeFlags: true,
+    dryRunKind: "client",
     outputShape: "{ threadId, title } (title is null when cleared)",
     errors: [
       apiErr(400, "Title too long", "max 200 characters"),
@@ -6661,6 +6680,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "role", type: "string", description: "Participant role (customer|pumppu|betoni|lattia|support|provider; default pumppu)" },
     ],
     writeFlags: true,
+    dryRunKind: "client",
     outputShape: "{ threadId, personId, role, added:true }",
     errors: [
       apiErr(403, "Not a manager of this thread", "requires owning-company admin role or sysadmin/developer"),
@@ -6693,6 +6713,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "person", type: "number", required: true, description: "personId to remove" },
     ],
     writeFlags: true,
+    dryRunKind: "client",
     outputShape: "{ threadId, personId, removed:true|false } (removed:false when the participant was already gone)",
     errors: [
       apiErr(403, "Not a manager of this thread", "requires owning-company admin role or sysadmin/developer"),
@@ -6853,6 +6874,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     auth: "any",
     mutates: true,
     writeFlags: true,
+    dryRunKind: "client",
     args: [{ name: "term", type: "string", required: true, description: "Canonical term" }],
     flags: [],
     outputShape:

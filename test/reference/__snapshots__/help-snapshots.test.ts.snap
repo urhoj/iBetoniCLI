@@ -25,7 +25,7 @@ FLAGS
   --message NUMBER    Target messageId (chat message; attach = message author, read = thread participant)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -70,7 +70,7 @@ FLAGS
   (none)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -128,7 +128,7 @@ FLAGS
   --message NUMBER    Target messageId (chat message; attach = message author, read = thread participant)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -320,7 +320,7 @@ FLAGS
   --etag STRING    Azure ETag (optional)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -441,7 +441,7 @@ FLAGS
   --type STRING    Type (NAME or id — \`ib attachment types\`)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -499,7 +499,7 @@ FLAGS
   --mime STRING    Override auto-detected MIME (fallback application/octet-stream)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -943,7 +943,7 @@ FLAGS
   --body JSON    Raw JSON body (overrides typed flags)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -990,7 +990,7 @@ FLAGS
   --body JSON    Raw JSON body (overrides typed flags)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -1061,7 +1061,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -1245,7 +1245,7 @@ FLAGS
   --allow-big-merge    System-admin: permit a merge above the safety row cap
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -1293,7 +1293,7 @@ FLAGS
   --unset STRING    Comma-separated field keys to turn OFF
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -1342,7 +1342,7 @@ FLAGS
   --reset    Turn ALL 9 operator flags OFF
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -1381,7 +1381,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -1455,7 +1455,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -1526,7 +1526,7 @@ FLAGS
   --unset STRING    Comma-separated setting names to turn OFF
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -1578,7 +1578,7 @@ FLAGS
   --body JSON    Raw JSON body (overrides typed flags)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -1940,7 +1940,7 @@ FLAGS
   --from-json STRING    Read the whole entry from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase: description (or summary/body), title (≤300), type, area, benefits, impact (≤500), status (≤30), severity (≤20), files, repo (≤200), sha (≤500), commit, vtag (≤200), bumpLevel (\`bump-level\` also accepted), feedback, sentry, source, date, language. files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input, so a row from \`ib dev changelog list\` can be edited and posted straight back: commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date. An unknown or wrong-typed key exits 4 (never silently dropped). The length caps apply to a JSON value exactly as to a flag — --from-json sidesteps shell quoting, not column width.
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -1996,7 +1996,7 @@ FLAGS
   (none)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -2013,7 +2013,6 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - Soft-delete: sets isDeleted=1 — the row is kept for audit but hidden from every read (get/list/report/pending), and there is no CLI undelete.
   - Deleting an already-released entry (one with a versionTag) removes it from that month's generated report.
-  - --dry-run resolves CLIENT-side (echoes wouldDelete, issues no DELETE); the backend route has no X-Dry-Run guard.
   - Deleting an already-deleted/missing id returns 404 (exit 5), not a no-op.
   - Developer-gated.
 
@@ -2145,7 +2144,7 @@ FLAGS
   --map STRING    JSON file (or -): [{changelogId, versionTag}] for precise per-entry stamping
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -2243,7 +2242,7 @@ FLAGS
   --from-json STRING    Read the patch from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase (description/summary/body, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (\`bump-level\` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a row from \`ib dev changelog list\` can be edited and posted straight back. An unknown or wrong-typed key exits 4 (never silently dropped).
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -2681,7 +2680,7 @@ FLAGS
   --env STRING    Environment buffer to clear (default: backend's current env)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -2696,9 +2695,6 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a developer        → requires isSystemAdmin or isDeveloper
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
   exit 3 (client-side)  Blocked by read-only mode → clearing needs a session without --read-only/IB_READ_ONLY
-
-NOTES
-  - The DELETE route honours no server-side X-Dry-Run — --dry-run is resolved CLIENT-SIDE (never sends).
 
 SEE ALSO
   ib dev perf stats
@@ -3099,7 +3095,7 @@ FLAGS
   (none)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3136,7 +3132,7 @@ FLAGS
   (none)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3171,7 +3167,7 @@ FLAGS
   --update-only    Only update existing terms; never insert
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3351,7 +3347,7 @@ FLAGS
   --needs-human-review    Park the term for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked.
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3463,7 +3459,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3502,7 +3498,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3579,7 +3575,7 @@ FLAGS
   --source STRING    manual | import | scheduled (default manual)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3649,7 +3645,7 @@ FLAGS
   --set-status STRING    Also set the pipeline status. Keys: ei_aloitettu → email1_lahetetty → muistutus_lahetetty → vastasi_kylla → tiedot_pyydetty → tervetuloa_lahetetty (pipeline order); terminal: vastasi_ei / ei_vastausta / ei_sovellu
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3695,7 +3691,7 @@ FLAGS
   --outreach-phone STRING    Contact override phone
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3732,7 +3728,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3768,7 +3764,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3804,7 +3800,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3842,7 +3838,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3978,7 +3974,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -4290,7 +4286,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -4329,7 +4325,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -4385,7 +4381,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -4427,7 +4423,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -4465,7 +4461,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -4503,7 +4499,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -4568,7 +4564,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -4608,7 +4604,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -4652,7 +4648,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -4698,7 +4694,7 @@ FLAGS
   --reason STRING    Decline reason — stored, shown to the customer, and audited (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -4833,7 +4829,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -4866,7 +4862,7 @@ FLAGS
   --body JSON    JSON object with the new keikka fields (required)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -4903,7 +4899,7 @@ FLAGS
   (none)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -5131,7 +5127,7 @@ FLAGS
   --status STRING    New keikkaTilaId (numeric, e.g. 9 = Toimitettu)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -5212,7 +5208,7 @@ FLAGS
   --type STRING    Document type name (alias for the positional)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -5293,7 +5289,7 @@ FLAGS
   (none)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -5366,7 +5362,7 @@ FLAGS
   (none)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -5522,7 +5518,7 @@ FLAGS
   --all    With --replace: substitute every occurrence instead of erroring on multiple matches
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -5638,7 +5634,7 @@ FLAGS
   --setting-type-id NUMBER    personSettingTypeId for acceptance tracking (must exist and be unmapped)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -5685,7 +5681,7 @@ FLAGS
   --setting-type-id NUMBER    personSettingTypeId for acceptance tracking (must exist in personSettingTypes and not be mapped to another type)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -6035,7 +6031,7 @@ FLAGS
   --expires-at DATE    Last day visible: YYYY-MM-DD (omit = never expires)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -6050,9 +6046,6 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not an admin/editor (writes + \`all\`/\`get\` require it) → an asiakas admin/editor or ilmoitustaulu editor must run it
   exit 4 (HTTP 400)  Validation error (missing title/text/start-date, bad priority/date) → check the flags
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-NOTES
-  - --dry-run previews the payload CLIENT-SIDE without writing (the route has no X-Dry-Run guard).
 
 SEE ALSO
   ib message board update, ib message board delete
@@ -6077,7 +6070,7 @@ FLAGS
   (none)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -6093,9 +6086,6 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not an admin/editor (writes + \`all\`/\`get\` require it) → an asiakas admin/editor or ilmoitustaulu editor must run it
   exit 4 (HTTP 400)  Validation error (missing title/text/start-date, bad priority/date) → check the flags
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
-
-NOTES
-  - --dry-run previews what would be deleted CLIENT-SIDE without writing.
 
 EXAMPLES
   ib message board delete 7 --reason "vanhentunut"
@@ -6191,7 +6181,7 @@ FLAGS
   --expires-at DATE    Last day visible: YYYY-MM-DD (pass "" to clear the expiry)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -6208,9 +6198,6 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation error (missing title/text/start-date, bad priority/date) → check the flags
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
-NOTES
-  - --dry-run previews the merged row CLIENT-SIDE without writing (no server X-Dry-Run guard).
-
 SEE ALSO
   ib message board get
 
@@ -6224,7 +6211,7 @@ exports[`Help snapshots — contract stability > help for ib message chat delete
   ib message chat delete <messageId> [flags]
 
 DESCRIPTION
-  Soft-delete a chat message (DELETE /api/messages/threads/:id/messages/:messageId; sets isDeleted=1, so it vanishes from every read). The author may delete their OWN message only while it is unanswered (no later reply from another participant); a sysadmin/developer may moderate any message in a thread they can access. --dry-run previews CLIENT-SIDE.
+  Soft-delete a chat message (DELETE /api/messages/threads/:id/messages/:messageId; sets isDeleted=1, so it vanishes from every read). The author may delete their OWN message only while it is unanswered (no later reply from another participant); a sysadmin/developer may moderate any message in a thread they can access.
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
@@ -6235,7 +6222,7 @@ FLAGS
   --tarjous NUMBER    Resolve the thread from this pumppuRequestId (one match required)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -6284,7 +6271,7 @@ FLAGS
   --body STRING    New message text (max 4000 chars) (required)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -6412,7 +6399,7 @@ FLAGS
   --tarjous NUMBER    Resolve the thread from this pumppuRequestId
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -6499,7 +6486,7 @@ FLAGS
   --source STRING    Provenance: web|cli|ai (default: IB_SOURCE env or cli)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -6624,7 +6611,7 @@ FLAGS
   --init    Caller's own company's first box via /box/initialize (no asiakasId)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -6663,7 +6650,7 @@ FLAGS
   (none)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -6733,7 +6720,7 @@ FLAGS
   --box-asiakas NUMBER    dailyMessageBoxAsiakasId of the share row (required)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -6811,7 +6798,7 @@ FLAGS
   --access STRING    read = read-only, edit = read/write (required)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -6846,7 +6833,7 @@ FLAGS
   (none)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -6882,7 +6869,7 @@ FLAGS
   --lisatieto STRING    Optional sub-text under the title
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -6920,7 +6907,7 @@ FLAGS
   --clear    Clear the message for the date (mutually exclusive with --message)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -6937,7 +6924,6 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - Exactly one of --message / --clear is required.
-  - --dry-run is CLIENT-side (returns the would-be payload, sends nothing) — the dailyMessage routes have no server X-Dry-Run guard.
 
 SEE ALSO
   ib message daily get
@@ -6962,7 +6948,7 @@ FLAGS
   --to NUMBER    Tenant (asiakasId) to share with (required)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -7000,7 +6986,7 @@ FLAGS
   (none)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -7181,7 +7167,7 @@ FLAGS
   --tarjous NUMBER    Resolve the thread from this pumppuRequestId
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -7230,7 +7216,7 @@ FLAGS
   --role STRING    Participant role (customer|pumppu|betoni|lattia|support|provider; default pumppu)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -7280,7 +7266,7 @@ FLAGS
   --person NUMBER    personId to remove (required)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -7327,7 +7313,7 @@ FLAGS
   --title STRING    New thread title (max 200 chars; "" clears) (required)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -7374,7 +7360,7 @@ FLAGS
   --tarjous NUMBER    Resolve the thread from this pumppuRequestId
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -7424,7 +7410,7 @@ FLAGS
   --from-brand STRING    Sender identity: betoni (default, noreply@ibetoni.fi) or betonijerry (noreply@betonijerry.fi)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -7475,7 +7461,7 @@ FLAGS
   --data STRING    Extra FCM data payload as a JSON object (e.g. '{"url":"/grid"}')
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -7521,7 +7507,7 @@ FLAGS
   (none)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -7613,7 +7599,7 @@ exports[`Help snapshots — contract stability > help for ib ohje update matches
   ib ohje update <helpId> [flags]
 
 DESCRIPTION
-  Update a UI help-text entry (PUT /api/helps/update). The CLI GET-merges the current row first, so fields you omit are PRESERVED (helps_save overwrites the whole row). Provide typed flags or --body JSON; typed flags win. --reason is required for a write. --dry-run previews the merged row CLIENT-SIDE without writing — the backend does not honour X-Dry-Run on this route. Mirrors the HelperIcon in-place editor.
+  Update a UI help-text entry (PUT /api/helps/update). The CLI GET-merges the current row first, so fields you omit are PRESERVED (helps_save overwrites the whole row). Provide typed flags or --body JSON; typed flags win. --reason is required for a write. Mirrors the HelperIcon in-place editor.
   Permissions: requires isHelperEditor (or system-admin/developer).
 
 ARGUMENTS
@@ -7636,7 +7622,7 @@ FLAGS
   --all    With --replace: substitute every occurrence
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -8026,7 +8012,7 @@ FLAGS
   --off    Disable the module
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -8210,7 +8196,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -8252,7 +8238,7 @@ FLAGS
   --date DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -8271,7 +8257,6 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - Requires Admin or HR Admin (server-enforced).
   - --reason is hard-required (exits 4 without it).
-  - --dry-run is CLIENT-side: previews wouldDelete and never deletes.
   - Resolves the personPvmId via the day list; when no row exists it's a no-op (deleted:false).
 
 SEE ALSO
@@ -8335,7 +8320,7 @@ FLAGS
   --text STRING    Free-text note on the day row
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -8355,7 +8340,6 @@ NOTES
   - Requires Admin or HR Admin (server-enforced) — Keikka Handler is NOT sufficient.
   - --status accepts an id or a name (resolved via \`ib person day statuses\`).
   - --reason is hard-required (exits 4 without it).
-  - --dry-run is CLIENT-side (the save endpoint has no server X-Dry-Run guard): it previews wouldChange and never writes.
   - Read-merges the existing row so a re-set updates in place (no duplicate) and PRESERVES the existing vehicle assignment. It cannot CHANGE the vehicle — use \`ib vehicle driver assign\` for that (atomic).
 
 SEE ALSO
@@ -8417,7 +8401,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -8490,7 +8474,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -8562,7 +8546,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -8600,7 +8584,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -8771,7 +8755,7 @@ FLAGS
   --owner NUMBER    ownerAsiakasId (default: active company)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -8819,7 +8803,7 @@ FLAGS
   --data STRING    Extra FCM data payload as a JSON object
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -8865,7 +8849,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -8937,7 +8921,7 @@ FLAGS
   --asiakas NUMBER    Target asiakasId (REQUIRED)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -9005,7 +8989,7 @@ FLAGS
   --asiakas NUMBER    Target asiakasId (REQUIRED)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -9091,7 +9075,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -9136,7 +9120,7 @@ FLAGS
   (none)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -9286,7 +9270,7 @@ FLAGS
   --all    With --replace: substitute every occurrence
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -9538,7 +9522,7 @@ FLAGS
   --geocode    Resolve lat/lng from the address via Google Maps when coordinates are not given (then persisted + echoed)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -9618,7 +9602,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -9850,7 +9834,7 @@ FLAGS
   --puomi-max NUMBER    puomiMax (m) to set while enrolling
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -9925,7 +9909,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -9969,7 +9953,7 @@ FLAGS
   --geocode    Force re-resolving lat/lng from the address via Google Maps (fails fast on no match). Address changes auto-geocode even without this flag when no coordinates are given
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -10057,7 +10041,7 @@ FLAGS
   --feedback NUMBER    cliFeedback id this task graduated from (provenance link)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -10097,7 +10081,7 @@ FLAGS
   --agent STRING    claude | hermes — set when an AI completes the task
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -10250,7 +10234,7 @@ FLAGS
   --deactivate    Soft-retire the task (active=0)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -10341,7 +10325,7 @@ FLAGS
   --asiakas NUMBER    Target asiakasId to create the vehicle under (defaults to active company; needs a vehicle-manage role on that tenant)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -10440,7 +10424,7 @@ FLAGS
   --person NUMBER    Driver personId (required)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -10568,7 +10552,7 @@ FLAGS
   (none)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -10611,7 +10595,7 @@ FLAGS
   (none)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -10691,7 +10675,7 @@ FLAGS
   --person NUMBER    Default driver personId (required)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -11179,7 +11163,7 @@ FLAGS
   --last-date DATE    End of validity window (lastDate); YYYY-MM-DD or today/yesterday/tomorrow
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -11286,7 +11270,7 @@ FLAGS
   --body JSON    JSON object with the new tyomaa fields
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -11418,7 +11402,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -11523,7 +11507,7 @@ FLAGS
   (none)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -11623,7 +11607,7 @@ FLAGS
   --owner NUMBER    ownerAsiakasId (default: active company)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -11700,7 +11684,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -11766,7 +11750,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -11802,7 +11786,7 @@ FLAGS
   (none)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -11871,7 +11855,7 @@ FLAGS
   --radius NUMBER    Geofence radius in metres (1-10000)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -11920,7 +11904,7 @@ FLAGS
   --yyyymmdd DATE    Effective date segment YYYYMMDD (defaults to today) (default: today)
 
 WRITE-SAFETY FLAGS
-  --dry-run            Validate without persisting. Returns the would-be response.
+  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 

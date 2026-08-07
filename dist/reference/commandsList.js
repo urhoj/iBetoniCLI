@@ -134,6 +134,7 @@ export function filterCommandSpecs(specs, filter, tier = getCallerTier()) {
         description: s.description,
         permissions: s.permissions ?? [],
         isWrite: isWriteSpec(s),
+        ...(s.dryRunKind ? { dryRunKind: s.dryRunKind } : {}),
     }));
 }
 /**

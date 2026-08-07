@@ -104,6 +104,12 @@ export interface CommandSummary {
    * "renders the standard write-safety block" — a different thing.
    */
   isWrite: boolean;
+  /**
+   * Present on writes with a declared `--dry-run` resolution kind: `"client"`
+   * never issues the write (safe under --read-only); `"server"`/absent sends
+   * `X-Dry-Run` and trusts the deployed backend guard.
+   */
+  dryRunKind?: "server" | "client";
 }
 
 /** Filter inputs for {@link filterCommandSpecs}. */
@@ -221,6 +227,7 @@ export function filterCommandSpecs(
       description: s.description,
       permissions: s.permissions ?? [],
       isWrite: isWriteSpec(s),
+      ...(s.dryRunKind ? { dryRunKind: s.dryRunKind } : {}),
     }));
 }
 
