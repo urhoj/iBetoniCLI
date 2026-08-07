@@ -7,7 +7,7 @@ import {
 } from "../program.js";
 import { getGlobalOptions } from "../globals.js";
 import { enableStats, flushStats } from "../stats.js";
-import { setOutputMode } from "../output/json.js";
+import { setOutputMode, setListColumns } from "../output/json.js";
 import { resolveAuth } from "../auth/resolve.js";
 import { defaultCredentialsPath } from "../auth/store.js";
 import { setCallerTier, resolveCallerTier } from "../tier.js";
@@ -29,6 +29,10 @@ program.hook("preAction", (_thisCommand, actionCommand) => {
   // Resolve the running command's CommandSpec so error envelopes can echo ITS
   // documented per-error remedy as `hint` (feedback #25). Shared with runArgv.
   applySpecErrors(actionCommand);
+  // AFTER applySpecErrors, which seeds the spec's own prettyColumns: an
+  // explicit --columns is the caller's override and must win.
+  const cols = getGlobalOptions(program).columns;
+  if (cols) setListColumns(cols);
 });
 
 // Resolve the caller's visibility tier from the session token BEFORE parse so

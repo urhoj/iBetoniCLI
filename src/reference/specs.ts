@@ -5589,6 +5589,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "{ items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }",
+    // 18 columns is far past what a terminal table holds, and the triage-
+    // relevant ones (scope/severity/complexity) sit at the END of the row, so
+    // the automatic leftmost-fits fallback would hide exactly the wrong half.
+    prettyColumns: ["feedbackId", "kind", "scope", "status", "severity", "complexity", "description"],
     errors: [
       { origin: "client", exit: 4, meaning: "Validation", remedy: "use only one of --all / --unresolved / --status; --status values must be open|reviewed|applied|dismissed" },
       apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),

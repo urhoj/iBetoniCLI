@@ -26,7 +26,7 @@ import { renderDomainHelp } from "./reference/domain.js";
 import { attachRichHelp, firstSentence } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
 import { canonicalPath } from "./reference/aliasPaths.js";
-import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, writeErrorEnvelope, setActiveCommandErrors, setExitCode as setExit, errorMessage } from "./output/json.js";
+import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, writeErrorEnvelope, setActiveCommandErrors, setListColumns, setExitCode as setExit, errorMessage } from "./output/json.js";
 import { guarded, jsonAction } from "./commands/_shared/action.js";
 import { buildValidationEnvelope } from "./output/validationEnvelope.js";
 import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, buildExcessArgumentsEnvelope, dateFlagSuggestion, excessPositionals, commandPath } from "./output/unknownCommand.js";
@@ -332,6 +332,7 @@ export function applySpecErrors(actionCommand) {
     const path = canonicalPath(commandPath(actionCommand));
     const spec = COMMAND_SPECS.find((s) => s.command === path);
     setActiveCommandErrors(spec?.errors ?? null);
+    setListColumns(spec?.prettyColumns ?? null);
 }
 export function enableParserThrow(program) {
     let captured = "";

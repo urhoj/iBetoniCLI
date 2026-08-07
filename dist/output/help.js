@@ -94,7 +94,7 @@ export function formatHelp(spec) {
     }
     lines.push("");
     lines.push("GLOBAL FLAGS");
-    lines.push("  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID");
+    lines.push("  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV");
     lines.push("");
     lines.push("OUTPUT (JSON, stdout)");
     lines.push(`  ${spec.outputShape}`);

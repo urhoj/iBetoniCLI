@@ -75,17 +75,100 @@ describe("pretty output", () => {
   });
 
   test("renderList caps table width and keeps narrow columns intact", () => {
+    // The blobs must DIFFER: two identical rows make every column constant, so
+    // the fold below would empty the table and this would stop testing width.
     const long = "word ".repeat(80);
     const out = renderList({
       items: [
-        { id: 1, blob: long },
-        { id: 2, blob: long },
+        { id: 1, blob: `alpha ${long}` },
+        { id: 2, blob: `beta ${long}` },
       ],
       nextCursor: null,
       count: 2,
     });
     expect(maxLineWidth(out)).toBeLessThanOrEqual(TERM);
-    expect(stripAnsi(out)).toMatch(/\bid\b/);
+    const plain = stripAnsi(out);
+    expect(plain).toMatch(/\bid\b/);
+    // feedback #341: one line per record — the long blob is cut, not wrapped
+    expect(plain.split("\n").filter((l) => l.includes("alpha")).length).toBe(1);
+    expect(plain).toContain("…");
+  });
+
+  // feedback #341: --pretty on a multi-ROW list rendered one full vertical
+  // key/value table PER ROW (12 feedback rows → 106 KB). The four tests below
+  // pin the replacement: fold what is constant, keep one line per record, and
+  // name whatever had to be dropped.
+  test("renderList folds constant and all-null columns above the table", () => {
+    const out = stripAnsi(
+      renderList({
+        items: [
+          { id: 1, status: "open", note: null, kind: "bug" },
+          { id: 2, status: "open", note: null, kind: "improvement" },
+        ],
+        nextCursor: null,
+        count: 2,
+      })
+    );
+    expect(out).toContain("all 2 rows:");
+    expect(out).toContain("status=open");
+    expect(out).toContain("note=—");
+    // the varying columns are the only ones left in the table
+    expect(out).toMatch(/│\s+id\s+│\s+kind\s+│/);
+  });
+
+  test("renderList keeps every column of a single-row list", () => {
+    // Every column of a 1-row list is trivially "constant" — folding there
+    // would leave an empty table.
+    const out = stripAnsi(
+      renderList({
+        items: [{ id: 1, status: "open", note: null }],
+        nextCursor: null,
+        count: 1,
+      })
+    );
+    expect(out).not.toContain("all 1 rows");
+    expect(out).toContain("status");
+    expect(out).toContain("note");
+  });
+
+  test("renderList honours an explicit column selection and names the rest", () => {
+    const items = [
+      { id: 1, kind: "bug", scope: "cli", description: "a" },
+      { id: 2, kind: "improvement", scope: "app", description: "b" },
+    ];
+    const out = stripAnsi(
+      renderList({ items, nextCursor: null, count: 2 }, ["id", "scope"])
+    );
+    expect(out).toMatch(/│\s+id\s+│\s+scope\s+│/);
+    expect(out).toContain("2 columns hidden");
+    expect(out).toContain("kind");
+  });
+
+  test("renderList ignores unknown column names and falls back to the auto fit", () => {
+    const items = [
+      { id: 1, kind: "bug" },
+      { id: 2, kind: "improvement" },
+    ];
+    const out = stripAnsi(
+      renderList({ items, nextCursor: null, count: 2 }, ["nope"])
+    );
+    expect(out).not.toContain("columns hidden");
+    expect(out).toContain("kind");
+  });
+
+  test("renderList clamps a multi-row cell to its first line", () => {
+    const out = stripAnsi(
+      renderList({
+        items: [
+          { id: 1, blob: "first line\nsecond line" },
+          { id: 2, blob: "other line\nsecond line" },
+        ],
+        nextCursor: null,
+        count: 2,
+      })
+    );
+    expect(out).toContain("first line…");
+    expect(out).not.toContain("second line");
   });
 
   test("renderList splits evenly when every column is oversized", () => {
@@ -99,19 +182,24 @@ describe("pretty output", () => {
     expect(stripAnsi(out).match(/x/g)?.length).toBe(300);
   });
 
-  test("renderList falls back to key:value blocks when columns can't stay readable", () => {
-    const wide = Object.fromEntries(
-      Array.from({ length: 14 }, (_, i) => [`column${i}`, `value ${i} `.repeat(8)])
-    );
+  test("renderList drops the columns that can't stay readable and names them", () => {
+    // Distinct per row, so nothing folds and the fit itself has to do the work.
+    const row = (tag: string) =>
+      Object.fromEntries(
+        Array.from({ length: 14 }, (_, i) => [`column${i}`, `${tag} ${i} `.repeat(8)])
+      );
     const out = renderList({
-      items: [wide, wide],
+      items: [row("alpha"), row("beta")],
       nextCursor: null,
       count: 2,
     });
     expect(maxLineWidth(out)).toBeLessThanOrEqual(TERM);
     const plain = stripAnsi(out);
-    expect(plain).toContain("# 1");
-    expect(plain).toContain("# 2");
-    expect(plain).toContain("column13"); // keys stay whole, not squeezed to 6 chars
+    expect(plain).toContain("column0"); // the identity anchor is never dropped
+    expect(plain).toMatch(/\d+ columns hidden/);
+    expect(plain).toContain("column13"); // dropped, but named in the footer
+    expect(plain).not.toContain("# 1"); // no per-record block fallback
+    // still one line per record, however many columns had to go
+    expect(plain.split("\n").filter((l) => l.includes("alpha")).length).toBe(1);
   });
 });

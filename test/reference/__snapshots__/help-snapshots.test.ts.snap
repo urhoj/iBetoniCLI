@@ -30,7 +30,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { ok: true, attachmentId, <column>: entityId } | { dryRun: true, wouldAttach: {...} }
@@ -75,7 +75,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { ok: true, attachmentId, deleted: true, blobDeleted } | { dryRun: true, wouldDelete: { attachmentId, blobName, origFileName } }
@@ -133,7 +133,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { ok: true, attachmentId, detached: entity } | { dryRun: true, wouldDetach: {...} }
@@ -176,7 +176,7 @@ FLAGS
   --force    Overwrite an existing file
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { ok: true, attachmentId, file (absolute path), bytes, fileType }
@@ -215,7 +215,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { attachmentId, origFileName, fileName, fileType, fileSize, fileComment, attachTime, liitaLaskuun, attachmentGroupId, attachmentGroupName, attachmentTypeId, attachmentTypeName, keikkaId?, vehicleId?, personId?, asiakasId?, tyomaaId?, sijaintiId?, tuoteId?, bugReportId?, pumppuRequestId?, pumppuOfferId?, messageId?, entryByPersonId, ownerAsiakasId, imageWidth, imageHeight } & { fileFolder, blobUrl }
@@ -264,7 +264,7 @@ FLAGS
   --limit NUMBER    Max rows (capped at 500) (default: 100)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ attachmentId, origFileName, fileName, fileType, fileSize, fileComment, attachTime, liitaLaskuun, attachmentGroupId, attachmentGroupName, attachmentTypeId, attachmentTypeName, keikkaId?, vehicleId?, personId?, asiakasId?, tyomaaId?, sijaintiId?, tuoteId?, bugReportId?, pumppuRequestId?, pumppuOfferId?, messageId?, entryByPersonId, ownerAsiakasId, imageWidth, imageHeight }>
@@ -325,7 +325,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { ok: true, attachmentId } | { dryRun: true, wouldCreate: {...} }
@@ -365,7 +365,7 @@ FLAGS
   --limit NUMBER    Max rows (capped at 500) (default: 100)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ attachmentId, origFileName, fileName, fileType, fileSize, fileComment, attachTime, liitaLaskuun, attachmentGroupId, attachmentGroupName, attachmentTypeId, attachmentTypeName, keikkaId?, vehicleId?, personId?, asiakasId?, tyomaaId?, sijaintiId?, tuoteId?, bugReportId?, pumppuRequestId?, pumppuOfferId?, messageId?, entryByPersonId, ownerAsiakasId, imageWidth, imageHeight }>
@@ -401,7 +401,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { groups: [{ attachmentGroupId, attachmentGroupName, attachmentGroupDescription, active }], types: [{ attachmentTypeId, attachmentGroupId, attachmentTypeName, attachmentTypeDescription, active }] }
@@ -446,7 +446,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { ok: true, attachmentId } | { dryRun: true, wouldUpdate: { fileComment: {from,to}, liitaLaskuun: {from,to}, ... } }
@@ -504,7 +504,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { ok: true, attachmentId } | { dryRun: true, wouldUpload: {...} }
@@ -545,7 +545,7 @@ FLAGS
   --name STRING    Original file name WITH extension (required)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { uploadUrl, fileFolder, fileName, putHeaders: { 'x-ms-blob-type': 'BlockBlob' }, expiresInSeconds: 3600 }
@@ -584,7 +584,7 @@ FLAGS
   --extend    Extend the active impersonation session by 10 minutes
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   start: { ok:true, impersonating:{ personId, actorPersonId, expiresAt } }. --end: { ok:true, restored:{ personId } }. --extend: { ok:true, expiresAt }.
@@ -623,7 +623,7 @@ FLAGS
   --endpoint URL    API endpoint to authorize against (default: https://api.ibetoni.fi)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   stderr: the authorization URL + 'Waiting for the OAuth callback…' immediately, then 'Logged in as <email> at <company>.'; credentials file written
@@ -655,7 +655,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   no stdout output; exit 0 on success
@@ -680,7 +680,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { ok: true }
@@ -709,7 +709,7 @@ FLAGS
   --to NUMBER    Target asiakasId to switch to
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { ok: true, activeCompany: { asiakasId, name } }
@@ -740,7 +740,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { personId, email?, activeCompany: { asiakasId, name, betoniJerryUmbrella? }, tier: 'developer'|'admin'|'standard', companies: { asiakasId, roles }[], endpoint, source: 'file'|'env', readOnly, tokenExpiresAt?, tokenExpired?, refreshed?, impersonating? } — \`tier\` is the discovery/capability gate; \`companies\` are the \`company switch\` targets (no name in the JWT — use \`ib company list\` for names); \`source:'env'\` = IB_TOKEN (non-refreshable); \`refreshed: true\` = the stored JWT had expired and whoami self-healed the session before reporting.
@@ -778,7 +778,7 @@ FLAGS
   --all    Full flat list of every command (~43 KB at 149 leaves). Default (no args) is the domain index.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   no args: { hint, items:[{ domain, count, description|null, commands:["keikka list", ...] }], nextCursor:null, count } (domain index) | with <domain> / --all / filters: { items: [{ command, description, permissions: string[], isWrite: boolean }], nextCursor: null, count }
@@ -810,7 +810,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { asiakasId, name }
@@ -836,7 +836,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasId, name, current }> = { items, nextCursor, count }
@@ -863,7 +863,7 @@ FLAGS
   --to NUMBER    Target asiakasId to switch to
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { ok: true, activeCompany: { asiakasId, name } }
@@ -895,7 +895,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   (none — always an error envelope)
@@ -941,7 +941,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   flat customer { asiakasId, name, yTunnus, type, address, postalCode, city, email, contactPersonId, shortName, comment } (or wouldCreate on --dry-run; with --get-or-create adds reused:boolean)
@@ -987,7 +987,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { ...flat customer, action: 'created'|'updated' } (action 'updated' also carries changed:boolean|null) · { action: 'would-*', dryRun } on --dry-run
@@ -1016,7 +1016,7 @@ FLAGS
   --limit NUMBER    Max rows (capped at 500). (default: 200)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasId, name, yTunnus, prhStatus:'dead'|'caution', prhSituation, prhCheckedAt }> — dead rows first, then most-recently-checked.
@@ -1058,7 +1058,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { deleted: number } or { dryRun: true, wouldDelete: number }
@@ -1086,7 +1086,7 @@ FLAGS
   --owner NUMBER    ownerAsiakasId to scan (default: active company)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { items: [{ id1, name1, id2, name2, matchCode: 'ytunnus'|'exact_name'|'email'|'name_prefix', matchValue, confidence: 'high'|'low' }], count, truncated? } — truncated=true when capped at 100 pairs
@@ -1125,7 +1125,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { asiakasId, name, yTunnus, type, address, postalCode, city, email, phone, contactPersonId, shortName, comment }
@@ -1161,7 +1161,7 @@ FLAGS
   --sort STRING    Result ordering: name (default) or registered (newest-registered first). Server-side.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasId, name, yTunnus, type, registeredAt }> + truncated:boolean · with --full the items add { address, postalCode, city, email, contactPersonId, shortName, comment, companyDescription } · with --include each item adds contacts:[{personId,name,phone,email,contactPersonTypeId}] and/or sijainnit:[{sijaintiId,name,lyh,address,sijaintiTypeId,maxDeliveryDistance,jerryActiveUntil}] · with --ids the response adds missing:[{asiakasId, reason:'not_owned'|'not_found'}] for requested ids that didn't return
@@ -1206,7 +1206,7 @@ FLAGS
   --limit NUMBER    Max rows (cap 500) (default: 100)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>
@@ -1242,7 +1242,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   real: { success, safetyValidation, timestamp, ... } | dry-run: { dryRun: true, validation: { success, ... } }
@@ -1290,7 +1290,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   report: { asiakasId, roolit:{...}, modules:{...} } | write: { asiakasId, applied:{ set, unset, dryRun }, state:{ roolit, modules } }
@@ -1336,7 +1336,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   verify: { asiakasId, allSet, flags:{ pumppu, jerry, … }, missing:[…] } (exit 1 when allSet=false) | set/reset: { asiakasId, applied:{ set, unset, dryRun }, state }
@@ -1375,7 +1375,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { added: { asiakasId, personId } } or { dryRun: true, wouldCreate: { asiakasId, personId, contactPersonTypeId } }
@@ -1408,7 +1408,7 @@ FLAGS
   --include-roles    Add permissionRoles[] (full per-company role names) to each person — N extra GETs, opt-in
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ personId, name, email, roleTypeId: number|null, permissionRoles?: string[] }>
@@ -1449,7 +1449,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { removed: { asiakasId, personId } } or { dryRun: true, wouldDelete: { asiakasId, personId } }
@@ -1482,7 +1482,7 @@ FLAGS
   --my-companies    Search across every company you belong to (customer/worksite/person)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasId, name, yTunnus, score }>
@@ -1520,7 +1520,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   report: { asiakasId, roolit:{…}, settings:{ HAS_FENNOA:bool, ALV:bool, … every setting } } | write: { asiakasId, applied:{set,unset,dryRun}, state }
@@ -1569,7 +1569,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   flat customer shape + changed:boolean|null (whether anything actually changed vs an idempotent no-op; null = undetermined) · wouldUpdate on --dry-run
@@ -1601,7 +1601,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ tyomaaId, name, address, city }>
@@ -1631,7 +1631,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { conversationId, personId, ownerAsiakasId, messageCount, messages: [{ gptMessageId, keikkaId, role?, content?, raw?, ... }] }
@@ -1668,7 +1668,7 @@ FLAGS
   --person NUMBER    Filter to one person's conversations (personId)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ conversationId, personId, ownerAsiakasId, entryTime, messageCount }> (truncated:true when the page hit --limit)
@@ -1708,7 +1708,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   preview: { dryRun:true, wouldDelete } | execute: { deleted }
@@ -1738,7 +1738,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { items: [{ entityType, params[], cascade?, developerOnly?, example }], count }
@@ -1771,7 +1771,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   preview: { dryRun:true, wouldDelete, patterns[] } | execute: { dryRun:false, deleted }
@@ -1810,7 +1810,7 @@ FLAGS
   --pattern STRING    SCAN match glob (default: *) (default: *)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { totalKeys, groups: [{ prefix, count }] }
@@ -1843,7 +1843,7 @@ FLAGS
   --reason STRING    Audit-log reason (X-Action-Reason)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   preview: { dryRun:true, wouldDelete, pattern } | execute: { deleted, pattern }
@@ -1873,7 +1873,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { connected, totalKeys, hitRate?, usedMemory? }
@@ -1930,7 +1930,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { changelogId } | { dryRun, wouldCreate, validation }
@@ -1984,7 +1984,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { deleted: true } | { dryRun, wouldDelete }
@@ -2024,7 +2024,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   entry
@@ -2064,7 +2064,7 @@ FLAGS
   --limit NUMBER    Max rows
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<entry> | (with --unreleased) { items, entries, maxBumpLevel, count }
@@ -2096,7 +2096,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { entries, maxBumpLevel, count }
@@ -2133,7 +2133,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { released, versionTag } | { released, mode:'map' } | { dryRun, wouldRelease }
@@ -2168,7 +2168,7 @@ FLAGS
   --format STRING    md|json (default: md)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { month, markdown } | { month, rows } | (with --unreleased) { items, entries, maxBumpLevel, count }
@@ -2231,7 +2231,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   entry
@@ -2274,7 +2274,7 @@ FLAGS
   --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — count only this scope
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { total, byStatus: { open, reviewed, applied, dismissed }, byKind, byScope, truncated?, hint? }
@@ -2316,7 +2316,7 @@ FLAGS
   --dry-run    Print the payload without sending (client-side)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
@@ -2366,7 +2366,7 @@ FLAGS
   --full    Accepted for cross-command consistency; get always returns the full row (no-op).
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   The full feedback row { feedbackId, kind, scope, status, description, command, errorText, cliVersion, context, resolution, createdAt, ... }
@@ -2411,7 +2411,7 @@ FLAGS
   --full    Return untruncated description/resolution (default: each capped at 200 chars)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }
@@ -2460,7 +2460,7 @@ FLAGS
   --full    Return the full updated row instead of the compact ack
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   A compact ack { feedbackId, status, updatedAt, resolution } (resolution capped at 200 chars; the full row with --full). A note-only call that leaves the row open/reviewed adds hint naming the closing statuses. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
@@ -2513,7 +2513,7 @@ FLAGS
   --full    Return the full updated row instead of the compact ack
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   A compact ack { feedbackId, scope, kind, severity, complexity, updatedAt, description? } (description capped at 200 chars; the full row with --full). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
@@ -2557,7 +2557,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { outbound:[{ personImpersonationGrantId, granteePersonId, targetPersonId, grantedByPersonId, grantedAt, notes, targetName, targetCompanyName }], inbound:[{ ...granteeName, granteeCompanyName }] }
@@ -2595,7 +2595,7 @@ FLAGS
   --limit NUMBER    Max sessions (capped at 1000) (default: 100)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { items:[{ sessionId, actorPersonId, targetPersonId, reason, ip, userAgent, startTime, extendCount, lastExtendTime, endTime, endReason, durationSeconds, active }], nextCursor, count, truncated } — sorted startTime desc, 90-day window.
@@ -2632,7 +2632,7 @@ FLAGS
   --details    Include slimmed top-items per signal, not just counts
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { generatedAt, needsYou, changelog:{ pending, deployPending, maxBumpLevel }, feedback:{ open, reviewed, byKind:{ open, reviewed } }, support:{ open, truncated }, legal:{ drafts }, glossary:{ misses }, jerry:{ noSupplyLive, noSupplyExpired } } — with --details each signal also carries an \`items\` array (feedback.items splits into { open, reviewed }; each reviewed item also carries { readyToClose, activeVersion, activatedAt }; jerry.items carry an \`expired\` flag).
@@ -2668,7 +2668,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   execute: { cleared:true, environment, message } | --dry-run: { dryRun:true, wouldClear:{ method, path } }
@@ -2703,7 +2703,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { enabled, threshold, sentryThreshold, maxEntries, environment, availableEnvironments:[string] }
@@ -2734,7 +2734,7 @@ FLAGS
   --env STRING    Environment buffer to read (default: backend's current env; discover via \`ib dev perf config\`)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ procedure, durationMs, entity, params, timestamp }> & { totalCount?, environment? } (+truncated:true when the page filled the limit)
@@ -2769,7 +2769,7 @@ FLAGS
   --env STRING    Environment buffer to read (default: backend's current env)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { totalSlowQueries, bufferedQueries, avgDuration, maxDuration, minDuration, topProcedures:[{ name, count, avgMs }], byEntity, since, threshold, sentryThreshold, environment }
@@ -2803,7 +2803,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { tables:[{name,columns}], foreignKeys:[{table,column,refTable,refColumn}], views:[{name}], procs:[{name,type,parameters}] }
@@ -2833,7 +2833,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   single name → { name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)
@@ -2864,7 +2864,7 @@ FLAGS
   --limit NUMBER    Max rows (max 1000) (default: 200)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { items: [{ name, type:'P'|'FN'|'TF'|'IF' }], nextCursor: null, count }
@@ -2895,7 +2895,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], inboundForeignKeys:[{refTable,refColumn,column}], indexes:[{name,columns,unique}] }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false). precision/scale are null for non-numeric types (varchar → maxLength); a DECIMAL(5,2) reports precision 5 / scale 2, an int precision 10 / scale 0.
@@ -2926,7 +2926,7 @@ FLAGS
   --limit NUMBER    Max rows (max 1000) (default: 200)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { items: [{ name, type:'table', columnCount }], nextCursor: null, count }
@@ -2957,7 +2957,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)
@@ -2988,7 +2988,7 @@ FLAGS
   --limit NUMBER    Max rows (max 1000) (default: 200)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { items: [{ name, type:'view', columnCount }], nextCursor: null, count }
@@ -3015,7 +3015,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { ok:boolean, cli, endpoint, readOnly, auth:{ personId, email, tier:'developer'|'admin'|'standard', ownerAsiakasId, ownerAsiakasName, companies:{ asiakasId, roles }[], issuedFor, tokenExp, tokenExpired, impersonating?:{actorPersonId,sessionId} }, connectivity:VersionReport, authProbe:{ ok, status?, error? } } — \`tier\` = capability/discovery gate; \`companies\` = \`company switch\` targets; \`impersonating\` present only when the token acts as another person.
@@ -3045,7 +3045,7 @@ FLAGS
   --refresh    Bypass the server's 15-minute cache
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ id, supplierName, invoiceNumber, dueDate, totalDue, totalGross, paymentStatus, approvalStatus, ... }> & { summary: { count, totalDue, overdueCount, overdueTotal, oldestDueDate }, fetchedAt, asiakasId, months, cached? }
@@ -3086,7 +3086,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { deleted: 0|1 } — rows removed; or { dryRun: true, term, wouldDelete: <entry>|null } with --dry-run
@@ -3123,7 +3123,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { term, dismissed: 1 }; or { dryRun: true, term, wouldDismiss: boolean } with --dry-run
@@ -3158,7 +3158,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { results: [{term, ok, error?}], ok, failed }
@@ -3192,7 +3192,7 @@ FLAGS
   --suggest-related    Also emit stale-related suggestions: specs mentioning a term/synonym/entity but not yet linked (info-level)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ term, issue: 'dead-related'|'near-duplicate'|'empty-definition'|'no-anchor'|'synonym-collision'|'stale-related', detail, severity }>
@@ -3227,7 +3227,7 @@ FLAGS
   --max-confidence NUMBER    Threshold for --needs-review (default 90).
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { items:[{term,synonyms,definition,relatedCommands:[{command,summary}],relatedEntity,domain,lastReviewed,runs,aiConfidence,needsHumanReview}], count, truncated? }
@@ -3263,7 +3263,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   single term: { term, synonyms[], definition, relatedCommands:[{command,summary}], relatedEntity } | batch (a,b,c): ListEnvelope<{ term, found, entry }>
@@ -3294,7 +3294,7 @@ FLAGS
   --top NUMBER    Return up to N
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { items:[{term,count,firstSeen,lastSeen,status}], count, truncated? }
@@ -3338,7 +3338,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { term, synonyms, definition, relatedCommands, relatedEntity, domain, runs }
@@ -3382,7 +3382,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   no arg: { items:[{id,title}], nextCursor:null, count } | with topic: { id, title, body }
@@ -3412,7 +3412,7 @@ FLAGS
   --asiakas NUMBER    Target asiakasId (alias for the positional)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { admins:[{personId,name}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,isJerry}] }
@@ -3450,7 +3450,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: false } }
@@ -3489,7 +3489,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: true } }
@@ -3519,7 +3519,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, sijaintiNonJerryCount, ajoneuvotEnabled, matchableVarikkoCount? }>. matchableVarikkoCount counts varikot that pass the REAL fan-out geofence (enrolled AND coords AND maxDeliveryDistance > 0); sijaintiJerryCount counts enrolment only, so matchableVarikkoCount 0 with sijaintiJerryCount > 0 means the company is Jerry-active but invisible to every tarjouspyyntö.
@@ -3566,7 +3566,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { jerryOnboardingId } · { dryRun: true, wouldCreate: { asiakasId } } on --dry-run
@@ -3597,7 +3597,7 @@ FLAGS
   --search STRING    Case-insensitive substring on asiakasNimi / outreachName / outreachEmail / contactPersonName / contactPersonEmail
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasId, asiakasNimi, tier, status, alue, outreachEmail, jerryActive, lastEventTime, muistutusDue }>
@@ -3636,7 +3636,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { jerryOnboardingEventId } · { dryRun: true, wouldLog: {...} } on --dry-run
@@ -3682,7 +3682,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: true } · { dryRun: true, wouldUpdate: { asiakasId, fields } } on --dry-run
@@ -3719,7 +3719,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: true, status: 'cancelled' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }
@@ -3755,7 +3755,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: true } or { dryRun: true, wouldDelete: { pumppuRequestId } }
@@ -3791,7 +3791,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: true, status: 'expired' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }
@@ -3829,7 +3829,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: true, status, expiresAt } or { dryRun: true, wouldUpdate: { pumppuRequestId, expiresAt } }
@@ -3861,7 +3861,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { pumppuRequestId, status, createdAt, sentAt, expiresAt, totalM3, kayttokohde, customerAsiakasId, customerNimi, operatorName, osoite, offerCount, acceptedPriceCents, bestPriceCents, recipients: [{ asiakasId, asiakasNimi, notifiedAt, viewedAt, declinedAt, declineReason, hasOffer }] }
@@ -3895,7 +3895,7 @@ FLAGS
   --limit NUMBER    Max rows (max 300) (default: 300)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ pumppuRequestId, status, createdAt, customerNimi, operatorName, osoite, totalM3, offerCount, acceptedPriceCents, bestPriceCents }>
@@ -3929,7 +3929,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ pumppuOfferId, providerAsiakasId, providerNimi, providerContactName, priceCents, vatPercent, status, scheduledAt, keikkaId }>
@@ -3965,7 +3965,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: true, status: 'open' | 'no_supply', providerCount, notifiedCount } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }
@@ -3999,7 +3999,7 @@ FLAGS
   --group-by STRING    Bucket by week | month | status (default: week)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { groupBy, from, to, buckets: [{ bucket, total, byStatus: { [status]: count }, offerCount, withOffers }], totals: { total, byStatus, offerCount, withOffers } }
@@ -4042,7 +4042,7 @@ FLAGS
   --search STRING    Search query (alias for the <query> positional)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasId, name }>
@@ -4070,7 +4070,7 @@ FLAGS
   --to STRING    createdAt to (inclusive)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { coverageChecks: { total, deliverable, notDeliverable, notGeocoded }, wizard: { sessions, step1, step2, step3, step4, step5, claimed }, outcomes: { [status]: count } }
@@ -4101,7 +4101,7 @@ FLAGS
   --limit NUMBER    Max rows (max 500) (default: 500)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ label, osoite, formattedAddress, placeId, lat, lng, searchCount, noSupplyCount, notGeocodedCount, deliverableEver, maxProviderCount, nearestVarikkoKm, lastSearchedAt }>
@@ -4137,7 +4137,7 @@ FLAGS
   --asiakas NUMBER    With --explain: force-include this company's varikot even if not yet Jerry-enabled (surfaces company-gate)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { geocoded: boolean, deliverable?: boolean, lat?, lng?, placeId?, formattedAddress?, providerCount?, nearestVarikkoKm?, providers?: [{ asiakasId, asiakasNimi, distanceKm }], considered?: [{ asiakasId, asiakasNimi, sijaintiId, excludedBy: 'company-gate'|'provider-dead'|'no-coords'|'not-enrolled'|'radius'|'boom', detail }], consideredSuppressed?: { [gate]: count } }
@@ -4182,7 +4182,7 @@ FLAGS
   --mine    Customer counts (default)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   --mine: { draft, open, pending_verification, accepted, cancelled, expired, no_supply } | --provider: { avoimet, tarjotut, voitetut, voitetutActionRequired, paattyneet }
@@ -4210,7 +4210,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { summary: { varikkoCount, providerCount, coveredAreas, coveredRegions: string[] }, coveredRegions: string[], areas: { key, listLocative, tailRegion, probeLat, probeLng, covered, providerCount }[], varikot: { asiakasId, asiakasNimi, sijaintiId, sijaintiNimi, lat, lng, maxDeliveryDistanceKm, puomiMin, puomiMax, jerryActiveUntil }[], computedAt } — \`coveredRegions\` (distinct tailRegions of covered areas) is the Google-Ads geo-targeting answer.
@@ -4239,7 +4239,7 @@ FLAGS
   --domain STRING    Sending domain to report on (default: betonijerry.fi)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { domain, days, checkedAt, key:{ readOnly, hasWhitelabel, hasSuppression, hasStats }, domainAuth:{ valid, records:{ mail_cname, dkim1, dkim2 } }, suppressions:{ bounces|blocks|spam_reports|invalid_emails: { count, forDomain, recent[] } }, stats:{ delivered, bounces, spam_reports, bounceRatePct, spamRatePct }, verdict:{ domainAuthValid, deliverabilityFlags[] } }
@@ -4277,7 +4277,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { pumppuRequestId, pumppuOfferId, keikkaId:null, status:'accepted' } · { dryRun:true, wouldAccept:{ pumppuRequestId, pumppuOfferId, status:'accepted' } } on --dry-run
@@ -4316,7 +4316,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { pumppuRequestId, pumppuOfferId, status:'confirmed', keikkaId, scheduledAt } · { dryRun:true, wouldConfirm:{ pumppuRequestId, pumppuOfferId, status:'confirmed', scheduledAt, pumppuId } } on --dry-run
@@ -4372,7 +4372,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { pumppuOfferId, status:'draft', created, messageThreadId } · { dryRun:true, wouldUpsert:{ pumppuRequestId, priceCents, vatPercent, priceTerms, validUntil, availableFrom, extraNotes, cancellationTerms, maintainsOrderInfo } } on --dry-run
@@ -4414,7 +4414,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: true, pumppuOfferId, deleted: true } or { dryRun: true, wouldDelete: { pumppuOfferId, status } }
@@ -4452,7 +4452,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { pumppuOfferId, status:'pending' } · { dryRun:true, wouldUpdate:{ pumppuRequestId, pumppuOfferId, status:'pending' } } on --dry-run
@@ -4490,7 +4490,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: true, status: 'withdrawn' } or { dryRun: true, wouldUpdate: { pumppuOfferId, status } }
@@ -4519,7 +4519,7 @@ FLAGS
   --asiakas NUMBER    Target company asiakasId (default: your own)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, openingHours, companyDescription, maintainsOrderInfo }
@@ -4555,7 +4555,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, openingHours, companyDescription, maintainsOrderInfo, changed } · { dryRun: true, wouldUpdate: {...} } on --dry-run
@@ -4595,7 +4595,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: true, status: 'cancelled' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }
@@ -4639,7 +4639,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { pumppuRequestId, status:'open', asiakasId, personId, tyomaaId, geocoded } · { dryRun:true, wouldCreate:{ asiakasId, osoite, pumppuAika, totalM3, requiredPuomi, pumppuKesto, requiredLinja, notes }, validation:{ ok:true } } on --dry-run
@@ -4685,7 +4685,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: true, declined: true, hasOtherProviders } (or { …, alreadyDeclined: true }) · { dryRun: true, wouldDecline: { pumppuRequestId, reason } } on --dry-run
@@ -4717,7 +4717,7 @@ FLAGS
   --provider    Provider-facing detail view (provider role)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   default: { pumppuRequestId, status, asiakasId, maaraM3, osoite, lat, lng, ... } | --provider: { request:{...}, ownOffer:{...}|null, ownAttachments:[…], requestAttachments:[…], messageThreadId }
@@ -4751,7 +4751,7 @@ FLAGS
   --tab STRING    With --provider: avoimet|tarjotut|voitetut|paattyneet
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ pumppuRequestId, status, createdAt, sentAt?, osoite, formattedAddress, totalM3|maaraM3, ... }> (fields differ between --mine and --open; --open is PII-masked)
@@ -4784,7 +4784,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ pumppuOfferId, status, priceCents, vatPercent, validUntil, asiakasNimi, ytunnus, providerDistanceKm, companyDescription, jerryContactName?, jerryContactPhone?, openingHours? }>
@@ -4820,7 +4820,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: true, undeclined: boolean } · { dryRun: true, wouldUndecline: { pumppuRequestId } } on --dry-run
@@ -4853,7 +4853,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { keikkaId, ...echoed fields } (raw backend response)
@@ -4890,7 +4890,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { ok: true, driver:{personId,name} } (raw backend response)
@@ -4922,7 +4922,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { keikkaId, ownerAsiakasId, pvm, time, customer:{asiakasId,name}|null, worksite:{tyomaaId,address}|null, vehicle:{vehicleId,plate}|null, driver:{personId,name}|null, m3, status }
@@ -4954,7 +4954,7 @@ FLAGS
   --lookback NUMBER    How far back from today to search, in days (max 3650) (default: 365)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { item: { keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time } | null, searched: { from, to } }
@@ -5000,7 +5000,7 @@ FLAGS
   --cursor STRING    Pagination cursor
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }> & { range: { from, to } } (the interpreted date window, echoed so an empty result is verifiably scoped). On an empty result the envelope also carries a \`hint\` explaining the count:0 (permitted-but-empty vs how to widen).
@@ -5044,7 +5044,7 @@ FLAGS
   --field STRING    Filter by fieldName (e.g. kuskit, laskuMemo, keikkaTilaId)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>
@@ -5079,7 +5079,7 @@ FLAGS
   --limit NUMBER    Max hits (client-side; backend caps at 100)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ keikkaId, title, pumppuAika, customerName, worksiteName, address, contactPerson, contactPhone }>
@@ -5118,7 +5118,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { ok: true } or backend response
@@ -5155,7 +5155,7 @@ FLAGS
   --date DATE    Validate every keikka for this date (YYYY-MM-DD or today/yesterday/tomorrow)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   single: { keikkaId, isValid, validationEnabled, summary:{totalIssues,critical,high,medium,low,notification,categories}, issues:[{type,message,priority,priorityName,category,categoryName,field}] } | day: { items:[{ keikkaId, isValid, summary, issues }], count, dayTotals:{totalIssues,critical,invalidKeikkas}, validationEnabled }
@@ -5199,7 +5199,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   {success} | dry-run: {dryRun: true, wouldAccept: {...}, validation}
@@ -5239,7 +5239,7 @@ FLAGS
   --limit NUMBER    Max rows (cap 500) (default: 500)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{personId, firstName, lastName, email, acceptedVersion, acceptedAt}> & {typeName, personSettingTypeId, truncated?}
@@ -5280,7 +5280,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   {success} | dry-run: {dryRun: true, wouldActivate: {documentId}, validation}
@@ -5311,7 +5311,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{typeName, displayName, personSettingTypeId, hasActive, documentId, version, title, effectiveDate, contentLength}>
@@ -5352,7 +5352,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   {success} | dry-run: {dryRun: true, wouldDelete: {documentId}, validation}
@@ -5388,7 +5388,7 @@ FLAGS
   --owner NUMBER    ownerAsiakasId scope for --type resolution (1349 = BetoniJerry); only valid with --type
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   {a: {documentId, typeName, version, status, contentLength}, b: {...}, sameContent, addedLines, removedLines, unified}
@@ -5421,7 +5421,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{documentId, typeName, version, title, status, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>
@@ -5453,7 +5453,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   {documentId, documentTypeId, typeName, version, title, status, markdownContent, isActive, ...}
@@ -5508,7 +5508,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   {documentId, success} | dry-run: {dryRun: true, wouldCreate: {...}, validation} | edit dry-run: {dryRun:true, type, field:"markdownContent", matchCount?, addedLines, removedLines, sameContent, unified}
@@ -5549,7 +5549,7 @@ FLAGS
   --meta    Omit markdownContent (returns contentLength instead)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   {documentId, typeName, version, title, effectiveDate, markdownContent | contentLength, ...}
@@ -5584,7 +5584,7 @@ FLAGS
   --owner NUMBER    ownerAsiakasId scope (default: your company from the token)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   {personId, ownerAsiakasId, requiresAcceptance, accepted: [{typeName, acceptedVersion, acceptedDate, ...}], missing: [...]}
@@ -5624,7 +5624,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   the created legalDocumentTypes row | dry-run: {dryRun: true, wouldCreateType: {...}, validation}
@@ -5671,7 +5671,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   the updated legalDocumentTypes row | dry-run: {dryRun: true, wouldUpdateType: {typeName, fields}, validation}
@@ -5708,7 +5708,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{documentTypeId, typeName, displayName, description, sortOrder, personSettingTypeId}>
@@ -5741,7 +5741,7 @@ FLAGS
   --status STRING    Filter by lifecycle status: draft|active|archived|deleted
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{documentId, version, title, status, isActive, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>
@@ -5777,7 +5777,7 @@ FLAGS
   --limit NUMBER    Max rows kept client-side (cap 2000) (default: 200)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personName, at, description, keikkaTilaContext, deviceType, palkkiText, palkkiVehicleRegNo, reason, impersonatedByPersonName }>
@@ -5814,7 +5814,7 @@ FLAGS
   --field STRING    Filter by changeTracker fieldName (client-side)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>
@@ -5853,7 +5853,7 @@ FLAGS
   --limit NUMBER    Max rows (server cap 500) (default: 100)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>
@@ -5890,7 +5890,7 @@ FLAGS
   --limit NUMBER    Max rows kept client-side (cap 2000) (default: 200)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }> (+truncated when --limit cut rows)
@@ -5923,7 +5923,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ entityType, entityIdMeaning, gate: 'member'|'admin', notes, deprecated? }>
@@ -5952,7 +5952,7 @@ FLAGS
   --limit NUMBER    Max rows (cap 500) (default: 100)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, at, description, deviceType, entityDisplayName, reason, impersonatedByPersonName }>
@@ -5980,7 +5980,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ messageId, ownerAsiakasId, title, body, priority, startDate, expiresAt, createdAt, updatedAt, createdBy }>
@@ -6021,7 +6021,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { messageId, ownerAsiakasId, title, body, priority, startDate, expiresAt, createdAt, updatedAt, createdBy } · { dryRun: true, proposed: {...} } on --dry-run
@@ -6063,7 +6063,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   204 no content · { dryRun: true, messageId, wouldDelete: {...} } on --dry-run
@@ -6098,7 +6098,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { messageId, ownerAsiakasId, title, body, priority, startDate, expiresAt, createdAt, updatedAt, createdBy }
@@ -6128,7 +6128,7 @@ FLAGS
   --date DATE    Day to query: today | yesterday | tomorrow | YYYYMMDD (default today)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ messageId, ownerAsiakasId, title, body, priority, startDate, expiresAt, createdAt, updatedAt, createdBy }>
@@ -6177,7 +6177,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { messageId, ownerAsiakasId, title, body, priority, startDate, expiresAt, createdAt, updatedAt, createdBy } · { dryRun: true, messageId, current, proposed } on --dry-run
@@ -6221,7 +6221,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { messageId, threadId, deleted:true } (+ alreadyDeleted:true if already gone) · { dryRun:true, threadId, wouldDelete:{ messageId, body, senderPersonId } } on --dry-run
@@ -6270,7 +6270,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { messageId, threadId, senderPersonId, body, editedAt, ... } (enriched row) · { messageId, threadId, unchanged:true } on no-op · { dryRun:true, threadId, wouldEdit:{ messageId, from, to } } on --dry-run
@@ -6315,7 +6315,7 @@ FLAGS
   --deleted    Include soft-deleted messages (your own; all for developers)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ messageId, threadId, senderPersonId, senderAsiakasId, kind, body, source, sourceNote, createdAt, editedAt, isDeleted, personFirstName, personLastName, senderAsiakasNimi }>
@@ -6355,7 +6355,7 @@ FLAGS
   --tarjous NUMBER    Resolve the thread from this pumppuRequestId
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { lastReadAt }
@@ -6398,7 +6398,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { messageId, threadId, restored:true } (+ alreadyActive:true if not deleted) · { dryRun:true, threadId, wouldRestore:{ messageId } } on --dry-run
@@ -6439,7 +6439,7 @@ FLAGS
   --limit NUMBER    Max results (server max 200) (default: 50)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ messageId, threadId, contextType, contextId, senderPersonId, body, createdAt, personFirstName, personLastName }>
@@ -6485,7 +6485,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { messageId, threadId, senderPersonId, senderAsiakasId, kind, body, source, sourceNote, createdAt } · { dryRun:true, threadId, wouldSend:{ body, source, sourceNote, recipients:[{ personId, name, role }] } } on --dry-run
@@ -6527,7 +6527,7 @@ FLAGS
   --tarjous NUMBER    Resolve the thread from this pumppuRequestId
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { thread: { threadId, contextType, contextId, ownerAsiakasId, createdAt, lastMessageAt, archivedAt }, participants: [{ participantId, personId, asiakasId, role, joinedAt, lastReadAt, leftAt, personFirstName, personLastName, asiakasNimi }] }
@@ -6563,7 +6563,7 @@ FLAGS
   --tarjous NUMBER    Only threads for this pumppuRequestId
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ threadId, contextType, contextId, ownerAsiakasId, createdAt, lastMessageAt, lastReadAt, unreadCount, lastMessageBody }>
@@ -6610,7 +6610,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success, boxId?, created? }
@@ -6649,7 +6649,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success, ... }
@@ -6681,7 +6681,7 @@ FLAGS
   --date DATE    Date for the message (YYYYMMDD | YYYY-MM-DD | today)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { box: { boxId, boxTitle, boxLisatieto?, ownerAsiakasId, dailyMessageBoxAsiakasId }, message: {...}|null, permissions: {...}[] }
@@ -6719,7 +6719,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success, dailyMessageBoxAsiakasPermissionsId? }
@@ -6754,7 +6754,7 @@ FLAGS
   --date DATE    Date for messages: YYYYMMDD | YYYY-MM-DD | today/yesterday/tomorrow
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { boxes: { boxId, boxTitle, boxLisatieto?, ownerAsiakasId, dailyMessageBoxAsiakasId }[], messages: {...}[], boxPermissions: {...}[] }
@@ -6797,7 +6797,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success, ... }
@@ -6832,7 +6832,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success, ... }
@@ -6868,7 +6868,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success, ... }
@@ -6906,7 +6906,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success, ... }
@@ -6948,7 +6948,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success, dailyMessageBoxAsiakasId? }
@@ -6986,7 +6986,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success, ... }
@@ -7016,7 +7016,7 @@ FLAGS
   --dry-run    Print the payload without sending (client-side)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { threadId, message } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
@@ -7052,7 +7052,7 @@ FLAGS
   --limit NUMBER    Max rows
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { items: SupportThreadRow[], nextCursor: null, count, truncated }
@@ -7087,7 +7087,7 @@ FLAGS
   --limit NUMBER    Max rows
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { items: SupportThreadRow[], nextCursor: null, count, truncated }
@@ -7126,7 +7126,7 @@ FLAGS
   --dry-run    Print the update body without sending (client-side)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { threadId, status } on success. With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
@@ -7167,7 +7167,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { threadId, archived:true } (+ alreadyArchived:true if already archived)
@@ -7216,7 +7216,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { threadId, personId, role, added:true }
@@ -7266,7 +7266,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { threadId, personId, removed:true|false } (removed:false when the participant was already gone)
@@ -7313,7 +7313,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { threadId, title } (title is null when cleared)
@@ -7360,7 +7360,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { threadId, archived:false } (+ alreadyOpen:true if already open)
@@ -7410,7 +7410,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { sent:true, to, from, subject } | { dryRun:true, wouldSend:{ to, from, subject, hasHtml } } (with --dry-run)
@@ -7461,7 +7461,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success, reason:'SENT'|'NO_DEVICES'|'DELIVERY_FAILED', personId, name, devicesTargeted, messageUuid?, successCount?, failureCount?, hint? } | { dryRun:true, wouldSend:{ personId, name, title, body, deviceCount } } (with --dry-run)
@@ -7507,7 +7507,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: true, helpId, deleted: boolean } — deleted is false when no row existed (idempotent); or { dryRun: true, helpId, wouldDelete: {helpId,title,shorttext,htmltext,img}|null } with --dry-run
@@ -7542,7 +7542,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { helpId, title, shorttext, htmltext, img } | null
@@ -7574,7 +7574,7 @@ FLAGS
   --max-confidence NUMBER    Threshold for --needs-review (default 90).
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ helpId, title, shorttext, htmltext, img, accessCount, aiConfidence, needsHumanReview, … }> (rows projected to --fields when set)
@@ -7622,7 +7622,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: true, helpId, created, written: {helpId,title,shorttext,htmltext,img, aiConfidence?, needsHumanReview?}, htmltextLength, response } — \`created\` is true when no prior row existed (a parallel groomer can spot an unexpected insert); aiConfidence/needsHumanReview present in \`written\` only when those flags were passed; or { dryRun: true, helpId, created, current, proposed } | edit dry-run: {dryRun:true, helpId, field, matchCount?, addedLines, removedLines, sameContent, unified}
@@ -7661,7 +7661,7 @@ FLAGS
   --city STRING    Helsinki | Vantaa | Espoo | HSY | Ryhti (override; otherwise derived/auto-tried then national Ryhti fallback)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { source:'sijainti'|'worksite'|'address'|'coords', input, coords:{lat,lng}, city|null, requestedCity|null, derivedCity|null, found:boolean, outOfArea:boolean, national:boolean, building:{ buildingId, nationalBuildingId, buildingType, floors, totalArea, completionYear, facadeMaterial, … common schema }|null }
@@ -7710,7 +7710,7 @@ FLAGS
   --with-buildings    Also count buildings on the parcel via national Ryhti (permit-based, best-effort); adds buildingCount + buildings to the parcel
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { source:'kiinteistotunnus'|'sijainti'|'worksite'|'address'|'coords', input, coords:{lat,lng}|null, found:boolean, parcel:{ source:'MML', kiinteistotunnus, kiinteistotunnusFormatted, municipalityNumber, parcelCount, totalAreaM2, palstat:[{ palstaId, kiinteistotunnus, kiinteistotunnusFormatted, areaM2, representativePoint:{lat,lng}|null, geometry }], buildingCount?, buildings?:[{ nationalBuildingId, usagePurpose, completionYear, status }] (only with --with-buildings) } }
@@ -7756,7 +7756,7 @@ FLAGS
   --page NUMBER    Result page for --search (default: 1)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   by-id: { businessId, name, tradeNames, address:{street,postCode,city,full}, companyForm, status } | search: ListEnvelope<{ businessId, name, city }>
@@ -7789,7 +7789,7 @@ FLAGS
   --time STRING    Forecast time (ISO 8601 or 'now')
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }
@@ -7820,7 +7820,7 @@ FLAGS
   --date STRING    Date (YYYY-MM-DD, or today/tomorrow/yesterday)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { date, minTemp, maxTemp, avgTemp, windSpeed, precipitation, weatherSymbol, source, coordinates }
@@ -7851,7 +7851,7 @@ FLAGS
   --time STRING    Forecast time, ISO 8601 or 'now'
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }
@@ -7883,7 +7883,7 @@ FLAGS
   --force-refresh    Bypass the cache and refetch from FMI
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }
@@ -7919,7 +7919,7 @@ FLAGS
   --keikka NUMBER    Keikka id (optional, for backend error correlation only)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { hourly: [{ time, temperature, windSpeed, precipitation, weatherSymbol }], summary, coordinates }
@@ -7951,7 +7951,7 @@ FLAGS
   --time STRING    Forecast time (ISO 8601 or 'now'; default now)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }
@@ -7980,7 +7980,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { enabled: boolean, ... }
@@ -8012,7 +8012,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: boolean, enabled: boolean, ... }
@@ -8044,7 +8044,7 @@ FLAGS
   --force-refresh    Bypass the cache and refetch from FMI
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }
@@ -8076,7 +8076,7 @@ FLAGS
   --person NUMBER    Filter to one personId
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ personId, name, date, status, statusName }>
@@ -8114,7 +8114,7 @@ FLAGS
   --limit NUMBER    Max rows per list (capped at 1000) (default: 100)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { personId, email, lastLoginTime, logins:[{entryTime}], securityEvents:[{eventType,method,source,ip,timestamp}], impersonations:{ asTarget:[{actorPersonId,entryTime,type,sessionId,endReason?}], asActor:[{targetPersonId,entryTime,type,sessionId,endReason?}] } }
@@ -8154,7 +8154,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasId, name }>
@@ -8196,7 +8196,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { personId, name, email, ... } (re-fetched) · with --get-or-create adds reused:boolean · dry-run: { dryRun: true, wouldCreate: ... }
@@ -8238,7 +8238,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   delete result | { dryRun:true, wouldDelete:{ personPvmId, date, status } | null } (with --dry-run)
@@ -8278,7 +8278,7 @@ FLAGS
   --to DATE    End date YYYY-MM-DD (default: --from)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ personPvmId, date, statusId, status, pois, vehicleId, text }>
@@ -8321,7 +8321,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   personPvm save result | { dryRun:true, personId, date, wouldChange:{ status?, text? } } (with --dry-run)
@@ -8360,7 +8360,7 @@ FLAGS
   --full    Include prefix/style/description/active/ownerAsiakasId
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ statusId, code, name, pois, vakioVapaa }>; with --full also { description, prefix, style, active, ownerAsiakasId }
@@ -8403,7 +8403,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { deleted: number } or { dryRun: true, wouldDelete: { personId } }
@@ -8431,7 +8431,7 @@ FLAGS
   --owner NUMBER    ownerAsiakasId to scan (default: active company)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { items: [{ id1, name1, id2, name2, matchCode: 'phone'|'email'|'full_name', matchValue, confidence: 'high'|'medium' }], count, truncated? } — truncated=true when capped at 100 pairs
@@ -8476,7 +8476,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { personId, personEmail, added: boolean } · dry-run: { dryRun:true, wouldAdd:{ personId, personEmail } }
@@ -8510,7 +8510,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ email, main: 0|1 }> (main:1 = primary, main:0 = alternative)
@@ -8548,7 +8548,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   backend delete result · dry-run: { dryRun:true, wouldDelete:{ personId, personEmail } }
@@ -8586,7 +8586,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { personId, personEmail, main:true, changed:boolean } · dry-run: { dryRun:true, wouldSetMain:{ personId, personEmail } }
@@ -8622,7 +8622,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { personId, name, email, phone, roles:number[] }
@@ -8653,7 +8653,7 @@ FLAGS
   --limit NUMBER    Max rows (capped at 500) (default: 100)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ personId, name, email, roles:number[] }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
@@ -8694,7 +8694,7 @@ FLAGS
   --field STRING    Filter by changeTracker fieldName (e.g. asiakasPersonSetting for role changes)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>
@@ -8723,7 +8723,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { personId, name, email, phone, activeCompany:{asiakasId,name}, tier:'developer'|'admin'|'standard', roles:[{roleTypeId,role}], companies:[{asiakasId,name,current}], impersonating?:{actorPersonId,sessionId} } — \`tier\` is the capability/discovery gate (the MCP-reachable equivalent of \`auth whoami\`'s tier); \`impersonating\` present only when acting as another person.
@@ -8757,7 +8757,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   real: { success, safetyValidation, timestamp, ... } | dry-run: { dryRun: true, validation: { success, ... } }
@@ -8805,7 +8805,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   Same as \`ib notification fcm send\` (delegates to it).
@@ -8851,7 +8851,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { personId, ownerAsiakasId } or { dryRun: true, wouldSetOwner: { personId, from, to } }
@@ -8883,7 +8883,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { role, typeId, displayName: string|null, description: string|null, comment: string|null, tiers: string[], deprecated: boolean }
@@ -8923,7 +8923,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { granted: { personId, asiakasId, roleTypeId } } | { dryRun:true, wouldCreate:{ personId, asiakasId, personSettingTypeId, personSettingString }, validation }
@@ -8955,7 +8955,7 @@ FLAGS
   --asiakas NUMBER    Target asiakasId (REQUIRED)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ asiakasPersonSettingId, roleTypeId, role: string|null }>
@@ -8991,7 +8991,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { removed: 1 } | { removed: 0 } (absent) | { dryRun:true, wouldDelete:{ asiakasPersonSettingId }, validation }
@@ -9026,7 +9026,7 @@ FLAGS
   --all-companies    Search EVERY tenant, no owner filter (developer/sysadmin only); each hit carries its asiakasId/asiakasName
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ personId, name, email, phone, asiakasId }>. With --my-companies / --all-companies each row also carries asiakasName, and the envelope gains truncated:true when the result hit the limit (backend ≥ 2026-06-11).
@@ -9077,7 +9077,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { ok: true, updated: { personId } } or { dryRun: true, wouldUpdate: { personId, ... } }
@@ -9122,7 +9122,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { deleted } (rows removed, 0 or 1 — idempotent) | --dry-run: { dryRun:true, wouldDelete:{ command, exists }, validation }
@@ -9152,7 +9152,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { command, summary, detail, hint }. exit 5 when unknown or no detail yet.
@@ -9179,7 +9179,7 @@ FLAGS
   --strict    Exit 1 if any orphan row exists (for CI)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { items: [{ command, severity:'warn', kind:'orphan', summary, hint }], count } — one finding per catalog key with no live command
@@ -9218,7 +9218,7 @@ FLAGS
   --orphans    Only ORPHAN rows: keys whose command no longer exists in the live catalogue (re-homed/renamed leftovers). Same set as \`reference detail lint\`, but streamed as normal list rows so you can pipe → \`delete\`. Compose with --search to narrow.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { items: [{ command, summary, lastReviewed, runs, aiConfidence, needsHumanReview, detail? }], count } — \`detail\` present only with --with-detail. --search/--orphans filter client-side and recompute count.
@@ -9272,7 +9272,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { command, runs, … } (backend response) | plain --dry-run: {dryRun:true, wouldSave:{command, exists, writes:{summaryChars?, detailChars?}, aiConfidence, needsHumanReview}, validation} | edit-mode --dry-run: {dryRun:true, command, field, matchCount?, addedLines, removedLines, sameContent, unified}
@@ -9310,7 +9310,7 @@ FLAGS
   --lean    Drop each command's \`notes\`/\`seeAlso\` prose (KEEPS \`examples\`) — ~7.6k fewer tokens on the full surface. For a whole-surface scan you get what exists + how to call it; fetch the dropped caveats/cross-refs per-command via \`ib <command> --help\`. Composes with --commands-only and domain filters.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { version, generatedAt, commonErrors: CommandError[], notice?, overview, glossary, feedbackGuidance, topics, commands: { '<command>': CommandSpec } } — with --commands-only: { version, generatedAt, commonErrors, commands }; with --lean each spec drops notes/seeAlso (examples kept). \`commonErrors\` (401/500) applies to EVERY command and is omitted from each spec's \`errors\`. \`notice\` appears only on the full (no-domain) dump. \`glossary\` is the term+synonyms INDEX only and is EMPTY unless \`--glossary\` is passed; fetch a definition with \`ib glossary lookup <term>\` or all of them with \`ib glossary list\`.
@@ -9343,7 +9343,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }>
@@ -9371,7 +9371,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }>
@@ -9403,7 +9403,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ keikkaId, pvm, asiakasId, tyomaaId, vehicleId, tila, m3, time }>
@@ -9437,7 +9437,7 @@ FLAGS
   --my-companies    Search across every company you belong to (customer/worksite/person)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { items: [{ entity, id, label, detail, <nativeIdField> }], nextCursor: null, count, errors: [{ entity, message }] }
@@ -9476,7 +9476,7 @@ FLAGS
   --asiakas NUMBER    Owner asiakasId (defaults to active company)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { closestSijainti: {...}|null, closestDistance: number|null }
@@ -9524,7 +9524,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { sijaintiId, success, lat?, lng?, coordsPersisted? } — lat/lng/coordsPersisted present when coordinates were given (coordsPersisted:false on --dry-run)
@@ -9560,7 +9560,7 @@ FLAGS
   --address STRING    Street address to resolve the point from, instead of sijaintiId (mutually exclusive)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { point:{lat,lng}|null, address:string|null, weather, building, parcel, cameras, sijainti, deliveries, vehicles } — each section is { status:'ok'|'empty'|'forbidden'|'error', data?, error? }; a forbidden/error section never fails the whole command
@@ -9604,7 +9604,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: true }
@@ -9633,7 +9633,7 @@ FLAGS
   --to STRING    Destination: 'lat,lng' or a sijaintiId (REQUIRED)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { matkaM: number|null, matkaMin: number|null, from:{lat,lng}, to:{lat,lng} }
@@ -9662,7 +9662,7 @@ FLAGS
   --address STRING    Free-form address (REQUIRED)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { geocoded:boolean, lat|null, lng|null, placeId|null, formattedAddress|null, status, results[] }
@@ -9699,7 +9699,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { sijaintiId, name, address, coords:{lat,lng}, type, jerryActiveUntil, ... } (raw row)
@@ -9735,7 +9735,7 @@ FLAGS
   --jerry    BetoniJerry audit lens: only Jerry-enrolled varikot (jerryActiveUntil set; expired included), each stamped with a derived \`matchable\` boolean
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil, maxDeliveryDistance }> (+matchable:boolean on each row when --jerry is set; +truncated:true when the result hit the limit; +hint pointing at --all / --all --asiakas <id> when 0 rows came back without --all)
@@ -9783,7 +9783,7 @@ FLAGS
   --limit NUMBER    Max rows (capped at 500) (default: 100)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil }> (+truncated:true when the result hit the limit)
@@ -9835,7 +9835,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { ok: true, ... } (raw backend response) or { dryRun: true, wouldUpdate: {...} }
@@ -9874,7 +9874,7 @@ FLAGS
   --jerry    Use the BetoniJerry type set (useJerry=1)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ sijaintiTypeId, selite }>
@@ -9910,7 +9910,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: true }
@@ -9954,7 +9954,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { ok: true, ..., lat?, lng?, coordsPersisted?, geocodeFailed? } — lat/lng/coordsPersisted present when coordinates were supplied or geocoded; geocodeFailed when the automatic address-change geocode found no match (update still ran, coords now NULL)
@@ -9993,7 +9993,7 @@ FLAGS
   --all    All tenants (requires developer/system-admin access; 403 otherwise)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   No --by: { period, totals:{orders,m3,activeVehicles,activeDrivers}, byStatus, byCustomer, byVehicle, byDriver, byWorksite, byDay }. With --by: ListEnvelope of that one breakdown.
@@ -10042,7 +10042,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { taskId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldWrite:{...} } (server-side preview).
@@ -10082,7 +10082,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { logId, task } (task = the updated row; nextDueAt advanced unless --failed). With --dry-run: { dryRun:true, wouldComplete:{ taskId, outcome, advancesNextDue } }.
@@ -10115,7 +10115,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   The full task row { taskId, title, instructions, skillRef, executor, recommendedAgent, assigneePersonId, asiakasId, cadenceUnit, cadenceCount, nextDueAt, lastDoneAt, active, feedbackId, createdAt, updatedAt, ... }
@@ -10152,7 +10152,7 @@ FLAGS
   --offset NUMBER    Pagination offset (default: 0)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { items: TaskRow[], nextCursor: null, count, truncated? } — TaskRow = { taskId, title, instructions, skillRef, executor, recommendedAgent, assigneePersonId, asiakasId, cadenceUnit, cadenceCount, nextDueAt, lastDoneAt, active, feedbackId, ... }
@@ -10186,7 +10186,7 @@ FLAGS
   --limit NUMBER    Max rows (cap 200) (default: 50)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { items: LogRow[], nextCursor: null, count, truncated? } — LogRow = { logId, taskId, doneAt, donePersonId, agent, outcome, notes }
@@ -10235,7 +10235,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   The full updated task row. With --dry-run: { dryRun:true, wouldWrite:{...} } (server-side preview).
@@ -10271,7 +10271,7 @@ FLAGS
   --keikka NUMBER    Validate this keikka against the reminders-drawer rules (alias of \`ib keikka validate <id>\`)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   list: ListEnvelope<{ id, titleFi, description, entity:'company'|'person' }>. company: { entity:'company', profile, asiakasId, asiakasNimi, ok, summary, checks[] }. person: { entity:'person', profile, asiakasId, asiakasNimi, personId, personNimi, ok, summary, checks:[{ id, severity, status:'pass'|'fail'|'skip', titleFi, detail? }] }.
@@ -10326,7 +10326,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { vehicleId, ... } (raw backend save response) | { dryRun, wouldCreate }
@@ -10357,7 +10357,7 @@ FLAGS
   --days NUMBER    Days-ahead window (default: 30)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleDateId, vehicleId, typeName, dateValue, expirationDate, daysUntil, urgency }>
@@ -10388,7 +10388,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleDateId, typeId, typeName, dateValue, expirationDate, dismissedUntil, quantity, status, daysUntil }>
@@ -10425,7 +10425,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success, vehicleId, date, personId, oldPersonId, oldDriverName, newDriverName, clearedFromVehicleId, keikkaIds, palkkiIds } | { dryRun:true, vehicleId, date, personId, oldPersonId, keikkaIds, palkkiIds, wouldClearFromVehicleId } (with --dry-run)
@@ -10468,7 +10468,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ personId, firstName, lastName, phone }>
@@ -10507,7 +10507,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleId, plate, name, type, typeName, driverPersonId, driverName, hasDriver, needsDriver, keikkaCount, m3 }>
@@ -10553,7 +10553,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success, vehicleId, date, personId:null, oldPersonId, oldDriverName, newDriverName:null, clearedFromVehicleId:null, keikkaIds, palkkiIds } | { dryRun:true, ... } (with --dry-run)
@@ -10596,7 +10596,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success, vehicleId, defaultDriverPersonId:null, cascade: { futureKeikkaIds, futureKeikkaCount, personPvmDaysUpdated } } | { dryRun:true, wouldUpdate } (with --dry-run)
@@ -10634,7 +10634,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { vehicleId, defaultDriverPersonId }
@@ -10676,7 +10676,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success, vehicleId, defaultDriverPersonId, cascade: { futureKeikkaIds, futureKeikkaCount, personPvmDaysUpdated } } | { dryRun:true, wouldUpdate } (with --dry-run)
@@ -10717,7 +10717,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleId, plate, name, type, typeName, driverPersonId, driverName, hasDriver, needsDriver, keikkaCount, m3 }>
@@ -10756,7 +10756,7 @@ FLAGS
   --to DATE    End date YYYY-MM-DD (or today/yesterday/tomorrow) (required)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ date, personId, firstName, lastName, name }>
@@ -10795,7 +10795,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { vehicleId, date, driver: { personId, firstName, lastName, phone } | null }
@@ -10832,7 +10832,7 @@ FLAGS
   --asiakas NUMBER    Read a vehicle owned by this company (cross-tenant). Requires sysadmin/developer or a vehicle-manage role on that tenant; default = active company.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { vehicleId, vehicleNo, name, plate, type, typeName, boomLength, capacity, sortNo, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, memo, billingProductId, asiakasId, defaultDriverId, showInGrid:boolean, showInReports:boolean, useNoDriverBar:boolean, isRestricted:boolean, hasGpsTracking:boolean }
@@ -10869,7 +10869,7 @@ FLAGS
   --cursor STRING    Pagination cursor (from a previous page's nextCursor)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
@@ -10905,7 +10905,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleId|null, matched, plate, objectName, lat, lng, speed, direction, engineState, address, at, ageMinutes|null, stale }> & { gpsAvailable, staleAfterMinutes }
@@ -10944,7 +10944,7 @@ FLAGS
   --field STRING    Filter by fieldName (e.g. vehicleRegNo)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }>
@@ -10978,7 +10978,7 @@ FLAGS
   --date DATE    Day (YYYY-MM-DD or today/yesterday/tomorrow); Europe/Helsinki (default: today)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ lat, lng }> & { gpsAvailable }
@@ -11012,7 +11012,7 @@ FLAGS
   --asiakas NUMBER    Search another company's fleet (cross-tenant). Requires sysadmin/developer or a vehicle-manage role on that tenant; default = active company.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
@@ -11046,7 +11046,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { vehicleId, plate, currentDriver:{personId,name}|null, currentKeikka:{keikkaId,tila}|null, lastGpsPing:{lat,lng,speed,direction,engineState,address,at,ageMinutes,stale}|null, gpsAvailable, staleAfterMinutes }
@@ -11086,7 +11086,7 @@ FLAGS
   --date DATE    Day (YYYY-MM-DD or today/yesterday/tomorrow); Europe/Helsinki (default: today)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ type, locationType?, locationId?, locationName?, locationAddress?, sijaintiTypeName?, asiakasNimi?, arrived, departed, durationMin, distanceKm? }> & { gpsAvailable }
@@ -11115,7 +11115,7 @@ FLAGS
   --asiakas NUMBER    List another company's vehicle types (cross-tenant). Requires sysadmin/developer or a vehicle-manage role on that tenant; default = active company.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleTypeId, name }>
@@ -11164,7 +11164,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   On write: the saved vehicle record. With --dry-run: { dryRun: true, vehicleId, wouldChange: { field: { from, to } } } — the field-level diff, computed client-side without POSTing (the save route ignores X-Dry-Run, so the preview cannot persist).
@@ -11200,7 +11200,7 @@ FLAGS
   --date DATE    Only visits on this day (YYYY-MM-DD or today/yesterday/tomorrow; Europe/Helsinki). Filtered client-side; auto-bounds the look-back when --days is omitted
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ vehicleId, plate, objectName, arrived, departed, durationMin }> & { gpsAvailable }
@@ -11238,7 +11238,7 @@ FLAGS
   --endpoint URL    Which deployment to query (global flag) (default: active profile, else https://api.ibetoni.fi)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { cli, endpoint, reachable, server: { app, version, commit, release, slot } | null, error? }
@@ -11270,7 +11270,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { tyomaaId, ... } (raw backend response)
@@ -11301,7 +11301,7 @@ FLAGS
   --address STRING    Street address to resolve the point from, instead of tyomaaId (mutually exclusive)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { point:{lat,lng}|null, address:string|null, weather, building, parcel, cameras, sijainti, deliveries, vehicles } — each section is { status:'ok'|'empty'|'forbidden'|'error', data?, error? }; a forbidden/error section never fails the whole command
@@ -11336,7 +11336,7 @@ FLAGS
   --days NUMBER    Look-ahead window (days) (default: 30)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ tyomaaDateId, tyomaaId, tyomaaName, typeName, expirationDate, daysUntil, urgency }>
@@ -11366,7 +11366,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ tyomaaDateId, typeId, typeName, date, expirationDate, daysUntil, status, quantity }>
@@ -11402,7 +11402,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { deleted: number } or { dryRun: true, wouldDelete: { tyomaaId } }
@@ -11430,7 +11430,7 @@ FLAGS
   --owner NUMBER    ownerAsiakasId to scan (default: active company)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { items: [{ id1, name1, id2, name2, matchCode: 'tyomaa_strict'|'tyomaa_anonymous', matchValue, confidence: 'high'|'medium' }], count, truncated? } — truncated=true when capped at 100 pairs
@@ -11470,7 +11470,7 @@ FLAGS
   --include-cameras    Attach nearby traffic cameras as cameras[] (heavy; default off)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { tyomaaId, name, tyomaaNum, address, address2, postalCode, city, formattedAddress, coords:{lat,lng}|null, drivingInstructions, comment, invoiceRef, contactPersonId, geofenceRadius, asiakasId, asiakasNimi, ownerAsiakasId, createdTime, modifiedTime, cameraCount, hasBuildingData } (+ rakennusData with --include-building, + cameras[] with --include-cameras)
@@ -11507,7 +11507,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success, ... } (raw backend response)
@@ -11537,7 +11537,7 @@ FLAGS
   --cursor STRING    Pagination cursor
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ tyomaaId, name, address, asiakasId, city }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
@@ -11570,7 +11570,7 @@ FLAGS
   --field STRING    Filter by fieldName
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }>
@@ -11607,7 +11607,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   real: { success, safetyValidation, timestamp, ... } | dry-run: { dryRun: true, validation: { success, ... } }
@@ -11648,7 +11648,7 @@ FLAGS
   (none)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { tyomaaId, summary:{...}, monthlyBreakdown:[...] }
@@ -11684,7 +11684,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { added: { tyomaaId, personId } } or { dryRun: true, wouldCreate: { tyomaaId, personId, contactPersonTypeId } }
@@ -11714,7 +11714,7 @@ FLAGS
   --worksite NUMBER    Target tyomaaId (alias for the positional; same flag as person add/remove)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ personId, name, email, contactType }>
@@ -11750,7 +11750,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { removed: { tyomaaId, personId } } or { dryRun: true, wouldDelete: { tyomaaId, personId } }
@@ -11786,7 +11786,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: true, tyomaa, message } (raw backend response)
@@ -11819,7 +11819,7 @@ FLAGS
   --my-companies    Search across every company you belong to (customer/worksite/person)
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   ListEnvelope<{ tyomaaId, name, tyomaaNum, address, address2, postalCode, city, formattedAddress, coords:{lat,lng}|null, drivingInstructions, comment }>
@@ -11855,7 +11855,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { success: true }
@@ -11904,7 +11904,7 @@ WRITE-SAFETY FLAGS
   --reason TEXT        Free-text justification. Stored in audit log.
 
 GLOBAL FLAGS
-  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
   { ok: true, ... } (raw backend response); --dry-run returns { dryRun: true, wouldUpdate: { <provided fields>, omittedFieldsPreserved: true } }

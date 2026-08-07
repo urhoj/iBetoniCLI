@@ -35,6 +35,19 @@ export interface GlobalOptions {
    * sends a Server-Timing header). Never touches stdout. Set via `--stats`.
    */
   stats: boolean;
+  /**
+   * Columns `--pretty` should show for a list table (`--columns a,b,c`),
+   * overriding the command spec's `prettyColumns` and the automatic fit.
+   * `null` = not set. No effect on JSON output — the data contract is
+   * unchanged; this only picks what the human table renders.
+   *
+   * Named `--columns`, NOT `--fields`: a root option is recognized anywhere in
+   * argv and would SHADOW the per-command `--fields <csv>` that
+   * `customer list` / `ohje list` already own (the same trap documented on
+   * `--company` above) — and those two do a real server/client-side
+   * PROJECTION, which is a different thing from picking table columns.
+   */
+  columns: string[] | null;
 }
 
 /** Truthy spellings accepted for the IB_READ_ONLY environment variable. */
@@ -61,6 +74,7 @@ const GLOBAL_OPTIONS: ReadonlyArray<readonly [flags: string, description: string
     "Run this one command in another company's context (ephemeral switch, not persisted)",
   ],
   ["--stats", "Print API, SQL, and cache hit/miss timing for this command to stderr"],
+  ["--columns <csv>", "Columns --pretty shows in a list table (default: chosen per command)"],
 ];
 
 /** The `-x` / `--xxx` tokens in a Commander flags string (`-e, --endpoint <url>`). */
@@ -88,6 +102,7 @@ export function getGlobalOptions(cmd: Command): GlobalOptions {
     readOnly?: boolean;
     company?: string;
     stats?: boolean;
+    columns?: string;
   }>();
   const envReadOnly = READ_ONLY_ENV_TRUE.has(
     (process.env.IB_READ_ONLY ?? "").trim().toLowerCase()
@@ -110,6 +125,10 @@ export function getGlobalOptions(cmd: Command): GlobalOptions {
     }
     asiakas = n;
   }
+  const columns = (o.columns ?? "")
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean);
   return {
     endpoint: o.endpoint ?? null,
     requestId: o.requestId ?? null,
@@ -120,6 +139,7 @@ export function getGlobalOptions(cmd: Command): GlobalOptions {
     readOnly: !!o.readOnly || envReadOnly,
     asiakas,
     stats: !!o.stats,
+    columns: columns.length > 0 ? columns : null,
   };
 }
 

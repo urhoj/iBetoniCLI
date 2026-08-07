@@ -165,6 +165,14 @@ export interface CommandSpec {
   mutates?: boolean;
   /** One-line description of the JSON response shape on stdout. */
   outputShape: string;
+  /**
+   * Columns `--pretty` should show for this command's list table, in order.
+   * Only worth setting on a WIDE list (roughly >8 columns), where the automatic
+   * leftmost-fits fallback in `renderList` would otherwise hide the columns a
+   * caller actually triages by (feedback #341). Purely presentational — it does
+   * not touch the JSON contract, and the global `--columns` overrides it.
+   */
+  prettyColumns?: readonly string[];
   /** Documented error codes with their meaning and remedy. */
   errors: CommandError[];
   /**
@@ -266,7 +274,7 @@ export function formatHelp(spec: CommandSpec): string {
   lines.push("");
   lines.push("GLOBAL FLAGS");
   lines.push(
-    "  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID"
+    "  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV"
   );
   lines.push("");
 

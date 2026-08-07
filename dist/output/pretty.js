@@ -39,6 +39,10 @@ function visibleWidth(cell) {
 }
 /** Below this per-column width a capped table stops being readable. */
 const READABLE_COL_WIDTH = 12;
+/** Marks a list cell (or folded value) that was cut to fit. */
+const ELLIPSIS = "…";
+/** Cell text without its colour escapes — for measuring and for slicing. */
+const plain = (cell) => cell.replace(ANSI_RE, "");
 function availableWidth(n) {
     const borders = n + 1;
     return Math.max(terminalWidth(), n * MIN_COL_WIDTH + borders) - borders;
@@ -88,39 +92,106 @@ function fittedOptions(natural) {
     const colWidths = fitColumns(natural);
     return colWidths ? { colWidths, wordWrap: true, wrapOnWordBoundary: false } : {};
 }
-export function renderList(envelope) {
+/** First line of a (possibly multi-line) cell, marked when lines were dropped. */
+function firstLine(cell) {
+    const nl = cell.indexOf("\n");
+    return nl === -1 ? cell : cell.slice(0, nl) + ELLIPSIS;
+}
+/** Cut a single-line cell to `max` visible chars, marking the loss. */
+function clampCell(cell, max) {
+    if (visibleWidth(cell) <= max)
+        return cell;
+    return max <= 1 ? ELLIPSIS : plain(cell).slice(0, max - 1) + ELLIPSIS;
+}
+/**
+ * Columns whose value never changes across the whole result set — including
+ * all-null ones. They are folded OUT of the table and reported once above it,
+ * so nothing is lost while the table wins its width back (an 18-column
+ * `ib dev feedback list` sheds 5 columns this way — feedback #341).
+ *
+ * Skipped for a 1-row list, where EVERY column is trivially "constant" and
+ * folding would leave an empty table. The first column is never folded: it is
+ * the row's identity anchor, and a table with no columns renders as nothing.
+ */
+function constantColumns(headers, items) {
+    if (items.length < 2)
+        return [];
+    const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+    return headers.filter((h, i) => i > 0 && items.every((r) => same(r[h], items[0][h])));
+}
+/** How many columns can still hold {@link READABLE_COL_WIDTH} chars each. */
+function readableColumnCount(n) {
+    let k = n;
+    while (k > 1 && k * READABLE_COL_WIDTH > availableWidth(k))
+        k--;
+    return k;
+}
+export function renderList(envelope, columns) {
     // Guard on the actual array, not `count`: a backend page can report a
     // non-zero/absent `count` (total-count semantics, or an out-of-range cursor)
     // while `items` is empty — trusting `count` here would deref items[0] and
     // crash pretty mode with a raw TypeError.
     if (envelope.items.length === 0)
         return chalk().dim("(no results)");
-    const headers = Object.keys(envelope.items[0]);
-    const rows = envelope.items.map((item) => headers.map((h) => formatCell(item[h])));
-    const natural = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => visibleWidth(r[i]))));
-    let out;
-    const naturalTotal = natural.reduce((a, w) => a + w + 2, 0);
-    if (naturalTotal > availableWidth(headers.length) &&
-        headers.length * READABLE_COL_WIDTH > availableWidth(headers.length)) {
-        // Too many columns to cap into the terminal readably — render each item as
-        // its own key:value block instead (feedback #34).
-        out = envelope.items
-            .map((item, i) => chalk().dim(`# ${i + 1}`) + "\n" + renderRecord(item))
-            .join("\n");
+    const items = envelope.items;
+    // A 1-row list is really a record: keep every column and every character
+    // (the hard-wrap below loses nothing). Only a MULTI-row list is a table that
+    // has to stay one line per record to be scannable.
+    const multi = items.length > 1;
+    const folded = constantColumns(Object.keys(items[0]), items);
+    let headers = Object.keys(items[0]).filter((h) => !folded.includes(h));
+    // An explicit selection (a spec's `prettyColumns`, or the global --columns)
+    // wins over the automatic fit — the caller has already said which columns
+    // matter, and `fitColumns` still guarantees the terminal is never exceeded.
+    // Automatic fallback is leftmost-fits: deliberately dumb and predictable,
+    // with every dropped column named in the footer, because no column-order-
+    // agnostic ranking picks the right subset across every domain's row shape.
+    const wanted = columns?.filter((c) => headers.includes(c)) ?? [];
+    let hidden;
+    if (wanted.length > 0) {
+        hidden = headers.filter((h) => !wanted.includes(h));
+        headers = [...wanted];
     }
     else {
-        const table = new (tableCtor())({
-            head: headers.map((h) => chalk().bold(h)),
-            ...fittedOptions(natural),
-        });
-        for (const row of rows)
-            table.push(row);
-        out = table.toString();
+        const keep = readableColumnCount(headers.length);
+        hidden = headers.slice(keep);
+        headers = headers.slice(0, keep);
+    }
+    let rows = items.map((item) => headers.map((h) => formatCell(item[h])));
+    if (multi)
+        rows = rows.map((r) => r.map(firstLine));
+    const natural = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => visibleWidth(r[i]))));
+    const colWidths = fitColumns(natural);
+    // Cut over-wide cells to their column rather than hard-wrapping them: wrapping
+    // is right for one record (nothing is lost) but turns a 12-row list back into
+    // the wall of text this whole path exists to avoid.
+    if (multi && colWidths) {
+        rows = rows.map((r) => r.map((c, i) => clampCell(c, colWidths[i] - 2)));
+    }
+    const table = new (tableCtor())({
+        head: headers.map((h) => chalk().bold(h)),
+        ...(colWidths ? { colWidths, wordWrap: true, wrapOnWordBoundary: false } : {}),
+    });
+    for (const row of rows)
+        table.push(row);
+    const out = [];
+    if (folded.length > 0) {
+        const label = `all ${items.length} rows`;
+        const text = folded
+            .map((h) => `${h}=${clampCell(firstLine(plain(formatCell(items[0][h]))), 40)}`)
+            .join(" · ");
+        out.push(...labeledLines(label, text, label.length + 2));
+    }
+    out.push(table.toString());
+    if (hidden.length > 0) {
+        const label = `${hidden.length} column${hidden.length === 1 ? "" : "s"} hidden`;
+        const text = `${hidden.join(", ")} — pass --columns <csv>, or drop --pretty for the full JSON`;
+        out.push(...labeledLines(label, text, label.length + 2));
     }
     if (envelope.nextCursor) {
-        out += `\n${chalk().dim(`(more — pass --cursor ${envelope.nextCursor})`)}`;
+        out.push(chalk().dim(`(more — pass --cursor ${envelope.nextCursor})`));
     }
-    return out;
+    return out.join("\n");
 }
 export function renderRecord(record) {
     const entries = Object.entries(record).map(([k, v]) => [k, formatCell(v)]);

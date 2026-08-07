@@ -22,6 +22,7 @@ const GLOBAL_OPTIONS = [
         "Run this one command in another company's context (ephemeral switch, not persisted)",
     ],
     ["--stats", "Print API, SQL, and cache hit/miss timing for this command to stderr"],
+    ["--columns <csv>", "Columns --pretty shows in a list table (default: chosen per command)"],
 ];
 /** The `-x` / `--xxx` tokens in a Commander flags string (`-e, --endpoint <url>`). */
 const flagTokens = (flags) => flags.split(/[\s,|]+/).filter((t) => t.startsWith("-"));
@@ -48,6 +49,10 @@ export function getGlobalOptions(cmd) {
         }
         asiakas = n;
     }
+    const columns = (o.columns ?? "")
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean);
     return {
         endpoint: o.endpoint ?? null,
         requestId: o.requestId ?? null,
@@ -58,6 +63,7 @@ export function getGlobalOptions(cmd) {
         readOnly: !!o.readOnly || envReadOnly,
         asiakas,
         stats: !!o.stats,
+        columns: columns.length > 0 ? columns : null,
     };
 }
 /** Fallback API endpoint when neither --endpoint nor the active profile sets one. */

@@ -13,6 +13,14 @@ let outputMode = "json";
  * commands) → generic hints only.
  */
 let activeCommandErrors = null;
+/**
+ * Columns the running command's list table should show under `--pretty`: the
+ * CommandSpec's `prettyColumns` (set by `applySpecErrors`), overridden by the
+ * global `--columns`. `null` = let `renderList` pick. Ctx-aware for the same
+ * reason as {@link activeCommandErrors} — an embedded run must not leak its
+ * selection into a concurrent one.
+ */
+let listColumns = null;
 function emitStdout(line) {
     const ctx = getEmbeddedCtx();
     if (ctx)
@@ -34,6 +42,13 @@ export function setActiveCommandErrors(rows) {
     else
         activeCommandErrors = rows;
 }
+export function setListColumns(cols) {
+    const ctx = getEmbeddedCtx();
+    if (ctx)
+        ctx.listColumns = cols;
+    else
+        listColumns = cols;
+}
 export function setOutputMode(m) {
     const ctx = getEmbeddedCtx();
     if (ctx)
@@ -45,7 +60,8 @@ export function writeJson(value) {
     const mode = getEmbeddedCtx()?.outputMode ?? outputMode;
     if (mode === "pretty") {
         if (isListEnvelope(value)) {
-            emitStdout(renderList(value) + "\n");
+            const cols = getEmbeddedCtx()?.listColumns ?? listColumns;
+            emitStdout(renderList(value, cols) + "\n");
             return;
         }
         if (value !== null && typeof value === "object") {

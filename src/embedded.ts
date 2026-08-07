@@ -7,6 +7,7 @@ export interface EmbeddedCtx {
   readOnly: boolean;
   outputMode: "json" | "pretty";
   activeCommandErrors: CommandError[] | null;
+  listColumns: readonly string[] | null;
   stdout: string[];
   stderr: string[];
   exitCode: number | null;

@@ -55,6 +55,7 @@ export async function runArgv(
     readOnly: opts.readOnly ?? false,
     outputMode: "json",
     activeCommandErrors: null,
+    listColumns: null,
     stdout: [],
     stderr: [],
     exitCode: null,
