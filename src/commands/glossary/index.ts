@@ -20,6 +20,9 @@ import { readJsonInput } from "../../api/parseBody.js";
 import { runGlossaryLint } from "./lint.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "../../assess.js";
 import { qs } from "../../api/query.js";
+// projectGlossaryForPrimer lives in reference/dump.ts (always-loaded side of
+// the boundary) so the dump does not statically pull this whole module in.
+import { projectGlossaryForPrimer } from "../../reference/dump.js";
 
 interface GlossaryEntry {
   term: string;
@@ -37,20 +40,6 @@ const splitList = (s?: string): string[] =>
 
 const arrToCsv = (v: unknown): string | undefined =>
   Array.isArray(v) ? v.join(",") : (typeof v === "string" ? v : undefined);
-
-/**
- * Project glossary rows to the {term, synonyms} INDEX shape — strips definition
- * and developer-tier-leaking fields. Shared by `glossary list --terms-only` and
- * the primer/dump (re-exported from reference/dump.ts for existing consumers).
- */
-export function projectGlossaryForPrimer(
-  items: Array<Record<string, unknown>>
-): Array<{ term: string; synonyms: string[] }> {
-  return items.map((g) => ({
-    term: g["term"] as string,
-    synonyms: (g["synonyms"] ?? []) as string[],
-  }));
-}
 
 /** Every field `set` / `import` can carry, from a flag or a --from-json object. */
 export interface GlossarySetFields {

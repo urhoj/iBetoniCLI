@@ -268,6 +268,20 @@ export function resolveDualString(
 }
 
 /**
+ * Resolve the target asiakasId for commands that accept it positionally OR
+ * via --asiakas (the dominant flag across the customer/* and jerry/* groups
+ * — feedback #28). Thin wrapper over the generic {@link resolveTarget}.
+ * Lives here (not in customer/index.ts) so jerry/message don't drag the whole
+ * customer module graph in for a 1-line wrapper.
+ */
+export function resolveAsiakasTarget(
+  positional: string | undefined,
+  flag: number | undefined
+): number {
+  return resolveTarget(positional, flag, "asiakasId", "asiakas");
+}
+
+/**
  * `<query>` / `--search <s>` via {@link resolveDualString} (feedback #235).
  * AIs learn the `--search` convention from list commands (`glossary list`,
  * `dev schema tables`) and reach for it on search-style commands too;

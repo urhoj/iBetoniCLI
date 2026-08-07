@@ -135,11 +135,11 @@ function constantColumns(
   items: ReadonlyArray<Record<string, unknown>>
 ): string[] {
   if (items.length < 2) return [];
-  const same = (a: unknown, b: unknown) =>
-    JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
-  return headers.filter(
-    (h, i) => i > 0 && items.every((r) => same(r[h], items[0][h]))
-  );
+  return headers.filter((h, i) => {
+    if (i === 0) return false;
+    const base = JSON.stringify(items[0][h] ?? null);
+    return items.every((r) => JSON.stringify(r[h] ?? null) === base);
+  });
 }
 
 /** How many columns can still hold {@link READABLE_COL_WIDTH} chars each. */

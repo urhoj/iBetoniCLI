@@ -27,8 +27,23 @@ import {
 import { emitStdout } from "../output/json.js";
 import packageJson from "../../package.json" with { type: "json" };
 import type { ApiClient } from "../api/client.js";
-import { runGlossaryList, projectGlossaryForPrimer } from "../commands/glossary/index.js";
-export { projectGlossaryForPrimer };
+
+/**
+ * Project glossary rows to the {term, synonyms} INDEX shape — strips definition
+ * and developer-tier-leaking fields. Shared by `glossary list --terms-only` and
+ * the primer/dump. Defined HERE (the always-loaded side of the boundary) so the
+ * glossary command module stays a lazy import — it used to be imported
+ * statically, putting ~28 KB of glossary/lint code into 100% of invocations for
+ * a function only `reference dump --glossary` and the glossary domain need.
+ */
+export function projectGlossaryForPrimer(
+  items: Array<Record<string, unknown>>
+): Array<{ term: string; synonyms: string[] }> {
+  return items.map((g) => ({
+    term: g["term"] as string,
+    synonyms: (g["synonyms"] ?? []) as string[],
+  }));
+}
 
 export interface ReferenceDump {
   version: string;
@@ -66,13 +81,15 @@ export interface ReferenceDump {
 /**
  * Best-effort fetch of the DB glossary projected to the primer shape
  * ({term,synonyms} only — strips definition and developer-tier-leaking fields).
- * Returns [] on any failure (offline/tokenless/route-not-deployed). Shared by
- * the root `--help` prefetch (bin/ib.ts) and the `reference dump` action.
+ * Returns [] on any failure (offline/tokenless/route-not-deployed). Used by the
+ * `reference dump --glossary` action only — hence the dynamic import: the
+ * glossary module loads when the flag is passed, not on every invocation.
  */
 export async function fetchPrimerGlossary(
   client: ApiClient
 ): Promise<Array<{ term: string; synonyms: string[] }>> {
   try {
+    const { runGlossaryList } = await import("../commands/glossary/index.js");
     const res = await runGlossaryList(client, {});
     return projectGlossaryForPrimer(res.items as Array<Record<string, unknown>>);
   } catch {

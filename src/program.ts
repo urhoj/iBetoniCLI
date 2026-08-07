@@ -16,7 +16,7 @@ import { defaultCredentialsPath } from "./auth/store.js";
 import { createCliContext } from "./cliContext.js";
 import { recordFriction } from "./friction.js";
 import type { ApiClient } from "./api/client.js";
-import { DOMAIN_REGISTRARS, resolveArgvDomain, type DomainDeps } from "./domains.js";
+import { DOMAIN_REGISTRARS, resolveArgvDomain, argvRestAfterDomain, type DomainDeps } from "./domains.js";
 import { runReferenceDump, fetchPrimerGlossary } from "./reference/dump.js";
 import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailEdit, runReferenceDetailDelete, runReferenceDetailLint, type ReferenceDetailListOptions } from "./reference/detail.js";
 import { addEditFlags, parseEditOp } from "./textEdit.js";
@@ -196,6 +196,7 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
     isReadOnly,
     getEndpoint,
     version: packageJson.version,
+    argvRest: argvRestAfterDomain(argv),
   };
   const selected = resolveArgvDomain(argv);
   for (const [domain, register] of DOMAIN_REGISTRARS) {

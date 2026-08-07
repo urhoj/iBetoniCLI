@@ -13,6 +13,12 @@ import { defaultCredentialsPath } from "../auth/store.js";
 import { setCallerTier, resolveCallerTier } from "../tier.js";
 import { setAmbientCommandPath, commandPathOf } from "../commandContext.js";
 
+// Start the credentials read BEFORE the module-loading program build — the two
+// are independent, so the file IO overlaps the imports instead of serializing
+// after them. Awaited below for the tier. `.catch` here so an early rejection
+// can't surface as an unhandled rejection while the build is still running.
+const authPromise = resolveAuth({ credentialsPath: defaultCredentialsPath() }).catch(() => null);
+
 // The argv hint lets buildProgram import ONLY the invoked domain's modules.
 const program = await buildProgram(process.argv.slice(2));
 
@@ -40,8 +46,7 @@ program.hook("preAction", (_thisCommand, actionCommand) => {
 // caller's tier. Fail-closed: any resolution failure → "standard" (privileged
 // subtrees hidden).
 try {
-  const resolvedAuth = await resolveAuth({ credentialsPath: defaultCredentialsPath() });
-  setCallerTier(resolveCallerTier(resolvedAuth?.token ?? null));
+  setCallerTier(resolveCallerTier((await authPromise)?.token ?? null));
 } catch {
   setCallerTier("standard");
 }

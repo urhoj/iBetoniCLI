@@ -8,8 +8,7 @@ import {
 } from "../../../api/writeFlags.js";
 import { writeJson, failWith } from "../../../output/json.js";
 import { resolveDate } from "../../../dates.js";
-import { resolveAsiakasTarget } from "../../customer/index.js";
-import { parseId, addAsiakasTargetOption } from "../../../targets.js";
+import { parseId, addAsiakasTargetOption, resolveAsiakasTarget } from "../../../targets.js";
 import { guarded, jsonAction } from "../../_shared/action.js";
 
 type Row = Record<string, unknown>;

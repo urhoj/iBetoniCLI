@@ -32,6 +32,12 @@ export interface DomainDeps {
   isReadOnly: () => boolean;
   getEndpoint: () => Promise<string>;
   version: string;
+  /**
+   * argv tokens AFTER the resolved domain token ({@link argvRestAfterDomain});
+   * `[]` on a full build. Lets an umbrella registrar (`dev`) narrow to the one
+   * sub-group the invocation names instead of loading its whole family.
+   */
+  argvRest: readonly string[];
 }
 
 type DomainRegistrar = (program: Command, deps: DomainDeps) => Promise<void>;
@@ -117,7 +123,14 @@ export const DOMAIN_REGISTRARS: ReadonlyMap<string, DomainRegistrar> = new Map<
         .description(
           "Developer & maintainer tools — CLI feedback, changelog, perf, cache, schema, AI logs, operator inbox. Filing feedback is open to everyone."
         );
-      const groups = await Promise.all(DEV_ALIAS_DOMAINS.map((name) => DEV_GROUP_LOADERS[name]()));
+      // Narrow to the ONE group the invocation names (`ib dev changelog add`
+      // needs changelog, not all seven — ~120 KB parsed per canonical dev
+      // call). Anything else as the next token (absent, a flag, `--help`,
+      // `impersonation`, an unknown group) falls back to the full family —
+      // `ib dev --help` and the unknown-subcommand envelope need it.
+      const next = d.argvRest[0] as (typeof DEV_ALIAS_DOMAINS)[number];
+      const names = DEV_ALIAS_DOMAINS.includes(next) ? [next] : DEV_ALIAS_DOMAINS;
+      const groups = await Promise.all(names.map((name) => DEV_GROUP_LOADERS[name]()));
       for (const register of groups) register(dev, d.getClient);
       (await import("./commands/dev/impersonation/index.js")).registerImpersonationCommands(dev, d.getClient);
     },
@@ -154,12 +167,29 @@ export const STATIC_DOMAIN_TOKENS: ReadonlySet<string> = new Set(["reference", "
  * the full tree (root help, unknown-command siblings).
  */
 export function resolveArgvDomain(argv: readonly string[] | undefined): string | null {
+  return scanArgv(argv)?.token ?? null;
+}
+
+/**
+ * The argv tokens after the resolved domain token — what {@link DomainDeps}
+ * `argvRest` carries. `[]` when no domain resolves (full build).
+ */
+export function argvRestAfterDomain(argv: readonly string[] | undefined): readonly string[] {
+  return scanArgv(argv)?.rest ?? [];
+}
+
+/** The one scan behind {@link resolveArgvDomain} and {@link argvRestAfterDomain}. */
+function scanArgv(
+  argv: readonly string[] | undefined
+): { token: string; rest: readonly string[] } | null {
   if (!argv) return null;
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i];
     if (token === "-" || token === "--") return null;
     if (!token.startsWith("-")) {
-      return DOMAIN_REGISTRARS.has(token) || STATIC_DOMAIN_TOKENS.has(token) ? token : null;
+      return DOMAIN_REGISTRARS.has(token) || STATIC_DOMAIN_TOKENS.has(token)
+        ? { token, rest: argv.slice(i + 1) }
+        : null;
     }
     if (!token.includes("=") && GLOBAL_VALUE_FLAGS.has(token)) i++;
   }

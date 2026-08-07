@@ -5,7 +5,7 @@ import { writeJson, exitWithError, failWith, errorMessage, setExitCode } from ".
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveRoleTypeId } from "../../roles.js";
-import { assertEnum, resolveTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption } from "../../targets.js";
+import { assertEnum, resolveAsiakasTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
 import { runPersonRoleList } from "../person/index.js";
 import { jsonAction, guarded } from "../_shared/action.js";
@@ -384,14 +384,9 @@ export async function runCustomerOperatorVerify(client, asiakasId) {
     const missing = ALL_FIELD_KEYS.filter((k) => !flags[k]);
     return { asiakasId, allSet: missing.length === 0, flags, missing };
 }
-/**
- * Resolve the target asiakasId for commands that accept it positionally OR
- * via --asiakas (the dominant flag across the customer/* and jerry/* groups
- * — feedback #28). Thin wrapper over the generic {@link resolveTarget}.
- */
-export function resolveAsiakasTarget(positional, flag) {
-    return resolveTarget(positional, flag, "asiakasId", "asiakas");
-}
+// resolveAsiakasTarget moved to targets.ts (jerry/message import it without the
+// customer graph); re-exported for existing importers.
+export { resolveAsiakasTarget };
 /**
  * GET /api/tyomaa/asiakasTyomaaList/:asiakasId — worksites belonging to a
  * customer. Backend returns a raw array; wrapped into the universal envelope.

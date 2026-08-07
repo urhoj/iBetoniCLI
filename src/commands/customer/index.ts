@@ -12,7 +12,7 @@ import { writeJson, exitWithError, failWith, errorMessage, setExitCode } from ".
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { resolveRoleTypeId } from "../../roles.js";
-import { assertEnum, resolveTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption } from "../../targets.js";
+import { assertEnum, resolveTarget, resolveAsiakasTarget, parseId, resolveSearchQuery, cappedInt, addAsiakasTargetOption } from "../../targets.js";
 import { resolveDate } from "../../dates.js";
 import { runPersonRoleList } from "../person/index.js";
 import { jsonAction, guarded } from "../_shared/action.js";
@@ -596,17 +596,9 @@ export async function runCustomerOperatorVerify(
   return { asiakasId, allSet: missing.length === 0, flags, missing };
 }
 
-/**
- * Resolve the target asiakasId for commands that accept it positionally OR
- * via --asiakas (the dominant flag across the customer/* and jerry/* groups
- * — feedback #28). Thin wrapper over the generic {@link resolveTarget}.
- */
-export function resolveAsiakasTarget(
-  positional: string | undefined,
-  flag: number | undefined
-): number {
-  return resolveTarget(positional, flag, "asiakasId", "asiakas");
-}
+// resolveAsiakasTarget moved to targets.ts (jerry/message import it without the
+// customer graph); re-exported for existing importers.
+export { resolveAsiakasTarget };
 
 interface CustomerWorksiteRow {
   tyomaaId: number;
