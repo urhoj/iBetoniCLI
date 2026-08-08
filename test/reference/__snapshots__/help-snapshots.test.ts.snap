@@ -3603,8 +3603,8 @@ FLAGS
   --malli STRING    Email variant label — FREE TEXT (not server-validated); the convention is A or B
   --kanava STRING    Preferred channel, free text
   --alue STRING    Operating area ({alue} merge field)
-  --company-type STRING    Company category
-  --source STRING    How the prospect entered the pipeline (default: manual)
+  --company-type STRING    Company category: pumppu | betoni | all | owner
+  --source STRING    How the prospect entered the pipeline: manual | import | scheduled (default: manual)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -3672,7 +3672,7 @@ ARGUMENTS
   <asiakasId> NUMBER    company asiakasId (required)
 
 FLAGS
-  --type STRING    Event kind; REQUIRED
+  --type STRING    Event kind: call | response | note; REQUIRED
   --text STRING    Event text; REQUIRED
   --time STRING    Backdated event time (ISO 8601)
   --set-status STRING    Also set the pipeline status. Keys: ei_aloitettu → email1_lahetetty → muistutus_lahetetty → vastasi_kylla → tiedot_pyydetty → tervetuloa_lahetetty (pipeline order); terminal: vastasi_ei / ei_vastausta / ei_sovellu
@@ -3721,7 +3721,7 @@ FLAGS
   --malli STRING    Email variant label — FREE TEXT (not server-validated); the convention is A or B
   --kanava STRING    Preferred channel
   --alue STRING    Operating area
-  --company-type STRING    Company category
+  --company-type STRING    Company category: pumppu | betoni | all | owner
   --notes STRING    muistiinpanot
   --outreach-name STRING    Contact override name
   --outreach-email STRING    Contact override email
@@ -3944,7 +3944,7 @@ DESCRIPTION
   Permissions: requires isSystemAdmin.
 
 FLAGS
-  --status STRING    Status CSV — any of the allowed keys
+  --status STRING    Status CSV: draft,open,no_supply,pending_verification,accepted,cancelled,expired
   --from STRING    createdAt from (YYYY-MM-DD/today/yesterday)
   --to STRING    createdAt to (inclusive)
   --customer NUMBER    Customer asiakasId
@@ -4154,7 +4154,7 @@ DESCRIPTION
 FLAGS
   --from STRING    createdAt from (YYYY-MM-DD/today/yesterday)
   --to STRING    createdAt to (inclusive)
-  --deliverable STRING    covered = deliverable at least once; no_supply = never covered
+  --deliverable STRING    covered (deliverable at least once) | no_supply (never covered)
   --q STRING    Address substring filter
   --limit NUMBER    Max rows (max 500) (default: 500)
 
@@ -4821,7 +4821,7 @@ FLAGS
   --status STRING    Filter --mine by status (CSV: open,pending_verification,accepted,cancelled,expired,no_supply)
   --limit NUMBER    Max rows for --mine (server caps at 200) (default: 100)
   --provider    Provider lifecycle view via /provider-list (incl. sent offers)
-  --tab STRING    With --provider: which lifecycle tab to return (default: avoimet)
+  --tab STRING    With --provider: which lifecycle tab to return (avoimet|tarjotut|voitetut|paattyneet) (default: avoimet)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
