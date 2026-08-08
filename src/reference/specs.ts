@@ -3215,6 +3215,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "{ closestSijainti: {...}|null, closestDistance: number|null }",
     errors: [
+      {
+        origin: "client",
+        exit: 4,
+        meaning:
+          "No worksite given, --worksite and --tyomaa differ, or one of --worksite/--tyomaa/--type/--asiakas is not a positive integer",
+        remedy: "name the worksite once (--worksite OR --tyomaa) and pass integer ids",
+      },
       apiErr(400, "Invalid tyomaaId or missing coordinates", "verify the worksite has lat/lng"),
       ...permErrors("auth.page.sijainnit.read"),
     ],
@@ -5124,6 +5131,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }",
     errors: [
+      { origin: "client", exit: 4, meaning: "--lat/--lng not a number", remedy: "pass decimal degrees, e.g. --lat 60.1699 --lng 24.9384" },
       apiErr(403, "Weather module off or permission denied", "enable via 'ib opendata weather toggle --on' (admin) or contact an admin"),
       apiErr(400, "Bad coords/time", "use Finland coords and a time within now..+240h"),
       apiErr(401, "Not authenticated", "run 'ib auth login'"),
@@ -5147,6 +5155,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ date, minTemp, maxTemp, avgTemp, windSpeed, precipitation, weatherSymbol, source, coordinates }",
     errors: [
+      { origin: "client", exit: 4, meaning: "--lat/--lng not a number", remedy: "pass decimal degrees, e.g. --lat 60.17 --lng 24.94" },
       apiErr(403, "Weather module off or permission denied", "enable via 'ib opendata weather toggle --on'"),
       apiErr(400, "Bad coords/date", "use Finland coords and a valid date"),
       apiErr(401, "Not authenticated", "run 'ib auth login'"),
@@ -5172,6 +5181,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ hourly: [{ time, temperature, windSpeed, precipitation, weatherSymbol }], summary, coordinates }",
     errors: [
+      { origin: "client", exit: 4, meaning: "--lat/--lng not a number, or --duration/--keikka not a positive integer", remedy: "pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120" },
       apiErr(403, "Weather module off or permission denied", "enable via 'ib opendata weather toggle --on'"),
       apiErr(400, "Bad coords/time/duration", "use Finland coords, valid ISO time, positive duration"),
       apiErr(401, "Not authenticated", "run 'ib auth login'"),

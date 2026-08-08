@@ -178,3 +178,51 @@ test("unknown legal subcommand → enriched envelope (#1)", async () => {
   expect(env.available).toContain("active");
   expect(env.available).not.toContain("save"); // tokenless → standard tier
 });
+
+/**
+ * fb#371 — flags whose value lands in a URL PATH segment are validated by the
+ * argParser, so a typo fails at PARSE time. Asserted end-to-end (not just on the
+ * helper) because the failure mode being guarded against is a bare `Number`
+ * coercer silently reaching the wire as the literal "NaN". Exit 4 naming the
+ * flag — rather than the exit 2 a tokenless getClient() would give — is what
+ * proves the guard fired before the action ever ran.
+ */
+describe("path-segment flags reject NaN at parse time (fb#371)", () => {
+  const opts = { token: "", endpoint: "https://example.invalid" };
+
+  test("ib sijainti closest --worksite abc → exit 4, no request", async () => {
+    const { exitCode, stderr } = await runArgv(
+      ["sijainti", "closest", "--worksite", "abc", "--type", "3"],
+      opts
+    );
+    expect(exitCode).toBe(4);
+    expect(JSON.parse(stderr).error).toMatch(/--worksite must be an integer/);
+  });
+
+  test("ib sijainti closest --asiakas abc → exit 4 (survives the ?? default)", async () => {
+    const { exitCode, stderr } = await runArgv(
+      ["sijainti", "closest", "--worksite", "555", "--type", "3", "--asiakas", "abc"],
+      opts
+    );
+    expect(exitCode).toBe(4);
+    expect(JSON.parse(stderr).error).toMatch(/--asiakas must be an integer/);
+  });
+
+  test("ib opendata weather forecast --lat 6O.17 → exit 4", async () => {
+    const { exitCode, stderr } = await runArgv(
+      ["opendata", "weather", "forecast", "--lat", "6O.17", "--lng", "24.94", "--time", "now"],
+      opts
+    );
+    expect(exitCode).toBe(4);
+    expect(JSON.parse(stderr).error).toMatch(/--lat must be a number/);
+  });
+
+  test("ib opendata weather pumping --duration abc → exit 4", async () => {
+    const { exitCode, stderr } = await runArgv(
+      ["opendata", "weather", "pumping", "--lat", "60.17", "--lng", "24.94", "--start", "now", "--duration", "abc"],
+      opts
+    );
+    expect(exitCode).toBe(4);
+    expect(JSON.parse(stderr).error).toMatch(/--duration must be an integer/);
+  });
+});

@@ -11,7 +11,7 @@ import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
 import { parseJsonBodyFlag } from "../../api/parseBody.js";
 import { CliError } from "../../api/errors.js";
-import { parseId, cappedInt, assertPositiveInt } from "../../targets.js";
+import { parseId, cappedInt, assertPositiveInt, intFlag } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { flattenGeocodeResult, type FlatGeocode } from "../_shared/geocode.js";
 import {
@@ -1268,11 +1268,15 @@ export function registerSijaintiCommands(
       )
     );
 
+  // Every flag here is intFlag, not a bare `Number`: all four are interpolated
+  // into a URL PATH segment (runSijaintiClosest). --asiakas is the subtle one —
+  // it defaults via `?? resolveOwnerAsiakasId()`, and NaN is not nullish, so a
+  // typo would survive the default and land in the last segment (fb#371).
   s.command("closest")
-    .option("--worksite <id>", "", Number)
-    .option("--tyomaa <id>", "", Number)
-    .requiredOption("--type <id>", "", Number)
-    .option("--asiakas <id>", "", Number)
+    .option("--worksite <id>", "", intFlag("--worksite"))
+    .option("--tyomaa <id>", "", intFlag("--tyomaa"))
+    .requiredOption("--type <id>", "", intFlag("--type"))
+    .option("--asiakas <id>", "", intFlag("--asiakas"))
     .action(
       guarded(async (opts: { worksite?: number; tyomaa?: number; type: number; asiakas?: number }) => {
         const client = await getClient();

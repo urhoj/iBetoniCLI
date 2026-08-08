@@ -7,7 +7,7 @@ import {
 } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
-import { parseId } from "../../targets.js";
+import { parseId, intFlag, numFlag } from "../../targets.js";
 import { runKeikkaGet } from "../keikka/index.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 
@@ -232,10 +232,14 @@ export function registerWeatherCommands(
     .command("weather", { hidden: !!opts.hidden })
     .description("FMI weather forecasts (requires the company weather module)");
 
+  // lat/lng/duration are parsed with numFlag/intFlag, not a bare `Number`: all
+  // three are interpolated into a URL PATH segment below, where a typo's `NaN`
+  // would reach the wire as the literal "NaN" (fb#371). The Finland/-240h range
+  // checks stay server-side — the backend owns them.
   w.command("forecast")
     .description("Point forecast for a lat/lng at a given time")
-    .requiredOption("--lat <n>", "", Number)
-    .requiredOption("--lng <n>", "", Number)
+    .requiredOption("--lat <n>", "", numFlag("--lat"))
+    .requiredOption("--lng <n>", "", numFlag("--lng"))
     .requiredOption("--time <iso>")
     .action(
       jsonAction(getClient, (client, opts: { lat: number; lng: number; time: string }) =>
@@ -245,8 +249,8 @@ export function registerWeatherCommands(
 
   w.command("day")
     .description("Daily aggregate forecast (min/max/avg temp, wind, precipitation)")
-    .requiredOption("--lat <n>", "", Number)
-    .requiredOption("--lng <n>", "", Number)
+    .requiredOption("--lat <n>", "", numFlag("--lat"))
+    .requiredOption("--lng <n>", "", numFlag("--lng"))
     .requiredOption("--date <d>")
     .action(
       jsonAction(getClient, (client, opts: { lat: number; lng: number; date: string }) =>
@@ -256,11 +260,11 @@ export function registerWeatherCommands(
 
   w.command("pumping")
     .description("Weather over a concrete-pumping window (start + duration minutes)")
-    .requiredOption("--lat <n>", "", Number)
-    .requiredOption("--lng <n>", "", Number)
+    .requiredOption("--lat <n>", "", numFlag("--lat"))
+    .requiredOption("--lng <n>", "", numFlag("--lng"))
     .requiredOption("--start <iso>")
-    .requiredOption("--duration <min>", "", Number)
-    .option("--keikka <id>", "", Number)
+    .requiredOption("--duration <min>", "", intFlag("--duration"))
+    .option("--keikka <id>", "", intFlag("--keikka"))
     .action(
       jsonAction(getClient, (client, opts: { lat: number; lng: number; start: string; duration: number; keikka?: number; }) =>
         runWeatherPumping(client, opts)

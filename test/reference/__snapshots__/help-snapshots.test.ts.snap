@@ -7906,6 +7906,7 @@ OUTPUT (JSON, stdout)
   { date, minTemp, maxTemp, avgTemp, windSpeed, precipitation, weatherSymbol, source, coordinates }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --lat/--lng not a number → pass decimal degrees, e.g. --lat 60.17 --lng 24.94
   exit 3 (HTTP 403)  Weather module off or permission denied → enable via 'ib opendata weather toggle --on'
   exit 4 (HTTP 400)  Bad coords/date        → use Finland coords and a valid date
   exit 2 (HTTP 401)  Not authenticated      → run 'ib auth login'
@@ -7937,6 +7938,7 @@ OUTPUT (JSON, stdout)
   { temperature, windSpeed, precipitation, cloudCover, weatherSymbol, description, source, coordinates, forecastTime, cached? }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --lat/--lng not a number → pass decimal degrees, e.g. --lat 60.1699 --lng 24.9384
   exit 3 (HTTP 403)  Weather module off or permission denied → enable via 'ib opendata weather toggle --on' (admin) or contact an admin
   exit 4 (HTTP 400)  Bad coords/time        → use Finland coords and a time within now..+240h
   exit 2 (HTTP 401)  Not authenticated      → run 'ib auth login'
@@ -8005,6 +8007,7 @@ OUTPUT (JSON, stdout)
   { hourly: [{ time, temperature, windSpeed, precipitation, weatherSymbol }], summary, coordinates }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --lat/--lng not a number, or --duration/--keikka not a positive integer → pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120
   exit 3 (HTTP 403)  Weather module off or permission denied → enable via 'ib opendata weather toggle --on'
   exit 4 (HTTP 400)  Bad coords/time/duration → use Finland coords, valid ISO time, positive duration
   exit 2 (HTTP 401)  Not authenticated      → run 'ib auth login'
@@ -9573,6 +9576,7 @@ OUTPUT (JSON, stdout)
   { closestSijainti: {...}|null, closestDistance: number|null }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  No worksite given, --worksite and --tyomaa differ, or one of --worksite/--tyomaa/--type/--asiakas is not a positive integer → name the worksite once (--worksite OR --tyomaa) and pass integer ids
   exit 4 (HTTP 400)  Invalid tyomaaId or missing coordinates → verify the worksite has lat/lng
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.read

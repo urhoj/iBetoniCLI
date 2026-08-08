@@ -98,6 +98,38 @@ export function intFlag(flag: string, min = 1): (value: string) => number {
 }
 
 /**
+ * Commander argParser: finite number within `[min, max]`; exit 4 otherwise. The
+ * FLOAT sibling of {@link intFlag}, for the values that are genuinely fractional
+ * — coordinates, metres — and so cannot use the integer guard.
+ *
+ * Same rationale (fb#249, then fb#371): a bare `Number` coercer turns a typo into
+ * `NaN`, which is not nullish, so it survives every `?? default` and reaches the
+ * wire as the literal `"NaN"` — in a URL PATH segment for weather's lat/lng.
+ * Empty is rejected explicitly because `Number("")` is `0`, a plausible-looking
+ * coordinate rather than an obvious error.
+ *
+ * Bounds are opt-in and meant for limits the CLI genuinely owns (`0..999.99`
+ * metres for a DECIMAL(5,2) column). Do NOT restate a range the backend already
+ * validates — a client copy of a server rule drifts silently.
+ */
+export function numFlag(
+  flag: string,
+  min = -Infinity,
+  max = Infinity
+): (value: string) => number {
+  const range =
+    Number.isFinite(min) || Number.isFinite(max) ? ` in ${min}..${max}` : "";
+  return (value: string) => {
+    const trimmed = (value ?? "").trim();
+    const n = trimmed === "" ? NaN : Number(trimmed);
+    if (!Number.isFinite(n) || n < min || n > max) {
+      failWith(`${flag} must be a number${range}`, 4);
+    }
+    return n;
+  };
+}
+
+/**
  * Attach the `--asiakas <id>` alias for an optional `[asiakasId]` positional —
  * the dual-target pattern (feedback #28), resolved in the action via
  * {@link resolveTarget} / `resolveAsiakasTarget`. Same shape as

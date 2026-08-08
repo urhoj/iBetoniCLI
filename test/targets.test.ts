@@ -3,6 +3,7 @@ import { Command } from "commander";
 import {
   addOwnerOption,
   assertEnum,
+  numFlag,
   parseId,
   parseOptionalId,
   parseRefId,
@@ -170,6 +171,42 @@ describe("addOwnerOption (--owner is a route segment, so NaN must not survive)",
   test("rejects zero and negatives", () => {
     expect(exitCodeOf(() => parseOwner("0"))).toBe(4);
     expect(exitCodeOf(() => parseOwner("-3"))).toBe(4);
+  });
+});
+
+describe("numFlag (fb#371 — lat/lng are route segments, so NaN must not survive)", () => {
+  test("accepts finite floats, negatives, and trims surrounding space", () => {
+    expect(numFlag("--lat")("60.1699")).toBe(60.1699);
+    expect(numFlag("--lng")(" 24.9384 ")).toBe(24.9384);
+    expect(numFlag("--x")("-3.5")).toBe(-3.5);
+    expect(numFlag("--x")("0")).toBe(0);
+  });
+
+  test("rejects every non-finite form with exit 4", () => {
+    // Empty is called out separately: Number("") is 0, a plausible-looking
+    // coordinate rather than an obvious error, so it must not slip through.
+    for (const bad of ["abc", "", "   ", "NaN", "Infinity", "-Infinity", "6O.17"]) {
+      expect(exitCodeOf(() => numFlag("--lat")(bad))).toBe(4);
+    }
+  });
+
+  test("bounds are opt-in and inclusive", () => {
+    const metres = numFlag("--puomi-min", 0, 999.99);
+    expect(metres("0")).toBe(0);
+    expect(metres("999.99")).toBe(999.99);
+    expect(exitCodeOf(() => metres("-0.1"))).toBe(4);
+    expect(exitCodeOf(() => metres("1000"))).toBe(4);
+    // Unbounded by default — a bare numFlag must not invent a range.
+    expect(numFlag("--x")("-9999999")).toBe(-9999999);
+  });
+
+  test("names the flag, and the range only when one was set", () => {
+    expect(errorOf(() => numFlag("--lat")("abc"))?.message).toBe(
+      "--lat must be a number"
+    );
+    expect(errorOf(() => numFlag("--puomi-min", 0, 999.99)("abc"))?.message).toBe(
+      "--puomi-min must be a number in 0..999.99"
+    );
   });
 });
 
