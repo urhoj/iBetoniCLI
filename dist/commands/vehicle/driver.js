@@ -4,18 +4,28 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFla
 import { parseId } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
+import { markPlaceholderVehicles } from "./placeholder.js";
 /** YYYY-MM-DD (or today/yesterday/tomorrow) → integer yyyymmdd. */
 function toYyyymmdd(date) {
     return Number(resolveDate(date).replace(/-/g, ""));
 }
 // ─── day-driver reads (date-keyed fleet views + per-vehicle) ─────────────────
-/** GET /api/cli/driver/board/:yyyymmdd — every grid-eligible vehicle + driver/gap + keikka load for a day. */
+/**
+ * GET /api/cli/driver/board/:yyyymmdd — every grid-eligible vehicle + driver/gap
+ * + keikka load for a day. Sentinel rows are stamped `placeholder: true` so a
+ * non-assignable legacy row isn't read as a driverless truck (fb#380).
+ */
 export async function runVehicleDriverBoard(client, date) {
-    return client.get(`/api/cli/driver/board/${toYyyymmdd(date)}`);
+    return markPlaceholderVehicles(await client.get(`/api/cli/driver/board/${toYyyymmdd(date)}`));
 }
-/** GET /api/cli/driver/gaps/:yyyymmdd — vehicles needing a driver that day (the "Ei kuljettajaa" list). */
+/**
+ * GET /api/cli/driver/gaps/:yyyymmdd — vehicles needing a driver that day (the
+ * "Ei kuljettajaa" list). Server-side these are the board rows filtered to
+ * `needsDriver`, so they get the same placeholder stamp — a sentinel marked on
+ * the board but bare here would be a contract the caller could trip on.
+ */
 export async function runVehicleDriverGaps(client, date) {
-    return client.get(`/api/cli/driver/gaps/${toYyyymmdd(date)}`);
+    return markPlaceholderVehicles(await client.get(`/api/cli/driver/gaps/${toYyyymmdd(date)}`));
 }
 /** GET /api/cli/driver/available/:yyyymmdd — assignable drivers free + not absent that day. */
 export async function runVehicleDriverAvailable(client, date) {

@@ -4,19 +4,39 @@ import { writeJson, exitWithError } from "../../output/json.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { CliError } from "../../api/errors.js";
 import { intFlag } from "../../targets.js";
+import { decodeJwtPayload } from "../../auth/jwt.js";
 function companyName(c) {
     return c.asiakasNimi ?? c.name ?? "";
 }
 /**
+ * Role names per asiakasId from the session JWT — free (the claims are already
+ * local, no extra round-trip). Decode failures degrade to "no roles known"
+ * rather than failing a read whose network half already succeeded: a token this
+ * client just authenticated with is decodable in practice, and a malformed one
+ * is `auth doctor`'s problem, not `company list`'s.
+ */
+function rolesByAsiakasId(client) {
+    try {
+        const claims = decodeJwtPayload(client.getCurrentToken());
+        return new Map(claims.companies.map((c) => [c.asiakasId, c.roles]));
+    }
+    catch {
+        return new Map();
+    }
+}
+/**
  * GET /api/company-selection/available and project to the universal list
- * envelope, annotating each row with `current: boolean`.
+ * envelope, annotating each row with `current: boolean` and the `roles` held
+ * there (from the JWT — see {@link CompanyListItem.roles}).
  */
 export async function runCompanyList(client) {
     const res = await client.get("/api/company-selection/available");
+    const roles = rolesByAsiakasId(client);
     const items = res.companies.map((c) => ({
         asiakasId: c.asiakasId,
         name: companyName(c),
         current: c.asiakasId === res.currentCompanyId,
+        roles: roles.get(c.asiakasId) ?? [],
     }));
     return listEnvelope(items);
 }

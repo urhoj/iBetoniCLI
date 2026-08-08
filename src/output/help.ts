@@ -352,6 +352,15 @@ export function formatHelp(spec: CommandSpec): string {
   lines.push(
     "  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV"
   );
+  // One pointer, not ten expanded descriptions: `--company` is the only global
+  // whose SEMANTICS a caller cannot guess from the name (it is an ephemeral
+  // company switch, not a target-id filter — see the naming note in globals.ts),
+  // and the cold-start probes inferred it from `whoami` output rather than any
+  // doc (fb#380). `ib help multi-tenancy` already explains it in full, so point
+  // there instead of growing every one of ~312 leaf helps by ten lines.
+  lines.push(
+    "  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy"
+  );
   lines.push("");
 
   lines.push("OUTPUT (JSON, stdout)");

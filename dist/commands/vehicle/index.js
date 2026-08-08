@@ -5,6 +5,7 @@ import { ownerAsiakasIdFromToken } from "../../owner.js";
 import { parseId, resolveSearchQuery, cappedInt, assertEnum } from "../../targets.js";
 import { diffFields } from "../../diff.js";
 import { registerVehicleDriverCommands } from "./driver.js";
+import { markPlaceholderVehicles } from "./placeholder.js";
 import { registerLogAlias } from "../log/index.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
@@ -25,10 +26,11 @@ const VISIT_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  * (name ← vehicleNimi, typeName ← vehicleTypes.vehicleTypeName, null when
  * unset). Default scope is
  * non-deleted with no narrowing (grid-hidden AND expired rows ARE included);
- * `deleted` / `gridOnly` / `validOn` / `type` opt into narrowing.
+ * `deleted` / `gridOnly` / `validOn` / `type` opt into narrowing. Legacy
+ * sentinel rows carry `placeholder: true` — see `./placeholder.ts`.
  */
 export async function runVehicleList(client, opts) {
-    return client.get(`/api/cli/vehicle/list${qs({
+    return markPlaceholderVehicles(await client.get(`/api/cli/vehicle/list${qs({
         limit: opts.limit,
         cursor: opts.cursor || undefined,
         // `1`, not the raw boolean — `qs` would serialise `true` as "true".
@@ -37,7 +39,7 @@ export async function runVehicleList(client, opts) {
         validOn: opts.validOn || undefined,
         type: opts.type,
         asiakas: opts.asiakas,
-    })}`);
+    })}`));
 }
 /**
  * GET /api/cli/vehicle/get/:vehicleId. Returns the full flat "Perustiedot"
@@ -128,7 +130,9 @@ export async function runVehicleTypes(client, asiakas) {
  * `search` query param; `limit` is appended only when supplied.
  */
 export async function runVehicleSearch(client, query, limit, asiakas) {
-    return client.get(`/api/cli/vehicle/list${qs({ search: query, limit, asiakas })}`);
+    // Same endpoint as `list`, so the same legacy sentinel rows can come back
+    // (a search for "ei" matches "Ei tietoa") — stamp them identically.
+    return markPlaceholderVehicles(await client.get(`/api/cli/vehicle/list${qs({ search: query, limit, asiakas })}`));
 }
 /**
  * GET /api/cli/vehicle/dates/:vehicleId — a vehicle's inspection/cert dates

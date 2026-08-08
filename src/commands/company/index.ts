@@ -6,6 +6,7 @@ import { writeJson, exitWithError } from "../../output/json.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { CliError } from "../../api/errors.js";
 import { intFlag } from "../../targets.js";
+import { decodeJwtPayload } from "../../auth/jwt.js";
 
 interface AvailableCompany {
   asiakasId: number;
@@ -27,6 +28,17 @@ export interface CompanyListItem {
   asiakasId: number;
   name: string;
   current: boolean;
+  /**
+   * Role names held in THIS company, read from the session JWT's
+   * `asiakasesWithTypes`. `[]` = membership with no roles (a real state — see
+   * asiakasId 4) or a company the token predates. Merged in here because
+   * neither output answered "which companies can I act on, as what" alone:
+   * `auth whoami` had the roles but no names, this had the names but no roles
+   * (fb#380). The names cannot go the other way — the JWT carries a name only
+   * for the ACTIVE company, so `renderWhoami` would need a network call and it
+   * is deliberately pure.
+   */
+  roles: string[];
 }
 
 export interface CompanyCurrent {
@@ -35,8 +47,25 @@ export interface CompanyCurrent {
 }
 
 /**
+ * Role names per asiakasId from the session JWT — free (the claims are already
+ * local, no extra round-trip). Decode failures degrade to "no roles known"
+ * rather than failing a read whose network half already succeeded: a token this
+ * client just authenticated with is decodable in practice, and a malformed one
+ * is `auth doctor`'s problem, not `company list`'s.
+ */
+function rolesByAsiakasId(client: ApiClient): Map<number, string[]> {
+  try {
+    const claims = decodeJwtPayload(client.getCurrentToken());
+    return new Map(claims.companies.map((c) => [c.asiakasId, c.roles]));
+  } catch {
+    return new Map();
+  }
+}
+
+/**
  * GET /api/company-selection/available and project to the universal list
- * envelope, annotating each row with `current: boolean`.
+ * envelope, annotating each row with `current: boolean` and the `roles` held
+ * there (from the JWT — see {@link CompanyListItem.roles}).
  */
 export async function runCompanyList(
   client: ApiClient
@@ -44,10 +73,12 @@ export async function runCompanyList(
   const res = await client.get<AvailableResponse>(
     "/api/company-selection/available"
   );
+  const roles = rolesByAsiakasId(client);
   const items = res.companies.map((c) => ({
     asiakasId: c.asiakasId,
     name: companyName(c),
     current: c.asiakasId === res.currentCompanyId,
+    roles: roles.get(c.asiakasId) ?? [],
   }));
   return listEnvelope(items);
 }

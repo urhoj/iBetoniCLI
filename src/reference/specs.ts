@@ -127,6 +127,11 @@ const VEHICLE_ASIAKAS_403: CommandError = apiErr(
   "No vehicle access on the requested --asiakas company",
   "use a tenant you have a vehicle-manage role on, or a developer token"
 );
+/** Shared by every vehicle-row list (list/search/driver board/driver gaps) — they
+ *  all read `dbo.vehicle`, so they all surface the legacy sentinel rows that no
+ *  id-taking command will accept (fb#380). One constant so the four can't drift. */
+const VEHICLE_PLACEHOLDER_NOTE =
+  "`placeholder: true` marks a legacy sentinel row (e.g. vehicleId 0 'Ei tietoa') that is listed but NOT addressable — `ib vehicle get 0` / `ib vehicle driver assign 0 …` exit 4. The key is absent on real vehicles. Which tenants carry one varies.";
 
 // ─── cross-domain shared fragments ───────────────────────────────────────────
 /** The system-admin 403 every `jerry admin` / admin-gated row repeats. */
@@ -567,12 +572,21 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib company list",
     description:
-      "List the companies the current user can act on, with the active one marked `current: true`.",
+      "List the companies the current user can act on — name, the roles held there, and the active one marked `current: true`. The one-call answer to 'where can I act, as what'.",
     auth: "any",
     flags: [],
     outputShape:
-      "ListEnvelope<{ asiakasId, name, current }> = { items, nextCursor, count }",
+      "ListEnvelope<{ asiakasId, name, current, roles }> = { items, nextCursor, count }",
     errors: [...COMMON_AUTH_ERRORS],
+    notes: [
+      // whoami holds the roles but no names (the JWT carries a name only for the
+      // ACTIVE company), so the names could not go the other way without making
+      // the pure, no-I/O whoami do a network call — the roles came here instead
+      // (fb#380).
+      "`roles` are read from your own JWT, so they cost no extra round-trip. `[]` = membership with no roles (a real state), not an error.",
+      "`ib auth whoami` reports the same memberships but names only the ACTIVE company — use this command when you need the names.",
+    ],
+    seeAlso: ["ib auth whoami", "ib company switch"],
     examples: ["ib company list", "ib company list --pretty"],
   },
   {
@@ -2166,11 +2180,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     outputShape:
-      "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>" + TRUNCATED_NOTE,
+      "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null, placeholder?:true }>" + TRUNCATED_NOTE,
     errors: [
       VEHICLE_ASIAKAS_403,
       ...permErrors("auth.page.vehicle.read"),
     ],
+    notes: [VEHICLE_PLACEHOLDER_NOTE],
     examples: [
       "ib vehicle list",
       "ib vehicle list --pretty",
@@ -2257,11 +2272,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     outputShape:
-      "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null }>" + TRUNCATED_NOTE,
+      "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null, placeholder?:true }>" + TRUNCATED_NOTE,
     errors: [
       VEHICLE_ASIAKAS_403,
       ...permErrors("auth.page.vehicle.read"),
     ],
+    notes: [VEHICLE_PLACEHOLDER_NOTE],
     examples: ["ib vehicle search ABC", "ib vehicle search kuorma --limit 20", "ib vehicle search 82", "ib vehicle search ABC --asiakas 1380"],
   },
   {
@@ -2466,11 +2482,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     flags: [],
     outputShape:
-      "ListEnvelope<{ vehicleId, plate, name, type, typeName, driverPersonId, driverName, hasDriver, needsDriver, keikkaCount, m3 }>",
+      "ListEnvelope<{ vehicleId, plate, name, type, typeName, driverPersonId, driverName, hasDriver, needsDriver, keikkaCount, m3, placeholder? }>",
     errors: permErrors("auth.page.grid.read"),
     notes: [
       "driverPersonId/driverName come from personPvm (the live day-driver source).",
-      "needsDriver = the vehicle uses the no-driver bar AND has no day driver (i.e. it's a gap).",
+      "needsDriver = the vehicle uses the no-driver bar AND has no day driver (i.e. it's a gap). Workload (keikkaCount/m3) does NOT affect it.",
+      VEHICLE_PLACEHOLDER_NOTE,
       "Deploy-gated: 404 until puminet5api ships /api/cli/driver/*.",
     ],
     seeAlso: ["ib vehicle driver gaps", "ib vehicle driver available", "ib vehicle driver assign"],
@@ -2479,16 +2496,24 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib vehicle driver gaps",
     description:
-      "Vehicles needing a driver that day — the 'Ei kuljettajaa' list. Board rows filtered to needsDriver.",
+      "Vehicles needing a driver that day — the 'Ei kuljettajaa' list. Board rows filtered to needsDriver = the vehicle is configured with the no-driver bar AND has no day driver.",
     permissions: ["auth.page.grid.read"],
     args: [
       { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)" },
     ],
     flags: [],
     outputShape:
-      "ListEnvelope<{ vehicleId, plate, name, type, typeName, driverPersonId, driverName, hasDriver, needsDriver, keikkaCount, m3 }>",
+      "ListEnvelope<{ vehicleId, plate, name, type, typeName, driverPersonId, driverName, hasDriver, needsDriver, keikkaCount, m3, placeholder? }>",
     errors: permErrors("auth.page.grid.read"),
-    notes: ["Pair with `ib vehicle driver available <date>` to find drivers to fill these. Deploy-gated."],
+    notes: [
+      // The gap test is the vehicle's useNoDriverBar FLAG, not its workload —
+      // keikkaCount/m3 are reported but do not gate needsDriver. Spelling that
+      // out here because an empty gaps list beside a fully driverless board
+      // reads as a contradiction otherwise (fb#380).
+      "A driverless vehicle is NOT a gap unless it uses the no-driver bar — so an empty gaps list alongside a board full of driverless vehicles is expected, not a contradiction. keikkaCount/m3 are informational and do NOT affect needsDriver.",
+      VEHICLE_PLACEHOLDER_NOTE,
+      "Pair with `ib vehicle driver available <date>` to find drivers to fill these. Deploy-gated.",
+    ],
     seeAlso: ["ib vehicle driver available", "ib vehicle driver assign", "ib vehicle driver board"],
     examples: ["ib vehicle driver gaps today", "ib vehicle driver gaps tomorrow"],
   },
