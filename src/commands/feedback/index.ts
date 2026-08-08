@@ -667,6 +667,9 @@ export function registerFeedbackCommands(
     );
 
   f.command("get <id>")
+    // `show` — the reflex spelling for read-one-row; callers retried it twice
+    // rather than reading the did-you-mean (feedback #373, earlier #275).
+    .alias("show")
     .option("--full")
     .action(
       guarded(async (idStr: string) => {

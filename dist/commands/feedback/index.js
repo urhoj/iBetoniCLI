@@ -496,6 +496,9 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .option("--offset <n>", "", Number)
         .action(jsonAction(getClient, (client, opts) => runFeedbackList(client, opts)));
     f.command("get <id>")
+        // `show` — the reflex spelling for read-one-row; callers retried it twice
+        // rather than reading the did-you-mean (feedback #373, earlier #275).
+        .alias("show")
         .option("--full")
         .action(guarded(async (idStr) => {
         const id = parseRefId(idStr, "feedback", "get");

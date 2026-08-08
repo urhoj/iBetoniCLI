@@ -2043,6 +2043,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib dev changelog get matches snapshot 1`] = `
 "USAGE
   ib dev changelog get <changelogId> [flags]
+  (also: ib dev changelog show)
 
 DESCRIPTION
   Get one change entry.
@@ -2387,6 +2388,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib dev feedback get matches snapshot 1`] = `
 "USAGE
   ib dev feedback get <id> [flags]
+  (also: ib dev feedback show)
 
 DESCRIPTION
   Fetch one feedback row by id (developer-only).

@@ -177,12 +177,14 @@ describe("recordFriction", () => {
     try {
       const program = await buildProgram();
       const { parserText, erroringCommand } = enableParserThrow(program);
+      // `view`, not `show` — `show` became a real alias of `get` (fb#373), so it
+      // no longer errors; `view` still exercises the same verb-synonym hint.
       await program
-        .parseAsync(["node", "ib", "dev", "feedback", "show", "273"])
+        .parseAsync(["node", "ib", "dev", "feedback", "view", "273"])
         .catch((err) => handleParseRejection(err, parserText, erroringCommand));
       const e = lastEntry();
       expect(e.exitCode).toBe(4);
-      expect(String(e.message)).toContain('unknown command "show" under `ib dev feedback`');
+      expect(String(e.message)).toContain('unknown command "view" under `ib dev feedback`');
       expect(String(e.message)).toContain("Did you mean `ib dev feedback get`?");
     } finally {
       stderrSpy.mockRestore();

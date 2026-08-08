@@ -5800,6 +5800,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     command: "ib dev feedback get",
+    aliases: ["ib dev feedback show"],
     description:
       "Fetch one feedback row by id (developer-only).",
     permissions: ["isSystemAdmin or isDeveloper"],

@@ -585,6 +585,8 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         writeJson(await runChangelogList(await getClient(), o));
     }));
     c.command("get <changelogId>")
+        // `show` — the reflex spelling for read-one-row (feedback #373).
+        .alias("show")
         .action(guarded(async (idStr) => {
         const id = parseRefId(idStr, "changelog", "get");
         const client = await getClient();
@@ -958,6 +960,7 @@ export const CHANGELOG_SPECS = [
     },
     {
         command: "ib dev changelog get",
+        aliases: ["ib dev changelog show"],
         description: "Get one change entry.",
         auth: "any",
         tier: "developer",
