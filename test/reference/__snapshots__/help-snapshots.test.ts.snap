@@ -2131,7 +2131,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
-  { entries, maxBumpLevel, count }
+  { items, entries, maxBumpLevel, count } — \`items\` is the canonical list key; \`entries\` is a back-compat alias of the same array (fb#163)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
@@ -2169,11 +2169,13 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
-  { released, versionTag } | { released, mode:'map' } | { dryRun, wouldRelease }
+  { released, versionTag } | { released, mode:'map' } | { dryRun, wouldRelease, validation }
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
   exit 4 (HTTP 400)  Validation (need --vtag or --map) → pass exactly one of --vtag/--map
+  exit 4 (client-side)  Neither or both of --vtag/--map given — the guard fires before any request → pass exactly one of --vtag (one tag for all pending entries) or --map (per-entry {changelogId, versionTag} array)
+  exit 4 (client-side)  --map file is unreadable, not valid JSON, or its root is not an array → check the path; the root must be a JSON array of { changelogId, versionTag }
 
 NOTES
   - Developer-gated.
@@ -2267,12 +2269,11 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
-  entry
+  entry & { relinkedFrom? } | { dryRun, wouldUpdate: { id, patch } }. \`relinkedFrom\` appears only when --feedback took the link from a row already resolved by a DIFFERENT entry (see the flag).
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
-  exit 4 (HTTP 400)  Validation (bad enum/language) → language must be fi|en
-  exit 4 (HTTP 400)  --bump-level on an already-RELEASED entry (one carrying a versionTag) — that bump has already shipped → Leave it as recorded; every other field is still editable. Only UNRELEASED entries (ib dev changelog pending) still drive a deploy.
+  exit 4 (HTTP 400)  Validation — a bad enum/language value, OR --bump-level on an already-RELEASED entry (one carrying a versionTag; that bump has already shipped) → For enums the error names the allowed values (language must be fi|en). For a released entry leave the level as recorded — every other field is still editable; only UNRELEASED entries (ib dev changelog pending) still drive a deploy.
   exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → Check the path; the root must be an object and every key an accepted field name (the error lists them)
   exit 4 (client-side)  a bounded free-text flag exceeds its devChangelog column width → trim the named flag by the stated overflow — a column-width limit, so --from-json does not help
 

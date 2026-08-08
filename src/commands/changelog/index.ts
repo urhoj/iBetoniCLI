@@ -1192,11 +1192,14 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       {
         name: "type",
         type: "string",
+        allowed: TYPES,
+        synonyms: TYPE_SYNONYMS,
         description: "feature|improvement|bugfix (conventional-commit synonyms accepted: fix→bugfix, feat→feature)",
       },
       {
         name: "area",
         type: "string",
+        allowed: AREAS,
         description: AREA_FLAG_DESC,
       },
       { name: "title", type: "string", description: "New title" },
@@ -1234,13 +1237,13 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         type: "string",
         description: "Sentry issue short id or URL this entry fixes (stored, not sent to Sentry)",
       },
-      { name: "source", type: "string", description: "Source: human|routine" },
+      { name: "source", type: "string", allowed: SOURCES, description: "Source: human|routine" },
       {
         name: "date",
         type: "date",
         description: "Entry date (YYYY-MM-DD|today)",
       },
-      { name: "language", type: "string", description: "Entry language (fi|en)" },
+      { name: "language", type: "string", allowed: LANGUAGES, description: "Entry language (fi|en)" },
       {
         name: "from-json",
         type: "string",
@@ -1251,7 +1254,8 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     writeFlags: true,
     mutates: true,
     dryRunKind: "client",
-    outputShape: "entry",
+    outputShape:
+      "entry & { relinkedFrom? } | { dryRun, wouldUpdate: { id, patch } }. `relinkedFrom` appears only when --feedback took the link from a row already resolved by a DIFFERENT entry (see the flag).",
     errors: [
       {
         http: 403,
@@ -1260,16 +1264,14 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         remedy: "dev token",
       },
       {
+        // ONE row per status — hintForError serves the FIRST http match, so a
+        // second 400 row here would be dead and mis-remedy the other case (fb#374).
         http: 400,
         exit: 4,
-        meaning: "Validation (bad enum/language)",
-        remedy: "language must be fi|en",
-      },
-      {
-        http: 400,
-        exit: 4,
-        meaning: "--bump-level on an already-RELEASED entry (one carrying a versionTag) — that bump has already shipped",
-        remedy: "Leave it as recorded; every other field is still editable. Only UNRELEASED entries (ib dev changelog pending) still drive a deploy.",
+        meaning:
+          "Validation — a bad enum/language value, OR --bump-level on an already-RELEASED entry (one carrying a versionTag; that bump has already shipped)",
+        remedy:
+          "For enums the error names the allowed values (language must be fi|en). For a released entry leave the level as recorded — every other field is still editable; only UNRELEASED entries (ib dev changelog pending) still drive a deploy.",
       },
       {
         origin: "client",
@@ -1385,7 +1387,8 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     auth: "any",
     tier: "developer",
     flags: [],
-    outputShape: "{ entries, maxBumpLevel, count }",
+    outputShape:
+      "{ items, entries, maxBumpLevel, count } — `items` is the canonical list key; `entries` is a back-compat alias of the same array (fb#163)",
     errors: [{ http: 403, exit: 3, meaning: "Developer only", remedy: "dev token" }],
     notes: [
       "This is the unreleased/pending view (mirrors `ib dev feedback list --unresolved`). `ib dev changelog list --unreleased` and `ib dev changelog report --unreleased` are aliases that route here; `report --month` covers already-released months.",
@@ -1406,10 +1409,24 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     mutates: true,
-    outputShape: "{ released, versionTag } | { released, mode:'map' } | { dryRun, wouldRelease }",
+    outputShape: "{ released, versionTag } | { released, mode:'map' } | { dryRun, wouldRelease, validation }",
     errors: [
       { http: 403, exit: 3, meaning: "Developer only", remedy: "dev token" },
       { http: 400, exit: 4, meaning: "Validation (need --vtag or --map)", remedy: "pass exactly one of --vtag/--map" },
+      {
+        origin: "client",
+        exit: 4,
+        match: "exactly one of",
+        meaning: "Neither or both of --vtag/--map given — the guard fires before any request",
+        remedy: "pass exactly one of --vtag (one tag for all pending entries) or --map (per-entry {changelogId, versionTag} array)",
+      },
+      {
+        origin: "client",
+        exit: 4,
+        match: "--map:",
+        meaning: "--map file is unreadable, not valid JSON, or its root is not an array",
+        remedy: "check the path; the root must be a JSON array of { changelogId, versionTag }",
+      },
     ],
     notes: [
       "Developer-gated.",
