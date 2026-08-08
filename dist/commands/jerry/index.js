@@ -6,6 +6,13 @@ import { parseId, resolveSearchQuery, resolveDualString, resolveAsiakasTarget, c
 import { resolveDate } from "../../dates.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
+// ─── request reads ──────────────────────────────────────────────────────────
+/**
+ * Tabs the provider lifecycle view (`--provider`) accepts — mirrors the
+ * backend's VALID_TABS (puminet5api routes/pumppuRequestRoutes.js), which 400s
+ * ("tab virheellinen") on anything else. Shared with the CommandSpec.
+ */
+export const PROVIDER_LIST_TABS = ["avoimet", "tarjotut", "voitetut", "paattyneet"];
 /**
  * List pump requests (tarjouspyynnöt). Three views:
  *   --mine     → GET /api/pumppuRequests/mine          (the caller's own requests; default)
@@ -283,6 +290,12 @@ export async function runJerryAdminToggle(client, asiakasId, on, flags) {
  * anything else. Shared by the option help here and the CommandSpecs.
  */
 export const ONBOARDING_STATUS_KEYS = "ei_aloitettu → email1_lahetetty → muistutus_lahetetty → vastasi_kylla → tiedot_pyydetty → tervetuloa_lahetetty (pipeline order); terminal: vastasi_ei / ei_vastausta / ei_sovellu";
+/** Prospect company categories — backend COMPANY_TYPES (400 "Unknown companyType"). */
+export const COMPANY_TYPES = ["pumppu", "betoni", "all", "owner"];
+/** How a prospect entered the pipeline — backend-validated (400 "Invalid source"). */
+export const ONBOARDING_SOURCES = ["manual", "import", "scheduled"];
+/** Contact-history event kinds — backend-validated (400 "eventType must be call, response or note"). */
+export const ONBOARDING_EVENT_TYPES = ["call", "response", "note"];
 /** Fields a `--search` substring matches against (company name + outreach/contact). */
 const ONBOARDING_SEARCH_FIELDS = [
     "asiakasNimi",
@@ -320,6 +333,22 @@ export async function runJerryOnboardingSet(client, asiakasId, fields, flags) {
 export async function runJerryOnboardingLog(client, asiakasId, body, flags) {
     return client.post(`/api/admin/jerry-onboarding/${asiakasId}/events`, body, { headers: writeFlagsToHeaders(flags) });
 }
+/**
+ * Statuses the admin request list can filter on — mirrors VALID_STATUSES in
+ * puminet5api modules/jerryAdmin/jerryAdminRequestsSql.js. The server SILENTLY
+ * DROPS an unknown status from the IN list (and returns every status when that
+ * empties the filter), so the CLI guards the value client-side rather than
+ * answering a wider question than the one asked.
+ */
+export const ADMIN_REQUEST_STATUSES = [
+    "draft",
+    "open",
+    "no_supply",
+    "pending_verification",
+    "accepted",
+    "cancelled",
+    "expired",
+];
 /** Admin request list (GET /api/admin/jerry-requests). System-admin only. */
 export async function runJerryAdminRequests(client, opts) {
     const data = await client.get(`/api/admin/jerry-requests${qs({
@@ -360,6 +389,14 @@ export async function runJerryAdminRequestGet(client, id) {
 export async function runJerryAdminRequestOffers(client, id) {
     return toListEnvelope(await client.get(`/api/admin/jerry-requests/${id}/offers`));
 }
+// ─── admin searches (Osoitehaut: address demand + conversion funnel) ─────────
+/**
+ * Coverage filter for the address-demand list. The backend translates these
+ * into a HAVING clause and IGNORES anything else — an unknown value silently
+ * returns the unfiltered list, which reads as "every address is covered".
+ * Guarded client-side for that reason.
+ */
+export const SEARCH_DELIVERABLE = ["covered", "no_supply"];
 /**
  * Aggregated searched-address demand (GET /api/admin/jerry-searches). System-admin only.
  * Each row is one address (collapsed by place), with searchCount + noSupplyCount — the
@@ -733,7 +770,16 @@ export function registerJerryCommands(parent, getClient) {
         .option("--customer <id>", "", Number)
         .option("--provider <id>", "", Number)
         .option("--limit <n>", "", cappedInt(300))
-        .action(jsonAction(getClient, (client, opts) => runJerryAdminRequests(client, opts)));
+        .action(guarded(async (opts) => {
+        // Reject an unknown status here: the server drops it from the IN list,
+        // and a filter that emptied out returns EVERY status — a wider answer
+        // than the one asked, with nothing saying so.
+        if (opts.status) {
+            assertEnumCsv(opts.status.split(",").map((s) => s.trim()).filter(Boolean), ADMIN_REQUEST_STATUSES, "--status");
+        }
+        const client = await getClient();
+        writeJson(await runJerryAdminRequests(client, opts));
+    }));
     adminRequest
         .command("stats")
         .option("--from <date>", "", resolveDate)
@@ -783,7 +829,14 @@ export function registerJerryCommands(parent, getClient) {
         .option("--deliverable <k>")
         .option("--q <text>")
         .option("--limit <n>", "", cappedInt(500))
-        .action(jsonAction(getClient, (client, opts) => runJerryAdminSearches(client, opts)));
+        .action(guarded(async (opts) => {
+        // An unknown --deliverable is ignored server-side (no HAVING clause), so
+        // the caller gets the UNFILTERED list — "no_suply" would read as "every
+        // address we ever checked is covered".
+        assertEnum(opts.deliverable, SEARCH_DELIVERABLE, "--deliverable");
+        const client = await getClient();
+        writeJson(await runJerryAdminSearches(client, opts));
+    }));
     adminSearches
         .command("funnel")
         .option("--from <date>", "", resolveDate)

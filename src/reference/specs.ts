@@ -24,7 +24,17 @@ import { exitCodeFromStatus } from "../api/errors.js";
 import { MESSAGE_DAILY_SPECS } from "../commands/message/daily/index.js";
 import { MESSAGE_BOARD_SPECS } from "../commands/message/board/index.js";
 import { CHANGELOG_SPECS } from "../commands/changelog/index.js";
-import { ONBOARDING_STATUS_KEYS, CHECK_ADDRESS_GATES, REQUEST_STATS_GROUPS } from "../commands/jerry/index.js";
+import {
+  ONBOARDING_STATUS_KEYS,
+  CHECK_ADDRESS_GATES,
+  REQUEST_STATS_GROUPS,
+  PROVIDER_LIST_TABS,
+  ADMIN_REQUEST_STATUSES,
+  SEARCH_DELIVERABLE,
+  COMPANY_TYPES,
+  ONBOARDING_SOURCES,
+  ONBOARDING_EVENT_TYPES,
+} from "../commands/jerry/index.js";
 import {
   KINDS as FEEDBACK_KINDS,
   SCOPES as FEEDBACK_SCOPES,
@@ -4037,11 +4047,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: ['ib person delete 5351 --reason "departed"'],
   },
 
-  // ─── jerry (17) — BetoniJerry marketplace ──────────────────────────────────
+  // ─── jerry (39) — BetoniJerry marketplace ──────────────────────────────────
   {
     command: "ib jerry request list",
     description:
-      "List BetoniJerry pump requests (tarjouspyynnöt). Default --mine returns the caller's own requests (GET /api/pumppuRequests/mine). --open returns the provider inbox of open requests in your delivery area (GET /api/pumppuRequests/open) and requires a provider company (isPumppuToimittaja); customer PII is masked there until your offer is accepted. --provider is the provider's own lifecycle view (GET /api/pumppuRequests/provider-list) — also provider-only, and includes your sent offers — selected by --tab <avoimet|tarjotut|voitetut|paattyneet> (default avoimet): avoimet = open requests to bid on, tarjotut = ones you have offered on (offer pending), voitetut = won (your offer accepted/confirmed), paattyneet = ended (expired, no_supply, or lost to another provider). --status (CSV) and --limit apply to --mine only. (Whole-market visibility is system-admin only — see `ib jerry admin requests`.)",
+      "List BetoniJerry pump requests (tarjouspyynnöt). Default --mine returns the caller's own requests (GET /api/pumppuRequests/mine). --open returns the provider inbox of open requests in your delivery area (GET /api/pumppuRequests/open) and requires a provider company (isPumppuToimittaja); customer PII is masked there until your offer is accepted. --provider is the provider's own lifecycle view (GET /api/pumppuRequests/provider-list) — also provider-only, and includes your sent offers — selected by --tab <avoimet|tarjotut|voitetut|paattyneet> (default avoimet): avoimet = open requests to bid on, tarjotut = ones you have offered on (offer pending), voitetut = won (your offer accepted/confirmed), paattyneet = ended (expired, no_supply, or lost to another provider). --status (CSV) and --limit apply to --mine only. Whole-market visibility is system-admin only.",
     permissions: ["--open / --provider: provider company (isPumppuToimittaja)"],
     flags: [
       { name: "open", type: "boolean", description: "Provider inbox of open requests in your delivery area (provider role)" },
@@ -4049,14 +4059,16 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "status", type: "string", description: "Filter --mine by status (CSV: open,pending_verification,accepted,cancelled,expired,no_supply)", allowed: ["open", "pending_verification", "accepted", "cancelled", "expired", "no_supply"] },
       { name: "limit", type: "number", default: "100", description: "Max rows for --mine (server caps at 200)" },
       { name: "provider", type: "boolean", description: "Provider lifecycle view via /provider-list (incl. sent offers)" },
-      { name: "tab", type: "string", description: "With --provider: avoimet|tarjotut|voitetut|paattyneet" },
+      { name: "tab", type: "string", default: "avoimet", description: "With --provider: which lifecycle tab to return", allowed: [...PROVIDER_LIST_TABS] },
     ],
     outputShape:
       "ListEnvelope<{ pumppuRequestId, status, createdAt, sentAt?, osoite, formattedAddress, totalM3|maaraM3, ... }> (fields differ between --mine and --open; --open is PII-masked)",
     errors: [
+      apiErr(400, "Unknown --tab", "use one of avoimet, tarjotut, voitetut, paattyneet (server-validated)"),
       apiErr(403, "Not a provider (for --open / --provider)", "switch to a provider company, or use --mine"),
       ...COMMON_AUTH_ERRORS,
     ],
+    seeAlso: ["ib jerry admin request list"],
     examples: [
       "ib jerry request list",
       "ib jerry request list --open",
@@ -4090,7 +4102,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId you own" }],
     flags: [],
     outputShape:
-      "ListEnvelope<{ pumppuOfferId, status, priceCents, vatPercent, validUntil, asiakasNimi, ytunnus, providerDistanceKm, companyDescription, jerryContactName?, jerryContactPhone?, openingHours? }>",
+      "ListEnvelope<{ pumppuOfferId, status, priceCents, vatPercent, availableFrom, cancellationTerms, extraNotes, priceTerms, validUntil, createdAt, updatedAt, asiakasNimi, ytunnus, asiakasId, messageThreadId, companyDescription, maintainsOrderInfo, jerryContactName, jerryContactPhone, openingHours, providerDistanceKm }> — jerryContactName/jerryContactPhone/openingHours are null on every row except the accepted offer; providerDistanceKm is null when the provider varikko or the worksite has no coordinates",
     errors: [
       apiErr(404, "Request not found / not yours", "verify requestId"),
       ...COMMON_AUTH_ERRORS,
@@ -4100,9 +4112,9 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib jerry request create",
     description:
-      "Create a customer pump request / tarjouspyyntö (POST /api/pumppuRequests). Any authenticated user — this is the CUSTOMER side (distinct from `ib jerry offer create`, the provider bid). The worksite address is given positionally OR via --address (exactly one; both allowed only if they agree). The server geocodes the address and inserts the request as status:'open', immediately visible to every geographically-matching provider. Omit --asiakas to bill it to your auto-created private BetoniJerry customer account; pass --asiakas to use a company you have access to. Requires --reason. ⚠ --dry-run is honoured only once the backend change deploys — against older backends X-Dry-Run is ignored and the request IS created.",
+      "Create a customer pump request / tarjouspyyntö (POST /api/pumppuRequests). Any authenticated user — this is the CUSTOMER side (distinct from `ib jerry offer create`, the provider bid). The worksite address is given positionally OR via --address (exactly one; both allowed only if they agree). The server geocodes the address and inserts the request as status:'open', immediately visible to every geographically-matching provider. Omit --asiakas to bill it to your auto-created private BetoniJerry customer account; pass --asiakas to use a company you have access to. Requires --reason.",
     auth: "any",
-    args: [{ name: "address", type: "string", description: "Worksite address (osoite); positional, or use --address" }],
+    args: [{ name: "address", type: "string", required: false, description: "Worksite address (osoite); pass it here OR as --address (exactly one)" }],
     flags: [
       { name: "address", type: "string", description: "Worksite address (osoite); alias for the positional" },
       { name: "pump-at", type: "string", description: "Pump datetime (pumppausaika; ISO, REQUIRED), e.g. 2026-06-17T09:00:00+03:00" },
@@ -4120,14 +4132,16 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ pumppuRequestId, status:'open', asiakasId, personId, tyomaaId, geocoded } · { dryRun:true, wouldCreate:{ asiakasId, osoite, pumppuAika, totalM3, requiredPuomi, pumppuKesto, requiredLinja, notes }, validation:{ ok:true } } on --dry-run",
     errors: [
-      apiErr(400, "osoite/pumppausaika/maaraM3 missing or invalid", "pass the address (positional or --address), --pump-at (ISO), --m3 (> 0)"),
+      { origin: "client", exit: 4, match: "address", meaning: "Address missing, or given BOTH positionally and via --address with different values", remedy: "pass the address exactly once — positional or --address" },
+      { origin: "client", exit: 4, match: "--m3", meaning: "--m3 is not a number > 0", remedy: "pass --m3 as a positive number of cubic metres" },
+      apiErr(400, "Server-side validation: pumppausaika not a parseable datetime, whitespace-only osoite, or non-numeric asiakasId/puomi", "pass --pump-at as a full ISO datetime (e.g. 2026-06-17T09:00:00+03:00) and a non-empty address"),
       apiErr(403, "No access to --asiakas", "omit --asiakas, or target a company you belong to"),
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
       "Customer side: creates the tarjouspyyntö itself, NOT a provider offer (that is `ib jerry offer create`).",
       "Created as status:'open' → immediately fans out to matching provider inboxes. Run `ib jerry check-address` first to preview which providers (if any) cover the address.",
-      "--dry-run is deploy-gated: until the backend honouring X-Dry-Run deploys, --dry-run still creates the request.",
+      "--dry-run runs the server's synchronous validation and echoes the would-be request, touching no DB (no asiakas resolve/auto-create, no geocode, no insert) — so a bad --pump-at/--m3 still 400s under --dry-run.",
     ],
     seeAlso: ["ib jerry check-address", "ib jerry request list", "ib jerry offer create"],
     examples: [
@@ -4216,7 +4230,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ pumppuOfferId, status:'draft', created, messageThreadId } · { dryRun:true, wouldUpsert:{ pumppuRequestId, priceCents, vatPercent, priceTerms, validUntil, availableFrom, extraNotes, cancellationTerms, maintainsOrderInfo } } on --dry-run",
     errors: [
-      apiErr(400, "priceCents missing / out of range", "pass --price-cents as an integer 1..99999900"),
+      { origin: "client", exit: 4, match: "--price-cents", meaning: "--price-cents is not an integer in 1..99999900 — rejected locally before anything is sent (this guard is stricter than the server's, so a bad price never reaches a server 400)", remedy: "pass --price-cents as an integer 1..99999900 (cents, not euros)" },
       apiErr(403, "Not a provider", "switch to a provider company (company switch)"),
       apiErr(404, "Request not found", "verify requestId"),
       apiErr(409, "Request not open / expired, or offer no longer editable", "the request was closed, or your offer is already accepted/rejected"),
@@ -4364,17 +4378,20 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib jerry counts",
     description:
-      "Lifecycle counts. Default --mine returns the customer view (GET /api/pumppuRequests/mine/counts: draft/open/pending_verification/accepted/cancelled/expired/no_supply). --provider returns the provider badge counts (GET /api/pumppuRequests/provider-counts: avoimet/tarjotut/voitetut/voitetutActionRequired/paattyneet) and requires a provider company.",
+      "Lifecycle counts. Default --mine returns the customer view (GET /api/pumppuRequests/mine/counts: draft/open/pending_verification/accepted/cancelled/expired/no_supply). --provider returns the provider badge counts (GET /api/pumppuRequests/provider-counts: avoimet/tarjotut/voitetut/voitetutActionRequired/paattyneet) plus this company's Jerry membership state, and requires a provider company.",
     permissions: ["--provider: provider company (isPumppuToimittaja)"],
     flags: [
       { name: "provider", type: "boolean", description: "Provider badge counts (provider role)" },
       { name: "mine", type: "boolean", description: "Customer counts (default)" },
     ],
     outputShape:
-      "--mine: { draft, open, pending_verification, accepted, cancelled, expired, no_supply } | --provider: { avoimet, tarjotut, voitetut, voitetutActionRequired, paattyneet }",
+      "--mine: { draft, open, pending_verification, accepted, cancelled, expired, no_supply } | --provider: { avoimet, tarjotut, voitetut, voitetutActionRequired, paattyneet, supportUnread, jerryActive, application: { status, createdTime } | null }",
     errors: [
       apiErr(403, "Not a provider (for --provider)", "switch to a provider company, or use --mine"),
       ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "--provider carries three non-count keys beyond the badge numbers: supportUnread (per-PERSON, not per-company: support threads with a message you have not read), jerryActive (the HAS_JERRY setting is on — the company is live in the marketplace), and application (this company's own jerryOnboarding row, null when it never applied). jerryActive is the cheapest single answer to 'is my company live in Jerry?'.",
     ],
     examples: ["ib jerry counts", "ib jerry counts --provider"],
   },
@@ -4397,7 +4414,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ geocoded: boolean, deliverable?: boolean, lat?, lng?, placeId?, formattedAddress?, providerCount?, nearestVarikkoKm?, providers?: [{ asiakasId, asiakasNimi, distanceKm }], considered?: [{ asiakasId, asiakasNimi, sijaintiId, excludedBy: 'company-gate'|'provider-dead'|'no-coords'|'not-enrolled'|'radius'|'boom', detail }], consideredSuppressed?: { [gate]: count } }",
     errors: [
-      apiErr(400, "osoite missing", "pass --address"),
+      apiErr(400, "Empty/whitespace-only --address (an omitted --address is caught locally by the parser, which answers with its own prescriptive envelope)", "pass a non-empty street address"),
       { origin: "client", exit: 4, match: "--boom", meaning: "--boom not a non-negative number", remedy: "pass metres ≥ 0, or omit for no boom filter" },
       { origin: "client", exit: 4, match: "--asiakas", meaning: "--asiakas without --explain, or not a positive integer", remedy: "add --explain, or pass a positive asiakasId" },
       { origin: "client", exit: 4, match: "--gate", meaning: "--gate without --explain, or an unknown reason name", remedy: "add --explain; valid reasons are company-gate, provider-dead, no-coords, not-enrolled, radius, boom" },
@@ -4409,7 +4426,6 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "--explain answers 'why no offers?': considered[] lists the NON-matching varikot (passing ones are in providers[]), each tagged with the FIRST gate it failed. Gate priority puts COMPANY-level reasons above DEPOT-level ones — company-gate → provider-dead → no-coords → not-enrolled → radius → boom — so the reason reported is the most upstream blocker, the one to fix first: adding coordinates to a depot changes nothing for a company that was never enrolled. Business-sensitive, so returned only to developer/admin tokens, exactly like providers[].",
       "company-gate is OMITTED by default: it only says 'this company was never in the programme', and on a live Helsinki probe it was 93 of 110 rows across 17 companies, burying the actionable ones. Whatever is withheld is counted in consideredSuppressed, so nothing disappears silently. Pass --gate company-gate (alone or with others) to see it, or --asiakas <id> to surface it for ONE company during onboarding — which is when it is a real answer.",
       "--gate narrows further: --gate no-coords,radius answers 'which enrolled depots are misconfigured?' without the rest. An unknown reason name exits 4 rather than silently narrowing the view, since a shorter list reads as 'nothing else is wrong'.",
-      "Deploy-gated: --explain / --gate / --asiakas are inert until the backend adding considered[] deploys (older backends silently ignore the extra body fields).",
     ],
     seeAlso: ["ib jerry admin list"],
     examples: [
@@ -4516,7 +4532,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
-      "matchableVarikkoCount is DEPLOY-GATED (feedback #336): it exists in the backend source but is absent from the response until that deploy ships. Test for it before using the health check — `matchableVarikkoCount === 0` against a backend that omits the field compares undefined === 0, which is never true, so the check silently reports every company healthy. Until then, diagnose per address with `ib jerry check-address --explain`.",
+      "The health check is `matchableVarikkoCount === 0 && sijaintiJerryCount > 0` — Jerry-active, varikot enrolled, yet invisible to every tarjouspyyntö. Diagnose the individual depot with `ib jerry check-address --explain`.",
     ],
     seeAlso: ["ib jerry check-address"],
     examples: ["ib jerry admin list", "ib jerry admin list --pretty"],
@@ -4560,7 +4576,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin enable",
     description:
-      "Enable the BetoniJerry module for a company — the audited toggle that sets BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/enable). Change-tracked via the asiakasSql proc paths. System-admin only. Requires --reason.",
+      "Enable the BetoniJerry module for a company — the audited toggle that sets BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/enable), auto-provisions the modules a provider needs, and returns a readiness `validation` payload naming what it could NOT provision. Change-tracked via the asiakasSql proc paths. System-admin only. Requires --reason.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "asiakasId", type: "number", required: false, description: "company asiakasId (or pass --asiakas)" }],
@@ -4571,13 +4587,19 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "always",
-    outputShape: "{ success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: true } }",
+    outputShape:
+      "{ success: true, validation?: { ok, summary: { [severity]: 'passed/total' }, missing: [{ id, severity, titleFi, detail }] } } or { dryRun: true, wouldUpdate: { asiakasId, enable: true } }",
     errors: [
       apiErr(400, "Invalid asiakasId", "pass a numeric asiakasId"),
       SYSADMIN_403,
       apiErr(404, "Company not found", "verify asiakasId"),
       ...COMMON_AUTH_ERRORS,
     ],
+    notes: [
+      "`validation` is the post-enable readiness summary — the `jerry` validation profile re-run against the company, with `missing` listing the still-failing checks (TarjousAdmin role, grid vehicle, Jerry-ready varikko coordinates, complete contact details): the parts that need real data and cannot be auto-provisioned. Enable itself already committed, so a non-ok validation is a TODO list, not a failure.",
+      "It is best-effort and enable-only: the key is ABSENT (not null) when the validation run itself fails, and `disable` never returns it. Re-run the same checks any time with `ib validate --profile jerry --asiakas <id>`.",
+    ],
+    seeAlso: ["ib validate"],
     examples: ['ib jerry admin enable 1402 --reason "onboard provider"', "ib jerry admin enable --asiakas 1402 --dry-run --reason preview"],
   },
   {
@@ -4629,17 +4651,17 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "asiakasId", type: "number", description: "company asiakasId" }],
     flags: [
       { name: "tier", type: "number", description: "1 priority / 2 secondary" },
-      { name: "malli", type: "string", description: "Email variant (A/B)" },
+      { name: "malli", type: "string", description: "Email variant label — FREE TEXT (not server-validated); the convention is A or B" },
       { name: "kanava", type: "string", description: "Preferred channel, free text" },
       { name: "alue", type: "string", description: "Operating area ({alue} merge field)" },
-      { name: "company-type", type: "string", description: "pumppu | betoni | all | owner" },
-      { name: "source", type: "string", description: "manual | import | scheduled (default manual)" },
+      { name: "company-type", type: "string", description: "Company category", allowed: [...COMPANY_TYPES] },
+      { name: "source", type: "string", default: "manual", description: "How the prospect entered the pipeline", allowed: [...ONBOARDING_SOURCES] },
     ],
     writeFlags: true,
     dryRunKind: "server",
     outputShape: "{ jerryOnboardingId } · { dryRun: true, wouldCreate: { asiakasId } } on --dry-run",
     errors: [
-      apiErr(400, "Prospect already exists / company not found", "check asiakasId"),
+      apiErr(400, "Prospect already exists / company not found / unknown --source or --company-type", "check asiakasId; --source is manual|import|scheduled, --company-type is pumppu|betoni|all|owner"),
       SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
     ],
@@ -4655,10 +4677,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [
       { name: "status", type: "string", description: `Pipeline status key: ${ONBOARDING_STATUS_KEYS}` },
       { name: "tier", type: "number", description: "1/2" },
-      { name: "malli", type: "string", description: "Email variant (A/B)" },
+      { name: "malli", type: "string", description: "Email variant label — FREE TEXT (not server-validated); the convention is A or B" },
       { name: "kanava", type: "string", description: "Preferred channel" },
       { name: "alue", type: "string", description: "Operating area" },
-      { name: "company-type", type: "string", description: "pumppu | betoni | all | owner" },
+      { name: "company-type", type: "string", description: "Company category", allowed: [...COMPANY_TYPES] },
       { name: "notes", type: "string", description: "muistiinpanot" },
       { name: "outreach-name", type: "string", description: "Contact override name" },
       { name: "outreach-email", type: "string", description: "Contact override email" },
@@ -4668,7 +4690,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     outputShape: "{ success: true } · { dryRun: true, wouldUpdate: { asiakasId, fields } } on --dry-run",
     errors: [
-      apiErr(400, "Unknown status", "use one of the status keys listed on --status"),
+      apiErr(400, "Unknown --status or --company-type", "use one of the status keys listed on --status; --company-type is pumppu|betoni|all|owner"),
       apiErr(404, "Prospect not found", "add it first: ib jerry admin onboarding add"),
       SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
@@ -4678,24 +4700,28 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin onboarding log",
     description:
-      "Append a call/response/note event to a prospect's contact history (POST /api/admin/jerry-onboarding/:asiakasId/events). --time backdates; --set-status also moves the pipeline status atomically. System-admin only.",
+      "Append a call/response/note event to a prospect's contact history (POST /api/admin/jerry-onboarding/:asiakasId/events). --time backdates; --set-status also moves the pipeline status (a second, best-effort step — see NOTES). System-admin only.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "asiakasId", type: "number", description: "company asiakasId" }],
     flags: [
-      { name: "type", type: "string", description: "call | response | note; REQUIRED" },
+      { name: "type", type: "string", description: "Event kind; REQUIRED", allowed: [...ONBOARDING_EVENT_TYPES] },
       { name: "text", type: "string", description: "Event text; REQUIRED" },
       { name: "time", type: "string", description: "Backdated event time (ISO 8601)" },
       { name: "set-status", type: "string", description: `Also set the pipeline status. Keys: ${ONBOARDING_STATUS_KEYS}` },
     ],
     writeFlags: true,
     dryRunKind: "server",
-    outputShape: "{ jerryOnboardingEventId } · { dryRun: true, wouldLog: {...} } on --dry-run",
+    outputShape:
+      "{ jerryOnboardingEventId } · { jerryOnboardingEventId, statusUpdated: false } when --set-status failed AFTER the event was written · { dryRun: true, wouldLog: { asiakasId, eventType, setStatus } } on --dry-run",
     errors: [
-      apiErr(400, "Invalid eventType / missing text", "type must be call, response or note"),
+      apiErr(400, "Invalid eventType / missing text / unknown --set-status", "type must be call, response or note; --set-status must be a known pipeline status key"),
       apiErr(404, "Prospect not found", "add it first: ib jerry admin onboarding add"),
       SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "--set-status is NOT atomic with the event write: the event is inserted first, then the status update + its status_change event. If that second step fails the call still returns 200 with `statusUpdated: false` and the event already persisted — check for that key rather than assuming a 200 moved the status. A --set-status equal to the current status is a no-op (no status_change event).",
     ],
     examples: ['ib jerry admin onboarding log 1389 --type call --text "puhuttiin Jussin kanssa, kiinnostunut" --set-status vastasi_kylla'],
   },
@@ -4706,7 +4732,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin"],
     tier: "developer",
     flags: [
-      { name: "status", type: "string", description: "Status CSV (open,accepted,…)" },
+      { name: "status", type: "string", description: "Status CSV — any of the allowed keys", allowed: [...ADMIN_REQUEST_STATUSES] },
       { name: "from", type: "string", description: "createdAt from (YYYY-MM-DD/today/yesterday)" },
       { name: "to", type: "string", description: "createdAt to (inclusive)" },
       { name: "customer", type: "number", description: "Customer asiakasId" },
@@ -4715,7 +4741,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "ListEnvelope<{ pumppuRequestId, status, createdAt, customerNimi, operatorName, osoite, totalM3, offerCount, acceptedPriceCents, bestPriceCents }>",
-    errors: [SYSADMIN_403, ...COMMON_AUTH_ERRORS],
+    errors: [
+      { origin: "client", exit: 4, match: "--status", meaning: "Unknown status in --status. Rejected locally because the server DROPS an unrecognised status from its filter and returns every status when that empties it — a silently wider answer", remedy: `use only: ${ADMIN_REQUEST_STATUSES.join(", ")}` },
+      SYSADMIN_403,
+      ...COMMON_AUTH_ERRORS,
+    ],
     seeAlso: ["ib jerry admin request stats"],
     examples: ["ib jerry admin request list --status open,accepted", "ib jerry admin request list --provider 1402 --from 2026-06-01"],
   },
@@ -4742,7 +4772,6 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "Bucketing happens in SQL in HELSINKI time, not UTC: a Sunday-evening request belongs to the week a Finnish reader would put it in. Weeks are ISO weeks labelled with the ISO YEAR, so a week straddling New Year stays one bucket — 2027-01-03 is `2026-W53`, not `2027-W53`.",
       "`withOffers` counts requests that received at least one non-draft offer; `offerCount` sums the offers themselves. With --group-by status the bucket IS the status, so byStatus has a single key — useful as a plain status breakdown for the window.",
       "Unlike `request list` there is no row cap, so totals stay correct as volume grows (the list caps at 300 and would silently under-count a client-side rollup).",
-      "Deploy-gated: needs the backend adding /api/admin/jerry-requests/stats.",
     ],
     seeAlso: ["ib jerry admin request list", "ib jerry admin searches funnel"],
     examples: [
@@ -4791,13 +4820,17 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [
       { name: "from", type: "string", description: "createdAt from (YYYY-MM-DD/today/yesterday)" },
       { name: "to", type: "string", description: "createdAt to (inclusive)" },
-      { name: "deliverable", type: "string", description: "covered | no_supply (never covered)" },
+      { name: "deliverable", type: "string", description: "covered = deliverable at least once; no_supply = never covered", allowed: [...SEARCH_DELIVERABLE] },
       { name: "q", type: "string", description: "Address substring filter" },
       { name: "limit", type: "number", default: "500", description: "Max rows (max 500)" },
     ],
     outputShape:
       "ListEnvelope<{ label, osoite, formattedAddress, placeId, lat, lng, searchCount, noSupplyCount, notGeocodedCount, deliverableEver, maxProviderCount, nearestVarikkoKm, lastSearchedAt }>",
-    errors: [SYSADMIN_403, ...COMMON_AUTH_ERRORS],
+    errors: [
+      { origin: "client", exit: 4, match: "--deliverable", meaning: "--deliverable is not covered/no_supply. Rejected locally because the server ignores an unknown value and returns the UNFILTERED list — which reads as 'every address is covered'", remedy: "pass --deliverable covered or --deliverable no_supply, or omit it for all rows" },
+      SYSADMIN_403,
+      ...COMMON_AUTH_ERRORS,
+    ],
     examples: [
       "ib jerry admin searches list --deliverable no_supply",
       "ib jerry admin searches list --from 2026-07-01 --q Vihti",
@@ -4875,7 +4908,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     tier: "developer",
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
     flags: [
-      { name: "days", type: "number", description: "Valid for N more days from now (default 14); mutually exclusive with --until" },
+      { name: "days", type: "number", description: "Valid for N more days from now; mutually exclusive with --until. Omit BOTH for the backend default of 14 days" },
       { name: "until", type: "string", description: "Absolute new expiry (ISO date/datetime); mutually exclusive with --days" },
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
@@ -4884,6 +4917,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     reasonPolicy: "always",
     outputShape: "{ success: true, status, expiresAt } or { dryRun: true, wouldUpdate: { pumppuRequestId, expiresAt } }",
     errors: [
+      { origin: "client", exit: 4, match: "--days or --until", meaning: "--days and --until passed together", remedy: "pass exactly one, or neither for the default 14 days" },
       apiErr(400, "Bad date/days", "use a positive --days or a future --until"),
       SYSADMIN_403,
       apiErr(409, "Wrong state", "request not in an extendable state (draft/cancelled/accepted)"),

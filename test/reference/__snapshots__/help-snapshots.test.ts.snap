@@ -3511,7 +3511,7 @@ exports[`Help snapshots — contract stability > help for ib jerry admin enable 
   ib jerry admin enable [<asiakasId>] [flags]
 
 DESCRIPTION
-  Enable the BetoniJerry module for a company — the audited toggle that sets BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/enable). Change-tracked via the asiakasSql proc paths. System-admin only. Requires --reason.
+  Enable the BetoniJerry module for a company — the audited toggle that sets BOTH isPumppuToimittaja and the HAS_JERRY setting (POST /api/admin/jerry-companies/:asiakasId/enable), auto-provisions the modules a provider needs, and returns a readiness \`validation\` payload naming what it could NOT provision. Change-tracked via the asiakasSql proc paths. System-admin only. Requires --reason.
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
@@ -3531,7 +3531,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
-  { success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: true } }
+  { success: true, validation?: { ok, summary: { [severity]: 'passed/total' }, missing: [{ id, severity, titleFi, detail }] } } or { dryRun: true, wouldUpdate: { asiakasId, enable: true } }
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Invalid asiakasId      → pass a numeric asiakasId
@@ -3539,6 +3539,13 @@ ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Company not found      → verify asiakasId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - \`validation\` is the post-enable readiness summary — the \`jerry\` validation profile re-run against the company, with \`missing\` listing the still-failing checks (TarjousAdmin role, grid vehicle, Jerry-ready varikko coordinates, complete contact details): the parts that need real data and cannot be auto-provisioned. Enable itself already committed, so a non-ok validation is a TODO list, not a failure.
+  - It is best-effort and enable-only: the key is ABSENT (not null) when the validation run itself fails, and \`disable\` never returns it. Re-run the same checks any time with \`ib validate --profile jerry --asiakas <id>\`.
+
+SEE ALSO
+  ib validate
 
 EXAMPLES
   ib jerry admin enable 1402 --reason "onboard provider"
@@ -3569,7 +3576,7 @@ ERRORS (stderr, exit non-zero)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
-  - matchableVarikkoCount is DEPLOY-GATED (feedback #336): it exists in the backend source but is absent from the response until that deploy ships. Test for it before using the health check — \`matchableVarikkoCount === 0\` against a backend that omits the field compares undefined === 0, which is never true, so the check silently reports every company healthy. Until then, diagnose per address with \`ib jerry check-address --explain\`.
+  - The health check is \`matchableVarikkoCount === 0 && sijaintiJerryCount > 0\` — Jerry-active, varikot enrolled, yet invisible to every tarjouspyyntö. Diagnose the individual depot with \`ib jerry check-address --explain\`.
 
 SEE ALSO
   ib jerry check-address
@@ -3593,11 +3600,11 @@ ARGUMENTS
 
 FLAGS
   --tier NUMBER    1 priority / 2 secondary
-  --malli STRING    Email variant (A/B)
+  --malli STRING    Email variant label — FREE TEXT (not server-validated); the convention is A or B
   --kanava STRING    Preferred channel, free text
   --alue STRING    Operating area ({alue} merge field)
-  --company-type STRING    pumppu | betoni | all | owner
-  --source STRING    manual | import | scheduled (default manual)
+  --company-type STRING    Company category
+  --source STRING    How the prospect entered the pipeline (default: manual)
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -3612,7 +3619,7 @@ OUTPUT (JSON, stdout)
   { jerryOnboardingId } · { dryRun: true, wouldCreate: { asiakasId } } on --dry-run
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Prospect already exists / company not found → check asiakasId
+  exit 4 (HTTP 400)  Prospect already exists / company not found / unknown --source or --company-type → check asiakasId; --source is manual|import|scheduled, --company-type is pumppu|betoni|all|owner
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -3658,14 +3665,14 @@ exports[`Help snapshots — contract stability > help for ib jerry admin onboard
   ib jerry admin onboarding log <asiakasId> [flags]
 
 DESCRIPTION
-  Append a call/response/note event to a prospect's contact history (POST /api/admin/jerry-onboarding/:asiakasId/events). --time backdates; --set-status also moves the pipeline status atomically. System-admin only.
+  Append a call/response/note event to a prospect's contact history (POST /api/admin/jerry-onboarding/:asiakasId/events). --time backdates; --set-status also moves the pipeline status (a second, best-effort step — see NOTES). System-admin only.
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
   <asiakasId> NUMBER    company asiakasId (required)
 
 FLAGS
-  --type STRING    call | response | note; REQUIRED
+  --type STRING    Event kind; REQUIRED
   --text STRING    Event text; REQUIRED
   --time STRING    Backdated event time (ISO 8601)
   --set-status STRING    Also set the pipeline status. Keys: ei_aloitettu → email1_lahetetty → muistutus_lahetetty → vastasi_kylla → tiedot_pyydetty → tervetuloa_lahetetty (pipeline order); terminal: vastasi_ei / ei_vastausta / ei_sovellu
@@ -3680,14 +3687,17 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
-  { jerryOnboardingEventId } · { dryRun: true, wouldLog: {...} } on --dry-run
+  { jerryOnboardingEventId } · { jerryOnboardingEventId, statusUpdated: false } when --set-status failed AFTER the event was written · { dryRun: true, wouldLog: { asiakasId, eventType, setStatus } } on --dry-run
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Invalid eventType / missing text → type must be call, response or note
+  exit 4 (HTTP 400)  Invalid eventType / missing text / unknown --set-status → type must be call, response or note; --set-status must be a known pipeline status key
   exit 5 (HTTP 404)  Prospect not found     → add it first: ib jerry admin onboarding add
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - --set-status is NOT atomic with the event write: the event is inserted first, then the status update + its status_change event. If that second step fails the call still returns 200 with \`statusUpdated: false\` and the event already persisted — check for that key rather than assuming a 200 moved the status. A --set-status equal to the current status is a no-op (no status_change event).
 
 EXAMPLES
   ib jerry admin onboarding log 1389 --type call --text "puhuttiin Jussin kanssa, kiinnostunut" --set-status vastasi_kylla
@@ -3708,10 +3718,10 @@ ARGUMENTS
 FLAGS
   --status STRING    Pipeline status key: ei_aloitettu → email1_lahetetty → muistutus_lahetetty → vastasi_kylla → tiedot_pyydetty → tervetuloa_lahetetty (pipeline order); terminal: vastasi_ei / ei_vastausta / ei_sovellu
   --tier NUMBER    1/2
-  --malli STRING    Email variant (A/B)
+  --malli STRING    Email variant label — FREE TEXT (not server-validated); the convention is A or B
   --kanava STRING    Preferred channel
   --alue STRING    Operating area
-  --company-type STRING    pumppu | betoni | all | owner
+  --company-type STRING    Company category
   --notes STRING    muistiinpanot
   --outreach-name STRING    Contact override name
   --outreach-email STRING    Contact override email
@@ -3730,7 +3740,7 @@ OUTPUT (JSON, stdout)
   { success: true } · { dryRun: true, wouldUpdate: { asiakasId, fields } } on --dry-run
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Unknown status         → use one of the status keys listed on --status
+  exit 4 (HTTP 400)  Unknown --status or --company-type → use one of the status keys listed on --status; --company-type is pumppu|betoni|all|owner
   exit 5 (HTTP 404)  Prospect not found     → add it first: ib jerry admin onboarding add
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -3864,7 +3874,7 @@ ARGUMENTS
   <requestId> NUMBER    pumppuRequestId (required)
 
 FLAGS
-  --days NUMBER    Valid for N more days from now (default 14); mutually exclusive with --until
+  --days NUMBER    Valid for N more days from now; mutually exclusive with --until. Omit BOTH for the backend default of 14 days
   --until STRING    Absolute new expiry (ISO date/datetime); mutually exclusive with --days
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
@@ -3881,6 +3891,7 @@ OUTPUT (JSON, stdout)
   { success: true, status, expiresAt } or { dryRun: true, wouldUpdate: { pumppuRequestId, expiresAt } }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --days and --until passed together → pass exactly one, or neither for the default 14 days
   exit 4 (HTTP 400)  Bad date/days          → use a positive --days or a future --until
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 4 (HTTP 409)  Wrong state            → request not in an extendable state (draft/cancelled/accepted)
@@ -3933,7 +3944,7 @@ DESCRIPTION
   Permissions: requires isSystemAdmin.
 
 FLAGS
-  --status STRING    Status CSV (open,accepted,…)
+  --status STRING    Status CSV — any of the allowed keys
   --from STRING    createdAt from (YYYY-MM-DD/today/yesterday)
   --to STRING    createdAt to (inclusive)
   --customer NUMBER    Customer asiakasId
@@ -3947,6 +3958,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ pumppuRequestId, status, createdAt, customerNimi, operatorName, osoite, totalM3, offerCount, acceptedPriceCents, bestPriceCents }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  Unknown status in --status. Rejected locally because the server DROPS an unrecognised status from its filter and returns every status when that empties it — a silently wider answer → use only: draft, open, no_supply, pending_verification, accepted, cancelled, expired
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -4062,7 +4074,6 @@ NOTES
   - Bucketing happens in SQL in HELSINKI time, not UTC: a Sunday-evening request belongs to the week a Finnish reader would put it in. Weeks are ISO weeks labelled with the ISO YEAR, so a week straddling New Year stays one bucket — 2027-01-03 is \`2026-W53\`, not \`2027-W53\`.
   - \`withOffers\` counts requests that received at least one non-draft offer; \`offerCount\` sums the offers themselves. With --group-by status the bucket IS the status, so byStatus has a single key — useful as a plain status breakdown for the window.
   - Unlike \`request list\` there is no row cap, so totals stay correct as volume grows (the list caps at 300 and would silently under-count a client-side rollup).
-  - Deploy-gated: needs the backend adding /api/admin/jerry-requests/stats.
 
 SEE ALSO
   ib jerry admin request list, ib jerry admin searches funnel
@@ -4143,7 +4154,7 @@ DESCRIPTION
 FLAGS
   --from STRING    createdAt from (YYYY-MM-DD/today/yesterday)
   --to STRING    createdAt to (inclusive)
-  --deliverable STRING    covered | no_supply (never covered)
+  --deliverable STRING    covered = deliverable at least once; no_supply = never covered
   --q STRING    Address substring filter
   --limit NUMBER    Max rows (max 500) (default: 500)
 
@@ -4154,6 +4165,7 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ label, osoite, formattedAddress, placeId, lat, lng, searchCount, noSupplyCount, notGeocodedCount, deliverableEver, maxProviderCount, nearestVarikkoKm, lastSearchedAt }>
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --deliverable is not covered/no_supply. Rejected locally because the server ignores an unknown value and returns the UNFILTERED list — which reads as 'every address is covered' → pass --deliverable covered or --deliverable no_supply, or omit it for all rows
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -4190,7 +4202,7 @@ OUTPUT (JSON, stdout)
   { geocoded: boolean, deliverable?: boolean, lat?, lng?, placeId?, formattedAddress?, providerCount?, nearestVarikkoKm?, providers?: [{ asiakasId, asiakasNimi, distanceKm }], considered?: [{ asiakasId, asiakasNimi, sijaintiId, excludedBy: 'company-gate'|'provider-dead'|'no-coords'|'not-enrolled'|'radius'|'boom', detail }], consideredSuppressed?: { [gate]: count } }
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  osoite missing         → pass --address
+  exit 4 (HTTP 400)  Empty/whitespace-only --address (an omitted --address is caught locally by the parser, which answers with its own prescriptive envelope) → pass a non-empty street address
   exit 4 (client-side)  --boom not a non-negative number → pass metres ≥ 0, or omit for no boom filter
   exit 4 (client-side)  --asiakas without --explain, or not a positive integer → add --explain, or pass a positive asiakasId
   exit 4 (client-side)  --gate without --explain, or an unknown reason name → add --explain; valid reasons are company-gate, provider-dead, no-coords, not-enrolled, radius, boom
@@ -4202,7 +4214,6 @@ NOTES
   - --explain answers 'why no offers?': considered[] lists the NON-matching varikot (passing ones are in providers[]), each tagged with the FIRST gate it failed. Gate priority puts COMPANY-level reasons above DEPOT-level ones — company-gate → provider-dead → no-coords → not-enrolled → radius → boom — so the reason reported is the most upstream blocker, the one to fix first: adding coordinates to a depot changes nothing for a company that was never enrolled. Business-sensitive, so returned only to developer/admin tokens, exactly like providers[].
   - company-gate is OMITTED by default: it only says 'this company was never in the programme', and on a live Helsinki probe it was 93 of 110 rows across 17 companies, burying the actionable ones. Whatever is withheld is counted in consideredSuppressed, so nothing disappears silently. Pass --gate company-gate (alone or with others) to see it, or --asiakas <id> to surface it for ONE company during onboarding — which is when it is a real answer.
   - --gate narrows further: --gate no-coords,radius answers 'which enrolled depots are misconfigured?' without the rest. An unknown reason name exits 4 rather than silently narrowing the view, since a shorter list reads as 'nothing else is wrong'.
-  - Deploy-gated: --explain / --gate / --asiakas are inert until the backend adding considered[] deploys (older backends silently ignore the extra body fields).
 
 SEE ALSO
   ib jerry admin list
@@ -4221,7 +4232,7 @@ exports[`Help snapshots — contract stability > help for ib jerry counts matche
   ib jerry counts [flags]
 
 DESCRIPTION
-  Lifecycle counts. Default --mine returns the customer view (GET /api/pumppuRequests/mine/counts: draft/open/pending_verification/accepted/cancelled/expired/no_supply). --provider returns the provider badge counts (GET /api/pumppuRequests/provider-counts: avoimet/tarjotut/voitetut/voitetutActionRequired/paattyneet) and requires a provider company.
+  Lifecycle counts. Default --mine returns the customer view (GET /api/pumppuRequests/mine/counts: draft/open/pending_verification/accepted/cancelled/expired/no_supply). --provider returns the provider badge counts (GET /api/pumppuRequests/provider-counts: avoimet/tarjotut/voitetut/voitetutActionRequired/paattyneet) plus this company's Jerry membership state, and requires a provider company.
   Permissions: requires --provider: provider company (isPumppuToimittaja).
 
 FLAGS
@@ -4232,12 +4243,15 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
-  --mine: { draft, open, pending_verification, accepted, cancelled, expired, no_supply } | --provider: { avoimet, tarjotut, voitetut, voitetutActionRequired, paattyneet }
+  --mine: { draft, open, pending_verification, accepted, cancelled, expired, no_supply } | --provider: { avoimet, tarjotut, voitetut, voitetutActionRequired, paattyneet, supportUnread, jerryActive, application: { status, createdTime } | null }
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a provider (for --provider) → switch to a provider company, or use --mine
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - --provider carries three non-count keys beyond the badge numbers: supportUnread (per-PERSON, not per-company: support threads with a message you have not read), jerryActive (the HAS_JERRY setting is on — the company is live in the marketplace), and application (this company's own jerryOnboarding row, null when it never applied). jerryActive is the cheapest single answer to 'is my company live in Jerry?'.
 
 EXAMPLES
   ib jerry counts
@@ -4428,7 +4442,7 @@ OUTPUT (JSON, stdout)
   { pumppuOfferId, status:'draft', created, messageThreadId } · { dryRun:true, wouldUpsert:{ pumppuRequestId, priceCents, vatPercent, priceTerms, validUntil, availableFrom, extraNotes, cancellationTerms, maintainsOrderInfo } } on --dry-run
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  priceCents missing / out of range → pass --price-cents as an integer 1..99999900
+  exit 4 (client-side)  --price-cents is not an integer in 1..99999900 — rejected locally before anything is sent (this guard is stricter than the server's, so a bad price never reaches a server 400) → pass --price-cents as an integer 1..99999900 (cents, not euros)
   exit 3 (HTTP 403)  Not a provider         → switch to a provider company (company switch)
   exit 5 (HTTP 404)  Request not found      → verify requestId
   exit 4 (HTTP 409)  Request not open / expired, or offer no longer editable → the request was closed, or your offer is already accepted/rejected
@@ -4668,14 +4682,14 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib jerry request create matches snapshot 1`] = `
 "USAGE
-  ib jerry request create <address> [flags]
+  ib jerry request create [<address>] [flags]
 
 DESCRIPTION
-  Create a customer pump request / tarjouspyyntö (POST /api/pumppuRequests). Any authenticated user — this is the CUSTOMER side (distinct from \`ib jerry offer create\`, the provider bid). The worksite address is given positionally OR via --address (exactly one; both allowed only if they agree). The server geocodes the address and inserts the request as status:'open', immediately visible to every geographically-matching provider. Omit --asiakas to bill it to your auto-created private BetoniJerry customer account; pass --asiakas to use a company you have access to. Requires --reason. ⚠ --dry-run is honoured only once the backend change deploys — against older backends X-Dry-Run is ignored and the request IS created.
+  Create a customer pump request / tarjouspyyntö (POST /api/pumppuRequests). Any authenticated user — this is the CUSTOMER side (distinct from \`ib jerry offer create\`, the provider bid). The worksite address is given positionally OR via --address (exactly one; both allowed only if they agree). The server geocodes the address and inserts the request as status:'open', immediately visible to every geographically-matching provider. Omit --asiakas to bill it to your auto-created private BetoniJerry customer account; pass --asiakas to use a company you have access to. Requires --reason.
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
-  <address> STRING    Worksite address (osoite); positional, or use --address (required)
+  <address> STRING    Worksite address (osoite); pass it here OR as --address (exactly one) (optional)
 
 FLAGS
   --address STRING    Worksite address (osoite); alias for the positional
@@ -4701,7 +4715,9 @@ OUTPUT (JSON, stdout)
   { pumppuRequestId, status:'open', asiakasId, personId, tyomaaId, geocoded } · { dryRun:true, wouldCreate:{ asiakasId, osoite, pumppuAika, totalM3, requiredPuomi, pumppuKesto, requiredLinja, notes }, validation:{ ok:true } } on --dry-run
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  osoite/pumppausaika/maaraM3 missing or invalid → pass the address (positional or --address), --pump-at (ISO), --m3 (> 0)
+  exit 4 (client-side)  Address missing, or given BOTH positionally and via --address with different values → pass the address exactly once — positional or --address
+  exit 4 (client-side)  --m3 is not a number > 0 → pass --m3 as a positive number of cubic metres
+  exit 4 (HTTP 400)  Server-side validation: pumppausaika not a parseable datetime, whitespace-only osoite, or non-numeric asiakasId/puomi → pass --pump-at as a full ISO datetime (e.g. 2026-06-17T09:00:00+03:00) and a non-empty address
   exit 3 (HTTP 403)  No access to --asiakas → omit --asiakas, or target a company you belong to
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -4709,7 +4725,7 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - Customer side: creates the tarjouspyyntö itself, NOT a provider offer (that is \`ib jerry offer create\`).
   - Created as status:'open' → immediately fans out to matching provider inboxes. Run \`ib jerry check-address\` first to preview which providers (if any) cover the address.
-  - --dry-run is deploy-gated: until the backend honouring X-Dry-Run deploys, --dry-run still creates the request.
+  - --dry-run runs the server's synchronous validation and echoes the would-be request, touching no DB (no asiakas resolve/auto-create, no geocode, no insert) — so a bad --pump-at/--m3 still 400s under --dry-run.
 
 SEE ALSO
   ib jerry check-address, ib jerry request list, ib jerry offer create
@@ -4796,7 +4812,7 @@ exports[`Help snapshots — contract stability > help for ib jerry request list 
   ib jerry request list [flags]
 
 DESCRIPTION
-  List BetoniJerry pump requests (tarjouspyynnöt). Default --mine returns the caller's own requests (GET /api/pumppuRequests/mine). --open returns the provider inbox of open requests in your delivery area (GET /api/pumppuRequests/open) and requires a provider company (isPumppuToimittaja); customer PII is masked there until your offer is accepted. --provider is the provider's own lifecycle view (GET /api/pumppuRequests/provider-list) — also provider-only, and includes your sent offers — selected by --tab <avoimet|tarjotut|voitetut|paattyneet> (default avoimet): avoimet = open requests to bid on, tarjotut = ones you have offered on (offer pending), voitetut = won (your offer accepted/confirmed), paattyneet = ended (expired, no_supply, or lost to another provider). --status (CSV) and --limit apply to --mine only. (Whole-market visibility is system-admin only — see \`ib jerry admin requests\`.)
+  List BetoniJerry pump requests (tarjouspyynnöt). Default --mine returns the caller's own requests (GET /api/pumppuRequests/mine). --open returns the provider inbox of open requests in your delivery area (GET /api/pumppuRequests/open) and requires a provider company (isPumppuToimittaja); customer PII is masked there until your offer is accepted. --provider is the provider's own lifecycle view (GET /api/pumppuRequests/provider-list) — also provider-only, and includes your sent offers — selected by --tab <avoimet|tarjotut|voitetut|paattyneet> (default avoimet): avoimet = open requests to bid on, tarjotut = ones you have offered on (offer pending), voitetut = won (your offer accepted/confirmed), paattyneet = ended (expired, no_supply, or lost to another provider). --status (CSV) and --limit apply to --mine only. Whole-market visibility is system-admin only.
   Permissions: requires --open / --provider: provider company (isPumppuToimittaja).
 
 FLAGS
@@ -4805,7 +4821,7 @@ FLAGS
   --status STRING    Filter --mine by status (CSV: open,pending_verification,accepted,cancelled,expired,no_supply)
   --limit NUMBER    Max rows for --mine (server caps at 200) (default: 100)
   --provider    Provider lifecycle view via /provider-list (incl. sent offers)
-  --tab STRING    With --provider: avoimet|tarjotut|voitetut|paattyneet
+  --tab STRING    With --provider: which lifecycle tab to return (default: avoimet)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -4814,9 +4830,13 @@ OUTPUT (JSON, stdout)
   ListEnvelope<{ pumppuRequestId, status, createdAt, sentAt?, osoite, formattedAddress, totalM3|maaraM3, ... }> (fields differ between --mine and --open; --open is PII-masked)
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Unknown --tab          → use one of avoimet, tarjotut, voitetut, paattyneet (server-validated)
   exit 3 (HTTP 403)  Not a provider (for --open / --provider) → switch to a provider company, or use --mine
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+SEE ALSO
+  ib jerry admin request list
 
 EXAMPLES
   ib jerry request list
@@ -4844,7 +4864,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ pumppuOfferId, status, priceCents, vatPercent, validUntil, asiakasNimi, ytunnus, providerDistanceKm, companyDescription, jerryContactName?, jerryContactPhone?, openingHours? }>
+  ListEnvelope<{ pumppuOfferId, status, priceCents, vatPercent, availableFrom, cancellationTerms, extraNotes, priceTerms, validUntil, createdAt, updatedAt, asiakasNimi, ytunnus, asiakasId, messageThreadId, companyDescription, maintainsOrderInfo, jerryContactName, jerryContactPhone, openingHours, providerDistanceKm }> — jerryContactName/jerryContactPhone/openingHours are null on every row except the accepted offer; providerDistanceKm is null when the provider varikko or the worksite has no coordinates
 
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Request not found / not yours → verify requestId

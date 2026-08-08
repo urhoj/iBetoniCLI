@@ -17,6 +17,13 @@ type Row = Record<string, unknown>;
 
 // ─── request reads ──────────────────────────────────────────────────────────
 
+/**
+ * Tabs the provider lifecycle view (`--provider`) accepts — mirrors the
+ * backend's VALID_TABS (puminet5api routes/pumppuRequestRoutes.js), which 400s
+ * ("tab virheellinen") on anything else. Shared with the CommandSpec.
+ */
+export const PROVIDER_LIST_TABS = ["avoimet", "tarjotut", "voitetut", "paattyneet"] as const;
+
 export interface JerryRequestListOpts {
   open?: boolean;
   mine?: boolean;
@@ -505,6 +512,15 @@ export async function runJerryAdminToggle(
 export const ONBOARDING_STATUS_KEYS =
   "ei_aloitettu → email1_lahetetty → muistutus_lahetetty → vastasi_kylla → tiedot_pyydetty → tervetuloa_lahetetty (pipeline order); terminal: vastasi_ei / ei_vastausta / ei_sovellu";
 
+/** Prospect company categories — backend COMPANY_TYPES (400 "Unknown companyType"). */
+export const COMPANY_TYPES = ["pumppu", "betoni", "all", "owner"] as const;
+
+/** How a prospect entered the pipeline — backend-validated (400 "Invalid source"). */
+export const ONBOARDING_SOURCES = ["manual", "import", "scheduled"] as const;
+
+/** Contact-history event kinds — backend-validated (400 "eventType must be call, response or note"). */
+export const ONBOARDING_EVENT_TYPES = ["call", "response", "note"] as const;
+
 export interface JerryOnboardingListOpts {
   status?: string;
   tier?: number;
@@ -588,6 +604,23 @@ export async function runJerryOnboardingLog(
   );
 }
 
+/**
+ * Statuses the admin request list can filter on — mirrors VALID_STATUSES in
+ * puminet5api modules/jerryAdmin/jerryAdminRequestsSql.js. The server SILENTLY
+ * DROPS an unknown status from the IN list (and returns every status when that
+ * empties the filter), so the CLI guards the value client-side rather than
+ * answering a wider question than the one asked.
+ */
+export const ADMIN_REQUEST_STATUSES = [
+  "draft",
+  "open",
+  "no_supply",
+  "pending_verification",
+  "accepted",
+  "cancelled",
+  "expired",
+] as const;
+
 export interface JerryAdminRequestsOpts {
   status?: string;
   from?: string;
@@ -665,6 +698,14 @@ export async function runJerryAdminRequestOffers(
 }
 
 // ─── admin searches (Osoitehaut: address demand + conversion funnel) ─────────
+
+/**
+ * Coverage filter for the address-demand list. The backend translates these
+ * into a HAVING clause and IGNORES anything else — an unknown value silently
+ * returns the unfiltered list, which reads as "every address is covered".
+ * Guarded client-side for that reason.
+ */
+export const SEARCH_DELIVERABLE = ["covered", "no_supply"] as const;
 
 export interface JerryAdminSearchesOpts {
   from?: string;
@@ -1243,9 +1284,20 @@ export function registerJerryCommands(
     .option("--provider <id>", "", Number)
     .option("--limit <n>", "", cappedInt(300))
     .action(
-      jsonAction(getClient, (client, opts: JerryAdminRequestsOpts) =>
-        runJerryAdminRequests(client, opts)
-      )
+      guarded(async (opts: JerryAdminRequestsOpts) => {
+        // Reject an unknown status here: the server drops it from the IN list,
+        // and a filter that emptied out returns EVERY status — a wider answer
+        // than the one asked, with nothing saying so.
+        if (opts.status) {
+          assertEnumCsv(
+            opts.status.split(",").map((s) => s.trim()).filter(Boolean),
+            ADMIN_REQUEST_STATUSES,
+            "--status"
+          );
+        }
+        const client = await getClient();
+        writeJson(await runJerryAdminRequests(client, opts));
+      })
     );
 
   adminRequest
@@ -1317,9 +1369,14 @@ export function registerJerryCommands(
     .option("--q <text>")
     .option("--limit <n>", "", cappedInt(500))
     .action(
-      jsonAction(getClient, (client, opts: JerryAdminSearchesOpts) =>
-        runJerryAdminSearches(client, opts)
-      )
+      guarded(async (opts: JerryAdminSearchesOpts) => {
+        // An unknown --deliverable is ignored server-side (no HAVING clause), so
+        // the caller gets the UNFILTERED list — "no_suply" would read as "every
+        // address we ever checked is covered".
+        assertEnum(opts.deliverable, SEARCH_DELIVERABLE, "--deliverable");
+        const client = await getClient();
+        writeJson(await runJerryAdminSearches(client, opts));
+      })
     );
 
   adminSearches
