@@ -104,9 +104,20 @@ export function addAsiakasTargetOption(cmd: Command): Command {
  * from the token). Wrap the command at the exact point the flag was registered
  * — Commander renders options in registration order, so moving it would move
  * the `--help` line.
+ *
+ * Parsed with {@link intFlag}, not a bare `Number`: this value is interpolated
+ * into a ROUTE SEGMENT (`/api/changes/latest/:owner`), and `NaN` is not nullish
+ * so it survives the `opts.owner ?? resolveActiveOwnerAsiakasId(...)` default
+ * and reaches the wire as the literal `"NaN"`. Unlike
+ * {@link addAsiakasTargetOption}, whose value is always re-validated by
+ * {@link resolveTarget}, nothing downstream re-checks this one.
  */
 export function addOwnerOption(cmd: Command): Command {
-  return cmd.option("--owner <id>", "ownerAsiakasId (default: active company)", Number);
+  return cmd.option(
+    "--owner <id>",
+    "ownerAsiakasId (default: active company)",
+    intFlag("--owner")
+  );
 }
 
 /**

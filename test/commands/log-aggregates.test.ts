@@ -129,4 +129,30 @@ describe("log aggregates", () => {
     expect(get()).toHaveBeenNthCalledWith(1, "/api/company-selection/available");
     expect(get()).toHaveBeenNthCalledWith(2, "/api/changes/latest/27?limit=100");
   });
+
+  describe("server-capped page signalling", () => {
+    const rows = (n: number) => Array.from({ length: n }, (_, i) => ROW(i + 1));
+
+    test("latest: a full page sets truncated", async () => {
+      get().mockResolvedValueOnce(rows(4));
+      const result = await runLogLatest(mockClient, 4, { owner: 27 });
+      expect(result.truncated).toBe(true);
+    });
+
+    test("latest: a partial page omits truncated", async () => {
+      get().mockResolvedValueOnce(rows(2));
+      expect((await runLogLatest(mockClient, 4, { owner: 27 })).truncated).toBeUndefined();
+    });
+
+    test("user: a full page sets truncated", async () => {
+      get().mockResolvedValueOnce(rows(4));
+      const result = await runLogUser(mockClient, 63, 4, { owner: 27 });
+      expect(result.truncated).toBe(true);
+    });
+
+    test("user: a partial page omits truncated", async () => {
+      get().mockResolvedValueOnce(rows(1));
+      expect((await runLogUser(mockClient, 63, 4, { owner: 27 })).truncated).toBeUndefined();
+    });
+  });
 });

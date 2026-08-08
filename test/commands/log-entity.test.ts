@@ -75,4 +75,46 @@ describe("runLogEntity", () => {
     const result = await runLogEntity(mockClient, "kuski", 42, 100, { owner: 27 });
     expect(result.count).toBe(0);
   });
+
+  describe("server-capped page signalling", () => {
+    const rows = (n: number, field = "laskuMemo") =>
+      Array.from({ length: n }, (_, i) => ({ ...ROW, changeId: i + 1, fieldName: field }));
+
+    test("a full page sets truncated (more history may exist)", async () => {
+      get().mockResolvedValueOnce(rows(5));
+      const result = await runLogEntity(mockClient, "keikka", 42, 5, { owner: 27 });
+      expect(result.count).toBe(5);
+      expect(result.truncated).toBe(true);
+    });
+
+    test("a partial page omits truncated", async () => {
+      get().mockResolvedValueOnce(rows(3));
+      const result = await runLogEntity(mockClient, "keikka", 42, 5, { owner: 27 });
+      expect(result.truncated).toBeUndefined();
+      expect(result.hint).toBeUndefined();
+    });
+
+    test("--field on a capped page warns the filter only saw that window", async () => {
+      // 5 rows fill the limit; none match the requested field, so the result is
+      // empty — which without the hint reads as "this field never changed".
+      get().mockResolvedValueOnce(rows(5, "otherField"));
+      const result = await runLogEntity(mockClient, "keikka", 42, 5, {
+        owner: 27,
+        field: "laskuMemo",
+      });
+      expect(result.count).toBe(0);
+      expect(result.truncated).toBe(true);
+      expect(result.hint).toMatch(/newest 5 changes only/);
+    });
+
+    test("--field on a partial page needs no hint (the whole history was seen)", async () => {
+      get().mockResolvedValueOnce([...rows(2, "otherField"), ROW]);
+      const result = await runLogEntity(mockClient, "keikka", 42, 100, {
+        owner: 27,
+        field: "laskuMemo",
+      });
+      expect(result.count).toBe(1);
+      expect(result.hint).toBeUndefined();
+    });
+  });
 });

@@ -59,11 +59,27 @@ function assertIsoDate(value: string, flag: string): void {
   }
 }
 
-function envelope(items: ChangeItem[], truncated = false): ListEnvelope<ChangeItem> {
+function envelope(
+  items: ChangeItem[],
+  truncated = false,
+  hint?: string
+): ListEnvelope<ChangeItem> {
   const out: ListEnvelope<ChangeItem> = listEnvelope(items);
   if (truncated) out.truncated = true;
+  if (hint) out.hint = hint;
   return out;
 }
+
+/**
+ * True when a SERVER-limited read came back with a full page. These routes cap at
+ * `?limit=` and return no cursor, so a full page is the only available "there may
+ * be more" signal — without it a capped result is indistinguishable from a
+ * complete history, which is exactly what an AI reads it as.
+ *
+ * (`range`/`by-entity-date` don't use this: they have no server limit, so
+ * {@link runChangeWindow} slices client-side and knows the real total.)
+ */
+const isCapped = (rows: unknown[], limit: number): boolean => rows.length >= limit;
 
 /**
  * The read every `ib log` subcommand performs: resolve the owner (all five
@@ -114,13 +130,23 @@ export async function runLogEntity(
   opts: { owner?: number; field?: string } = {}
 ): Promise<ListEnvelope<ChangeItem>> {
   assertKnownEntityType(entityType);
-  let list = await getChanges(
+  const rows = await getChanges(
     client,
     (owner) => `/api/changes/${entityType}/${entityId}/${owner}?limit=${limit}`,
     opts.owner
   );
-  if (opts.field) list = list.filter((r) => r.fieldName === opts.field);
-  return envelope(list.map(projectChangeRow));
+  const capped = isCapped(rows, limit);
+  // --field filters CLIENT-side, after the server's limit: the backend route
+  // takes only `limit` (changeTrackingRoutes getChangeHistory). So on a capped
+  // page the filter ran over the newest `limit` changes only, and an empty
+  // result means "not in this window" — NOT "this field never changed". Say so,
+  // or the caller reads a false negative as fact.
+  const list = opts.field ? rows.filter((r) => r.fieldName === opts.field) : rows;
+  const hint =
+    opts.field && capped
+      ? `--field ${opts.field} was applied client-side to the newest ${limit} changes only; older changes to it are not shown. Raise --limit (max 500) or use \`ib log by-entity-date\` to search a date window.`
+      : undefined;
+  return envelope(list.map(projectChangeRow), capped, hint);
 }
 
 /** GET /api/changes/latest/:owner — admin-only, newest first, server cap 500. */
@@ -136,7 +162,7 @@ export async function runLogLatest(
       `/api/changes/latest/${owner}${qs({ limit, entityType: opts.entityType || undefined })}`,
     opts.owner
   );
-  return envelope(rows.map(projectChangeRow));
+  return envelope(rows.map(projectChangeRow), isCapped(rows, limit));
 }
 
 /** GET /api/changes/range/:owner — admin-only, by change timestamp. */
@@ -211,7 +237,7 @@ export async function runLogUser(
         : `/api/changes/user/${personId}/${owner}?limit=${limit}`,
     opts.owner
   );
-  return envelope(rows.map(projectChangeRow));
+  return envelope(rows.map(projectChangeRow), isCapped(rows, limit));
 }
 
 /** Registers a thin `log <id>` alias on an entity group, delegating to runLogEntity. */

@@ -1,5 +1,12 @@
 import { describe, test, expect } from "vitest";
-import { parseId, parseOptionalId, parseRefId, resolveSearchQuery } from "../src/targets.js";
+import { Command } from "commander";
+import {
+  addOwnerOption,
+  parseId,
+  parseOptionalId,
+  parseRefId,
+  resolveSearchQuery,
+} from "../src/targets.js";
 
 /** Run fn and return the CliError exitCode it threw (or undefined if it didn't throw). */
 const exitCodeOf = (fn: () => void): number | undefined => {
@@ -136,5 +143,31 @@ describe("resolveSearchQuery (feedback #235 — positional OR --search)", () => 
 
   test("missing-query error names both input forms", () => {
     expect(() => resolveSearchQuery(undefined, undefined)).toThrow(/<query>.*--search/);
+  });
+});
+
+describe("addOwnerOption (--owner is a route segment, so NaN must not survive)", () => {
+  /** Parse argv through a throwaway command carrying only --owner. */
+  const parseOwner = (value: string): number | undefined => {
+    const cmd = addOwnerOption(new Command("t").exitOverride());
+    cmd.action(() => {});
+    cmd.parse(["--owner", value], { from: "user" });
+    return cmd.opts().owner as number | undefined;
+  };
+
+  test("accepts a positive integer", () => {
+    expect(parseOwner("27")).toBe(27);
+  });
+
+  test("rejects a non-numeric id with exit 4 instead of yielding NaN", () => {
+    // Bare Number("abc") is NaN, which is NOT nullish — it survived
+    // `opts.owner ?? resolveActiveOwnerAsiakasId(...)` and reached the wire as
+    // /api/changes/latest/NaN.
+    expect(exitCodeOf(() => parseOwner("abc"))).toBe(4);
+  });
+
+  test("rejects zero and negatives", () => {
+    expect(exitCodeOf(() => parseOwner("0"))).toBe(4);
+    expect(exitCodeOf(() => parseOwner("-3"))).toBe(4);
   });
 });
