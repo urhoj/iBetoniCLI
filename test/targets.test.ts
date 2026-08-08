@@ -2,6 +2,7 @@ import { describe, test, expect } from "vitest";
 import { Command } from "commander";
 import {
   addOwnerOption,
+  assertEnum,
   parseId,
   parseOptionalId,
   parseRefId,
@@ -169,5 +170,47 @@ describe("addOwnerOption (--owner is a route segment, so NaN must not survive)",
   test("rejects zero and negatives", () => {
     expect(exitCodeOf(() => parseOwner("0"))).toBe(4);
     expect(exitCodeOf(() => parseOwner("-3"))).toBe(4);
+  });
+});
+
+describe("assertEnum (fb#369 — one retry, not a guess)", () => {
+  const KINDS = ["improvement", "bug", "idea", "legal"] as const;
+
+  test("undefined is a no-op and a listed value passes", () => {
+    expect(() => assertEnum(undefined, KINDS, "--kind")).not.toThrow();
+    expect(() => assertEnum("bug", KINDS, "--kind")).not.toThrow();
+  });
+
+  test("an unknown value exits 4 and lists the allowed set", () => {
+    const err = errorOf(() => assertEnum("nonsense", KINDS, "--kind"));
+    expect(err?.exitCode).toBe(4);
+    expect(err?.message).toContain("--kind must be one of: improvement, bug, idea, legal");
+  });
+
+  test("a near miss names the intended value", () => {
+    expect(errorOf(() => assertEnum("bugs", KINDS, "--kind"))?.message).toContain(
+      "did you mean bug?"
+    );
+  });
+
+  test("a synonym bridges what edit distance cannot", () => {
+    const SEVERITIES = ["critical", "major", "minor", "cosmetic"] as const;
+    // "high" is 5 edits from "major" — no fuzzy matcher reaches it.
+    expect(
+      errorOf(() => assertEnum("high", SEVERITIES, "--severity", { high: "major" }))?.message
+    ).toContain("did you mean major?");
+  });
+
+  test("a synonym pointing outside the allowed set is dropped, not echoed", () => {
+    expect(errorOf(() => assertEnum("high", KINDS, "--kind", { high: "urgent" }))?.message).not.toMatch(
+      /did you mean/
+    );
+  });
+
+  test("the allowed set always precedes the hint, so hintForError still matches", () => {
+    // `hintForError` resolves a command's own remedy by the "must be one of"
+    // substring — a hint prefixed ahead of it would strand every ERRORS row.
+    const msg = errorOf(() => assertEnum("bugs", KINDS, "--kind"))?.message ?? "";
+    expect(msg.indexOf("must be one of")).toBeLessThan(msg.indexOf("did you mean"));
   });
 });

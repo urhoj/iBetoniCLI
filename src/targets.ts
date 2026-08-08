@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { failWith } from "./output/json.js";
 import { CliError } from "./api/errors.js";
+import { closestName } from "./output/nearest.js";
 
 /**
  * Commander coercer for a `--limit`-style flag that is clamped to `cap`.
@@ -16,7 +17,15 @@ export function cappedInt(cap: number): (v: string) => number {
 /**
  * Guard an OPTIONAL enum-valued flag against its allowed set. `undefined` is a
  * no-op (the flag was not given); anything else outside `allowed` exits 4 with
- * the house message `--flag must be one of: a, b, c`.
+ * the house message `--flag must be one of: a, b, c`, plus a `— did you mean X?`
+ * suffix whenever one candidate stands out.
+ *
+ * The suffix costs one retry instead of a guess: `closestName` bridges typos
+ * (prefix, then edit distance), and `synonyms` bridges the gaps distance cannot
+ * — a caller reaching for a DIFFERENT vocabulary rather than fat-fingering this
+ * one (`--severity high` for `major`: 5 edits away, so only the table finds it).
+ * The listed set always precedes the suffix, so `hintForError`'s "must be one
+ * of" substring match keeps resolving the command's own ERRORS remedy.
  *
  * Raised through {@link failWith}, so the error carries `statusCode: 0` —
  * `origin:"client"`, the only shape `hintForError`'s `matchClientRow` will look
@@ -26,10 +35,14 @@ export function cappedInt(cap: number): (v: string) => number {
 export function assertEnum(
   value: string | undefined,
   allowed: readonly string[],
-  flag: string
+  flag: string,
+  synonyms?: Record<string, string>
 ): void {
   if (value !== undefined && !allowed.includes(value)) {
-    failWith(`${flag} must be one of: ${allowed.join(", ")}`, 4);
+    const guess =
+      closestName(value, [...allowed]) ?? synonyms?.[value.trim().toLowerCase()];
+    const hint = guess && allowed.includes(guess) ? ` — did you mean ${guess}?` : "";
+    failWith(`${flag} must be one of: ${allowed.join(", ")}${hint}`, 4);
   }
 }
 

@@ -5710,11 +5710,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "description", type: "string", description: "Alias for the positional description; if both are passed, they must match" },
       { name: "body", type: "string", description: "Alias for --description (free text — NOT the raw-JSON --body of the entity update commands); if several are passed, they must match" },
       { name: "title", type: "string", description: "Optional title, folded into the description as its first line (feedback rows have no stored title column). Alone it becomes the whole description." },
-      { name: "kind", type: "string", default: "improvement", description: "improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal)", allowed: [...FEEDBACK_KINDS] },
+      { name: "kind", type: "string", default: "improvement", description: "improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal). STRICT: an unknown value exits 4 (it used to fall back to improvement, which mis-triaged bug reports silently — feedback #369)", allowed: [...FEEDBACK_KINDS] },
       { name: "scope", type: "string", default: "cli", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — which product surface this targets (routing key for triage; orthogonal to --kind; impeccable = auto-piped design-hook findings)", allowed: [...FEEDBACK_SCOPES] },
       { name: "command", type: "string", description: "The ib command/argv that triggered the friction" },
       { name: "error", type: "string", description: "Error message you hit, if any" },
-      { name: "severity", type: "string", description: "critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug", allowed: [...FEEDBACK_SEVERITIES] },
+      { name: "severity", type: "string", description: "critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug. NOT high|medium|low (the issue-tracker vocabulary most tooling uses): map high→major, medium→minor, low→cosmetic. Unknown exits 4", allowed: [...FEEDBACK_SEVERITIES] },
       { name: "complexity", type: "number", description: "1-5 agent-triage estimate (orthogonal to --severity): 1 simple+autonomous · 2 simple+wants-input · 3 complex+autonomous · 4 complex+needs-user · 5 very-complex+needs-user & heavier model. Lets a batch-fix agent pull `list --max-complexity 3`. See `ib help complexity`." },
       { name: "from-json", type: "string", description: "Read the whole payload from a JSON object file (or - for stdin); explicit flags override. Keys: description (or body), title, kind, scope, command, error, severity, complexity. The READ shape's `errorText` is also accepted for `error`, so a stored feedback row can template the file. An unknown or wrong-typed key exits 4 (never silently dropped)." },
       { name: "dry-run", type: "boolean", description: "Print the payload without sending (client-side)" },
@@ -5722,7 +5722,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.",
     errors: [
-      { origin: "client", exit: 4, match: ["is required", "must be one of", "must be an integer"], meaning: "Validation", remedy: "description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (STRICT — unknown exits 4); --severity, when given, must be critical|major|minor|cosmetic; --complexity, when given, must be an integer 1-5" },
+      { origin: "client", exit: 4, match: ["is required", "must be one of", "must be an integer"], meaning: "Validation", remedy: "description is required; all three enums are STRICT — an unknown value exits 4 and is never rewritten: --kind must be improvement|bug|idea|legal, --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other, --severity (when given) must be critical|major|minor|cosmetic (NOT the high|medium|low vocabulary — high≈major, medium≈minor, low≈cosmetic); --complexity, when given, must be an integer 1-5. The message names the closest valid value when there is one" },
       { origin: "client", exit: 4, match: "too many arguments", meaning: "too many arguments — the shell split the description on its inner double-quotes (typical on Windows PowerShell)", remedy: "Pass the report via --from-json <file|-> instead of argv" },
       { origin: "client", exit: 4, match: "--from-json", meaning: "--from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key", remedy: "Check the path; the root must be an object and every key an accepted field name (the error lists them)" },
       apiErr(401, "Token expired", "ib auth refresh"),
@@ -5777,7 +5777,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     // the automatic leftmost-fits fallback would hide exactly the wrong half.
     prettyColumns: ["feedbackId", "kind", "scope", "status", "severity", "complexity", "description"],
     errors: [
-      { origin: "client", exit: 4, meaning: "Validation", remedy: "use only one of --all / --unresolved / --status; --status values must be open|reviewed|applied|dismissed" },
+      { origin: "client", exit: 4, meaning: "Validation", remedy: "use only one of --all / --unresolved / --status; --status values must be open|reviewed|applied|dismissed; --kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would return an empty list that reads as 'nothing filed')" },
       apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
       apiErr(401, "Token expired", "ib auth refresh"),
       apiErr(500, "Backend error", "retry with --verbose"),
@@ -5930,6 +5930,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ total, byStatus: { open, reviewed, applied, dismissed }, byKind, byScope, truncated?, hint? }",
     errors: [
+      { origin: "client", exit: 4, match: "must be one of", meaning: "Validation", remedy: "--kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would report total:0 rather than an error)" },
       apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),
       apiErr(401, "Token expired", "ib auth refresh"),
       apiErr(500, "Backend error", "retry with --verbose"),

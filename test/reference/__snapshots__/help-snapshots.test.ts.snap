@@ -2313,6 +2313,7 @@ OUTPUT (JSON, stdout)
   { total, byStatus: { open, reviewed, applied, dismissed }, byKind, byScope, truncated?, hint? }
 
 ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  Validation             → --kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would report total:0 rather than an error)
   exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -2340,11 +2341,11 @@ FLAGS
   --description STRING    Alias for the positional description; if both are passed, they must match
   --body STRING    Alias for --description (free text — NOT the raw-JSON --body of the entity update commands); if several are passed, they must match
   --title STRING    Optional title, folded into the description as its first line (feedback rows have no stored title column). Alone it becomes the whole description.
-  --kind STRING    improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal) (default: improvement)
+  --kind STRING    improvement (CLI UX friction) | bug (CLI defect) | idea (new-capability proposal) | legal (legal-document change/draft proposal). STRICT: an unknown value exits 4 (it used to fall back to improvement, which mis-triaged bug reports silently — feedback #369) (default: improvement)
   --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — which product surface this targets (routing key for triage; orthogonal to --kind; impeccable = auto-piped design-hook findings) (default: cli)
   --command STRING    The ib command/argv that triggered the friction
   --error STRING    Error message you hit, if any
-  --severity STRING    critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug
+  --severity STRING    critical | major | minor | cosmetic — optional triage weight, most useful with --kind bug. NOT high|medium|low (the issue-tracker vocabulary most tooling uses): map high→major, medium→minor, low→cosmetic. Unknown exits 4
   --complexity NUMBER    1-5 agent-triage estimate (orthogonal to --severity): 1 simple+autonomous · 2 simple+wants-input · 3 complex+autonomous · 4 complex+needs-user · 5 very-complex+needs-user & heavier model. Lets a batch-fix agent pull \`list --max-complexity 3\`. See \`ib help complexity\`.
   --from-json STRING    Read the whole payload from a JSON object file (or - for stdin); explicit flags override. Keys: description (or body), title, kind, scope, command, error, severity, complexity. The READ shape's \`errorText\` is also accepted for \`error\`, so a stored feedback row can template the file. An unknown or wrong-typed key exits 4 (never silently dropped).
   --dry-run    Print the payload without sending (client-side)
@@ -2356,7 +2357,7 @@ OUTPUT (JSON, stdout)
   { feedbackId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldSend:{ method, path, body } }.
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  Validation             → description is required; --kind must be improvement|bug|idea|legal (unknown values fall back to improvement); --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (STRICT — unknown exits 4); --severity, when given, must be critical|major|minor|cosmetic; --complexity, when given, must be an integer 1-5
+  exit 4 (client-side)  Validation             → description is required; all three enums are STRICT — an unknown value exits 4 and is never rewritten: --kind must be improvement|bug|idea|legal, --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other, --severity (when given) must be critical|major|minor|cosmetic (NOT the high|medium|low vocabulary — high≈major, medium≈minor, low≈cosmetic); --complexity, when given, must be an integer 1-5. The message names the closest valid value when there is one
   exit 4 (client-side)  too many arguments — the shell split the description on its inner double-quotes (typical on Windows PowerShell) → Pass the report via --from-json <file|-> instead of argv
   exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → Check the path; the root must be an object and every key an accepted field name (the error lists them)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -2452,7 +2453,7 @@ OUTPUT (JSON, stdout)
   { items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  Validation             → use only one of --all / --unresolved / --status; --status values must be open|reviewed|applied|dismissed
+  exit 4 (client-side)  Validation             → use only one of --all / --unresolved / --status; --status values must be open|reviewed|applied|dismissed; --kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would return an empty list that reads as 'nothing filed')
   exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose

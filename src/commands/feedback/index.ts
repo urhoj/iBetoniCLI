@@ -33,6 +33,22 @@ export const STATUSES = ["open", "reviewed", "applied", "dismissed"] as const;
 export const SEVERITIES = ["critical", "major", "minor", "cosmetic"] as const;
 type Severity = (typeof SEVERITIES)[number];
 
+/**
+ * The OTHER severity vocabulary — high/medium/low is what issue trackers and
+ * most AI tooling use, so it is the natural first guess here and too far from
+ * ours for edit distance to bridge (`high`→`major` is 5 edits). Mapped to a
+ * `did you mean` hint on the exit-4 message, NOT accepted as an alias: this
+ * command's whole contract is that an unknown enum value is reported, never
+ * quietly rewritten (feedback #369).
+ */
+const SEVERITY_SYNONYMS: Record<string, string> = {
+  high: "major",
+  medium: "minor",
+  low: "cosmetic",
+  blocker: "critical",
+  trivial: "cosmetic",
+};
+
 // complexity = an AI-agent triage estimate (1-5), orthogonal to severity
 // (severity = urgency/impact; complexity = effort + how autonomously an agent
 // can act). 1 simple/autonomous · 2 simple/wants-input-proceeds-on-recommendation
@@ -202,10 +218,16 @@ function buildCreateBody(input: FeedbackCreateInput): FeedbackCreateBody {
   if (!description) {
     failWith("description is required", 4);
   }
+  // All three enums are STRICT (feedback #369). --kind used to fall back to
+  // "improvement" on an unknown value while its two siblings — and `update`'s
+  // own --kind — exited 4, so a bug filed as `--kind bugs` was silently
+  // relabelled an improvement and returned a success + feedbackId: the caller
+  // moved on and the row was mis-triaged with nothing recording the rewrite.
+  assertEnum(input.kind, KINDS, "--kind");
   assertEnum(input.scope, SCOPES, "--scope");
-  assertEnum(input.severity, SEVERITIES, "--severity");
+  assertEnum(input.severity, SEVERITIES, "--severity", SEVERITY_SYNONYMS);
   const body: FeedbackCreateBody = {
-    kind: KINDS.includes(input.kind as Kind) ? (input.kind as Kind) : "improvement",
+    kind: (input.kind as Kind) ?? "improvement",
     scope: (input.scope as Scope) ?? "cli",
     description,
   };
@@ -277,6 +299,11 @@ function resolveStatuses(opts: {
  * newest-first (or oldest-first under `--oldest`) and sliced [offset,
  * offset+limit) client-side. Long free-text is capped at 200 chars unless
  * `--full`.
+ *
+ * `--kind`/`--scope` are validated here for the same reason `create` validates
+ * them (feedback #369): both are forwarded to the server as SQL filters, so an
+ * unknown value returns an empty list — which reads as "nothing is filed under
+ * that kind", not "you typed a kind that does not exist".
  */
 export async function runFeedbackList(
   client: ApiClient,
@@ -295,6 +322,8 @@ export async function runFeedbackList(
     oldest?: boolean;
   }
 ): Promise<ListEnvelope<Record<string, unknown>>> {
+  assertEnum(opts.kind, KINDS, "--kind");
+  assertEnum(opts.scope, SCOPES, "--scope");
   const statuses = resolveStatuses(opts);
   let items: Record<string, unknown>[];
   let truncated = false;
@@ -375,6 +404,9 @@ export async function runFeedbackCount(
   client: ApiClient,
   opts: { kind?: string; scope?: string }
 ): Promise<Record<string, unknown>> {
+  // Same silent-empty trap as `list` — here it reads as a total of 0 (fb#369).
+  assertEnum(opts.kind, KINDS, "--kind");
+  assertEnum(opts.scope, SCOPES, "--scope");
   const rows = await fetchRows(client, { kind: opts.kind, scope: opts.scope, limit: CAP });
   const byStatus: Record<string, number> = { open: 0, reviewed: 0, applied: 0, dismissed: 0 };
   const byKind: Record<string, number> = {};
@@ -518,7 +550,7 @@ export async function runFeedbackUpdate(
 ): Promise<Record<string, unknown>> {
   assertEnum(input.scope, SCOPES, "--scope");
   assertEnum(input.kind, KINDS, "--kind");
-  assertEnum(input.severity, SEVERITIES, "--severity");
+  assertEnum(input.severity, SEVERITIES, "--severity", SEVERITY_SYNONYMS);
   if (input.description !== undefined && !input.description.trim()) {
     failWith("--description must be non-empty", 4);
   }

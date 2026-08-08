@@ -302,9 +302,25 @@ describe("ib feedback create", () => {
     );
   });
 
-  test("an unknown --kind falls back to improvement", async () => {
+  // fb#369: --kind used to be the one enum here that silently rewrote an
+  // unknown value to "improvement", so a bug filed as `--kind bugs` landed
+  // mis-triaged with a success + feedbackId and nothing recording the rewrite.
+  test("an unknown --kind exits 4 and never POSTs", async () => {
+    await expect(
+      runFeedbackCreate(mockClient, { description: "x", kind: "nonsense" })
+    ).rejects.toMatchObject({ exitCode: 4 });
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  test("a near-miss --kind names the intended value", async () => {
+    await expect(
+      runFeedbackCreate(mockClient, { description: "x", kind: "bugs" })
+    ).rejects.toMatchObject({ message: expect.stringContaining("did you mean bug?") });
+  });
+
+  test("--kind defaults to improvement when omitted", async () => {
     post.mockResolvedValueOnce({ feedbackId: 9 });
-    await runFeedbackCreate(mockClient, { description: "x", kind: "nonsense" });
+    await runFeedbackCreate(mockClient, { description: "x" });
     expect(post.mock.calls[0][1]).toMatchObject({ kind: "improvement" });
   });
 
@@ -335,10 +351,27 @@ describe("ib feedback create", () => {
     }
   );
 
-  test("unknown --scope exits 4 (strict, unlike --kind)", async () => {
+  test("unknown --scope exits 4", async () => {
     await expect(
       runFeedbackCreate(mockClient, { description: "x", scope: "nonsense" })
     ).rejects.toMatchObject({ exitCode: 4 });
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  // The issue-tracker vocabulary is the natural first guess and is too far from
+  // ours for edit distance to bridge (`high`→`major` is 5 edits) — hence the
+  // explicit synonym table. Still exit 4: a hint, never a silent alias (fb#369).
+  test.each([
+    ["high", "major"],
+    ["medium", "minor"],
+    ["low", "cosmetic"],
+  ])("--severity %s exits 4 and points at %s", async (given, intended) => {
+    await expect(
+      runFeedbackCreate(mockClient, { description: "x", kind: "bug", severity: given })
+    ).rejects.toMatchObject({
+      exitCode: 4,
+      message: expect.stringContaining(`did you mean ${intended}?`),
+    });
     expect(post).not.toHaveBeenCalled();
   });
 
@@ -476,6 +509,16 @@ describe("ib feedback list", () => {
     await runFeedbackList(mockClient, { scope: "workspace" });
     expect(get).toHaveBeenNthCalledWith(1, "/api/feedback?status=open&scope=workspace&limit=200");
     expect(get).toHaveBeenNthCalledWith(2, "/api/feedback?status=reviewed&scope=workspace&limit=200");
+  });
+
+  // Both are server-side SQL filters, so an unknown value would come back as an
+  // empty list — indistinguishable from "nothing is filed under that" (fb#369).
+  test.each([
+    ["kind", { kind: "bugs" }],
+    ["scope", { scope: "worksapce" }],
+  ])("an unknown --%s exits 4 instead of returning an empty list", async (_f, opts) => {
+    await expect(runFeedbackList(mockClient, opts)).rejects.toMatchObject({ exitCode: 4 });
+    expect(get).not.toHaveBeenCalled();
   });
 
   test("forwards --search on the single-status path", async () => {
@@ -1138,6 +1181,14 @@ describe("ib feedback count", () => {
     const out = await runFeedbackCount(mockClient, {});
     expect(out.truncated).toBe(true);
     expect(out.hint).toMatch(/lower bound/);
+  });
+
+  // Unvalidated, an unknown filter reports total:0 — "nothing open" (fb#369).
+  test("an unknown --kind exits 4 instead of reporting total 0", async () => {
+    await expect(runFeedbackCount(mockClient, { kind: "bugs" })).rejects.toMatchObject({
+      exitCode: 4,
+    });
+    expect(get).not.toHaveBeenCalled();
   });
 });
 
