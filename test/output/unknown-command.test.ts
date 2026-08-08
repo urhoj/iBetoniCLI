@@ -14,6 +14,7 @@ import {
   dateFlagSuggestion,
   siblingsAcceptingOption,
   siblingGroupsWithCommand,
+  descendantsOwningVerb,
   OPTION_REDIRECTS,
 } from "../../src/output/unknownCommand.js";
 
@@ -221,6 +222,51 @@ describe("sibling-GROUP subcommand redirect (#343)", () => {
     ]);
   });
 
+});
+
+describe("descendant-subgroup verb redirect (fb#379)", () => {
+  test("the audited dead-ends now point at the owning subgroup", () => {
+    expect(descendantsOwningVerb("ib keikka", "assign", "developer")).toEqual([
+      "ib keikka drivers assign",
+    ]);
+    expect(descendantsOwningVerb("ib vehicle", "assign", "developer")).toEqual([
+      "ib vehicle driver assign",
+    ]);
+    expect(descendantsOwningVerb("ib message", "archive", "developer")).toEqual([
+      "ib message thread archive",
+    ]);
+  });
+
+  test("envelope carries the redirect, copy-paste runnable with the caller's args", () => {
+    const keikka = program.commands.find((c) => c.name() === "keikka")!;
+    keikka.args = ["assign", "92", "tomorrow"];
+    const env = buildUnknownCommandEnvelope(keikka, "assign", "developer");
+    keikka.args = [];
+    expect(env.availableElsewhere).toEqual(["ib keikka drivers assign"]);
+    expect(env.hint).toContain("`ib keikka drivers assign 92 tomorrow` does");
+  });
+
+  test("never fires at the root — a bare verb matches too many domains", () => {
+    expect(descendantsOwningVerb("ib", "assign", "developer")).toEqual([]);
+  });
+
+  test("a direct sibling is not re-suggested (depth-1 is already `available`)", () => {
+    expect(descendantsOwningVerb("ib keikka", "list", "developer")).toEqual([]);
+  });
+
+  test("tier-gated: a developer-only descendant is invisible below its tier", () => {
+    // `ib jerry admin request stats` is developer-tier; standard callers get nothing.
+    expect(descendantsOwningVerb("ib jerry", "stats", "developer")).toContain(
+      "ib jerry admin request stats"
+    );
+    expect(descendantsOwningVerb("ib jerry", "stats", "standard")).toEqual([]);
+  });
+
+  test("the curated pair still wins over the descendant scan", () => {
+    const company = program.commands.find((c) => c.name() === "company")!;
+    const env = buildUnknownCommandEnvelope(company, "get", "developer");
+    expect(env.availableElsewhere).toEqual(["ib customer get"]);
+  });
 });
 
 describe("asDateSuggestion (#328)", () => {
