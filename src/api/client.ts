@@ -330,6 +330,30 @@ export function createApiClient({
         exitCodeFromStatus(res.status)
       );
     }
+    // Dry-run post-condition. EVERY handler that honours `X-Dry-Run` answers with
+    // a top-level `dryRun: true` — via `middleware/dryRun.js` `respond()` or the
+    // hand-built equivalents — and `sendSuccess` sends that body unwrapped. So a
+    // 2xx with no marker means the route has NO dry-run guard and the write just
+    // PERSISTED, which is exactly the failure `--dry-run` exists to prevent
+    // (four routes shipped that way: weather toggle, keikka tila/set, sijainti
+    // delete/undelete). The request is already sent, so this cannot prevent the
+    // first write — it converts a silent, undetectable persist into a loud exit 6.
+    // Scope is right by construction: client-side previews never reach `request`.
+    if (method !== "GET" && opts.headers?.["X-Dry-Run"] === "1") {
+      const marked =
+        !!parsed &&
+        typeof parsed === "object" &&
+        (parsed as { dryRun?: unknown }).dryRun === true;
+      if (!marked) {
+        throw new CliError(
+          `Dry-run NOT honoured: '${method} ${path}' returned no dryRun marker — the write may have PERSISTED.`,
+          0,
+          { code: "DRY_RUN_NOT_HONOURED" },
+          6,
+          "this endpoint has no server-side X-Dry-Run guard (or the backend predates it) — verify the effect, check the deployed build with `ib version`, and file `ib dev feedback create --kind bug`"
+        );
+      }
+    }
     return parsed as T;
   }
 

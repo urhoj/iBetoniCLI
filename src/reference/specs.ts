@@ -217,6 +217,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "etag", type: "string", description: "Azure ETag (optional)" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "{ ok: true, attachmentId } | { dryRun: true, wouldCreate: {...} }",
     errors: [apiErr(403, "fileFolder outside the active company / not a member of the target", "mint via upload-url; check active company"), apiErr(400, "Missing required field / unknown entity", "see required flags"), ...COMMON_AUTH_ERRORS],
     notes: [ENTITY_FLAG_NOTE, "Audited via ChangeTracker on the linked entity's timeline (--reason lands in changeTracker.reason).", DEPLOY_NOTE],
@@ -230,6 +231,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "attachmentId", type: "number", description: "attachments.attachmentId" }],
     flags: [...ATTACHMENT_ENTITY_FLAGS],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "{ ok: true, attachmentId, <column>: entityId } | { dryRun: true, wouldAttach: {...} }",
     errors: [apiErr(404, "Attachment not found", "verify attachmentId"), apiErr(403, "No membership on attachment or target", "check active company"), ...COMMON_AUTH_ERRORS],
     notes: [ENTITY_FLAG_NOTE, "Audited via ChangeTracker on the target entity's timeline.", DEPLOY_NOTE],
@@ -246,6 +248,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     flags: [...ATTACHMENT_ENTITY_FLAGS],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "{ ok: true, attachmentId, detached: entity } | { dryRun: true, wouldDetach: {...} }",
     errors: [apiErr(403, "Not owner company or missing manager role", "switch to the owner company; need Admin/KeikkaHandler/AttachmentHandler/Owner"), apiErr(404, "Attachment not found", "verify attachmentId"), { origin: "client", exit: 4, meaning: "No entity given, or conflicting positional + flag", remedy: "name the entity once — positional word OR a --<entity> flag" }, ...COMMON_AUTH_ERRORS],
     notes: ["Name the entity as a positional word (`detach 4711 keikka`) OR an attach-style flag (`detach 4711 --keikka 9001`) — the flag's id is ignored since detach only needs the entity name.", "Audited via ChangeTracker on the previously-linked entity's timeline.", DEPLOY_NOTE],
@@ -264,6 +267,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "type", type: "string", description: "Type (NAME or id — `ib attachment types`)" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "{ ok: true, attachmentId } | { dryRun: true, wouldUpdate: { fileComment: {from,to}, liitaLaskuun: {from,to}, ... } }",
     errors: [apiErr(403, "Not owner company / missing manager role / liitaLaskuun without lasku-admin", "use an account with lasku or asiakas admin role on the owner company"), apiErr(404, "Attachment not found", "verify attachmentId"), ...COMMON_AUTH_ERRORS],
     notes: ["Comment changes are audited via ChangeTracker.", DEPLOY_NOTE],
@@ -277,6 +281,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "attachmentId", type: "number", description: "attachments.attachmentId" }],
     flags: [],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     reasonDetail: "(blob deletion is irreversible)",
     mutates: true,
@@ -786,6 +791,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "{ keikkaId, ...echoed fields } (raw backend response)",
     errors: [
       apiErr(400, "Validation failed", "fix --body fields"),
@@ -810,6 +816,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "{ ok: true } or backend response",
     errors: [
       { origin: "client", exit: 4, meaning: "--status not a numeric keikkaTilaId", remedy: "pass a number, e.g. --status 9" },
@@ -832,6 +839,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "keikkaId", type: "number", description: "keikkaId to assign default driver to" }],
     flags: [],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "{ ok: true, driver:{personId,name} } (raw backend response)",
     errors: [
       apiErr(404, "Keikka not found", "verify keikkaId"),
@@ -1042,6 +1050,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "body", type: "json", description: "Raw JSON body (overrides typed flags)" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "flat customer { asiakasId, name, yTunnus, type, address, postalCode, city, email, contactPersonId, shortName, comment } (or wouldCreate on --dry-run; with --get-or-create adds reused:boolean)",
     errors: [
       apiErr(400, "Missing yTunnus / validation, or >1 customer shares the yTunnus with --get-or-create", "pass --ytunnus or --from-prh; for an ambiguous match use `ib customer get <id>`"),
@@ -1074,6 +1083,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "body", type: "json", description: "Raw JSON body (overrides typed flags)" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "flat customer shape + changed:boolean|null (whether anything actually changed vs an idempotent no-op; null = undetermined) · wouldUpdate on --dry-run",
     errors: [
       apiErr(404, "Customer not found", "verify asiakasId"),
@@ -1105,6 +1115,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "body", type: "json", description: "Raw JSON body (overrides typed flags)" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "{ ...flat customer, action: 'created'|'updated' } (action 'updated' also carries changed:boolean|null) · { action: 'would-*', dryRun } on --dry-run",
     errors: [
       apiErr(400, "No ytunnus key, or >1 customers share the ytunnus (ambiguous)", "provide --ytunnus/--from-prh; for an ambiguous match use `ib customer update <id>`"),
@@ -1168,6 +1179,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape:
       "report: { asiakasId, roolit:{...}, modules:{...} } | write: { asiakasId, applied:{ set, unset, dryRun }, state:{ roolit, modules } }",
     errors: [
@@ -1200,6 +1212,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reset", type: "boolean", description: "Turn ALL 9 operator flags OFF" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape:
       "verify: { asiakasId, allSet, flags:{ pumppu, jerry, … }, missing:[…] } (exit 1 when allSet=false) | set/reset: { asiakasId, applied:{ set, unset, dryRun }, state }",
     errors: [
@@ -1299,6 +1312,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "unset", type: "string", description: "Comma-separated setting names to turn OFF" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape:
       "report: { asiakasId, roolit:{…}, settings:{ HAS_FENNOA:bool, ALV:bool, … every setting } } | write: { asiakasId, applied:{set,unset,dryRun}, state }",
     errors: [
@@ -1421,6 +1435,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "{ tyomaaId, ... } (raw backend response)",
     errors: [
       apiErr(400, "Validation failed", "fix --body fields"),
@@ -1465,6 +1480,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "{ ok: true, ... } (raw backend response); --dry-run returns { dryRun: true, wouldUpdate: { <provided fields>, omittedFieldsPreserved: true } }",
     errors: [
       apiErr(400, "No fields to update", "pass at least one typed flag or a --body/--from-json patch"),
@@ -1793,6 +1809,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ granted: { personId, asiakasId, roleTypeId } } | { dryRun:true, wouldCreate:{ personId, asiakasId, personSettingTypeId, personSettingString }, validation }",
     errors: [
@@ -1816,6 +1833,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "asiakas", type: "number", description: "Target asiakasId (REQUIRED)" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ removed: 1 } | { removed: 0 } (absent) | { dryRun:true, wouldDelete:{ asiakasPersonSettingId }, validation }",
     errors: [
@@ -2237,6 +2255,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "asiakas", type: "number", description: "Target asiakasId to create the vehicle under (defaults to active company; needs a vehicle-manage role on that tenant)" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "{ vehicleId, ... } (raw backend save response) | { dryRun, wouldCreate }",
     errors: [
       apiErr(400, "Validation failed", "fix the field flags"),
@@ -2510,6 +2529,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "person", type: "number", description: "Driver personId", required: true },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape:
       "{ success, vehicleId, date, personId, oldPersonId, oldDriverName, newDriverName, clearedFromVehicleId, keikkaIds, palkkiIds } | { dryRun:true, vehicleId, date, personId, oldPersonId, keikkaIds, palkkiIds, wouldClearFromVehicleId } (with --dry-run)",
@@ -2541,6 +2561,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     flags: [],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape:
       "{ success, vehicleId, date, personId:null, oldPersonId, oldDriverName, newDriverName:null, clearedFromVehicleId:null, keikkaIds, palkkiIds } | { dryRun:true, ... } (with --dry-run)",
@@ -2578,6 +2599,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "person", type: "number", description: "Default driver personId", required: true },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape:
       "{ success, vehicleId, defaultDriverPersonId, cascade: { futureKeikkaIds, futureKeikkaCount, personPvmDaysUpdated } } | { dryRun:true, wouldUpdate } (with --dry-run)",
@@ -2602,6 +2624,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "vehicleId", type: "number", description: "Target vehicleId" }],
     flags: [],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape:
       "{ success, vehicleId, defaultDriverPersonId:null, cascade: { futureKeikkaIds, futureKeikkaCount, personPvmDaysUpdated } } | { dryRun:true, wouldUpdate } (with --dry-run)",
@@ -2633,6 +2656,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "data", type: "string", description: "Extra FCM data payload as a JSON object (e.g. '{\"url\":\"/grid\"}')" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape:
       "{ success, reason:'SENT'|'NO_DEVICES'|'DELIVERY_FAILED', personId, name, devicesTargeted, messageUuid?, successCount?, failureCount?, hint? } | { dryRun:true, wouldSend:{ personId, name, title, body, deviceCount } } (with --dry-run)",
     errors: [
@@ -2690,6 +2714,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape:
       "{ sent:true, to, from, subject } | { dryRun:true, wouldSend:{ to, from, subject, hasHtml } } (with --dry-run)",
     errors: [
@@ -2747,6 +2772,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "data", type: "string", description: "Extra FCM data payload as a JSON object" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "Same as `ib notification fcm send` (delegates to it).",
     errors: [
       apiErr(400, "Missing/invalid field (no --title/--body, ambiguous name, non-object --data)", "supply --title/--body and an unambiguous person"),
@@ -2786,6 +2812,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ personId, personEmail, added: boolean } · dry-run: { dryRun:true, wouldAdd:{ personId, personEmail } }",
     errors: [
@@ -2810,6 +2837,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape:
       "{ personId, personEmail, main:true, changed:boolean } · dry-run: { dryRun:true, wouldSetMain:{ personId, personEmail } }",
@@ -2837,6 +2865,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "backend delete result · dry-run: { dryRun:true, wouldDelete:{ personId, personEmail } }",
     errors: [
@@ -2993,6 +3022,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "geocode", type: "boolean", description: "Resolve lat/lng from the address via Google Maps when coordinates are not given (then persisted + echoed)" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "{ sijaintiId, success, lat?, lng?, coordsPersisted? } — lat/lng/coordsPersisted present when coordinates were given (coordsPersisted:false on --dry-run)",
     errors: [
       apiErr(400, "Validation failed", "fix --body fields"),
@@ -3027,6 +3057,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "geocode", type: "boolean", description: "Force re-resolving lat/lng from the address via Google Maps (fails fast on no match). Address changes auto-geocode even without this flag when no coordinates are given" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "{ ok: true, ..., lat?, lng?, coordsPersisted?, geocodeFailed? } — lat/lng/coordsPersisted present when coordinates were supplied or geocoded; geocodeFailed when the automatic address-change geocode found no match (update still ran, coords now NULL)",
     errors: [
       apiErr(400, "Validation failed", "fix --body fields"),
@@ -3054,6 +3085,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "puomi-max", type: "number", description: "puomiMax (m) to set while enrolling" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape:
       "{ ok: true, ... } (raw backend response) or { dryRun: true, wouldUpdate: {...} }",
     errors: [
@@ -3085,6 +3117,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ success: true }",
     errors: [
@@ -3102,6 +3135,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ success: true }",
     errors: [
@@ -3455,6 +3489,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "all", type: "boolean", description: "With --replace: substitute every occurrence instead of erroring on multiple matches" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "unless-dry-run",
     mutates: true,
     outputShape: "{documentId, success} | dry-run: {dryRun: true, wouldCreate: {...}, validation} | edit dry-run: {dryRun:true, type, field:\"markdownContent\", matchCount?, addedLines, removedLines, sameContent, unified}",
@@ -3483,6 +3518,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "documentId", type: "number", description: "legalDocuments.documentId to activate" }],
     flags: [],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "unless-dry-run",
     mutates: true,
     outputShape: "{success} | dry-run: {dryRun: true, wouldActivate: {documentId}, validation}",
@@ -3502,6 +3538,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "documentId", type: "number", description: "legalDocuments.documentId to soft-delete" }],
     flags: [],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "unless-dry-run",
     mutates: true,
     outputShape: "{success} | dry-run: {dryRun: true, wouldDelete: {documentId}, validation}",
@@ -3546,6 +3583,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "type", type: "string", description: "Document type name (alias for the positional)" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "unless-dry-run",
     mutates: true,
     outputShape: "{success} | dry-run: {dryRun: true, wouldAccept: {...}, validation}",
@@ -3578,6 +3616,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "setting-type-id", type: "number", description: "personSettingTypeId for acceptance tracking (must exist and be unmapped)" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "unless-dry-run",
     mutates: true,
     outputShape: "the created legalDocumentTypes row | dry-run: {dryRun: true, wouldCreateType: {...}, validation}",
@@ -3609,6 +3648,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "setting-type-id", type: "number", description: "personSettingTypeId for acceptance tracking (must exist in personSettingTypes and not be mapped to another type)" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "unless-dry-run",
     mutates: true,
     outputShape: "the updated legalDocumentTypes row | dry-run: {dryRun: true, wouldUpdateType: {typeName, fields}, validation}",
@@ -3674,6 +3714,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: number }",
     errors: [
@@ -3693,6 +3734,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ added: { asiakasId, personId } } or { dryRun: true, wouldCreate: { asiakasId, personId, contactPersonTypeId } }",
     errors: [
@@ -3712,6 +3754,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ removed: { asiakasId, personId } } or { dryRun: true, wouldDelete: { asiakasId, personId } }",
     errors: [
@@ -3748,6 +3791,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: { tyomaaId } }",
     errors: [
@@ -3763,6 +3807,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "tyomaaId", type: "number", description: "tyomaaId" }],
     flags: [],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "{ success: true, tyomaa, message } (raw backend response)",
     errors: [
       apiErr(404, "Worksite not found", "verify tyomaaId"),
@@ -3779,6 +3824,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "radius", type: "number", description: "Geofence radius in metres (1-10000)" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "{ success: true }",
     errors: [
       apiErr(400, "Radius out of range", "use 1-10000"),
@@ -3793,6 +3839,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "tyomaaId", type: "number", description: "tyomaaId" }],
     flags: [],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "{ success, ... } (raw backend response)",
     errors: [
       apiErr(400, "Missing coordinates", "run refresh-location first"),
@@ -3811,6 +3858,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ added: { tyomaaId, personId } } or { dryRun: true, wouldCreate: { tyomaaId, personId, contactPersonTypeId } }",
     errors: permErrors("auth.page.tyomaa.edit"),
@@ -3827,6 +3875,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ removed: { tyomaaId, personId } } or { dryRun: true, wouldDelete: { tyomaaId, personId } }",
     errors: [
@@ -3866,6 +3915,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ personId, name, email, ... } (re-fetched) · with --get-or-create adds reused:boolean · dry-run: { dryRun: true, wouldCreate: ... }",
     errors: [
@@ -3900,6 +3950,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ ok: true, updated: { personId } } or { dryRun: true, wouldUpdate: { personId, ... } }",
     errors: [
@@ -3935,6 +3986,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ personId, ownerAsiakasId } or { dryRun: true, wouldSetOwner: { personId, from, to } }",
     errors: [
@@ -3957,6 +4009,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: { personId } }",
     errors: [
@@ -4044,6 +4097,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape:
       "{ pumppuRequestId, status:'open', asiakasId, personId, tyomaaId, geocoded } · { dryRun:true, wouldCreate:{ asiakasId, osoite, pumppuAika, totalM3, requiredPuomi, pumppuKesto, requiredLinja, notes }, validation:{ ok:true } } on --dry-run",
@@ -4071,6 +4125,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId you own" }],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape:
       "{ success: true, status: 'cancelled' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
@@ -4089,6 +4144,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId you were sent" }],
     flags: [{ name: "reason", type: "string", description: "Decline reason — stored, shown to the customer, and audited (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape:
       "{ success: true, declined: true, hasOtherProviders } (or { …, alreadyDeclined: true }) · { dryRun: true, wouldDecline: { pumppuRequestId, reason } } on --dry-run",
@@ -4108,6 +4164,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId you previously declined" }],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape:
       "{ success: true, undeclined: boolean } · { dryRun: true, wouldUndecline: { pumppuRequestId } } on --dry-run",
@@ -4136,6 +4193,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape:
       "{ pumppuOfferId, status:'draft', created, messageThreadId } · { dryRun:true, wouldUpsert:{ pumppuRequestId, priceCents, vatPercent, priceTerms, validUntil, availableFrom, extraNotes, cancellationTerms, maintainsOrderInfo } } on --dry-run",
@@ -4166,6 +4224,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape:
       "{ pumppuOfferId, status:'pending' } · { dryRun:true, wouldUpdate:{ pumppuRequestId, pumppuOfferId, status:'pending' } } on --dry-run",
@@ -4189,6 +4248,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape:
       "{ pumppuRequestId, pumppuOfferId, keikkaId:null, status:'accepted' } · { dryRun:true, wouldAccept:{ pumppuRequestId, pumppuOfferId, status:'accepted' } } on --dry-run",
@@ -4214,6 +4274,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape:
       "{ pumppuRequestId, pumppuOfferId, status:'confirmed', keikkaId, scheduledAt } · { dryRun:true, wouldConfirm:{ pumppuRequestId, pumppuOfferId, status:'confirmed', scheduledAt, pumppuId } } on --dry-run",
@@ -4247,6 +4308,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape:
       "{ success: true, status: 'withdrawn' } or { dryRun: true, wouldUpdate: { pumppuOfferId, status } }",
@@ -4269,6 +4331,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape:
       "{ success: true, pumppuOfferId, deleted: true } or { dryRun: true, wouldDelete: { pumppuOfferId, status } }",
@@ -4404,6 +4467,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, openingHours, companyDescription, maintainsOrderInfo, changed } · { dryRun: true, wouldUpdate: {...} } on --dry-run",
     errors: [
@@ -4487,6 +4551,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: true } }",
     errors: [
@@ -4509,6 +4574,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ success: true } or { dryRun: true, wouldUpdate: { asiakasId, enable: false } }",
     errors: [
@@ -4552,6 +4618,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "source", type: "string", description: "manual | import | scheduled (default manual)" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "{ jerryOnboardingId } · { dryRun: true, wouldCreate: { asiakasId } } on --dry-run",
     errors: [
       apiErr(400, "Prospect already exists / company not found", "check asiakasId"),
@@ -4580,6 +4647,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "outreach-phone", type: "string", description: "Contact override phone" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "{ success: true } · { dryRun: true, wouldUpdate: { asiakasId, fields } } on --dry-run",
     errors: [
       apiErr(400, "Unknown status", "use one of the status keys listed on --status"),
@@ -4603,6 +4671,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "set-status", type: "string", description: `Also set the pipeline status. Keys: ${ONBOARDING_STATUS_KEYS}` },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     outputShape: "{ jerryOnboardingEventId } · { dryRun: true, wouldLog: {...} } on --dry-run",
     errors: [
       apiErr(400, "Invalid eventType / missing text", "type must be call, response or note"),
@@ -4740,6 +4809,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ success: true, status: 'expired' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
     errors: [SYSADMIN_403, apiErr(409, "Wrong state", "request not in an expirable state"), ...COMMON_AUTH_ERRORS],
@@ -4754,6 +4824,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ success: true, status: 'cancelled' } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
     errors: [SYSADMIN_403, apiErr(409, "Wrong state", "request not in a cancellable state"), ...COMMON_AUTH_ERRORS],
@@ -4768,6 +4839,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ success: true, status: 'open' | 'no_supply', providerCount, notifiedCount } or { dryRun: true, wouldUpdate: { pumppuRequestId, status } }",
     notes: [
@@ -4790,6 +4862,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ success: true, status, expiresAt } or { dryRun: true, wouldUpdate: { pumppuRequestId, expiresAt } }",
     errors: [
@@ -4809,6 +4882,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
     flags: [{ name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" }],
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "always",
     outputShape: "{ success: true } or { dryRun: true, wouldDelete: { pumppuRequestId } }",
     errors: [
@@ -5164,6 +5238,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "Enable or disable the weather module for the active company. Pass exactly one of --on or --off. Admin-scoped operation. Supports --dry-run, --idempotency-key, and --reason for audit trail.",
     auth: "any",
     writeFlags: true,
+    dryRunKind: "server",
     flags: [
       { name: "on", type: "boolean", description: "Enable the module" },
       { name: "off", type: "boolean", description: "Disable the module" },
@@ -5346,6 +5421,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     auth: "any",
     mutates: true,
     writeFlags: true,
+    dryRunKind: "server",
     args: [
       {
         name: "command...",
@@ -5408,6 +5484,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     auth: "any",
     mutates: true,
     writeFlags: true,
+    dryRunKind: "server",
     reasonPolicy: "unless-dry-run",
     args: [
       {
@@ -6850,6 +6927,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     auth: "any",
     mutates: true,
     writeFlags: true,
+    dryRunKind: "server",
     args: [{ name: "term", type: "string", required: true, description: "Missed term (as listed by `ib glossary misses`)" }],
     flags: [],
     outputShape: "{ term, dismissed: 1 }; or { dryRun: true, term, wouldDismiss: boolean } with --dry-run",
@@ -6869,6 +6947,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     auth: "any",
     mutates: true,
     writeFlags: true,
+    dryRunKind: "server",
     args: [{ name: "term", type: "string", required: true, description: "Canonical term" }],
     flags: [
       { name: "definition", type: "string", description: "One-paragraph definition (≤2000). Omit to keep current." },
@@ -6908,6 +6987,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     auth: "any",
     mutates: true,
     writeFlags: true,
+    dryRunKind: "server",
     args: [{ name: "file", type: "string", required: true, description: "JSON array file of {term, definition, synonyms?, relatedCommands?, relatedEntity?, domain?, aiConfidence?, needsHumanReview?} objects (or - for stdin)" }],
     flags: [
       { name: "update-only", type: "boolean", description: "Only update existing terms; never insert" },
@@ -7023,6 +7103,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     writeFlags: true,
+    dryRunKind: "server",
     mutates: true,
     flags: [
       { name: "title", type: "string", description: "Task title, max 200 chars (required)" },
@@ -7055,6 +7136,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     writeFlags: true,
+    dryRunKind: "server",
     mutates: true,
     args: [{ name: "id", type: "number", description: "taskId" }],
     flags: [
@@ -7084,6 +7166,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     writeFlags: true,
+    dryRunKind: "server",
     mutates: true,
     args: [{ name: "id", type: "number", description: "taskId" }],
     flags: [

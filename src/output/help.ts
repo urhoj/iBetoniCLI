@@ -130,7 +130,7 @@ export interface CommandFlag {
   synonyms?: Record<string, string>;
 }
 
-export interface CommandSpec {
+interface CommandSpecBase {
   /** Full command path, e.g. `ib keikka list`. */
   command: string;
   /**
@@ -174,25 +174,12 @@ export interface CommandSpec {
   args?: CommandArg[];
   /** Command-specific flags rendered in the FLAGS section. */
   flags: CommandFlag[];
-  /** When true, the WRITE-SAFETY FLAGS block is included. */
-  writeFlags?: boolean;
   /**
    * True when the command mutates data even if it doesn't use the standard
    * write-safety block (e.g. custom client-side dry-run). Falls back to
    * writeFlags for ib commands filtering.
    */
   mutates?: boolean;
-  /**
-   * How `--dry-run` resolves for this mutation — machine-readable, replacing
-   * the per-spec prose restatements. ABSENT on a writeFlags command means
-   * `"server"`: the `X-Dry-Run` header is sent and the BACKEND skips
-   * persistence (a route whose guard is not deployed will still persist).
-   * `"client"`: the CLI resolves the preview locally and NEVER issues the
-   * write — safe-by-construction, and it works under `--read-only`. Drives
-   * the WRITE-SAFETY `--dry-run` help line and rides verbatim in
-   * `ib reference dump` / `ib commands`.
-   */
-  dryRunKind?: "server" | "client";
   /**
    * Declares that this write REQUIRES `--reason` (the X-Action-Reason audit
    * string). Enforced CENTRALLY — buildProgram installs a preAction hook that
@@ -232,6 +219,39 @@ export interface CommandSpec {
   /** Copy-paste-ready invocation examples. */
   examples: string[];
 }
+
+/**
+ * The write-safety half of a {@link CommandSpec}, split out as a discriminated
+ * union so that declaring the standard write flags FORCES a decision about how
+ * `--dry-run` resolves — omitting `dryRunKind` on a `writeFlags: true` spec is a
+ * COMPILE error, exactly as omitting `http`/`origin` is on a `CommandError`.
+ *
+ * This is load-bearing. `dryRunKind` used to be optional with ABSENT meaning
+ * `"server"`, i.e. the unsafe reading was the default: authors got the
+ * "backend skips persistence" help text for free without anyone checking that a
+ * backend guard existed. Four commands shipped that way and silently PERSISTED
+ * on `--dry-run` (weather toggle, keikka tila/set, sijainti delete/undelete).
+ *
+ * It describes what the CLI DOES, which is decidable from the run function:
+ * - `"client"` — the CLI resolves the preview locally and NEVER issues the
+ *   write. Safe by construction, and works under `--read-only`.
+ * - `"server"` — the `X-Dry-Run` header is sent and the BACKEND is expected to
+ *   skip persistence. Whether it actually does is a separate axis, enforced at
+ *   runtime by the dry-run post-condition in `src/api/client.ts` (a 2xx with no
+ *   `dryRun` marker is a hard exit 6 rather than a silent write).
+ *
+ * Drives the WRITE-SAFETY `--dry-run` help line and rides verbatim in
+ * `ib reference dump` / `ib commands`.
+ */
+type WriteSafetySpec =
+  | { writeFlags: true; dryRunKind: "server" | "client" }
+  | { writeFlags?: false; dryRunKind?: "client" };
+
+/**
+ * A command's full specification: the descriptive half ({@link CommandSpecBase})
+ * intersected with the write-safety half ({@link WriteSafetySpec}).
+ */
+export type CommandSpec = CommandSpecBase & WriteSafetySpec;
 
 /**
  * Render a {@link CommandSpec} as the AI-optimized `--help` text. Output is a
@@ -313,7 +333,7 @@ export function formatHelp(spec: CommandSpec): string {
     lines.push(
       spec.dryRunKind === "client"
         ? "  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only)."
-        : "  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response."
+        : "  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.\n                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview."
     );
     lines.push(
       "  --idempotency-key K  Replay protection. Cached for 24h."

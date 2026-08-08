@@ -392,8 +392,11 @@ describe("ApiClient", () => {
   });
 
   test("explicit headers override", async () => {
+    // Body carries the dryRun marker only because the sample headers include
+    // `X-Dry-Run: 1`: the client asserts that post-condition (see the "dry-run
+    // post-condition" describe). This test is about header pass-through.
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({}), {
+      new Response(JSON.stringify({ dryRun: true }), {
         status: 200,
         headers: { "content-type": "application/json" },
       })
@@ -459,5 +462,63 @@ describe("sanitizeHeaderValue", () => {
 
   test("neutralizes control chars (CR/LF) to block header injection", () => {
     expect(sanitizeHeaderValue("ok\r\nX-Evil: 1")).toBe("ok??X-Evil: 1");
+  });
+});
+
+describe("dry-run post-condition", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  const client = () =>
+    createApiClient({
+      endpoint: "https://api.example.com",
+      token: "eyJtest",
+      version: "1.0.0",
+    });
+
+  const dryRunHeaders = { headers: { "X-Dry-Run": "1" } };
+
+  test("passes through when the response carries the dryRun marker", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ dryRun: true, wouldUpdate: { id: 1 }, validation: { ok: true } })
+    );
+    const res = await client().post("/api/thing", { a: 1 }, dryRunHeaders);
+    expect(res).toMatchObject({ dryRun: true });
+  });
+
+  test("throws exit 6 DRY_RUN_NOT_HONOURED when the marker is absent", async () => {
+    // The exact shape the four unguarded routes returned: a normal success body.
+    mockFetch.mockResolvedValueOnce(jsonResponse({ enabled: false, asiakasId: 26, success: true }));
+    await expect(client().post("/api/thing", { a: 1 }, dryRunHeaders)).rejects.toMatchObject({
+      exitCode: 6,
+      statusCode: 0,
+      body: { code: "DRY_RUN_NOT_HONOURED" },
+    });
+  });
+
+  test("does not fire without the X-Dry-Run header", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ success: true }));
+    await expect(client().post("/api/thing", { a: 1 })).resolves.toMatchObject({ success: true });
+  });
+
+  test("does not fire on a GET", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ rows: [] }));
+    await expect(client().get("/api/thing", dryRunHeaders)).resolves.toMatchObject({ rows: [] });
+  });
+
+  test("a real HTTP error still surfaces as itself, not as a missing marker", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ error: "nope" }, 403));
+    await expect(client().post("/api/thing", { a: 1 }, dryRunHeaders)).rejects.toMatchObject({
+      statusCode: 403,
+      exitCode: 3,
+    });
+  });
+
+  test("dryRun:false in the body is treated as not honoured", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ dryRun: false, success: true }));
+    await expect(client().post("/api/thing", { a: 1 }, dryRunHeaders)).rejects.toMatchObject({
+      exitCode: 6,
+    });
   });
 });

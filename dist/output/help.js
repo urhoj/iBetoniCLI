@@ -97,7 +97,7 @@ export function formatHelp(spec) {
         lines.push("WRITE-SAFETY FLAGS");
         lines.push(spec.dryRunKind === "client"
             ? "  --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only)."
-            : "  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.");
+            : "  --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.\n                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.");
         lines.push("  --idempotency-key K  Replay protection. Cached for 24h.");
         lines.push(spec.reasonPolicy
             ? `  --reason TEXT        Free-text justification, stored in audit log. REQUIRED${spec.reasonPolicy === "unless-dry-run" ? " unless --dry-run" : ""}${spec.reasonDetail ? ` ${spec.reasonDetail}` : ""}.`

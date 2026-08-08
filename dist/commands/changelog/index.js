@@ -815,6 +815,7 @@ export const CHANGELOG_SPECS = [
             },
         ]),
         writeFlags: true,
+        dryRunKind: "server",
         mutates: true,
         outputShape: "{ changelogId, relinkedFrom? } | { dryRun, wouldCreate, validation }. `relinkedFrom` appears only when --feedback named a row already resolved by a DIFFERENT entry, and carries that entry's id; a one-line note also goes to stderr.",
         errors: [
@@ -1206,6 +1207,7 @@ export const CHANGELOG_SPECS = [
             { name: "map", type: "string", description: "JSON file (or -): [{changelogId, versionTag}] for precise per-entry stamping" },
         ],
         writeFlags: true,
+        dryRunKind: "server",
         mutates: true,
         outputShape: "{ released, versionTag } | { released, mode:'map' } | { dryRun, wouldRelease }",
         errors: [

@@ -26,6 +26,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -71,6 +72,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED (blob deletion is irreversible).
 
@@ -129,6 +131,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -321,6 +324,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -442,6 +446,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -944,6 +949,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -991,6 +997,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -1062,6 +1069,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -1294,6 +1302,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -1343,6 +1352,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -1382,6 +1392,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -1456,6 +1467,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -1527,6 +1539,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -1579,6 +1592,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -1941,6 +1955,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -2145,6 +2160,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3133,6 +3149,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3168,6 +3185,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3348,6 +3366,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3460,6 +3479,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -3499,6 +3519,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -3576,6 +3597,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3646,6 +3668,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3692,6 +3715,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -3729,6 +3753,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -3765,6 +3790,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -3801,6 +3827,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -3839,6 +3866,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -3975,6 +4003,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -4287,6 +4316,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -4326,6 +4356,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -4382,6 +4413,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -4424,6 +4456,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -4462,6 +4495,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -4500,6 +4534,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -4565,6 +4600,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -4605,6 +4641,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -4649,6 +4686,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -4695,6 +4733,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -4830,6 +4869,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -4863,6 +4903,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -4900,6 +4941,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -5128,6 +5170,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -5209,6 +5252,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
@@ -5290,6 +5334,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
@@ -5363,6 +5408,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
@@ -5519,6 +5565,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
@@ -5635,6 +5682,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
@@ -5682,6 +5730,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
@@ -7411,6 +7460,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -7462,6 +7512,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -8013,6 +8064,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -8197,6 +8249,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -8402,6 +8455,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -8475,6 +8529,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -8547,6 +8602,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -8585,6 +8641,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -8804,6 +8861,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -8850,6 +8908,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -8922,6 +8981,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -8990,6 +9050,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -9076,6 +9137,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -9121,6 +9183,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED unless --dry-run.
 
@@ -9271,6 +9334,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -9523,6 +9587,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -9603,6 +9668,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -9835,6 +9901,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -9910,6 +9977,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -9954,6 +10022,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -10042,6 +10111,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -10082,6 +10152,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -10235,6 +10306,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -10326,6 +10398,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -10425,6 +10498,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -10553,6 +10627,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -10596,6 +10671,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -10676,6 +10752,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -11271,6 +11348,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -11403,6 +11481,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -11508,6 +11587,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -11685,6 +11765,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -11751,6 +11832,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification, stored in audit log. REQUIRED.
 
@@ -11787,6 +11869,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -11856,6 +11939,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
@@ -11905,6 +11989,7 @@ FLAGS
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
+                       If the backend does NOT honour it, the CLI exits 6 rather than reporting a write as a preview.
   --idempotency-key K  Replay protection. Cached for 24h.
   --reason TEXT        Free-text justification. Stored in audit log.
 
