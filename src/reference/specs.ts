@@ -5750,7 +5750,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "You can pass the description positionally or as its --description/--body aliases; if you pass more than one, they must match. Here --body is FREE TEXT, unlike the raw-JSON --body on the entity update commands.",
       "gh-issue-style invocation works: `feedback add --title X --description Y` — `add` aliases `create`, and --title is prepended to the description as its first line (blank line between). Feedback rows store only a description, so the title is a formatting convenience, not a separate field.",
       'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib dev feedback create --kind bug -- "--pretty output too wide". Everything after `--` is taken as positional text.',
-      'SHELL QUOTING (fb#299): a report body is exactly the text most likely to contain double quotes (quoted help text, JSON fragments, error strings), and Windows PowerShell splits a native argument on those inner quotes — the CLI then sees many positionals and exits 4 with "too many arguments". --from-json <file|-> sidesteps argv entirely and is the recommended path for any long or quote-bearing report; it also covers --command/--error, which carry quoted text just as often as the description.',
+      "SHELL QUOTING (fb#299): a report body (and --command/--error) is exactly the text most likely to carry inner double-quotes, which Windows PowerShell splits on — pass long or quote-bearing reports via --from-json <file|->; see `ib help shell-quoting`.",
       "When invoked by the betoni.online /ai assistant, the originating conversation id is auto-attached as context.conversationId (via the IB_CONVERSATION_ID env var the /ai loop injects) — a developer can then read the full conversation with `ib dev ai conversation <id>`. Manual CLI use does not set it.",
     ],
     examples: [
@@ -5878,7 +5878,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "--note/--reason/--resolution write the SAME stored note. Passing several with different values merges them (joined in note→resolution→reason order) instead of dropping any — so mixing up --reason with the audit header loses nothing.",
       "A note WITHOUT --status does NOT close the row — it stays open/reviewed and the ack carries a hint saying so; pass --status applied|dismissed to close (feedback #270).",
       "The two ways to close a row have OPPOSITE defaults, so don't assume this one closes: `ib dev changelog add --feedback <id>` closes it for you (status=applied plus a `Shipped: changelog #N` resolution), while this command leaves the status alone unless you pass --status. Recording the fix in the changelog is the one-call path (feedback #293).",
-      "SHELL QUOTING (feedback #327): a resolution note explains what was fixed, so it is exactly the text most likely to quote commands, SQL and error strings — and Windows PowerShell splits a native argument on those inner quotes. The CLI then sees extra positionals and exits 4, or (when no split fragment starts with `-`) stores a note TRUNCATED at the first quote. Use --from-json <file|-> for any long or quote-bearing note; it sidesteps argv entirely.",
+      "SHELL QUOTING (fb#327): a resolution note quotes commands and errors, and a quote-split can even store the note TRUNCATED at the first quote — use --from-json <file|-> for any quote-bearing note; see `ib help shell-quoting`.",
     ],
     seeAlso: ["ib dev changelog add", "ib dev feedback list"],
     examples: [
@@ -5924,7 +5924,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     notes: [
       "--description REPLACES the stored report; --append-description ADDS to it (read-merge-write, blank-line separated). Prefer append for later commentary — a replace that goes wrong destroys the original evidence, and feedback rows have no version history to recover it from. The two are mutually exclusive (exit 4).",
-      "SHELL QUOTING (feedback #332): a feedback description quotes commands, SQL and error strings, and Windows PowerShell splits a native argument on those inner quotes — the CLI then sees extra positionals and exits 4, or (when no split fragment starts with `-`) silently stores text TRUNCATED at the first quote. Since --description overwrites the filed report, that truncation is destructive. Use --from-json <file|-> for any long or quote-bearing text.",
+      "SHELL QUOTING (fb#332): --description OVERWRITES the filed report, so a quote-split truncation is destructive — use --from-json <file|-> for long or quote-bearing text; see `ib help shell-quoting`.",
     ],
     seeAlso: ["ib dev feedback resolve"],
     examples: [

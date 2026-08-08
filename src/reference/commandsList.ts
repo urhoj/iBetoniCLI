@@ -10,6 +10,7 @@
  * `COMMAND_SPECS` so this never drifts from `--help` / `reference dump`.
  */
 import type { CommandSpec } from "../output/help.js";
+import { firstSentence } from "../output/help.js";
 import { COMMAND_SPECS } from "./specs.js";
 import { CliError } from "../api/errors.js";
 import { domainBlurb } from "./domain.js";
@@ -96,6 +97,9 @@ export function specMatcherForToken(
 /** Compact per-command summary surfaced by `ib commands`. */
 export interface CommandSummary {
   command: string;
+  /** FIRST SENTENCE of the spec description (fb#382 — the flat list is a
+   *  discovery skim; the full text is one `--help` away and in `reference dump`).
+   *  Mirrors how group help renders its leaf table. */
   description: string;
   permissions: string[];
   /**
@@ -224,7 +228,7 @@ export function filterCommandSpecs(
     })
     .map((s) => ({
       command: s.command,
-      description: s.description,
+      description: firstSentence(s.description),
       permissions: s.permissions ?? [],
       isWrite: isWriteSpec(s),
       ...(s.dryRunKind ? { dryRunKind: s.dryRunKind } : {}),
@@ -250,9 +254,18 @@ export interface DomainIndexEntry {
   count: number;
   /** Offline domain blurb from {@link DOMAIN_BLURBS}; null when the domain has no entry. */
   description: string | null;
-  /** Leaf command paths relative to `ib` (directly runnable, e.g. "keikka list"). */
+  /** Leaf command paths relative to `ib` (directly runnable, e.g. "keikka list").
+   *  Capped at {@link INDEX_COMMANDS_CAP} per domain (fb#382) — `more` carries
+   *  the count of paths not shown; `ib commands <domain>` lists them all. */
   commands: string[];
+  /** Number of additional leaf paths not shown in `commands` (absent when none). */
+  more?: number;
 }
+
+/** Max leaf paths a domain row lists in the bare index — enough to show the
+ *  domain's shape without the big domains (dev 44, jerry 39, message 33)
+ *  tripling the size of every fresh agent's FIRST discovery call (fb#382). */
+const INDEX_COMMANDS_CAP = 8;
 
 /** Envelope for the domain index; `hint` is the FIRST key so it's read before the rows. */
 export interface DomainIndexEnvelope {
@@ -289,15 +302,18 @@ export function buildDomainIndex(
   }
   const items = [...byDomain.keys()].sort().map((domain) => {
     const inDomain = byDomain.get(domain)!;
+    const paths = inDomain.map((s) => s.command.replace(/^ib /, ""));
+    const shown = paths.slice(0, INDEX_COMMANDS_CAP);
     return {
       domain,
       count: inDomain.length,
       description: domainBlurb(domain),
-      commands: inDomain.map((s) => s.command.replace(/^ib /, "")),
+      commands: shown,
+      ...(paths.length > shown.length ? { more: paths.length - shown.length } : {}),
     };
   });
   return {
-    hint: "domain index — one domain's commands: `ib commands <domain>` · full flat list: `ib commands --all` · one command's spec: `ib <command> --help`",
+    hint: "domain index — one domain's commands: `ib commands <domain>` · full flat list: `ib commands --all` · one command's spec: `ib <command> --help`. A row's `more: N` = N further paths not shown here.",
     ...listEnvelope(items),
   };
 }

@@ -863,7 +863,7 @@ export const CHANGELOG_SPECS = [
         ],
         notes: [
             "You can pass the description positionally, as --description, or as its --summary/--body aliases — if you pass more than one they must match (mirrors `ib dev feedback create`). Here --body is FREE TEXT, unlike the raw-JSON --body on the entity update commands.",
-            'SHELL QUOTING (fb#300): an entry description is long-form prose ABOUT code, so it is the text most likely to contain double quotes (quoted identifiers, JSON fragments, error strings) — and Windows PowerShell splits a native argument on those inner quotes, so the CLI sees many positionals and exits 4 with "too many arguments". --from-json <file|-> sidesteps argv entirely and is the recommended path for any quote-bearing entry; stripping the quotes instead silently degrades the permanent record. --type/--area/--title are required but may come from the JSON.',
+            "SHELL QUOTING (fb#300): an entry description is prose about code — the text most likely to carry inner double-quotes, which Windows PowerShell splits on. Pass quote-bearing entries via --from-json <file|-> (required --type/--area/--title may come from the JSON); see `ib help shell-quoting`.",
             'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib dev changelog add --type bugfix --area cli --title "x" -- "-5% render time". Everything after `--` is taken as positional text.',
             "--dry-run is SERVER-side (X-Dry-Run): the backend validates the payload then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s under --dry-run.",
             "Bounded free-text flags are length-checked client-side (exit 4) before POSTing: --status ≤30, --severity ≤20, --title ≤300, --impact ≤500, --repo/--vtag ≤200, --sha ≤500. (--description/--benefits/--files are unbounded.)",
@@ -1096,7 +1096,7 @@ export const CHANGELOG_SPECS = [
             },
         ],
         notes: [
-            "SHELL QUOTING (fb#300): this is the command used to CORRECT an entry, which is exactly the retry that hits the quoting hazard again — Windows PowerShell splits a native argument on inner double-quotes. Pass quote-bearing prose via --from-json <file|-> rather than stripping the quotes.",
+            "SHELL QUOTING (fb#300): this is the CORRECTION command, so the retry hits the quoting hazard again — pass quote-bearing prose via --from-json <file|->; see `ib help shell-quoting`.",
             "THE CORRECTION PATH FOR --bump-level (fb#303). Deploy Step 0 bumps each coordinated repo from the MAX bump level across the UNRELEASED entries naming it, so a wrong level mis-drives a real release. Fix it here — do NOT delete + re-add, which mints a new changelogId and orphans the cliFeedback row pointing at the old one.",
             "--bump-level has NO default here (unlike `add`, where it defaults to patch): omitting it leaves the recorded level untouched, so an unrelated `update --status …` cannot silently downgrade a deliberate minor.",
             "--feedback also marks that cliFeedback row applied and sets resolvedByChangelogId back to this entry — the only way to re-establish a link lost to delete + re-add (`ib dev feedback resolve` sets status/resolution but not the link).",

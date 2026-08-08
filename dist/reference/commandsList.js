@@ -1,3 +1,4 @@
+import { firstSentence } from "../output/help.js";
 import { COMMAND_SPECS } from "./specs.js";
 import { CliError } from "../api/errors.js";
 import { domainBlurb } from "./domain.js";
@@ -131,7 +132,7 @@ export function filterCommandSpecs(specs, filter, tier = getCallerTier()) {
     })
         .map((s) => ({
         command: s.command,
-        description: s.description,
+        description: firstSentence(s.description),
         permissions: s.permissions ?? [],
         isWrite: isWriteSpec(s),
         ...(s.dryRunKind ? { dryRunKind: s.dryRunKind } : {}),
@@ -144,6 +145,10 @@ export function filterCommandSpecs(specs, filter, tier = getCallerTier()) {
 export function buildCommandsList(filter, tier = getCallerTier()) {
     return listEnvelope(filterCommandSpecs(COMMAND_SPECS, filter, tier));
 }
+/** Max leaf paths a domain row lists in the bare index — enough to show the
+ *  domain's shape without the big domains (dev 44, jerry 39, message 33)
+ *  tripling the size of every fresh agent's FIRST discovery call (fb#382). */
+const INDEX_COMMANDS_CAP = 8;
 /**
  * Bare `ib commands` — a ~5 KB domain INDEX instead of the full flat list
  * (~43 KB at 149 leaves and growing). Progressive-discovery entry point:
@@ -171,15 +176,18 @@ export function buildDomainIndex(specs = COMMAND_SPECS, tier = getCallerTier()) 
     }
     const items = [...byDomain.keys()].sort().map((domain) => {
         const inDomain = byDomain.get(domain);
+        const paths = inDomain.map((s) => s.command.replace(/^ib /, ""));
+        const shown = paths.slice(0, INDEX_COMMANDS_CAP);
         return {
             domain,
             count: inDomain.length,
             description: domainBlurb(domain),
-            commands: inDomain.map((s) => s.command.replace(/^ib /, "")),
+            commands: shown,
+            ...(paths.length > shown.length ? { more: paths.length - shown.length } : {}),
         };
     });
     return {
-        hint: "domain index — one domain's commands: `ib commands <domain>` · full flat list: `ib commands --all` · one command's spec: `ib <command> --help`",
+        hint: "domain index — one domain's commands: `ib commands <domain>` · full flat list: `ib commands --all` · one command's spec: `ib <command> --help`. A row's `more: N` = N further paths not shown here.",
         ...listEnvelope(items),
     };
 }

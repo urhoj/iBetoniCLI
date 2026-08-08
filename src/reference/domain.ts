@@ -140,6 +140,12 @@ export const TOPICS: Topic[] = [
       "LOCAL: `attachment upload <file> --<entity> <id>` does mint->PUT->register in one step; `attachment download <id>` saves to disk. REMOTE (/api/cli/exec, MCP): upload/download are DENIED (they would touch the SERVER's filesystem). Instead: `attachment upload-url --name f.ext` -> PUT the bytes yourself (header x-ms-blob-type: BlockBlob) -> `attachment register ...`; for downloads run `attachment get <id>` and fetch blobUrl yourself (expires in 1h). Groups/types are NAMES or ids — legend: `ib attachment types`. delete is irreversible (blob hard-delete) and needs --reason.",
   },
   {
+    id: "shell-quoting",
+    title: "Windows shell quoting: pass prose via --from-json",
+    body:
+      'Windows PowerShell splits a native argument on its INNER double-quotes, and long-form prose (feedback reports, changelog entries, resolution notes) is exactly the text most likely to contain them (quoted identifiers, JSON fragments, error strings). The CLI then sees several positionals and exits 4 with "too many arguments" — or, when no split fragment starts with `-`, silently stores text TRUNCATED at the first quote (destructive on update/resolve commands, which overwrite the stored row). Fix: pass the whole payload via --from-json <file|-> (sidesteps argv entirely; required flags may come from the JSON). Stripping the quotes instead silently degrades the permanent record. (fb#299/#300/#327/#332)',
+  },
+  {
     id: "complexity",
     title: "Feedback complexity (AI-agent triage 1-5)",
     body:
