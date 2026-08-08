@@ -969,9 +969,19 @@ export async function runPersonHistory(
   const rows = await client.get<RawChangeRow[]>(
     `/api/changes/person/${personId}/${owner}?limit=${limit}`
   );
-  let list = Array.isArray(rows) ? rows : [];
-  if (opts.field) list = list.filter((r) => r.fieldName === opts.field);
-  return listEnvelope(list.map(projectHistoryRow));
+  const page = Array.isArray(rows) ? rows : [];
+  // The route caps at ?limit= with no cursor, so a full page is the only "there
+  // may be more" signal — and --field filters CLIENT-side over that page only,
+  // so an empty filtered result on a capped page means "not in the newest
+  // `limit` changes", not "never changed" (same contract as `ib log entity`, fb#376).
+  const capped = page.length >= limit;
+  const list = opts.field ? page.filter((r) => r.fieldName === opts.field) : page;
+  const env = listEnvelope(list.map(projectHistoryRow));
+  if (capped) env.truncated = true;
+  if (opts.field && capped) {
+    env.hint = `--field ${opts.field} was applied client-side to the newest ${limit} changes only; older changes to it are not shown. Raise --limit (max 500).`;
+  }
+  return env;
 }
 
 /** Pull the new personId out of newPerson's response (tolerant of legacy shapes). */

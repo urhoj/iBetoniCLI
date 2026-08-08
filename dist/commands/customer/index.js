@@ -473,7 +473,12 @@ export async function runCustomerHistory(client, asiakasId, limit) {
     const owner = await resolveCurrentOwnerAsiakasId(client);
     const rows = await client.get(`/api/changes/asiakas/${asiakasId}/${owner}?limit=${limit}`);
     const list = Array.isArray(rows) ? rows : [];
-    return listEnvelope(list.map(projectHistoryRow));
+    const env = listEnvelope(list.map(projectHistoryRow));
+    // The route caps at ?limit= and returns no cursor, so a full page is the only
+    // "there may be more" signal (same contract as `ib log entity`, fb#376).
+    if (list.length >= limit)
+        env.truncated = true;
+    return env;
 }
 /**
  * POST /api/asiakas/person/remove — detach a person from a customer.

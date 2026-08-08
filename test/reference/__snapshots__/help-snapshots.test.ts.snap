@@ -1225,7 +1225,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>
+  ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }> (+truncated:true when the page filled --limit — cursor-less route, so a full page may hide older rows)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -1249,7 +1249,7 @@ DESCRIPTION
 FLAGS
   --main NUMBER    asiakasId to KEEP — references merge into this one (required)
   --secondary NUMBER    asiakasId to REMOVE — merged away then deleted (required)
-  --owner NUMBER    ownerAsiakasId (default: active company)
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
   --allow-big-merge    System-admin: permit a merge above the safety row cap
 
 WRITE-SAFETY FLAGS
@@ -5099,7 +5099,7 @@ ARGUMENTS
   <keikkaId> NUMBER    keikkaId (required)
 
 FLAGS
-  --owner NUMBER    ownerAsiakasId (default: active company)
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
   --limit NUMBER    Max rows (capped at 500) (default: 100)
   --field STRING    Filter by fieldName (e.g. kuskit, laskuMemo, keikkaTilaId)
 
@@ -5107,7 +5107,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>
+  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }> (+truncated:true when the page filled --limit — cursor-less route, so a full page may hide older rows) (+hint when --field filtered a capped page: the filter saw only the newest --limit rows)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -5841,14 +5841,14 @@ FLAGS
   --entity-type STRING    keikka or palkki (required)
   --from DATE    Entity-date window start (or today/yesterday/tomorrow) (required)
   --to DATE    Entity-date window end (or today/yesterday/tomorrow) (required)
-  --owner NUMBER    ownerAsiakasId (default: active company)
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
   --limit NUMBER    Max rows kept client-side (cap 2000) (default: 200)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personName, at, description, keikkaTilaContext, deviceType, palkkiText, palkkiVehicleRegNo, reason, impersonatedByPersonName }>
+  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personName, at, description, keikkaTilaContext, deviceType, palkkiText, palkkiVehicleRegNo, reason, impersonatedByPersonName }> (+truncated when --limit cut rows)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -5869,7 +5869,7 @@ exports[`Help snapshots — contract stability > help for ib log entity matches 
   ib log entity <entityType> <entityId> [flags]
 
 DESCRIPTION
-  Change-tracker audit trail for ONE entity of any type — who changed which field, when, old→new, and the --reason recorded by writes. GET /api/changes/:entityType/:entityId/:ownerAsiakasId; owner defaults to the active company. entityType is validated client-side against the offline catalog (\`ib log types\`); 'keikka' folds in the keikka's keikkaBetoni rows; deprecated 'kuski' is accepted with a stderr note. --field filters client-side.
+  Change-tracker audit trail for ONE entity of any type — who changed which field, when, old→new, and the --reason recorded by writes. GET /api/changes/:entityType/:entityId/:ownerAsiakasId; owner defaults to the active company. entityType is validated client-side against the offline catalog (\`ib log types\`); 'keikka' folds in the keikka's keikkaBetoni rows; deprecated 'kuski' is accepted with a stderr note. --field filters client-side AFTER the server's --limit page — on a capped page an empty result means 'not in the newest --limit changes', NOT 'this field never changed' (the envelope then carries a hint; raise --limit or use \`ib log by-entity-date\`).
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
@@ -5877,7 +5877,7 @@ ARGUMENTS
   <entityId> NUMBER    The entity's id (see entityIdMeaning in \`ib log types\`) (required)
 
 FLAGS
-  --owner NUMBER    ownerAsiakasId (default: active company)
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
   --limit NUMBER    Max rows (capped at 500) (default: 100)
   --field STRING    Filter by changeTracker fieldName (client-side)
 
@@ -5885,7 +5885,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>
+  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }> (+truncated:true when the page filled --limit — cursor-less route, so a full page may hide older rows) (+hint when --field filtered a capped page: the filter saw only the newest --limit rows)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -5901,8 +5901,8 @@ SEE ALSO
   ib log types, ib keikka log, ib log latest
 
 EXAMPLES
-  ib log entity keikka 12345
-  ib log entity vehicle 53 --field kuskit
+  ib log entity keikka 12345 --field kuskit
+  ib log entity vehicle 53 --field vehicleRegNo
   ib log entity pumppuRequest 17
 "
 `;
@@ -5917,14 +5917,14 @@ DESCRIPTION
 
 FLAGS
   --entity-type STRING    Filter to one entityType
-  --owner NUMBER    ownerAsiakasId (default: active company)
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
   --limit NUMBER    Max rows (server cap 500) (default: 100)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>
+  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }> (+truncated:true when the page filled --limit — cursor-less route, so a full page may hide older rows)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -5953,8 +5953,8 @@ FLAGS
   --from DATE    Window start, YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow) (required)
   --to DATE    Window end, YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow) (required)
   --entity-type STRING    Filter to one entityType
-  --person NUMBER    Filter to one actor personId
-  --owner NUMBER    ownerAsiakasId (default: active company)
+  --person NUMBER    Filter to one actor personId (a non-integer value exits 4 client-side)
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
   --limit NUMBER    Max rows kept client-side (cap 2000) (default: 200)
 
 GLOBAL FLAGS
@@ -6016,14 +6016,14 @@ ARGUMENTS
   <personId> NUMBER    Whose changes (omit = yourself; others need admin) (optional)
 
 FLAGS
-  --owner NUMBER    ownerAsiakasId (default: active company)
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
   --limit NUMBER    Max rows (cap 500) (default: 100)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, at, description, deviceType, entityDisplayName, reason, impersonatedByPersonName }>
+  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, at, description, deviceType, entityDisplayName, reason, impersonatedByPersonName }> (+truncated:true when the page filled --limit — cursor-less route, so a full page may hide older rows)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -8753,7 +8753,7 @@ ARGUMENTS
   <personId> NUMBER    personId whose audit trail to fetch (required)
 
 FLAGS
-  --owner NUMBER    ownerAsiakasId (default: active company)
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
   --limit NUMBER    Max rows (capped at 500) (default: 100)
   --field STRING    Filter by changeTracker fieldName (e.g. asiakasPersonSetting for role changes)
 
@@ -8761,7 +8761,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>
+  ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }> (+truncated:true when the page filled --limit — cursor-less route, so a full page may hide older rows) (+hint when --field filtered a capped page: the filter saw only the newest --limit rows)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -8813,7 +8813,7 @@ DESCRIPTION
 FLAGS
   --main NUMBER    personId to KEEP — references merge into this one (required)
   --secondary NUMBER    personId to REMOVE — merged away then deleted (required)
-  --owner NUMBER    ownerAsiakasId (default: active company)
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
 
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
@@ -11024,7 +11024,7 @@ ARGUMENTS
   <vehicleId> NUMBER    vehicleId (required)
 
 FLAGS
-  --owner NUMBER    ownerAsiakasId (default: active company)
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
   --limit NUMBER    Max rows (capped at 500) (default: 100)
   --field STRING    Filter by fieldName (e.g. vehicleRegNo)
 
@@ -11032,7 +11032,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }>
+  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }> (+truncated:true when the page filled --limit — cursor-less route, so a full page may hide older rows) (+hint when --field filtered a capped page: the filter saw only the newest --limit rows)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -11654,7 +11654,7 @@ ARGUMENTS
   <tyomaaId> NUMBER    tyomaaId (required)
 
 FLAGS
-  --owner NUMBER    ownerAsiakasId (default: active company)
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
   --limit NUMBER    Max rows (capped at 500) (default: 100)
   --field STRING    Filter by fieldName
 
@@ -11662,7 +11662,7 @@ GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }>
+  ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }> (+truncated:true when the page filled --limit — cursor-less route, so a full page may hide older rows) (+hint when --field filtered a capped page: the filter saw only the newest --limit rows)
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -11688,7 +11688,7 @@ DESCRIPTION
 FLAGS
   --main NUMBER    tyomaaId to KEEP — references merge into this one (required)
   --secondary NUMBER    tyomaaId to REMOVE — merged away then deleted (required)
-  --owner NUMBER    ownerAsiakasId (default: active company)
+  --owner NUMBER    ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)
 
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).

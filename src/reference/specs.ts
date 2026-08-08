@@ -89,6 +89,15 @@ const DEPLOY_NOTE = "Deploy-gated (404 until the backend ships /api/cli/attachme
 const TRUNCATED_NOTE =
   " (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)";
 
+/** Appended to server-capped log outputShapes: the /api/changes routes return no
+ *  cursor, so a FULL page is the only "there may be more" signal — the CLI flags
+ *  it client-side, so it works against any backend (fb#375). */
+const LOG_CAPPED_NOTE =
+  " (+truncated:true when the page filled --limit — cursor-less route, so a full page may hide older rows)";
+/** Companion for log specs that also filter --field client-side (fb#375). */
+const LOG_FIELD_HINT_NOTE =
+  " (+hint when --field filtered a capped page: the filter saw only the newest --limit rows)";
+
 // ─── legal shared fragments ──────────────────────────────────────────────────
 const LEGAL_DEV_ERRORS: CommandError[] = [
   apiErr(401, "Token expired", "ib auth refresh"),
@@ -880,12 +889,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     auth: "any",
     args: [{ name: "keikkaId", type: "number", description: "keikkaId" }],
     flags: [
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
       { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
       { name: "field", type: "string", description: "Filter by fieldName (e.g. kuskit, laskuMemo, keikkaTilaId)" },
     ],
     outputShape:
-      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>",
+      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>" +
+      LOG_CAPPED_NOTE +
+      LOG_FIELD_HINT_NOTE,
     errors: authErrors(
       apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")
     ),
@@ -1259,7 +1270,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [
       { name: "main", type: "number", description: "asiakasId to KEEP — references merge into this one (required)" },
       { name: "secondary", type: "number", description: "asiakasId to REMOVE — merged away then deleted (required)" },
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
       { name: "allow-big-merge", type: "boolean", description: "System-admin: permit a merge above the safety row cap" },
     ],
     writeFlags: true,
@@ -1296,7 +1307,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "limit", type: "number", default: "100", description: "Max rows (cap 500)" },
     ],
     outputShape:
-      "ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>",
+      "ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>" +
+      LOG_CAPPED_NOTE,
     errors: permErrors("auth.page.asiakas.read"),
     examples: ["ib customer log 26", "ib customer log 26 --limit 20"],
   },
@@ -1575,12 +1587,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     auth: "any",
     args: [{ name: "tyomaaId", type: "number", description: "tyomaaId" }],
     flags: [
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
       { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
       { name: "field", type: "string", description: "Filter by fieldName" },
     ],
     outputShape:
-      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }>",
+      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }>" +
+      LOG_CAPPED_NOTE +
+      LOG_FIELD_HINT_NOTE,
     errors: authErrors(
       apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")
     ),
@@ -1619,7 +1633,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [
       { name: "main", type: "number", description: "tyomaaId to KEEP — references merge into this one (required)" },
       { name: "secondary", type: "number", description: "tyomaaId to REMOVE — merged away then deleted (required)" },
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
     ],
     writeFlags: true,
     reasonPolicy: "unless-dry-run",
@@ -1887,12 +1901,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     auth: "any",
     args: [{ name: "personId", type: "number", description: "personId whose audit trail to fetch" }],
     flags: [
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
       { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
       { name: "field", type: "string", description: "Filter by changeTracker fieldName (e.g. asiakasPersonSetting for role changes)" },
     ],
     outputShape:
-      "ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>",
+      "ListEnvelope<{ changeId, field, oldValue, newValue, changeType, personId, personName, at, description, reason }>" +
+      LOG_CAPPED_NOTE +
+      LOG_FIELD_HINT_NOTE,
     errors: authErrors(
       apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")
     ),
@@ -1928,7 +1944,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [
       { name: "main", type: "number", description: "personId to KEEP — references merge into this one (required)" },
       { name: "secondary", type: "number", description: "personId to REMOVE — merged away then deleted (required)" },
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
     ],
     writeFlags: true,
     reasonPolicy: "unless-dry-run",
@@ -2410,12 +2426,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     auth: "any",
     args: [{ name: "vehicleId", type: "number", description: "vehicleId" }],
     flags: [
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
       { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
       { name: "field", type: "string", description: "Filter by fieldName (e.g. vehicleRegNo)" },
     ],
     outputShape:
-      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }>",
+      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }>" +
+      LOG_CAPPED_NOTE +
+      LOG_FIELD_HINT_NOTE,
     errors: authErrors(
       apiErr(403, "Not a member of that company (and not admin)", "ib company switch to that owner, or use an admin token")
     ),
@@ -6178,19 +6196,21 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib log entity",
     description:
-      "Change-tracker audit trail for ONE entity of any type — who changed which field, when, old→new, and the --reason recorded by writes. GET /api/changes/:entityType/:entityId/:ownerAsiakasId; owner defaults to the active company. entityType is validated client-side against the offline catalog (`ib log types`); 'keikka' folds in the keikka's keikkaBetoni rows; deprecated 'kuski' is accepted with a stderr note. --field filters client-side.",
+      "Change-tracker audit trail for ONE entity of any type — who changed which field, when, old→new, and the --reason recorded by writes. GET /api/changes/:entityType/:entityId/:ownerAsiakasId; owner defaults to the active company. entityType is validated client-side against the offline catalog (`ib log types`); 'keikka' folds in the keikka's keikkaBetoni rows; deprecated 'kuski' is accepted with a stderr note. --field filters client-side AFTER the server's --limit page — on a capped page an empty result means 'not in the newest --limit changes', NOT 'this field never changed' (the envelope then carries a hint; raise --limit or use `ib log by-entity-date`).",
     auth: "any",
     args: [
       { name: "entityType", type: "string", description: "One of `ib log types` (e.g. keikka, vehicle, pumppuRequest)" },
       { name: "entityId", type: "number", description: "The entity's id (see entityIdMeaning in `ib log types`)" },
     ],
     flags: [
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
       { name: "limit", type: "number", default: "100", description: "Max rows (capped at 500)" },
       { name: "field", type: "string", description: "Filter by changeTracker fieldName (client-side)" },
     ],
     outputShape:
-      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>",
+      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>" +
+      LOG_CAPPED_NOTE +
+      LOG_FIELD_HINT_NOTE,
     errors: authErrors(
       apiErr(403, "Not a member of that company — or entityType personAvailability without an admin role", "ib company switch to that owner, or use an admin token"),
       { origin: "client", exit: 4, meaning: "Unknown entityType (client-side validation)", remedy: "ib log types" }
@@ -6201,8 +6221,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     seeAlso: ["ib log types", "ib keikka log", "ib log latest"],
     examples: [
-      "ib log entity keikka 12345",
-      "ib log entity vehicle 53 --field kuskit",
+      "ib log entity keikka 12345 --field kuskit",
+      "ib log entity vehicle 53 --field vehicleRegNo",
       "ib log entity pumppuRequest 17",
     ],
   },
@@ -6213,11 +6233,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["isAnyAdmin (asiakasAdmin/laskuAdmin/system admin)"],
     flags: [
       { name: "entity-type", type: "string", description: "Filter to one entityType" },
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
       { name: "limit", type: "number", default: "100", description: "Max rows (server cap 500)" },
     ],
     outputShape:
-      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>",
+      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName, keikkaTilaContext, deviceType }>" +
+      LOG_CAPPED_NOTE,
     errors: authErrors(
       apiErr(403, "Not an admin in the owner company", "use an admin token, or per-entity `ib log entity`")
     ),
@@ -6233,8 +6254,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "from", type: "date", description: "Window start, YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)", required: true },
       { name: "to", type: "date", description: "Window end, YYYY-MM-DD or ISO datetime (or today/yesterday/tomorrow)", required: true },
       { name: "entity-type", type: "string", description: "Filter to one entityType" },
-      { name: "person", type: "number", description: "Filter to one actor personId" },
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "person", type: "number", description: "Filter to one actor personId (a non-integer value exits 4 client-side)" },
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
       { name: "limit", type: "number", default: "200", description: "Max rows kept client-side (cap 2000)" },
     ],
     outputShape:
@@ -6259,11 +6280,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "entity-type", type: "string", description: "keikka or palkki", required: true },
       { name: "from", type: "date", description: "Entity-date window start (or today/yesterday/tomorrow)", required: true },
       { name: "to", type: "date", description: "Entity-date window end (or today/yesterday/tomorrow)", required: true },
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
       { name: "limit", type: "number", default: "200", description: "Max rows kept client-side (cap 2000)" },
     ],
     outputShape:
-      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personName, at, description, keikkaTilaContext, deviceType, palkkiText, palkkiVehicleRegNo, reason, impersonatedByPersonName }>",
+      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personName, at, description, keikkaTilaContext, deviceType, palkkiText, palkkiVehicleRegNo, reason, impersonatedByPersonName }> (+truncated when --limit cut rows)",
     errors: authErrors(
       apiErr(403, "Not an admin in the owner company", "use an admin token"),
       { origin: "client", exit: 4, meaning: "entityType not keikka|palkki, or bad dates (client-side)", remedy: "use --entity-type keikka|palkki and ISO dates or today/yesterday/tomorrow" }
@@ -6280,11 +6301,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "personId", type: "number", required: false, description: "Whose changes (omit = yourself; others need admin)" },
     ],
     flags: [
-      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company)" },
+      { name: "owner", type: "number", description: "ownerAsiakasId (default: active company; a non-integer value exits 4 client-side)" },
       { name: "limit", type: "number", default: "100", description: "Max rows (cap 500)" },
     ],
     outputShape:
-      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, at, description, deviceType, entityDisplayName, reason, impersonatedByPersonName }>",
+      "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, at, description, deviceType, entityDisplayName, reason, impersonatedByPersonName }>" +
+      LOG_CAPPED_NOTE,
     errors: authErrors(
       apiErr(403, "Another person's history without an admin role", "omit personId, or use an admin token")
     ),

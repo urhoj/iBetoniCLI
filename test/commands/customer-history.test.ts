@@ -35,4 +35,16 @@ describe("runCustomerHistory", () => {
       count: 1,
     });
   });
+
+  test("a full server page sets truncated (no cursor — the only more-rows signal)", async () => {
+    get()
+      .mockResolvedValueOnce({ currentCompanyId: 1349 })
+      .mockResolvedValueOnce([
+        { changeId: 11, fieldName: "asiakasNimi" },
+        { changeId: 12, fieldName: "asiakasNimi" },
+      ]);
+    const result = await runCustomerHistory(mockClient, 26, 2);
+    expect(result.truncated).toBe(true);
+    expect(result.count).toBe(2);
+  });
 });

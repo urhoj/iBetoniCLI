@@ -58,5 +58,27 @@ describe("runPersonHistory", () => {
     });
     expect(result.count).toBe(1);
     expect(result.items[0].field).toBe("asiakasPersonSetting");
+    expect(result.truncated).toBeUndefined();
+    expect(result.hint).toBeUndefined();
+  });
+
+  test("a full server page sets truncated (no cursor — the only more-rows signal)", async () => {
+    const get = mockClient.get;
+    get.mockResolvedValueOnce([ROW, EMAIL_ROW]);
+    const result = await runPersonHistory(mockClient, 63, 2, { owner: 27 });
+    expect(result.truncated).toBe(true);
+    expect(result.hint).toBeUndefined();
+  });
+
+  test("--field on a capped page keeps truncated and adds the newest-N hint", async () => {
+    const get = mockClient.get;
+    get.mockResolvedValueOnce([ROW, EMAIL_ROW]);
+    const result = await runPersonHistory(mockClient, 63, 2, {
+      owner: 27,
+      field: "asiakasPersonSetting",
+    });
+    expect(result.count).toBe(1);
+    expect(result.truncated).toBe(true);
+    expect(result.hint).toContain("newest 2 changes");
   });
 });

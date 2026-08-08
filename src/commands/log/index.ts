@@ -16,7 +16,7 @@ import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, failWith, warnNote } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
-import { parseId, parseOptionalId, cappedInt, addOwnerOption } from "../../targets.js";
+import { parseId, parseOptionalId, cappedInt, intFlag, addOwnerOption } from "../../targets.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import {
   CHANGE_ENTITY_TYPES,
@@ -309,7 +309,7 @@ export function registerLogCommands(
         "--to <iso>"
       )
       .option("--entity-type <type>")
-      .option("--person <personId>", "", (v: string) => Number(v))
+      .option("--person <personId>", "", intFlag("--person"))
   )
     .option(
       "--limit <n>",
