@@ -126,6 +126,20 @@ describe("parser errors → JSON envelope", () => {
     expect(process.exitCode).toBe(4);
   });
 
+  // fb#383 — the reported invocation, one level up from #379: the verb is owned
+  // by two DOMAINS, and the root envelope used to answer with 29 group names.
+  test("unknown ROOT command owned by domain groups → runnable redirect", async () => {
+    await run(["dashboard"]);
+    const parsed = lastStderrJson();
+    expect(parsed.group).toBe("ib");
+    expect(parsed.availableElsewhere).toEqual([
+      "ib worksite dashboard",
+      "ib sijainti dashboard",
+    ]);
+    expect(String(parsed.hint)).toContain("`ib worksite dashboard`, `ib sijainti dashboard`");
+    expect(process.exitCode).toBe(4);
+  });
+
   test("unknown flag → USAGE envelope, exit 4", async () => {
     await run(["company", "list", "--nope"]);
     const parsed = lastStderrJson();

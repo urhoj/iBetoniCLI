@@ -83,33 +83,51 @@ export function siblingGroupsWithCommand(
 }
 
 /**
+ * How many owners a verb may have before the ROOT-level scan stays silent.
+ *
+ * At the root every domain is in scope, so the scan must separate a SPECIFIC
+ * verb from generic CRUD. Measured over the catalogue the two are cleanly
+ * split: 147 of 158 verbs have ≤4 owners (`dashboard` 2, `assign` 2, `merge` 3,
+ * `send` 4), then it jumps to 5 (`clear`, `types`), 7 (`log`), 8 (`add`, `set`,
+ * `search`), 11 (`create`) … 28 (`list`). Above this the root answer is the
+ * domain list plus `ib commands` it already prints — naming an arbitrary 3-of-28
+ * would displace that with noise.
+ */
+const ROOT_MAX_OWNERS = 4;
+
+/**
  * Descendant leaves inside `group`'s OWN subtree whose final VERB is the
  * unknown token (fb#379): `ib keikka assign` dead-ends although
  * `ib keikka drivers assign` exists — `available` names the subgroup but
  * nothing says the verb lives inside it. DERIVED from COMMAND_SPECS like
  * {@link siblingsAcceptingOption}, not curated: scoped to the group's own
  * subtree, so the everyone-owns-a-`get` noise that keeps
- * {@link GROUP_SIBLING_DOMAINS} curated cannot arise. Never fires at the root
- * (`ib list` would match a `list` in every domain — pure noise). Tier-gated
- * (enumeration secrecy) and capped at 3.
+ * {@link GROUP_SIBLING_DOMAINS} curated cannot arise. Tier-gated (enumeration
+ * secrecy).
+ *
+ * The ROOT runs the same scan over every domain (fb#383: `ib dashboard`
+ * dead-ended although `ib worksite dashboard` / `ib sijainti dashboard` own the
+ * verb, leaving the caller to guess among 29 groups). There the noise the group
+ * case cannot hit IS reachable, so the guard is {@link ROOT_MAX_OWNERS} — the
+ * complete owner list or nothing, never a truncation of it.
  */
 export function descendantsOwningVerb(
   group: string,
   token: string,
   tier: CallerTier
 ): string[] {
-  if (!token || group === "ib") return [];
+  if (!token) return [];
   const base = canonicalPath(group);
   const t = token.toLowerCase();
-  return COMMAND_SPECS.filter((s) => {
+  const hits = COMMAND_SPECS.filter((s) => {
     if (!s.command.startsWith(`${base} `)) return false;
     const rest = s.command.slice(base.length + 1).split(" ");
     // At least one subgroup between the group and the verb — depth-1 matches
     // are real siblings and already covered by `available`/didYouMean.
     return rest.length >= 2 && rest[rest.length - 1].toLowerCase() === t && !isHiddenAtTier(s, tier);
-  })
-    .map((s) => s.command)
-    .slice(0, 3);
+  }).map((s) => s.command);
+  if (group === "ib") return hits.length <= ROOT_MAX_OWNERS ? hits : [];
+  return hits.slice(0, 3);
 }
 
 /** Space-joined path of a command up its parent chain (e.g. "ib legal"). */
@@ -188,12 +206,18 @@ export function buildUnknownCommandEnvelope(
   // of this very group (fb#379) — same copy-paste rendering.
   const descendants = elsewhere.length ? [] : descendantsOwningVerb(group, unknownToken, tier);
   const rest = (cmd.args ?? []).slice(1).map(String);
+  // "this group" is the group the caller typed — at the root there is none, so
+  // the same two sentences name the owning DOMAIN instead (fb#383).
+  const livesIn =
+    group === "ib" ? "the verb lives in that domain group" : "the verb lives in a subgroup of this command";
+  const livesDeeper =
+    group === "ib" ? "the verb exists in these groups" : "the verb exists deeper in this group";
   const crossGroup = elsewhere.length
     ? `\`${group} ${unknownToken}\` does not exist, but \`${[elsewhere[0].path, ...rest].join(" ")}\` does — ${elsewhere[0].why}. `
     : descendants.length === 1
-      ? `\`${group} ${unknownToken}\` does not exist, but \`${[descendants[0], ...rest].join(" ")}\` does — the verb lives in a subgroup of this command. `
+      ? `\`${group} ${unknownToken}\` does not exist, but \`${[descendants[0], ...rest].join(" ")}\` does — ${livesIn}. `
       : descendants.length > 1
-        ? `\`${group} ${unknownToken}\` does not exist, but the verb exists deeper in this group: ${descendants.map((d) => `\`${d}\``).join(", ")}. `
+        ? `\`${group} ${unknownToken}\` does not exist, but ${livesDeeper}: ${descendants.map((d) => `\`${d}\``).join(", ")}. `
         : "";
   return {
     success: false,

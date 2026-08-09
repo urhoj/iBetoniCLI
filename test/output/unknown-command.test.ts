@@ -246,8 +246,43 @@ describe("descendant-subgroup verb redirect (fb#379)", () => {
     expect(env.hint).toContain("`ib keikka drivers assign 92 tomorrow` does");
   });
 
-  test("never fires at the root — a bare verb matches too many domains", () => {
-    expect(descendantsOwningVerb("ib", "assign", "developer")).toEqual([]);
+  test("fires at the root for a SPECIFIC verb (fb#383)", () => {
+    // the reported case: `ib dashboard` left the caller guessing among 29 groups
+    expect(descendantsOwningVerb("ib", "dashboard", "developer")).toEqual([
+      "ib worksite dashboard",
+      "ib sijainti dashboard",
+    ]);
+    expect(descendantsOwningVerb("ib", "assign", "developer")).toEqual([
+      "ib keikka drivers assign",
+      "ib vehicle driver assign",
+    ]);
+  });
+
+  test("stays silent at the root for a GENERIC verb — every domain owns one", () => {
+    // ~28 owners: naming an arbitrary few would displace the domain list + `ib
+    // commands` advice, which IS the right answer for a bare CRUD verb.
+    for (const verb of ["list", "get", "create", "delete", "search", "clear"]) {
+      expect(descendantsOwningVerb("ib", verb, "developer")).toEqual([]);
+    }
+  });
+
+  test("root envelope carries the redirect and names the owning domains", () => {
+    const env = buildUnknownCommandEnvelope(program, "dashboard", "developer");
+    expect(env.availableElsewhere).toEqual(["ib worksite dashboard", "ib sijainti dashboard"]);
+    expect(env.hint).toContain("`ib worksite dashboard`, `ib sijainti dashboard`");
+    // …without claiming a group the caller never typed
+    expect(env.hint).not.toContain("this group");
+    expect(env.available).toContain("worksite");
+  });
+
+  test("root scan is tier-gated too", () => {
+    // all three `stats` owners are developer-tier (jerry admin / dev cache / dev perf)
+    expect(descendantsOwningVerb("ib", "stats", "developer")).toEqual([
+      "ib jerry admin request stats",
+      "ib dev cache stats",
+      "ib dev perf stats",
+    ]);
+    expect(descendantsOwningVerb("ib", "stats", "standard")).toEqual([]);
   });
 
   test("a direct sibling is not re-suggested (depth-1 is already `available`)", () => {
