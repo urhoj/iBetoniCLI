@@ -506,11 +506,31 @@ export async function runJerryAdminToggle(
 
 /**
  * Valid onboarding pipeline status keys — mirrors backend ALL_STATUSES
- * (puminet5api modules/jerryAdmin/onboardingStatus.js); the server 400s on
- * anything else. Shared by the option help here and the CommandSpecs.
+ * (puminet5api modules/jerryAdmin/onboardingStatus.js): the ranked pipeline
+ * first, then the three terminal states. The server 400s on anything else.
+ *
+ * `ilmoittautunut` is set by the backend when an operator self-applies
+ * (source='self_apply'); an operator rarely sets it by hand, but it IS a valid
+ * value on every status flag — omitting it here made self-applied prospects
+ * look unfilterable/unsettable through the documented vocabulary (fb#377).
  */
-export const ONBOARDING_STATUS_KEYS =
-  "ei_aloitettu → email1_lahetetty → muistutus_lahetetty → vastasi_kylla → tiedot_pyydetty → tervetuloa_lahetetty (pipeline order); terminal: vastasi_ei / ei_vastausta / ei_sovellu";
+export const ONBOARDING_PIPELINE_STATUSES = [
+  "ei_aloitettu",
+  "ilmoittautunut",
+  "email1_lahetetty",
+  "muistutus_lahetetty",
+  "vastasi_kylla",
+  "tiedot_pyydetty",
+  "tervetuloa_lahetetty",
+] as const;
+export const ONBOARDING_TERMINAL_STATUSES = ["vastasi_ei", "ei_vastausta", "ei_sovellu"] as const;
+export const ONBOARDING_STATUSES = [
+  ...ONBOARDING_PIPELINE_STATUSES,
+  ...ONBOARDING_TERMINAL_STATUSES,
+] as const;
+
+/** Prose rendering of {@link ONBOARDING_STATUSES} for flag help — single-sourced from the arrays. */
+export const ONBOARDING_STATUS_KEYS = `${ONBOARDING_PIPELINE_STATUSES.join(" → ")} (pipeline order; ilmoittautunut is set by self-apply); terminal: ${ONBOARDING_TERMINAL_STATUSES.join(" / ")}`;
 
 /** Prospect company categories — backend COMPANY_TYPES (400 "Unknown companyType"). */
 export const COMPANY_TYPES = ["pumppu", "betoni", "all", "owner"] as const;

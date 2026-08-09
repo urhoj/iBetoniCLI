@@ -26,6 +26,7 @@ import { MESSAGE_BOARD_SPECS } from "../commands/message/board/index.js";
 import { CHANGELOG_SPECS } from "../commands/changelog/index.js";
 import {
   ONBOARDING_STATUS_KEYS,
+  ONBOARDING_STATUSES,
   CHECK_ADDRESS_GATES,
   REQUEST_STATS_GROUPS,
   PROVIDER_LIST_TABS,
@@ -4664,7 +4665,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["isSystemAdmin"],
     tier: "developer",
     flags: [
-      { name: "status", type: "string", description: `Filter by pipeline status key: ${ONBOARDING_STATUS_KEYS}` },
+      { name: "status", type: "string", description: `Filter by pipeline status key: ${ONBOARDING_STATUS_KEYS}`, allowed: [...ONBOARDING_STATUSES] },
       { name: "tier", type: "number", description: "Tier filter (1 priority / 2 secondary)" },
       { name: "due", type: "boolean", description: "Only rows where the email1b reminder is due" },
       { name: "search", type: "string", description: "Case-insensitive substring on asiakasNimi / outreachName / outreachEmail / contactPersonName / contactPersonEmail" },
@@ -4707,7 +4708,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     tier: "developer",
     args: [{ name: "asiakasId", type: "number", description: "company asiakasId" }],
     flags: [
-      { name: "status", type: "string", description: `Pipeline status key: ${ONBOARDING_STATUS_KEYS}` },
+      { name: "status", type: "string", description: `Pipeline status key: ${ONBOARDING_STATUS_KEYS}`, allowed: [...ONBOARDING_STATUSES] },
       { name: "tier", type: "number", description: "1/2" },
       { name: "malli", type: "string", description: "Email variant label — FREE TEXT (not server-validated); the convention is A or B" },
       { name: "kanava", type: "string", description: "Preferred channel" },
@@ -4740,7 +4741,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "type", type: "string", description: "Event kind: call | response | note; REQUIRED", allowed: [...ONBOARDING_EVENT_TYPES] },
       { name: "text", type: "string", description: "Event text; REQUIRED" },
       { name: "time", type: "string", description: "Backdated event time (ISO 8601)" },
-      { name: "set-status", type: "string", description: `Also set the pipeline status. Keys: ${ONBOARDING_STATUS_KEYS}` },
+      { name: "set-status", type: "string", description: `Also set the pipeline status. Keys: ${ONBOARDING_STATUS_KEYS}`, allowed: [...ONBOARDING_STATUSES] },
     ],
     writeFlags: true,
     dryRunKind: "server",
