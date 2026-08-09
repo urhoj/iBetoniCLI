@@ -1,0 +1,231 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`parse-time guard → hint pairing > every argParser guard resolves a hint that answers its own message 1`] = `
+"ib auth switch --to <asiakasId>
+  ! --to must be an integer >= 1
+  > (no hint)
+
+ib changelog add --feedback <id>
+  ! --feedback must be an integer >= 1
+  > (no hint)
+
+ib changelog list --feedback <id>
+  ! --feedback must be an integer >= 1
+  > (no hint)
+
+ib changelog update --feedback <id>
+  ! --feedback must be an integer >= 1
+  > (no hint)
+
+ib company switch --to <asiakasId>
+  ! --to must be an integer >= 1
+  > (no hint)
+
+ib customer merge --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib dev changelog add --feedback <id>
+  ! --feedback must be an integer >= 1
+  > (no hint)
+
+ib dev changelog list --feedback <id>
+  ! --feedback must be an integer >= 1
+  > (no hint)
+
+ib dev changelog update --feedback <id>
+  ! --feedback must be an integer >= 1
+  > (no hint)
+
+ib keikka log --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib log by-entity-date --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib log entity --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib log latest --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib log range --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib log range --person <personId>
+  ! --person must be an integer >= 1
+  > (no hint)
+
+ib log user --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib notification fcm send --data <json>
+  ! --data must be a JSON object
+  > received: -5
+
+ib notification fcm send --data <json>
+  ! Invalid --data JSON: Unexpected end of JSON input
+  > received: 
+
+ib notification fcm send --data <json>
+  ! Invalid --data JSON: Unexpected token 'a', "abc" is not valid JSON
+  > received: abc
+
+ib opendata weather day --lat <n>
+  ! --lat must be a number
+  > pass decimal degrees, e.g. --lat 60.17 --lng 24.94
+
+ib opendata weather day --lng <n>
+  ! --lng must be a number
+  > pass decimal degrees, e.g. --lat 60.17 --lng 24.94
+
+ib opendata weather forecast --lat <n>
+  ! --lat must be a number
+  > pass decimal degrees, e.g. --lat 60.1699 --lng 24.9384
+
+ib opendata weather forecast --lng <n>
+  ! --lng must be a number
+  > pass decimal degrees, e.g. --lat 60.1699 --lng 24.9384
+
+ib opendata weather pumping --duration <min>
+  ! --duration must be an integer >= 1
+  > pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120
+
+ib opendata weather pumping --keikka <id>
+  ! --keikka must be an integer >= 1
+  > pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120
+
+ib opendata weather pumping --lat <n>
+  ! --lat must be a number
+  > pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120
+
+ib opendata weather pumping --lng <n>
+  ! --lng must be a number
+  > pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120
+
+ib person log --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib person merge --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib person notify --data <json>
+  ! --data must be a JSON object
+  > received: -5
+
+ib person notify --data <json>
+  ! Invalid --data JSON: Unexpected end of JSON input
+  > received: 
+
+ib person notify --data <json>
+  ! Invalid --data JSON: Unexpected token 'a', "abc" is not valid JSON
+  > received: abc
+
+ib sijainti closest --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > name the worksite once (--worksite OR --tyomaa) and pass integer ids
+
+ib sijainti closest --tyomaa <id>
+  ! --tyomaa must be an integer >= 1
+  > name the worksite once (--worksite OR --tyomaa) and pass integer ids
+
+ib sijainti closest --type <id>
+  ! --type must be an integer >= 1
+  > name the worksite once (--worksite OR --tyomaa) and pass integer ids
+
+ib sijainti closest --worksite <id>
+  ! --worksite must be an integer >= 1
+  > name the worksite once (--worksite OR --tyomaa) and pass integer ids
+
+ib task add --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > --title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
+
+ib task add --assignee <personId>
+  ! --assignee must be an integer >= 1
+  > --title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
+
+ib task add --feedback <id>
+  ! --feedback must be an integer >= 1
+  > --title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
+
+ib task list --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > --executor must be human|ai; --agent must be claude|hermes; --assignee/--asiakas/--limit/--offset must be integers
+
+ib task list --assignee <personId>
+  ! --assignee must be an integer >= 1
+  > --executor must be human|ai; --agent must be claude|hermes; --assignee/--asiakas/--limit/--offset must be integers
+
+ib task list --limit <n>
+  ! --limit must be an integer >= 1
+  > --executor must be human|ai; --agent must be claude|hermes; --assignee/--asiakas/--limit/--offset must be integers
+
+ib task list --offset <n>
+  ! --offset must be an integer >= 0
+  > --executor must be human|ai; --agent must be claude|hermes; --assignee/--asiakas/--limit/--offset must be integers
+
+ib task log --limit <n>
+  ! --limit must be an integer >= 1
+  > (no hint)
+
+ib task set --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > provide at least one field; --activate/--deactivate and enum values as documented; --assignee/--asiakas must be integers
+
+ib task set --assignee <personId>
+  ! --assignee must be an integer >= 1
+  > provide at least one field; --activate/--deactivate and enum values as documented; --assignee/--asiakas must be integers
+
+ib vehicle log --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib weather day --lat <n>
+  ! --lat must be a number
+  > pass decimal degrees, e.g. --lat 60.17 --lng 24.94
+
+ib weather day --lng <n>
+  ! --lng must be a number
+  > pass decimal degrees, e.g. --lat 60.17 --lng 24.94
+
+ib weather forecast --lat <n>
+  ! --lat must be a number
+  > pass decimal degrees, e.g. --lat 60.1699 --lng 24.9384
+
+ib weather forecast --lng <n>
+  ! --lng must be a number
+  > pass decimal degrees, e.g. --lat 60.1699 --lng 24.9384
+
+ib weather pumping --duration <min>
+  ! --duration must be an integer >= 1
+  > pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120
+
+ib weather pumping --keikka <id>
+  ! --keikka must be an integer >= 1
+  > pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120
+
+ib weather pumping --lat <n>
+  ! --lat must be a number
+  > pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120
+
+ib weather pumping --lng <n>
+  ! --lng must be a number
+  > pass decimal degrees and whole minutes, e.g. --lat 60.17 --lng 24.94 --duration 120
+
+ib worksite log --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
+
+ib worksite merge --owner <id>
+  ! --owner must be an integer >= 1
+  > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`"
+`;

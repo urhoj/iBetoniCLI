@@ -10419,7 +10419,7 @@ OUTPUT (JSON, stdout)
   { taskId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldWrite:{...} } (server-side preview).
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  Validation             → --title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month, count 1-120
+  exit 4 (client-side)  Validation             → --title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -10619,7 +10619,7 @@ OUTPUT (JSON, stdout)
   The full updated task row. With --dry-run: { dryRun:true, wouldWrite:{...} } (server-side preview).
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  Validation             → provide at least one field; --activate/--deactivate and enum values as documented
+  exit 4 (client-side)  Validation             → provide at least one field; --activate/--deactivate and enum values as documented; --assignee/--asiakas must be integers
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 5 (HTTP 404)  Not found              → check the id via \`ib task list --inactive\`
   exit 6 (HTTP 500)  Backend error          → retry with --verbose

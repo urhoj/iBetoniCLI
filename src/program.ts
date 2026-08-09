@@ -24,7 +24,7 @@ import { addWriteFlagsToCommand, type WriteFlags, requireReason } from "./api/wr
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "./assess.js";
 import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDomain } from "./reference/commandsList.js";
 import { renderDomainHelp } from "./reference/domain.js";
-import { attachRichHelp, firstSentence } from "./output/help.js";
+import { attachRichHelp, firstSentence, type CommandSpec } from "./output/help.js";
 import { COMMAND_SPECS } from "./reference/specs.js";
 import { canonicalPath } from "./reference/aliasPaths.js";
 import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, writeErrorEnvelope, setActiveCommandErrors, setListColumns, setExitCode as setExit, errorMessage } from "./output/json.js";
@@ -419,13 +419,23 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
  * path-join logic must NOT drift between the two entry points.
  */
 export function applySpecErrors(actionCommand: Command): void {
-  // canonicalPath so invoking a back-compat alias still resolves the command's
-  // OWN documented remedies; without it hintForError fell back to the generic
-  // per-status hint on every aliased path.
-  const path = canonicalPath(commandPath(actionCommand));
-  const spec = COMMAND_SPECS.find((s) => s.command === path);
+  const spec = specFor(actionCommand);
   setActiveCommandErrors(spec?.errors ?? null);
   setListColumns(spec?.prettyColumns ?? null);
+}
+
+/**
+ * The command's own `CommandSpec`, or `undefined` when none matches. Shared by
+ * {@link applySpecErrors} (preAction) and {@link handleParseRejection}'s
+ * parse-time branch so the two resolve the SAME spec for the same command.
+ *
+ * canonicalPath so invoking a back-compat alias still resolves the command's
+ * OWN documented remedies; without it hintForError fell back to the generic
+ * per-status hint on every aliased path.
+ */
+function specFor(cmd: Command): CommandSpec | undefined {
+  const path = canonicalPath(commandPath(cmd));
+  return COMMAND_SPECS.find((s) => s.command === path);
 }
 
 /**
@@ -468,11 +478,18 @@ export interface ParserHooks {
   parserText: () => string;
   /** The command that last called _exit — the GROUP for an unknown subcommand. */
   erroringCommand: () => Command | null;
+  /**
+   * The deepest command parse dispatched INTO, recorded before that command
+   * parses its own options — so it is known even when an option/argument
+   * `argParser` throws (feedback #385). `null` until the first dispatch.
+   */
+  dispatchedCommand: () => Command | null;
 }
 
 export function enableParserThrow(program: Command): ParserHooks {
   let captured = "";
   let erroringCmd: Command | null = null;
+  let dispatchedCmd: Command | null = null;
   const output = {
     writeErr: (s: string) => {
       captured += s;
@@ -492,11 +509,24 @@ export function enableParserThrow(program: Command): ParserHooks {
       erroringCmd = cmd;
       throw err;
     });
+    // Commander runs a command's OWN preSubcommand hooks (never an ancestor's),
+    // so the hook is registered per command — each dispatch overwrites the
+    // pointer and the last one to win is the leaf. Fires BEFORE the subcommand
+    // parses its options, which is the only place an argParser throw can be
+    // attributed from: that throw is not a CommanderError, so `exitOverride`
+    // never runs and `erroringCommand` stays null (feedback #385).
+    cmd.hook("preSubcommand", (_parent, sub) => {
+      dispatchedCmd = sub;
+    });
     cmd.configureOutput(output);
     cmd.commands.forEach(walk);
   };
   walk(program);
-  return { parserText: () => captured, erroringCommand: () => erroringCmd };
+  return {
+    parserText: () => captured,
+    erroringCommand: () => erroringCmd,
+    dispatchedCommand: () => dispatchedCmd,
+  };
 }
 
 /** Commander's error shape under exitOverride (avoid instanceof across copies). */
@@ -555,7 +585,9 @@ function emitUsageEnvelope<T extends { error: string; hint: string }>(
  * lets the loop drain. Routing:
  *
  *  - CliError (failWith guards / global-option validation thrown outside any
- *    action try-block) → stderr envelope + its mapped exit code.
+ *    action try-block) → stderr envelope + its mapped exit code, with the
+ *    dispatched command's spec ERRORS resolved first so a PARSE-time guard gets
+ *    the same `hint` an in-action one does (feedback #385).
  *  - Commander help/version display (exitCode 0) → pass any captured text
  *    through, exit 0.
  *  - `commander.help` (help auto-rendered for a bare `ib` / bare group, exit
@@ -569,15 +601,23 @@ function emitUsageEnvelope<T extends { error: string; hint: string }>(
  */
 export function handleParseRejection(
   err: unknown,
-  parserText: () => string,
-  erroringCommand?: () => Command | null
+  hooks: Partial<ParserHooks> = {}
 ): void {
+  const { parserText, erroringCommand, dispatchedCommand } = hooks;
   if (err instanceof CliError) {
+    // A parse-time guard (an option/argument `argParser` calling `failWith`)
+    // throws BEFORE the preAction hook that normally runs `applySpecErrors`, so
+    // without this the whole parse-time class of client errors could never echo
+    // its command's own ERRORS remedy — the spec rows were documentation-only at
+    // runtime (feedback #385). Errors only: re-seeding prettyColumns here would
+    // clobber an explicit `--columns` on the rare CliError that escapes an action.
+    const cmd = dispatchedCommand?.();
+    if (cmd) setActiveCommandErrors(specFor(cmd)?.errors ?? null);
     exitWithError(err);
     return;
   }
   if (isCommanderError(err)) {
-    const text = parserText();
+    const text = parserText?.() ?? "";
     if (err.exitCode === 0 || err.code === "commander.help") {
       if (text) emitStderr(text);
       setExit(err.exitCode ?? 0);

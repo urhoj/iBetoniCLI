@@ -176,12 +176,12 @@ describe("recordFriction", () => {
     const prevExitCode = process.exitCode;
     try {
       const program = await buildProgram();
-      const { parserText, erroringCommand } = enableParserThrow(program);
+      const hooks = enableParserThrow(program);
       // `view`, not `show` — `show` became a real alias of `get` (fb#373), so it
       // no longer errors; `view` still exercises the same verb-synonym hint.
       await program
         .parseAsync(["node", "ib", "dev", "feedback", "view", "273"])
-        .catch((err) => handleParseRejection(err, parserText, erroringCommand));
+        .catch((err) => handleParseRejection(err, hooks));
       const e = lastEntry();
       expect(e.exitCode).toBe(4);
       expect(String(e.message)).toContain('unknown command "view" under `ib dev feedback`');

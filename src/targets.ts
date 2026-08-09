@@ -86,12 +86,22 @@ export function assertPositiveInt(value: number, label: string): void {
  * Commander argParser: strict integer >= min; exit 4 otherwise. Bare `Number`
  * lets NaN through — the backend silently drops a NaN filter and returns ALL
  * rows (fb#249), and a NaN id serialises as `null` in a JSON body.
+ *
+ * `hint` is for a flag whose remedy is the SAME on every command that carries
+ * it (see {@link addOwnerOption}) — it rides on the error and so wins over the
+ * command's spec ERRORS row. Leave it unset otherwise: an argParser throw now
+ * resolves the running command's own documented remedy (fb#385), and a blanket
+ * hint here would shadow it on every command that has one.
  */
-export function intFlag(flag: string, min = 1): (value: string) => number {
+export function intFlag(
+  flag: string,
+  min = 1,
+  hint?: string
+): (value: string) => number {
   return (value: string) => {
     const n = Number((value ?? "").trim());
     if (!Number.isSafeInteger(n) || n < min) {
-      failWith(`${flag} must be an integer >= ${min}`, 4);
+      failWith(`${flag} must be an integer >= ${min}`, 4, hint);
     }
     return n;
   };
@@ -156,12 +166,22 @@ export function addAsiakasTargetOption(cmd: Command): Command {
  * and reaches the wire as the literal `"NaN"`. Unlike
  * {@link addAsiakasTargetOption}, whose value is always re-validated by
  * {@link resolveTarget}, nothing downstream re-checks this one.
+ *
+ * Carries its OWN remedy hint because the flag spans ~11 commands with one
+ * meaning, and almost none of them documents it in an ERRORS row — leaving the
+ * fb#385 parse-time resolution to fall back on whatever single client/exit-4 row
+ * those commands do have (`ib log entity` → "ib log types", `ib log
+ * by-entity-date` → "use ISO dates"), which answers a question nobody asked.
  */
 export function addOwnerOption(cmd: Command): Command {
   return cmd.option(
     "--owner <id>",
     "ownerAsiakasId (default: active company)",
-    intFlag("--owner")
+    intFlag(
+      "--owner",
+      1,
+      "--owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with `ib company list`"
+    )
   );
 }
 

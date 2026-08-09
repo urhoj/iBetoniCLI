@@ -11,7 +11,7 @@ import { setAmbientCommandPath, commandPathOf } from "./commandContext.js";
  */
 export async function runArgv(argv, opts) {
     const program = await buildProgram(argv);
-    const { parserText, erroringCommand } = enableParserThrow(program);
+    const parserHooks = enableParserThrow(program);
     // Mirror bin/ib.ts: resolve each command's CommandSpec errors for hint output.
     program.hook("preAction", (_t, actionCommand) => {
         setAmbientCommandPath(commandPathOf(actionCommand));
@@ -40,7 +40,7 @@ export async function runArgv(argv, opts) {
             await program.parseAsync(["node", "ib", ...argv]);
         }
         catch (err) {
-            handleParseRejection(err, parserText, erroringCommand);
+            handleParseRejection(err, parserHooks);
         }
     });
     return {

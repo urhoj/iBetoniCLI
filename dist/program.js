@@ -333,13 +333,22 @@ export async function buildProgram(argv) {
  * path-join logic must NOT drift between the two entry points.
  */
 export function applySpecErrors(actionCommand) {
-    // canonicalPath so invoking a back-compat alias still resolves the command's
-    // OWN documented remedies; without it hintForError fell back to the generic
-    // per-status hint on every aliased path.
-    const path = canonicalPath(commandPath(actionCommand));
-    const spec = COMMAND_SPECS.find((s) => s.command === path);
+    const spec = specFor(actionCommand);
     setActiveCommandErrors(spec?.errors ?? null);
     setListColumns(spec?.prettyColumns ?? null);
+}
+/**
+ * The command's own `CommandSpec`, or `undefined` when none matches. Shared by
+ * {@link applySpecErrors} (preAction) and {@link handleParseRejection}'s
+ * parse-time branch so the two resolve the SAME spec for the same command.
+ *
+ * canonicalPath so invoking a back-compat alias still resolves the command's
+ * OWN documented remedies; without it hintForError fell back to the generic
+ * per-status hint on every aliased path.
+ */
+function specFor(cmd) {
+    const path = canonicalPath(commandPath(cmd));
+    return COMMAND_SPECS.find((s) => s.command === path);
 }
 /**
  * Enforce a spec-declared `--reason` requirement ({@link CommandSpec.reasonPolicy})
@@ -363,6 +372,7 @@ export function enforceSpecReasonPolicy(actionCommand) {
 export function enableParserThrow(program) {
     let captured = "";
     let erroringCmd = null;
+    let dispatchedCmd = null;
     const output = {
         writeErr: (s) => {
             captured += s;
@@ -382,11 +392,24 @@ export function enableParserThrow(program) {
             erroringCmd = cmd;
             throw err;
         });
+        // Commander runs a command's OWN preSubcommand hooks (never an ancestor's),
+        // so the hook is registered per command — each dispatch overwrites the
+        // pointer and the last one to win is the leaf. Fires BEFORE the subcommand
+        // parses its options, which is the only place an argParser throw can be
+        // attributed from: that throw is not a CommanderError, so `exitOverride`
+        // never runs and `erroringCommand` stays null (feedback #385).
+        cmd.hook("preSubcommand", (_parent, sub) => {
+            dispatchedCmd = sub;
+        });
         cmd.configureOutput(output);
         cmd.commands.forEach(walk);
     };
     walk(program);
-    return { parserText: () => captured, erroringCommand: () => erroringCmd };
+    return {
+        parserText: () => captured,
+        erroringCommand: () => erroringCmd,
+        dispatchedCommand: () => dispatchedCmd,
+    };
 }
 function isCommanderError(err) {
     return (typeof err === "object" &&
@@ -428,7 +451,9 @@ function emitUsageEnvelope(err, env) {
  * lets the loop drain. Routing:
  *
  *  - CliError (failWith guards / global-option validation thrown outside any
- *    action try-block) → stderr envelope + its mapped exit code.
+ *    action try-block) → stderr envelope + its mapped exit code, with the
+ *    dispatched command's spec ERRORS resolved first so a PARSE-time guard gets
+ *    the same `hint` an in-action one does (feedback #385).
  *  - Commander help/version display (exitCode 0) → pass any captured text
  *    through, exit 0.
  *  - `commander.help` (help auto-rendered for a bare `ib` / bare group, exit
@@ -440,13 +465,23 @@ function emitUsageEnvelope(err, env) {
  *    surface.
  *  - Anything else → plain message, exit 1 (unexpected runtime failure).
  */
-export function handleParseRejection(err, parserText, erroringCommand) {
+export function handleParseRejection(err, hooks = {}) {
+    const { parserText, erroringCommand, dispatchedCommand } = hooks;
     if (err instanceof CliError) {
+        // A parse-time guard (an option/argument `argParser` calling `failWith`)
+        // throws BEFORE the preAction hook that normally runs `applySpecErrors`, so
+        // without this the whole parse-time class of client errors could never echo
+        // its command's own ERRORS remedy — the spec rows were documentation-only at
+        // runtime (feedback #385). Errors only: re-seeding prettyColumns here would
+        // clobber an explicit `--columns` on the rare CliError that escapes an action.
+        const cmd = dispatchedCommand?.();
+        if (cmd)
+            setActiveCommandErrors(specFor(cmd)?.errors ?? null);
         exitWithError(err);
         return;
     }
     if (isCommanderError(err)) {
-        const text = parserText();
+        const text = parserText?.() ?? "";
         if (err.exitCode === 0 || err.code === "commander.help") {
             if (text)
                 emitStderr(text);

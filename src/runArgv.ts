@@ -27,7 +27,7 @@ export async function runArgv(
   opts: RunArgvOpts
 ): Promise<RunArgvResult> {
   const program = await buildProgram(argv);
-  const { parserText, erroringCommand } = enableParserThrow(program);
+  const parserHooks = enableParserThrow(program);
 
   // Mirror bin/ib.ts: resolve each command's CommandSpec errors for hint output.
   program.hook("preAction", (_t, actionCommand) => {
@@ -58,7 +58,7 @@ export async function runArgv(
     try {
       await program.parseAsync(["node", "ib", ...argv]);
     } catch (err) {
-      handleParseRejection(err, parserText, erroringCommand);
+      handleParseRejection(err, parserHooks);
     }
   });
 

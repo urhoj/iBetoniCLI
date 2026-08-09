@@ -24,7 +24,7 @@ const program = await buildProgram(process.argv.slice(2));
 
 // Throw-instead-of-exit for the parser (usage errors become the JSON envelope
 // in handleParseRejection; help/version pass through) + capture its stderr.
-const { parserText, erroringCommand } = enableParserThrow(program);
+const parserHooks = enableParserThrow(program);
 
 program.hook("preAction", (_thisCommand, actionCommand) => {
   if (getGlobalOptions(program).pretty) setOutputMode("pretty");
@@ -62,7 +62,7 @@ await program.parseAsync(process.argv).catch((err) => {
   // already failed, so this can only ever affect an error render, never flip a
   // successful command's stdout out of JSON.
   if (program.opts().pretty) setOutputMode("pretty");
-  handleParseRejection(err, parserText, erroringCommand);
+  handleParseRejection(err, parserHooks);
 });
 // Same reason: `getGlobalOptions` here threw a raw CliError stack trace past the
 // handled envelope on `ib … --company abc`, clobbering exit 4 with exit 1.

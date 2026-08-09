@@ -5,7 +5,7 @@ import {
   handleParseRejection,
 } from "../src/program.js";
 import { CliError } from "../src/api/errors.js";
-import { setOutputMode } from "../src/output/json.js";
+import { setOutputMode, setActiveCommandErrors } from "../src/output/json.js";
 import { runArgv } from "../src/runArgv.js";
 
 /**
@@ -33,10 +33,10 @@ describe("parser errors → JSON envelope", () => {
 
   async function run(argv: string[]): Promise<void> {
     const program = await buildProgram();
-    const { parserText, erroringCommand } = enableParserThrow(program);
+    const hooks = enableParserThrow(program);
     await program
       .parseAsync(["node", "ib", ...argv])
-      .catch((err) => handleParseRejection(err, parserText, erroringCommand));
+      .catch((err) => handleParseRejection(err, hooks));
   }
 
   function lastStderrJson(): Record<string, unknown> {
@@ -165,16 +165,103 @@ describe("parser errors → JSON envelope", () => {
   });
 
   test("a CliError thrown outside an action try lands as envelope + mapped code", () => {
-    handleParseRejection(new CliError("guard", 0, null, 3), () => "");
+    handleParseRejection(new CliError("guard", 0, null, 3));
     const parsed = lastStderrJson();
     expect(parsed.error).toBe("guard");
     expect(process.exitCode).toBe(3);
   });
 
   test("non-Commander, non-CliError stays plain text exit 1", () => {
-    handleParseRejection(new Error("boom"), () => "");
+    handleParseRejection(new Error("boom"));
     expect(String(stderrSpy.mock.calls.at(-1)![0])).toBe("boom\n");
     expect(process.exitCode).toBe(1);
+  });
+});
+
+/**
+ * A guard that runs during PARSE (an option/argument `argParser`) throws before
+ * the preAction hook that resolves the command's CommandSpec, so its envelope
+ * used to carry no `hint` at all while the identical in-action guard on the same
+ * command got one — the ERRORS-row contract was documentation-only for the whole
+ * parse-time class (feedback #385).
+ */
+describe("parse-time guard errors resolve the command's own ERRORS remedy", () => {
+  let stderrSpy: ReturnType<typeof vi.spyOn>;
+  let prevExitCode: number | string | undefined;
+
+  beforeEach(() => {
+    stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    prevExitCode = process.exitCode;
+    process.exitCode = undefined;
+    setActiveCommandErrors(null);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    setActiveCommandErrors(null);
+    process.exitCode = prevExitCode;
+  });
+
+  async function envelopeFor(argv: string[]): Promise<Record<string, unknown>> {
+    const program = await buildProgram();
+    const hooks = enableParserThrow(program);
+    await program
+      .parseAsync(["node", "ib", ...argv])
+      .catch((err) => handleParseRejection(err, hooks));
+    return JSON.parse(String(stderrSpy.mock.calls.at(-1)![0]));
+  }
+
+  test("argParser guard gets the spec remedy (the fb#385 repro)", async () => {
+    const parsed = await envelopeFor(["sijainti", "closest", "--worksite", "abc", "--type", "3"]);
+    expect(parsed.error).toBe("--worksite must be an integer >= 1");
+    expect(parsed.hint).toBe(
+      "name the worksite once (--worksite OR --tyomaa) and pass integer ids"
+    );
+    expect(process.exitCode).toBe(4);
+  });
+
+  test("same command, same remedy, whether the guard runs at parse or in the action", async () => {
+    const atParse = await envelopeFor(["sijainti", "closest", "--worksite", "abc", "--type", "3"]);
+    const inAction = await envelopeFor(["sijainti", "closest", "--type", "3"]);
+    expect(atParse.hint).toBe(inAction.hint);
+  });
+
+  test("a topic-specific row is NOT served to an unrelated flag-type error", async () => {
+    // `ib log entity`'s only client/exit-4 row documents an unknown entityType.
+    // Resolving the spec at parse time would hand "ib log types" to a bad
+    // --owner via the exit-only fallback; the flag's own hint wins instead.
+    const parsed = await envelopeFor(["log", "entity", "keikka", "1", "--owner", "abc"]);
+    expect(parsed.error).toBe("--owner must be an integer >= 1");
+    expect(String(parsed.hint)).toMatch(/ownerAsiakasId/);
+    expect(String(parsed.hint)).not.toMatch(/log types/);
+    expect(process.exitCode).toBe(4);
+  });
+
+  test("--owner is answered on a command with no ERRORS row at all (fb#385's own example)", async () => {
+    const parsed = await envelopeFor(["log", "latest", "--owner", "abc"]);
+    expect(parsed.error).toBe("--owner must be an integer >= 1");
+    expect(String(parsed.hint)).toMatch(/omit it entirely to read the active company/);
+  });
+
+  test("--person on log range no longer inherits the date row", async () => {
+    const parsed = await envelopeFor([
+      "log", "range", "--from", "2026-06-01", "--to", "2026-06-02", "--person", "abc",
+    ]);
+    expect(parsed.error).toBe("--person must be an integer >= 1");
+    expect(parsed.hint).toBeUndefined();
+  });
+
+  test("a command with no client exit-4 row still emits no invented hint", async () => {
+    const parsed = await envelopeFor(["company", "switch", "--to", "abc"]);
+    expect(parsed.error).toBe("--to must be an integer >= 1");
+    expect(parsed.hint).toBeUndefined();
+  });
+
+  test("a leaf two levels down resolves its own spec, not the group's", async () => {
+    const parsed = await envelopeFor(["task", "list", "--limit", "abc"]);
+    expect(parsed.error).toBe("--limit must be an integer >= 1");
+    expect(String(parsed.hint)).toMatch(/must be integers/);
   });
 });
 

@@ -6332,7 +6332,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ListEnvelope<{ changeId, entityType, entityId, field, oldValue, newValue, changeType, personId, personName, at, description, reason, impersonatedByPersonName }> (+truncated when --limit cut rows)",
     errors: authErrors(
       apiErr(403, "Not an admin in the owner company", "use an admin token"),
-      { origin: "client", exit: 4, meaning: "Invalid --from/--to (client-side)", remedy: "use YYYY-MM-DD or ISO datetime; today/yesterday/tomorrow are also accepted" },
+      // `match` scopes the row to the date guard: it is the command's only
+      // client/exit-4 row, so without it the exit-only fallback served "use
+      // YYYY-MM-DD" for a non-integer --person too (fb#385).
+      { origin: "client", exit: 4, match: "must be YYYY-MM-DD", meaning: "Invalid --from/--to (client-side)", remedy: "use YYYY-MM-DD or ISO datetime; today/yesterday/tomorrow are also accepted" },
       apiErr(400, "Backend rejected the dates", "use ISO date strings")
     ),
     seeAlso: ["ib log by-entity-date"],
@@ -7213,7 +7216,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "{ taskId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldWrite:{...} } (server-side preview).",
     errors: [
-      { origin: "client", exit: 4, meaning: "Validation", remedy: "--title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month, count 1-120" },
+      { origin: "client", exit: 4, meaning: "Validation", remedy: "--title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
@@ -7278,7 +7281,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "The full updated task row. With --dry-run: { dryRun:true, wouldWrite:{...} } (server-side preview).",
     errors: [
-      { origin: "client", exit: 4, meaning: "Validation", remedy: "provide at least one field; --activate/--deactivate and enum values as documented" },
+      { origin: "client", exit: 4, meaning: "Validation", remedy: "provide at least one field; --activate/--deactivate and enum values as documented; --assignee/--asiakas must be integers" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(404, "Not found", "check the id via `ib task list --inactive`"),
       apiErr(500, "Backend error", "retry with --verbose"),
