@@ -4847,14 +4847,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin searches list",
     description:
-      "Searched addresses (BetoniJerry coverage-checks) aggregated by place, with searchCount and a covered vs no_supply split — the signal for where to expand provider coverage (GET /api/admin/jerry-searches). Filters: --from/--to (createdAt), --deliverable (covered | no_supply), --q (address substring), --limit. System-admin only.",
+      "Searched addresses (BetoniJerry coverage-checks) aggregated by place, with searchCount and a covered vs no_supply split — the signal for where to expand provider coverage (GET /api/admin/jerry-searches). Filters: --from/--to (createdAt), --deliverable (covered | no_supply), --search (address substring), --limit. System-admin only.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     flags: [
       { name: "from", type: "string", description: "createdAt from (YYYY-MM-DD/today/yesterday)" },
       { name: "to", type: "string", description: "createdAt to (inclusive)" },
       { name: "deliverable", type: "string", description: "covered (deliverable at least once) | no_supply (never covered)", allowed: [...SEARCH_DELIVERABLE] },
-      { name: "q", type: "string", description: "Address substring filter" },
+      { name: "search", type: "string", description: "Address substring filter" },
       { name: "limit", type: "number", default: "500", description: "Max rows (max 500)" },
     ],
     outputShape:
@@ -4866,7 +4866,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     examples: [
       "ib jerry admin searches list --deliverable no_supply",
-      "ib jerry admin searches list --from 2026-07-01 --q Vihti",
+      "ib jerry admin searches list --from 2026-07-01 --search Vihti",
     ],
   },
   {
@@ -6135,7 +6135,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         args: [{ name: "entityType", type: "string", description: "Entity family, e.g. keikka/asiakas/vehicle (see `ib dev cache entities`)" }],
         flags: [
           { name: "id", type: "number", description: "Entity id (e.g. keikkaId)" },
-          { name: "asiakas-id", type: "number", description: "Tenant scope (developers may target others; non-devs use their own)" },
+          { name: "asiakas", type: "number", description: "Tenant scope (developers may target others; non-devs use their own)" },
           { name: "cascade", type: "boolean", description: "Also invalidate related families (keikka only)" },
           ...writeFlags,
         ],
@@ -6155,7 +6155,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         examples: [
           "ib dev cache invalidate keikka --id 123",
           "ib dev cache invalidate keikka --id 123 --cascade --confirm",
-          "ib dev cache invalidate asiakas --asiakas-id 8 --confirm",
+          "ib dev cache invalidate asiakas --asiakas 8 --confirm",
         ],
       },
       {

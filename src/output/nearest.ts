@@ -37,7 +37,7 @@ export function levenshtein(a: string, b: string): number {
  * distance both miss, so a real near-match always wins. Keyed by the mistyped
  * verb → the canonical sibling(s) to try, in order.
  */
-const VERB_SYNONYMS: Record<string, string[]> = {
+export const VERB_SYNONYMS: Record<string, string[]> = {
   add: ["create"],
   create: ["add"],
   show: ["get"],
@@ -45,12 +45,57 @@ const VERB_SYNONYMS: Record<string, string[]> = {
 };
 
 /**
+ * FLAG synonyms — the option analogue of {@link VERB_SYNONYMS} (feedback #388).
+ *
+ * Edit distance cannot bridge `--query`→`--search` (distance 5 against a
+ * threshold of 2), so a semantically obvious guess returned `didYouMean: null`
+ * and cost a failed call. Same guard rails as the verb table: consulted only
+ * after prefix + edit distance both miss, and it can only ever resolve to a name
+ * that is ALREADY in `names` — so a command owning a real `--text` / `--type`
+ * flag is never overridden, and the table cannot invent a flag.
+ *
+ * Pairs are bidirectional wherever BOTH spellings are live in the catalogue
+ * (`asiakas` 38 uses ↔ `customer` 9, `worksite` 13 ↔ `tyomaa` 3, `type` 20 ↔
+ * `kind` 4). That is the case this exists for: the majority spelling is right on
+ * most commands and wrong on the minority that use the other, so guessing either
+ * one is wrong somewhere. One-way entries point at a spelling with no live
+ * counterpart (`pvm`→`date`: the Finnish form appears in the domain vocabulary
+ * but no spec declares it).
+ */
+export const FLAG_SYNONYMS: Record<string, string[]> = {
+  query: ["search"],
+  q: ["search"],
+  term: ["search"],
+  keyword: ["search"],
+  filter: ["search"],
+  text: ["search"],
+  customer: ["asiakas"],
+  client: ["asiakas"],
+  asiakas: ["customer"],
+  worksite: ["tyomaa"],
+  tyomaa: ["worksite"],
+  site: ["worksite"],
+  pvm: ["date"],
+  type: ["kind"],
+  kind: ["type"],
+};
+
+/**
  * Closest name to `target` within an edit-distance threshold, else null.
  * A prefix match (`acc`→`accept`, target ≥ 2 chars) always wins; then the
  * minimum edit distance, accepted only when ≤ max(2, floor(len/2)); finally a
- * known verb-synonym (`add`→`create`, `show`→`get`) present among `names`.
+ * known synonym present among `names`.
+ *
+ * `synonyms` selects the table: {@link VERB_SYNONYMS} for subcommand names (the
+ * default, so enum values via `assertEnum` keep their existing behaviour) and
+ * {@link FLAG_SYNONYMS} for option names. They are kept apart deliberately —
+ * `type`→`kind` is right for a flag and meaningless for a verb.
  */
-export function closestName(target: string, names: string[]): string | null {
+export function closestName(
+  target: string,
+  names: string[],
+  synonyms: Record<string, string[]> = VERB_SYNONYMS
+): string | null {
   if (!target || names.length === 0) return null;
   const t = target.toLowerCase();
   const prefix = names.find((n) => t.length >= 2 && n.toLowerCase().startsWith(t));
@@ -66,8 +111,8 @@ export function closestName(target: string, names: string[]): string | null {
     }
   }
   if (best !== null && bestDist <= threshold) return best;
-  // Edit distance missed — fall back to a known verb synonym present in `names`.
-  for (const syn of VERB_SYNONYMS[t] ?? []) {
+  // Edit distance missed — fall back to a known synonym present in `names`.
+  for (const syn of synonyms[t] ?? []) {
     const hit = names.find((n) => n.toLowerCase() === syn);
     if (hit) return hit;
   }

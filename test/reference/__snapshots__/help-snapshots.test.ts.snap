@@ -1844,7 +1844,7 @@ ARGUMENTS
 
 FLAGS
   --id NUMBER    Entity id (e.g. keikkaId)
-  --asiakas-id NUMBER    Tenant scope (developers may target others; non-devs use their own)
+  --asiakas NUMBER    Tenant scope (developers may target others; non-devs use their own)
   --cascade    Also invalidate related families (keikka only)
   --confirm    Execute the operation (default is dry-run preview)
   --force-prod    Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec.
@@ -1875,7 +1875,7 @@ SEE ALSO
 EXAMPLES
   ib dev cache invalidate keikka --id 123
   ib dev cache invalidate keikka --id 123 --cascade --confirm
-  ib dev cache invalidate asiakas --asiakas-id 8 --confirm
+  ib dev cache invalidate asiakas --asiakas 8 --confirm
 "
 `;
 
@@ -4262,14 +4262,14 @@ exports[`Help snapshots — contract stability > help for ib jerry admin searche
   ib jerry admin searches list [flags]
 
 DESCRIPTION
-  Searched addresses (BetoniJerry coverage-checks) aggregated by place, with searchCount and a covered vs no_supply split — the signal for where to expand provider coverage (GET /api/admin/jerry-searches). Filters: --from/--to (createdAt), --deliverable (covered | no_supply), --q (address substring), --limit. System-admin only.
+  Searched addresses (BetoniJerry coverage-checks) aggregated by place, with searchCount and a covered vs no_supply split — the signal for where to expand provider coverage (GET /api/admin/jerry-searches). Filters: --from/--to (createdAt), --deliverable (covered | no_supply), --search (address substring), --limit. System-admin only.
   Permissions: requires isSystemAdmin.
 
 FLAGS
   --from STRING    createdAt from (YYYY-MM-DD/today/yesterday)
   --to STRING    createdAt to (inclusive)
   --deliverable STRING    covered (deliverable at least once) | no_supply (never covered)
-  --q STRING    Address substring filter
+  --search STRING    Address substring filter
   --limit NUMBER    Max rows (max 500) (default: 500)
 
 GLOBAL FLAGS
@@ -4287,7 +4287,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib jerry admin searches list --deliverable no_supply
-  ib jerry admin searches list --from 2026-07-01 --q Vihti
+  ib jerry admin searches list --from 2026-07-01 --search Vihti
 "
 `;
 

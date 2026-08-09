@@ -619,7 +619,7 @@ describe("ib jerry admin searches", () => {
       truncated: false,
     });
     const out = await runJerryAdminSearches(mockClient, {
-      from: "2026-07-01", to: "2026-07-24", deliverable: "no_supply", q: "Vihti", limit: 50,
+      from: "2026-07-01", to: "2026-07-24", deliverable: "no_supply", search: "Vihti", limit: 50,
     });
     expect(get).toHaveBeenCalledWith(
       "/api/admin/jerry-searches?from=2026-07-01&to=2026-07-24&deliverable=no_supply&q=Vihti&limit=50"
@@ -630,6 +630,20 @@ describe("ib jerry admin searches", () => {
       count: 1,
       truncated: false,
     });
+  });
+
+  // fb#388: the FLAG was renamed --q → --search; the backend query param is
+  // still `q`, and the old spelling stays accepted as a hidden alias.
+  test("list still accepts the deprecated q alias and sends it as q=", async () => {
+    get.mockResolvedValueOnce({ rows: [] });
+    await runJerryAdminSearches(mockClient, { q: "Vihti" });
+    expect(get).toHaveBeenCalledWith("/api/admin/jerry-searches?q=Vihti");
+  });
+
+  test("list prefers --search over the deprecated --q when both are given", async () => {
+    get.mockResolvedValueOnce({ rows: [] });
+    await runJerryAdminSearches(mockClient, { search: "Espoo", q: "Vihti" });
+    expect(get).toHaveBeenCalledWith("/api/admin/jerry-searches?q=Espoo");
   });
 
   test("list with no options hits the bare path", async () => {

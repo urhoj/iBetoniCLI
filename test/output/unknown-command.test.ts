@@ -184,6 +184,65 @@ describe("sibling-command flag redirect (#308)", () => {
   });
 });
 
+// feedback #388 — semantic flag guesses edit distance cannot bridge.
+describe("flag synonyms (fb#388)", () => {
+  test("the reported case: customer search --query resolves to --search", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("customer", "search"), "--query");
+    expect(env.didYouMean).toBe("--search");
+    expect(env.hint).toContain("Did you mean `--search`?");
+  });
+
+  test("the synonym never invents a flag the command does not accept", () => {
+    // `keikka list` has no --search, so --query must NOT resolve to one.
+    const env = buildUnknownOptionEnvelope(leafByPath("keikka", "list"), "--query");
+    expect(env.availableOptions).not.toContain("--search");
+    expect(env.didYouMean).not.toBe("--search");
+  });
+
+  test("a real near-match still beats the synonym table", () => {
+    // --qeury is one transposition from --query… but --search is the only
+    // search-ish flag here, so the fuzzy path (not the table) must answer.
+    const env = buildUnknownOptionEnvelope(leafByPath("customer", "search"), "--limitt");
+    expect(env.didYouMean).toBe("--limit");
+  });
+
+  test("synonym-matched siblings are reported with the spelling they accept", () => {
+    // `person list` accepts neither --query nor --search; `person search` owns
+    // the capability, under --search.
+    const env = buildUnknownOptionEnvelope(leafByPath("person", "list"), "--query");
+    expect(env.acceptedBy).toEqual(["ib person search"]);
+    expect(env.acceptedAs).toBe("--search");
+    expect(env.hint).toContain("`--search`");
+    expect(env.hint).toContain("ib person search");
+  });
+
+  test("acceptedAs is absent when the siblings accept the flag verbatim", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("person", "list"), "--search");
+    expect(env.acceptedBy).toEqual(["ib person search"]);
+    expect(env.acceptedAs).toBeUndefined();
+  });
+
+  test("a same-command did-you-mean suppresses the sibling redirect", () => {
+    // customer search owns --search itself: answer here, don't send them away.
+    const env = buildUnknownOptionEnvelope(leafByPath("customer", "search"), "--query");
+    expect(env.acceptedBy).toEqual([]);
+    expect(env.acceptedAs).toBeUndefined();
+  });
+
+  test("the two renamed outliers now accept the majority spelling (fb#388)", () => {
+    const cache = buildUnknownOptionEnvelope(leafByPath("dev", "cache", "invalidate"), "--zzz");
+    expect(cache.availableOptions).toContain("--asiakas");
+    expect(cache.availableOptions).not.toContain("--asiakas-id");
+
+    const searches = buildUnknownOptionEnvelope(
+      leafByPath("jerry", "admin", "searches", "list"),
+      "--zzz"
+    );
+    expect(searches.availableOptions).toContain("--search");
+    expect(searches.availableOptions).not.toContain("--q");
+  });
+});
+
 // feedback #343 — `ib company get 8` dead-ended on a group that has no `get`,
 // while `ib customer get 8` (the same asiakas) is exactly what was wanted.
 describe("sibling-GROUP subcommand redirect (#343)", () => {

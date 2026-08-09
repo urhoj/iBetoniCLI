@@ -1,3 +1,4 @@
+import { Option } from "commander";
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, toListEnvelope, type ListEnvelope } from "../../api/envelopes.js";
@@ -731,6 +732,9 @@ export interface JerryAdminSearchesOpts {
   from?: string;
   to?: string;
   deliverable?: string; // 'covered' | 'no_supply'
+  search?: string;
+  /** Deprecated pre-rename spelling of {@link JerryAdminSearchesOpts.search},
+   *  still accepted as a hidden CLI alias (fb#388). The WIRE param stays `q`. */
   q?: string;
   limit?: number;
 }
@@ -754,7 +758,8 @@ export async function runJerryAdminSearches(
       from: opts.from || undefined,
       to: opts.to || undefined,
       deliverable: opts.deliverable || undefined,
-      q: opts.q || undefined,
+      // The backend query param is `q`; the FLAG was renamed to --search (fb#388).
+      q: opts.search || opts.q || undefined,
       limit: opts.limit,
     })}`
   );
@@ -1386,7 +1391,13 @@ export function registerJerryCommands(
     .option("--from <date>", "", resolveDate)
     .option("--to <date>", "", resolveDate)
     .option("--deliverable <k>")
-    .option("--q <text>")
+    .option("--search <text>")
+    // Back-compat alias for the pre-rename spelling (fb#388). `--q` was the lone
+    // outlier among 20 search commands — 19 spell it `--search` — and guessing
+    // the majority form did not merely fail here, it redirected the caller to
+    // `ib jerry admin search`, a DIFFERENT command (coverage check, not demand).
+    // Hidden: the spec documents only `--search`.
+    .addOption(new Option("--q <text>").hideHelp())
     .option("--limit <n>", "", cappedInt(500))
     .action(
       guarded(async (opts: JerryAdminSearchesOpts) => {

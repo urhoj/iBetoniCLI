@@ -1,3 +1,4 @@
+import { Option } from "commander";
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { writeJson } from "../../output/json.js";
@@ -85,16 +86,24 @@ export function registerCacheCommands(parent: Command, getClient: () => Promise<
 
   c.command("invalidate <entityType>")
     .option("--id <n>", "", (v: string) => Number(v))
-    .option("--asiakas-id <n>", "", (v: string) => Number(v))
+    .option("--asiakas <n>", "", (v: string) => Number(v))
+    // Back-compat alias for the pre-rename spelling (fb#388). `--asiakas-id` was
+    // the lone outlier among 39 tenant-scoped commands — 38 spell it `--asiakas`
+    // — so guessing the majority form failed here and guessing this one failed
+    // everywhere else. Hidden: the spec documents only `--asiakas`, so `--help`
+    // and `reference dump` show one spelling while old scripts keep working.
+    .addOption(
+      new Option("--asiakas-id <n>").argParser((v: string) => Number(v)).hideHelp()
+    )
     .option("--cascade")
     .option("--confirm")
     .option("--force-prod")
     .option("--reason <text>")
     .action(
-      jsonAction(getClient, (client, entityType: string, opts: { id?: number; asiakasId?: number; cascade?: boolean; confirm?: boolean; forceProd?: boolean; reason?: string }) =>
+      jsonAction(getClient, (client, entityType: string, opts: { id?: number; asiakas?: number; asiakasId?: number; cascade?: boolean; confirm?: boolean; forceProd?: boolean; reason?: string }) =>
         runCacheInvalidate(
           client,
-          { entityType, id: opts.id, asiakasId: opts.asiakasId, cascade: opts.cascade },
+          { entityType, id: opts.id, asiakasId: opts.asiakas ?? opts.asiakasId, cascade: opts.cascade },
           { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason }
         )
       )

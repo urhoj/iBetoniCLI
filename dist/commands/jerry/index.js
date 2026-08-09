@@ -1,3 +1,4 @@
+import { Option } from "commander";
 import { listEnvelope, toListEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
@@ -427,7 +428,8 @@ export async function runJerryAdminSearches(client, opts) {
         from: opts.from || undefined,
         to: opts.to || undefined,
         deliverable: opts.deliverable || undefined,
-        q: opts.q || undefined,
+        // The backend query param is `q`; the FLAG was renamed to --search (fb#388).
+        q: opts.search || opts.q || undefined,
         limit: opts.limit,
     })}`);
     const items = Array.isArray(data?.rows) ? data.rows : [];
@@ -847,7 +849,13 @@ export function registerJerryCommands(parent, getClient) {
         .option("--from <date>", "", resolveDate)
         .option("--to <date>", "", resolveDate)
         .option("--deliverable <k>")
-        .option("--q <text>")
+        .option("--search <text>")
+        // Back-compat alias for the pre-rename spelling (fb#388). `--q` was the lone
+        // outlier among 20 search commands — 19 spell it `--search` — and guessing
+        // the majority form did not merely fail here, it redirected the caller to
+        // `ib jerry admin search`, a DIFFERENT command (coverage check, not demand).
+        // Hidden: the spec documents only `--search`.
+        .addOption(new Option("--q <text>").hideHelp())
         .option("--limit <n>", "", cappedInt(500))
         .action(guarded(async (opts) => {
         // An unknown --deliverable is ignored server-side (no HAVING clause), so

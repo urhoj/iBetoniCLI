@@ -24,7 +24,7 @@ import { isHiddenAtTier, type CallerTier } from "../tier.js";
 // pulls reference/specs.js and would close an import cycle. Re-exported here:
 // both names are part of this module's public surface for its callers/tests.
 export { levenshtein, closestName } from "./nearest.js";
-import { closestName } from "./nearest.js";
+import { closestName, FLAG_SYNONYMS } from "./nearest.js";
 
 /**
  * Group pairs that are two views of the SAME entity, where an unknown
@@ -284,8 +284,14 @@ export interface UnknownOptionEnvelope {
   didYouMean: string | null;
   availableOptions: string[];
   positionals: string[];
-  /** Sibling commands in this domain that DO accept the rejected flag. */
+  /** Sibling commands in this domain that DO accept the rejected flag — or,
+   *  when `acceptedAs` is set, that own the capability under that spelling. */
   acceptedBy: string[];
+  /** Set only when `acceptedBy` was matched through a SYNONYM (fb#388): the flag
+   *  spelling those commands actually accept (`--search` for a rejected
+   *  `--query`). Absent when they accept the rejected flag verbatim, so a caller
+   *  can always tell which of the two spellings to send. */
+  acceptedAs?: string;
   hint: string;
 }
 
@@ -321,6 +327,30 @@ export function siblingsAcceptingOption(
   ).map((s) => s.command);
   const named = hits.filter((c) => c.endsWith(` ${flag.slice(2)}`));
   return (named.length ? named : hits).slice(0, 3);
+}
+
+/**
+ * {@link siblingsAcceptingOption} retried under the flag's SYNONYM spellings,
+ * for when no sibling accepts the rejected flag verbatim (feedback #388).
+ *
+ * `ib person list --query X` is the fb#308 case one step removed: the capability
+ * lives on `ib person search`, but under `--search`, so the literal scan returns
+ * nothing and the caller is left with a bare "unknown option". Returns the
+ * canonical `flag` alongside the commands, because the answer is a DIFFERENT
+ * spelling — reporting the commands alone would make `acceptedBy` claim they
+ * accept `--query`, which they do not.
+ */
+export function siblingsAcceptingSynonym(
+  command: string,
+  unknownOption: string,
+  tier: CallerTier
+): { flag: string; commands: string[] } | null {
+  const bare = unknownOption.replace(/^-+/, "").toLowerCase();
+  for (const syn of FLAG_SYNONYMS[bare] ?? []) {
+    const commands = siblingsAcceptingOption(command, `--${syn}`, tier);
+    if (commands.length) return { flag: `--${syn}`, commands };
+  }
+  return null;
 }
 
 /**
@@ -540,9 +570,11 @@ export function prosePrefixHint(token: string, availableOptions: string[]): stri
  * (`ib customer search --search X`) the default USAGE envelope only echoes
  * "unknown option '--search'" with a generic hint — a dead end that doesn't say
  * what the command DOES accept (feedback #235/#236). This lists the command's
- * real positionals + flags, a fuzzy "did you mean" among its actual flags, the
- * sibling command(s) that DO accept the flag, and (when present) a curated
- * cross-command redirect. `cmd` is the command that threw (a leaf — options
+ * real positionals + flags, a "did you mean" among its actual flags (fuzzy, then
+ * the {@link FLAG_SYNONYMS} table for the semantic guesses edit distance cannot
+ * bridge — fb#388), the sibling command(s) that DO accept the flag verbatim or
+ * under a synonym, and (when present) a curated cross-command redirect. `cmd` is
+ * the command that threw (a leaf — options
  * belong to leaves); `unknownOption` is the bad flag verbatim incl. leading
  * dashes (e.g. `--search`).
  */
@@ -556,15 +588,24 @@ export function buildUnknownOptionEnvelope(
   const bare = unknownOption.replace(/^-+/, "");
   const guess = closestName(
     bare,
-    availableOptions.map((o) => o.replace(/^-+/, ""))
+    availableOptions.map((o) => o.replace(/^-+/, "")),
+    FLAG_SYNONYMS
   );
   const didYouMean = guess ? `--${guess}` : null;
   const redirect = OPTION_REDIRECTS[`${command} ${unknownOption}`];
   // A curated redirect is hand-written for this exact command+flag, so it wins;
   // the derived sibling list is the general case behind it.
-  const acceptedBy = redirect
+  const acceptedLiteral = redirect
     ? []
     : siblingsAcceptingOption(canonicalPath(command), unknownOption, tier);
+  // Nothing accepts it verbatim — a synonym spelling still might (fb#388).
+  // Suppressed when `didYouMean` fired: the flag exists on THIS command under
+  // another name, which beats redirecting the caller to a sibling.
+  const viaSynonym =
+    redirect || didYouMean || acceptedLiteral.length
+      ? null
+      : siblingsAcceptingSynonym(canonicalPath(command), unknownOption, tier);
+  const acceptedBy = viaSynonym ? viaSynonym.commands : acceptedLiteral;
 
   const domain = command.split(" ")[1]; // token after `ib`, e.g. customer
   const discover = domain
@@ -573,7 +614,15 @@ export function buildUnknownOptionEnvelope(
 
   const parts: string[] = [];
   if (redirect) parts.push(redirect);
-  if (acceptedBy.length === 1) {
+  if (viaSynonym && acceptedBy.length === 1) {
+    parts.push(
+      `\`${unknownOption}\` is not accepted here or by any sibling, but \`${viaSynonym.flag}\` is the same thing — send it to \`${acceptedBy[0]}\`.`
+    );
+  } else if (viaSynonym) {
+    parts.push(
+      `\`${unknownOption}\` is not accepted here or by any sibling; the equivalent \`${viaSynonym.flag}\` is owned by ${acceptedBy.map((c) => `\`${c}\``).join(", ")}.`
+    );
+  } else if (acceptedBy.length === 1) {
     parts.push(
       `\`${unknownOption}\` belongs to \`${acceptedBy[0]}\` — that sibling command owns this capability, not this one.`
     );
@@ -612,6 +661,7 @@ export function buildUnknownOptionEnvelope(
     availableOptions,
     positionals,
     acceptedBy,
+    ...(viaSynonym ? { acceptedAs: viaSynonym.flag } : {}),
     hint: [...prosePrefixHint(unknownOption, availableOptions), ...parts].join(" "),
   };
 }

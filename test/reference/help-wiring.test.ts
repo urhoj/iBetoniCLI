@@ -112,6 +112,25 @@ describe("Rich --help wiring — real command tree", () => {
   // (e.g. `vehicle list --cursor`, `person day set` write-safety block).
   const WRITE_SAFETY_LONGS = ["--dry-run", "--idempotency-key", "--reason"];
 
+  /**
+   * Hidden back-compat flag aliases (`new Option(...).hideHelp()`) → the
+   * documented flag each stands in for (fb#388: two naming outliers renamed to
+   * the majority spelling, old argv still accepted).
+   *
+   * These are deliberately spec-less, which is precisely the state the drift
+   * test below exists to catch — so the exemption is paired with an exact-match
+   * assertion here. A new hidden option that is not listed fails, a listed row
+   * whose option disappeared fails, and an alias standing in for a flag the spec
+   * does NOT document fails. "Hidden" can therefore never mean "undocumented
+   * capability", only "second spelling of a documented one".
+   */
+  const DEPRECATED_FLAG_ALIASES: Record<string, string> = {
+    "ib dev cache invalidate --asiakas-id": "--asiakas",
+    "ib jerry admin searches list --q": "--search",
+  };
+
+  const isHidden = (opt: { hidden?: boolean }): boolean => !!opt.hidden;
+
   test("every wired Commander option appears in the spec (flags or write-safety block)", () => {
     const drift: string[] = [];
     for (const spec of COMMAND_SPECS) {
@@ -122,10 +141,33 @@ describe("Rich --help wiring — real command tree", () => {
         const long = opt.long;
         if (!long || long === "--help") continue;
         if (WRITE_SAFETY_LONGS.includes(long) && spec.writeFlags) continue;
+        if (isHidden(opt)) continue; // pinned by the alias test below
         if (!specFlagLongs.has(long)) drift.push(`${spec.command} ${long}`);
       }
     }
     expect(drift).toEqual([]);
+  });
+
+  test("every hidden flag alias is declared and stands in for a documented flag", () => {
+    const found: string[] = [];
+    for (const spec of COMMAND_SPECS) {
+      const cmd = commands.get(spec.command);
+      if (!cmd) continue;
+      const specFlagLongs = new Set(spec.flags.map((f) => `--${f.name}`));
+      for (const opt of cmd.options) {
+        if (!opt.long || !isHidden(opt)) continue;
+        const key = `${spec.command} ${opt.long}`;
+        found.push(key);
+        const canonical = DEPRECATED_FLAG_ALIASES[key];
+        expect(canonical, `${key} is hidden but undeclared in DEPRECATED_FLAG_ALIASES`).toBeTruthy();
+        expect(
+          specFlagLongs.has(canonical),
+          `${key} stands in for ${canonical}, which this command's spec does not document`
+        ).toBe(true);
+      }
+    }
+    // Exact match both ways — no unlisted hidden option, no stale row.
+    expect(found.sort()).toEqual(Object.keys(DEPRECATED_FLAG_ALIASES).sort());
   });
 
   test("no subcommand option collides with a root global option", () => {
