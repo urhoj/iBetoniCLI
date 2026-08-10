@@ -15,6 +15,7 @@ import {
   siblingsAcceptingOption,
   siblingGroupsWithCommand,
   descendantsOwningVerb,
+  topLevelDomainRedirect,
   OPTION_REDIRECTS,
 } from "../../src/output/unknownCommand.js";
 
@@ -360,6 +361,91 @@ describe("descendant-subgroup verb redirect (fb#379)", () => {
     const company = program.commands.find((c) => c.name() === "company")!;
     const env = buildUnknownCommandEnvelope(company, "get", "developer");
     expect(env.availableElsewhere).toEqual(["ib customer get"]);
+  });
+});
+
+describe("top-level domain redirect (fb#386)", () => {
+  /** This group's visible children, as buildUnknownCommandEnvelope computes them. */
+  const childrenOf = (...path: string[]) =>
+    visibleSubcommands(path.length ? leafByPath(...path) : program, "developer");
+
+  test("the reported dead-ends now point at the owning domain", () => {
+    // `ib dev task list` — a plausible over-generalization of the `ib dev` re-homing
+    expect(topLevelDomainRedirect("ib dev", "task", childrenOf("dev"), "developer")).toEqual([
+      { path: "ib task", why: expect.stringContaining("top-level domain") },
+    ]);
+    expect(
+      topLevelDomainRedirect("ib keikka", "glossary", childrenOf("keikka"), "developer")
+    ).toEqual([{ path: "ib glossary", why: expect.stringContaining("top-level domain") }]);
+  });
+
+  test("envelope renders it copy-paste runnable with the caller's remaining args", () => {
+    const dev = program.commands.find((c) => c.name() === "dev")!;
+    dev.args = ["task", "list"];
+    const env = buildUnknownCommandEnvelope(dev, "task", "developer");
+    dev.args = [];
+    expect(env.availableElsewhere).toEqual(["ib task"]);
+    expect(env.hint).toContain("`ib task list` does");
+    expect(env.hint).toContain("not a subcommand of `ib dev`");
+  });
+
+  test("invents nothing for a token that is not a domain", () => {
+    expect(topLevelDomainRedirect("ib dev", "nosuch", childrenOf("dev"), "developer")).toEqual([]);
+    // `schema`/`ai`/`changelog` were re-homed under `ib dev`; the hidden top-level
+    // back-compat aliases still parse but are NOT domains, so are never suggested.
+    for (const alias of ["schema", "ai", "changelog"]) {
+      expect(topLevelDomainRedirect("ib keikka", alias, childrenOf("keikka"), "developer")).toEqual(
+        []
+      );
+    }
+  });
+
+  test("the in-group descendant scan wins — an answer inside the chosen group is better", () => {
+    // `ib stats` is a domain AND `ib jerry admin request stats` owns the verb.
+    const jerry = program.commands.find((c) => c.name() === "jerry")!;
+    const env = buildUnknownCommandEnvelope(jerry, "stats", "developer");
+    expect(env.availableElsewhere).toEqual(["ib jerry admin request stats"]);
+    expect(env.hint).not.toContain("top-level domain");
+  });
+
+  test("yields to a direct child that EXTENDS the token", () => {
+    // the complete catalogue set: a redirect to `ib log` / `ib worksite` /
+    // `ib version` would be wrong in each — the caller stopped a character early.
+    expect(topLevelDomainRedirect("ib auth", "log", childrenOf("auth"), "developer")).toEqual([]);
+    expect(
+      topLevelDomainRedirect("ib customer", "worksite", childrenOf("customer"), "developer")
+    ).toEqual([]);
+    expect(topLevelDomainRedirect("ib legal", "version", childrenOf("legal"), "developer")).toEqual(
+      []
+    );
+    // …and the in-group did-you-mean still answers those
+    expect(buildUnknownCommandEnvelope(legalOf(), "version", "developer").didYouMean).toBe(
+      "versions"
+    );
+  });
+
+  test("silent at the root, and when already inside that domain", () => {
+    // a root token that IS a domain would have parsed — there is nothing to redirect
+    expect(topLevelDomainRedirect("ib", "task", childrenOf(), "developer")).toEqual([]);
+    expect(topLevelDomainRedirect("ib task", "task", childrenOf("task"), "developer")).toEqual([]);
+  });
+
+  test("tier-gated on whole-domain visibility (enumeration secrecy)", () => {
+    // `task` is developer-only — a standard caller must not learn the domain exists.
+    expect(topLevelDomainRedirect("ib dev", "task", childrenOf("dev"), "standard")).toEqual([]);
+    expect(topLevelDomainRedirect("ib dev", "task", childrenOf("dev"), "admin")).toEqual([]);
+    // an open domain is offered at every tier
+    expect(
+      topLevelDomainRedirect("ib keikka", "glossary", childrenOf("keikka"), "standard")
+    ).toHaveLength(1);
+  });
+
+  test("layers gracefully below a curated pair that could not answer", () => {
+    // company↔customer is declared, but `ib customer customer` does not exist, so
+    // the curated layer stays silent and the domain match answers instead.
+    const company = program.commands.find((c) => c.name() === "company")!;
+    const env = buildUnknownCommandEnvelope(company, "customer", "developer");
+    expect(env.availableElsewhere).toEqual(["ib customer"]);
   });
 });
 

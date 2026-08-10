@@ -1,6 +1,6 @@
 import { COMMAND_SPECS } from "../reference/specs.js";
 import { canonicalPath } from "../reference/aliasPaths.js";
-import { fullyHiddenDomains } from "../reference/commandsList.js";
+import { commandDomains, fullyHiddenDomains } from "../reference/commandsList.js";
 import { isHiddenAtTier } from "../tier.js";
 // The matcher itself lives in the leaf module ./nearest.js so `targets.ts`
 // (assertEnum's did-you-mean) can reach it without importing this file, which
@@ -80,6 +80,55 @@ export function descendantsOwningVerb(group, token, tier) {
         return hits.length <= ROOT_MAX_OWNERS ? hits : [];
     return hits.slice(0, 3);
 }
+/**
+ * The unknown token under a group is itself a top-level DOMAIN (fb#386):
+ * `ib dev task list` dead-ended although `ib task list` exists — a plausible
+ * over-generalization of the 2026-06-30 `ib dev` re-homing (feedback/changelog/
+ * perf/cache/schema/ai/inbox all live there, so recurring tasks "should" too).
+ * Same for `ib keikka glossary` vs `ib glossary`.
+ *
+ * DERIVED, and noise-free for a different reason than the layers above it: the
+ * match is an exact DOMAIN-NAME equality, not a verb scan, so the everyone-owns-
+ * a-`get` problem never arises. Domains come from {@link commandDomains} over
+ * `COMMAND_SPECS`, i.e. the CANONICAL paths — the re-homed `schema`/`ai`/
+ * `changelog` are correctly not domains, and the hidden back-compat aliases that
+ * still parse can never be suggested.
+ *
+ * Two guards, each measured against the whole catalogue rather than guessed:
+ *
+ * - Ranked BELOW {@link descendantsOwningVerb} by the caller, because an answer
+ *   inside the group the caller already chose beats sending them elsewhere. 8
+ *   pairs collide, and the in-group answer is right in all 8 (`ib jerry stats`
+ *   → `ib jerry admin request stats`, not the `ib stats` domain).
+ * - `available` (this group's visible children) suppresses the redirect when one
+ *   of them literally EXTENDS the token, which is the caller reaching for a real
+ *   child and stopping a character early. Exactly 3 in the catalogue —
+ *   `ib auth log`→`login`, `ib customer worksite`→`worksites`,
+ *   `ib legal version`→`versions` — and a redirect to `ib log` / `ib worksite` /
+ *   `ib version` would be actively wrong in each.
+ *
+ * Tier-gated on WHOLE-domain visibility (enumeration secrecy): a domain every
+ * leaf of which is hidden at `tier` is not named.
+ */
+export function topLevelDomainRedirect(group, token, available, tier) {
+    const parts = group.split(" ");
+    // At the ROOT a token that IS a domain would have parsed, so there is nothing
+    // to redirect; `parts[1] === token` means the caller is already in that domain.
+    if (parts.length < 2 || parts[1] === token)
+        return [];
+    if (!commandDomains(COMMAND_SPECS).includes(token))
+        return [];
+    if (fullyHiddenDomains(tier).has(token))
+        return [];
+    if (available.some((name) => name !== token && name.startsWith(token)))
+        return [];
+    return [
+        {
+            path: `ib ${token}`,
+            why: `\`${token}\` is a top-level domain of its own, not a subcommand of \`${group}\``,
+        },
+    ];
+}
 /** Space-joined path of a command up its parent chain (e.g. "ib legal"). */
 export function commandPath(cmd) {
     const parts = [];
@@ -132,10 +181,15 @@ export function buildUnknownCommandEnvelope(cmd, unknownToken, tier) {
     // in-group list is only context. Rendered with the caller's remaining args
     // (`ib customer get 8`, not `ib customer get`) so it is copy-paste runnable;
     // cmd.args holds the bad token followed by whatever came after it.
-    const elsewhere = siblingGroupsWithCommand(group, unknownToken, tier);
+    const curated = siblingGroupsWithCommand(group, unknownToken, tier);
     // Only when no curated pair answered: the verb may live in a CHILD subgroup
     // of this very group (fb#379) — same copy-paste rendering.
-    const descendants = elsewhere.length ? [] : descendantsOwningVerb(group, unknownToken, tier);
+    const descendants = curated.length ? [] : descendantsOwningVerb(group, unknownToken, tier);
+    // Last: the token names a top-level DOMAIN (fb#386). Ranked below both — an
+    // answer inside the group the caller chose beats sending them to another one.
+    const elsewhere = curated.length || descendants.length
+        ? curated
+        : topLevelDomainRedirect(group, unknownToken, available, tier);
     const rest = (cmd.args ?? []).slice(1).map(String);
     // "this group" is the group the caller typed — at the root there is none, so
     // the same two sentences name the owning DOMAIN instead (fb#383).
