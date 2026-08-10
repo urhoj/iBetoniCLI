@@ -16,7 +16,6 @@ const FAKE_JWT = `eyJhbGciOiJIUzI1NiJ9.${PAYLOAD}.sig`;
 const CLAIM_PAYLOAD = Buffer.from(
   JSON.stringify({
     personId: 6233,
-    ownerAsiakasId: 1349,
     iat: 1754375517,
     asiakasesWithTypes: [
       { asiakasId: 1349, roles: ["asiakasAdmin"], isPumppuToimittaja: true },
@@ -28,12 +27,22 @@ const CLAIM_JWT = `eyJhbGciOiJIUzI1NiJ9.${CLAIM_PAYLOAD}.sig`;
 
 const mockClient = mockApiClient({ getCurrentToken: vi.fn(() => FAKE_JWT) });
 
-describe("runPersonMe", () => {
-  beforeEach(() => {
-    mockClient.get.mockReset();
-    mockClient.getCurrentToken.mockReturnValue(FAKE_JWT);
-  });
+beforeEach(() => {
+  mockClient.get.mockReset();
+  mockClient.getCurrentToken.mockReturnValue(FAKE_JWT);
+});
 
+/** Capture the error a synchronous call throws; fail loudly if it does not throw. */
+function captured(fn: () => unknown): CliError {
+  try {
+    fn();
+  } catch (e) {
+    return e as CliError;
+  }
+  throw new Error("expected the call to throw, but it returned");
+}
+
+describe("runPersonMe", () => {
   test("decodes the JWT and composes profile + roles + companies", async () => {
     mockClient.get
       .mockResolvedValueOnce({ personId: 6233, name: "System Jerry", email: "sys@x.fi", phone: "+358", roles: [11, 8] })
@@ -97,44 +106,36 @@ const BACKEND_ROW = {
   activeMembership: true,
 };
 
+/** The fb#395 case: authorized (so present) but holding no live role there. */
+const ROLELESS_ROW = {
+  ...BACKEND_ROW,
+  asiakasId: 908,
+  name: "betoni.online",
+  roles: [],
+  isPumppuToimittaja: false,
+  activeMembership: false,
+};
+
 describe("runPersonCompanies", () => {
-  beforeEach(() => {
-    mockClient.get.mockReset();
-    mockClient.getCurrentToken.mockReturnValue(FAKE_JWT);
-  });
-
-  test("reads the authorization-aligned route with the explicit personId", async () => {
+  test("returns the authorization-aligned route's rows verbatim, incl. an authorized-but-roleless company", async () => {
     mockClient.get.mockResolvedValueOnce({
-      items: [BACKEND_ROW],
-      nextCursor: null,
-      count: 1,
-      personId: 5351,
-      source: "asiakas_listForPerson",
-    });
-    const result = await runPersonCompanies(mockClient, 5351);
-    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/person/5351/companies");
-    expect(result.source).toBe("asiakas_listForPerson");
-    expect(result.items).toEqual([BACKEND_ROW]);
-    expect(result.count).toBe(1);
-  });
-
-  test("defaults to the caller's personId from the JWT", async () => {
-    mockClient.get.mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, personId: 6233, source: "asiakas_listForPerson" });
-    await runPersonCompanies(mockClient);
-    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/person/6233/companies");
-  });
-
-  test("carries activeMembership through, so an authorized-but-roleless company stays visible", async () => {
-    mockClient.get.mockResolvedValueOnce({
-      items: [BACKEND_ROW, { ...BACKEND_ROW, asiakasId: 908, name: "betoni.online", roles: [], isPumppuToimittaja: false, activeMembership: false }],
+      items: [BACKEND_ROW, ROLELESS_ROW],
       nextCursor: null,
       count: 2,
       personId: 5351,
       source: "asiakas_listForPerson",
     });
     const result = await runPersonCompanies(mockClient, 5351);
-    expect(result.items.map((i) => i.asiakasId)).toEqual([26, 908]);
-    expect(result.items.find((i) => i.asiakasId === 908)?.activeMembership).toBe(false);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/person/5351/companies");
+    expect(result.source).toBe("asiakas_listForPerson");
+    expect(result.items).toEqual([BACKEND_ROW, ROLELESS_ROW]);
+    expect(result.count).toBe(2);
+  });
+
+  test("defaults to the caller's personId from the JWT", async () => {
+    mockClient.get.mockResolvedValueOnce({ items: [], nextCursor: null, count: 0, personId: 6233, source: "asiakas_listForPerson" });
+    await runPersonCompanies(mockClient);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/person/6233/companies");
   });
 
   test("falls back to the legacy route when the new one is not deployed, and SAYS the answer is narrower", async () => {
@@ -149,16 +150,18 @@ describe("runPersonCompanies", () => {
     expect(result.source).toBe("person_getUserAsiakasList");
     expect(result.hint).toMatch(/not deployed yet/);
     expect(result.personId).toBe(5351);
-    // Padded to the full item shape so consumers need no shape branch.
+    // Same key set as the real route (no shape branch for consumers), but the
+    // fields this source CANNOT report are null — never [] / false, which would
+    // assert "no roles" / "not a provider" about rows that provably hold a role.
     expect(result.items).toEqual([
       {
         asiakasId: 26,
         name: "Kalle Urho Oy",
-        roles: [],
-        isTyomaaAsiakas: false,
-        isPumppuToimittaja: false,
-        isBetoniToimittaja: false,
-        isLattiaToimittaja: false,
+        roles: null,
+        isTyomaaAsiakas: null,
+        isPumppuToimittaja: null,
+        isBetoniToimittaja: null,
+        isLattiaToimittaja: null,
         activeMembership: true,
       },
     ]);
@@ -217,14 +220,24 @@ describe("runPersonCompaniesAsToken", () => {
     expect(runPersonCompaniesAsToken(mockClient, 6233).personId).toBe(6233);
   });
 
+  test("mintedAt is null on a compact token — those are signed without iat", () => {
+    const noIat = Buffer.from(
+      JSON.stringify({ personId: 6233, asiakasesWithTypes: [{ asiakasId: 8, roles: [] }] })
+    ).toString("base64url");
+    mockClient.getCurrentToken.mockReturnValue(`eyJhbGciOiJIUzI1NiJ9.${noIat}.sig`);
+
+    const result = runPersonCompaniesAsToken(mockClient);
+
+    expect(result.mintedAt).toBeNull();
+    expect(result.count).toBe(1);
+    // The hint must not claim a snapshot instant it does not have.
+    expect(result.hint).toMatch(/null on compact/);
+  });
+
   test("exits 4 for another person — a token cannot answer for someone else", () => {
-    try {
-      runPersonCompaniesAsToken(mockClient, 5351);
-      throw new Error("expected a usage failure");
-    } catch (e) {
-      expect(e).toBeInstanceOf(CliError);
-      expect((e as CliError).exitCode).toBe(4);
-      expect((e as CliError).message).toMatch(/only works for personId 6233/);
-    }
+    const e = captured(() => runPersonCompaniesAsToken(mockClient, 5351));
+    expect(e).toBeInstanceOf(CliError);
+    expect(e.exitCode).toBe(4);
+    expect(e.message).toMatch(/only works for personId 6233/);
   });
 });

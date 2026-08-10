@@ -144,14 +144,26 @@ export async function runPersonSearch(client, query, limit, ownerAsiakasId) {
  * back to the legacy client-side fan-out so the command works pre- and
  * post-deploy. `opts.fallback` supplies the fan-out; `opts.limit` is forwarded.
  */
-export async function runPersonSearchMyCompanies(client, query, opts) {
+export function runPersonSearchMyCompanies(client, query, opts) {
+    return orLegacy(() => client.get(`/api/cli/person/search${qs({ q: query, limit: opts.limit })}`), opts.fallback);
+}
+/**
+ * Deploy gate: run `primary`; on 404/405 — the route does not exist on THIS
+ * backend yet — run `fallback` instead. Any other failure propagates.
+ *
+ * Only safe where a deployed route cannot answer 404 for a legitimately missing
+ * resource; both current callers return an empty list rather than 404 for
+ * "nothing found", so a 404 here can only mean "not deployed". File-local on
+ * purpose — these are the only two deploy gates in the CLI (every other
+ * `statusCode === 404` check in src/ is a resource-404 handler).
+ */
+async function orLegacy(primary, fallback) {
     try {
-        return await client.get(`/api/cli/person/search${qs({ q: query, limit: opts.limit })}`);
+        return await primary();
     }
     catch (e) {
-        // Endpoint not deployed yet → fall back to the client-side fan-out.
         if (e instanceof CliError && (e.statusCode === 404 || e.statusCode === 405)) {
-            return opts.fallback();
+            return fallback();
         }
         throw e;
     }
@@ -283,7 +295,7 @@ export async function runPersonMe(client) {
         ...(impersonating ? { impersonating } : {}),
     };
 }
-const LEGACY_SOURCE_HINT = "backend route /api/cli/person/:personId/companies is not deployed yet — these rows are the NARROWER active-membership set (no roles/flags) and may omit companies the backend still authorizes. Use `ib person companies --as-token` for the authorization claim.";
+const LEGACY_SOURCE_HINT = "backend route /api/cli/person/:personId/companies is not deployed yet — these rows are the NARROWER active-membership set and may omit companies the backend still authorizes. roles/is* are null (this source cannot report them), NOT empty. Use `ib person companies --as-token` for the authorization claim.";
 /**
  * `ib person companies [personId]` — the companies a person belongs to, in the
  * notion backend authorization actually uses. personId defaults to the caller.
@@ -303,43 +315,31 @@ export async function runPersonCompanies(client, personId) {
     const id = personId ??
         decodeJwtPayload(client.getCurrentToken()).personId ??
         failWith("could not resolve personId from the active token", 4);
-    try {
-        return await client.get(`/api/cli/person/${id}/companies`);
-    }
-    catch (e) {
-        if (!(e instanceof CliError && (e.statusCode === 404 || e.statusCode === 405)))
-            throw e;
-        return { ...(await runPersonCompaniesLegacy(client, id)), personId: id };
-    }
+    return orLegacy(() => client.get(`/api/cli/person/${id}/companies`), () => runPersonCompaniesLegacy(client, id));
 }
 /**
  * Pre-deploy fallback: GET /api/person/getUserAsiakasList/:personId (the NARROW
- * proc), defensively unwrapping the mssql shapes that route can return. Rows are
- * padded to the full item shape with empty roles/flags and
- * `activeMembership: true` — every row of the narrow proc is by definition an
- * active membership.
+ * proc). Roles and the toimittaja flags come back `null` — NOT empty/false: that
+ * proc requires an enabled, in-validity role attachment, so every row provably
+ * holds a role, and reporting `[]` would be an affirmative wrong answer of
+ * exactly the kind fb#395 exists to eliminate. `activeMembership` is `true` by
+ * construction. The JSON key set is unchanged, so consumers need no shape branch.
  */
-async function runPersonCompaniesLegacy(client, id) {
-    const raw = await client.get(`/api/person/getUserAsiakasList/${id}`);
-    let rows = [];
-    if (Array.isArray(raw)) {
-        rows = raw;
-    }
-    else if (raw && typeof raw === "object") {
-        rows = raw.recordset || raw.recordsets?.[0] || [];
-    }
-    const items = rows.map((r) => ({
-        asiakasId: r.asiakasId,
-        name: r.asiakasNimi ?? r.asiakasName ?? r.name ?? null,
-        roles: [],
-        isTyomaaAsiakas: false,
-        isPumppuToimittaja: false,
-        isBetoniToimittaja: false,
-        isLattiaToimittaja: false,
+async function runPersonCompaniesLegacy(client, personId) {
+    const raw = await client.get(`/api/person/getUserAsiakasList/${personId}`);
+    const items = unwrapRows(raw).map((r) => ({
+        asiakasId: Number(r.asiakasId),
+        name: (r.asiakasNimi ?? r.asiakasName ?? r.name ?? null),
+        roles: null,
+        isTyomaaAsiakas: null,
+        isPumppuToimittaja: null,
+        isBetoniToimittaja: null,
+        isLattiaToimittaja: null,
         activeMembership: true,
     }));
     return {
         ...listEnvelope(items),
+        personId,
         source: "person_getUserAsiakasList",
         hint: LEGACY_SOURCE_HINT,
     };
@@ -353,18 +353,19 @@ async function runPersonCompaniesLegacy(client, id) {
  * memberships, so there is no honest way to answer it for another personId.
  */
 export function runPersonCompaniesAsToken(client, personId) {
-    const claims = decodeJwtPayload(client.getCurrentToken());
-    const self = claims.personId ?? failWith("could not resolve personId from the active token", 4);
+    const token = client.getCurrentToken();
+    const self = decodeJwtPayload(token).personId ??
+        failWith("could not resolve personId from the active token", 4);
     if (personId !== undefined && personId !== self) {
         failUsage(`--as-token reports the ACTIVE token's own claim, so it only works for personId ${self} (the caller); got ${personId}. Drop --as-token to read personId ${personId}'s companies from the backend.`);
     }
-    const { mintedAt, companies } = tokenCompanyClaims(client.getCurrentToken());
+    const { mintedAt, companies } = tokenCompanyClaims(token);
     return {
         ...listEnvelope(companies),
         personId: self,
         source: "jwt-claim",
         mintedAt,
-        hint: "snapshot as of mintedAt — a company added or role granted since then is absent until the token is re-minted (ib company switch / re-login).",
+        hint: "a SNAPSHOT taken when the token was minted (mintedAt; null on compact/short-shape tokens, which are signed without iat) — a company added or role granted since is absent until the token is re-minted (ib company switch / re-login).",
     };
 }
 /**

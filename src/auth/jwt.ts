@@ -124,6 +124,28 @@ function expandedPayload(jwt: string): Record<string, unknown> {
   }
 }
 
+/**
+ * Normalize the raw `asiakasesWithTypes` claim into typed rows. Shared by
+ * `decodeJwtPayload` (which narrows to `{asiakasId, roles}`) and
+ * `tokenCompanyClaims` (which keeps the flags), so the two cannot disagree about
+ * what the token says — the same reason `expandedPayload` is shared.
+ */
+function companyClaims(expanded: Record<string, unknown>): TokenCompanyClaim[] {
+  const raw = Array.isArray(expanded.asiakasesWithTypes)
+    ? (expanded.asiakasesWithTypes as Array<Record<string, unknown>>)
+    : [];
+  return raw
+    .map((c) => ({
+      asiakasId: Number(c?.asiakasId),
+      roles: Array.isArray(c?.roles) ? (c.roles as string[]) : [],
+      isTyomaaAsiakas: c?.isTyomaaAsiakas === true,
+      isPumppuToimittaja: c?.isPumppuToimittaja === true,
+      isBetoniToimittaja: c?.isBetoniToimittaja === true,
+      isLattiaToimittaja: c?.isLattiaToimittaja === true,
+    }))
+    .filter((c) => Number.isFinite(c.asiakasId));
+}
+
 export function decodeJwtPayload(jwt: string): DecodedClaims {
   if (jwt === lastToken && lastClaims) return lastClaims;
   const expanded = expandedPayload(jwt);
@@ -141,22 +163,15 @@ export function decodeJwtPayload(jwt: string): DecodedClaims {
   // read the entry for ownerAsiakasId (the active tenant). asiakasAdmin/hrAdmin
   // mirror canSendCliNotification's gate. Absent/short token → false.
   const owner = finite(expanded.ownerAsiakasId ?? expanded.o);
-  const companies = Array.isArray(expanded.asiakasesWithTypes)
-    ? (expanded.asiakasesWithTypes as Array<{ asiakasId?: unknown; roles?: unknown }>)
-    : [];
+  const companies = companyClaims(expanded);
   const activeRoles = companies
-    .filter((c) => finite(c?.asiakasId) === owner)
-    .flatMap((c) => (Array.isArray(c?.roles) ? (c.roles as unknown[]) : []));
+    .filter((c) => c.asiakasId === owner)
+    .flatMap((c) => c.roles);
   const isActiveCompanyAdmin =
     owner !== undefined &&
     (activeRoles.includes("asiakasAdmin") || activeRoles.includes("hrAdmin"));
 
-  const companyList = companies
-    .map((c) => ({
-      asiakasId: finite(c?.asiakasId),
-      roles: Array.isArray(c?.roles) ? (c.roles as string[]) : [],
-    }))
-    .filter((c): c is { asiakasId: number; roles: string[] } => c.asiakasId !== undefined);
+  const companyList = companies.map(({ asiakasId, roles }) => ({ asiakasId, roles }));
 
   const claims: DecodedClaims = {
     personId: finite(expanded.personId ?? expanded.sub),
@@ -204,27 +219,22 @@ export interface TokenCompanyClaim {
  * granted after `mintedAt` is not in it until the token is re-minted
  * (`ib company switch`, re-login, or a refresh). Backs
  * `ib person companies --as-token` (feedback #395).
+ *
+ * `mintedAt` is null on COMPACT (short-shape) tokens: `@ibetoni/auth` signs
+ * those with `noTimestamp: true`, so they carry no `iat` and the codec does not
+ * restore one. It cannot be derived from `exp` — the TTL varies (impersonation
+ * tokens are 10 min). Callers must treat null as "unknown", not "just now".
  */
 export function tokenCompanyClaims(jwt: string): {
   mintedAt: string | null;
   companies: TokenCompanyClaim[];
 } {
   const expanded = expandedPayload(jwt);
-  const raw = Array.isArray(expanded.asiakasesWithTypes)
-    ? (expanded.asiakasesWithTypes as Array<Record<string, unknown>>)
-    : [];
-  const companies = raw
-    .map((c) => ({
-      asiakasId: Number(c?.asiakasId),
-      roles: Array.isArray(c?.roles) ? (c.roles as string[]) : [],
-      isTyomaaAsiakas: c?.isTyomaaAsiakas === true,
-      isPumppuToimittaja: c?.isPumppuToimittaja === true,
-      isBetoniToimittaja: c?.isBetoniToimittaja === true,
-      isLattiaToimittaja: c?.isLattiaToimittaja === true,
-    }))
-    .filter((c) => Number.isFinite(c.asiakasId));
   const iat = typeof expanded.iat === "number" ? expanded.iat : null;
-  return { mintedAt: iat === null ? null : new Date(iat * 1000).toISOString(), companies };
+  return {
+    mintedAt: iat === null ? null : new Date(iat * 1000).toISOString(),
+    companies: companyClaims(expanded),
+  };
 }
 
 /** The orientation shape for an active impersonation session. */

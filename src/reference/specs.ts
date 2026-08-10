@@ -1974,13 +1974,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     outputShape:
-      "ListEnvelope<{ asiakasId, name, roles: string[], isTyomaaAsiakas, isPumppuToimittaja, isBetoniToimittaja, isLattiaToimittaja, activeMembership }> + { personId, source: 'asiakas_listForPerson'|'person_getUserAsiakasList', hint? }. " +
-      "With --as-token: ListEnvelope<{ asiakasId, roles, is*Toimittaja, isTyomaaAsiakas }> + { personId, source:'jwt-claim', mintedAt, hint } — no company names (the JWT carries none for non-active companies).",
+      "ListEnvelope<{ asiakasId, name, roles: string[]|null, isTyomaaAsiakas, isPumppuToimittaja, isBetoniToimittaja, isLattiaToimittaja (each boolean|null), activeMembership }> + { personId, source: 'asiakas_listForPerson'|'person_getUserAsiakasList', hint? }. " +
+      "With --as-token: ListEnvelope<{ asiakasId, roles, is*Toimittaja, isTyomaaAsiakas }> + { personId, source:'jwt-claim', mintedAt: string|null, hint } — no company names (the JWT carries none for non-active companies).",
     notes: [
       "`activeMembership: false` means AUTHORIZED but holding no live role there — still a company the backend lets the person act in. Do not read it as 'not a member'.",
       "Two membership notions exist in the DB and they disagree by design: `asiakas_listForPerson` (this command, and the JWT claim) counts any attachment; `person_getUserAsiakasList` additionally requires an undeleted attachment with an enabled, in-validity role and is always a SUBSET. Before fb#395 this command reported the subset while every authorization path read the superset.",
-      "`--as-token` is the ground truth for 'why did that endpoint 403 me': provider routes (e.g. tarjous/pumppu endpoints) resolve their toimittaja flags straight from this claim. It is a SNAPSHOT taken at `mintedAt` — a company added or role granted since is absent until the token is re-minted (`ib company switch`, re-login, refresh).",
-      "`source: 'person_getUserAsiakasList'` means the backend route is not deployed yet, so the rows are the narrower subset with empty roles/flags; the `hint` field says so.",
+      "`--as-token` is the ground truth for 'why did that endpoint 403 me': provider routes (e.g. tarjous/pumppu endpoints) resolve their toimittaja flags straight from this claim. It is a SNAPSHOT taken at `mintedAt` — a company added or role granted since is absent until the token is re-minted (`ib company switch`, re-login, refresh). `mintedAt` is null on compact/short-shape tokens (signed without `iat`); treat null as unknown, not as just-now.",
+      "`source: 'person_getUserAsiakasList'` means the backend route is not deployed yet, so the rows are the narrower ACTIVE-membership subset and `roles`/`is*` come back **null** — meaning 'this source cannot report them', NOT 'no roles'. Every row that source returns provably holds at least one role. The `hint` field says so too.",
     ],
     seeAlso: ["ib company list", "ib person me", "ib person role list", "ib customer person list"],
     errors: authErrors(
@@ -1992,6 +1992,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       {
         origin: "client",
         exit: 4,
+        // `match` is load-bearing: without it this row becomes the exit-only
+        // fallback for EVERY client-side exit 4 on this command, and would serve
+        // this remedy for the unrelated "could not resolve personId from the
+        // active token" failure (feedback #289 / #305 class).
+        match: "--as-token",
         meaning: "--as-token given with another person's personId",
         remedy: "--as-token only reports YOUR token's claim — drop the personId, or drop --as-token to query the backend",
       }
