@@ -10845,7 +10845,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib vehicle driver assign matches snapshot 1`] = `
 "USAGE
-  ib vehicle driver assign <vehicleId> <date> --person <person> [flags]
+  ib vehicle driver assign <vehicleId> [<date>] --person <person> [flags]
 
 DESCRIPTION
   Set the DAY driver of a vehicle for a date. ATOMIC (the same transaction the web grid uses): writes personPvm.vehicleId AND the driver on every keikka (keikkaPerson) and palkki (palkkiPerson) on that vehicle that day, and relocates the driver off any other vehicle they held that day. Returns the full set of affected rows. Requires --reason.
@@ -10854,10 +10854,11 @@ DESCRIPTION
 
 ARGUMENTS
   <vehicleId> NUMBER    Target vehicleId (required)
-  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) — or pass it as --date (optional)
 
 FLAGS
   --person NUMBER    Driver personId (required)
+  --date DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) — alias for the <date> positional
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -10883,6 +10884,7 @@ NOTES
   - Cascade: personPvm.vehicleId set for the driver; keikkaPerson driver (contactPersonTypeId=1) replaced on each affected keikka; palkkiPerson driver replaced on each affected palkki; the prior occupant of this vehicle (oldPersonId) is freed, and the new driver is pulled off any other vehicle (clearedFromVehicleId).
   - Return reports exactly what changed: keikkaIds + palkkiIds touched, oldPersonId/oldDriverName displaced, newDriverName, clearedFromVehicleId.
   - keikkaPerson rows are written with keikkaPersonSourceId=30; the grid's per-keikka-bar driver label filters sourceId=50, so the vehicle ROW shows the driver (via personPvm) but a reloaded keikka BAR may not — known display quirk shared with the web grid.
+  - Give the day positionally OR as \`--date\` (the same flag \`ib vehicle timeline\` / \`route\` / \`visits\` take) — exactly one. Both together is fine only when they mean the same day; neither exits 4.
   - Emits the dayDriver:updated socket so live grids update. Deploy-gated (404 until /api/cli/driver/* ships).
 
 SEE ALSO
@@ -10891,12 +10893,13 @@ SEE ALSO
 EXAMPLES
   ib vehicle driver assign 53 tomorrow --person 555 --reason 'auto-fill'
   ib vehicle driver assign 53 today --person 555 --dry-run --reason preview
+  ib vehicle driver assign 53 --date tomorrow --person 555 --reason 'auto-fill'
 "
 `;
 
 exports[`Help snapshots — contract stability > help for ib vehicle driver available matches snapshot 1`] = `
 "USAGE
-  ib vehicle driver available <date> [flags]
+  ib vehicle driver available [<date>] [flags]
 
 DESCRIPTION
   Drivers free to assign that day — company pumpparit (asiakasPersonSettingTypeId 8) minus those already assigned to a vehicle that day minus those absent. The assignment candidate pool.
@@ -10904,10 +10907,10 @@ DESCRIPTION
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
-  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) — or pass it as --date (optional)
 
 FLAGS
-  (none)
+  --date DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) — alias for the <date> positional
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -10923,6 +10926,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - Returns PEOPLE, not vehicles — the drivers you can hand to \`assign\`.
+  - Give the day positionally OR as \`--date\` (the same flag \`ib vehicle timeline\` / \`route\` / \`visits\` take) — exactly one. Both together is fine only when they mean the same day; neither exits 4.
   - Absences are already excluded; for the raw away-list use \`ib person absences\`. Deploy-gated.
 
 SEE ALSO
@@ -10931,12 +10935,13 @@ SEE ALSO
 EXAMPLES
   ib vehicle driver available today
   ib vehicle driver available tomorrow
+  ib vehicle driver available --date tomorrow
 "
 `;
 
 exports[`Help snapshots — contract stability > help for ib vehicle driver board matches snapshot 1`] = `
 "USAGE
-  ib vehicle driver board <date> [flags]
+  ib vehicle driver board [<date>] [flags]
 
 DESCRIPTION
   All grid-eligible vehicles for a day with their day driver, gap status (Ei kuljettajaa), and keikka load. The dispatcher's day view.
@@ -10944,10 +10949,10 @@ DESCRIPTION
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
-  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) — or pass it as --date (optional)
 
 FLAGS
-  (none)
+  --date DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) — alias for the <date> positional
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -10965,6 +10970,7 @@ NOTES
   - driverPersonId/driverName come from personPvm (the live day-driver source).
   - needsDriver = the vehicle uses the no-driver bar AND has no day driver (i.e. it's a gap). Workload (keikkaCount/m3) does NOT affect it.
   - \`placeholder: true\` marks a legacy sentinel row (e.g. vehicleId 0 'Ei tietoa') that is listed but NOT addressable — \`ib vehicle get 0\` / \`ib vehicle driver assign 0 …\` exit 4. The key is absent on real vehicles. Which tenants carry one varies.
+  - Give the day positionally OR as \`--date\` (the same flag \`ib vehicle timeline\` / \`route\` / \`visits\` take) — exactly one. Both together is fine only when they mean the same day; neither exits 4.
   - Deploy-gated: 404 until puminet5api ships /api/cli/driver/*.
 
 SEE ALSO
@@ -10973,12 +10979,13 @@ SEE ALSO
 EXAMPLES
   ib vehicle driver board today
   ib vehicle driver board 2026-06-10
+  ib vehicle driver board --date 2026-06-10
 "
 `;
 
 exports[`Help snapshots — contract stability > help for ib vehicle driver clear matches snapshot 1`] = `
 "USAGE
-  ib vehicle driver clear <vehicleId> <date> [flags]
+  ib vehicle driver clear <vehicleId> [<date>] [flags]
 
 DESCRIPTION
   Remove the DAY driver from a vehicle for a date (same atomic cascade as assign, personId=null): clears the driver from that day's keikkat/palkit and frees the person (personPvm.vehicleId=null) so they're available for other tasks. Returns what was cleared. Requires --reason.
@@ -10987,10 +10994,10 @@ DESCRIPTION
 
 ARGUMENTS
   <vehicleId> NUMBER    Target vehicleId (required)
-  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) — or pass it as --date (optional)
 
 FLAGS
-  (none)
+  --date DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) — alias for the <date> positional
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -11013,6 +11020,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - Requires Admin, HR Admin, or Keikka Handler on the active company. --reason is hard-required (exits 4 without it).
+  - Give the day positionally OR as \`--date\` (the same flag \`ib vehicle timeline\` / \`route\` / \`visits\` take) — exactly one. Both together is fine only when they mean the same day; neither exits 4.
   - Use this when a driver breaks down / is pulled off — they become available again for \`ib vehicle driver assign\` elsewhere. Deploy-gated.
 
 SEE ALSO
@@ -11020,6 +11028,7 @@ SEE ALSO
 
 EXAMPLES
   ib vehicle driver clear 53 today --reason 'breakdown — freed for other run'
+  ib vehicle driver clear 53 --date today --reason 'breakdown — freed for other run'
 "
 `;
 
@@ -11155,7 +11164,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib vehicle driver gaps matches snapshot 1`] = `
 "USAGE
-  ib vehicle driver gaps <date> [flags]
+  ib vehicle driver gaps [<date>] [flags]
 
 DESCRIPTION
   Vehicles needing a driver that day — the 'Ei kuljettajaa' list. Board rows filtered to needsDriver = the vehicle is configured with the no-driver bar AND has no day driver.
@@ -11163,10 +11172,10 @@ DESCRIPTION
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
 ARGUMENTS
-  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) — or pass it as --date (optional)
 
 FLAGS
-  (none)
+  --date DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) — alias for the <date> positional
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -11183,6 +11192,7 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - A driverless vehicle is NOT a gap unless it uses the no-driver bar — so an empty gaps list alongside a board full of driverless vehicles is expected, not a contradiction. keikkaCount/m3 are informational and do NOT affect needsDriver.
   - \`placeholder: true\` marks a legacy sentinel row (e.g. vehicleId 0 'Ei tietoa') that is listed but NOT addressable — \`ib vehicle get 0\` / \`ib vehicle driver assign 0 …\` exit 4. The key is absent on real vehicles. Which tenants carry one varies.
+  - Give the day positionally OR as \`--date\` (the same flag \`ib vehicle timeline\` / \`route\` / \`visits\` take) — exactly one. Both together is fine only when they mean the same day; neither exits 4.
   - Pair with \`ib vehicle driver available <date>\` to find drivers to fill these. Deploy-gated.
 
 SEE ALSO
@@ -11191,6 +11201,7 @@ SEE ALSO
 EXAMPLES
   ib vehicle driver gaps today
   ib vehicle driver gaps tomorrow
+  ib vehicle driver gaps --date tomorrow
 "
 `;
 
@@ -11236,7 +11247,7 @@ EXAMPLES
 
 exports[`Help snapshots — contract stability > help for ib vehicle driver who matches snapshot 1`] = `
 "USAGE
-  ib vehicle driver who <vehicleId> <date> [flags]
+  ib vehicle driver who <vehicleId> [<date>] [flags]
 
 DESCRIPTION
   The day driver assigned to a single vehicle on a date (from personPvm), or null.
@@ -11245,10 +11256,10 @@ DESCRIPTION
 
 ARGUMENTS
   <vehicleId> NUMBER    Target vehicleId (required)
-  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) (required)
+  <date> DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) — or pass it as --date (optional)
 
 FLAGS
-  (none)
+  --date DATE    Day YYYY-MM-DD (or today/yesterday/tomorrow) — alias for the <date> positional
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -11264,6 +11275,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - Returns driver:null (not 404) when no driver is assigned. For a date range use \`ib vehicle driver history\`. For the STANDING default see \`ib vehicle driver default get\`. Deploy-gated.
+  - Give the day positionally OR as \`--date\` (the same flag \`ib vehicle timeline\` / \`route\` / \`visits\` take) — exactly one. Both together is fine only when they mean the same day; neither exits 4.
 
 SEE ALSO
   ib vehicle driver history, ib vehicle driver default get, ib vehicle driver board
@@ -11271,6 +11283,7 @@ SEE ALSO
 EXAMPLES
   ib vehicle driver who 53 today
   ib vehicle driver who 53 2026-06-10
+  ib vehicle driver who 53 --date 2026-06-10
 "
 `;
 
@@ -11293,7 +11306,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { vehicleId, vehicleNo, name, plate, type, typeName, boomLength, capacity, sortNo, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, memo, billingProductId, asiakasId, defaultDriverId, showInGrid:boolean, showInReports:boolean, useNoDriverBar:boolean, isRestricted:boolean, hasGpsTracking:boolean }
+  { vehicleId, vehicleNo, name, plate, type, typeName, boomLength, capacity, sortNo, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, memo, billingProductId, asiakasId, ownerAsiakasId, defaultDriverId, showInGrid:boolean, showInReports:boolean, useNoDriverBar:boolean, isRestricted:boolean, hasGpsTracking:boolean }
 
 ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Vehicle not found      → verify vehicleId (and --asiakas if it belongs to another company)
@@ -11301,6 +11314,9 @@ ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - \`asiakasId\` and \`ownerAsiakasId\` are distinct columns and often equal. \`ownerAsiakasId\` is the tenant this read is scoped to, so it is the SAME on every row of one response (the active company, or \`--asiakas\`); \`asiakasId\` is the assigned company and is what the grid splits own-vs-foreign vehicles on.
 
 EXAMPLES
   ib vehicle get 7
@@ -11331,7 +11347,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null, placeholder?:true }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
+  ListEnvelope<{ vehicleId, vehicleNo, plate, name, type, typeName, capacity, sortNo, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null, asiakasId, ownerAsiakasId, placeholder?:true }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  No vehicle access on the requested --asiakas company → use a tenant you have a vehicle-manage role on, or a developer token
@@ -11341,6 +11357,8 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - \`placeholder: true\` marks a legacy sentinel row (e.g. vehicleId 0 'Ei tietoa') that is listed but NOT addressable — \`ib vehicle get 0\` / \`ib vehicle driver assign 0 …\` exit 4. The key is absent on real vehicles. Which tenants carry one varies.
+  - Rows come back ordered by \`vehicleNo\` (then vehicleId), NOT by \`sortNo\` — the grid orders on \`sortNo\`, so sort client-side to reproduce its row order.
+  - \`asiakasId\` and \`ownerAsiakasId\` are distinct columns and often equal. \`ownerAsiakasId\` is the tenant this read is scoped to, so it is the SAME on every row of one response (the active company, or \`--asiakas\`); \`asiakasId\` is the assigned company and is what the grid splits own-vs-foreign vehicles on.
 
 SEE ALSO
   ib vehicle types
@@ -11481,7 +11499,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null, placeholder?:true }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
+  ListEnvelope<{ vehicleId, vehicleNo, plate, name, type, typeName, capacity, sortNo, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null, asiakasId, ownerAsiakasId, placeholder?:true }> (+truncated:true when the result hit the limit; backend ≥ 2026-06-11)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  No vehicle access on the requested --asiakas company → use a tenant you have a vehicle-manage role on, or a developer token
@@ -11491,6 +11509,8 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - \`placeholder: true\` marks a legacy sentinel row (e.g. vehicleId 0 'Ei tietoa') that is listed but NOT addressable — \`ib vehicle get 0\` / \`ib vehicle driver assign 0 …\` exit 4. The key is absent on real vehicles. Which tenants carry one varies.
+  - Rows come back ordered by \`vehicleNo\` (then vehicleId), NOT by \`sortNo\` — the grid orders on \`sortNo\`, so sort client-side to reproduce its row order.
+  - \`asiakasId\` and \`ownerAsiakasId\` are distinct columns and often equal. \`ownerAsiakasId\` is the tenant this read is scoped to, so it is the SAME on every row of one response (the active company, or \`--asiakas\`); \`asiakasId\` is the assigned company and is what the grid splits own-vs-foreign vehicles on.
 
 EXAMPLES
   ib vehicle search ABC

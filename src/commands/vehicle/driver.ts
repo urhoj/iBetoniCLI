@@ -8,12 +8,17 @@ import {
   writeFlagsToHeaders,
   addWriteFlagsToCommand,
 } from "../../api/writeFlags.js";
-import { parseId } from "../../targets.js";
+import { parseId, resolveDateInput } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 import { markPlaceholderVehicles } from "./placeholder.js";
 
 type Row = Record<string, unknown>;
+
+/** Parsed options of every date-keyed driver leaf: the `--date` positional alias. */
+interface VehicleDayOpts {
+  date?: string;
+}
 
 /** YYYY-MM-DD (or today/yesterday/tomorrow) → integer yyyymmdd. */
 function toYyyymmdd(date: string): number {
@@ -191,28 +196,43 @@ export function registerVehicleDriverCommands(
     .command("driver")
     .description("Vehicle drivers: day-driver dispatch (board/gaps/available/who/assign/clear/history) + the standing default driver");
 
+  // Every date-keyed leaf below takes its day EITHER positionally or as
+  // `--date` (feedback #393): the sibling GPS reads (`vehicle timeline`/
+  // `route`/`visits`) are flag-shaped, and an agent arriving from one of those
+  // reached for `--date` here and burned an exit 4 on argument shape alone.
+  // `resolveDateInput` enforces exactly-one and expands today/yesterday/tomorrow.
+  const DATE_FLAG = "--date <date>";
+
+  /**
+   * `jsonAction` for a fleet-wide day read, with the date guard resolved BEFORE
+   * `getClient()` (the ordering `sijainti closest` already uses): a bad or
+   * missing date must exit 4 on its own terms rather than surfacing as an auth
+   * failure the caller would fix first and only then learn the real problem.
+   */
+  const dayAction =
+    (run: (client: ApiClient, date: string) => Promise<ListEnvelope<Row>>) =>
+      guarded(async (date: string | undefined, opts: VehicleDayOpts) => {
+        const day = resolveDateInput(date, opts.date);
+        writeJson(await run(await getClient(), day));
+      });
+
   // ── fleet / day planning reads (date-keyed) ──
-  driver
-    .command("board <date>")
-    .action(jsonAction(getClient, (client, date: string) => runVehicleDriverBoard(client, date)));
+  driver.command("board [date]").option(DATE_FLAG).action(dayAction(runVehicleDriverBoard));
 
-  driver
-    .command("gaps <date>")
-    .action(jsonAction(getClient, (client, date: string) => runVehicleDriverGaps(client, date)));
+  driver.command("gaps [date]").option(DATE_FLAG).action(dayAction(runVehicleDriverGaps));
 
-  driver
-    .command("available <date>")
-    .action(
-      jsonAction(getClient, (client, date: string) => runVehicleDriverAvailable(client, date))
-    );
+  driver.command("available [date]").option(DATE_FLAG).action(dayAction(runVehicleDriverAvailable));
 
   // ── per-vehicle day-driver ──
   driver
-    .command("who <vehicleId> <date>")
+    .command("who <vehicleId> [date]")
+    .option(DATE_FLAG)
     .action(
-      jsonAction(getClient, (client, vehicleIdStr: string, date: string) =>
-        runVehicleDriverWho(client, parseId(vehicleIdStr, "vehicleId"), date)
-      )
+      guarded(async (vehicleIdStr: string, date: string | undefined, opts: VehicleDayOpts) => {
+        const vehicleId = parseId(vehicleIdStr, "vehicleId");
+        const day = resolveDateInput(date, opts.date);
+        writeJson(await runVehicleDriverWho(await getClient(), vehicleId, day));
+      })
     );
 
   driver
@@ -227,21 +247,23 @@ export function registerVehicleDriverCommands(
 
   addWriteFlagsToCommand(
     driver
-      .command("assign <vehicleId> <date>")
+      .command("assign <vehicleId> [date]")
+      .option(DATE_FLAG)
       .requiredOption("--person <pid>", "", (s: string) => Number(s))
-  ).action(guarded(async (vehicleIdStr: string, date: string, opts: WriteFlags & { person: number }) => {
-    writeJson(
-      await runVehicleDriverAssign(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts.person, date, opts)
-    );
+  ).action(guarded(async (vehicleIdStr: string, date: string | undefined, opts: WriteFlags & VehicleDayOpts & { person: number }) => {
+    const vehicleId = parseId(vehicleIdStr, "vehicleId");
+    const day = resolveDateInput(date, opts.date);
+    writeJson(await runVehicleDriverAssign(await getClient(), vehicleId, opts.person, day, opts));
   }));
 
   addWriteFlagsToCommand(
     driver
-      .command("clear <vehicleId> <date>")
-  ).action(guarded(async (vehicleIdStr: string, date: string, opts: WriteFlags) => {
-    writeJson(
-      await runVehicleDriverClear(await getClient(), parseId(vehicleIdStr, "vehicleId"), date, opts)
-    );
+      .command("clear <vehicleId> [date]")
+      .option(DATE_FLAG)
+  ).action(guarded(async (vehicleIdStr: string, date: string | undefined, opts: WriteFlags & VehicleDayOpts) => {
+    const vehicleId = parseId(vehicleIdStr, "vehicleId");
+    const day = resolveDateInput(date, opts.date);
+    writeJson(await runVehicleDriverClear(await getClient(), vehicleId, day, opts));
   }));
 
   // ── standing default driver ──

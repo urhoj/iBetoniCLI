@@ -1,7 +1,7 @@
 import { writeJson } from "../../output/json.js";
 import { resolveDate } from "../../dates.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
-import { parseId } from "../../targets.js";
+import { parseId, resolveDateInput } from "../../targets.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 import { markPlaceholderVehicles } from "./placeholder.js";
@@ -105,33 +105,54 @@ export function registerVehicleDriverCommands(parent, getClient) {
     const driver = parent
         .command("driver")
         .description("Vehicle drivers: day-driver dispatch (board/gaps/available/who/assign/clear/history) + the standing default driver");
+    // Every date-keyed leaf below takes its day EITHER positionally or as
+    // `--date` (feedback #393): the sibling GPS reads (`vehicle timeline`/
+    // `route`/`visits`) are flag-shaped, and an agent arriving from one of those
+    // reached for `--date` here and burned an exit 4 on argument shape alone.
+    // `resolveDateInput` enforces exactly-one and expands today/yesterday/tomorrow.
+    const DATE_FLAG = "--date <date>";
+    /**
+     * `jsonAction` for a fleet-wide day read, with the date guard resolved BEFORE
+     * `getClient()` (the ordering `sijainti closest` already uses): a bad or
+     * missing date must exit 4 on its own terms rather than surfacing as an auth
+     * failure the caller would fix first and only then learn the real problem.
+     */
+    const dayAction = (run) => guarded(async (date, opts) => {
+        const day = resolveDateInput(date, opts.date);
+        writeJson(await run(await getClient(), day));
+    });
     // ── fleet / day planning reads (date-keyed) ──
-    driver
-        .command("board <date>")
-        .action(jsonAction(getClient, (client, date) => runVehicleDriverBoard(client, date)));
-    driver
-        .command("gaps <date>")
-        .action(jsonAction(getClient, (client, date) => runVehicleDriverGaps(client, date)));
-    driver
-        .command("available <date>")
-        .action(jsonAction(getClient, (client, date) => runVehicleDriverAvailable(client, date)));
+    driver.command("board [date]").option(DATE_FLAG).action(dayAction(runVehicleDriverBoard));
+    driver.command("gaps [date]").option(DATE_FLAG).action(dayAction(runVehicleDriverGaps));
+    driver.command("available [date]").option(DATE_FLAG).action(dayAction(runVehicleDriverAvailable));
     // ── per-vehicle day-driver ──
     driver
-        .command("who <vehicleId> <date>")
-        .action(jsonAction(getClient, (client, vehicleIdStr, date) => runVehicleDriverWho(client, parseId(vehicleIdStr, "vehicleId"), date)));
+        .command("who <vehicleId> [date]")
+        .option(DATE_FLAG)
+        .action(guarded(async (vehicleIdStr, date, opts) => {
+        const vehicleId = parseId(vehicleIdStr, "vehicleId");
+        const day = resolveDateInput(date, opts.date);
+        writeJson(await runVehicleDriverWho(await getClient(), vehicleId, day));
+    }));
     driver
         .command("history <vehicleId>")
         .requiredOption("--from <date>")
         .requiredOption("--to <date>")
         .action(jsonAction(getClient, (client, vehicleIdStr, opts) => runVehicleDriverHistory(client, parseId(vehicleIdStr, "vehicleId"), opts)));
     addWriteFlagsToCommand(driver
-        .command("assign <vehicleId> <date>")
+        .command("assign <vehicleId> [date]")
+        .option(DATE_FLAG)
         .requiredOption("--person <pid>", "", (s) => Number(s))).action(guarded(async (vehicleIdStr, date, opts) => {
-        writeJson(await runVehicleDriverAssign(await getClient(), parseId(vehicleIdStr, "vehicleId"), opts.person, date, opts));
+        const vehicleId = parseId(vehicleIdStr, "vehicleId");
+        const day = resolveDateInput(date, opts.date);
+        writeJson(await runVehicleDriverAssign(await getClient(), vehicleId, opts.person, day, opts));
     }));
     addWriteFlagsToCommand(driver
-        .command("clear <vehicleId> <date>")).action(guarded(async (vehicleIdStr, date, opts) => {
-        writeJson(await runVehicleDriverClear(await getClient(), parseId(vehicleIdStr, "vehicleId"), date, opts));
+        .command("clear <vehicleId> [date]")
+        .option(DATE_FLAG)).action(guarded(async (vehicleIdStr, date, opts) => {
+        const vehicleId = parseId(vehicleIdStr, "vehicleId");
+        const day = resolveDateInput(date, opts.date);
+        writeJson(await runVehicleDriverClear(await getClient(), vehicleId, day, opts));
     }));
     // ── standing default driver ──
     const def = driver

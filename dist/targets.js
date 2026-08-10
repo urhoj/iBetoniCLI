@@ -1,6 +1,7 @@
 import { failWith } from "./output/json.js";
 import { CliError } from "./api/errors.js";
 import { closestName } from "./output/nearest.js";
+import { resolveDate } from "./dates.js";
 /**
  * Commander coercer for a `--limit`-style flag that is clamped to `cap`.
  * Deliberately NOT a validator: a non-numeric value still yields `NaN` (which
@@ -238,6 +239,31 @@ export function resolveTarget(positional, flag, positionalName, flagName) {
         failWith(`positional ${positionalName} (${positional}) and --${flagName} (${flag}) differ — pass only one`, 4);
     }
     return id;
+}
+/**
+ * Resolve a DATE that may arrive as a positional arg OR a `--date` flag — the
+ * date twin of {@link resolveTarget} (feedback #393: `ib vehicle driver board`
+ * took a positional while its `vehicle timeline`/`route`/`visits` siblings take
+ * `--date`, so an agent moving between them kept spending an exit 4 on the
+ * shape alone). Exactly one is required; both are allowed only when they mean
+ * the same day, compared AFTER alias expansion so `today` and the matching ISO
+ * date agree rather than reading as a conflict.
+ *
+ * Returns the `resolveDate`-expanded value, so callers still receive
+ * `YYYY-MM-DD` (or an unrecognised string passed through for the backend to
+ * reject) exactly as the positional-only form did.
+ */
+export function resolveDateInput(positional, flag, argName = "date") {
+    const pos = resolveDate(positional);
+    const opt = resolveDate(flag);
+    const date = pos ?? opt;
+    if (date === undefined) {
+        failWith(`missing ${argName}: pass <${argName}> positionally or via --${argName} <date> (YYYY-MM-DD, or today/yesterday/tomorrow)`, 4);
+    }
+    if (pos !== undefined && opt !== undefined && pos !== opt) {
+        failWith(`positional ${argName} (${positional}) and --${argName} (${flag}) differ — pass only one`, 4);
+    }
+    return date;
 }
 /**
  * Resolve a free-TEXT value that may arrive as a positional OR a `--flag`

@@ -1,5 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { mockApiClient } from "../helpers/mockClient.js";
+import { runArgv } from "../../src/runArgv.js";
+import { todayHelsinki } from "../../src/dates.js";
 import {
   runVehicleDriverBoard,
   runVehicleDriverGaps,
@@ -120,5 +122,62 @@ describe("ib vehicle driver default", () => {
       { vehicleId: 53, personId: null },
       { headers: { "X-Action-Reason": "driver left" } }
     );
+  });
+});
+
+/**
+ * feedback #393: the day-keyed leaves were positional-only while their
+ * `vehicle timeline` / `route` / `visits` siblings take `--date`, so an agent
+ * moving between them spent a whole failed call on argument shape. Both
+ * spellings now parse, and the guard runs BEFORE getClient — an argument
+ * mistake must not surface as an auth failure the caller fixes first.
+ */
+describe("ib vehicle driver — date positional OR --date (fb#393)", () => {
+  // Guard-only invocations: they exit 4 before any request, so the
+  // (unreachable) endpoint is never dialled.
+  const opts = { token: "t", endpoint: "http://127.0.0.1:9" };
+  const errorOf = (stderr: string): string => JSON.parse(stderr).error;
+
+  // `before` is everything up to the date slot; `after` the flags that follow
+  // (the two writes hard-require --reason, the reads take none).
+  const DATE_LEAVES = [
+    { leaf: "board", before: ["vehicle", "driver", "board"], after: [] as string[] },
+    { leaf: "gaps", before: ["vehicle", "driver", "gaps"], after: [] as string[] },
+    { leaf: "available", before: ["vehicle", "driver", "available"], after: [] as string[] },
+    { leaf: "who", before: ["vehicle", "driver", "who", "53"], after: [] as string[] },
+    { leaf: "clear", before: ["vehicle", "driver", "clear", "53"], after: ["--reason", "x"] },
+    {
+      leaf: "assign",
+      before: ["vehicle", "driver", "assign", "53"],
+      after: ["--person", "555", "--reason", "x"],
+    },
+  ];
+
+  test.each(DATE_LEAVES)("$leaf: neither positional nor --date -> exit 4", async ({ before, after }) => {
+    const r = await runArgv([...before, ...after], opts);
+    expect(r.exitCode).toBe(4);
+    expect(errorOf(r.stderr)).toMatch(/missing date.*--date/s);
+  });
+
+  test.each(DATE_LEAVES)("$leaf: conflicting positional and --date -> exit 4", async ({ before, after }) => {
+    const r = await runArgv([...before, "2026-06-10", "--date", "2026-06-11", ...after], opts);
+    expect(r.exitCode).toBe(4);
+    expect(errorOf(r.stderr)).toMatch(/differ/);
+  });
+
+  test("assign: --date is accepted (no unknown-option rejection)", async () => {
+    // A parse rejection would be code USAGE; getting past the parser to the
+    // dead endpoint is what proves the flag is wired.
+    const r = await runArgv(
+      ["vehicle", "driver", "assign", "53", "--date", "2026-06-10", "--person", "555", "--reason", "x"],
+      opts
+    );
+    expect(r.exitCode).not.toBe(4);
+    expect(r.stderr).not.toMatch(/unknown option/i);
+  });
+
+  test("board: a same-day pair written two ways is NOT a conflict", async () => {
+    const r = await runArgv(["vehicle", "driver", "board", "today", "--date", todayHelsinki()], opts);
+    expect(r.exitCode).not.toBe(4);
   });
 });

@@ -7,8 +7,10 @@ import {
   parseId,
   parseOptionalId,
   parseRefId,
+  resolveDateInput,
   resolveSearchQuery,
 } from "../src/targets.js";
+import { todayHelsinki } from "../src/dates.js";
 
 /** Run fn and return the CliError exitCode it threw (or undefined if it didn't throw). */
 const exitCodeOf = (fn: () => void): number | undefined => {
@@ -145,6 +147,49 @@ describe("resolveSearchQuery (feedback #235 — positional OR --search)", () => 
 
   test("missing-query error names both input forms", () => {
     expect(() => resolveSearchQuery(undefined, undefined)).toThrow(/<query>.*--search/);
+  });
+});
+
+describe("resolveDateInput (feedback #393 — positional OR --date)", () => {
+  test("positional alone resolves, with aliases expanded", () => {
+    expect(resolveDateInput("2026-06-10", undefined)).toBe("2026-06-10");
+    expect(resolveDateInput("today", undefined)).toBe(todayHelsinki());
+  });
+
+  test("--date flag alone resolves (the fb#393 case)", () => {
+    expect(resolveDateInput(undefined, "2026-06-10")).toBe("2026-06-10");
+    expect(resolveDateInput(undefined, "today")).toBe(todayHelsinki());
+  });
+
+  test("both allowed when they mean the same day AFTER alias expansion", () => {
+    // The comparison has to happen post-expansion: `today` and its ISO
+    // spelling are one day, and rejecting that pair as a conflict would be a
+    // false positive on the most natural way to write the same thing twice.
+    expect(resolveDateInput("today", todayHelsinki())).toBe(todayHelsinki());
+    expect(resolveDateInput("2026-06-10", "2026-06-10")).toBe("2026-06-10");
+  });
+
+  test("both, meaning different days → exit 4", () => {
+    expect(exitCodeOf(() => resolveDateInput("2026-06-10", "2026-06-11"))).toBe(4);
+    expect(exitCodeOf(() => resolveDateInput("today", "tomorrow"))).toBe(4);
+  });
+
+  test("neither → exit 4, naming both input forms", () => {
+    expect(exitCodeOf(() => resolveDateInput(undefined, undefined))).toBe(4);
+    expect(() => resolveDateInput(undefined, undefined)).toThrow(/<date>.*--date/);
+  });
+
+  test("an unrecognised string passes through for the backend to reject", () => {
+    // Same contract as resolveDate: only the three aliases are expanded client
+    // -side; anything else is the backend's call, so the CLI must not invent a
+    // second, divergent date validator here.
+    expect(resolveDateInput("08-06-2026", undefined)).toBe("08-06-2026");
+  });
+
+  test("the argName rides into both messages", () => {
+    expect(errorOf(() => resolveDateInput(undefined, undefined, "pvm"))?.message).toMatch(
+      /missing pvm/
+    );
   });
 });
 

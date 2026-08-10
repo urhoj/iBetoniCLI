@@ -65,9 +65,12 @@ const VISIT_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  * GET /api/cli/vehicle/list with the universal list envelope shape.
  * Query parameters are appended only when set on `opts`. Rows are
  * self-describing — each carries showInGrid / firstDate / lastDate /
- * deletedTime alongside { vehicleId, plate, name, type, typeName, capacity }
- * (name ← vehicleNimi, typeName ← vehicleTypes.vehicleTypeName, null when
- * unset). Default scope is
+ * deletedTime alongside { vehicleId, vehicleNo, plate, name, type, typeName,
+ * capacity, sortNo, asiakasId, ownerAsiakasId } (name ← vehicleNimi, typeName ←
+ * vehicleTypes.vehicleTypeName, null when unset). `sortNo` is the grid's ORDER
+ * and `asiakasId`/`ownerAsiakasId` its GROUPING, so fleet layout is answerable
+ * from one call (fb#394) — note the rows themselves arrive in vehicleNo order,
+ * not sortNo order. Default scope is
  * non-deleted with no narrowing (grid-hidden AND expired rows ARE included);
  * `deleted` / `gridOnly` / `validOn` / `type` opt into narrowing. Legacy
  * sentinel rows carry `placeholder: true` — see `./placeholder.ts`.
@@ -96,8 +99,9 @@ export async function runVehicleList(
  * GET /api/cli/vehicle/get/:vehicleId. Returns the full flat "Perustiedot"
  * record: identity (vehicleNo/name/plate/type/typeName), specs (boomLength ←
  * vehiclePuomi, capacity ← vehicleM3, sortNo), validity (firstDate/lastDate),
- * memo, billingProductId, asiakasId, defaultDriverId, and the behaviour toggles
- * (showInGrid/showInReports/useNoDriverBar/isRestricted/hasGpsTracking).
+ * memo, billingProductId, asiakasId, ownerAsiakasId, defaultDriverId, and the
+ * behaviour toggles (showInGrid/showInReports/useNoDriverBar/isRestricted/
+ * hasGpsTracking).
  *
  * `asiakas` reads a vehicle owned by another company (cross-tenant); it needs
  * sysadmin/developer or a vehicle-manage role on that tenant, else the backend

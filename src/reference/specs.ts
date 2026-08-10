@@ -16,7 +16,7 @@
  *   400 = validation
  *   500 = backend error
  */
-import type { CommandError, CommandFlag, CommandSpec } from "../output/help.js";
+import type { CommandArg, CommandError, CommandFlag, CommandSpec } from "../output/help.js";
 import { exitCodeFromStatus } from "../api/errors.js";
 // `ib message daily` / `ib message board` specs are co-located with their
 // commands (one source of truth per sub-group) and spread in at the end of
@@ -135,6 +135,47 @@ const VEHICLE_ASIAKAS_403: CommandError = apiErr(
  *  id-taking command will accept (fb#380). One constant so the four can't drift. */
 const VEHICLE_PLACEHOLDER_NOTE =
   "`placeholder: true` marks a legacy sentinel row (e.g. vehicleId 0 'Ei tietoa') that is listed but NOT addressable — `ib vehicle get 0` / `ib vehicle driver assign 0 …` exit 4. The key is absent on real vehicles. Which tenants carry one varies.";
+
+/** Fleet ORDER is `sortNo`, which the rows carry but are not sorted by (fb#394):
+ *  the list comes back in vehicleNo order, so a caller reproducing the grid's
+ *  row order has to sort client-side — silently assuming the wire order IS the
+ *  grid order is the failure this note exists to prevent. */
+const VEHICLE_ORDERING_NOTE =
+  "Rows come back ordered by `vehicleNo` (then vehicleId), NOT by `sortNo` — the grid orders on `sortNo`, so sort client-side to reproduce its row order.";
+/** `asiakasId` vs `ownerAsiakasId`: distinct columns, and only the first varies
+ *  within one response (fb#394). */
+const VEHICLE_OWNER_NOTE =
+  "`asiakasId` and `ownerAsiakasId` are distinct columns and often equal. `ownerAsiakasId` is the tenant this read is scoped to, so it is the SAME on every row of one response (the active company, or `--asiakas`); `asiakasId` is the assigned company and is what the grid splits own-vs-foreign vehicles on.";
+/** The list row is ~14 columns wide, so leftmost-fits would hide sortNo/ownership. */
+const VEHICLE_LIST_PRETTY_COLUMNS = [
+  "vehicleId",
+  "vehicleNo",
+  "plate",
+  "name",
+  "typeName",
+  "sortNo",
+  "showInGrid",
+  "asiakasId",
+] as const;
+
+/* The `ib vehicle driver` day-keyed leaves take their date EITHER positionally
+ * or as `--date` (fb#393). The group used to be positional-only while its
+ * `vehicle timeline`/`route`/`visits` siblings were flag-shaped, so an agent
+ * arriving from one of those spent an exit 4 on argument shape alone. Three
+ * constants, so the six leaves state the same contract. */
+const DRIVER_DATE_ARG: CommandArg = {
+  name: "date",
+  type: "date",
+  required: false,
+  description: "Day YYYY-MM-DD (or today/yesterday/tomorrow) — or pass it as --date",
+};
+const DRIVER_DATE_FLAG: CommandFlag = {
+  name: "date",
+  type: "date",
+  description: "Day YYYY-MM-DD (or today/yesterday/tomorrow) — alias for the <date> positional",
+};
+const DRIVER_DATE_NOTE =
+  "Give the day positionally OR as `--date` (the same flag `ib vehicle timeline` / `route` / `visits` take) — exactly one. Both together is fine only when they mean the same day; neither exits 4.";
 
 // ─── cross-domain shared fragments ───────────────────────────────────────────
 /** The system-admin 403 every `jerry admin` / admin-gated row repeats. */
@@ -2183,12 +2224,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     outputShape:
-      "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null, placeholder?:true }>" + TRUNCATED_NOTE,
+      "ListEnvelope<{ vehicleId, vehicleNo, plate, name, type, typeName, capacity, sortNo, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null, asiakasId, ownerAsiakasId, placeholder?:true }>" + TRUNCATED_NOTE,
+    prettyColumns: VEHICLE_LIST_PRETTY_COLUMNS,
     errors: [
       VEHICLE_ASIAKAS_403,
       ...permErrors("auth.page.vehicle.read"),
     ],
-    notes: [VEHICLE_PLACEHOLDER_NOTE],
+    notes: [VEHICLE_PLACEHOLDER_NOTE, VEHICLE_ORDERING_NOTE, VEHICLE_OWNER_NOTE],
     examples: [
       "ib vehicle list",
       "ib vehicle list --pretty",
@@ -2213,12 +2255,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     outputShape:
-      "{ vehicleId, vehicleNo, name, plate, type, typeName, boomLength, capacity, sortNo, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, memo, billingProductId, asiakasId, defaultDriverId, showInGrid:boolean, showInReports:boolean, useNoDriverBar:boolean, isRestricted:boolean, hasGpsTracking:boolean }",
+      "{ vehicleId, vehicleNo, name, plate, type, typeName, boomLength, capacity, sortNo, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, memo, billingProductId, asiakasId, ownerAsiakasId, defaultDriverId, showInGrid:boolean, showInReports:boolean, useNoDriverBar:boolean, isRestricted:boolean, hasGpsTracking:boolean }",
     errors: [
       apiErr(404, "Vehicle not found", "verify vehicleId (and --asiakas if it belongs to another company)"),
       VEHICLE_ASIAKAS_403,
       ...permErrors("auth.page.vehicle.read"),
     ],
+    notes: [VEHICLE_OWNER_NOTE],
     examples: ["ib vehicle get 7", "ib vehicle get 159 --asiakas 1380"],
   },
   {
@@ -2275,12 +2318,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     outputShape:
-      "ListEnvelope<{ vehicleId, plate, name, type, typeName, capacity, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null, placeholder?:true }>" + TRUNCATED_NOTE,
+      "ListEnvelope<{ vehicleId, vehicleNo, plate, name, type, typeName, capacity, sortNo, showInGrid:boolean, firstDate:YYYY-MM-DD|null, lastDate:YYYY-MM-DD|null, deletedTime:ISO|null, asiakasId, ownerAsiakasId, placeholder?:true }>" + TRUNCATED_NOTE,
+    prettyColumns: VEHICLE_LIST_PRETTY_COLUMNS,
     errors: [
       VEHICLE_ASIAKAS_403,
       ...permErrors("auth.page.vehicle.read"),
     ],
-    notes: [VEHICLE_PLACEHOLDER_NOTE],
+    notes: [VEHICLE_PLACEHOLDER_NOTE, VEHICLE_ORDERING_NOTE, VEHICLE_OWNER_NOTE],
     examples: ["ib vehicle search ABC", "ib vehicle search kuorma --limit 20", "ib vehicle search 82", "ib vehicle search ABC --asiakas 1380"],
   },
   {
@@ -2480,10 +2524,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     description:
       "All grid-eligible vehicles for a day with their day driver, gap status (Ei kuljettajaa), and keikka load. The dispatcher's day view.",
     permissions: ["auth.page.grid.read"],
-    args: [
-      { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)" },
-    ],
-    flags: [],
+    args: [DRIVER_DATE_ARG],
+    flags: [DRIVER_DATE_FLAG],
     outputShape:
       "ListEnvelope<{ vehicleId, plate, name, type, typeName, driverPersonId, driverName, hasDriver, needsDriver, keikkaCount, m3, placeholder? }>",
     errors: permErrors("auth.page.grid.read"),
@@ -2491,20 +2533,23 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "driverPersonId/driverName come from personPvm (the live day-driver source).",
       "needsDriver = the vehicle uses the no-driver bar AND has no day driver (i.e. it's a gap). Workload (keikkaCount/m3) does NOT affect it.",
       VEHICLE_PLACEHOLDER_NOTE,
+      DRIVER_DATE_NOTE,
       "Deploy-gated: 404 until puminet5api ships /api/cli/driver/*.",
     ],
     seeAlso: ["ib vehicle driver gaps", "ib vehicle driver available", "ib vehicle driver assign"],
-    examples: ["ib vehicle driver board today", "ib vehicle driver board 2026-06-10"],
+    examples: [
+      "ib vehicle driver board today",
+      "ib vehicle driver board 2026-06-10",
+      "ib vehicle driver board --date 2026-06-10",
+    ],
   },
   {
     command: "ib vehicle driver gaps",
     description:
       "Vehicles needing a driver that day — the 'Ei kuljettajaa' list. Board rows filtered to needsDriver = the vehicle is configured with the no-driver bar AND has no day driver.",
     permissions: ["auth.page.grid.read"],
-    args: [
-      { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)" },
-    ],
-    flags: [],
+    args: [DRIVER_DATE_ARG],
+    flags: [DRIVER_DATE_FLAG],
     outputShape:
       "ListEnvelope<{ vehicleId, plate, name, type, typeName, driverPersonId, driverName, hasDriver, needsDriver, keikkaCount, m3, placeholder? }>",
     errors: permErrors("auth.page.grid.read"),
@@ -2515,28 +2560,36 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       // reads as a contradiction otherwise (fb#380).
       "A driverless vehicle is NOT a gap unless it uses the no-driver bar — so an empty gaps list alongside a board full of driverless vehicles is expected, not a contradiction. keikkaCount/m3 are informational and do NOT affect needsDriver.",
       VEHICLE_PLACEHOLDER_NOTE,
+      DRIVER_DATE_NOTE,
       "Pair with `ib vehicle driver available <date>` to find drivers to fill these. Deploy-gated.",
     ],
     seeAlso: ["ib vehicle driver available", "ib vehicle driver assign", "ib vehicle driver board"],
-    examples: ["ib vehicle driver gaps today", "ib vehicle driver gaps tomorrow"],
+    examples: [
+      "ib vehicle driver gaps today",
+      "ib vehicle driver gaps tomorrow",
+      "ib vehicle driver gaps --date tomorrow",
+    ],
   },
   {
     command: "ib vehicle driver available",
     description:
       "Drivers free to assign that day — company pumpparit (asiakasPersonSettingTypeId 8) minus those already assigned to a vehicle that day minus those absent. The assignment candidate pool.",
     permissions: ["auth.page.grid.read"],
-    args: [
-      { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)" },
-    ],
-    flags: [],
+    args: [DRIVER_DATE_ARG],
+    flags: [DRIVER_DATE_FLAG],
     outputShape: "ListEnvelope<{ personId, firstName, lastName, phone }>",
     errors: permErrors("auth.page.grid.read"),
     notes: [
       "Returns PEOPLE, not vehicles — the drivers you can hand to `assign`.",
+      DRIVER_DATE_NOTE,
       "Absences are already excluded; for the raw away-list use `ib person absences`. Deploy-gated.",
     ],
     seeAlso: ["ib vehicle driver gaps", "ib vehicle driver assign", "ib person absences"],
-    examples: ["ib vehicle driver available today", "ib vehicle driver available tomorrow"],
+    examples: [
+      "ib vehicle driver available today",
+      "ib vehicle driver available tomorrow",
+      "ib vehicle driver available --date tomorrow",
+    ],
   },
   {
     command: "ib vehicle driver who",
@@ -2544,14 +2597,21 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["auth.page.grid.read"],
     args: [
       { name: "vehicleId", type: "number", description: "Target vehicleId" },
-      { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)" },
+      DRIVER_DATE_ARG,
     ],
-    flags: [],
+    flags: [DRIVER_DATE_FLAG],
     outputShape: "{ vehicleId, date, driver: { personId, firstName, lastName, phone } | null }",
     errors: permErrors("auth.page.grid.read"),
-    notes: ["Returns driver:null (not 404) when no driver is assigned. For a date range use `ib vehicle driver history`. For the STANDING default see `ib vehicle driver default get`. Deploy-gated."],
+    notes: [
+      "Returns driver:null (not 404) when no driver is assigned. For a date range use `ib vehicle driver history`. For the STANDING default see `ib vehicle driver default get`. Deploy-gated.",
+      DRIVER_DATE_NOTE,
+    ],
     seeAlso: ["ib vehicle driver history", "ib vehicle driver default get", "ib vehicle driver board"],
-    examples: ["ib vehicle driver who 53 today", "ib vehicle driver who 53 2026-06-10"],
+    examples: [
+      "ib vehicle driver who 53 today",
+      "ib vehicle driver who 53 2026-06-10",
+      "ib vehicle driver who 53 --date 2026-06-10",
+    ],
   },
   {
     command: "ib vehicle driver history",
@@ -2579,10 +2639,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["auth.page.grid.tilaus.edit"],
     args: [
       { name: "vehicleId", type: "number", description: "Target vehicleId" },
-      { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)" },
+      DRIVER_DATE_ARG,
     ],
     flags: [
       { name: "person", type: "number", description: "Driver personId", required: true },
+      DRIVER_DATE_FLAG,
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -2598,12 +2659,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "Cascade: personPvm.vehicleId set for the driver; keikkaPerson driver (contactPersonTypeId=1) replaced on each affected keikka; palkkiPerson driver replaced on each affected palkki; the prior occupant of this vehicle (oldPersonId) is freed, and the new driver is pulled off any other vehicle (clearedFromVehicleId).",
       "Return reports exactly what changed: keikkaIds + palkkiIds touched, oldPersonId/oldDriverName displaced, newDriverName, clearedFromVehicleId.",
       "keikkaPerson rows are written with keikkaPersonSourceId=30; the grid's per-keikka-bar driver label filters sourceId=50, so the vehicle ROW shows the driver (via personPvm) but a reloaded keikka BAR may not — known display quirk shared with the web grid.",
+      DRIVER_DATE_NOTE,
       "Emits the dayDriver:updated socket so live grids update. Deploy-gated (404 until /api/cli/driver/* ships).",
     ],
     seeAlso: ["ib vehicle driver gaps", "ib vehicle driver available", "ib vehicle driver clear", "ib vehicle driver default set"],
     examples: [
       "ib vehicle driver assign 53 tomorrow --person 555 --reason 'auto-fill'",
       "ib vehicle driver assign 53 today --person 555 --dry-run --reason preview",
+      "ib vehicle driver assign 53 --date tomorrow --person 555 --reason 'auto-fill'",
     ],
   },
   {
@@ -2613,9 +2676,9 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     permissions: ["auth.page.grid.tilaus.edit"],
     args: [
       { name: "vehicleId", type: "number", description: "Target vehicleId" },
-      { name: "date", type: "date", description: "Day YYYY-MM-DD (or today/yesterday/tomorrow)" },
+      DRIVER_DATE_ARG,
     ],
-    flags: [],
+    flags: [DRIVER_DATE_FLAG],
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "always",
@@ -2627,10 +2690,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     notes: [
       "Requires Admin, HR Admin, or Keikka Handler on the active company. --reason is hard-required (exits 4 without it).",
+      DRIVER_DATE_NOTE,
       "Use this when a driver breaks down / is pulled off — they become available again for `ib vehicle driver assign` elsewhere. Deploy-gated.",
     ],
     seeAlso: ["ib vehicle driver assign", "ib vehicle driver who"],
-    examples: ["ib vehicle driver clear 53 today --reason 'breakdown — freed for other run'"],
+    examples: [
+      "ib vehicle driver clear 53 today --reason 'breakdown — freed for other run'",
+      "ib vehicle driver clear 53 --date today --reason 'breakdown — freed for other run'",
+    ],
   },
   {
     command: "ib vehicle driver default get",
