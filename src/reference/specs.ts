@@ -1961,13 +1961,46 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib person companies",
     description:
-      "List the companies (asiakkaat) a person belongs to. personId is optional and defaults to the caller. Reverse of `customer person list`.",
+      "List the companies (asiakkaat) a person belongs to, in the notion backend AUTHORIZATION uses: every company with an asiakasPerson attachment (or where the person is the asiakas contact person), which is the same set that mints the JWT `asiakasesWithTypes` claim. Each row carries the roles + toimittaja flags held there and `activeMembership` (does the person also hold an enabled, in-validity role?). personId defaults to the caller. Reverse of `customer person list`.",
     auth: "any",
+    permissions: ["self, company admin (asiakasAdmin/hrAdmin/asiakasOwner) in a company shared with the target, or developer"],
     args: [{ name: "personId", type: "number", required: false, description: "personId (defaults to caller)" }],
-    flags: [],
-    outputShape: "ListEnvelope<{ asiakasId, name }>",
-    errors: [...COMMON_AUTH_ERRORS],
-    examples: ["ib person companies", "ib person companies 5351"],
+    flags: [
+      {
+        name: "as-token",
+        type: "boolean",
+        description:
+          "Report the ACTIVE token's own `asiakasesWithTypes` claim verbatim instead of querying — literally what the backend authorizes on. Offline; self-only (a token carries only its bearer's memberships).",
+      },
+    ],
+    outputShape:
+      "ListEnvelope<{ asiakasId, name, roles: string[], isTyomaaAsiakas, isPumppuToimittaja, isBetoniToimittaja, isLattiaToimittaja, activeMembership }> + { personId, source: 'asiakas_listForPerson'|'person_getUserAsiakasList', hint? }. " +
+      "With --as-token: ListEnvelope<{ asiakasId, roles, is*Toimittaja, isTyomaaAsiakas }> + { personId, source:'jwt-claim', mintedAt, hint } — no company names (the JWT carries none for non-active companies).",
+    notes: [
+      "`activeMembership: false` means AUTHORIZED but holding no live role there — still a company the backend lets the person act in. Do not read it as 'not a member'.",
+      "Two membership notions exist in the DB and they disagree by design: `asiakas_listForPerson` (this command, and the JWT claim) counts any attachment; `person_getUserAsiakasList` additionally requires an undeleted attachment with an enabled, in-validity role and is always a SUBSET. Before fb#395 this command reported the subset while every authorization path read the superset.",
+      "`--as-token` is the ground truth for 'why did that endpoint 403 me': provider routes (e.g. tarjous/pumppu endpoints) resolve their toimittaja flags straight from this claim. It is a SNAPSHOT taken at `mintedAt` — a company added or role granted since is absent until the token is re-minted (`ib company switch`, re-login, refresh).",
+      "`source: 'person_getUserAsiakasList'` means the backend route is not deployed yet, so the rows are the narrower subset with empty roles/flags; the `hint` field says so.",
+    ],
+    seeAlso: ["ib company list", "ib person me", "ib person role list", "ib customer person list"],
+    errors: authErrors(
+      apiErr(
+        403,
+        "Not authorized to read that person's companies",
+        "you need company admin in a company you share with them, or developer access; drop the personId to read your own"
+      ),
+      {
+        origin: "client",
+        exit: 4,
+        meaning: "--as-token given with another person's personId",
+        remedy: "--as-token only reports YOUR token's claim — drop the personId, or drop --as-token to query the backend",
+      }
+    ),
+    examples: [
+      "ib person companies",
+      "ib person companies 5351",
+      "ib person companies --as-token",
+    ],
   },
   {
     command: "ib person log",

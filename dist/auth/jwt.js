@@ -56,25 +56,32 @@ let lastClaims;
  * fallback is also the unit-test path (tests construct minimal `header.body.sig`
  * fixtures and don't depend on the workspace package being symlinked).
  */
-export function decodeJwtPayload(jwt) {
-    if (jwt === lastToken && lastClaims)
-        return lastClaims;
+/**
+ * Shape-check, base64url-decode and (for v2 short tokens) expand a JWT payload
+ * into its long-shape claim object. Shared by `decodeJwtPayload` and
+ * `tokenCompanyClaims` so the two can never disagree about what the token says.
+ */
+function expandedPayload(jwt) {
     const problem = jwtShapeProblem(jwt);
     if (problem)
         throw new Error(`Malformed JWT: ${problem}`);
-    const parts = jwt.split(".");
-    const json = Buffer.from(parts[1], "base64url").toString("utf8");
+    const json = Buffer.from(jwt.split(".")[1], "base64url").toString("utf8");
     const raw = JSON.parse(json);
-    let expanded = raw;
-    if (raw.v !== undefined) {
-        try {
-            expanded = resolveExpandPayload()?.(raw) ?? raw;
-        }
-        catch {
-            // Codec rejected the payload (e.g. unknown role) — use raw shape, as the
-            // old always-wrapped try/catch did.
-        }
+    if (raw.v === undefined)
+        return raw;
+    try {
+        return resolveExpandPayload()?.(raw) ?? raw;
     }
+    catch {
+        // Codec rejected the payload (e.g. unknown role) — use raw shape, as the
+        // old always-wrapped try/catch did.
+        return raw;
+    }
+}
+export function decodeJwtPayload(jwt) {
+    if (jwt === lastToken && lastClaims)
+        return lastClaims;
+    const expanded = expandedPayload(jwt);
     const globalRoles = (expanded.globalRoles ?? {});
     // A missing claim must surface as `undefined`, not `Number(undefined)` → NaN
     // (NaN serialises into a URL/query as the literal "NaN").
@@ -117,6 +124,33 @@ export function decodeJwtPayload(jwt) {
     lastToken = jwt;
     lastClaims = claims;
     return claims;
+}
+/**
+ * The token's `asiakasesWithTypes` claim as-is, plus when the token was minted.
+ *
+ * This IS the authorization source: backend routes read this claim, not any
+ * live membership query. It is therefore a SNAPSHOT — a company added or a role
+ * granted after `mintedAt` is not in it until the token is re-minted
+ * (`ib company switch`, re-login, or a refresh). Backs
+ * `ib person companies --as-token` (feedback #395).
+ */
+export function tokenCompanyClaims(jwt) {
+    const expanded = expandedPayload(jwt);
+    const raw = Array.isArray(expanded.asiakasesWithTypes)
+        ? expanded.asiakasesWithTypes
+        : [];
+    const companies = raw
+        .map((c) => ({
+        asiakasId: Number(c?.asiakasId),
+        roles: Array.isArray(c?.roles) ? c.roles : [],
+        isTyomaaAsiakas: c?.isTyomaaAsiakas === true,
+        isPumppuToimittaja: c?.isPumppuToimittaja === true,
+        isBetoniToimittaja: c?.isBetoniToimittaja === true,
+        isLattiaToimittaja: c?.isLattiaToimittaja === true,
+    }))
+        .filter((c) => Number.isFinite(c.asiakasId));
+    const iat = typeof expanded.iat === "number" ? expanded.iat : null;
+    return { mintedAt: iat === null ? null : new Date(iat * 1000).toISOString(), companies };
 }
 /**
  * Project the impersonation claims (`imp`/`imp_sid`) into the orientation shape

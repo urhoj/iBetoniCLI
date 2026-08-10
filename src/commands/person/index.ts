@@ -10,7 +10,9 @@ import { writeJson, failWith, failUsage, errorMessage } from "../../output/json.
 import {
   decodeJwtPayload,
   impersonationFromClaims,
+  tokenCompanyClaims,
   type ImpersonationInfo,
+  type TokenCompanyClaim,
 } from "../../auth/jwt.js";
 import { resolveCallerTier, type CallerTier } from "../../tier.js";
 import { resolveActiveOwnerAsiakasId } from "../../owner.js";
@@ -464,19 +466,82 @@ interface UserAsiakasRow {
   name?: string;
 }
 
+/** One company row from `ib person companies` — see {@link runPersonCompanies}. */
+export interface PersonCompanyItem {
+  asiakasId: number;
+  name: string | null;
+  /** Role names held in this company (from the same source that mints the JWT claim). */
+  roles: string[];
+  isTyomaaAsiakas: boolean;
+  isPumppuToimittaja: boolean;
+  isBetoniToimittaja: boolean;
+  isLattiaToimittaja: boolean;
+  /**
+   * `true` when the person also has an ENABLED, in-validity role attachment here
+   * (`person_getUserAsiakasList`). `false` means "authorized, but holds no live
+   * role" — an authorized company either way.
+   */
+  activeMembership: boolean;
+}
+
+export interface PersonCompaniesOutput extends ListEnvelope<PersonCompanyItem> {
+  personId: number;
+  /**
+   * Which membership notion produced these rows.
+   * `asiakas_listForPerson` = the authorization set (matches the JWT claim).
+   * `person_getUserAsiakasList` = the pre-deploy fallback: the NARROWER active-
+   * membership set, with no roles/flags — a strict subset of the authorization set.
+   */
+  source: "asiakas_listForPerson" | "person_getUserAsiakasList";
+  /** Present only on the fallback, naming what the answer is missing. */
+  hint?: string;
+}
+
+const LEGACY_SOURCE_HINT =
+  "backend route /api/cli/person/:personId/companies is not deployed yet — these rows are the NARROWER active-membership set (no roles/flags) and may omit companies the backend still authorizes. Use `ib person companies --as-token` for the authorization claim.";
+
 /**
- * `ib person companies [personId]` — the customers a person belongs to (reverse
- * of `customer person list`). personId defaults to the caller (from the JWT).
- * GET /api/person/getUserAsiakasList/:personId; defensive unwrap of mssql shapes.
+ * `ib person companies [personId]` — the companies a person belongs to, in the
+ * notion backend authorization actually uses. personId defaults to the caller.
+ *
+ * Reads GET /api/cli/person/:personId/companies, which is built from the exact
+ * pipeline that mints the JWT `asiakasesWithTypes` claim, so it cannot disagree
+ * with what gates the API. Each row carries `activeMembership` for the narrower
+ * "has a live role here" notion, so both readings are available and neither
+ * silently stands in for the other (feedback #395).
+ *
+ * Falls back to the legacy GET /api/person/getUserAsiakasList/:personId on
+ * 404/405 (same deploy-gate pattern as `person search --my-companies`), tagging
+ * `source` + `hint` so a pre-deploy answer is self-describing rather than
+ * quietly narrower.
  */
 export async function runPersonCompanies(
   client: ApiClient,
   personId?: number
-): Promise<ListEnvelope<{ asiakasId: number; name: string | null }>> {
+): Promise<PersonCompaniesOutput> {
   const id =
     personId ??
     decodeJwtPayload(client.getCurrentToken()).personId ??
     failWith("could not resolve personId from the active token", 4);
+  try {
+    return await client.get<PersonCompaniesOutput>(`/api/cli/person/${id}/companies`);
+  } catch (e) {
+    if (!(e instanceof CliError && (e.statusCode === 404 || e.statusCode === 405))) throw e;
+    return { ...(await runPersonCompaniesLegacy(client, id)), personId: id };
+  }
+}
+
+/**
+ * Pre-deploy fallback: GET /api/person/getUserAsiakasList/:personId (the NARROW
+ * proc), defensively unwrapping the mssql shapes that route can return. Rows are
+ * padded to the full item shape with empty roles/flags and
+ * `activeMembership: true` — every row of the narrow proc is by definition an
+ * active membership.
+ */
+async function runPersonCompaniesLegacy(
+  client: ApiClient,
+  id: number
+): Promise<Omit<PersonCompaniesOutput, "personId">> {
   const raw = await client.get<
     UserAsiakasRow[] | { recordset?: UserAsiakasRow[]; recordsets?: UserAsiakasRow[][] }
   >(`/api/person/getUserAsiakasList/${id}`);
@@ -486,8 +551,58 @@ export async function runPersonCompanies(
   } else if (raw && typeof raw === "object") {
     rows = raw.recordset || raw.recordsets?.[0] || [];
   }
-  const items = rows.map((r) => ({ asiakasId: r.asiakasId, name: r.asiakasNimi ?? r.asiakasName ?? r.name ?? null }));
-  return listEnvelope(items);
+  const items: PersonCompanyItem[] = rows.map((r) => ({
+    asiakasId: r.asiakasId,
+    name: r.asiakasNimi ?? r.asiakasName ?? r.name ?? null,
+    roles: [],
+    isTyomaaAsiakas: false,
+    isPumppuToimittaja: false,
+    isBetoniToimittaja: false,
+    isLattiaToimittaja: false,
+    activeMembership: true,
+  }));
+  return {
+    ...listEnvelope(items),
+    source: "person_getUserAsiakasList",
+    hint: LEGACY_SOURCE_HINT,
+  };
+}
+
+export interface PersonCompaniesTokenOutput extends ListEnvelope<TokenCompanyClaim> {
+  personId: number;
+  source: "jwt-claim";
+  /** When the token was minted — the claim is a snapshot as of this instant. */
+  mintedAt: string | null;
+  hint: string;
+}
+
+/**
+ * `ib person companies --as-token` — the `asiakasesWithTypes` claim of the ACTIVE
+ * token, verbatim. This is literally what backend authorization reads, so it is
+ * the ground truth for "why did that endpoint let me in / 403 me".
+ *
+ * Offline (no request) and self-only: a token carries only its own bearer's
+ * memberships, so there is no honest way to answer it for another personId.
+ */
+export function runPersonCompaniesAsToken(
+  client: ApiClient,
+  personId?: number
+): PersonCompaniesTokenOutput {
+  const claims = decodeJwtPayload(client.getCurrentToken());
+  const self = claims.personId ?? failWith("could not resolve personId from the active token", 4);
+  if (personId !== undefined && personId !== self) {
+    failUsage(
+      `--as-token reports the ACTIVE token's own claim, so it only works for personId ${self} (the caller); got ${personId}. Drop --as-token to read personId ${personId}'s companies from the backend.`
+    );
+  }
+  const { mintedAt, companies } = tokenCompanyClaims(client.getCurrentToken());
+  return {
+    ...listEnvelope(companies),
+    personId: self,
+    source: "jwt-claim",
+    mintedAt,
+    hint: "snapshot as of mintedAt — a company added or role granted since then is absent until the token is re-minted (ib company switch / re-login).",
+  };
 }
 
 /**
@@ -919,13 +1034,14 @@ export function registerPersonCommands(
     .action(jsonAction(getClient, runPersonMe));
 
   p.command("companies [personId]")
+    .option("--as-token")
     .action(
-      jsonAction(getClient, (client, personIdStr?: string) =>
-        runPersonCompanies(
-          client,
-          parseOptionalId(personIdStr, "personId")
-        )
-      )
+      jsonAction(getClient, (client, personIdStr: string | undefined, opts: { asToken?: boolean }) => {
+        const id = parseOptionalId(personIdStr, "personId");
+        return opts.asToken
+          ? runPersonCompaniesAsToken(client, id)
+          : runPersonCompanies(client, id);
+      })
     );
 
   registerCombinatorCommands(p, getClient, {

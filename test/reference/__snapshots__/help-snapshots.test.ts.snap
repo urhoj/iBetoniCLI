@@ -8513,29 +8513,41 @@ exports[`Help snapshots — contract stability > help for ib person companies ma
   ib person companies [<personId>] [flags]
 
 DESCRIPTION
-  List the companies (asiakkaat) a person belongs to. personId is optional and defaults to the caller. Reverse of \`customer person list\`.
-  Auth: requires login (any authenticated user).
+  List the companies (asiakkaat) a person belongs to, in the notion backend AUTHORIZATION uses: every company with an asiakasPerson attachment (or where the person is the asiakas contact person), which is the same set that mints the JWT \`asiakasesWithTypes\` claim. Each row carries the roles + toimittaja flags held there and \`activeMembership\` (does the person also hold an enabled, in-validity role?). personId defaults to the caller. Reverse of \`customer person list\`.
+  Permissions: requires self, company admin (asiakasAdmin/hrAdmin/asiakasOwner) in a company shared with the target, or developer.
 
 ARGUMENTS
   <personId> NUMBER    personId (defaults to caller) (optional)
 
 FLAGS
-  (none)
+  --as-token    Report the ACTIVE token's own \`asiakasesWithTypes\` claim verbatim instead of querying — literally what the backend authorizes on. Offline; self-only (a token carries only its bearer's memberships).
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ asiakasId, name }>
+  ListEnvelope<{ asiakasId, name, roles: string[], isTyomaaAsiakas, isPumppuToimittaja, isBetoniToimittaja, isLattiaToimittaja, activeMembership }> + { personId, source: 'asiakas_listForPerson'|'person_getUserAsiakasList', hint? }. With --as-token: ListEnvelope<{ asiakasId, roles, is*Toimittaja, isTyomaaAsiakas }> + { personId, source:'jwt-claim', mintedAt, hint } — no company names (the JWT carries none for non-active companies).
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not authorized to read that person's companies → you need company admin in a company you share with them, or developer access; drop the personId to read your own
+  exit 4 (client-side)  --as-token given with another person's personId → --as-token only reports YOUR token's claim — drop the personId, or drop --as-token to query the backend
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - \`activeMembership: false\` means AUTHORIZED but holding no live role there — still a company the backend lets the person act in. Do not read it as 'not a member'.
+  - Two membership notions exist in the DB and they disagree by design: \`asiakas_listForPerson\` (this command, and the JWT claim) counts any attachment; \`person_getUserAsiakasList\` additionally requires an undeleted attachment with an enabled, in-validity role and is always a SUBSET. Before fb#395 this command reported the subset while every authorization path read the superset.
+  - \`--as-token\` is the ground truth for 'why did that endpoint 403 me': provider routes (e.g. tarjous/pumppu endpoints) resolve their toimittaja flags straight from this claim. It is a SNAPSHOT taken at \`mintedAt\` — a company added or role granted since is absent until the token is re-minted (\`ib company switch\`, re-login, refresh).
+  - \`source: 'person_getUserAsiakasList'\` means the backend route is not deployed yet, so the rows are the narrower subset with empty roles/flags; the \`hint\` field says so.
+
+SEE ALSO
+  ib company list, ib person me, ib person role list, ib customer person list
 
 EXAMPLES
   ib person companies
   ib person companies 5351
+  ib person companies --as-token
 "
 `;
 
