@@ -46,6 +46,10 @@ export const DEV_ALIAS_DOMAINS = [
  * deliberately spec-less leaves from it rather than restating the list.
  */
 export const ALIAS_PREFIXES = [
+    // `log` was the WRITER while every other `ib … log` is an audit-trail read,
+    // so callers reached for it to read a prospect's history and got a usage
+    // error instead. The writer is now `note` and the read is `events` (fb#391).
+    ["ib jerry admin onboarding log", "ib jerry admin onboarding note"],
     ["ib customer prh", "ib opendata prh"],
     ["ib weather", "ib opendata weather"],
     ...DEV_ALIAS_DOMAINS.map((d) => [`ib ${d}`, `ib dev ${d}`]),

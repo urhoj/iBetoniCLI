@@ -3729,6 +3729,49 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib jerry admin onboarding events matches snapshot 1`] = `
+"USAGE
+  ib jerry admin onboarding events <asiakasId> [flags]
+
+DESCRIPTION
+  Read a prospect's contact history, newest-first (GET /api/admin/jerry-onboarding/:asiakasId/events) — the append-only trail of calls, responses, notes, status_change moves and email_sent snapshots. This is where a decision's REASON lives: the prospect row carries only the current status, so a terminal status like \`ei_sovellu\` is indistinguishable from a deliberate hold until you read the trail. System-admin only.
+  Permissions: requires isSystemAdmin.
+
+ARGUMENTS
+  <asiakasId> NUMBER    company asiakasId (required)
+
+FLAGS
+  --type STRING    Only this event kind. call/response/note are caller-written; status_change and email_sent are written by the backend
+  --limit NUMBER    Keep only the newest N events (sets \`truncated\`)
+  --full    Return complete emailBody snapshots instead of the 200-char preview
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ jerryOnboardingEventId, asiakasId, eventType, eventText, templateKey, emailTo, emailSubject, emailBody, eventTime, createdByPersonId, createdTime }> — \`hint\` names how many emailBody snapshots were cut
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (HTTP 400)  Invalid asiakasId      → pass a positive integer asiakasId
+  exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - emailBody is capped at 200 chars unless --full — one welcome-email snapshot is ~3 KB and a few of them bury the rest of the timeline. Neither reduction is silent: --limit sets "truncated", the body cut sets "hint".
+  - eventTime is the BUSINESS time (backdatable via \`onboarding note --time\`); createdTime is when the row was written. They differ on any imported or backdated event, so order by eventTime when reconstructing what happened.
+
+SEE ALSO
+  ib jerry admin onboarding note, ib jerry admin onboarding list
+
+EXAMPLES
+  ib jerry admin onboarding events 1414
+  ib jerry admin onboarding events 1414 --type note
+  ib jerry admin onboarding events 1414 --type email_sent --full
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib jerry admin onboarding list matches snapshot 1`] = `
 "USAGE
   ib jerry admin onboarding list [flags]
@@ -3748,12 +3791,18 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ asiakasId, asiakasNimi, tier, status, alue, outreachEmail, jerryActive, lastEventTime, muistutusDue }>
+  ListEnvelope<{ asiakasId, asiakasNimi, tier, status, alue, outreachEmail, muistiinpanot, jerryActive, lastEventTime, lastNote, lastNoteType, lastNoteTime, muistutusDue }>
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - \`lastNote\` previews (200 chars) the most recent HUMAN-written event — note/call/response, with \`lastNoteType\` naming which — so the reason behind a status is visible without opening the trail. \`status\` alone cannot tell a ruled-out prospect from a deliberately held one; read \`lastNote\`/\`muistiinpanot\` before acting on a terminal status, and \`ib jerry admin onboarding events <asiakasId>\` for the full history. Deploy-gated: the three lastNote* fields are absent until puminet5api ships them.
+
+SEE ALSO
+  ib jerry admin onboarding events
 
 EXAMPLES
   ib jerry admin onboarding list --due
@@ -3761,12 +3810,12 @@ EXAMPLES
 "
 `;
 
-exports[`Help snapshots — contract stability > help for ib jerry admin onboarding log matches snapshot 1`] = `
+exports[`Help snapshots — contract stability > help for ib jerry admin onboarding note matches snapshot 1`] = `
 "USAGE
-  ib jerry admin onboarding log <asiakasId> [flags]
+  ib jerry admin onboarding note <asiakasId> [flags]
 
 DESCRIPTION
-  Append a call/response/note event to a prospect's contact history (POST /api/admin/jerry-onboarding/:asiakasId/events). --time backdates; --set-status also moves the pipeline status (a second, best-effort step — see NOTES). System-admin only.
+  Append a call/response/note event to a prospect's contact history (POST /api/admin/jerry-onboarding/:asiakasId/events). --time backdates; --set-status also moves the pipeline status (a second, best-effort step — see NOTES). To READ the history use \`ib jerry admin onboarding events\`. System-admin only.
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
@@ -3792,7 +3841,7 @@ OUTPUT (JSON, stdout)
   { jerryOnboardingEventId } · { jerryOnboardingEventId, statusUpdated: false } when --set-status failed AFTER the event was written · { dryRun: true, wouldLog: { asiakasId, eventType, setStatus } } on --dry-run
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Invalid eventType / missing text / unknown --set-status → type must be call, response or note; --set-status must be a known pipeline status key
+  exit 4 (HTTP 400)  Invalid eventType / missing text / unknown --set-status → type must be call, response or note; --set-status must be a known pipeline status key. Reading the history instead? That is \`ib jerry admin onboarding events <asiakasId>\`
   exit 5 (HTTP 404)  Prospect not found     → add it first: ib jerry admin onboarding add
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -3800,9 +3849,13 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - --set-status is NOT atomic with the event write: the event is inserted first, then the status update + its status_change event. If that second step fails the call still returns 200 with \`statusUpdated: false\` and the event already persisted — check for that key rather than assuming a 200 moved the status. A --set-status equal to the current status is a no-op (no status_change event).
+  - \`ib jerry admin onboarding log\` is a hidden back-compat alias for this command. It was renamed because every other \`ib … log\` is an audit-trail READ, so callers reached for it to read a prospect's history and got a usage error.
+
+SEE ALSO
+  ib jerry admin onboarding events
 
 EXAMPLES
-  ib jerry admin onboarding log 1389 --type call --text "puhuttiin Jussin kanssa, kiinnostunut" --set-status vastasi_kylla
+  ib jerry admin onboarding note 1389 --type call --text "puhuttiin Jussin kanssa, kiinnostunut" --set-status vastasi_kylla
 "
 `;
 

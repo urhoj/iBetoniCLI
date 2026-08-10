@@ -317,6 +317,17 @@ export const COMPANY_TYPES = ["pumppu", "betoni", "all", "owner"];
 export const ONBOARDING_SOURCES = ["manual", "import", "scheduled"];
 /** Contact-history event kinds — backend-validated (400 "eventType must be call, response or note"). */
 export const ONBOARDING_EVENT_TYPES = ["call", "response", "note"];
+/**
+ * Every event kind that can APPEAR in the trail: the three a caller may write
+ * plus the two the backend writes itself (`status_change` on every status move,
+ * `email_sent` with the sent-body snapshot). Read-side only — passing either of
+ * the extra two to `onboarding note` is a 400.
+ */
+export const ONBOARDING_EVENT_TYPES_ALL = [
+    ...ONBOARDING_EVENT_TYPES,
+    "status_change",
+    "email_sent",
+];
 /** Fields a `--search` substring matches against (company name + outreach/contact). */
 const ONBOARDING_SEARCH_FIELDS = [
     "asiakasNimi",
@@ -349,6 +360,54 @@ export async function runJerryOnboardingAdd(client, asiakasId, fields, flags) {
 /** Partial-update a prospect (PUT /api/admin/jerry-onboarding/:id). System-admin only. */
 export async function runJerryOnboardingSet(client, asiakasId, fields, flags) {
     return client.put(`/api/admin/jerry-onboarding/${asiakasId}`, fields, { headers: writeFlagsToHeaders(flags) });
+}
+/**
+ * How much of an `email_sent` snapshot the default view keeps. One `email3`
+ * body is ~3 KB, so a prospect with three sends buries its own timeline —
+ * the same cap-and-hint shape `ib dev feedback list` uses on `description`.
+ */
+export const ONBOARDING_EVENT_BODY_CAP = 200;
+/**
+ * Read a prospect's contact history, newest-first
+ * (GET /api/admin/jerry-onboarding/:asiakasId/events).
+ *
+ * The read half of `onboarding note`. The trail is append-only and is where a
+ * decision's REASON lives — why a prospect was parked, what the welcome email
+ * actually said, when the status last moved and who moved it. None of that is
+ * on the prospect row, so without this command a terminal status like
+ * `ei_sovellu` cannot be told apart from a deliberate hold without leaving the
+ * CLI entirely (fb#391: the route already existed, the command did not).
+ *
+ * `emailBody` is capped unless `--full`; `truncated` marks a `--limit` cut and
+ * `hint` names the body cut, so neither reduction is silent.
+ */
+export async function runJerryOnboardingEvents(client, asiakasId, opts = {}) {
+    const env = toListEnvelope(await client.get(`/api/admin/jerry-onboarding/${asiakasId}/events`));
+    let items = env.items;
+    if (opts.type)
+        items = items.filter((r) => r.eventType === opts.type);
+    const cut = typeof opts.limit === "number" && items.length > opts.limit;
+    if (cut)
+        items = items.slice(0, opts.limit);
+    let bodiesCut = 0;
+    if (!opts.full) {
+        items = items.map((r) => {
+            const body = r.emailBody;
+            if (typeof body === "string" && body.length > ONBOARDING_EVENT_BODY_CAP) {
+                bodiesCut++;
+                return { ...r, emailBody: `${body.slice(0, ONBOARDING_EVENT_BODY_CAP)}…` };
+            }
+            return r;
+        });
+    }
+    return listEnvelope(items, {
+        ...(cut ? { truncated: true } : {}),
+        ...(bodiesCut > 0
+            ? {
+                hint: `${bodiesCut} emailBody snapshot(s) cut to ${ONBOARDING_EVENT_BODY_CAP} chars — pass --full for the sent text`,
+            }
+            : {}),
+    });
 }
 /** Log a call/response/note event (POST /api/admin/jerry-onboarding/:id/events). */
 export async function runJerryOnboardingLog(client, asiakasId, body, flags) {
@@ -766,12 +825,22 @@ export function registerJerryCommands(parent, getClient) {
         .option("--outreach-name <text>")
         .option("--outreach-email <email>")
         .option("--outreach-phone <phone>")).action(jsonAction(getClient, (client, idStr, opts) => runJerryOnboardingSet(client, resolveAsiakasTarget(idStr, undefined), pickProspectFields(opts), opts)));
-    addWriteFlagsToCommand(onboarding
-        .command("log <asiakasId>")
-        .requiredOption("--type <t>")
-        .requiredOption("--text <text>")
-        .option("--time <iso>")
-        .option("--set-status <key>")).action(guarded(async (idStr, opts) => {
+    onboarding
+        .command("events <asiakasId>")
+        .option("--type <t>")
+        .option("--limit <n>", "", cappedInt(200))
+        .option("--full")
+        .action(guarded(async (idStr, opts) => {
+        if (opts.type)
+            assertEnum(opts.type, ONBOARDING_EVENT_TYPES_ALL, "--type");
+        const client = await getClient();
+        writeJson(await runJerryOnboardingEvents(client, resolveAsiakasTarget(idStr, undefined), opts));
+    }));
+    // Canonical writer is `note`; `log` stays as a hidden, still-executable alias.
+    // Every other `ib … log` in this CLI is an audit-trail READ (`ib person log`,
+    // `ib log latest/range/by-entity-date`), so the old name actively mispointed
+    // callers looking for the history — the read now lives at `events` (fb#391).
+    const onboardingNoteAction = guarded(async (idStr, opts) => {
         const client = await getClient();
         const body = { eventType: opts.type, eventText: opts.text };
         if (opts.time !== undefined)
@@ -779,7 +848,14 @@ export function registerJerryCommands(parent, getClient) {
         if (opts.setStatus !== undefined)
             body.setStatus = opts.setStatus;
         writeJson(await runJerryOnboardingLog(client, resolveAsiakasTarget(idStr, undefined), body, opts));
-    }));
+    });
+    const addNoteOptions = (cmd) => cmd
+        .requiredOption("--type <t>")
+        .requiredOption("--text <text>")
+        .option("--time <iso>")
+        .option("--set-status <key>");
+    addWriteFlagsToCommand(addNoteOptions(onboarding.command("note <asiakasId>"))).action(onboardingNoteAction);
+    addWriteFlagsToCommand(addNoteOptions(onboarding.command("log <asiakasId>", { hidden: true })).description("Deprecated alias for `ib jerry admin onboarding note` (still works). To READ the history, use `ib jerry admin onboarding events`.")).action(onboardingNoteAction);
     // admin request — lifecycle subgroup (reads + write transitions) ─────────────
     const adminRequest = admin
         .command("request")

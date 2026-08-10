@@ -35,6 +35,8 @@ import {
   COMPANY_TYPES,
   ONBOARDING_SOURCES,
   ONBOARDING_EVENT_TYPES,
+  ONBOARDING_EVENT_TYPES_ALL,
+  ONBOARDING_EVENT_BODY_CAP,
 } from "../commands/jerry/index.js";
 import {
   KINDS as FEEDBACK_KINDS,
@@ -4671,8 +4673,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "search", type: "string", description: "Case-insensitive substring on asiakasNimi / outreachName / outreachEmail / contactPersonName / contactPersonEmail" },
     ],
     outputShape:
-      "ListEnvelope<{ asiakasId, asiakasNimi, tier, status, alue, outreachEmail, jerryActive, lastEventTime, muistutusDue }>",
+      "ListEnvelope<{ asiakasId, asiakasNimi, tier, status, alue, outreachEmail, muistiinpanot, jerryActive, lastEventTime, lastNote, lastNoteType, lastNoteTime, muistutusDue }>",
     errors: [SYSADMIN_403, ...COMMON_AUTH_ERRORS],
+    notes: [
+      "`lastNote` previews (200 chars) the most recent HUMAN-written event — note/call/response, with `lastNoteType` naming which — so the reason behind a status is visible without opening the trail. `status` alone cannot tell a ruled-out prospect from a deliberately held one; read `lastNote`/`muistiinpanot` before acting on a terminal status, and `ib jerry admin onboarding events <asiakasId>` for the full history. Deploy-gated: the three lastNote* fields are absent until puminet5api ships them.",
+    ],
+    seeAlso: ["ib jerry admin onboarding events"],
     examples: ["ib jerry admin onboarding list --due", "ib jerry admin onboarding list --search transsinkko"],
   },
   {
@@ -4731,9 +4737,39 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: ['ib jerry admin onboarding set 1389 --status vastasi_kylla --reason "vastasi puhelimessa"'],
   },
   {
-    command: "ib jerry admin onboarding log",
+    command: "ib jerry admin onboarding events",
     description:
-      "Append a call/response/note event to a prospect's contact history (POST /api/admin/jerry-onboarding/:asiakasId/events). --time backdates; --set-status also moves the pipeline status (a second, best-effort step — see NOTES). System-admin only.",
+      "Read a prospect's contact history, newest-first (GET /api/admin/jerry-onboarding/:asiakasId/events) — the append-only trail of calls, responses, notes, status_change moves and email_sent snapshots. This is where a decision's REASON lives: the prospect row carries only the current status, so a terminal status like `ei_sovellu` is indistinguishable from a deliberate hold until you read the trail. System-admin only.",
+    permissions: ["isSystemAdmin"],
+    tier: "developer",
+    args: [{ name: "asiakasId", type: "number", description: "company asiakasId" }],
+    flags: [
+      { name: "type", type: "string", description: "Only this event kind. call/response/note are caller-written; status_change and email_sent are written by the backend", allowed: [...ONBOARDING_EVENT_TYPES_ALL] },
+      { name: "limit", type: "number", description: "Keep only the newest N events (sets `truncated`)" },
+      { name: "full", type: "boolean", description: `Return complete emailBody snapshots instead of the ${ONBOARDING_EVENT_BODY_CAP}-char preview` },
+    ],
+    outputShape:
+      "ListEnvelope<{ jerryOnboardingEventId, asiakasId, eventType, eventText, templateKey, emailTo, emailSubject, emailBody, eventTime, createdByPersonId, createdTime }> — `hint` names how many emailBody snapshots were cut",
+    errors: [
+      apiErr(400, "Invalid asiakasId", "pass a positive integer asiakasId"),
+      SYSADMIN_403,
+      ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      `emailBody is capped at ${ONBOARDING_EVENT_BODY_CAP} chars unless --full — one welcome-email snapshot is ~3 KB and a few of them bury the rest of the timeline. Neither reduction is silent: --limit sets "truncated", the body cut sets "hint".`,
+      "eventTime is the BUSINESS time (backdatable via `onboarding note --time`); createdTime is when the row was written. They differ on any imported or backdated event, so order by eventTime when reconstructing what happened.",
+    ],
+    seeAlso: ["ib jerry admin onboarding note", "ib jerry admin onboarding list"],
+    examples: [
+      "ib jerry admin onboarding events 1414",
+      "ib jerry admin onboarding events 1414 --type note",
+      "ib jerry admin onboarding events 1414 --type email_sent --full",
+    ],
+  },
+  {
+    command: "ib jerry admin onboarding note",
+    description:
+      "Append a call/response/note event to a prospect's contact history (POST /api/admin/jerry-onboarding/:asiakasId/events). --time backdates; --set-status also moves the pipeline status (a second, best-effort step — see NOTES). To READ the history use `ib jerry admin onboarding events`. System-admin only.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "asiakasId", type: "number", description: "company asiakasId" }],
@@ -4748,15 +4784,17 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ jerryOnboardingEventId } · { jerryOnboardingEventId, statusUpdated: false } when --set-status failed AFTER the event was written · { dryRun: true, wouldLog: { asiakasId, eventType, setStatus } } on --dry-run",
     errors: [
-      apiErr(400, "Invalid eventType / missing text / unknown --set-status", "type must be call, response or note; --set-status must be a known pipeline status key"),
+      apiErr(400, "Invalid eventType / missing text / unknown --set-status", "type must be call, response or note; --set-status must be a known pipeline status key. Reading the history instead? That is `ib jerry admin onboarding events <asiakasId>`"),
       apiErr(404, "Prospect not found", "add it first: ib jerry admin onboarding add"),
       SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
       "--set-status is NOT atomic with the event write: the event is inserted first, then the status update + its status_change event. If that second step fails the call still returns 200 with `statusUpdated: false` and the event already persisted — check for that key rather than assuming a 200 moved the status. A --set-status equal to the current status is a no-op (no status_change event).",
+      "`ib jerry admin onboarding log` is a hidden back-compat alias for this command. It was renamed because every other `ib … log` is an audit-trail READ, so callers reached for it to read a prospect's history and got a usage error.",
     ],
-    examples: ['ib jerry admin onboarding log 1389 --type call --text "puhuttiin Jussin kanssa, kiinnostunut" --set-status vastasi_kylla'],
+    seeAlso: ["ib jerry admin onboarding events"],
+    examples: ['ib jerry admin onboarding note 1389 --type call --text "puhuttiin Jussin kanssa, kiinnostunut" --set-status vastasi_kylla'],
   },
   {
     command: "ib jerry admin request list",
