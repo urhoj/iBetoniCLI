@@ -88,7 +88,10 @@ export async function runCustomerDeadList(client, opts = {}) {
     return client.get(`/api/cli/customer/dead-list${qs({ limit: opts.limit })}`);
 }
 /**
- * GET /api/cli/customer/get/:asiakasId. Returns the flat backend record as-is.
+ * GET /api/cli/customer/get/:asiakasId. Returns the flat backend record as-is,
+ * including `roolit` (the provider/worksite-customer booleans) on a deployed
+ * backend — so "is this company a pump provider?" is answered by this command
+ * and does not need the admin-gated `customer modules`.
  */
 export async function runCustomerGet(client, asiakasId) {
     return client.get(`/api/cli/customer/get/${asiakasId}`);

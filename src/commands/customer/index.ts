@@ -164,10 +164,23 @@ export interface CustomerFlat {
   contactPersonId: number | null;
   shortName: string | null;
   comment: string | null;
+  /** Registration timestamp (asiakas.entryTime), ISO. */
+  registeredAt: string | null;
+  /**
+   * What the customer IS — the four asiakas roolit booleans, same sub-shape
+   * `customer modules` reports (feedback #396). Deploy-gated: absent from a
+   * backend older than the 2026-08-10 projection widening, hence optional.
+   * NEVER seed a write body from this — the update builders below are explicit
+   * allowlists for exactly that reason (asiakas_save is a blanket UPDATE).
+   */
+  roolit?: AsiakasRoolit;
 }
 
 /**
- * GET /api/cli/customer/get/:asiakasId. Returns the flat backend record as-is.
+ * GET /api/cli/customer/get/:asiakasId. Returns the flat backend record as-is,
+ * including `roolit` (the provider/worksite-customer booleans) on a deployed
+ * backend — so "is this company a pump provider?" is answered by this command
+ * and does not need the admin-gated `customer modules`.
  */
 export async function runCustomerGet(
   client: ApiClient,

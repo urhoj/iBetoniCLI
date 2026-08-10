@@ -72,6 +72,32 @@ describe("ib customer list/get/search", () => {
     expect((result as { asiakasId: number }).asiakasId).toBe(1349);
   });
 
+  // fb#396: roolit answers "is this company a pump provider?" from the obvious
+  // command. The backend projects it; assert the CLI passes it through intact
+  // (nested, NOT flattened — same sub-shape `customer modules` reports).
+  test("runCustomerGet: passes roolit + registeredAt through unchanged", async () => {
+    mockClient.get.mockResolvedValueOnce({
+      asiakasId: 8,
+      name: "Kalle Urho Oy",
+      comment: "Betonipumppausliiketoiminta siirtynyt muualle",
+      registeredAt: "2022-02-15T13:11:00.000Z",
+      roolit: {
+        isTyomaaAsiakas: true,
+        isPumppuToimittaja: true,
+        isBetoniToimittaja: false,
+        isLattiaToimittaja: false,
+      },
+    });
+    const result = await runCustomerGet(mockClient, 8);
+    expect(result.registeredAt).toBe("2022-02-15T13:11:00.000Z");
+    expect(result.roolit).toEqual({
+      isTyomaaAsiakas: true,
+      isPumppuToimittaja: true,
+      isBetoniToimittaja: false,
+      isLattiaToimittaja: false,
+    });
+  });
+
   test("runCustomerSearch: GET /api/asiakas/search?searchString=<query>", async () => {
     mockClient.get.mockResolvedValueOnce([
       { asiakasId: 1349, name: "BetoniJerry" },

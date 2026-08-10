@@ -1048,11 +1048,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "sort", type: "string", description: "Result ordering: name (default) or registered (newest-registered first). Server-side.", allowed: ["name", "registered"] },
     ],
     outputShape:
-      "ListEnvelope<{ asiakasId, name, yTunnus, type, registeredAt }> + truncated:boolean · with --full the items add { address, postalCode, city, email, contactPersonId, shortName, comment, companyDescription } · with --include each item adds contacts:[{personId,name,phone,email,contactPersonTypeId}] and/or sijainnit:[{sijaintiId,name,lyh,address,sijaintiTypeId,maxDeliveryDistance,jerryActiveUntil}] · with --ids the response adds missing:[{asiakasId, reason:'not_owned'|'not_found'}] for requested ids that didn't return",
+      "ListEnvelope<{ asiakasId, name, yTunnus, type, registeredAt }> + truncated:boolean · with --full the items add { address, postalCode, city, email, contactPersonId, shortName, comment, companyDescription, roolit:{isTyomaaAsiakas,isPumppuToimittaja,isBetoniToimittaja,isLattiaToimittaja} } · with --include each item adds contacts:[{personId,name,phone,email,contactPersonTypeId}] and/or sijainnit:[{sijaintiId,name,lyh,address,sijaintiTypeId,maxDeliveryDistance,jerryActiveUntil}] · with --ids the response adds missing:[{asiakasId, reason:'not_owned'|'not_found'}] for requested ids that didn't return",
     errors: permErrors("auth.page.asiakas.read"),
     notes: [
       "Scope: regular users see their own tenant + their own company row; SYSTEM ADMINS list across ALL tenants (incl. cross-tenant --ids).",
       "--full returns every flat-customer field + the jerry companyDescription in one call (diff a whole tenant without N×`customer get`).",
+      "--full also carries `roolit` per row, so 'which of my customers are pump providers?' is ONE call: `ib customer list --full --fields name,roolit` (needs the 2026-08-10 backend; older deployments omit the field).",
       "--ids 1,2,3 restricts to specific asiakasIds and returns ALL of them (NOT capped at the default 100 — bounded by the ids list, max 1000) — the efficient way to refresh only the rows you care about.",
       "Without --ids the list is capped (default 100 / max 500) and `truncated:true` flags when you hit the cap (narrow with --ids or raise --limit).",
       "--fields / --sijainti-types trim what you ingest: project to the columns you diff and keep only the location types you care about (e.g. varikko/asema). Server-side on a deployed backend, with a client-side fallback so they work pre-deploy.",
@@ -1089,16 +1090,22 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib customer get",
     description:
-      "Get a single customer (asiakas) by id with flat contact fields.",
+      "Get a single customer (asiakas) by id: flat contact fields + roolit (what the company IS — pump/concrete/floor supplier, worksite customer).",
     permissions: ["auth.page.asiakas.read"],
     args: [{ name: "asiakasId", type: "number", description: "asiakasId to fetch" }],
     flags: [],
     outputShape:
-      "{ asiakasId, name, yTunnus, type, address, postalCode, city, email, phone, contactPersonId, shortName, comment }",
+      "{ asiakasId, name, yTunnus, type, address, postalCode, city, email, phone, contactPersonId, shortName, comment, registeredAt, roolit:{ isTyomaaAsiakas, isPumppuToimittaja, isBetoniToimittaja, isLattiaToimittaja } }",
     errors: [
       apiErr(404, "Customer not found", "verify asiakasId"),
       ...permErrors("auth.page.asiakas.read"),
     ],
+    notes: [
+      "roolit is the answer to 'what is this company?' — isPumppuToimittaja is what gates every provider-side pumppuRequest endpoint (and the frontend's jerry page), so read it rather than inferring the business from the free-text `comment`. The two DO diverge: a comment can say the pumping business was sold while isPumppuToimittaja is still true.",
+      "roolit is the same sub-shape `customer modules` reports, minus the 8 module flags — those need the admin-gated read (`ib customer modules <id>`), this one only needs asiakas.read.",
+      "roolit needs the 2026-08-10 backend; against an older deployment the field is simply absent (not false).",
+    ],
+    seeAlso: ["ib customer modules", "ib customer settings", "ib customer list"],
     examples: ["ib customer get 1349"],
   },
   {
