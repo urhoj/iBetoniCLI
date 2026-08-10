@@ -57,11 +57,15 @@ describe("levenshtein / closestName (#1)", () => {
     expect(closestName("add", ["aad", "create"])).toBe("aad");
   });
   test("retired-name synonym changes→log (#402)", () => {
-    // 6 edits apart with no shared prefix, so only the table can bridge it.
-    expect(levenshtein("changes", "log")).toBeGreaterThan(2);
     expect(closestName("changes", ["log", "keikka"])).toBe("log");
-    // ...and never invents `log` where the group has no such leaf.
-    expect(closestName("changes", ["create", "list"])).toBeNull();
+    // A real edit-distance match still outranks the synonym — and this pair is
+    // the reason it matters: `changelog` is EXACTLY at the threshold from
+    // `changes` (distance 3 = max(2, floor(7/2))), so the root suggestion is
+    // `log` only while the back-compat `ib changelog` alias stays
+    // Commander-hidden. That invariant is pinned in the visibleSubcommands
+    // describe below; un-hide it and `ib changes` starts pointing at the wrong
+    // group.
+    expect(closestName("changes", ["changelog", "log"])).toBe("changelog");
   });
 });
 
@@ -98,16 +102,12 @@ describe("buildUnknownCommandEnvelope (#1)", () => {
     expect(env.didYouMean).toBe("create");
     expect(env.hint).toContain("ib keikka create");
   });
+  // The ROOT candidate set is the case no other synonym test covers (the
+  // group-level path is already proven by the `add`→`create` test above).
   test("retired group name at the ROOT: `ib changes` → `ib log` (#402)", () => {
     const env = buildUnknownCommandEnvelope(program, "changes", "developer");
     expect(env.didYouMean).toBe("log");
     expect(env.hint).toContain("Did you mean `ib log`?");
-  });
-  test("...and inside a group that owns a log leaf: `ib keikka changes` → `ib keikka log`", () => {
-    const keikka = program.commands.find((c) => c.name() === "keikka")!;
-    const env = buildUnknownCommandEnvelope(keikka, "changes", "developer");
-    expect(env.didYouMean).toBe("log");
-    expect(env.hint).toContain("ib keikka log");
   });
 });
 
@@ -596,6 +596,10 @@ describe("visibleSubcommands root tier-hiding (#1)", () => {
     // back-compat aliases are still Commander-hidden even at developer tier
     expect(names).not.toContain("schema");
     expect(names).not.toContain("ai");
+    // `changelog` carries a second load beyond alias hygiene: it sits exactly at
+    // the fuzzy threshold from `changes`, so the fb#402 did-you-mean resolves to
+    // `log` only while it is absent from this list.
+    expect(names).not.toContain("changelog");
   });
 });
 

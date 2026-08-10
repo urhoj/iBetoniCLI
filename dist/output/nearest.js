@@ -35,15 +35,14 @@ export function levenshtein(a, b) {
  * (feedback #229): the `add` (changelog) vs `create` (every other group) split,
  * and `show`/`view` for the canonical `get`. Consulted only after prefix + edit
  * distance both miss, so a real near-match always wins. Keyed by the mistyped
- * verb → the canonical sibling(s) to try, in order.
+ * verb or group name → the canonical sibling(s) to try, in order.
  *
  * `changes`→`log` is the RETIRED-NAME case (fb#402): the changeTracker group was
  * renamed `ib changes`→`ib log` as a clean break (2026-06-11, betonicli
  * 87482f8), so the old name is not merely unregistered — it is deliberately
  * gone, and `changes` sits 6 edits from `log` with no shared prefix, i.e. exactly
  * the guess no derived layer can reach. Docs written before the rename keep
- * teaching it, so the miss recurs long after the break. Fires at every level:
- * root `ib changes` → `ib log`, and `ib keikka changes` → `ib keikka log`.
+ * teaching it, so the miss recurs long after the break.
  */
 export const VERB_SYNONYMS = {
     add: ["create"],
