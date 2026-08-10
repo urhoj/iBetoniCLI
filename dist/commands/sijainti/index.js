@@ -905,7 +905,12 @@ export function registerSijaintiCommands(parent, getClient) {
         .requiredOption("--type <id>", "", intFlag("--type"))
         .option("--asiakas <id>", "", intFlag("--asiakas"))
         .action(guarded(async (opts) => {
-        const client = await getClient();
+        // Argv guards run BEFORE getClient(): a caller who named the target
+        // wrong should be told THAT, not "Not logged in". The ordering was also
+        // silently environment-dependent — with credentials present the guard
+        // was reached and emitted its remedy, without them getClient() failed
+        // first, so parse-errors.test.ts passed on a developer machine and
+        // failed in CI (which has no token) on every run.
         if (opts.worksite !== undefined && opts.tyomaa !== undefined && opts.worksite !== opts.tyomaa) {
             failWith("--worksite and --tyomaa differ — pass only one", 4);
         }
@@ -913,6 +918,7 @@ export function registerSijaintiCommands(parent, getClient) {
         if (tyomaaId === undefined) {
             failWith("missing target: pass --worksite <id> (--tyomaa is accepted as an alias)", 4);
         }
+        const client = await getClient();
         const result = await runSijaintiClosest(client, {
             tyomaaId,
             sijaintiTypeId: opts.type,
