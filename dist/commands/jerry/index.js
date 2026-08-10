@@ -803,6 +803,8 @@ export function registerJerryCommands(parent, getClient) {
             out.outreachPhone = o.outreachPhone;
         if (o.companyType !== undefined)
             out.companyType = o.companyType;
+        if (o.parkedUntil !== undefined)
+            out.parkedUntil = o.parkedUntil;
         return out;
     };
     addWriteFlagsToCommand(onboarding
@@ -824,7 +826,8 @@ export function registerJerryCommands(parent, getClient) {
         .option("--notes <text>")
         .option("--outreach-name <text>")
         .option("--outreach-email <email>")
-        .option("--outreach-phone <phone>")).action(jsonAction(getClient, (client, idStr, opts) => runJerryOnboardingSet(client, resolveAsiakasTarget(idStr, undefined), pickProspectFields(opts), opts)));
+        .option("--outreach-phone <phone>")
+        .option("--parked-until <date>", "", resolveDate)).action(jsonAction(getClient, (client, idStr, opts) => runJerryOnboardingSet(client, resolveAsiakasTarget(idStr, undefined), pickProspectFields(opts), opts)));
     onboarding
         .command("events <asiakasId>")
         .option("--type <t>")

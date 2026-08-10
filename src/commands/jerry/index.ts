@@ -1311,6 +1311,7 @@ export function registerJerryCommands(
     if (o.outreachEmail !== undefined) out.outreachEmail = o.outreachEmail;
     if (o.outreachPhone !== undefined) out.outreachPhone = o.outreachPhone;
     if (o.companyType !== undefined) out.companyType = o.companyType;
+    if (o.parkedUntil !== undefined) out.parkedUntil = o.parkedUntil;
     return out;
   };
 
@@ -1347,6 +1348,7 @@ export function registerJerryCommands(
       .option("--outreach-name <text>")
       .option("--outreach-email <email>")
       .option("--outreach-phone <phone>")
+      .option("--parked-until <date>", "", resolveDate)
   ).action(
     jsonAction(getClient, (client, idStr: string, opts: WriteOpts & Record<string, unknown>) =>
       runJerryOnboardingSet(client, resolveAsiakasTarget(idStr, undefined), pickProspectFields(opts), opts)

@@ -4669,11 +4669,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [
       { name: "status", type: "string", description: `Filter by pipeline status key: ${ONBOARDING_STATUS_KEYS}`, allowed: [...ONBOARDING_STATUSES] },
       { name: "tier", type: "number", description: "Tier filter (1 priority / 2 secondary)" },
-      { name: "due", type: "boolean", description: "Only rows where the email1b reminder is due" },
+      { name: "due", type: "boolean", description: "Only rows where the email1b reminder is due (parked rows are excluded — a hold suppresses the reminder until it lapses)" },
       { name: "search", type: "string", description: "Case-insensitive substring on asiakasNimi / outreachName / outreachEmail / contactPersonName / contactPersonEmail" },
     ],
     outputShape:
-      "ListEnvelope<{ asiakasId, asiakasNimi, tier, status, alue, outreachEmail, muistiinpanot, jerryActive, lastEventTime, lastNote, lastNoteType, lastNoteTime, muistutusDue }>",
+      "ListEnvelope<{ asiakasId, asiakasNimi, tier, status, alue, outreachEmail, muistiinpanot, jerryActive, lastEventTime, lastNote, lastNoteType, lastNoteTime, parkedUntil, parked, muistutusDue }>",
     errors: [SYSADMIN_403, ...COMMON_AUTH_ERRORS],
     notes: [
       "`lastNote` previews (200 chars) the most recent HUMAN-written event — note/call/response, with `lastNoteType` naming which — so the reason behind a status is visible without opening the trail. `status` alone cannot tell a ruled-out prospect from a deliberately held one; read `lastNote`/`muistiinpanot` before acting on a terminal status, and `ib jerry admin onboarding events <asiakasId>` for the full history. Deploy-gated: the three lastNote* fields are absent until puminet5api ships them.",
@@ -4724,12 +4724,16 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "outreach-name", type: "string", description: "Contact override name" },
       { name: "outreach-email", type: "string", description: "Contact override email" },
       { name: "outreach-phone", type: "string", description: "Contact override phone" },
+      { name: "parked-until", type: "string", description: "Hold the prospect until this date (YYYY-MM-DD or today/tomorrow); pass \"\" to lift the hold. Does NOT change --status" },
     ],
     writeFlags: true,
     dryRunKind: "server",
     outputShape: "{ success: true } · { dryRun: true, wouldUpdate: { asiakasId, fields } } on --dry-run",
+    notes: [
+      "--parked-until is how you defer a prospect. Do NOT park by moving --status to a terminal key: status holds ONE fact, so overwriting it destroys the pipeline position the prospect actually reached, and the row then misstates its own history. A parked row keeps its true status, reports `parked: true`, and is suppressed from `--due` until the date passes — after which it surfaces again by itself. The change is also written to the event trail. Deploy-gated: needs the 2026-08-10-jerry-onboarding-parked-until migration.",
+    ],
     errors: [
-      apiErr(400, "Unknown --status or --company-type", "use one of the status keys listed on --status; --company-type is pumppu|betoni|all|owner"),
+      apiErr(400, "Unknown --status or --company-type, or malformed --parked-until", "use one of the status keys listed on --status; --company-type is pumppu|betoni|all|owner; --parked-until must be YYYY-MM-DD or \"\""),
       apiErr(404, "Prospect not found", "add it first: ib jerry admin onboarding add"),
       SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,

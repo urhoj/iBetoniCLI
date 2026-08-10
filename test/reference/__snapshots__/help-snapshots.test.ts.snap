@@ -3783,7 +3783,7 @@ DESCRIPTION
 FLAGS
   --status STRING    Filter by pipeline status key: ei_aloitettu → ilmoittautunut → email1_lahetetty → muistutus_lahetetty → vastasi_kylla → tiedot_pyydetty → tervetuloa_lahetetty (pipeline order; ilmoittautunut is set by self-apply); terminal: vastasi_ei / ei_vastausta / ei_sovellu
   --tier NUMBER    Tier filter (1 priority / 2 secondary)
-  --due    Only rows where the email1b reminder is due
+  --due    Only rows where the email1b reminder is due (parked rows are excluded — a hold suppresses the reminder until it lapses)
   --search STRING    Case-insensitive substring on asiakasNimi / outreachName / outreachEmail / contactPersonName / contactPersonEmail
 
 GLOBAL FLAGS
@@ -3791,7 +3791,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ asiakasId, asiakasNimi, tier, status, alue, outreachEmail, muistiinpanot, jerryActive, lastEventTime, lastNote, lastNoteType, lastNoteTime, muistutusDue }>
+  ListEnvelope<{ asiakasId, asiakasNimi, tier, status, alue, outreachEmail, muistiinpanot, jerryActive, lastEventTime, lastNote, lastNoteType, lastNoteTime, parkedUntil, parked, muistutusDue }>
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
@@ -3881,6 +3881,7 @@ FLAGS
   --outreach-name STRING    Contact override name
   --outreach-email STRING    Contact override email
   --outreach-phone STRING    Contact override phone
+  --parked-until STRING    Hold the prospect until this date (YYYY-MM-DD or today/tomorrow); pass "" to lift the hold. Does NOT change --status
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -3896,11 +3897,14 @@ OUTPUT (JSON, stdout)
   { success: true } · { dryRun: true, wouldUpdate: { asiakasId, fields } } on --dry-run
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Unknown --status or --company-type → use one of the status keys listed on --status; --company-type is pumppu|betoni|all|owner
+  exit 4 (HTTP 400)  Unknown --status or --company-type, or malformed --parked-until → use one of the status keys listed on --status; --company-type is pumppu|betoni|all|owner; --parked-until must be YYYY-MM-DD or ""
   exit 5 (HTTP 404)  Prospect not found     → add it first: ib jerry admin onboarding add
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - --parked-until is how you defer a prospect. Do NOT park by moving --status to a terminal key: status holds ONE fact, so overwriting it destroys the pipeline position the prospect actually reached, and the row then misstates its own history. A parked row keeps its true status, reports \`parked: true\`, and is suppressed from \`--due\` until the date passes — after which it surfaces again by itself. The change is also written to the event trail. Deploy-gated: needs the 2026-08-10-jerry-onboarding-parked-until migration.
 
 EXAMPLES
   ib jerry admin onboarding set 1389 --status vastasi_kylla --reason "vastasi puhelimessa"
