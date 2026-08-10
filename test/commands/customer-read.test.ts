@@ -78,8 +78,6 @@ describe("ib customer list/get/search", () => {
   test("runCustomerGet: passes roolit + registeredAt through unchanged", async () => {
     mockClient.get.mockResolvedValueOnce({
       asiakasId: 8,
-      name: "Kalle Urho Oy",
-      comment: "Betonipumppausliiketoiminta siirtynyt muualle",
       registeredAt: "2022-02-15T13:11:00.000Z",
       roolit: {
         isTyomaaAsiakas: true,
