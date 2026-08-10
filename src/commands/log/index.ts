@@ -7,8 +7,13 @@
  * (personAvailability needs admin); latest/range/by-entity-date need an admin
  * role; user <otherPersonId> needs admin.
  *
- * Spec: docs/superpowers/specs/2026-06-10-ib-changetracker-reading-design.md
- * Rename (changes→log): docs/superpowers/specs/2026-06-11-ib-log-rename-design.md
+ * Renamed from `ib changes` on 2026-06-11 (betonicli 87482f8) as a CLEAN BREAK —
+ * the old paths are gone, not aliased, and `entity-log-aliases.test.ts` holds
+ * that. Only the /api/changes/* wire paths kept the old name. A retired name
+ * still taught by pre-rename docs is a recurring wrong guess, so `changes`→`log`
+ * is carried in VERB_SYNONYMS (src/output/nearest.ts) for the did-you-mean
+ * (fb#402). Both original design specs have since been pruned; the surviving
+ * reference is puminet5api/docs/tech/change-tracking/CHANGETRACKER_SYSTEM.md.
  */
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";

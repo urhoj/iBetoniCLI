@@ -56,6 +56,13 @@ describe("levenshtein / closestName (#1)", () => {
     // an edit-distance near-match still wins over the synonym table
     expect(closestName("add", ["aad", "create"])).toBe("aad");
   });
+  test("retired-name synonym changes→log (#402)", () => {
+    // 6 edits apart with no shared prefix, so only the table can bridge it.
+    expect(levenshtein("changes", "log")).toBeGreaterThan(2);
+    expect(closestName("changes", ["log", "keikka"])).toBe("log");
+    // ...and never invents `log` where the group has no such leaf.
+    expect(closestName("changes", ["create", "list"])).toBeNull();
+  });
 });
 
 describe("buildUnknownCommandEnvelope (#1)", () => {
@@ -90,6 +97,17 @@ describe("buildUnknownCommandEnvelope (#1)", () => {
     expect(env.available).toContain("create");
     expect(env.didYouMean).toBe("create");
     expect(env.hint).toContain("ib keikka create");
+  });
+  test("retired group name at the ROOT: `ib changes` → `ib log` (#402)", () => {
+    const env = buildUnknownCommandEnvelope(program, "changes", "developer");
+    expect(env.didYouMean).toBe("log");
+    expect(env.hint).toContain("Did you mean `ib log`?");
+  });
+  test("...and inside a group that owns a log leaf: `ib keikka changes` → `ib keikka log`", () => {
+    const keikka = program.commands.find((c) => c.name() === "keikka")!;
+    const env = buildUnknownCommandEnvelope(keikka, "changes", "developer");
+    expect(env.didYouMean).toBe("log");
+    expect(env.hint).toContain("ib keikka log");
   });
 });
 
