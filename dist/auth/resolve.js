@@ -18,7 +18,13 @@ import { failWith } from "../output/json.js";
 function bareTokenAuth(token, defaultEndpoint, fromEnv = false) {
     const shapeProblem = fromEnv ? jwtShapeProblem(token) : null;
     if (shapeProblem) {
-        failWith(`IB_TOKEN is not a JWT: ${shapeProblem}`, 2, "check how IB_TOKEN was set — a command substitution (IB_TOKEN=$(…)) captures the command's WHOLE stdout, banner lines included; extract the token with `grep -oE 'eyJ[A-Za-z0-9_-]+[.][A-Za-z0-9_-]+[.][A-Za-z0-9_-]+'`");
+        failWith(`IB_TOKEN is not a JWT: ${shapeProblem}`, 2, token === ""
+            ? // The opposite capture accident from the one below: the command printed
+                // NOTHING to stdout, so there are no banner lines to strip — the minting
+                // step itself failed (wrong directory, missing env, non-zero exit) and
+                // its diagnostic went to stderr, which `$(…)` does not capture (fb#420).
+                "IB_TOKEN is set but empty — the command that produced it wrote nothing to stdout; run that command on its own (without 2>/dev/null) and read its stderr"
+            : "check how IB_TOKEN was set — a command substitution (IB_TOKEN=$(…)) captures the command's WHOLE stdout, banner lines included; extract the token with `grep -oE 'eyJ[A-Za-z0-9_-]+[.][A-Za-z0-9_-]+[.][A-Za-z0-9_-]+'`");
     }
     let personId = null;
     let ownerAsiakasId = null;
@@ -51,7 +57,13 @@ export async function resolveAuth(opts) {
     // 401 instead of silently acting as the HOST's credentials.
     if (opts.token !== undefined)
         return bareTokenAuth(opts.token, opts.defaultEndpoint);
-    if (process.env.IB_TOKEN)
+    // Same `!== undefined` reasoning, for the same reason: SETTING the variable is
+    // the caller declaring headless intent, so an empty value is a broken minting
+    // step, never a request to fall back to interactive credentials. Under
+    // truthiness this silently used the credentials file and any staleness there
+    // surfaced as "session unrecoverable, run `ib auth login`" — a diagnostic
+    // pointing at the wrong subsystem entirely (fb#420).
+    if (process.env.IB_TOKEN !== undefined)
         return bareTokenAuth(process.env.IB_TOKEN, opts.defaultEndpoint, true);
     const creds = await createStore(opts.credentialsPath).load();
     if (!creds)

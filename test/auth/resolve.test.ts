@@ -106,6 +106,56 @@ describe("resolveAuth", () => {
     expect(cli.hint).toMatch(/command substitution/);
   });
 
+  // fb#420: SETTING IB_TOKEN is the caller declaring headless intent, so an empty
+  // value is a broken minting step — never a request to fall back to interactive
+  // credentials. Under the old truthiness check it silently used the credentials
+  // file, and any staleness there surfaced as "session unrecoverable, run
+  // `ib auth login`": a diagnostic naming the wrong subsystem entirely.
+  test("an EMPTY IB_TOKEN fails fast instead of falling back to the credentials file", async () => {
+    const { createStore } = await import("../../src/auth/store.js");
+    const file = join(dir, "credentials.json");
+    await createStore(file).save({
+      jwt: "file_jwt",
+      refreshToken: "rt",
+      issuedAt: "",
+      expiresAt: "",
+      personId: 1,
+      ownerAsiakasId: 1,
+      ownerAsiakasName: "X",
+      endpoint: "https://api.example.com",
+    });
+    process.env.IB_TOKEN = "";
+
+    const err = await resolveAuth({ credentialsPath: file }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CliError);
+    const cli = err as CliError;
+    expect(cli.exitCode).toBe(2);
+    expect(cli.message).toMatch(/IB_TOKEN is not a JWT: the variable is set but empty/);
+    // The remedy must point at the minting command's stderr, NOT at the
+    // captured-banner advice — there is no banner to strip when stdout was empty.
+    expect(cli.hint).toMatch(/wrote nothing to stdout/);
+    expect(cli.hint).not.toMatch(/banner lines included/);
+  });
+
+  test("an UNSET IB_TOKEN still falls back to the credentials file", async () => {
+    const { createStore } = await import("../../src/auth/store.js");
+    const file = join(dir, "credentials.json");
+    await createStore(file).save({
+      jwt: "file_jwt",
+      refreshToken: "rt",
+      issuedAt: "",
+      expiresAt: "",
+      personId: 1,
+      ownerAsiakasId: 1,
+      ownerAsiakasName: "X",
+      endpoint: "https://api.example.com",
+    });
+    delete process.env.IB_TOKEN;
+
+    const auth = await resolveAuth({ credentialsPath: file });
+    expect(auth).toMatchObject({ token: "file_jwt", source: "file", refreshable: true });
+  });
+
   // The embedded caller's token comes from the SERVER, so a 401 is the honest
   // answer there — no local guess about how it was set.
   test("an embedded caller's malformed token stays best-effort", async () => {

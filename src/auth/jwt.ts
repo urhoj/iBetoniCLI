@@ -73,6 +73,10 @@ function resolveExpandPayload(): ExpandPayload | null {
  * captured the script's banner lines along with the JWT).
  */
 export function jwtShapeProblem(token: string): string | null {
+  // Called out before the segment count, which would otherwise describe the empty
+  // string as "got 1" — technically true, useless to act on. An empty value has a
+  // distinct cause (the minting command produced no stdout) and its own remedy.
+  if (token === "") return "the variable is set but empty (0 chars)";
   const parts = token.split(".");
   if (parts.length !== 3)
     return `expected 3 dot-separated segments, got ${parts.length} (${token.length} chars)`;
