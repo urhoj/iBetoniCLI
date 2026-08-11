@@ -68,8 +68,16 @@ const SOURCES = ["human", "routine"];
 // that is recognized, bumps nothing, and needs no --bump-level none. A reporter
 // believed a routine standalone-lane entry had armed a five-repo bump and filed
 // it (feedback #354). Spell the three tiers out, since only the third is armed.
+//
+// Lead with "(CSV)" like the sibling --files/--sha/--commit descriptions do
+// (fb#408): --repo has always accepted a CSV (csvFields below; the backend
+// canonicalizes per token and computeReleasePlan bumps EVERY coordinated token),
+// but the singular opening made a reporter file a cross-lane change under one
+// repo and demote the other to a --files path, losing the attribution. Cross-lane
+// is not an edge case — the versioning model HAS two lanes, and any CLI change
+// needing a backend route touches both.
 const REPO_FLAG_DESC =
-  "Repo this entry ships in. THREE tiers: (1) coordinated — puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace — each bumped independently on next deploy from the max --bump-level naming it; (2) recognized standalone — betonicli, @ibetoni/*, dbo.*, ibetoni-site, bsg2 — NO app bump at all (--bump-level is inert here; these version via `npm run final`); (3) ⚠ a value resolving to NO known repo at all, which fail-safe-bumps ALL coordinated repos unless --bump-level none.";
+  "Repo(s) this entry ships in (CSV). Every token is resolved on its own, so a cross-lane change names BOTH repos — `--repo \"puminet5api,betonicli\"` — instead of demoting one to a --files path. THREE tiers: (1) coordinated — puminet4|puminet5api|puminet7-functions-app|betonijerry|workspace — each bumped independently on next deploy from the max --bump-level naming it; (2) recognized standalone — betonicli, @ibetoni/*, dbo.*, ibetoni-site, bsg2 — NO app bump at all (--bump-level is inert here; these version via `npm run final`); (3) ⚠ a value resolving to NO known repo at all, which fail-safe-bumps ALL coordinated repos unless --bump-level none.";
 const AREA_FLAG_DESC =
   "Technical layer: frontend|backend|cli|database|cicd (repo granularity goes in --repo, not here)";
 // Named once and used by both the Commander options and the specs, so the
@@ -1054,6 +1062,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       'A description starting with "-" is parsed as an option (exit 4) — put a bare `--` terminator before it: ib dev changelog add --type bugfix --area cli --title "x" -- "-5% render time". Everything after `--` is taken as positional text.',
       "--dry-run is SERVER-side (X-Dry-Run): the backend validates the payload then echoes wouldCreate without inserting — a bad --type/--area/--date still 400s under --dry-run.",
       "Bounded free-text flags are length-checked client-side (exit 4) before POSTing: --status ≤30, --severity ≤20, --title ≤300, --impact ≤500, --repo/--vtag ≤200, --sha ≤500. (--description/--benefits/--files are unbounded.)",
+      'CROSS-LANE ENTRIES: --repo is a CSV, and the versioning model has two lanes (coordinated apps vs standalone betonicli/@ibetoni/*), so a change that spans them names both — --repo "puminet5api,betonicli". Each token is bumped/stamped on its own (a CSV mixing lanes bumps only its coordinated tokens), and the resulting entry is findable under either name. Recording only one lane and putting the other in --files loses the attribution and takes an `update` to repair (fb#408).',
       "--feedback on a row that is ALREADY resolved TAKES the link from the earlier entry. That is intended (it is how a wrong first link gets corrected), but a row's work often spans several entries — a fix, then a follow-up, a revert, a doc pass — so a cross-reference silently becomes the sole resolver and a reader following the feedback row lands on the follow-up instead of the fix. The response now carries `relinkedFrom` and stderr names the displaced entry; restore it with `ib dev changelog update <thatId> --feedback <id>` (fb#366).",
       "DEPLOY-GATED (fb#366): `relinkedFrom` and its stderr note come from a later puminet5api version. Against an older backend the re-link still happens and is still SILENT — check the row with `ib dev feedback get <id>` after linking an already-resolved one.",
       "Developer-gated.",
@@ -1064,6 +1073,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       'ib dev changelog add "positional description works too" --type bugfix --area cli --title "x"',
       'ib dev changelog add --type feature --area backend --title "x" --body "gh-style --body works as a --description alias"',
       'ib dev changelog add --type bugfix --area backend --title "fix npe" --description "y" --sentry PUMINET5API-1A2',
+      'ib dev changelog add --type feature --area cli --title "x" --description "y" --repo "puminet5api,betonicli"',
       "ib dev changelog add --from-json ./entry.json",
       "ib dev changelog add --from-json ./entry.json --bump-level minor",
     ],
@@ -1085,7 +1095,12 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         type: "string",
         description: AREA_FLAG_DESC,
       },
-      { name: "repo", type: "string", description: "Repo/submodule" },
+      {
+        name: "repo",
+        type: "string",
+        description:
+          "Repo/submodule — matches entries whose --repo CSV CONTAINS this token, so `--repo betonicli` also returns cross-lane rows recorded as \"puminet5api,betonicli\" (deploy-gated: against an older backend this is an exact string match and those rows are invisible). Aliases resolve (`cli` → betonicli); a CSV here matches rows containing ANY of the tokens.",
+      },
       {
         name: "feedback",
         type: "number",
@@ -1215,7 +1230,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       },
       { name: "severity", type: "string", description: SEVERITY_FLAG_DESC, allowed: [...SEVERITIES], synonyms: SEVERITY_SYNONYMS },
       { name: "files", type: "string", description: "CSV of file paths" },
-      { name: "repo", type: "string", description: "Repo/submodule" },
+      { name: "repo", type: "string", description: "Repo(s) this entry ships in (CSV) — replaces the recorded value wholesale, so re-send every repo, not just the added one" },
       { name: "sha", type: "string", description: "Commit SHAs (CSV)" },
       { name: "commit", type: "string", description: "Alias for --sha — Commit SHAs (CSV); if both are given, they must match" },
       { name: "vtag", type: "string", description: "Version tag" },
