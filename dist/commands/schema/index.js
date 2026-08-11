@@ -16,6 +16,13 @@ export async function runSchemaViews(client, opts) {
 export async function runSchemaProcs(client, opts) {
     return client.get(listQuery("/api/cli/schema/procs", opts));
 }
+export async function runSchemaTriggers(client, opts) {
+    return client.get(`/api/cli/schema/triggers${qs({
+        table: opts.table || undefined,
+        search: opts.search || undefined,
+        limit: opts.limit,
+    })}`);
+}
 export async function runSchemaTable(client, name) {
     return client.get(`/api/cli/schema/table/${name}`);
 }
@@ -24,6 +31,9 @@ export async function runSchemaView(client, name) {
 }
 export async function runSchemaProc(client, name) {
     return client.get(`/api/cli/schema/proc/${name}`);
+}
+export async function runSchemaTrigger(client, name) {
+    return client.get(`/api/cli/schema/trigger/${name}`);
 }
 export async function runSchemaDump(client) {
     return client.get("/api/cli/schema/dump");
@@ -74,12 +84,17 @@ export function registerSchemaCommands(parent, getClient, opts = {}) {
     listOpt(s.command("tables")).action(jsonAction(getClient, runSchemaTables));
     listOpt(s.command("views")).action(jsonAction(getClient, runSchemaViews));
     listOpt(s.command("procs")).action(jsonAction(getClient, runSchemaProcs));
+    listOpt(s.command("triggers"))
+        .option("--table <name>", "Only triggers whose parent table is <name>")
+        .action(jsonAction(getClient, runSchemaTriggers));
     s.command("table <name>")
         .action(runOneOrBatch(runSchemaTable));
     s.command("view <name>")
         .action(runOneOrBatch(runSchemaView));
     s.command("proc <name>")
         .action(runOneOrBatch(runSchemaProc));
+    s.command("trigger <name>")
+        .action(runOneOrBatch(runSchemaTrigger));
     s.command("dump")
         .action(jsonAction(getClient, runSchemaDump));
 }

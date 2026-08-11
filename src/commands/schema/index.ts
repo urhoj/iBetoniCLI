@@ -12,6 +12,11 @@ export interface SchemaListFilter {
   limit?: number;
 }
 
+/** `triggers` adds a parent-table filter on top of the shared list filter. */
+export interface SchemaTriggerFilter extends SchemaListFilter {
+  table?: string;
+}
+
 type Envelope = ListEnvelope<Record<string, unknown>>;
 type Record_ = Record<string, unknown>;
 
@@ -28,6 +33,18 @@ export async function runSchemaViews(client: ApiClient, opts: SchemaListFilter):
 export async function runSchemaProcs(client: ApiClient, opts: SchemaListFilter): Promise<Envelope> {
   return client.get<Envelope>(listQuery("/api/cli/schema/procs", opts));
 }
+export async function runSchemaTriggers(
+  client: ApiClient,
+  opts: SchemaTriggerFilter
+): Promise<Envelope> {
+  return client.get<Envelope>(
+    `/api/cli/schema/triggers${qs({
+      table: opts.table || undefined,
+      search: opts.search || undefined,
+      limit: opts.limit,
+    })}`
+  );
+}
 export async function runSchemaTable(client: ApiClient, name: string): Promise<Record_> {
   return client.get<Record_>(`/api/cli/schema/table/${name}`);
 }
@@ -36,6 +53,9 @@ export async function runSchemaView(client: ApiClient, name: string): Promise<Re
 }
 export async function runSchemaProc(client: ApiClient, name: string): Promise<Record_> {
   return client.get<Record_>(`/api/cli/schema/proc/${name}`);
+}
+export async function runSchemaTrigger(client: ApiClient, name: string): Promise<Record_> {
+  return client.get<Record_>(`/api/cli/schema/trigger/${name}`);
 }
 export async function runSchemaDump(client: ApiClient): Promise<Record_> {
   return client.get<Record_>("/api/cli/schema/dump");
@@ -102,6 +122,9 @@ export function registerSchemaCommands(
   listOpt(s.command("procs")).action(
     jsonAction(getClient, runSchemaProcs)
   );
+  listOpt(s.command("triggers"))
+    .option("--table <name>", "Only triggers whose parent table is <name>")
+    .action(jsonAction(getClient, runSchemaTriggers));
 
   s.command("table <name>")
     .action(runOneOrBatch(runSchemaTable));
@@ -109,6 +132,8 @@ export function registerSchemaCommands(
     .action(runOneOrBatch(runSchemaView));
   s.command("proc <name>")
     .action(runOneOrBatch(runSchemaProc));
+  s.command("trigger <name>")
+    .action(runOneOrBatch(runSchemaTrigger));
 
   s.command("dump")
     .action(jsonAction(getClient, runSchemaDump));

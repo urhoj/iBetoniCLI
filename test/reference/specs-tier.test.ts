@@ -12,6 +12,8 @@ describe("tier tagging", () => {
     "ib dev schema view",
     "ib dev schema procs",
     "ib dev schema proc",
+    "ib dev schema triggers",
+    "ib dev schema trigger",
     "ib dev schema dump",
     "ib dev feedback list",
     "ib dev feedback get",

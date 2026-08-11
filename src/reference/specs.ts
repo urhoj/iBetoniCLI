@@ -5132,7 +5132,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: ['ib jerry admin request delete 41 --reason "cleanup draft"'],
   },
 
-  // ─── schema (7) — developer-only SQL introspection ─────────────────────────
+  // ─── schema (9) — developer-only SQL introspection ─────────────────────────
   ...((): CommandSpec[] => {
     const DEV_PERMS = ["developer access (isSystemAdmin or isDeveloper)"];
     const devErrors: CommandError[] = [
@@ -5158,13 +5158,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       },
       {
         command: "ib dev schema table",
-        description: "Columns (type, nullability, default, key), primary key, foreign keys (outbound), inbound references (tables/columns whose FK points AT this table), and indexes for one dbo table — or several at once via a comma-separated list. Developer-only.",
+        description: "Columns (type, nullability, default, key), primary key, foreign keys (outbound), inbound references (tables/columns whose FK points AT this table), indexes, and attached triggers for one dbo table — or several at once via a comma-separated list. Developer-only.",
         permissions: DEV_PERMS,
         tier: "developer",
         args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix); comma-separated for a batch (a,b,c)" }],
         flags: [],
-        outputShape: "single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], inboundForeignKeys:[{refTable,refColumn,column}], indexes:[{name,columns,unique}] }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false). precision/scale are null for non-numeric types (varchar → maxLength); a DECIMAL(5,2) reports precision 5 / scale 2, an int precision 10 / scale 0.",
-        errors: [...devErrors, invalidNameErr, apiErr(404, "Table not found", "check the name via `ib dev schema tables`")],
+        outputShape: "single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], inboundForeignKeys:[{refTable,refColumn,column}], indexes:[{name,columns,unique}], triggers:[{name,timing,events,disabled}] }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false). precision/scale are null for non-numeric types (varchar → maxLength); a DECIMAL(5,2) reports precision 5 / scale 2, an int precision 10 / scale 0. `triggers` is a SUMMARY (no T-SQL) — read a body with `ib dev schema trigger <name>`.",
+        errors: [...devErrors, invalidNameErr, apiErr(404, "Table not found", "check the name via `ib dev schema tables` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → `ib dev schema trigger`)")],
         examples: ["ib dev schema table keikka", "ib dev schema table keikka,asiakas,tyomaa"],
       },
       {
@@ -5185,7 +5185,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix); comma-separated for a batch (a,b,c)" }],
         flags: [],
         outputShape: "single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)",
-        errors: [...devErrors, invalidNameErr, apiErr(404, "View not found", "check the name via `ib dev schema views`")],
+        errors: [...devErrors, invalidNameErr, apiErr(404, "View not found", "check the name via `ib dev schema views` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → `ib dev schema trigger`)")],
         examples: ["ib dev schema view keikkaBetoniView", "ib dev schema view keikkaBetoniView,asiakasView"],
       },
       {
@@ -5206,16 +5206,44 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix); comma-separated for a batch (a,b,c)" }],
         flags: [],
         outputShape: "single name → { name, type, parameters:[{name,dataType,mode}], definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)",
-        errors: [...devErrors, invalidNameErr, apiErr(404, "Proc/function not found", "check the name via `ib dev schema procs`")],
+        errors: [...devErrors, invalidNameErr, apiErr(404, "Proc/function not found", "check the name via `ib dev schema procs` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → `ib dev schema trigger`)")],
         examples: ["ib dev schema proc asiakas_find", "ib dev schema proc sijainti_save,sijainti_add,asiakas_sijainnit_get"],
       },
       {
+        command: "ib dev schema triggers",
+        description: "List dbo triggers with their parent table, timing (AFTER / INSTEAD OF), the events that fire them, and whether they are disabled. Narrow to one table with --table. Developer-only.",
+        permissions: DEV_PERMS,
+        tier: "developer",
+        flags: [
+          ...listFlags,
+          { name: "table", type: "string", description: "Only triggers whose parent table is this (exact name)" },
+        ],
+        outputShape: "{ items: [{ name, table, timing:'AFTER'|'INSTEAD OF', events:['INSERT'|'UPDATE'|'DELETE'], disabled, type:'trigger' }], nextCursor: null, count }",
+        errors: devErrors,
+        notes: [
+          "Trigger bodies carry real business logic here (keikka_after_ins_trig creates keikkaBetoni/toimitus/keikkaPerson rows), so a table's writers are not fully described by its procs alone.",
+          "`ib dev schema table <name>` already lists that table's triggers in its `triggers` summary — use this command to search across tables or to filter by name.",
+        ],
+        examples: ["ib dev schema triggers", "ib dev schema triggers --table keikka", "ib dev schema triggers --search updateLastActive"],
+      },
+      {
+        command: "ib dev schema trigger",
+        description: "Parent table, timing, events, disabled flag, and full definition (T-SQL) for one dbo trigger — or several at once via a comma-separated list. Developer-only.",
+        permissions: DEV_PERMS,
+        tier: "developer",
+        args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix); comma-separated for a batch (a,b,c)" }],
+        flags: [],
+        outputShape: "single name → { name, table, timing:'AFTER'|'INSTEAD OF', events:[…], disabled, definition:'<T-SQL>' }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false)",
+        errors: [...devErrors, invalidNameErr, apiErr(404, "Trigger not found", "check the name via `ib dev schema triggers` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it")],
+        examples: ["ib dev schema trigger keikka_after_ins_trig", "ib dev schema trigger keikka_after_ins_trig,tyomaaPerson_after_ins_trig"],
+      },
+      {
         command: "ib dev schema dump",
-        description: "Whole-schema structural map of the dbo schema (developer-gated, read-only) — all tables with column names and types, FK edges, view names, and proc signatures. No proc/view bodies (use `schema proc`/`schema view` for those).",
+        description: "Whole-schema structural map of the dbo schema (developer-gated, read-only) — all tables with column names and types, FK edges, view names, proc signatures, and trigger summaries. No proc/view/trigger bodies (use `schema proc`/`schema view`/`schema trigger` for those).",
         permissions: DEV_PERMS,
         tier: "developer",
         flags: [],
-        outputShape: "{ tables:[{name,columns}], foreignKeys:[{table,column,refTable,refColumn}], views:[{name}], procs:[{name,type,parameters}] }",
+        outputShape: "{ tables:[{name,columns}], foreignKeys:[{table,column,refTable,refColumn}], views:[{name}], procs:[{name,type,parameters}], triggers:[{name,table,timing,events,disabled}] }",
         errors: devErrors,
         examples: ["ib dev schema dump"],
       },

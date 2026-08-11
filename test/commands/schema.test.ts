@@ -9,6 +9,8 @@ import {
   runSchemaProc,
   runSchemaDump,
   runSchemaBatch,
+  runSchemaTriggers,
+  runSchemaTrigger,
 } from "../../src/commands/schema/index.js";
 import { CliError } from "../../src/api/errors.js";
 
@@ -70,6 +72,47 @@ describe("ib schema", () => {
     expect(mockClient.get).toHaveBeenCalledWith(
       "/api/cli/schema/proc/asiakas_find"
     );
+  });
+
+  test("runSchemaTriggers: bare path when no opts", async () => {
+    get().mockResolvedValueOnce({ items: [], nextCursor: null, count: 0 });
+    await runSchemaTriggers(mockClient, {});
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/schema/triggers");
+  });
+
+  test("runSchemaTriggers: table filter alone", async () => {
+    get().mockResolvedValueOnce({ items: [], nextCursor: null, count: 0 });
+    await runSchemaTriggers(mockClient, { table: "keikka" });
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/schema/triggers?table=keikka");
+  });
+
+  test("runSchemaTriggers: table + search + limit query string", async () => {
+    get().mockResolvedValueOnce({ items: [], nextCursor: null, count: 0 });
+    await runSchemaTriggers(mockClient, { table: "keikka", search: "ins", limit: 50 });
+    expect(mockClient.get).toHaveBeenCalledWith(
+      "/api/cli/schema/triggers?table=keikka&search=ins&limit=50"
+    );
+  });
+
+  test("runSchemaTrigger: GET /api/cli/schema/trigger/<name>", async () => {
+    get().mockResolvedValueOnce({ name: "keikka_after_ins_trig", table: "keikka" });
+    const r = (await runSchemaTrigger(mockClient, "keikka_after_ins_trig")) as { table: string };
+    expect(mockClient.get).toHaveBeenCalledWith(
+      "/api/cli/schema/trigger/keikka_after_ins_trig"
+    );
+    expect(r.table).toBe("keikka");
+  });
+
+  test("runSchemaBatch works for triggers too (comma-separated names)", async () => {
+    get()
+      .mockResolvedValueOnce({ name: "a_trig" })
+      .mockRejectedValueOnce(new CliError("Trigger not found", 404, {}, 5));
+    const res = await runSchemaBatch(mockClient, runSchemaTrigger, ["a_trig", "nope"]);
+    expect(mockClient.get).toHaveBeenNthCalledWith(1, "/api/cli/schema/trigger/a_trig");
+    expect(res.items).toEqual([
+      { name: "a_trig", found: true, object: { name: "a_trig" } },
+      { name: "nope", found: false, object: null },
+    ]);
   });
 
   test("runSchemaDump: GET /api/cli/schema/dump", async () => {
