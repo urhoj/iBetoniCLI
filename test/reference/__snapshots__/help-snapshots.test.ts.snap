@@ -5757,7 +5757,7 @@ DESCRIPTION
   Auth: requires login (any authenticated user).
 
 FLAGS
-  (none)
+  --language STRING    Document language applied to every per-type fetch: fi (binding original) or en (unofficial translation, falls back to fi where no active en row exists). (default: fi)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -5779,6 +5779,7 @@ SEE ALSO
 EXAMPLES
   ib legal active
   ib legal list
+  ib legal active --language en
 "
 `;
 
@@ -5944,6 +5945,7 @@ FLAGS
   --type STRING    Document type name (see ib legal types) (required)
   --doc-version STRING    Version string, e.g. 2.0 (NOT --version — that is the global CLI version flag) (required)
   --title STRING    Document title (required for a full save; defaults to the current doc's title in edit mode)
+  --language STRING    Document language: fi (binding original) or en (unofficial translation). In edit mode (--replace/--append/--prepend) this also selects WHICH language's current active document is read. (default: fi)
   --file STRING    Read markdown content from a local file
   --content STRING    Inline markdown content (use over /api/cli/exec — no local FS there)
   --owner NUMBER    ownerAsiakasId tenant scope (1349 = BetoniJerry); omit for global
@@ -5971,7 +5973,8 @@ OUTPUT (JSON, stdout)
   {documentId, success} | dry-run: {dryRun: true, wouldCreate: {...}, validation} | edit dry-run: {dryRun:true, type, field:"markdownContent", matchCount?, addedLines, removedLines, sameContent, unified}
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  Missing --reason / no content / --file unreadable or combined with --content → pass --file OR --content, and --reason unless --dry-run
+  exit 4 (client-side)  Missing --reason / no content / --file unreadable or combined with --content / --validate-json failed → pass --file OR --content, and --reason unless --dry-run
+  exit 4 (client-side)  Edit mode (--replace/--append/--prepend) resolved to a document in a DIFFERENT language than --language — Task 8's read falls back to the fi row when no active en row exists, so this refuses rather than silently publishing Finnish content tagged language:en → create the target language version with a full --file/--content save first, then retry the edit
   exit 4 (HTTP 400)  Required fields missing → provide --type --doc-version --title and content
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
@@ -5979,6 +5982,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - X-Dry-Run is honoured server-side on this route once the gating deploy is live — do not --dry-run against a backend without it (the write would persist).
+  - Edit mode (--replace/--append/--prepend) refuses when the served document's own language differs from --language (the fi fallback for a type with no active en document yet) — create the target language version with a full --file/--content save first.
 
 SEE ALSO
   ib legal activate, ib legal versions
@@ -5988,6 +5992,7 @@ EXAMPLES
   ib legal save --type TOS --doc-version 2.1 --title Kayttoehdot --content "# TOS" --activate --dry-run
   ib legal save --type BETONIJERRY_OFFER_ACCEPTANCE --doc-version offer-2026-06-18 --title 'Tarjouksen hyväksyntä' --file offer.md --validate-json --reason 'update CTA copy'
   ib legal save --type TOS --doc-version 2.1 --replace "14 vrk" --with "30 vrk" --reason "extend payment term" --dry-run
+  ib legal save --type TOS --doc-version 2.1 --title "Terms of Service" --file ./tos-en.md --language en --activate --reason "publish EN translation"
 "
 `;
 
@@ -6004,6 +6009,7 @@ ARGUMENTS
 
 FLAGS
   --meta    Omit markdownContent (returns contentLength instead)
+  --language STRING    Document language: fi (binding original) or en (unofficial translation). The backend falls back to the fi row when no active en row exists for the type. (default: fi)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -6026,6 +6032,7 @@ SEE ALSO
 EXAMPLES
   ib legal show BETONIJERRY_TOS
   ib legal show TOS --meta
+  ib legal show TOS --language en
 "
 `;
 
@@ -6203,6 +6210,7 @@ ARGUMENTS
 FLAGS
   --owner NUMBER    Filter by ownerAsiakasId tenant scope
   --status STRING    Filter by lifecycle status: draft|active|archived|deleted
+  --language STRING    Filter by document language: fi (binding original) or en (unofficial translation) (default: fi)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -6222,6 +6230,7 @@ EXAMPLES
   ib legal versions TOS
   ib legal versions TOS --status draft
   ib legal versions BETONIJERRY_TOS
+  ib legal versions TOS --language en
 "
 `;
 

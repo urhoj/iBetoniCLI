@@ -1,4 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
+import { Command } from "commander";
 import { mockApiClient, type MockApiClient } from "../helpers/mockClient.js";
 import {
   runLegalTypes,
@@ -21,6 +22,9 @@ import {
   runLegalTypeCreate,
   runLegalTypeUpdate,
   pickTypeFields,
+  normalizeLegalLanguage,
+  registerLegalCommands,
+  assertServedLanguageMatches,
 } from "../../src/commands/legal/index.js";
 import { buildProgram } from "../../src/program.js";
 import { CliError } from "../../src/api/errors.js";
@@ -64,6 +68,20 @@ describe("ib legal reads", () => {
     expect(out).toHaveProperty("markdownContent", "# hello");
   });
 
+  test("show forwards --language as a query param (Task 9)", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue({ documentId: 1, version: "1.0", markdownContent: "# hello" });
+    await runLegalShow(c, "TOS", false, "en");
+    expect(c.get).toHaveBeenCalledWith("/api/legal-documents/current/TOS?language=en");
+  });
+
+  test("show omits the language param when not given (backward-compat)", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue({ documentId: 1 });
+    await runLegalShow(c, "TOS", false, undefined);
+    expect(c.get).toHaveBeenCalledWith("/api/legal-documents/current/TOS");
+  });
+
   test("active rolls up every type, marking hasActive and stripping content", async () => {
     const c = mockClient();
     c.get
@@ -97,6 +115,17 @@ describe("ib legal reads", () => {
       .mockResolvedValueOnce([TYPES[0]]) // single type -> no second fetch to race
       .mockRejectedValueOnce(new CliError("boom", 500, null, 6));
     await expect(runLegalActive(c)).rejects.toMatchObject({ exitCode: 6 });
+  });
+
+  test("active forwards --language to every per-type fetch (Task 9)", async () => {
+    const c = mockClient();
+    c.get
+      .mockResolvedValueOnce(TYPES) // /types
+      .mockResolvedValueOnce({ documentId: 3, version: "2.0", markdownContent: "# hi" }) // current/TOS
+      .mockRejectedValueOnce(new CliError("not found", 404, null, 5)); // current/GLOBAL
+    await runLegalActive(c, "en");
+    expect(c.get).toHaveBeenNthCalledWith(2, "/api/legal-documents/current/TOS?language=en");
+    expect(c.get).toHaveBeenNthCalledWith(3, "/api/legal-documents/current/GLOBAL?language=en");
   });
 
   test("status strips content from missing docs and passes owner", async () => {
@@ -134,6 +163,20 @@ describe("ib legal reads", () => {
     expect(c.get).toHaveBeenCalledWith("/api/legal-documents/TOS/versions");
     expect(out.items[0]).not.toHaveProperty("markdownContent");
     expect(out.count).toBe(1);
+  });
+
+  test("versions forwards --language, combined with --owner (Task 9)", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue([]);
+    await runLegalVersions(c, "TOS", 1349, undefined, "en");
+    expect(c.get).toHaveBeenCalledWith("/api/legal-documents/TOS/versions?ownerAsiakasId=1349&language=en");
+  });
+
+  test("versions omits the language param when not given (backward-compat)", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue([]);
+    await runLegalVersions(c, "TOS", undefined, undefined, undefined);
+    expect(c.get).toHaveBeenCalledWith("/api/legal-documents/TOS/versions");
   });
 
   test("versions --status filters client-side", async () => {
@@ -335,6 +378,20 @@ describe("ib legal writes", () => {
     );
   });
 
+  test("save sends language in the body (Task 9)", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue(TYPES);
+    c.post.mockResolvedValue({ documentId: 11, success: true });
+    await runLegalSave(c, {
+      typeName: "TOS", version: "2.0", title: "T", markdownContent: "# x", activate: false, language: "en",
+    }, { reason: "publish EN" });
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/legal-documents/save",
+      expect.objectContaining({ language: "en" }),
+      { headers: { "X-Action-Reason": "publish EN" } }
+    );
+  });
+
   test("save with unknown typeName -> exit-5 CliError, no POST", async () => {
     const c = mockClient();
     c.get.mockResolvedValue(TYPES);
@@ -526,11 +583,175 @@ describe("ib legal save — edit mode (in-field partial)", () => {
     expect(String((body as Record<string, unknown>).markdownContent)).toContain("## Liite");
   });
 
+  test("--language reads the SAME language variant and re-saves it tagged the same way (Task 9)", async () => {
+    const c = mockClient();
+    const ACTIVE_EN = { ...ACTIVE, title: "Terms of Service", markdownContent: "# TOS\n\nPayment term is 14 days.\n" };
+    c.get.mockImplementation((url: string) =>
+      url.includes("/current/")
+        ? Promise.resolve(ACTIVE_EN)
+        : Promise.resolve(TYPES) // resolveDocumentType inside runLegalSave
+    );
+    c.post.mockResolvedValue({ documentId: 9, success: true });
+    await runLegalSaveWithEdit(
+      c, "TOS",
+      { kind: "append", text: "\n\nAppendix." },
+      { version: "2.1", language: "en" },
+      { reason: "add appendix" }
+    );
+    expect(c.get).toHaveBeenCalledWith("/api/legal-documents/current/TOS?language=en");
+    const [, body] = c.post.mock.calls[0];
+    expect(body).toMatchObject({ language: "en", title: "Terms of Service" });
+  });
+
+  // Review finding (Task 9, round 1): Task 8's /current/:typeName falls back to
+  // the fi row when no active en row exists. --append/--prepend don't require
+  // matching existing text, so a naive read+edit+save would silently publish
+  // Finnish content tagged language:"en". The served document carries its own
+  // `language` column — refuse instead of trusting the request.
+  test("--language en refuses when the served document is the fi FALLBACK (Task 9 fix)", async () => {
+    const c = mockClient();
+    c.get.mockImplementation((url: string) =>
+      url.includes("/current/")
+        ? Promise.resolve({ ...ACTIVE, language: "fi" }) // no active en row -> Task 8 serves fi
+        : Promise.resolve(TYPES)
+    );
+    await expect(
+      runLegalSaveWithEdit(
+        c, "TOS",
+        { kind: "append", text: "\n\nAppendix." },
+        { version: "2.1", language: "en" },
+        { reason: "add appendix" }
+      )
+    ).rejects.toMatchObject({ exitCode: 4 });
+    expect(c.post).not.toHaveBeenCalled();
+  });
+
   test("no active version → exit 5", async () => {
     const c = mockClient();
     c.get.mockRejectedValue(new CliError("not found", 404, null, 5));
     await expect(
       runLegalSaveWithEdit(c, "TOS", { kind: "append", text: "x" }, { version: "2.1" }, { reason: "r" })
     ).rejects.toMatchObject({ exitCode: 5 });
+  });
+});
+
+describe("normalizeLegalLanguage", () => {
+  test("defaults to fi when omitted", () => {
+    expect(normalizeLegalLanguage(undefined)).toBe("fi");
+  });
+  test("lowercases and trims a valid code", () => {
+    expect(normalizeLegalLanguage(" EN ")).toBe("en");
+  });
+  test("rejects an unknown code with the allowed list", () => {
+    expect(() => normalizeLegalLanguage("de")).toThrow(/--language must be one of: fi, en/);
+  });
+});
+
+describe("assertServedLanguageMatches (Task 9 review fix)", () => {
+  test("no-op when served language matches what was requested", () => {
+    expect(() => assertServedLanguageMatches("TOS", "en", { language: "en" })).not.toThrow();
+  });
+  test("no-op when neither is given (both default to fi)", () => {
+    expect(() => assertServedLanguageMatches("TOS", undefined, { language: "fi" })).not.toThrow();
+  });
+  test("refuses (exit 4) on a served/requested mismatch", () => {
+    expect(() => assertServedLanguageMatches("TOS", "en", { language: "fi" })).toThrowError(
+      expect.objectContaining({ exitCode: 4 })
+    );
+  });
+  test("the mismatch message names the type, what was requested, and what was served", () => {
+    try {
+      assertServedLanguageMatches("BETONIJERRY_TOS", "en", { language: "fi" });
+      throw new Error("expected to throw");
+    } catch (e) {
+      expect((e as Error).message).toMatch(/BETONIJERRY_TOS/);
+      expect((e as Error).message).toMatch(/en/);
+      expect((e as Error).message).toMatch(/fi/);
+    }
+  });
+  // Deliberate fail-open: an older backend (or a shape change) that omits the
+  // `language` field gives this guard nothing to verify against, so it must
+  // NOT refuse — refusing here would break edit mode entirely against any
+  // backend that doesn't yet return the column.
+  test("does NOT refuse when the response carries no language field at all (cannot verify)", () => {
+    expect(() => assertServedLanguageMatches("TOS", "en", {})).not.toThrow();
+  });
+});
+
+// Task 9: `ib legal --language` end-to-end through Commander, proving the CLI
+// itself (not just the pure run* functions) defaults every read/write to fi
+// when --language is omitted, so every pre-Task-9 invocation is unchanged.
+describe("ib legal --language wiring through Commander (Task 9)", () => {
+  function program(client: MockApiClient): Command {
+    const p = new Command();
+    registerLegalCommands(p, async () => client);
+    return p;
+  }
+
+  test("show: omitting --language sends language=fi", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue({ documentId: 1, markdownContent: "x" });
+    await program(c).parseAsync(["legal", "show", "BETONIJERRY_TOS"], { from: "user" });
+    expect(c.get).toHaveBeenCalledWith("/api/legal-documents/current/BETONIJERRY_TOS?language=fi");
+  });
+
+  test("show: --language en sends language=en", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue({ documentId: 1, markdownContent: "x" });
+    await program(c).parseAsync(["legal", "show", "BETONIJERRY_TOS", "--language", "en"], { from: "user" });
+    expect(c.get).toHaveBeenCalledWith("/api/legal-documents/current/BETONIJERRY_TOS?language=en");
+  });
+
+  test("active: omitting --language sends language=fi to every per-type fetch", async () => {
+    const c = mockClient();
+    c.get
+      .mockResolvedValueOnce([TYPES[0]])
+      .mockResolvedValueOnce({ documentId: 3, markdownContent: "x" });
+    await program(c).parseAsync(["legal", "active"], { from: "user" });
+    expect(c.get).toHaveBeenNthCalledWith(2, "/api/legal-documents/current/TOS?language=fi");
+  });
+
+  test("versions: omitting --language sends language=fi", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue([]);
+    await program(c).parseAsync(["legal", "versions", "TOS"], { from: "user" });
+    expect(c.get).toHaveBeenCalledWith("/api/legal-documents/TOS/versions?language=fi");
+  });
+
+  test("save: omitting --language sends language:fi in the body", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue(TYPES);
+    c.post.mockResolvedValue({ documentId: 11, success: true });
+    await program(c).parseAsync(
+      ["legal", "save", "--type", "TOS", "--doc-version", "2.1", "--title", "T", "--content", "# x", "--reason", "r"],
+      { from: "user" }
+    );
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/legal-documents/save",
+      expect.objectContaining({ language: "fi" }),
+      expect.any(Object)
+    );
+  });
+
+  test("save: --language en sends language:en in the body", async () => {
+    const c = mockClient();
+    c.get.mockResolvedValue(TYPES);
+    c.post.mockResolvedValue({ documentId: 11, success: true });
+    await program(c).parseAsync(
+      ["legal", "save", "--type", "TOS", "--doc-version", "2.1", "--title", "T", "--content", "# x", "--language", "en", "--reason", "r"],
+      { from: "user" }
+    );
+    expect(c.post).toHaveBeenCalledWith(
+      "/api/legal-documents/save",
+      expect.objectContaining({ language: "en" }),
+      expect.any(Object)
+    );
+  });
+
+  test("activate needs no --language flag — it targets a documentId that already carries its language", async () => {
+    const activate = program(mockClient()).commands
+      .find((c) => c.name() === "legal")!
+      .commands.find((c) => c.name() === "activate")!;
+    expect(activate.options.some((o) => o.long === "--language")).toBe(false);
   });
 });
