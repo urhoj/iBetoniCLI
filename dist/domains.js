@@ -76,6 +76,9 @@ export const DOMAIN_REGISTRARS = new Map([
             for (const register of groups)
                 register(dev, d.getClient);
             (await import("./commands/dev/impersonation/index.js")).registerImpersonationCommands(dev, d.getClient);
+            // Same shape as impersonation: canonical only under `ib dev`, no hidden
+            // top-level alias (it never had a top-level path).
+            (await import("./commands/dev/db-target/index.js")).registerDbTargetCommands(dev, d.getClient);
         },
     ],
     // Hidden back-compat aliases at the old top-level paths (still executable).

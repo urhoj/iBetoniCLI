@@ -5984,6 +5984,68 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     seeAlso: ["ib dev impersonation sessions"],
     examples: ["ib dev impersonation grants 63"],
   },
+  // ─── db-target (2) ───────────────────────────────────────────────────────
+  {
+    command: "ib dev db-target",
+    description:
+      "Which SQL database the LOCAL backend is talking to (dev or prod), with the server/database it resolved. Local development only: the route is loopback-gated and 404s on every deployed backend, so pass --endpoint http://127.0.0.1:8080. Answers the question the DbTargetChip in the puminet4 header answers, without opening a browser. Use --expect in scripts to fail closed BEFORE writing.",
+    permissions: ["login (read); the local backend must be non-production and loopback"],
+    flags: [
+      {
+        name: "expect",
+        type: "string",
+        description:
+          "Exit 1 if the live target is not this (dev|prod). The JSON is still written, with expected + matches added.",
+      },
+    ],
+    outputShape:
+      "{ target, targets[], switchable, server, database, missing[], complete } — plus { expected, matches } when --expect is passed.",
+    errors: [
+      apiErr(
+        404,
+        "Not found — the endpoint is NOT deployed anywhere",
+        "this means you are NOT talking to a local backend, never that the command is missing: the route is loopback-only and 404s in production. Pass --endpoint http://127.0.0.1:8080"
+      ),
+      apiErr(401, "Token expired", "ib auth refresh"),
+      {
+        origin: "client",
+        exit: 1,
+        meaning: "--expect did not match the live target",
+        remedy: "the JSON on stdout carries the real target; switch with `ib dev db-target set <target> --confirm`",
+      },
+    ],
+    notes: [
+      "A local backend can be repointed at PRODUCTION, in which case every local write is a real write. That is what --expect guards (feedback #430).",
+      "AUTH: the stored credentials are issued by the DEPLOYED API, and a local backend verifies with its own JWT_KEY — so it rejects them and the CLI reports a refresh failure whose remedy says `ib auth login`. That remedy is wrong here: logging in again authenticates against production and still will not work locally. Use a locally-minted token instead: IB_TOKEN=$(node utils/test/mint-local-token.js <personId>) run from puminet5api.",
+    ],
+    seeAlso: ["ib dev db-target set"],
+    examples: [
+      "ib dev db-target --endpoint http://127.0.0.1:8080",
+      "ib dev db-target --expect dev --endpoint http://127.0.0.1:8080",
+    ],
+  },
+  {
+    command: "ib dev db-target set",
+    description:
+      "Repoint the local backend at dev or prod. Previews unless --confirm (nothing is sent without it). On success the backend flushes the whole two-tier cache, because it holds the OUTGOING database's rows; a failed switch reverts and reports validation rather than success. Local development only — same loopback gate as `ib dev db-target`.",
+    permissions: ["isSystemAdmin or isDeveloper", "local, non-production, loopback backend"],
+    tier: "developer",
+    mutates: true,
+    args: [{ name: "target", type: "string", description: "dev | prod" }],
+    flags: [{ name: "confirm", type: "boolean", description: "Execute the switch (default is a preview)" }],
+    outputShape:
+      "preview: { dryRun:true, from, to, wouldFlushCache:true, hint } | execute: { target, server, database, changed, ... }",
+    errors: [
+      apiErr(404, "Not a local backend", "the route is loopback-only; pass --endpoint http://127.0.0.1:8080"),
+      apiErr(400, "Unknown target, or the switch failed and was reverted", "target must be dev|prod; a revert means nothing changed"),
+      apiErr(403, "Developer role required", "requires isSystemAdmin or isDeveloper"),
+    ],
+    notes: [
+      "Switching to prod makes every subsequent local write a REAL write. Preview first; the preview names the target you are moving to.",
+    ],
+    seeAlso: ["ib dev db-target"],
+    examples: ["ib dev db-target set dev --endpoint http://127.0.0.1:8080", "ib dev db-target set dev --confirm --endpoint http://127.0.0.1:8080"],
+  },
   // ─── feedback (5) ────────────────────────────────────────────────────────
   // NOTE on classification: feedback create/resolve carry custom write semantics
   // (meta-exempt create, client-side --dry-run, no idempotency/reason), so they
@@ -6382,7 +6444,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         mutates: true,
         args: [{ name: "glob", type: "string", description: "Raw Redis key glob (e.g. 'keikka:*')" }],
         flags: writeFlags,
-        outputShape: "preview: { dryRun:true, wouldDelete, pattern } | execute: { deleted, pattern }",
+        outputShape:
+          "preview: { dryRun:true, wouldDelete, pattern, sampleKeys } | execute: { deleted, pattern }. When wouldDelete is 0 the preview ALSO carries { totalKeys, existingPrefixes[], hint } — a zero alone cannot tell 'cache is clean' from 'your glob is wrong', so those fields settle it without a second command (feedback #431).",
         errors: [...devErrors, refusedRemote, readOnlyErr],
         examples: ["ib dev cache pattern 'keikka:*'", "ib dev cache pattern 'person:*' --confirm --force-prod"],
       },
