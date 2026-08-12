@@ -5681,7 +5681,7 @@ DESCRIPTION
   Auth: requires login (any authenticated user).
 
 FLAGS
-  (none)
+  --language STRING    Document language applied to every per-type fetch: fi (binding original) or en (unofficial translation, falls back to fi where no active en row exists). (default: fi)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -5703,6 +5703,7 @@ SEE ALSO
 EXAMPLES
   ib legal active
   ib legal list
+  ib legal active --language en
 "
 `;
 
@@ -5868,6 +5869,7 @@ FLAGS
   --type STRING    Document type name (see ib legal types) (required)
   --doc-version STRING    Version string, e.g. 2.0 (NOT --version — that is the global CLI version flag) (required)
   --title STRING    Document title (required for a full save; defaults to the current doc's title in edit mode)
+  --language STRING    Document language: fi (binding original) or en (unofficial translation). In edit mode (--replace/--append/--prepend) this also selects WHICH language's current active document is read. (default: fi)
   --file STRING    Read markdown content from a local file
   --content STRING    Inline markdown content (use over /api/cli/exec — no local FS there)
   --owner NUMBER    ownerAsiakasId tenant scope (1349 = BetoniJerry); omit for global
@@ -5912,6 +5914,7 @@ EXAMPLES
   ib legal save --type TOS --doc-version 2.1 --title Kayttoehdot --content "# TOS" --activate --dry-run
   ib legal save --type BETONIJERRY_OFFER_ACCEPTANCE --doc-version offer-2026-06-18 --title 'Tarjouksen hyväksyntä' --file offer.md --validate-json --reason 'update CTA copy'
   ib legal save --type TOS --doc-version 2.1 --replace "14 vrk" --with "30 vrk" --reason "extend payment term" --dry-run
+  ib legal save --type TOS --doc-version 2.1 --title "Terms of Service" --file ./tos-en.md --language en --activate --reason "publish EN translation"
 "
 `;
 
@@ -5928,6 +5931,7 @@ ARGUMENTS
 
 FLAGS
   --meta    Omit markdownContent (returns contentLength instead)
+  --language STRING    Document language: fi (binding original) or en (unofficial translation). The backend falls back to the fi row when no active en row exists for the type. (default: fi)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -5950,6 +5954,7 @@ SEE ALSO
 EXAMPLES
   ib legal show BETONIJERRY_TOS
   ib legal show TOS --meta
+  ib legal show TOS --language en
 "
 `;
 
@@ -6127,6 +6132,7 @@ ARGUMENTS
 FLAGS
   --owner NUMBER    Filter by ownerAsiakasId tenant scope
   --status STRING    Filter by lifecycle status: draft|active|archived|deleted
+  --language STRING    Filter by document language: fi (binding original) or en (unofficial translation) (default: fi)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -6146,6 +6152,7 @@ EXAMPLES
   ib legal versions TOS
   ib legal versions TOS --status draft
   ib legal versions BETONIJERRY_TOS
+  ib legal versions TOS --language en
 "
 `;
 

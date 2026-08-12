@@ -3539,6 +3539,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "typeName", type: "string", description: "Document type name (see ib legal types)" }],
     flags: [
       { name: "meta", type: "boolean", description: "Omit markdownContent (returns contentLength instead)" },
+      {
+        name: "language",
+        type: "string",
+        default: "fi",
+        description: "Document language: fi (binding original) or en (unofficial translation). The backend falls back to the fi row when no active en row exists for the type.",
+        allowed: ["fi", "en"],
+      },
     ],
     outputShape:
       "{documentId, typeName, version, title, effectiveDate, markdownContent | contentLength, ...}",
@@ -3550,7 +3557,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       ...COMMON_AUTH_ERRORS,
     ],
     seeAlso: ["ib legal types", "ib legal versions"],
-    examples: ["ib legal show BETONIJERRY_TOS", "ib legal show TOS --meta"],
+    examples: ["ib legal show BETONIJERRY_TOS", "ib legal show TOS --meta", "ib legal show TOS --language en"],
   },
   {
     command: "ib legal active",
@@ -3558,13 +3565,21 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     description:
       "Roll-up of the current ACTIVE document of EVERY type in one call — the single-view answer to 'what legal text is live right now'. One row per type: types with no active version appear with hasActive:false (not dropped). Content is stripped (contentLength only) — read a body via ib legal show <typeName>. Client-side fan-out over ib legal types + ib legal show.",
     auth: "any",
-    flags: [],
+    flags: [
+      {
+        name: "language",
+        type: "string",
+        default: "fi",
+        description: "Document language applied to every per-type fetch: fi (binding original) or en (unofficial translation, falls back to fi where no active en row exists).",
+        allowed: ["fi", "en"],
+      },
+    ],
     outputShape:
       "ListEnvelope<{typeName, displayName, personSettingTypeId, hasActive, documentId, version, title, effectiveDate, contentLength}>",
     errors: COMMON_AUTH_ERRORS,
     notes: ["Also reachable as `ib legal list` (alias) — `active` is the legal group's analog of other domains' `list`."],
     seeAlso: ["ib legal types", "ib legal show"],
-    examples: ["ib legal active", "ib legal list"],
+    examples: ["ib legal active", "ib legal list", "ib legal active --language en"],
   },
   {
     command: "ib legal status",
@@ -3593,12 +3608,19 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [
       { name: "owner", type: "number", description: "Filter by ownerAsiakasId tenant scope" },
       { name: "status", type: "string", description: "Filter by lifecycle status: draft|active|archived|deleted", allowed: ["draft", "active", "archived", "deleted"] },
+      {
+        name: "language",
+        type: "string",
+        default: "fi",
+        description: "Filter by document language: fi (binding original) or en (unofficial translation)",
+        allowed: ["fi", "en"],
+      },
     ],
     outputShape:
       "ListEnvelope<{documentId, version, title, status, isActive, effectiveDate, createdBy, createdTime, notes, ownerAsiakasId}>",
     errors: COMMON_AUTH_ERRORS,
     seeAlso: ["ib legal get", "ib legal diff", "ib legal drafts", "ib legal activate"],
-    examples: ["ib legal versions TOS", "ib legal versions TOS --status draft", "ib legal versions BETONIJERRY_TOS"],
+    examples: ["ib legal versions TOS", "ib legal versions TOS --status draft", "ib legal versions BETONIJERRY_TOS", "ib legal versions TOS --language en"],
   },
   {
     command: "ib legal drafts",
@@ -3671,6 +3693,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "type", type: "string", required: true, description: "Document type name (see ib legal types)" },
       { name: "doc-version", type: "string", required: true, description: "Version string, e.g. 2.0 (NOT --version — that is the global CLI version flag)" },
       { name: "title", type: "string", description: "Document title (required for a full save; defaults to the current doc's title in edit mode)" },
+      {
+        name: "language",
+        type: "string",
+        default: "fi",
+        description: "Document language: fi (binding original) or en (unofficial translation). In edit mode (--replace/--append/--prepend) this also selects WHICH language's current active document is read.",
+        allowed: ["fi", "en"],
+      },
       { name: "file", type: "string", description: "Read markdown content from a local file" },
       { name: "content", type: "string", description: "Inline markdown content (use over /api/cli/exec — no local FS there)" },
       { name: "owner", type: "number", description: "ownerAsiakasId tenant scope (1349 = BetoniJerry); omit for global" },
@@ -3703,6 +3732,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       'ib legal save --type TOS --doc-version 2.1 --title Kayttoehdot --content "# TOS" --activate --dry-run',
       "ib legal save --type BETONIJERRY_OFFER_ACCEPTANCE --doc-version offer-2026-06-18 --title 'Tarjouksen hyväksyntä' --file offer.md --validate-json --reason 'update CTA copy'",
       'ib legal save --type TOS --doc-version 2.1 --replace "14 vrk" --with "30 vrk" --reason "extend payment term" --dry-run',
+      'ib legal save --type TOS --doc-version 2.1 --title "Terms of Service" --file ./tos-en.md --language en --activate --reason "publish EN translation"',
     ],
   },
   {

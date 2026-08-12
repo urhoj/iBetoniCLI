@@ -21,7 +21,7 @@ import {
   type WriteFlags,
 } from "../../api/writeFlags.js";
 import { writeJson, failWith, failUsage } from "../../output/json.js";
-import { parseId, cappedInt } from "../../targets.js";
+import { parseId, cappedInt, assertEnum } from "../../targets.js";
 import { decodeJwtPayload, type DecodedClaims } from "../../auth/jwt.js";
 import { lineDiff } from "../../textDiff.js";
 import { addEditFlags, applyTextEdit, parseEditOp, textEditDryRunEnvelope, type TextEditOp } from "../../textEdit.js";
@@ -32,6 +32,22 @@ import { bothInOrder } from "../../parallel.js";
 
 /** Lifecycle status values on legalDocuments.status (see backend migration). */
 export const LEGAL_STATUSES = ["draft", "active", "archived", "deleted"] as const;
+
+/**
+ * Document language values on legalDocuments.language (Task 8 backend). `fi`
+ * is the binding original; `en` is an unofficial translation — the backend
+ * falls back to the `fi` row when no active `en` row exists for a type.
+ */
+export const LEGAL_LANGUAGES = ["fi", "en"] as const;
+
+/** Normalize --language to a validated lowercase fi|en, defaulting to fi (the binding original) when omitted. Exits 4 on a bad code. */
+export function normalizeLegalLanguage(lang: string | undefined): string {
+  const v = (lang ?? "fi").trim().toLowerCase();
+  assertEnum(v, LEGAL_LANGUAGES, "--language");
+  return v;
+}
+
+const LANGUAGE_FLAG_DESC = "Document language: fi (binding) or en (unofficial translation). Default fi.";
 
 export interface LegalDocType {
   documentTypeId: number;
@@ -51,6 +67,8 @@ export interface LegalSaveFields {
   notes?: string;
   effectiveDate?: string;
   activate?: boolean;
+  /** Document language (fi|en). Omitted = backend default (fi). */
+  language?: string;
 }
 
 type Row = Record<string, unknown>;
@@ -77,10 +95,12 @@ export async function runLegalTypes(client: ApiClient): Promise<ListEnvelope<Leg
 export async function runLegalShow(
   client: ApiClient,
   typeName: string,
-  metaOnly: boolean
+  metaOnly: boolean,
+  language?: string
 ): Promise<Row> {
+  const suffix = qs({ language: language || undefined });
   const doc = await client.get<Row>(
-    `/api/legal-documents/current/${encodeURIComponent(typeName)}`
+    `/api/legal-documents/current/${encodeURIComponent(typeName)}${suffix}`
   );
   if (metaOnly && doc && typeof doc === "object") return diffMeta(doc);
   return doc;
@@ -95,8 +115,9 @@ export async function runLegalShow(
  * dropped. Content is stripped (reported as `contentLength`) — read a body via
  * `ib legal show <typeName>`.
  */
-export async function runLegalActive(client: ApiClient): Promise<ListEnvelope<Row>> {
+export async function runLegalActive(client: ApiClient, language?: string): Promise<ListEnvelope<Row>> {
   const types = await runLegalTypes(client);
+  const suffix = qs({ language: language || undefined });
   const items = await Promise.all(
     types.items.map(async (t): Promise<Row> => {
       const base: Row = {
@@ -106,7 +127,7 @@ export async function runLegalActive(client: ApiClient): Promise<ListEnvelope<Ro
       };
       try {
         const doc = await client.get<Row>(
-          `/api/legal-documents/current/${encodeURIComponent(t.typeName)}`
+          `/api/legal-documents/current/${encodeURIComponent(t.typeName)}${suffix}`
         );
         return {
           ...base,
@@ -168,9 +189,10 @@ export async function runLegalVersions(
   client: ApiClient,
   typeName: string,
   ownerAsiakasId?: number,
-  status?: string
+  status?: string,
+  language?: string
 ): Promise<ListEnvelope<Row>> {
-  const q = ownerAsiakasId != null ? `?ownerAsiakasId=${ownerAsiakasId}` : "";
+  const q = qs({ ownerAsiakasId, language: language || undefined });
   const rows = await client.get<Row[]>(
     `/api/legal-documents/${encodeURIComponent(typeName)}/versions${q}`
   );
@@ -318,6 +340,7 @@ export async function runLegalSave(
     activate: !!fields.activate,
     ownerAsiakasId: fields.ownerAsiakasId ?? null,
     effectiveDate: fields.effectiveDate,
+    language: fields.language,
   };
   return client.post<unknown>("/api/legal-documents/save", body, {
     headers: writeFlagsToHeaders(flags),
@@ -330,7 +353,10 @@ export async function runLegalSave(
  * place). Fetches the active doc (typeName implies the tenant), applies the edit
  * locally, then `--dry-run` returns the field diff WITHOUT writing (client-side,
  * safe-by-construction), or a real run delegates to `runLegalSave`. `--title`
- * defaults to the current doc's title when omitted.
+ * defaults to the current doc's title when omitted. `fields.language` (when
+ * given) both selects WHICH language's current active document is read and
+ * tags the saved edit with that same language, so an edit never cross-pollinates
+ * the fi and en variants of a type.
  */
 export async function runLegalSaveWithEdit(
   client: ApiClient,
@@ -343,10 +369,11 @@ export async function runLegalSaveWithEdit(
     notes?: string;
     effectiveDate?: string;
     activate?: boolean;
+    language?: string;
   },
   flags: WriteFlags
 ): Promise<unknown> {
-  const current = await runLegalShow(client, type, false); // /current/:type ; 404 → CliError exit 5
+  const current = await runLegalShow(client, type, false, fields.language); // /current/:type ; 404 → CliError exit 5
   const before = typeof current.markdownContent === "string" ? current.markdownContent : "";
   const { next, matchCount } = applyTextEdit(before, op);
   if (flags.dryRun) {
@@ -364,6 +391,7 @@ export async function runLegalSaveWithEdit(
       notes: fields.notes,
       effectiveDate: fields.effectiveDate,
       activate: fields.activate,
+      language: fields.language,
     },
     flags
   );
@@ -544,16 +572,22 @@ export function registerLegalCommands(
   legal
     .command("show <typeName>")
     .option("--meta")
+    .option("--language <l>", LANGUAGE_FLAG_DESC, "fi")
     .action(
-      jsonAction(getClient, (client, typeName: string, opts: { meta?: boolean }) =>
-        runLegalShow(client, typeName, !!opts.meta)
+      jsonAction(getClient, (client, typeName: string, opts: { meta?: boolean; language?: string }) =>
+        runLegalShow(client, typeName, !!opts.meta, normalizeLegalLanguage(opts.language))
       )
     );
 
   legal
     .command("active")
     .alias("list")
-    .action(jsonAction(getClient, runLegalActive));
+    .option("--language <l>", LANGUAGE_FLAG_DESC, "fi")
+    .action(
+      jsonAction(getClient, (client, opts: { language?: string }) =>
+        runLegalActive(client, normalizeLegalLanguage(opts.language))
+      )
+    );
 
   legal
     .command("status")
@@ -576,13 +610,15 @@ export function registerLegalCommands(
     .command("versions <typeName>")
     .option("--owner <id>", "", Number)
     .option("--status <status>")
+    .option("--language <l>", LANGUAGE_FLAG_DESC, "fi")
     .action(
-      guarded(async (typeName: string, opts: { owner?: number; status?: string }) => {
+      guarded(async (typeName: string, opts: { owner?: number; status?: string; language?: string }) => {
         if (opts.status && !LEGAL_STATUSES.includes(opts.status as (typeof LEGAL_STATUSES)[number])) {
           failWith(`Invalid --status "${opts.status}". Valid: ${LEGAL_STATUSES.join(", ")}`, 4);
         }
+        const language = normalizeLegalLanguage(opts.language);
         const client = await getClient();
-        writeJson(await runLegalVersions(client, typeName, opts.owner, opts.status));
+        writeJson(await runLegalVersions(client, typeName, opts.owner, opts.status, language));
       })
     );
 
@@ -640,7 +676,8 @@ export function registerLegalCommands(
     .option("--notes <text>")
     .option("--effective-date <date>")
     .option("--activate")
-    .option("--validate-json");
+    .option("--validate-json")
+    .option("--language <l>", LANGUAGE_FLAG_DESC, "fi");
   addEditFlags(saveCmd);
   addWriteFlagsToCommand(saveCmd).action(
     guarded(async (opts: WriteFlags & {
@@ -654,12 +691,14 @@ export function registerLegalCommands(
       effectiveDate?: string;
       activate?: boolean;
       validateJson?: boolean;
+      language?: string;
       replace?: string;
       with?: string;
       append?: string;
       prepend?: string;
       all?: boolean;
     }) => {
+      const language = normalizeLegalLanguage(opts.language);
       const editOp = parseEditOp(opts);
       if (editOp) {
         if (opts.file !== undefined || opts.content !== undefined) {
@@ -678,6 +717,7 @@ export function registerLegalCommands(
               notes: opts.notes,
               effectiveDate: opts.effectiveDate,
               activate: !!opts.activate,
+              language,
             },
             opts
           )
@@ -712,6 +752,7 @@ export function registerLegalCommands(
             notes: opts.notes,
             effectiveDate: opts.effectiveDate,
             activate: !!opts.activate,
+            language,
           },
           opts
         )
