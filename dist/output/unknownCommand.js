@@ -231,12 +231,14 @@ export const OPTION_REDIRECTS = {
     "ib dev cache invalidate --pattern": "`cache invalidate` targets an entity FAMILY by its <entityType> positional (e.g. `ib dev cache invalidate keikka --id 123`). For a raw Redis key glob use `ib dev cache pattern <glob>` instead.",
 };
 /** Long flags a command accepts, derived from its curated spec (tier-blind — the
- *  caller already invoked this command; only sibling ENUMERATION is tier-gated). */
+ *  caller already invoked this command; only sibling ENUMERATION is tier-gated).
+ *  Deduped: a `reasonPolicy: "always"` command declares `--reason` in its own
+ *  `flags` AND gets it again via `writeFlags` (fb#449). */
 function specOptionLongs(spec) {
     const longs = spec.flags.map((f) => `--${f.name}`);
     if (spec.writeFlags)
         longs.push("--dry-run", "--idempotency-key", "--reason");
-    return longs;
+    return [...new Set(longs)];
 }
 /** Real long options wired on a Commander command (fallback when no spec — e.g.
  *  a hidden back-compat alias). Drops the framework-added `--help`. */
@@ -495,8 +497,11 @@ export function buildUnknownOptionEnvelope(cmd, unknownOption, tier = "developer
     const didYouMean = guess ? `--${guess}` : null;
     const redirect = OPTION_REDIRECTS[`${command} ${unknownOption}`];
     // A curated redirect is hand-written for this exact command+flag, so it wins;
-    // the derived sibling list is the general case behind it.
-    const acceptedLiteral = redirect
+    // the derived sibling list is the general case behind it. Also suppressed when
+    // `didYouMean` fired (fb#443/#449): the flag exists on THIS command under a
+    // near spelling (e.g. the single-dash `-reason` typo), which beats redirecting
+    // the caller to a sibling — same principle as the `viaSynonym` guard below.
+    const acceptedLiteral = redirect || didYouMean
         ? []
         : siblingsAcceptingOption(canonicalPath(command), unknownOption, tier);
     // Nothing accepts it verbatim — a synonym spelling still might (fb#388).

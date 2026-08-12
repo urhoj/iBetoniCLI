@@ -4,6 +4,7 @@ import { assertEnum, assertPositiveInt, intFlag } from "../../targets.js";
 import { addWriteFlagsToCommand, writeFlagsToHeaders, } from "../../api/writeFlags.js";
 import { resolveDate } from "../../dates.js";
 import { jsonAction } from "../_shared/action.js";
+import { applyFromJson } from "../_shared/fromJson.js";
 import { qs } from "../../api/query.js";
 // EXECUTORS/AGENTS exported for specs.ts `allowed:` sets (validation envelopes).
 export const EXECUTORS = ["human", "ai"];
@@ -100,6 +101,16 @@ export async function runTaskAdd(client, input, flags) {
         headers: writeFlagsToHeaders(flags),
     });
 }
+/**
+ * `task add --from-json` (fb#450): --instructions is exactly the long,
+ * quote-bearing prose field the JSON path exists to protect from argv quoting.
+ * Accepted keys derive from the command's own flags; the write-safety trio and
+ * the carrier flag itself are non-payload.
+ */
+const ADD_FROM_JSON = {
+    nonPayload: new Set(["fromJson", "dryRun", "idempotencyKey", "reason", "help"]),
+    numericFields: new Set(["assignee", "asiakas", "feedback"]),
+};
 /** POST /api/tasks/:id/complete — done (default) / --skipped / --failed. */
 export async function runTaskComplete(client, id, input, flags) {
     if (input.skipped && input.failed) {
@@ -189,8 +200,12 @@ export function registerTaskCommands(parent, getClient, opts = {}) {
         .action(jsonAction(getClient, (client, opts) => runTaskList(client, opts)));
     t.command("get <id>")
         .action(jsonAction(getClient, (client, idStr) => runTaskGet(client, parseTaskId(idStr, "get"))));
+    // --title enforced in runTaskAdd, NOT via .requiredOption: it may arrive from
+    // --from-json, and Commander's missing-mandatory check would also fire BEFORE
+    // its unknown-option check, masking a typo'd flag behind "missing --title"
+    // (fb#450 — the fb#309 masking class).
     addWriteFlagsToCommand(t.command("add")
-        .requiredOption("--title <text>")
+        .option("--title <text>")
         .option("--executor <executor>")
         .option("--instructions <text>")
         .option("--skill <ref>")
@@ -199,7 +214,13 @@ export function registerTaskCommands(parent, getClient, opts = {}) {
         .option("--asiakas <id>", "", intFlag("--asiakas"))
         .option("--cadence <spec>")
         .option("--first-due <date>")
-        .option("--feedback <id>", "", intFlag("--feedback"))).action(jsonAction(getClient, (client, opts) => runTaskAdd(client, opts, opts)));
+        .option("--feedback <id>", "", intFlag("--feedback"))
+        .option("--from-json <file>")).action(jsonAction(getClient, (client, opts, cmd) => {
+        // Shared merge: explicitly-typed flags outrank the JSON object; unknown
+        // or wrong-typed JSON keys exit 4 (same contract as feedback create).
+        applyFromJson(cmd, opts, ADD_FROM_JSON);
+        return runTaskAdd(client, opts, opts);
+    }));
     addWriteFlagsToCommand(t.command("complete <id>")
         .option("--notes <text>")
         .option("--skipped")

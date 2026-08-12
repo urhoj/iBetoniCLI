@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
+import { Command } from "commander";
 import { mockApiClient, type MockApiClient } from "../helpers/mockClient.js";
 import {
   parseCadence,
@@ -9,7 +10,9 @@ import {
   runTaskComplete,
   runTaskSet,
   runTaskLog,
+  registerTaskCommands,
 } from "../../src/commands/task/index.js";
+import { payloadKeyMap } from "../../src/commands/_shared/fromJson.js";
 
 function mockClient(): MockApiClient {
   return mockApiClient({
@@ -156,6 +159,42 @@ describe("runTaskAdd", () => {
       runTaskAdd(client, input as Parameters<typeof runTaskAdd>[1], {})
     ).rejects.toThrowError(msg);
     expect(client.post).not.toHaveBeenCalled();
+  });
+});
+
+// fb#450: --from-json parity for the command whose --instructions is exactly
+// the long quote-bearing prose the JSON path exists to protect.
+describe("task add --from-json wiring (fb#450)", () => {
+  const addCmd = () => {
+    const program = new Command();
+    registerTaskCommands(program, async () => client as never);
+    return program.commands
+      .find((c) => c.name() === "task")!
+      .commands.find((c) => c.name() === "add")!;
+  };
+
+  test("--from-json is wired and --title is no longer Commander-mandatory", () => {
+    const add = addCmd();
+    expect(add.options.some((o) => o.long === "--from-json")).toBe(true);
+    // A Commander-mandatory --title would (a) reject a JSON-supplied title and
+    // (b) mask an unknown flag behind "missing --title" (the fb#309 ordering).
+    const title = add.options.find((o) => o.long === "--title")!;
+    expect(title.mandatory).toBe(false);
+  });
+
+  test("the payload key map covers every task field and no write-safety flag", () => {
+    const keys = payloadKeyMap(addCmd(), {
+      nonPayload: new Set(["fromJson", "dryRun", "idempotencyKey", "reason", "help"]),
+    });
+    for (const k of ["title", "executor", "instructions", "skill", "agent", "assignee", "asiakas", "cadence", "feedback"]) {
+      expect(keys.get(k), k).toBe(k);
+    }
+    // Both spellings of the hyphenated flag resolve to the camelCase attribute.
+    expect(keys.get("firstDue")).toBe("firstDue");
+    expect(keys.get("first-due")).toBe("firstDue");
+    for (const k of ["fromJson", "dryRun", "idempotencyKey", "reason", "help"]) {
+      expect(keys.has(k), k).toBe(false);
+    }
   });
 });
 

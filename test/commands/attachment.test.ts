@@ -88,6 +88,22 @@ describe("resolveEntityTarget", () => {
     expect(() => resolveEntityTarget({})).toThrowError(CliError);
     expect(() => resolveEntityTarget({ keikka: 1, vehicle: 2 })).toThrowError(CliError);
   });
+
+  // fb#429: `--asiakas` is the majority spelling for an asiakasId across the
+  // CLI; here it is a hidden alias folded onto the canonical `--customer`.
+  test("folds the --asiakas alias onto --customer", () => {
+    expect(resolveEntityTarget({ asiakas: 1389 })).toEqual({ entity: "customer", entityId: 1389 });
+    // Agreement is allowed; still exactly one entity flag after the fold.
+    expect(resolveEntityTarget({ asiakas: 8, customer: 8 })).toEqual({ entity: "customer", entityId: 8 });
+  });
+
+  test("disagreeing --asiakas vs --customer is a loud conflict, not a silent pick", () => {
+    expect(() => resolveEntityTarget({ asiakas: 5, customer: 6 })).toThrowError(/alias for --customer/);
+  });
+
+  test("the alias does not defeat the exactly-one rule", () => {
+    expect(() => resolveEntityTarget({ asiakas: 5, keikka: 1 })).toThrowError(CliError);
+  });
 });
 
 describe("resolveDetachEntity", () => {
@@ -109,6 +125,10 @@ describe("resolveDetachEntity", () => {
     expect(() => resolveDetachEntity(undefined, {})).toThrowError(CliError);
     expect(() => resolveDetachEntity("keikka", { vehicle: 53 })).toThrowError(CliError);
     expect(() => resolveDetachEntity(undefined, { keikka: 1, vehicle: 2 })).toThrowError(CliError);
+  });
+
+  test("resolves the --asiakas alias as customer (fb#429)", () => {
+    expect(resolveDetachEntity(undefined, { asiakas: 1389 })).toBe("customer");
   });
 });
 

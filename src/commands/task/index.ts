@@ -19,6 +19,7 @@ import {
 } from "../../api/writeFlags.js";
 import { resolveDate } from "../../dates.js";
 import { jsonAction } from "../_shared/action.js";
+import { applyFromJson, type FromJsonConfig } from "../_shared/fromJson.js";
 import { qs } from "../../api/query.js";
 
 // EXECUTORS/AGENTS exported for specs.ts `allowed:` sets (validation envelopes).
@@ -156,6 +157,17 @@ export async function runTaskAdd(
   });
 }
 
+/**
+ * `task add --from-json` (fb#450): --instructions is exactly the long,
+ * quote-bearing prose field the JSON path exists to protect from argv quoting.
+ * Accepted keys derive from the command's own flags; the write-safety trio and
+ * the carrier flag itself are non-payload.
+ */
+const ADD_FROM_JSON: FromJsonConfig = {
+  nonPayload: new Set(["fromJson", "dryRun", "idempotencyKey", "reason", "help"]),
+  numericFields: new Set(["assignee", "asiakas", "feedback"]),
+};
+
 export interface TaskCompleteInput {
   skipped?: boolean;
   failed?: boolean;
@@ -283,9 +295,13 @@ export function registerTaskCommands(
       )
     );
 
+  // --title enforced in runTaskAdd, NOT via .requiredOption: it may arrive from
+  // --from-json, and Commander's missing-mandatory check would also fire BEFORE
+  // its unknown-option check, masking a typo'd flag behind "missing --title"
+  // (fb#450 — the fb#309 masking class).
   addWriteFlagsToCommand(
     t.command("add")
-      .requiredOption("--title <text>")
+      .option("--title <text>")
       .option("--executor <executor>")
       .option("--instructions <text>")
       .option("--skill <ref>")
@@ -295,9 +311,16 @@ export function registerTaskCommands(
       .option("--cadence <spec>")
       .option("--first-due <date>")
       .option("--feedback <id>", "", intFlag("--feedback"))
+      .option("--from-json <file>")
   ).action(
-    jsonAction(getClient, (client, opts: TaskAddInput & WriteFlags) =>
-      runTaskAdd(client, opts, opts)
+    jsonAction(
+      getClient,
+      (client, opts: TaskAddInput & WriteFlags & { fromJson?: string }, cmd: Command) => {
+        // Shared merge: explicitly-typed flags outrank the JSON object; unknown
+        // or wrong-typed JSON keys exit 4 (same contract as feedback create).
+        applyFromJson(cmd, opts as Record<string, unknown>, ADD_FROM_JSON);
+        return runTaskAdd(client, opts, opts);
+      }
     )
   );
 

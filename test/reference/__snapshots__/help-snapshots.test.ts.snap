@@ -10724,6 +10724,7 @@ FLAGS
   --asiakas NUMBER    Company (asiakasId) the task is scoped to; omit = internal/global
   --first-due STRING    First due date (YYYY-MM-DD or today/tomorrow); default: due immediately
   --feedback NUMBER    cliFeedback id this task graduated from (provenance link)
+  --from-json STRING    Read the whole payload from a JSON object file (or - for stdin); explicit flags override. Keys: title, executor, instructions, skill, agent, assignee, asiakas, cadence, first-due, feedback. An unknown or wrong-typed key exits 4 (never silently dropped). Shell-safe: the way to pass --instructions prose containing quotes on Windows PowerShell.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -10739,7 +10740,7 @@ OUTPUT (JSON, stdout)
   { taskId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldWrite:{...} } (server-side preview).
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  Validation             → --title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
+  exit 4 (client-side)  Validation             → --title, --executor (human|ai) and --cadence (<count>/<unit>) are required (from flags or --from-json); --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 

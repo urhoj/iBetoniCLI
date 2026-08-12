@@ -127,6 +127,14 @@ describe("Rich --help wiring — real command tree", () => {
   const DEPRECATED_FLAG_ALIASES: Record<string, string> = {
     "ib dev cache invalidate --asiakas-id": "--asiakas",
     "ib jerry admin searches list --q": "--search",
+    // fb#429: attachment commands spell the asiakasId flag `--customer`
+    // (mirrors backend ENTITY_COLUMNS) while ~38 tenant-scoped commands spell
+    // it `--asiakas` — accept the majority spelling everywhere entity flags go.
+    "ib attachment attach --asiakas": "--customer",
+    "ib attachment detach --asiakas": "--customer",
+    "ib attachment list --asiakas": "--customer",
+    "ib attachment register --asiakas": "--customer",
+    "ib attachment upload --asiakas": "--customer",
   };
 
   const isHidden = (opt: { hidden?: boolean }): boolean => !!opt.hidden;

@@ -1,4 +1,4 @@
-import type { Command } from "commander";
+import { Option, type Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import type { ListEnvelope } from "../../api/envelopes.js";
 import { writeJson, failWith } from "../../output/json.js";
@@ -66,7 +66,30 @@ function addEntityFlags(cmd: Command): Command {
   for (const e of ENTITY_OPTS) {
     cmd.option(e.flag, "", (s: string) => Number(s));
   }
+  // Hidden alias (fb#429): the asiakasId flag is spelled `--asiakas` on most
+  // tenant-scoped commands, but here the canonical spelling is `--customer`
+  // (mirrors backend ENTITY_COLUMNS) — so the majority guess failed on every
+  // attachment command. Hidden: the spec documents only `--customer`.
+  cmd.addOption(new Option("--asiakas <id>").argParser((s: string) => Number(s)).hideHelp());
   return cmd;
+}
+
+/**
+ * Fold the hidden `--asiakas` alias into `--customer` (fb#429). Commander has no
+ * true option aliasing — `--asiakas` lands on its own `asiakas` key, which the
+ * ENTITY_OPTS scans would read as ZERO entity flags. Both allowed only when they
+ * agree, so a disagreement is a loud conflict rather than a silent pick.
+ */
+function foldAsiakasAlias(opts: Record<string, unknown>): void {
+  if (opts.asiakas === undefined) return;
+  if (opts.customer !== undefined && opts.customer !== opts.asiakas) {
+    failWith(
+      `--asiakas is an alias for --customer — they disagree (${opts.asiakas} vs ${opts.customer}); pass only one`,
+      4
+    );
+  }
+  opts.customer = opts.asiakas;
+  delete opts.asiakas;
 }
 
 /** Exactly one entity flag must be set. Exported for tests. */
@@ -74,6 +97,7 @@ export function resolveEntityTarget(opts: Record<string, unknown>): {
   entity: string;
   entityId: number;
 } {
+  foldAsiakasAlias(opts);
   const hits = ENTITY_OPTS.filter((e) => opts[e.optKey] !== undefined);
   if (hits.length !== 1) {
     failWith(
@@ -107,6 +131,7 @@ export function resolveDetachEntity(
   positional: string | undefined,
   opts: Record<string, unknown>
 ): string {
+  foldAsiakasAlias(opts);
   const flagHits = ENTITY_OPTS.filter((e) => opts[e.optKey] !== undefined);
   if (flagHits.length > 1) {
     failWith(

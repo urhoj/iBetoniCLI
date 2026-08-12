@@ -163,15 +163,15 @@ ib sijainti closest --worksite <id>
 
 ib task add --asiakas <id>
   ! --asiakas must be an integer >= 1
-  > --title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
+  > --title, --executor (human|ai) and --cadence (<count>/<unit>) are required (from flags or --from-json); --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
 
 ib task add --assignee <personId>
   ! --assignee must be an integer >= 1
-  > --title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
+  > --title, --executor (human|ai) and --cadence (<count>/<unit>) are required (from flags or --from-json); --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
 
 ib task add --feedback <id>
   ! --feedback must be an integer >= 1
-  > --title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
+  > --title, --executor (human|ai) and --cadence (<count>/<unit>) are required (from flags or --from-json); --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
 
 ib task list --asiakas <id>
   ! --asiakas must be an integer >= 1

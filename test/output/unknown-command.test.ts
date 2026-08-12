@@ -203,6 +203,34 @@ describe("sibling-command flag redirect (#308)", () => {
   });
 });
 
+// feedback #443/#449 — a single-dash typo of a flag the command ITSELF owns must
+// lead with the same-command correction, never a sibling redirect: `-reason` on
+// `jerry admin enable` (which owns --reason) led with "belongs to a sibling
+// command: ib jerry request create…", sending the caller to the wrong command.
+describe("single-dash typo on an owned flag (fb#443/#449)", () => {
+  test("the reported case: jerry admin enable -reason → did-you-mean only, no sibling redirect", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("jerry", "admin", "enable"), "-reason");
+    expect(env.didYouMean).toBe("--reason");
+    expect(env.acceptedBy).toEqual([]);
+    expect(env.hint).not.toContain("sibling");
+    expect(env.hint).toContain("Did you mean `--reason`?");
+  });
+
+  test("availableOptions is deduped for a reasonPolicy-always command", () => {
+    // The command declares --reason in its own spec.flags AND writeFlags adds it
+    // again — the envelope (and its hint prose) must list it once.
+    const env = buildUnknownOptionEnvelope(leafByPath("jerry", "admin", "enable"), "-reason");
+    expect(env.availableOptions).toContain("--reason");
+    expect(env.availableOptions.filter((o, i, a) => a.indexOf(o) !== i)).toEqual([]);
+  });
+
+  test("no same-command match → the sibling redirect still fires (#308 preserved)", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("person", "list"), "--search");
+    expect(env.didYouMean).toBeNull();
+    expect(env.acceptedBy).toEqual(["ib person search"]);
+  });
+});
+
 // feedback #388 — semantic flag guesses edit distance cannot bridge.
 describe("flag synonyms (fb#388)", () => {
   test("the reported case: customer search --query resolves to --search", () => {

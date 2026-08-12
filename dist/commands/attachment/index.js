@@ -1,3 +1,4 @@
+import { Option } from "commander";
 import { writeJson, failWith } from "../../output/json.js";
 import { readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -26,10 +27,31 @@ function addEntityFlags(cmd) {
     for (const e of ENTITY_OPTS) {
         cmd.option(e.flag, "", (s) => Number(s));
     }
+    // Hidden alias (fb#429): the asiakasId flag is spelled `--asiakas` on most
+    // tenant-scoped commands, but here the canonical spelling is `--customer`
+    // (mirrors backend ENTITY_COLUMNS) — so the majority guess failed on every
+    // attachment command. Hidden: the spec documents only `--customer`.
+    cmd.addOption(new Option("--asiakas <id>").argParser((s) => Number(s)).hideHelp());
     return cmd;
+}
+/**
+ * Fold the hidden `--asiakas` alias into `--customer` (fb#429). Commander has no
+ * true option aliasing — `--asiakas` lands on its own `asiakas` key, which the
+ * ENTITY_OPTS scans would read as ZERO entity flags. Both allowed only when they
+ * agree, so a disagreement is a loud conflict rather than a silent pick.
+ */
+function foldAsiakasAlias(opts) {
+    if (opts.asiakas === undefined)
+        return;
+    if (opts.customer !== undefined && opts.customer !== opts.asiakas) {
+        failWith(`--asiakas is an alias for --customer — they disagree (${opts.asiakas} vs ${opts.customer}); pass only one`, 4);
+    }
+    opts.customer = opts.asiakas;
+    delete opts.asiakas;
 }
 /** Exactly one entity flag must be set. Exported for tests. */
 export function resolveEntityTarget(opts) {
+    foldAsiakasAlias(opts);
     const hits = ENTITY_OPTS.filter((e) => opts[e.optKey] !== undefined);
     if (hits.length !== 1) {
         failWith(`Exactly one entity flag required (got ${hits.length}): ${ENTITY_OPTS.map((e) => e.flag.split(" ")[0]).join(" | ")}`, 4);
@@ -55,6 +77,7 @@ export function normalizeEntityWord(raw) {
  * Exported for tests.
  */
 export function resolveDetachEntity(positional, opts) {
+    foldAsiakasAlias(opts);
     const flagHits = ENTITY_OPTS.filter((e) => opts[e.optKey] !== undefined);
     if (flagHits.length > 1) {
         failWith(`Only one entity flag allowed (got ${flagHits.length}): ${ENTITY_OPTS.map((e) => e.flag.split(" ")[0]).join(" | ")}`, 4);

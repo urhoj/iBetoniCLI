@@ -7579,10 +7579,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "asiakas", type: "number", description: "Company (asiakasId) the task is scoped to; omit = internal/global" },
       { name: "first-due", type: "string", description: "First due date (YYYY-MM-DD or today/tomorrow); default: due immediately" },
       { name: "feedback", type: "number", description: "cliFeedback id this task graduated from (provenance link)" },
+      { name: "from-json", type: "string", description: "Read the whole payload from a JSON object file (or - for stdin); explicit flags override. Keys: title, executor, instructions, skill, agent, assignee, asiakas, cadence, first-due, feedback. An unknown or wrong-typed key exits 4 (never silently dropped). Shell-safe: the way to pass --instructions prose containing quotes on Windows PowerShell." },
     ],
     outputShape: "{ taskId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldWrite:{...} } (server-side preview).",
     errors: [
-      { origin: "client", exit: 4, meaning: "Validation", remedy: "--title, --executor (human|ai) and --cadence (<count>/<unit>) are required; --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers" },
+      { origin: "client", exit: 4, meaning: "Validation", remedy: "--title, --executor (human|ai) and --cadence (<count>/<unit>) are required (from flags or --from-json); --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],

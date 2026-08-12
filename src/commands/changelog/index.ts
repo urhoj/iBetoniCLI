@@ -709,12 +709,14 @@ export function registerChangelogCommands(
             )}) — on next deploy this fail-safe-bumps ALL coordinated repos. For the standalone lane (betonicli, @ibetoni/*) add --bump-level none.`
           );
         // Recognized standalone lane: the planner skips it entirely, so the
-        // --bump-level just recorded will never move a version. Silent today,
-        // and the caller has no way to tell it apart from a coordinated entry
-        // that WILL bump (feedback #354). One line, same shape as the ⚠ above.
+        // --bump-level just recorded will never move a version (feedback #354).
+        // Must read as REASSURANCE, not rejection — the old wording ("repos are
+        // …; pass --bump-level none") landed as "unknown repo → fail-safe bump
+        // of everything" and cost a caller an investigation (fb#466). Keep the
+        // alarm tone for the genuinely-unrecognized ⚠ branch above only.
         else if (coordinated.length === 0)
           warnNote(
-            `[ib] note: --repo "${o.repo}" is the standalone lane, so --bump-level ${o.bumpLevel || "patch"} is inert — no repo is bumped by this entry. Coordinated repos are ${COORDINATED_REPOS.join(", ")}; pass --bump-level none to say so explicitly.`
+            `[ib] note: --repo "${o.repo}" is a recognized standalone package, not a coordinated release repo — this entry bumps no app version, so --bump-level ${o.bumpLevel || "patch"} is inert (standalone packages are auto-bumped by \`npm run final\`). This is fine; nothing to do.`
           );
       }
       if (o.sha) body.commitShas = o.sha;
