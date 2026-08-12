@@ -7,6 +7,7 @@ import {
   runJerryRequestCreate,
   runJerryRequestCancel,
   runJerryCounts,
+  runJerryStats,
   runJerryCheckAddress,
   runJerryCoverage,
   runJerryProviderSettingsGet,
@@ -157,6 +158,20 @@ describe("ib jerry counts", () => {
     get.mockResolvedValueOnce({ avoimet: 5 });
     await runJerryCounts(mockClient, true);
     expect(get).toHaveBeenCalledWith("/api/pumppuRequests/provider-counts");
+  });
+});
+
+describe("ib jerry stats", () => {
+  test("no --weeks sends no query string, letting the server default apply", async () => {
+    get.mockResolvedValueOnce({ weeks: [] });
+    await runJerryStats(mockClient, undefined);
+    expect(get).toHaveBeenCalledWith("/api/admin/jerry-searches/weekly");
+  });
+
+  test("--weeks is passed through", async () => {
+    get.mockResolvedValueOnce({ weeks: [] });
+    await runJerryStats(mockClient, 26);
+    expect(get).toHaveBeenCalledWith("/api/admin/jerry-searches/weekly?weeks=26");
   });
 });
 

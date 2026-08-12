@@ -354,8 +354,9 @@ describe("descendant-subgroup verb redirect (fb#379)", () => {
   });
 
   test("root scan is tier-gated too", () => {
-    // all three `stats` owners are developer-tier (jerry admin / dev cache / dev perf)
+    // all four `stats` owners are developer-tier (jerry / jerry admin / dev cache / dev perf)
     expect(descendantsOwningVerb("ib", "stats", "developer")).toEqual([
+      "ib jerry stats",
       "ib jerry admin request stats",
       "ib dev cache stats",
       "ib dev perf stats",

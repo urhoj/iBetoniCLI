@@ -4612,6 +4612,31 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib jerry counts", "ib jerry counts --provider"],
   },
   {
+    command: "ib jerry stats",
+    description:
+      "Weekly BetoniJerry funnel as a time series (GET /api/admin/jerry-searches/weekly): visitors → address searches → wizard sessions → requests sent → offers. Monday-start weeks, oldest first. This is the trend view; `ib jerry counts` is the lifecycle snapshot of your own requests. Use it to answer 'is demand growing' and 'are providers still answering', neither of which a single-window number can show.",
+    permissions: ["isSystemAdmin"],
+    tier: "developer",
+    flags: [
+      { name: "weeks", type: "number", description: "How many weeks back (default 12, capped at 104)" },
+    ],
+    outputShape:
+      "{ weeks: [{ weekStart, visitors, wizardVisitors, authedVisitors, searches, coveredSearches, noSupplySearches, wizardSessions, reachedReview, requestsSent, noSupplyRequests, offersSent, offersAccepted }] }",
+    errors: [
+      SYSADMIN_403,
+      ...COMMON_AUTH_ERRORS,
+    ],
+    seeAlso: ["ib jerry admin request stats", "ib jerry admin searches funnel", "ib jerry counts"],
+    notes: [
+      "`visitors` is null — not 0 — for any week before 2026-08-12, when the daily visitor rollup started. The presence heartbeat was ephemeral until then, so those weeks have no visitor number and never can. Reading a null as 0 would say 'nobody came' when the truth is 'we were not counting yet'.",
+      "`wizardSessions` counts only PRE-CLAIM sessions: BetonijerryAnonymousEvent stops recording once a server draft exists, so a returning logged-in user who resumes a draft is invisible here. It undercounts, and the gap widens as more traffic is authenticated — do not read it as total wizard usage.",
+      "`reachedReview` means 'completed step 4', i.e. landed on Vaihe 5 (tarkista). It is NOT step >= 5, which is structurally 0 because the wizard emits a step only when advancing off it and Vaihe 5 ends in Lähetä (fb#457).",
+      "`offersSent` excludes drafts — an unsent draft offer is not an answer to the customer. `offersAccepted` counts both 'accepted' and 'confirmed'.",
+      "Not to be confused with `ib jerry admin request stats`, which is also weekly but covers ONLY requests (with a per-status split and an arbitrary --from/--to window). Use that one to dissect request outcomes; use this one to see the whole funnel end to end, including the demand upstream of any request. Both bucket in Helsinki time and agree on which week a request belongs to.",
+    ],
+    examples: ["ib jerry stats", "ib jerry stats --weeks 26"],
+  },
+  {
     command: "ib jerry check-address",
     description:
       "Geofence feasibility probe (POST /api/pumppuRequests/checkAddress; the route is unauthenticated, but ib calls it with your session): which provider varikot cover an address. The single best tool for diagnosing 'no offers'. --address is required (the `osoite` body field); if --lat/--lng/--place-id are all supplied the server trusts them instead of re-geocoding. Not a mutation, so no write-safety flags. Rate-limited 20/min per IP. The `providers` array is only included when the token is a developer/admin.",

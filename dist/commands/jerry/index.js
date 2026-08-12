@@ -163,6 +163,18 @@ export async function runJerryCounts(client, provider) {
         : "/api/pumppuRequests/mine/counts";
     return client.get(path);
 }
+/**
+ * Weekly marketplace funnel (GET /api/admin/jerry-searches/weekly). System-admin only.
+ *
+ * The trend counterpart to `counts`: where `counts` is a lifecycle snapshot of
+ * your own requests, this is the whole funnel week by week — visitors, address
+ * searches, wizard sessions, requests, offers — so a change in demand or a
+ * provider side that has gone quiet is visible as a shape, not a single number.
+ */
+export async function runJerryStats(client, weeks) {
+    const qs = weeks === undefined ? "" : `?weeks=${weeks}`;
+    return client.get(`/api/admin/jerry-searches/weekly${qs}`);
+}
 /** Exclusion reasons `--explain` can report, in gate-priority order. */
 export const CHECK_ADDRESS_GATES = [
     "company-gate",
@@ -684,6 +696,10 @@ export function registerJerryCommands(parent, getClient) {
         .option("--provider")
         .option("--mine")
         .action(jsonAction(getClient, (client, opts) => runJerryCounts(client, !!opts.provider)));
+    // stats ──────────────────────────────────────────────────────────────────────
+    j.command("stats")
+        .option("--weeks <n>", "", Number)
+        .action(jsonAction(getClient, (client, opts) => runJerryStats(client, opts.weeks)));
     // check-address ────────────────────────────────────────────────────────────
     j.command("check-address")
         .requiredOption("--address <s>")
