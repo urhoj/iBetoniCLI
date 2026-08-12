@@ -60,6 +60,15 @@ export async function runSchemaTrigger(client: ApiClient, name: string): Promise
 export async function runSchemaDump(client: ApiClient): Promise<Record_> {
   return client.get<Record_>("/api/cli/schema/dump");
 }
+/**
+ * Migration snapshot tables + their retention state (fb#440). No `search` —
+ * the server decides what counts as a snapshot (stamped, or matching the name
+ * heuristic), and a substring filter on top would only hide rows from the very
+ * report whose job is to be complete.
+ */
+export async function runSchemaSnapshots(client: ApiClient, opts: SchemaListFilter): Promise<Envelope> {
+  return client.get<Envelope>(`/api/cli/schema/snapshots${qs({ limit: opts.limit })}`);
+}
 
 /**
  * Batch the single-object lookups (`table`/`view`/`proc`) — the comma-separated
@@ -137,4 +146,8 @@ export function registerSchemaCommands(
 
   s.command("dump")
     .action(jsonAction(getClient, runSchemaDump));
+
+  s.command("snapshots")
+    .option("--limit <n>", "", cappedInt(1000))
+    .action(jsonAction(getClient, runSchemaSnapshots));
 }

@@ -5203,7 +5203,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: ['ib jerry admin request delete 41 --reason "cleanup draft"'],
   },
 
-  // ─── schema (9) — developer-only SQL introspection ─────────────────────────
+  // ─── schema (10) — developer-only SQL introspection ────────────────────────
   ...((): CommandSpec[] => {
     const DEV_PERMS = ["developer access (isSystemAdmin or isDeveloper)"];
     const devErrors: CommandError[] = [
@@ -5317,6 +5317,24 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         outputShape: "{ tables:[{name,columns}], foreignKeys:[{table,column,refTable,refColumn}], views:[{name}], procs:[{name,type,parameters}], triggers:[{name,table,timing,events,disabled}] }",
         errors: devErrors,
         examples: ["ib dev schema dump"],
+      },
+      {
+        command: "ib dev schema snapshots",
+        description:
+          "List migration snapshot tables (the copies migrations take before they delete) with their retention state. Reports only — nothing here drops anything. Developer-only.",
+        permissions: DEV_PERMS,
+        tier: "developer",
+        flags: [{ name: "limit", type: "number", default: "200", description: "Max rows (max 1000)" }],
+        outputShape:
+          "{ items: [{ name, type:'table', rows, createdAt, state:'expired'|'malformed'|'unstamped'|'stamped', dropAfter, origin, reason, daysOverdue }], nextCursor: null, count } — ordered action-first: expired (most overdue) → malformed → unstamped → stamped.",
+        errors: devErrors,
+        notes: [
+          "The retention contract is an `IB_Snapshot` extended property on the table itself, so it travels with the object and dies with it. `origin` names the migration that created the snapshot; `reason` says what it holds.",
+          "`unstamped` = the table LOOKS like a snapshot by name but carries no contract — detection deliberately does not rely on the naming convention, since a forgotten stamp is the failure being caught. `malformed` = a stamp with no usable date, which is worse than none: it reads as owned but can never expire.",
+          "Expired never means 'drop it automatically'. A monthly `ib task` surfaces these in the morning report and a human decides — dropping a rollback path on a timer is worse than keeping a dead table.",
+          "Convention, the 90-day cap and the GDPR position: puminet5api `migrations/README.md` § Snapshot tables.",
+        ],
+        examples: ["ib dev schema snapshots"],
       },
     ];
   })(),

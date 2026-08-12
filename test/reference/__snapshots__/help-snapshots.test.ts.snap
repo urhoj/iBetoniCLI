@@ -3081,6 +3081,40 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev schema snapshots matches snapshot 1`] = `
+"USAGE
+  ib dev schema snapshots [flags]
+
+DESCRIPTION
+  List migration snapshot tables (the copies migrations take before they delete) with their retention state. Reports only — nothing here drops anything. Developer-only.
+  Permissions: requires developer access (isSystemAdmin or isDeveloper).
+
+FLAGS
+  --limit NUMBER    Max rows (max 1000) (default: 200)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { items: [{ name, type:'table', rows, createdAt, state:'expired'|'malformed'|'unstamped'|'stamped', dropAfter, origin, reason, daysOverdue }], nextCursor: null, count } — ordered action-first: expired (most overdue) → malformed → unstamped → stamped.
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - The retention contract is an \`IB_Snapshot\` extended property on the table itself, so it travels with the object and dies with it. \`origin\` names the migration that created the snapshot; \`reason\` says what it holds.
+  - \`unstamped\` = the table LOOKS like a snapshot by name but carries no contract — detection deliberately does not rely on the naming convention, since a forgotten stamp is the failure being caught. \`malformed\` = a stamp with no usable date, which is worse than none: it reads as owned but can never expire.
+  - Expired never means 'drop it automatically'. A monthly \`ib task\` surfaces these in the morning report and a human decides — dropping a rollback path on a timer is worse than keeping a dead table.
+  - Convention, the 90-day cap and the GDPR position: puminet5api \`migrations/README.md\` § Snapshot tables.
+
+EXAMPLES
+  ib dev schema snapshots
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev schema table matches snapshot 1`] = `
 "USAGE
   ib dev schema table <name> [flags]

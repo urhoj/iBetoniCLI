@@ -39,6 +39,15 @@ export async function runSchemaDump(client) {
     return client.get("/api/cli/schema/dump");
 }
 /**
+ * Migration snapshot tables + their retention state (fb#440). No `search` —
+ * the server decides what counts as a snapshot (stamped, or matching the name
+ * heuristic), and a substring filter on top would only hide rows from the very
+ * report whose job is to be complete.
+ */
+export async function runSchemaSnapshots(client, opts) {
+    return client.get(`/api/cli/schema/snapshots${qs({ limit: opts.limit })}`);
+}
+/**
  * Batch the single-object lookups (`table`/`view`/`proc`) — the comma-separated
  * path (feedback #109). Fans out the SAME single-object `run*` function in
  * parallel so each name's path lives in exactly one place. Mirrors
@@ -97,5 +106,8 @@ export function registerSchemaCommands(parent, getClient, opts = {}) {
         .action(runOneOrBatch(runSchemaTrigger));
     s.command("dump")
         .action(jsonAction(getClient, runSchemaDump));
+    s.command("snapshots")
+        .option("--limit <n>", "", cappedInt(1000))
+        .action(jsonAction(getClient, runSchemaSnapshots));
 }
 //# sourceMappingURL=index.js.map
