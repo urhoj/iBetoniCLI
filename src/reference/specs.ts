@@ -5985,28 +5985,31 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     examples: ["ib dev impersonation grants 63"],
   },
   // ─── db-target (2) ───────────────────────────────────────────────────────
+  // Both leaves hit one loopback-only route, so they share its 404 and the
+  // local-auth trap rather than restating them.
+  ...((): CommandSpec[] => {
+    const loopback404 = apiErr(
+      404,
+      "Not found — this route is NOT deployed anywhere",
+      "you are not talking to a local backend; it is loopback-only and 404s in production. Never read this as 'no such command'. Pass --endpoint http://127.0.0.1:8080"
+    );
+    const LOCAL_AUTH_REMEDY =
+      "stored credentials are minted by the DEPLOYED API and a local backend verifies with its own JWT_KEY, so `ib auth login` will NOT help — it authenticates against production. Use IB_TOKEN=$(node utils/test/mint-local-token.js <personId>) from puminet5api.";
+    const LOCAL_AUTH_NOTE = `AUTH against a local backend: ${LOCAL_AUTH_REMEDY}`;
+    return [
   {
     command: "ib dev db-target show",
     description:
       "Which SQL database the LOCAL backend is talking to (dev or prod), with the server/database it resolved. Local development only: the route is loopback-gated and 404s on every deployed backend, so pass --endpoint http://127.0.0.1:8080. Answers the question the DbTargetChip in the puminet4 header answers, without opening a browser. Use --expect in scripts to fail closed BEFORE writing.",
-    permissions: ["login (read); the local backend must be non-production and loopback"],
+    auth: "any",
     flags: [
-      {
-        name: "expect",
-        type: "string",
-        description:
-          "Exit 1 if the live target is not this (dev|prod). The JSON is still written, with expected + matches added.",
-      },
+      { name: "expect", type: "string", description: "Exit 1 if the live target is not this (dev|prod)" },
     ],
     outputShape:
-      "{ target, targets[], switchable, server, database, missing[], complete } — plus { expected, matches } when --expect is passed.",
+      "{ target, targets[], switchable, server, database, missing[], complete } — plus { expected, matches } when --expect is passed. NOTE the two status fields describe DIFFERENT targets: `complete` is whether the CURRENT target's env vars all resolve, while `missing` lists the vars absent for the target you would switch TO. So { target:'dev', missing:['PROD_SQL_PASSWORD'], complete:true } means dev is fine and prod is not configured.",
     errors: [
-      apiErr(
-        404,
-        "Not found — the endpoint is NOT deployed anywhere",
-        "this means you are NOT talking to a local backend, never that the command is missing: the route is loopback-only and 404s in production. Pass --endpoint http://127.0.0.1:8080"
-      ),
-      apiErr(401, "Token expired", "ib auth refresh"),
+      loopback404,
+      apiErr(401, "Token rejected by the local backend", LOCAL_AUTH_REMEDY),
       {
         origin: "client",
         exit: 1,
@@ -6015,8 +6018,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       },
     ],
     notes: [
-      "A local backend can be repointed at PRODUCTION, in which case every local write is a real write. That is what --expect guards (feedback #430).",
-      "AUTH: the stored credentials are issued by the DEPLOYED API, and a local backend verifies with its own JWT_KEY — so it rejects them and the CLI reports a refresh failure whose remedy says `ib auth login`. That remedy is wrong here: logging in again authenticates against production and still will not work locally. Use a locally-minted token instead: IB_TOKEN=$(node utils/test/mint-local-token.js <personId>) run from puminet5api.",
+      "A local backend can be repointed at PRODUCTION, in which case every local write is a real write (feedback #430).",
+      LOCAL_AUTH_NOTE,
     ],
     seeAlso: ["ib dev db-target set"],
     examples: [
@@ -6027,25 +6030,29 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib dev db-target set",
     description:
-      "Repoint the local backend at dev or prod. Previews unless --confirm (nothing is sent without it). On success the backend flushes the whole two-tier cache, because it holds the OUTGOING database's rows; a failed switch reverts and reports validation rather than success. Local development only — same loopback gate as `ib dev db-target`.",
-    permissions: ["isSystemAdmin or isDeveloper", "local, non-production, loopback backend"],
+      "Repoint the local backend at dev or prod. Previews unless --confirm (nothing is sent without it). On success the backend flushes the whole two-tier cache, because it holds the OUTGOING database's rows; a failed switch reverts and reports validation rather than success.",
+    permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     mutates: true,
     args: [{ name: "target", type: "string", description: "dev | prod" }],
     flags: [{ name: "confirm", type: "boolean", description: "Execute the switch (default is a preview)" }],
     outputShape:
-      "preview: { dryRun:true, from, to, wouldFlushCache:true, hint } | execute: { target, server, database, changed, ... }",
+      "preview: { dryRun:true, from, to, wouldFlushCache, hint } — wouldFlushCache is false when you are already on that target, because the backend flushes only on a real change | execute: the same shape as `db-target show`, plus { changed }.",
     errors: [
-      apiErr(404, "Not a local backend", "the route is loopback-only; pass --endpoint http://127.0.0.1:8080"),
+      loopback404,
+      apiErr(401, "Token rejected by the local backend", LOCAL_AUTH_REMEDY),
       apiErr(400, "Unknown target, or the switch failed and was reverted", "target must be dev|prod; a revert means nothing changed"),
-      apiErr(403, "Developer role required", "requires isSystemAdmin or isDeveloper"),
+      apiErr(403, "Developer role required", "the GET is open to any logged-in caller; only the switch needs developer"),
     ],
     notes: [
       "Switching to prod makes every subsequent local write a REAL write. Preview first; the preview names the target you are moving to.",
+      LOCAL_AUTH_NOTE,
     ],
     seeAlso: ["ib dev db-target show"],
     examples: ["ib dev db-target set dev --endpoint http://127.0.0.1:8080", "ib dev db-target set dev --confirm --endpoint http://127.0.0.1:8080"],
   },
+    ];
+  })(),
   // ─── feedback (5) ────────────────────────────────────────────────────────
   // NOTE on classification: feedback create/resolve carry custom write semantics
   // (meta-exempt create, client-side --dry-run, no idempotency/reason), so they
