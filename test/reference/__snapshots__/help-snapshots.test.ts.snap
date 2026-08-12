@@ -1938,7 +1938,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  preview: { dryRun:true, wouldDelete, pattern } | execute: { deleted, pattern }
+  preview: { dryRun:true, wouldDelete, pattern, sampleKeys } | execute: { deleted, pattern }. When wouldDelete is 0 the preview ALSO carries { totalKeys, existingPrefixes[], hint } — a zero alone cannot tell 'cache is clean' from 'your glob is wrong', so those fields settle it without a second command (feedback #431).
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -2367,6 +2367,80 @@ EXAMPLES
   ib dev changelog update 386 --language en
   ib dev changelog update 386 --bump-level none --reason "docs-only, should not bump"
   ib dev changelog update 386 --from-json ./patch.json
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev db-target set matches snapshot 1`] = `
+"USAGE
+  ib dev db-target set <target> [flags]
+
+DESCRIPTION
+  Repoint the local backend at dev or prod. Previews unless --confirm (nothing is sent without it). On success the backend flushes the whole two-tier cache, because it holds the OUTGOING database's rows; a failed switch reverts and reports validation rather than success. Local development only — same loopback gate as \`ib dev db-target\`.
+  Permissions: requires isSystemAdmin or isDeveloper, local, non-production, loopback backend.
+
+ARGUMENTS
+  <target> STRING    dev | prod (required)
+
+FLAGS
+  --confirm    Execute the switch (default is a preview)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  preview: { dryRun:true, from, to, wouldFlushCache:true, hint } | execute: { target, server, database, changed, ... }
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  Not a local backend    → the route is loopback-only; pass --endpoint http://127.0.0.1:8080
+  exit 4 (HTTP 400)  Unknown target, or the switch failed and was reverted → target must be dev|prod; a revert means nothing changed
+  exit 3 (HTTP 403)  Developer role required → requires isSystemAdmin or isDeveloper
+
+NOTES
+  - Switching to prod makes every subsequent local write a REAL write. Preview first; the preview names the target you are moving to.
+
+SEE ALSO
+  ib dev db-target show
+
+EXAMPLES
+  ib dev db-target set dev --endpoint http://127.0.0.1:8080
+  ib dev db-target set dev --confirm --endpoint http://127.0.0.1:8080
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev db-target show matches snapshot 1`] = `
+"USAGE
+  ib dev db-target show [flags]
+
+DESCRIPTION
+  Which SQL database the LOCAL backend is talking to (dev or prod), with the server/database it resolved. Local development only: the route is loopback-gated and 404s on every deployed backend, so pass --endpoint http://127.0.0.1:8080. Answers the question the DbTargetChip in the puminet4 header answers, without opening a browser. Use --expect in scripts to fail closed BEFORE writing.
+  Permissions: requires login (read); the local backend must be non-production and loopback.
+
+FLAGS
+  --expect STRING    Exit 1 if the live target is not this (dev|prod). The JSON is still written, with expected + matches added.
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { target, targets[], switchable, server, database, missing[], complete } — plus { expected, matches } when --expect is passed.
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (HTTP 404)  Not found — the endpoint is NOT deployed anywhere → this means you are NOT talking to a local backend, never that the command is missing: the route is loopback-only and 404s in production. Pass --endpoint http://127.0.0.1:8080
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 1 (client-side)  --expect did not match the live target → the JSON on stdout carries the real target; switch with \`ib dev db-target set <target> --confirm\`
+
+NOTES
+  - A local backend can be repointed at PRODUCTION, in which case every local write is a real write. That is what --expect guards (feedback #430).
+  - AUTH: the stored credentials are issued by the DEPLOYED API, and a local backend verifies with its own JWT_KEY — so it rejects them and the CLI reports a refresh failure whose remedy says \`ib auth login\`. That remedy is wrong here: logging in again authenticates against production and still will not work locally. Use a locally-minted token instead: IB_TOKEN=$(node utils/test/mint-local-token.js <personId>) run from puminet5api.
+
+SEE ALSO
+  ib dev db-target set
+
+EXAMPLES
+  ib dev db-target show --endpoint http://127.0.0.1:8080
+  ib dev db-target show --expect dev --endpoint http://127.0.0.1:8080
 "
 `;
 

@@ -5986,7 +5986,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   },
   // ─── db-target (2) ───────────────────────────────────────────────────────
   {
-    command: "ib dev db-target",
+    command: "ib dev db-target show",
     description:
       "Which SQL database the LOCAL backend is talking to (dev or prod), with the server/database it resolved. Local development only: the route is loopback-gated and 404s on every deployed backend, so pass --endpoint http://127.0.0.1:8080. Answers the question the DbTargetChip in the puminet4 header answers, without opening a browser. Use --expect in scripts to fail closed BEFORE writing.",
     permissions: ["login (read); the local backend must be non-production and loopback"],
@@ -6020,8 +6020,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     seeAlso: ["ib dev db-target set"],
     examples: [
-      "ib dev db-target --endpoint http://127.0.0.1:8080",
-      "ib dev db-target --expect dev --endpoint http://127.0.0.1:8080",
+      "ib dev db-target show --endpoint http://127.0.0.1:8080",
+      "ib dev db-target show --expect dev --endpoint http://127.0.0.1:8080",
     ],
   },
   {
@@ -6043,7 +6043,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       "Switching to prod makes every subsequent local write a REAL write. Preview first; the preview names the target you are moving to.",
     ],
-    seeAlso: ["ib dev db-target"],
+    seeAlso: ["ib dev db-target show"],
     examples: ["ib dev db-target set dev --endpoint http://127.0.0.1:8080", "ib dev db-target set dev --confirm --endpoint http://127.0.0.1:8080"],
   },
   // ─── feedback (5) ────────────────────────────────────────────────────────

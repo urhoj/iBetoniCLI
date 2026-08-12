@@ -7,9 +7,16 @@ export async function runDbTargetSet(client, target) {
     return client.post("/api/dev/db-target", { target });
 }
 export function registerDbTargetCommands(parent, getClient) {
+    // A node with subcommands is a GROUP in this CLI and groups are not runnable
+    // (test/reference/spec-examples-parse.test.ts enforces it), so `show` is a
+    // subcommand rather than an action on `db-target` itself — same shape as
+    // `dev impersonation`.
     const cmd = parent
         .command("db-target")
-        .description("Which SQL database the LOCAL backend is on (loopback-only; pass --endpoint http://127.0.0.1:8080)")
+        .description("Which SQL database the LOCAL backend is on (loopback-only; pass --endpoint http://127.0.0.1:8080)");
+    cmd
+        .command("show")
+        .description("Print the local backend's current SQL target")
         .option("--expect <target>", "Exit 1 if the live target is not this (dev|prod)")
         .action(guarded(async (opts) => {
         const current = await runDbTargetGet(await getClient());
