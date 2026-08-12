@@ -18,6 +18,31 @@ describe("resolveRoleTypeId", () => {
     expect(() => resolveRoleTypeId("notARole")).toThrow(/keikkaHandler/);
   });
 
+  // fb#418: "TarjousAdmin" denotes typeId 1 (laskupohjaAdmin, per the DB +
+  // @ibetoni/constants) AND typeId 5 (laskuAdmin, per the Jerry module). The
+  // generic valid-names dump is useless here — nothing in it resembles the word
+  // — so the caller picks by coin-flip and the wrong one fails silently later.
+  test("an ambiguous role name names both candidates instead of listing everything", () => {
+    for (const spelling of ["tarjousAdmin", "TarjousAdmin", "tarjousadmin"]) {
+      expect(() => resolveRoleTypeId(spelling)).toThrow(/laskupohjaAdmin \(typeId 1\)/);
+      expect(() => resolveRoleTypeId(spelling)).toThrow(/laskuAdmin \(typeId 5\)/);
+      // NOT the generic path — the whole point is not dumping every role.
+      expect(() => resolveRoleTypeId(spelling)).not.toThrow(/unknown role/i);
+    }
+  });
+
+  test("the ambiguous-name rejection is still client-origin exit 4", () => {
+    let caught: unknown;
+    try {
+      resolveRoleTypeId("tarjousAdmin");
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(CliError);
+    expect((caught as CliError).statusCode).toBe(0);
+    expect((caught as CliError).exitCode).toBe(4);
+  });
+
   // The guard is local — no request is made — so it must report itself as
   // client-origin (`statusCode: 0`). It used to fabricate 400, which both lied
   // in the envelope and hid `ib person list`'s own client ERRORS remedy from

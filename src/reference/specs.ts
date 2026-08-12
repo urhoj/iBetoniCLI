@@ -180,6 +180,18 @@ const DRIVER_DATE_NOTE =
 // ─── cross-domain shared fragments ───────────────────────────────────────────
 /** The system-admin 403 every `jerry admin` / admin-gated row repeats. */
 const SYSADMIN_403: CommandError = apiErr(403, "Not a system admin", "use a system-admin token");
+/**
+ * `resolveRoleTypeId` rejects an unknown --role LOCALLY, before any request, so
+ * every role-taking command needs this client row alongside its backend-400 twin
+ * (the 400 is still reachable — the backend enforces role limits too).
+ */
+const ROLE_NAME_CLIENT_ERROR: CommandError = {
+  origin: "client",
+  exit: 4,
+  meaning: "unknown or ambiguous role name — rejected by the CLI before any request",
+  remedy:
+    "pass an exact role name; the error names your options and `ib person role explain <name>` describes one. \"tarjousAdmin\" is not a role name — it denotes TWO (fb#418)",
+};
 /** The dual-target `--asiakas` alias flag (see targets.ts addAsiakasTargetOption). */
 const ASIAKAS_TARGET_FLAG: CommandFlag = {
   name: "asiakas",
@@ -849,8 +861,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ keikkaId, ownerAsiakasId, pvm, time, customer:{asiakasId,name}|null, worksite:{tyomaaId,address}|null, vehicle:{vehicleId,plate}|null, driver:{personId,name}|null, m3, status }",
     errors: [
-      apiErr(404, "Keikka not found", "verify keikkaId"),
+      apiErr(404, "Keikka not found OR outside your visible scope", "verify keikkaId — but note this is NOT proof the row is absent: results mirror your permissions, so an existing keikka in another tenant 404s identically"),
       ...permErrors("auth.page.grid.tilaus.read"),
+    ],
+    notes: [
+      "A 404 answers 'can I see it', not 'does it exist' — every command mirrors the caller's permissions, so a keikka owned by another tenant is indistinguishable from a keikkaId that was never issued. Do NOT read it as a typo. To settle existence you need a caller whose scope could see it: `ib company switch` to the owning tenant, or a system-admin/developer token (feedback #427).",
     ],
     examples: ["ib keikka get 9001"],
   },
@@ -897,7 +912,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape: "{ ok: true } or backend response",
     errors: [
       { origin: "client", exit: 4, meaning: "--status not a numeric keikkaTilaId", remedy: "pass a number, e.g. --status 9" },
-      apiErr(404, "Keikka not found", "verify keikkaId"),
+      apiErr(404, "Keikka not found OR outside your visible scope", "verify keikkaId — but note this is NOT proof the row is absent: results mirror your permissions, so an existing keikka in another tenant 404s identically"),
       ...permErrors("auth.page.grid.tilaus.edit"),
     ],
     notes: [
@@ -919,7 +934,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     outputShape: "{ ok: true, driver:{personId,name} } (raw backend response)",
     errors: [
-      apiErr(404, "Keikka not found", "verify keikkaId"),
+      apiErr(404, "Keikka not found OR outside your visible scope", "verify keikkaId — but note this is NOT proof the row is absent: results mirror your permissions, so an existing keikka in another tenant 404s identically"),
       ...permErrors("auth.page.grid.tilaus.edit"),
     ],
     examples: [
@@ -983,7 +998,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "single: { keikkaId, isValid, validationEnabled, summary:{totalIssues,critical,high,medium,low,notification,categories}, issues:[{type,message,priority,priorityName,category,categoryName,field}] } | day: { items:[{ keikkaId, isValid, summary, issues }], count, dayTotals:{totalIssues,critical,invalidKeikkas}, validationEnabled }",
     errors: [
-      apiErr(404, "Keikka not found", "verify keikkaId"),
+      apiErr(404, "Keikka not found OR outside your visible scope", "verify keikkaId — but note this is NOT proof the row is absent: results mirror your permissions, so an existing keikka in another tenant 404s identically"),
       apiErr(400, "Bad date / keikkaId", "use YYYY-MM-DD or a positive integer"),
       ...permErrors("auth.page.grid.tilaus.read"),
     ],
@@ -1902,9 +1917,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     reasonPolicy: "always",
     outputShape: "{ granted: { personId, asiakasId, roleTypeId } } | { dryRun:true, wouldCreate:{ personId, asiakasId, personSettingTypeId, personSettingString }, validation }",
     errors: [
+      ROLE_NAME_CLIENT_ERROR,
       apiErr(400, "Unknown role / company limit reached", "use a name from ROLE_TYPEID_BY_NAME"),
       apiErr(403, "Not a tenant admin", "use a system-admin token or a tenant admin"),
       ...COMMON_AUTH_ERRORS,
+    ],
+    notes: [
+      "\"TarjousAdmin\" is NOT a usable --role value: the name denotes two different roles. laskupohjaAdmin (typeId 1) is what dbo.asiakasPersonSettingTypes + @ibetoni/constants call isTarjousAdmin, and is what the BetoniJerry email-recipient fallback and `ib jerry admin detail`.admins read; laskuAdmin (typeId 5) is what the Jerry admin dashboard's tarjousAdminCount and the Jerry validation profile's people.tarjousAdmin check read. Granting the documented one leaves Jerry validation red with a message saying you granted nothing — pass the explicit name instead (fb#418).",
     ],
     examples: [
       "ib person role grant 5351 --role keikkaHandler --asiakas 26 --reason 'onboard handler'",
@@ -1926,6 +1945,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     reasonPolicy: "always",
     outputShape: "{ removed: 1 } | { removed: 0 } (absent) | { dryRun:true, wouldDelete:{ asiakasPersonSettingId }, validation }",
     errors: [
+      ROLE_NAME_CLIENT_ERROR,
       apiErr(400, "Unknown role", "use a name from ROLE_TYPEID_BY_NAME"),
       apiErr(403, "Not a tenant admin", "use a system-admin token or a tenant admin"),
       ...COMMON_AUTH_ERRORS,
@@ -1941,6 +1961,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [],
     outputShape: "{ role, typeId, displayName: string|null, description: string|null, comment: string|null, tiers: string[], deprecated: boolean }",
     errors: [
+      ROLE_NAME_CLIENT_ERROR,
       apiErr(400, "Unknown role name", "see ROLE_TYPEID_BY_NAME in @ibetoni/constants"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -3185,7 +3206,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "lyh", type: "string", description: "sijaintiLyh — short code/abbreviation, ≤50 chars (defaults to --name)" },
       { name: "max-distance", type: "number", description: "Delivery radius in km, stored as maxDeliveryDistance (default 50; not Jerry-only)" },
       { name: "asiakas", type: "number", description: "Owner asiakasId (defaults to your active company)" },
-      { name: "puomi-min", type: "number", description: "puomiMin — smallest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)" },
+      { name: "puomi-min", type: "number", description: "puomiMin (m) — STORED ONLY, not used for matching (fb#415): no pump has a boom minimum, so a floor could only hide you from work you can do" },
       { name: "puomi-max", type: "number", description: "puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)" },
       { name: "geocode", type: "boolean", description: "Resolve lat/lng from the address via Google Maps when coordinates are not given (then persisted + echoed)" },
     ],
@@ -3220,7 +3241,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "lng", type: "number", description: "Longitude (persisted via updateLatLng + echoed)" },
       { name: "lyh", type: "string", description: "sijaintiLyh — short code/abbreviation (≤50 chars)" },
       { name: "max-distance", type: "number", description: "Delivery radius in km, stored as maxDeliveryDistance (not Jerry-only)" },
-      { name: "puomi-min", type: "number", description: "puomiMin — smallest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)" },
+      { name: "puomi-min", type: "number", description: "puomiMin (m) — STORED ONLY, not used for matching (fb#415): no pump has a boom minimum, so a floor could only hide you from work you can do" },
       { name: "puomi-max", type: "number", description: "puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)" },
       { name: "geocode", type: "boolean", description: "Force re-resolving lat/lng from the address via Google Maps (fails fast on no match). Address changes auto-geocode even without this flag when no coordinates are given" },
     ],
@@ -3249,7 +3270,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "on", type: "boolean", description: "Enrol (jerryActiveUntil = sentinel) + ensure a delivery radius" },
       { name: "off", type: "boolean", description: "Unenrol (jerryActiveUntil = null)" },
       { name: "radius", type: "number", description: "Delivery radius in km (maxDeliveryDistance) to set when enrolling; defaults to 50 when the varikko has none" },
-      { name: "puomi-min", type: "number", description: "puomiMin (m) to set while enrolling — betonijerry matches requests with puomiMin <= boom <= puomiMax (NULL bound = unbounded)" },
+      { name: "puomi-min", type: "number", description: "puomiMin (m) to set while enrolling — STORED ONLY, not used for matching (fb#415); betonijerry matches on puomiMax alone" },
       { name: "puomi-max", type: "number", description: "puomiMax (m) to set while enrolling" },
     ],
     writeFlags: true,
@@ -3267,7 +3288,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "IMPORTANT: BetoniJerry coverage keys on the delivery radius maxDeliveryDistance (KM) — NOT geofenceRadius (metres, a GPS depot detector) — so --on ALSO sets that radius: --radius <km>, or a 50 km default when the varikko has none (otherwise it would be enrolled but cover nothing).",
       "Replicates the EditSijainti toggle: reads the row, overrides the fields, and writes back (lat/lng etc. preserved).",
       "Matching also requires the company-level gates: isPumppuToimittaja AND the HAS_JERRY setting (asiakasSettingTypeId 35) — toggle both with `ib jerry admin enable`. Varikko enrolment alone does not make the company matchable.",
-      "Boom-range matching (since 2026-07): requests stating a boom only match varikot whose puomiMin/puomiMax range covers it (NULL bound = unbounded; both NULL = matches everything). Vehicle fleet booms are NOT consulted. Deploy-gated: needs the backend with sijainti puomi columns.",
+      "Boom matching (since 2026-07, corrected 2026-08-12): a request stating a boom matches a varikko when its REACH covers it — puomiMax IS NULL (unbounded) OR puomiMax >= boom. `puomiMin` is stored but NOT matched on: any pump can be run as a line pump with no boom, so a floor could only hide a provider from work it can do (fb#415). Vehicle fleet booms are NOT consulted. Deploy-gated: needs the backend with sijainti puomi columns.",
     ],
     examples: [
       "ib sijainti set-jerry 42 --on --radius 60 --reason 'pilot varikko, 60 km radius'",
@@ -4553,7 +4574,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "lng", type: "number", description: "Longitude (trusted only with --lat + --place-id)" },
       { name: "place-id", type: "string", description: "Google placeId (lets the server trust client coords)" },
       { name: "formatted-address", type: "string", description: "Google formatted address" },
-      { name: "boom", type: "number", description: "Required boom (m) — filters varikot by their puomiMin/puomiMax range (absent/0 = no boom filter)" },
+      { name: "boom", type: "number", description: "Required boom (m) — keeps varikot with enough REACH: puomiMax NULL or >= it (absent/0 = no boom filter)" },
       { name: "explain", type: "boolean", description: "Add considered[] — per-varikko exclusion reasons for non-matching depots (developer/admin only)" },
       { name: "gate", type: "string", description: "With --explain: CSV of exclusion reasons to include (company-gate|provider-dead|no-coords|not-enrolled|radius|boom). Default omits company-gate", allowed: [...CHECK_ADDRESS_GATES] },
       { name: "asiakas", type: "number", description: "With --explain: force-include this company's varikot even if not yet Jerry-enabled (surfaces company-gate)" },
@@ -4569,7 +4590,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     notes: [
-      "A varikko counts toward providerCount only when ALL of these hold: the company has isPumppuToimittaja = 1, the company has the HAS_JERRY setting on (ib jerry admin enable), the sijainti is enrolled (jerryActiveUntil in the future, ib sijainti set-jerry --on) with maxDeliveryDistance covering the point, and — when a boom is stated — the sijainti boom range covers it (puomiMin <= boom <= puomiMax, NULL bound = unbounded).",
+      "A varikko counts toward providerCount only when ALL of these hold: the company has isPumppuToimittaja = 1, the company has the HAS_JERRY setting on (ib jerry admin enable), the sijainti is enrolled (jerryActiveUntil in the future, ib sijainti set-jerry --on) with maxDeliveryDistance covering the point, and — when a boom is stated — the sijainti has enough reach (puomiMax IS NULL or >= boom; puomiMin is stored but NOT matched on, fb#415).",
       "--explain answers 'why no offers?': considered[] lists the NON-matching varikot (passing ones are in providers[]), each tagged with the FIRST gate it failed. Gate priority puts COMPANY-level reasons above DEPOT-level ones — company-gate → provider-dead → no-coords → not-enrolled → radius → boom — so the reason reported is the most upstream blocker, the one to fix first: adding coordinates to a depot changes nothing for a company that was never enrolled. Business-sensitive, so returned only to developer/admin tokens, exactly like providers[].",
       "company-gate is OMITTED by default: it only says 'this company was never in the programme', and on a live Helsinki probe it was 93 of 110 rows across 17 companies, burying the actionable ones. Whatever is withheld is counted in consideredSuppressed, so nothing disappears silently. Pass --gate company-gate (alone or with others) to see it, or --asiakas <id> to surface it for ONE company during onboarding — which is when it is a real answer.",
       "--gate narrows further: --gate no-coords,radius answers 'which enrolled depots are misconfigured?' without the rest. An unknown reason name exits 4 rather than silently narrowing the view, since a shorter list reads as 'nothing else is wrong'.",
@@ -4892,7 +4913,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [
       { name: "type", type: "string", description: "Event kind: call | response | note; REQUIRED", allowed: [...ONBOARDING_EVENT_TYPES] },
       { name: "text", type: "string", description: "Event text; REQUIRED" },
-      { name: "time", type: "string", description: "Backdated event time (ISO 8601)" },
+      { name: "time", type: "string", description: "Backdated event time. Offset-less (2026-08-11T12:00) = Helsinki wall-clock; a zoned form (…+03:00, …Z) is converted to that instant" },
       { name: "set-status", type: "string", description: `Also set the pipeline status. Keys: ${ONBOARDING_STATUS_KEYS}`, allowed: [...ONBOARDING_STATUSES] },
     ],
     writeFlags: true,
@@ -4901,6 +4922,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "{ jerryOnboardingEventId } · { jerryOnboardingEventId, statusUpdated: false } when --set-status failed AFTER the event was written · { dryRun: true, wouldLog: { asiakasId, eventType, setStatus } } on --dry-run",
     errors: [
       apiErr(400, "Invalid eventType / missing text / unknown --set-status", "type must be call, response or note; --set-status must be a known pipeline status key. Reading the history instead? That is `ib jerry admin onboarding events <asiakasId>`"),
+      { origin: "client", exit: 4, meaning: "--time is not a parseable ISO 8601 timestamp, or a component is out of range", remedy: "pass Helsinki wall-clock (2026-08-11T12:00) or a zoned form (2026-08-11T12:00:00+03:00)" },
       apiErr(404, "Prospect not found", "add it first: ib jerry admin onboarding add"),
       SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
@@ -4908,6 +4930,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       "--set-status is NOT atomic with the event write: the event is inserted first, then the status update + its status_change event. If that second step fails the call still returns 200 with `statusUpdated: false` and the event already persisted — check for that key rather than assuming a 200 moved the status. A --set-status equal to the current status is a no-op (no status_change event).",
       "`ib jerry admin onboarding log` is a hidden back-compat alias for this command. It was renamed because every other `ib … log` is an audit-trail READ, so callers reached for it to read a prospect's history and got a usage error.",
+      "--time is normalized to a UTC instant BEFORE the POST. An offset-less value is read as Europe/Helsinki (the timezone every date flag here documents), so `--time 2026-08-11T12:00` stores 09:00Z in summer. Until 2026-08-12 the raw string was posted and the offset was DROPPED rather than applied — `12:00:00+03:00` stored as 12:00Z, skewing every backdated event by 2-3 h with an HTTP 200 and no signal (fb#412). Onboarding events are append-only, so verify with `ib jerry admin onboarding events <asiakasId>` before relying on a backfilled timestamp.",
     ],
     seeAlso: ["ib jerry admin onboarding events"],
     examples: ['ib jerry admin onboarding note 1389 --type call --text "puhuttiin Jussin kanssa, kiinnostunut" --set-status vastasi_kylla'],

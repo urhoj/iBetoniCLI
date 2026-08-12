@@ -37,6 +37,22 @@ ib dev changelog update --feedback <id>
   ! --feedback must be an integer >= 1
   > (no hint)
 
+ib jerry admin onboarding log --time <iso>
+  ! --time: not a valid ISO 8601 timestamp: "-5". Use Helsinki wall-clock (2026-08-11T12:00) or a zoned form (2026-08-11T12:00:00+03:00, 2026-08-11T09:00:00Z).
+  > pass Helsinki wall-clock (2026-08-11T12:00) or a zoned form (2026-08-11T12:00:00+03:00)
+
+ib jerry admin onboarding log --time <iso>
+  ! --time: not a valid ISO 8601 timestamp: "abc". Use Helsinki wall-clock (2026-08-11T12:00) or a zoned form (2026-08-11T12:00:00+03:00, 2026-08-11T09:00:00Z).
+  > pass Helsinki wall-clock (2026-08-11T12:00) or a zoned form (2026-08-11T12:00:00+03:00)
+
+ib jerry admin onboarding note --time <iso>
+  ! --time: not a valid ISO 8601 timestamp: "-5". Use Helsinki wall-clock (2026-08-11T12:00) or a zoned form (2026-08-11T12:00:00+03:00, 2026-08-11T09:00:00Z).
+  > pass Helsinki wall-clock (2026-08-11T12:00) or a zoned form (2026-08-11T12:00:00+03:00)
+
+ib jerry admin onboarding note --time <iso>
+  ! --time: not a valid ISO 8601 timestamp: "abc". Use Helsinki wall-clock (2026-08-11T12:00) or a zoned form (2026-08-11T12:00:00+03:00, 2026-08-11T09:00:00Z).
+  > pass Helsinki wall-clock (2026-08-11T12:00) or a zoned form (2026-08-11T12:00:00+03:00)
+
 ib keikka log --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`

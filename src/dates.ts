@@ -10,6 +10,8 @@
  * gets the final say. Used by every command that accepts a date flag (keikka,
  * schedule, vehicle).
  */
+import { failWith } from "./output/json.js";
+
 const COMPANY_TZ = "Europe/Helsinki";
 
 // Constructing an Intl.DateTimeFormat loads ICU data for the locale + timezone
@@ -63,6 +65,89 @@ export function resolveDate(input: string | undefined): string | undefined {
   const utcMidnight = UTC_MIDNIGHT_RE.exec(input);
   if (utcMidnight) return utcMidnight[1];
   return input;
+}
+
+/** Already carries a zone: trailing `Z` or a `±HH:MM` / `±HHMM` offset. */
+const ZONED_RE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
+
+/** `YYYY-MM-DD` with an optional `THH:MM[:SS[.mmm]]` wall-clock time. */
+const LOCAL_DATETIME_RE =
+  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.(\d{1,3}))?)?$/;
+
+let helsinkiPartsFormat: Intl.DateTimeFormat | undefined;
+
+/**
+ * Europe/Helsinki's UTC offset in ms at a given instant — DST-aware (+2 h EET
+ * / +3 h EEST). Derived by formatting the instant as Helsinki wall-clock and
+ * re-reading those components as if they were UTC; the difference IS the
+ * offset. `hourCycle: "h23"` avoids the `hour12: false` quirk that renders
+ * midnight as hour 24.
+ */
+function helsinkiOffsetMs(utcMs: number): number {
+  helsinkiPartsFormat ??= new Intl.DateTimeFormat("en-CA", {
+    timeZone: COMPANY_TZ,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const p: Record<string, number> = {};
+  for (const { type, value } of helsinkiPartsFormat.formatToParts(new Date(utcMs))) {
+    if (type !== "literal") p[type] = Number(value);
+  }
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - utcMs;
+}
+
+/**
+ * Normalize a TIMESTAMP flag to a UTC ISO instant (`…Z`) — the shape the
+ * backend stores verbatim.
+ *
+ * Two accepted inputs, both unambiguous by the time they leave here:
+ * - **Zoned** (`…Z`, `…+03:00`): a real instant already; converted to UTC.
+ *   Previously the raw string was posted through and the DATETIME2 bind
+ *   DROPPED the offset instead of applying it, so `12:00+03:00` stored as
+ *   `12:00Z` — every backdated event skewed by 2–3 h, silently, with an HTTP
+ *   200 and no signal (feedback #412).
+ * - **Offset-less** (`2026-08-11T12:00`): read as **Europe/Helsinki**
+ *   wall-clock, matching what every other date flag in this CLI documents.
+ *
+ * DST is resolved in two passes: take the offset at the naive guess, then
+ * re-read it at the corrected instant. On the spring-forward gap the result
+ * lands just after the jump; on the autumn repeat it picks the first (EEST)
+ * occurrence.
+ *
+ * Component ranges are checked explicitly because `Date.UTC` silently ROLLS
+ * OVER — `2026-13-45` would otherwise become a valid instant in 2027.
+ */
+export function resolveDateTime(input?: string, flag = "--time"): string | undefined {
+  if (!input) return undefined;
+  const value = input.trim();
+  const bad = (why: string): never =>
+    failWith(
+      `${flag}: ${why}: "${input}". Use Helsinki wall-clock (2026-08-11T12:00) or a zoned form (2026-08-11T12:00:00+03:00, 2026-08-11T09:00:00Z).`,
+      4
+    );
+
+  if (ZONED_RE.test(value)) {
+    const ms = Date.parse(value);
+    if (Number.isNaN(ms)) bad("not a valid ISO 8601 timestamp");
+    return new Date(ms).toISOString();
+  }
+
+  const m = LOCAL_DATETIME_RE.exec(value);
+  if (!m) bad("not a valid ISO 8601 timestamp");
+  const [, y, mo, d, h = "00", mi = "00", s = "00", frac = "0"] = m!;
+  const [year, month, day, hour, minute, second] = [y, mo, d, h, mi, s].map(Number);
+  if (month < 1 || month > 12) bad("month out of range");
+  if (day < 1 || day > 31) bad("day out of range");
+  if (hour > 23 || minute > 59 || second > 59) bad("time out of range");
+
+  const wallAsUtc = Date.UTC(year, month - 1, day, hour, minute, second, Number(frac.padEnd(3, "0")));
+  const guess = wallAsUtc - helsinkiOffsetMs(wallAsUtc);
+  return new Date(wallAsUtc - helsinkiOffsetMs(guess)).toISOString();
 }
 
 const MONTH_RE = /^\d{4}-\d{2}$/;

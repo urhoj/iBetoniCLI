@@ -4,7 +4,7 @@ import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFla
 import { writeJson, failWith } from "../../output/json.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
 import { parseId, resolveSearchQuery, resolveDualString, resolveAsiakasTarget, cappedInt, addAsiakasTargetOption, assertEnum, assertEnumCsv, assertPositiveInt } from "../../targets.js";
-import { resolveDate } from "../../dates.js";
+import { resolveDate, resolveDateTime } from "../../dates.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
 // ─── request reads ──────────────────────────────────────────────────────────
@@ -855,7 +855,11 @@ export function registerJerryCommands(parent, getClient) {
     const addNoteOptions = (cmd) => cmd
         .requiredOption("--type <t>")
         .requiredOption("--text <text>")
-        .option("--time <iso>")
+        // Normalized at PARSE time so both `note` and its hidden `log` alias get
+        // it: offset-less input is Helsinki wall-clock, zoned input is converted
+        // to the real UTC instant. Posting the raw string let the DATETIME2 bind
+        // drop the offset — 12:00+03:00 stored as 12:00Z, silently (fb#412).
+        .option("--time <iso>", "", (v) => resolveDateTime(v))
         .option("--set-status <key>");
     addWriteFlagsToCommand(addNoteOptions(onboarding.command("note <asiakasId>"))).action(onboardingNoteAction);
     addWriteFlagsToCommand(addNoteOptions(onboarding.command("log <asiakasId>", { hidden: true })).description("Deprecated alias for `ib jerry admin onboarding note` (still works). To READ the history, use `ib jerry admin onboarding events`.")).action(onboardingNoteAction);
