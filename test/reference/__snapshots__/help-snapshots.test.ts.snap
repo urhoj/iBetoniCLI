@@ -4929,7 +4929,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, openingHours, companyDescription, maintainsOrderInfo }
+  { asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, jerryPersonEmail, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsentAt, publicListingConsentBy }
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  No edit rights on company → use a tarjousAdmin/admin token for that company
@@ -4947,7 +4947,7 @@ exports[`Help snapshots — contract stability > help for ib jerry provider-sett
   ib jerry provider-settings set [flags]
 
 DESCRIPTION
-  Upsert a provider company's BetoniJerry settings (PUT /api/jerry-provider-settings). Partial-payload-safe: only the body keys present are written (omit a key to preserve it). jerryPersonId must belong to the target company. --asiakas targets another company. Returns the FULL saved settings (no follow-up GET needed) plus changed:boolean (whether anything actually changed vs an idempotent no-op). companyDescription is nvarchar — ä/ö are preserved. Requires --reason.
+  Upsert a provider company's BetoniJerry settings (PUT /api/jerry-provider-settings). Partial-payload-safe: only the body keys present are written (omit a key to preserve it). jerryPersonId must belong to the target company. --asiakas targets another company. Returns the FULL saved settings (no follow-up GET needed) plus changed:boolean (whether anything actually changed vs an idempotent no-op). companyDescription is nvarchar — ä/ö are preserved. Requires --reason. Writable keys: jerryPersonId, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsent. \`publicListingConsent\` is a BOOLEAN intent flag — the server stamps publicListingConsentAt/By from your token; never send a timestamp. Re-granting an already-granted consent does not re-stamp the original date. On Windows PowerShell use --from-json <file>: PowerShell splits a quoted --body value on its inner double-quotes.
   Permissions: requires edit-tier on the target company (tarjousAdmin / company admin).
 
 FLAGS

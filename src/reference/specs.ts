@@ -4650,7 +4650,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "asiakas", type: "number", description: "Target company asiakasId (default: your own)" },
     ],
     outputShape:
-      "{ asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, openingHours, companyDescription, maintainsOrderInfo }",
+      "{ asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, jerryPersonEmail, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsentAt, publicListingConsentBy }",
     errors: [
       apiErr(403, "No edit rights on company", "use a tarjousAdmin/admin token for that company"),
       ...COMMON_AUTH_ERRORS,
@@ -4660,7 +4660,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib jerry provider-settings set",
     description:
-      "Upsert a provider company's BetoniJerry settings (PUT /api/jerry-provider-settings). Partial-payload-safe: only the body keys present are written (omit a key to preserve it). jerryPersonId must belong to the target company. --asiakas targets another company. Returns the FULL saved settings (no follow-up GET needed) plus changed:boolean (whether anything actually changed vs an idempotent no-op). companyDescription is nvarchar — ä/ö are preserved. Requires --reason.",
+      "Upsert a provider company's BetoniJerry settings (PUT /api/jerry-provider-settings). Partial-payload-safe: only the body keys present are written (omit a key to preserve it). jerryPersonId must belong to the target company. --asiakas targets another company. Returns the FULL saved settings (no follow-up GET needed) plus changed:boolean (whether anything actually changed vs an idempotent no-op). companyDescription is nvarchar — ä/ö are preserved. Requires --reason. Writable keys: jerryPersonId, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsent. `publicListingConsent` is a BOOLEAN intent flag — the server stamps publicListingConsentAt/By from your token; never send a timestamp. Re-granting an already-granted consent does not re-stamp the original date. On Windows PowerShell use --from-json <file>: PowerShell splits a quoted --body value on its inner double-quotes.",
     permissions: ["edit-tier on the target company (tarjousAdmin / company admin)"],
     flags: [
       { name: "body", type: "json", description: "JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo? }. Mutually exclusive with --from-json." },
