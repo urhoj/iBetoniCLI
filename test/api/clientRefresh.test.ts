@@ -1,5 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { createApiClient } from "../../src/api/client.js";
+import { CliError } from "../../src/api/errors.js";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -143,6 +144,36 @@ describe("ApiClient auto-refresh on 401", () => {
       hint: expect.stringContaining("ib auth login"),
     });
     // No retry fetch was issued because refresh failed.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test("a CliError thrown by the refresh callback propagates untouched (fb#465)", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "Invalid Token" }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      })
+    );
+    // A deliberate diagnostic (e.g. the endpoint-mismatch error) carries its own
+    // hint — the generic "expired/invalid, run `ib auth login`" wrap must not
+    // replace it.
+    const mismatch = new CliError(
+      "401 from http://127.0.0.1:8080, but the stored session was minted against https://api.example.com",
+      401,
+      null,
+      2,
+      "authenticate against this endpoint with `ib auth login --endpoint http://127.0.0.1:8080`"
+    );
+    const client = createApiClient({
+      endpoint: "http://127.0.0.1:8080",
+      token: "eyJold",
+      version: "1.0.0",
+      onRefresh: vi.fn().mockRejectedValue(mismatch),
+    });
+
+    const err = await client.get("/api/something").catch((e) => e);
+    expect(err).toBe(mismatch);
+    expect((err as CliError).hint).toContain("ib auth login --endpoint");
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });

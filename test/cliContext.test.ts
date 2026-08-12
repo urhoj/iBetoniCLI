@@ -134,3 +134,105 @@ describe("createCliContext — --company switch 403 (feedback #311)", () => {
     expect(err.hint).toBeUndefined();
   });
 });
+
+// feedback #465: a file session's token is endpoint-specific. A 401 under an
+// `--endpoint` override that differs from the stored endpoint must name the
+// mismatch (and never attempt/persist a refresh against the override), instead
+// of reporting the still-valid session as "unrecoverable".
+describe("createCliContext — --endpoint differs from stored session endpoint (feedback #465)", () => {
+  let dir: string;
+  const mockFetch = vi.fn();
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "ib-ctx-465-"));
+    mockFetch.mockReset();
+    vi.stubGlobal("fetch", mockFetch);
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+    vi.unstubAllGlobals();
+  });
+
+  async function makeContext(endpointOverride: string) {
+    const file = join(dir, "credentials.json");
+    await createStore(file).save({
+      jwt: "eyJstored",
+      refreshToken: "r",
+      issuedAt: "",
+      expiresAt: "",
+      personId: 42,
+      ownerAsiakasId: 8,
+      ownerAsiakasName: "Kalle Urho Oy",
+      endpoint: "https://api.example.com",
+    });
+    const ctx = await createCliContext({
+      credentialsPath: file,
+      version: "1.0.0",
+      global: { ...EMPTY_GLOBAL, endpoint: endpointOverride },
+    });
+    return { ctx, file };
+  }
+
+  test("401 from the override endpoint names both endpoints, skips refresh, persists nothing", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "Invalid Token" }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      })
+    );
+
+    const { ctx, file } = await makeContext("http://127.0.0.1:8080");
+    const err: CliError = await ctx.client!.get("/api/jerry/stats").then(
+      () => {
+        throw new Error("request did not fail");
+      },
+      (e) => e as CliError
+    );
+
+    // Client-origin statusCode 0 — a locally-fabricated diagnostic, not a
+    // wrapped server response (client-origin-status guard).
+    expect(err.statusCode).toBe(0);
+    expect(err.exitCode).toBe(2);
+    expect(err.message).toContain("http://127.0.0.1:8080");
+    expect(err.message).toContain("https://api.example.com");
+    expect(err.message).toMatch(/endpoint-specific/);
+    expect(err.hint).toContain("ib auth login --endpoint http://127.0.0.1:8080");
+    expect(err.hint).toContain("mint-local-token.js");
+    // No refresh round-trip was attempted — the only fetch is the original GET.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    // The stored profile is untouched.
+    const creds = await createStore(file).load();
+    expect(creds?.jwt).toBe("eyJstored");
+    expect(creds?.refreshToken).toBe("r");
+  });
+
+  test("a normalization-equal override (trailing slash, case) keeps the refresh path", async () => {
+    // Original GET → 401, bearer refresh → 200 with a fresh token, retry → 200.
+    mockFetch
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: "Token expired" }), {
+          status: 401,
+          headers: { "content-type": "application/json" },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ token: "eyJfresh" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      );
+
+    const { ctx, file } = await makeContext("https://API.example.com/");
+    const result = await ctx.client!.get<{ ok: boolean }>("/api/thing");
+
+    expect(result).toEqual({ ok: true });
+    expect(mockFetch.mock.calls[1][0]).toContain("/api/auth/refresh-token");
+    const creds = await createStore(file).load();
+    expect(creds?.jwt).toBe("eyJfresh");
+  });
+});

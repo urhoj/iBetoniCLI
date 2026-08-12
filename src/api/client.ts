@@ -306,6 +306,10 @@ export function createApiClient({
       try {
         newToken = await onRefresh(currentToken);
       } catch (e) {
+        // A CliError from the refresh callback is a deliberate, fully-mapped
+        // diagnostic (e.g. the endpoint-mismatch error, fb#465) — let it
+        // through with its own hint instead of re-wrapping it below.
+        if (e instanceof CliError) throw e;
         const detail = errorMessage(e);
         // A FAILED refresh means the stored token is fully expired/invalid —
         // `ib auth refresh` can't recover it (it 401s the same way), so the

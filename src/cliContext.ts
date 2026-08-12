@@ -176,6 +176,21 @@ export async function createCliContext(opts: {
     // Undecodable token — treat as a normal session.
   }
 
+  // fb#465: a file-backed session is endpoint-specific — its JWT and refresh
+  // token were minted by `auth.endpoint`. When the global `--endpoint` points
+  // elsewhere, a 401 there means "wrong endpoint for this token", not "session
+  // expired": refreshing against the OVERRIDE endpoint fails (different
+  // JWT_KEY), and if the keys happened to match it would persist a
+  // foreign-minted JWT (consuming the rotated refresh token) into the stored
+  // profile. On mismatch the refresh path becomes an immediate, network-free
+  // diagnostic naming the real cause and remedy instead of the misleading
+  // "session unrecoverable, run `ib auth login`".
+  const normalizeEndpoint = (u: string) => u.replace(/\/+$/, "").toLowerCase();
+  const endpointMismatch =
+    auth.source === "file" &&
+    opts.global.endpoint != null &&
+    normalizeEndpoint(opts.global.endpoint) !== normalizeEndpoint(auth.endpoint);
+
   const client = createApiClient({
     endpoint,
     token: eph.token,
@@ -192,9 +207,24 @@ export async function createCliContext(opts: {
     // refreshAndPersistSession falls back to the OAuth refresh_token grant when
     // the JWT-bearer refresh fails (fb#258: heals a session whose JWT lapsed),
     // persisting the rotated refresh token + expiry alongside the fresh JWT.
+    // On an `--endpoint` override differing from the stored session's endpoint
+    // the callback instead raises the endpoint-mismatch diagnostic (fb#465).
     onRefresh:
       auth.refreshable && !eph.switched && !isImpersonating
-        ? (currentJwt: string) => refreshAndPersistSession({ endpoint, store, currentJwt })
+        ? endpointMismatch
+          ? async () => {
+              // Client-origin (statusCode 0): the 401 itself came from the
+              // server, but THIS error is a locally-fabricated diagnostic —
+              // see test/api/client-origin-status.test.ts.
+              throw new CliError(
+                `401 from ${endpoint}, but the stored session was minted against ${auth.endpoint} — a token is endpoint-specific (the stored session is likely still valid on its own endpoint)`,
+                0,
+                null,
+                2,
+                `authenticate against this endpoint with \`ib auth login --endpoint ${endpoint}\`, or set IB_TOKEN to a token minted for it (local backend: \`node puminet5api/utils/test/mint-local-token.js\`)`
+              );
+            }
+          : (currentJwt: string) => refreshAndPersistSession({ endpoint, store, currentJwt })
         : undefined,
   });
 
