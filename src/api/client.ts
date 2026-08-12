@@ -70,6 +70,16 @@ interface ApiClientOptions {
   actingAs?: { ownerAsiakasId: number; ownerAsiakasName?: string };
   /** Suppress non-data stderr diagnostics (the acting-as line). */
   quiet?: boolean;
+  /**
+   * `--verbose`: print a stderr diagnostic for every FAILED request — method,
+   * full URL, status, the X-Request-ID actually sent (Sentry correlation), and
+   * the raw response body (which carries backend fields the compact error
+   * envelope drops, e.g. `message`/`retryable`). This is what makes the
+   * documented "retry with --verbose" remedies real (feedback #444: the flag
+   * was parsed but consumed nowhere, so the hint added nothing). Deliberately
+   * NOT gated on `quiet` — an explicit --verbose wins.
+   */
+  verbose?: boolean;
 }
 
 interface FetchOptions {
@@ -133,11 +143,16 @@ export function createApiClient({
   readOnly = false,
   actingAs,
   quiet = false,
+  verbose = false,
 }: ApiClientOptions) {
   const platform = `${process.platform} node-${process.versions.node}`;
   const userAgent = `ib-cli/${version} (${platform})`;
   let currentToken = token;
   let actingAsAnnounced = false;
+  // The X-Request-ID actually sent on the most recent fetch (a fresh UUID per
+  // request unless the caller pinned one) — captured so the --verbose failure
+  // diagnostic can print the id to correlate with Sentry/backend logs.
+  let lastRequestId = requestId;
 
   /**
    * Print the acting-as company once, before the process's first write. No-op
@@ -182,6 +197,7 @@ export function createApiClient({
     for (const key of Object.keys(merged)) {
       merged[key] = sanitizeHeaderValue(merged[key]);
     }
+    lastRequestId = merged["X-Request-ID"];
     return merged;
   }
 
@@ -323,6 +339,17 @@ export function createApiClient({
       ? await res.json().catch(() => null)
       : await res.text().catch(() => "");
     if (!res.ok) {
+      if (verbose) {
+        // stderr only — the stdout JSON contract is never polluted. The raw
+        // body surfaces backend fields the compact envelope drops (`message`,
+        // `retryable`, dev-mode `details`); the request-id links to Sentry.
+        const rawBody =
+          typeof parsed === "string" ? parsed : JSON.stringify(parsed);
+        warnNote(
+          `[ib] HTTP ${res.status} ${method} ${endpoint}${path} · request-id ${lastRequestId}` +
+            (rawBody && rawBody !== "null" ? ` · body ${rawBody}` : "")
+        );
+      }
       throw new CliError(
         errorMessageFromBody(parsed, res.status),
         res.status,

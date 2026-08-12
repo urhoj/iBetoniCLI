@@ -380,6 +380,22 @@ export function assertServedLanguageMatches(
 }
 
 /**
+ * DB column legalDocuments.version is nvarchar(20); an overlong --doc-version
+ * used to surface as an opaque backend 500 DATABASE_ERROR that reproduced on
+ * every slot and read as a server-side outage (feedback #444). The width is a
+ * fixed schema fact, so refuse client-side (exit 4) before any request.
+ */
+export const DOC_VERSION_MAX_LENGTH = 20;
+export function assertDocVersionLength(docVersion: string): void {
+  if (docVersion.length > DOC_VERSION_MAX_LENGTH) {
+    failWith(
+      `--doc-version is limited to ${DOC_VERSION_MAX_LENGTH} characters (legalDocuments.version nvarchar(${DOC_VERSION_MAX_LENGTH})); got ${docVersion.length}`,
+      4
+    );
+  }
+}
+
+/**
  * Edit-mode `legal save`: in-field partial edit of the CURRENT ACTIVE document's
  * markdown, saved as a NEW immutable version (versions are never mutated in
  * place). Fetches the active doc (typeName implies the tenant), applies the edit
@@ -734,6 +750,7 @@ export function registerLegalCommands(
       prepend?: string;
       all?: boolean;
     }) => {
+      assertDocVersionLength(opts.docVersion);
       const language = normalizeLegalLanguage(opts.language);
       const editOp = parseEditOp(opts);
       if (editOp) {

@@ -69,11 +69,15 @@ export function sanitizeHeaderValue(value) {
  */
 const NETWORK_RETRY_BACKOFF_MS = [250, 750];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-export function createApiClient({ endpoint, token, version, requestId, onRefresh, readOnly = false, actingAs, quiet = false, }) {
+export function createApiClient({ endpoint, token, version, requestId, onRefresh, readOnly = false, actingAs, quiet = false, verbose = false, }) {
     const platform = `${process.platform} node-${process.versions.node}`;
     const userAgent = `ib-cli/${version} (${platform})`;
     let currentToken = token;
     let actingAsAnnounced = false;
+    // The X-Request-ID actually sent on the most recent fetch (a fresh UUID per
+    // request unless the caller pinned one) — captured so the --verbose failure
+    // diagnostic can print the id to correlate with Sentry/backend logs.
+    let lastRequestId = requestId;
     /**
      * Print the acting-as company once, before the process's first write. No-op
      * when quiet, when no identity was supplied, or already announced.
@@ -111,6 +115,7 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
         for (const key of Object.keys(merged)) {
             merged[key] = sanitizeHeaderValue(merged[key]);
         }
+        lastRequestId = merged["X-Request-ID"];
         return merged;
     }
     // `payload` is the already-serialized body (undefined = no body) — serialized
@@ -221,6 +226,14 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
             ? await res.json().catch(() => null)
             : await res.text().catch(() => "");
         if (!res.ok) {
+            if (verbose) {
+                // stderr only — the stdout JSON contract is never polluted. The raw
+                // body surfaces backend fields the compact envelope drops (`message`,
+                // `retryable`, dev-mode `details`); the request-id links to Sentry.
+                const rawBody = typeof parsed === "string" ? parsed : JSON.stringify(parsed);
+                warnNote(`[ib] HTTP ${res.status} ${method} ${endpoint}${path} · request-id ${lastRequestId}` +
+                    (rawBody && rawBody !== "null" ? ` · body ${rawBody}` : ""));
+            }
             throw new CliError(errorMessageFromBody(parsed, res.status), res.status, parsed, exitCodeFromStatus(res.status));
         }
         // Dry-run post-condition. EVERY handler that honours `X-Dry-Run` answers with

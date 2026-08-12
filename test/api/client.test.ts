@@ -522,3 +522,58 @@ describe("dry-run post-condition", () => {
     });
   });
 });
+
+// --verbose failure diagnostic (feedback #444: the flag was parsed but consumed
+// NOWHERE, so every "retry with --verbose" remedy promised detail that could
+// not appear). It must surface what the compact envelope drops: the raw body
+// and the X-Request-ID actually sent (Sentry correlation).
+describe("verbose failure diagnostic", () => {
+  let stderrSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    mockFetch.mockReset();
+    stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+  });
+  afterEach(() => {
+    stderrSpy.mockRestore();
+  });
+
+  const client = (verbose: boolean) =>
+    createApiClient({
+      endpoint: "https://api.example.com",
+      token: "eyJtest",
+      version: "1.0.0",
+      requestId: "req-fixed-id",
+      verbose,
+    });
+
+  test("prints method, URL, status, request-id, and the raw body on a failed request", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse(
+        { success: false, error: "DATABASE_ERROR", message: "Tietokantavirhe.", retryable: false },
+        500
+      )
+    );
+    await expect(client(true).post("/api/legal-documents/save", { a: 1 })).rejects.toMatchObject({
+      statusCode: 500,
+    });
+    expect(stderrSpy).toHaveBeenCalledTimes(1);
+    const line = stderrSpy.mock.calls[0][0] as string;
+    expect(line).toContain("HTTP 500 POST https://api.example.com/api/legal-documents/save");
+    expect(line).toContain("request-id req-fixed-id");
+    // The raw body carries fields the compact error envelope drops.
+    expect(line).toContain('"message":"Tietokantavirhe."');
+    expect(line).toContain('"retryable":false');
+  });
+
+  test("silent without verbose", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ error: "nope" }, 500));
+    await expect(client(false).get("/api/thing")).rejects.toMatchObject({ statusCode: 500 });
+    expect(stderrSpy).not.toHaveBeenCalled();
+  });
+
+  test("silent on a successful request even with verbose", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ ok: true }));
+    await expect(client(true).get("/api/thing")).resolves.toMatchObject({ ok: true });
+    expect(stderrSpy).not.toHaveBeenCalled();
+  });
+});

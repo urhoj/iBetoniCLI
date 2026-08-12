@@ -5943,7 +5943,7 @@ DESCRIPTION
 
 FLAGS
   --type STRING    Document type name (see ib legal types) (required)
-  --doc-version STRING    Version string, e.g. 2.0 (NOT --version — that is the global CLI version flag) (required)
+  --doc-version STRING    Version string, e.g. 2.0, max 20 chars — DB column nvarchar(20) (NOT --version — that is the global CLI version flag) (required)
   --title STRING    Document title (required for a full save; defaults to the current doc's title in edit mode)
   --language STRING    Document language: fi (binding original) or en (unofficial translation). In edit mode (--replace/--append/--prepend) this also selects WHICH language's current active document is read. (default: fi)
   --file STRING    Read markdown content from a local file
@@ -5975,6 +5975,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Missing --reason / no content / --file unreadable or combined with --content / --validate-json failed → pass --file OR --content, and --reason unless --dry-run
   exit 4 (client-side)  Edit mode (--replace/--append/--prepend) resolved to a document in a DIFFERENT language than --language — Task 8's read falls back to the fi row when no active en row exists, so this refuses rather than silently publishing Finnish content tagged language:en → create the target language version with a full --file/--content save first, then retry the edit
+  exit 4 (client-side)  --doc-version exceeds 20 characters (DB column legalDocuments.version is nvarchar(20)) → shorten the version string to 20 characters or fewer
   exit 4 (HTTP 400)  Required fields missing → provide --type --doc-version --title and content
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token

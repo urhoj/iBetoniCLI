@@ -25,6 +25,7 @@ import {
   normalizeLegalLanguage,
   registerLegalCommands,
   assertServedLanguageMatches,
+  assertDocVersionLength,
 } from "../../src/commands/legal/index.js";
 import { buildProgram } from "../../src/program.js";
 import { CliError } from "../../src/api/errors.js";
@@ -753,5 +754,48 @@ describe("ib legal --language wiring through Commander (Task 9)", () => {
       .find((c) => c.name() === "legal")!
       .commands.find((c) => c.name() === "activate")!;
     expect(activate.options.some((o) => o.long === "--language")).toBe(false);
+  });
+});
+
+// Feedback #444: a --doc-version longer than legalDocuments.version nvarchar(20)
+// used to travel to the backend and come back as an opaque 500 DATABASE_ERROR
+// (real cause visible only in Sentry). The width is a fixed schema fact, so the
+// CLI refuses client-side, exit 4, limit named — before any request is sent.
+describe("--doc-version length guard", () => {
+  test("20 characters passes", () => {
+    expect(() => assertDocVersionLength("x".repeat(20))).not.toThrow();
+  });
+
+  test("21 characters exits 4 naming the limit", () => {
+    try {
+      assertDocVersionLength("x".repeat(21));
+      throw new Error("expected to throw");
+    } catch (e) {
+      expect(e).toBeInstanceOf(CliError);
+      expect((e as CliError).exitCode).toBe(4);
+      expect((e as CliError).message).toContain("limited to 20 characters");
+      expect((e as CliError).message).toContain("got 21");
+    }
+  });
+
+  test("save refuses BEFORE any network call (both full-save and edit mode)", async () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    const prevExitCode = process.exitCode;
+    try {
+      const c = mockClient();
+      const p = new Command();
+      registerLegalCommands(p, async () => c);
+      await p.parseAsync(
+        ["legal", "save", "--type", "TOS", "--doc-version", "zz-langprobe-delete-me",
+          "--title", "T", "--content", "# x", "--reason", "r"],
+        { from: "user" }
+      );
+      expect(c.get).not.toHaveBeenCalled();
+      expect(c.post).not.toHaveBeenCalled();
+      expect(process.exitCode).toBe(4);
+    } finally {
+      process.exitCode = prevExitCode;
+      stderrSpy.mockRestore();
+    }
   });
 });

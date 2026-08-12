@@ -3691,7 +3691,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     tier: "developer",
     flags: [
       { name: "type", type: "string", required: true, description: "Document type name (see ib legal types)" },
-      { name: "doc-version", type: "string", required: true, description: "Version string, e.g. 2.0 (NOT --version — that is the global CLI version flag)" },
+      { name: "doc-version", type: "string", required: true, description: "Version string, e.g. 2.0, max 20 chars — DB column nvarchar(20) (NOT --version — that is the global CLI version flag)" },
       { name: "title", type: "string", description: "Document title (required for a full save; defaults to the current doc's title in edit mode)" },
       {
         name: "language",
@@ -3730,6 +3730,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         meaning: "Edit mode (--replace/--append/--prepend) resolved to a document in a DIFFERENT language than --language — Task 8's read falls back to the fi row when no active en row exists, so this refuses rather than silently publishing Finnish content tagged language:en",
         remedy: "create the target language version with a full --file/--content save first, then retry the edit",
         match: "edit would apply to the",
+      },
+      {
+        origin: "client", exit: 4,
+        meaning: "--doc-version exceeds 20 characters (DB column legalDocuments.version is nvarchar(20))",
+        remedy: "shorten the version string to 20 characters or fewer",
+        match: "limited to 20 characters",
       },
       apiErr(400, "Required fields missing", "provide --type --doc-version --title and content"),
       ...LEGAL_DEV_ERRORS,
