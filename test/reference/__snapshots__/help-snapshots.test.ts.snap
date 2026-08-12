@@ -4951,7 +4951,7 @@ DESCRIPTION
   Permissions: requires edit-tier on the target company (tarjousAdmin / company admin).
 
 FLAGS
-  --body JSON    JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo? }. Mutually exclusive with --from-json.
+  --body JSON    JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo?, website?, publicSlug?, publicListingConsent? }. Mutually exclusive with --from-json.
   --from-json STRING    Read the JSON body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body.
   --asiakas NUMBER    Target company asiakasId (default: your own)
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
@@ -4967,7 +4967,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, openingHours, companyDescription, maintainsOrderInfo, changed } · { dryRun: true, wouldUpdate: {...} } on --dry-run
+  { asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, jerryPersonEmail, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsentAt, publicListingConsentBy, changed } · { dryRun: true, wouldUpdate: {...} } on --dry-run
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Invalid field / contact not in company → check jerryPersonId belongs to the company
