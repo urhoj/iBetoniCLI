@@ -22,7 +22,7 @@ const GLOBAL_OPTIONS = [
         "Run this one command in another company's context (ephemeral switch, not persisted)",
     ],
     ["--stats", "Print API, SQL, and cache hit/miss timing for this command to stderr"],
-    ["--columns <csv>", "Columns --pretty shows in a list table (default: chosen per command)"],
+    ["--columns <csv>", "Only output these fields (projects lists and single records; loud on no match)"],
 ];
 /** The `-x` / `--xxx` tokens in a Commander flags string (`-e, --endpoint <url>`). */
 const flagTokens = (flags) => flags.split(/[\s,|]+/).filter((t) => t.startsWith("-"));

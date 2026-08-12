@@ -36,16 +36,21 @@ export interface GlobalOptions {
    */
   stats: boolean;
   /**
-   * Columns `--pretty` should show for a list table (`--columns a,b,c`),
-   * overriding the command spec's `prettyColumns` and the automatic fit.
-   * `null` = not set. No effect on JSON output — the data contract is
-   * unchanged; this only picks what the human table renders.
+   * Output projection (`--columns a,b,c`): the success output keeps only the
+   * named top-level fields — each row of a list (`ListEnvelope` items / raw
+   * arrays, envelope metadata kept) or the single record. Applied at the
+   * `writeJson` chokepoint in BOTH JSON and `--pretty` modes; under `--pretty`
+   * it also overrides the spec's `prettyColumns` table pick. LOUD by contract
+   * (fb#451 — it used to be a pretty-table-only pick, silently a no-op in JSON
+   * mode): unknown columns warn on stderr; no matching column, or output that
+   * cannot be projected (a scalar), exits 4 naming what IS available.
+   * `null` = not set.
    *
    * Named `--columns`, NOT `--fields`: a root option is recognized anywhere in
    * argv and would SHADOW the per-command `--fields <csv>` that
    * `customer list` / `ohje list` already own (the same trap documented on
-   * `--company` above) — and those two do a real server/client-side
-   * PROJECTION, which is a different thing from picking table columns.
+   * `--company` above) — those two are a SERVER-side projection; this one is
+   * client-side over the returned payload, so the two compose (intersection).
    */
   columns: string[] | null;
 }
@@ -74,7 +79,7 @@ const GLOBAL_OPTIONS: ReadonlyArray<readonly [flags: string, description: string
     "Run this one command in another company's context (ephemeral switch, not persisted)",
   ],
   ["--stats", "Print API, SQL, and cache hit/miss timing for this command to stderr"],
-  ["--columns <csv>", "Columns --pretty shows in a list table (default: chosen per command)"],
+  ["--columns <csv>", "Only output these fields (projects lists and single records; loud on no match)"],
 ];
 
 /** The `-x` / `--xxx` tokens in a Commander flags string (`-e, --endpoint <url>`). */

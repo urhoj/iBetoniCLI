@@ -9,6 +9,8 @@ export interface EmbeddedCtx {
   outputMode: "json" | "pretty";
   activeCommandErrors: CommandError[] | null;
   listColumns: readonly string[] | null;
+  /** Explicit global `--columns` output projection (fb#451) — see `output/json.ts`. */
+  projectionColumns: readonly string[] | null;
   /**
    * The caller's visibility tier, resolved from THEIR token. Read by
    * `getCallerTier()` ahead of the module-global ambient holder, so two

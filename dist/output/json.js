@@ -21,6 +21,16 @@ let activeCommandErrors = null;
  * selection into a concurrent one.
  */
 let listColumns = null;
+/**
+ * Columns the caller EXPLICITLY requested via the global `--columns` flag — a
+ * real client-side output projection applied by {@link writeJson} in BOTH JSON
+ * and `--pretty` modes (fb#451: the flag used to be a pretty-table-only pick,
+ * silently a no-op in JSON mode — exactly where AI callers live). Kept
+ * SEPARATE from {@link listColumns}, which is also seeded from the spec's
+ * `prettyColumns` — a presentation DEFAULT that must never narrow the JSON
+ * contract. Ctx-aware for the same reason as the rest.
+ */
+let projectionColumns = null;
 function emitStdout(line) {
     const ctx = getEmbeddedCtx();
     if (ctx)
@@ -49,6 +59,68 @@ export function setListColumns(cols) {
     else
         listColumns = cols;
 }
+export function setProjectionColumns(cols) {
+    const ctx = getEmbeddedCtx();
+    if (ctx)
+        ctx.projectionColumns = cols;
+    else
+        projectionColumns = cols;
+}
+const isRow = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+/**
+ * Apply the global `--columns` projection to a command's success output
+ * (fb#451). A `ListEnvelope` / raw array projects each object row (envelope
+ * metadata — `nextCursor`/`count`/`truncated`/`hint` — is kept); a single
+ * record projects its top-level keys. LOUD by contract — the old silent no-op
+ * was the bug: a requested column matching nothing warns on stderr; when NO
+ * requested column matches, or the output is a scalar that cannot be
+ * projected at all, the command exits 4 naming what IS available instead of
+ * returning the unprojected payload as if the flag had been applied.
+ */
+export function applyColumnsProjection(value, cols) {
+    let rows;
+    if (isListEnvelope(value)) {
+        if (value.items.length === 0)
+            return value; // empty list: nothing to project
+        rows = value.items.filter(isRow);
+    }
+    else if (Array.isArray(value)) {
+        if (value.length === 0)
+            return value;
+        rows = value.filter(isRow);
+    }
+    else if (isRow(value)) {
+        rows = [value];
+    }
+    else {
+        failUsage(`--columns cannot project this command's output (${value === null ? "null" : typeof value}) — drop --columns here.`);
+    }
+    if (rows.length === 0) {
+        failUsage("--columns cannot project this command's output (its rows are not objects) — drop --columns here.");
+    }
+    const matched = cols.filter((c) => rows.some((r) => c in r));
+    if (matched.length === 0) {
+        const available = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+        failUsage(`--columns: none of [${cols.join(", ")}] exist in this output. Available: ${available.join(", ")}.`);
+    }
+    if (matched.length < cols.length) {
+        const unknown = cols.filter((c) => !matched.includes(c));
+        warnNote(`[ib] --columns: unknown column(s) ignored: ${unknown.join(", ")}`);
+    }
+    const pick = (r) => {
+        const out = {};
+        for (const c of cols)
+            if (c in r)
+                out[c] = r[c];
+        return out;
+    };
+    if (isListEnvelope(value)) {
+        return { ...value, items: value.items.map((it) => (isRow(it) ? pick(it) : it)) };
+    }
+    if (Array.isArray(value))
+        return value.map((it) => (isRow(it) ? pick(it) : it));
+    return pick(value);
+}
 export function setOutputMode(m) {
     const ctx = getEmbeddedCtx();
     if (ctx)
@@ -57,6 +129,9 @@ export function setOutputMode(m) {
         outputMode = m;
 }
 export function writeJson(value) {
+    const projection = getEmbeddedCtx()?.projectionColumns ?? projectionColumns;
+    if (projection)
+        value = applyColumnsProjection(value, projection);
     const mode = getEmbeddedCtx()?.outputMode ?? outputMode;
     if (mode === "pretty") {
         if (isListEnvelope(value)) {

@@ -2,7 +2,7 @@
 import { buildProgram, enableParserThrow, handleParseRejection, applySpecErrors, } from "../program.js";
 import { getGlobalOptions } from "../globals.js";
 import { enableStats, flushStats } from "../stats.js";
-import { setOutputMode, setListColumns } from "../output/json.js";
+import { setOutputMode, setListColumns, setProjectionColumns } from "../output/json.js";
 import { resolveAuth } from "../auth/resolve.js";
 import { defaultCredentialsPath } from "../auth/store.js";
 import { setCallerTier, resolveCallerTier } from "../tier.js";
@@ -29,10 +29,13 @@ program.hook("preAction", (_thisCommand, actionCommand) => {
     // documented per-error remedy as `hint` (feedback #25). Shared with runArgv.
     applySpecErrors(actionCommand);
     // AFTER applySpecErrors, which seeds the spec's own prettyColumns: an
-    // explicit --columns is the caller's override and must win.
+    // explicit --columns is the caller's override and must win. It is also a
+    // real output projection (fb#451) — writeJson applies it in both modes.
     const cols = getGlobalOptions(program).columns;
-    if (cols)
+    if (cols) {
         setListColumns(cols);
+        setProjectionColumns(cols);
+    }
 });
 // Resolve the caller's visibility tier from the session token BEFORE parse so
 // discovery (`ib commands`, `ib reference dump`, root primer) renders at the

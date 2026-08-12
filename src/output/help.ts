@@ -200,7 +200,8 @@ interface CommandSpecBase {
    * Only worth setting on a WIDE list (roughly >8 columns), where the automatic
    * leftmost-fits fallback in `renderList` would otherwise hide the columns a
    * caller actually triages by (feedback #341). Purely presentational — it does
-   * not touch the JSON contract, and the global `--columns` overrides it.
+   * not touch the JSON contract, and the global `--columns` overrides it (that
+   * flag, unlike this default, also PROJECTS the payload itself — fb#451).
    */
   prettyColumns?: readonly string[];
   /** Documented error codes with their meaning and remedy. */

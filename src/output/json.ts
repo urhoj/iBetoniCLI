@@ -31,6 +31,17 @@ let activeCommandErrors: CommandError[] | null = null;
  */
 let listColumns: readonly string[] | null = null;
 
+/**
+ * Columns the caller EXPLICITLY requested via the global `--columns` flag — a
+ * real client-side output projection applied by {@link writeJson} in BOTH JSON
+ * and `--pretty` modes (fb#451: the flag used to be a pretty-table-only pick,
+ * silently a no-op in JSON mode — exactly where AI callers live). Kept
+ * SEPARATE from {@link listColumns}, which is also seeded from the spec's
+ * `prettyColumns` — a presentation DEFAULT that must never narrow the JSON
+ * contract. Ctx-aware for the same reason as the rest.
+ */
+let projectionColumns: readonly string[] | null = null;
+
 function emitStdout(line: string): void {
   const ctx = getEmbeddedCtx();
   if (ctx) ctx.stdout.push(line);
@@ -55,6 +66,71 @@ export function setListColumns(cols: readonly string[] | null): void {
   else listColumns = cols;
 }
 
+export function setProjectionColumns(cols: readonly string[] | null): void {
+  const ctx = getEmbeddedCtx();
+  if (ctx) ctx.projectionColumns = cols;
+  else projectionColumns = cols;
+}
+
+const isRow = (v: unknown): v is Record<string, unknown> =>
+  v !== null && typeof v === "object" && !Array.isArray(v);
+
+/**
+ * Apply the global `--columns` projection to a command's success output
+ * (fb#451). A `ListEnvelope` / raw array projects each object row (envelope
+ * metadata — `nextCursor`/`count`/`truncated`/`hint` — is kept); a single
+ * record projects its top-level keys. LOUD by contract — the old silent no-op
+ * was the bug: a requested column matching nothing warns on stderr; when NO
+ * requested column matches, or the output is a scalar that cannot be
+ * projected at all, the command exits 4 naming what IS available instead of
+ * returning the unprojected payload as if the flag had been applied.
+ */
+export function applyColumnsProjection(
+  value: unknown,
+  cols: readonly string[]
+): unknown {
+  let rows: Record<string, unknown>[];
+  if (isListEnvelope(value)) {
+    if (value.items.length === 0) return value; // empty list: nothing to project
+    rows = value.items.filter(isRow);
+  } else if (Array.isArray(value)) {
+    if (value.length === 0) return value;
+    rows = value.filter(isRow);
+  } else if (isRow(value)) {
+    rows = [value];
+  } else {
+    failUsage(
+      `--columns cannot project this command's output (${value === null ? "null" : typeof value}) — drop --columns here.`
+    );
+  }
+  if (rows.length === 0) {
+    failUsage(
+      "--columns cannot project this command's output (its rows are not objects) — drop --columns here."
+    );
+  }
+  const matched = cols.filter((c) => rows.some((r) => c in r));
+  if (matched.length === 0) {
+    const available = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+    failUsage(
+      `--columns: none of [${cols.join(", ")}] exist in this output. Available: ${available.join(", ")}.`
+    );
+  }
+  if (matched.length < cols.length) {
+    const unknown = cols.filter((c) => !matched.includes(c));
+    warnNote(`[ib] --columns: unknown column(s) ignored: ${unknown.join(", ")}`);
+  }
+  const pick = (r: Record<string, unknown>): Record<string, unknown> => {
+    const out: Record<string, unknown> = {};
+    for (const c of cols) if (c in r) out[c] = r[c];
+    return out;
+  };
+  if (isListEnvelope(value)) {
+    return { ...value, items: value.items.map((it) => (isRow(it) ? pick(it) : it)) };
+  }
+  if (Array.isArray(value)) return value.map((it) => (isRow(it) ? pick(it) : it));
+  return pick(value as Record<string, unknown>);
+}
+
 export function setOutputMode(m: "json" | "pretty"): void {
   const ctx = getEmbeddedCtx();
   if (ctx) ctx.outputMode = m;
@@ -62,6 +138,8 @@ export function setOutputMode(m: "json" | "pretty"): void {
 }
 
 export function writeJson(value: unknown): void {
+  const projection = getEmbeddedCtx()?.projectionColumns ?? projectionColumns;
+  if (projection) value = applyColumnsProjection(value, projection);
   const mode = getEmbeddedCtx()?.outputMode ?? outputMode;
   if (mode === "pretty") {
     if (isListEnvelope(value)) {

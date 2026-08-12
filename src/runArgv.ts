@@ -2,6 +2,8 @@ import { buildProgram, enableParserThrow, handleParseRejection, applySpecErrors 
 import { runEmbedded, type EmbeddedCtx } from "./embedded.js";
 import { resolveCallerTier } from "./tier.js";
 import { setAmbientCommandPath, commandPathOf } from "./commandContext.js";
+import { getGlobalOptions } from "./globals.js";
+import { setListColumns, setProjectionColumns } from "./output/json.js";
 
 export interface RunArgvOpts {
   token: string;
@@ -29,10 +31,18 @@ export async function runArgv(
   const program = await buildProgram(argv);
   const parserHooks = enableParserThrow(program);
 
-  // Mirror bin/ib.ts: resolve each command's CommandSpec errors for hint output.
+  // Mirror bin/ib.ts: resolve each command's CommandSpec errors for hint
+  // output, and honour the global --columns output projection (fb#451 — the
+  // embedded runner used to ignore the flag entirely). The hook runs inside
+  // runEmbedded, so the ctx-aware setters write to THIS call's ctx.
   program.hook("preAction", (_t, actionCommand) => {
     setAmbientCommandPath(commandPathOf(actionCommand));
     applySpecErrors(actionCommand);
+    const cols = getGlobalOptions(program).columns;
+    if (cols) {
+      setListColumns(cols);
+      setProjectionColumns(cols);
+    }
   });
 
   // The caller's tier and the running command path ride in the EmbeddedCtx
@@ -47,6 +57,7 @@ export async function runArgv(
     outputMode: "json",
     activeCommandErrors: null,
     listColumns: null,
+    projectionColumns: null,
     tier: resolveCallerTier(opts.token),
     commandPath: null,
     stdout: [],

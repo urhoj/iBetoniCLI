@@ -51,4 +51,15 @@ describe("json.ts embedded routing", () => {
     expect(spy).toHaveBeenCalledWith('{"a":1}\n');
     spy.mockRestore();
   });
+  // fb#451: --columns projection rides the ctx, never module state — a
+  // concurrent non-embedded write stays unprojected.
+  test("--columns projection is ctx-scoped in embedded mode", async () => {
+    const spy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+    const c = { ...ctx(), projectionColumns: ["a"] } as EmbeddedCtx;
+    await runEmbedded(c, async () => writeJson({ a: 1, b: 2 }));
+    expect(c.stdout.join("")).toBe('{"a":1}\n');
+    writeJson({ a: 1, b: 2 });
+    expect(spy).toHaveBeenCalledWith('{"a":1,"b":2}\n');
+    spy.mockRestore();
+  });
 });
