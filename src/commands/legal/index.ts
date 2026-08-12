@@ -348,15 +348,50 @@ export async function runLegalSave(
 }
 
 /**
+ * Guard for edit-mode `legal save` (feedback from Task 9 review): the doc read
+ * by `runLegalShow` may be Task 8's `fi` FALLBACK rather than the requested
+ * language — `--append`/`--prepend` don't require matching existing text, so
+ * that fallback would otherwise be edited and re-saved silently mislabelled.
+ * `doc.language` is a real column on legalDocuments (Task 8), so the SERVED
+ * language is always knowable from the response — compare it to what was
+ * requested and refuse (exit 4) on a mismatch instead of trusting the request.
+ *
+ * A response with NO `language` field at all (an older backend, or a shape
+ * change) is deliberately NOT treated as a mismatch: there is nothing to
+ * verify against, so this is a no-op rather than a false refusal. That is a
+ * DELIBERATE fail-open choice, not an oversight — the alternative (fail closed
+ * whenever `language` is absent) would break edit mode entirely against any
+ * backend that doesn't yet return the column, for a mismatch this guard cannot
+ * even detect in that case.
+ */
+export function assertServedLanguageMatches(
+  type: string,
+  requested: string | undefined,
+  doc: Row
+): void {
+  const want = requested ?? "fi";
+  const served = doc.language;
+  if (typeof served !== "string") return; // cannot verify — see doc comment above
+  if (served === want) return;
+  failWith(
+    `no active ${want} document exists for ${type} — the edit would apply to the ${served} fallback and publish it mislabelled as ${want}. Create the ${want} version with a full --file/--content save first.`,
+    4
+  );
+}
+
+/**
  * Edit-mode `legal save`: in-field partial edit of the CURRENT ACTIVE document's
  * markdown, saved as a NEW immutable version (versions are never mutated in
  * place). Fetches the active doc (typeName implies the tenant), applies the edit
  * locally, then `--dry-run` returns the field diff WITHOUT writing (client-side,
  * safe-by-construction), or a real run delegates to `runLegalSave`. `--title`
  * defaults to the current doc's title when omitted. `fields.language` (when
- * given) both selects WHICH language's current active document is read and
- * tags the saved edit with that same language, so an edit never cross-pollinates
- * the fi and en variants of a type.
+ * given) selects WHICH language's current active document is read and tags the
+ * saved edit with that same language — but Task 8's read endpoint deliberately
+ * FALLS BACK to the `fi` row when no active `en` row exists for the type (so a
+ * missing translation is never a blank consent gate). Trusting the request
+ * alone would let an edit silently read Finnish content and publish it tagged
+ * `language: en`; {@link assertServedLanguageMatches} refuses instead.
  */
 export async function runLegalSaveWithEdit(
   client: ApiClient,
@@ -374,6 +409,7 @@ export async function runLegalSaveWithEdit(
   flags: WriteFlags
 ): Promise<unknown> {
   const current = await runLegalShow(client, type, false, fields.language); // /current/:type ; 404 → CliError exit 5
+  assertServedLanguageMatches(type, fields.language, current);
   const before = typeof current.markdownContent === "string" ? current.markdownContent : "";
   const { next, matchCount } = applyTextEdit(before, op);
   if (flags.dryRun) {

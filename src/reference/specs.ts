@@ -3719,12 +3719,24 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     mutates: true,
     outputShape: "{documentId, success} | dry-run: {dryRun: true, wouldCreate: {...}, validation} | edit dry-run: {dryRun:true, type, field:\"markdownContent\", matchCount?, addedLines, removedLines, sameContent, unified}",
     errors: [
-      { origin: "client", exit: 4, meaning: "Missing --reason / no content / --file unreadable or combined with --content", remedy: "pass --file OR --content, and --reason unless --dry-run" },
+      {
+        origin: "client", exit: 4,
+        meaning: "Missing --reason / no content / --file unreadable or combined with --content / --validate-json failed",
+        remedy: "pass --file OR --content, and --reason unless --dry-run",
+        match: ["provide --file", "missing required flag", "mutually exclusive", "cannot read file", "--validate-json failed"],
+      },
+      {
+        origin: "client", exit: 4,
+        meaning: "Edit mode (--replace/--append/--prepend) resolved to a document in a DIFFERENT language than --language — Task 8's read falls back to the fi row when no active en row exists, so this refuses rather than silently publishing Finnish content tagged language:en",
+        remedy: "create the target language version with a full --file/--content save first, then retry the edit",
+        match: "edit would apply to the",
+      },
       apiErr(400, "Required fields missing", "provide --type --doc-version --title and content"),
       ...LEGAL_DEV_ERRORS,
     ],
     notes: [
       "X-Dry-Run is honoured server-side on this route once the gating deploy is live — do not --dry-run against a backend without it (the write would persist).",
+      "Edit mode (--replace/--append/--prepend) refuses when the served document's own language differs from --language (the fi fallback for a type with no active en document yet) — create the target language version with a full --file/--content save first.",
     ],
     seeAlso: ["ib legal activate", "ib legal versions"],
     examples: [

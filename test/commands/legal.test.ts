@@ -24,6 +24,7 @@ import {
   pickTypeFields,
   normalizeLegalLanguage,
   registerLegalCommands,
+  assertServedLanguageMatches,
 } from "../../src/commands/legal/index.js";
 import { buildProgram } from "../../src/program.js";
 import { CliError } from "../../src/api/errors.js";
@@ -602,6 +603,29 @@ describe("ib legal save — edit mode (in-field partial)", () => {
     expect(body).toMatchObject({ language: "en", title: "Terms of Service" });
   });
 
+  // Review finding (Task 9, round 1): Task 8's /current/:typeName falls back to
+  // the fi row when no active en row exists. --append/--prepend don't require
+  // matching existing text, so a naive read+edit+save would silently publish
+  // Finnish content tagged language:"en". The served document carries its own
+  // `language` column — refuse instead of trusting the request.
+  test("--language en refuses when the served document is the fi FALLBACK (Task 9 fix)", async () => {
+    const c = mockClient();
+    c.get.mockImplementation((url: string) =>
+      url.includes("/current/")
+        ? Promise.resolve({ ...ACTIVE, language: "fi" }) // no active en row -> Task 8 serves fi
+        : Promise.resolve(TYPES)
+    );
+    await expect(
+      runLegalSaveWithEdit(
+        c, "TOS",
+        { kind: "append", text: "\n\nAppendix." },
+        { version: "2.1", language: "en" },
+        { reason: "add appendix" }
+      )
+    ).rejects.toMatchObject({ exitCode: 4 });
+    expect(c.post).not.toHaveBeenCalled();
+  });
+
   test("no active version → exit 5", async () => {
     const c = mockClient();
     c.get.mockRejectedValue(new CliError("not found", 404, null, 5));
@@ -620,6 +644,37 @@ describe("normalizeLegalLanguage", () => {
   });
   test("rejects an unknown code with the allowed list", () => {
     expect(() => normalizeLegalLanguage("de")).toThrow(/--language must be one of: fi, en/);
+  });
+});
+
+describe("assertServedLanguageMatches (Task 9 review fix)", () => {
+  test("no-op when served language matches what was requested", () => {
+    expect(() => assertServedLanguageMatches("TOS", "en", { language: "en" })).not.toThrow();
+  });
+  test("no-op when neither is given (both default to fi)", () => {
+    expect(() => assertServedLanguageMatches("TOS", undefined, { language: "fi" })).not.toThrow();
+  });
+  test("refuses (exit 4) on a served/requested mismatch", () => {
+    expect(() => assertServedLanguageMatches("TOS", "en", { language: "fi" })).toThrowError(
+      expect.objectContaining({ exitCode: 4 })
+    );
+  });
+  test("the mismatch message names the type, what was requested, and what was served", () => {
+    try {
+      assertServedLanguageMatches("BETONIJERRY_TOS", "en", { language: "fi" });
+      throw new Error("expected to throw");
+    } catch (e) {
+      expect((e as Error).message).toMatch(/BETONIJERRY_TOS/);
+      expect((e as Error).message).toMatch(/en/);
+      expect((e as Error).message).toMatch(/fi/);
+    }
+  });
+  // Deliberate fail-open: an older backend (or a shape change) that omits the
+  // `language` field gives this guard nothing to verify against, so it must
+  // NOT refuse — refusing here would break edit mode entirely against any
+  // backend that doesn't yet return the column.
+  test("does NOT refuse when the response carries no language field at all (cannot verify)", () => {
+    expect(() => assertServedLanguageMatches("TOS", "en", {})).not.toThrow();
   });
 });
 
