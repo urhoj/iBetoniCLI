@@ -70,7 +70,9 @@ export async function runJerryRequestList(
  * Get a single pump request. Default is the customer-owned recap
  * (GET /api/pumppuRequests/:id). `--provider` switches to the provider-facing
  * detail (GET /api/pumppuRequests/:id/provider-detail; requires isProvider) —
- * customer PII stays masked there until this provider's offer is accepted.
+ * which, under the open-details model, reveals the FULL customer lead (name,
+ * address, lat/lng, phone, email) to every matched provider while the request is
+ * open. Masking lives on the `--open` list and the fan-out email, not here.
  */
 export async function runJerryRequestGet(
   client: ApiClient,
