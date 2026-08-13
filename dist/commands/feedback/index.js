@@ -6,6 +6,7 @@ import { guarded, jsonAction } from "../_shared/action.js";
 import { foldAliases } from "../_shared/flags.js";
 import { applyFromJson } from "../_shared/fromJson.js";
 import { qs } from "../../api/query.js";
+import { CliError } from "../../api/errors.js";
 // Exported for specs.ts: the spec flags declare these as machine-readable
 // `allowed:` sets (validation envelopes), single-sourced from here.
 export const KINDS = ["improvement", "bug", "idea", "legal"];
@@ -61,7 +62,7 @@ const TRUNCATE_HINT = "description/resolution truncated to 200 chars; ib dev fee
  * that found this, three were NULL-complexity and genuinely 1-2, so trusting
  * the filter would have surfaced one of four and reported the batch done).
  */
-const COMPLEXITY_NULL_HINT = "a complexity filter is active and EXCLUDES rows with no estimate (complexity is optional on create, so most rows are unset — absent means unestimated, not complex); re-run without --complexity/--max-complexity to see the full candidate set";
+const COMPLEXITY_NULL_HINT = "a complexity filter is active and EXCLUDES rows with no estimate (complexity is optional on create, so most rows are unset — absent means unestimated, not complex); re-run without --complexity/--max-complexity to see the full candidate set, or with --complexity none to see ONLY the unestimated rows";
 /** Cap a string at MAX_FREETEXT chars, appending "..." when cut. Non-strings
  * pass through untouched. */
 function truncateField(v) {
@@ -295,19 +296,50 @@ export async function runFeedbackGet(client, id) {
     return client.get(`/api/feedback/${id}`);
 }
 /**
- * Client-side aggregate of /api/feedback for the cheapest "is there anything?"
- * answer. Fetches up to the 200-row cap (optionally pre-filtered by
- * kind/scope) and buckets by status/kind/scope. Flags `truncated` if the table
- * exceeds the cap (won't happen at current row counts; kept honest).
+ * Aggregate counts, server-side over the WHOLE table (GET /api/feedback/stats).
+ *
+ * This used to bucket a client-side page in JS, which was correct only while the
+ * table stayed under the 200-row cap. It didn't: the page is newest-first, so
+ * truncation dropped the OLDEST rows — the longest-neglected backlog, the worst
+ * possible bias for a "how much is still open?" number — and a command whose
+ * entire purpose is producing counts returned wrong ones by default (fb#536,
+ * measured: byStatus.open 87 vs a true 91). The docstring's old parenthetical
+ * ("won't happen at current row counts") is exactly the kind of assumption
+ * nothing re-checks; it had silently expired.
+ *
+ * DEPLOY-GATED with a graceful fallback: against a backend without the route we
+ * fall back to the old rollup and keep its `truncated`/`hint` caveat, so the
+ * command degrades to its previous behaviour rather than breaking outright.
+ *
+ * The fallback deliberately does NOT key off a single status. An older backend
+ * has no /stats path, so the request falls through to `GET /:id` as id="stats" —
+ * which, before that route learned to reject a non-numeric id, reached SQL and
+ * came back 500 ("Conversion failed when converting the nvarchar value 'stats'")
+ * rather than 404. Verified against prod. Auth and permission errors still
+ * propagate: they are actionable, and the fallback call would fail the same way.
  */
 export async function runFeedbackCount(client, opts) {
     // Same silent-empty trap as `list` — here it reads as a total of 0 (fb#369).
     assertEnum(opts.kind, KINDS, "--kind");
     assertEnum(opts.scope, SCOPES, "--scope");
+    const suffix = qs({ kind: opts.kind || undefined, scope: opts.scope || undefined });
+    try {
+        return await client.get(`/api/feedback/stats${suffix}`);
+    }
+    catch (e) {
+        const status = e instanceof CliError ? e.statusCode : 0;
+        if (status === 401 || status === 403)
+            throw e;
+        return countClientSide(client, opts);
+    }
+}
+/** Pre-fb#536 rollup: bucket one capped page in JS. Only reached on an older backend. */
+async function countClientSide(client, opts) {
     const rows = await fetchRows(client, { kind: opts.kind, scope: opts.scope, limit: CAP });
     const byStatus = { open: 0, reviewed: 0, applied: 0, dismissed: 0 };
     const byKind = {};
     const byScope = {};
+    let unestimated = 0;
     for (const r of rows) {
         const s = String(r.status ?? "");
         if (s in byStatus)
@@ -316,11 +348,14 @@ export async function runFeedbackCount(client, opts) {
         byKind[k] = (byKind[k] ?? 0) + 1;
         const sc = String(r.scope ?? "unknown");
         byScope[sc] = (byScope[sc] ?? 0) + 1;
+        if (r.complexity == null)
+            unestimated += 1;
     }
-    const out = { total: rows.length, byStatus, byKind, byScope };
+    const out = { total: rows.length, byStatus, byKind, byScope, unestimated };
     if (rows.length >= CAP) {
         out.truncated = true;
-        out.hint = "count is a lower bound — fetch hit the 200-row cap";
+        out.hint =
+            "count is a lower bound — this backend has no /api/feedback/stats, so the rollup ran client-side and hit the 200-row cap. The rows dropped are the OLDEST, so `open` is understated most.";
     }
     return out;
 }
@@ -520,7 +555,11 @@ export function registerFeedbackCommands(parent, getClient, opts = {}) {
         .option("--kind <kind>")
         .option("--scope <scope>")
         .option("--search <text>")
-        .option("--complexity <n>", "", Number)
+        // Not a bare `Number` like its --max-complexity sibling: `none` is a real
+        // value here (select the UNESTIMATED rows), and Number("none") is NaN, which
+        // the backend's parseInt guard would drop as "no filter" — returning the whole
+        // table as if nothing had been asked for (fb#535).
+        .option("--complexity <n>", "", (v) => (v.toLowerCase() === "none" ? "none" : Number(v)))
         .option("--max-complexity <n>", "", Number)
         .option("--oldest")
         .option("--limit <n>", "", Number)

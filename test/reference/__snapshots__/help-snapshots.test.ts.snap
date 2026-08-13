@@ -2455,7 +2455,7 @@ exports[`Help snapshots — contract stability > help for ib dev feedback count 
   ib dev feedback count [flags]
 
 DESCRIPTION
-  Aggregate counts of filed feedback by status, kind, and scope (developer-only). The cheapest way to answer "is there any open feedback?" — a tiny fixed-size response instead of a row dump. Counts are computed client-side over up to 200 rows.
+  Aggregate counts of filed feedback by status, kind, and scope, plus how many rows still have NO complexity estimate (developer-only). The cheapest way to answer "is there any open feedback?" — a tiny fixed-size response instead of a row dump. Aggregated server-side over the WHOLE table, so the totals stay correct at any volume.
   Permissions: requires isSystemAdmin or isDeveloper.
 
 FLAGS
@@ -2467,13 +2467,16 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { total, byStatus: { open, reviewed, applied, dismissed }, byKind, byScope, truncated?, hint? }
+  { total, byStatus: { open, reviewed, applied, dismissed }, byKind, byScope, unestimated, truncated?, hint? }. \`unestimated\` = rows with complexity IS NULL — pair it with \`list --complexity none\` to work through them.
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Validation             → --kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would report total:0 rather than an error)
   exit 3 (HTTP 403)  Permission denied      → requires a developer token (isSystemAdmin/isDeveloper)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - DEPLOY-GATED (fb#536): the server-side aggregate needs /api/feedback/stats. Against an older backend the command falls back to the previous client-side rollup over a 200-row page and sets \`truncated: true\` with a hint — those numbers are a LOWER BOUND, and because the page is newest-first the rows dropped are the OLDEST, so \`open\` is understated most. Cross-check a truncated result with \`ib dev feedback list --status open --limit 200\`.
 
 EXAMPLES
   ib dev feedback count
@@ -2598,8 +2601,8 @@ FLAGS
   --kind STRING    improvement | bug | idea | legal
   --scope STRING    cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other
   --search STRING    Substring match over description/command/resolution/errorText (deploy-gated)
-  --complexity NUMBER    Only items with this exact complexity 1-5 (deploy-gated). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex.
-  --max-complexity NUMBER    Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls (deploy-gated). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex.
+  --complexity STRING    Only items with this exact complexity 1-5, or \`none\` for the rows with NO estimate at all (deploy-gated). ⚠ A NUMERIC value EXCLUDES unestimated rows, which is most of the table — absent means unestimated, not complex; \`--complexity none\` is how you select exactly that set for a backfill pass (fb#535).
+  --max-complexity NUMBER    Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls (deploy-gated). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex; use \`--complexity none\` to find those.
   --oldest    Oldest-first (createdAt ASC) — FIFO drain order so the triage loop clears the backlog before newer arrivals; default is newest-first
   --limit NUMBER    Max rows (cap 200) (default: 50)
   --offset NUMBER    Pagination offset (default: 0)

@@ -6227,8 +6227,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "kind", type: "string", description: "improvement | bug | idea | legal", allowed: [...FEEDBACK_KINDS] },
       { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other", allowed: [...FEEDBACK_SCOPES] },
       { name: "search", type: "string", description: "Substring match over description/command/resolution/errorText (deploy-gated)" },
-      { name: "complexity", type: "number", description: "Only items with this exact complexity 1-5 (deploy-gated). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex." },
-      { name: "max-complexity", type: "number", description: "Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls (deploy-gated). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex." },
+      { name: "complexity", type: "string", description: "Only items with this exact complexity 1-5, or `none` for the rows with NO estimate at all (deploy-gated). ⚠ A NUMERIC value EXCLUDES unestimated rows, which is most of the table — absent means unestimated, not complex; `--complexity none` is how you select exactly that set for a backfill pass (fb#535)." },
+      { name: "max-complexity", type: "number", description: "Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls (deploy-gated). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex; use `--complexity none` to find those." },
       { name: "oldest", type: "boolean", description: "Oldest-first (createdAt ASC) — FIFO drain order so the triage loop clears the backlog before newer arrivals; default is newest-first" },
       { name: "limit", type: "number", default: "50", description: "Max rows (cap 200)" },
       { name: "offset", type: "number", default: "0", description: "Pagination offset" },
@@ -6384,7 +6384,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib dev feedback count",
     description:
-      "Aggregate counts of filed feedback by status, kind, and scope (developer-only). The cheapest way to answer \"is there any open feedback?\" — a tiny fixed-size response instead of a row dump. Counts are computed client-side over up to 200 rows.",
+      "Aggregate counts of filed feedback by status, kind, and scope, plus how many rows still have NO complexity estimate (developer-only). The cheapest way to answer \"is there any open feedback?\" — a tiny fixed-size response instead of a row dump. Aggregated server-side over the WHOLE table, so the totals stay correct at any volume.",
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     flags: [
@@ -6392,7 +6392,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "scope", type: "string", description: "cli | app | jerry | bsg2 | workspace | security | ops | impeccable | other — count only this scope", allowed: [...FEEDBACK_SCOPES] },
     ],
     outputShape:
-      "{ total, byStatus: { open, reviewed, applied, dismissed }, byKind, byScope, truncated?, hint? }",
+      "{ total, byStatus: { open, reviewed, applied, dismissed }, byKind, byScope, unestimated, truncated?, hint? }. `unestimated` = rows with complexity IS NULL — pair it with `list --complexity none` to work through them.",
+    notes: [
+      "DEPLOY-GATED (fb#536): the server-side aggregate needs /api/feedback/stats. Against an older backend the command falls back to the previous client-side rollup over a 200-row page and sets `truncated: true` with a hint — those numbers are a LOWER BOUND, and because the page is newest-first the rows dropped are the OLDEST, so `open` is understated most. Cross-check a truncated result with `ib dev feedback list --status open --limit 200`.",
+    ],
     errors: [
       { origin: "client", exit: 4, match: "must be one of", meaning: "Validation", remedy: "--kind must be improvement|bug|idea|legal and --scope one of cli|app|jerry|bsg2|workspace|security|ops|impeccable|other (both STRICT — they are server-side SQL filters, so an unknown value would report total:0 rather than an error)" },
       apiErr(403, "Permission denied", "requires a developer token (isSystemAdmin/isDeveloper)"),

@@ -541,6 +541,16 @@ describe("ib feedback list", () => {
     expect(get).toHaveBeenCalledWith("/api/feedback?status=open&complexity=5");
   });
 
+  test("forwards --complexity none, the unestimated-row selector (fb#535)", async () => {
+    // The set both numeric filters exclude by construction, and the one a
+    // complexity-backfill pass needs. It has to survive as the literal string:
+    // Number("none") is NaN, which the backend's parseInt guard drops as "no
+    // filter" — returning the whole table as if nothing had been asked for.
+    get.mockResolvedValueOnce([]);
+    await runFeedbackList(mockClient, { status: "open", complexity: "none" });
+    expect(get).toHaveBeenCalledWith("/api/feedback?status=open&complexity=none");
+  });
+
   test("--oldest sets createdAt ASC ordering on the single-status path", async () => {
     get.mockResolvedValueOnce([]);
     await runFeedbackList(mockClient, { status: "open", oldest: true });
@@ -1148,39 +1158,83 @@ describe("ib feedback update", () => {
 // ─── count ───────────────────────────────────────────────────────────────────
 
 describe("ib feedback count", () => {
-  test("aggregates by status, kind, scope", async () => {
+  /** The whole-table aggregate the backend now returns. */
+  const statsPayload = {
+    total: 545,
+    byStatus: { open: 91, reviewed: 5, applied: 105, dismissed: 5 },
+    byKind: { improvement: 105, bug: 77 },
+    byScope: { cli: 71, app: 39 },
+    unestimated: 26,
+  };
+
+  test("reads the server-side aggregate, uncapped", async () => {
+    get.mockResolvedValueOnce(statsPayload);
+    const out = await runFeedbackCount(mockClient, {});
+    expect(get).toHaveBeenCalledWith("/api/feedback/stats");
+    expect(out).toMatchObject(statsPayload);
+    // No cap involved, so no lower-bound caveat to carry.
+    expect(out.truncated).toBeUndefined();
+  });
+
+  test("forwards --kind and --scope filters", async () => {
+    get.mockResolvedValueOnce(statsPayload);
+    await runFeedbackCount(mockClient, { kind: "bug", scope: "cli" });
+    expect(get).toHaveBeenCalledWith("/api/feedback/stats?kind=bug&scope=cli");
+  });
+
+  test("falls back to the client-side rollup on a backend without the route", async () => {
+    // Deploy-gated: degrade to the previous behaviour rather than break outright.
+    get.mockRejectedValueOnce(new CliError("Not found", 404));
     get.mockResolvedValueOnce([
-      { feedbackId: 1, status: "open", kind: "improvement", scope: "cli" },
-      { feedbackId: 2, status: "open", kind: "bug", scope: "app" },
+      { feedbackId: 1, status: "open", kind: "improvement", scope: "cli", complexity: 2 },
+      { feedbackId: 2, status: "open", kind: "bug", scope: "app", complexity: null },
       { feedbackId: 3, status: "applied", kind: "improvement", scope: "cli" },
     ]);
     const out = await runFeedbackCount(mockClient, {});
-    expect(get).toHaveBeenCalledWith("/api/feedback?limit=200");
+    expect(get).toHaveBeenLastCalledWith("/api/feedback?limit=200");
     expect(out).toMatchObject({
       total: 3,
       byStatus: { open: 2, reviewed: 0, applied: 1, dismissed: 0 },
       byKind: { improvement: 2, bug: 1 },
       byScope: { cli: 2, app: 1 },
+      unestimated: 2,
     });
   });
 
-  test("forwards --kind and --scope filters", async () => {
-    get.mockResolvedValueOnce([]);
-    await runFeedbackCount(mockClient, { kind: "bug", scope: "cli" });
-    expect(get).toHaveBeenCalledWith("/api/feedback?kind=bug&scope=cli&limit=200");
+  test("a permission error propagates instead of silently degrading", async () => {
+    // Actionable, and the fallback call would fail identically — answering a
+    // permissions problem with quietly capped numbers would be worse than an error.
+    get.mockRejectedValueOnce(new CliError("Permission denied", 403));
+    await expect(runFeedbackCount(mockClient, {})).rejects.toMatchObject({ statusCode: 403 });
   });
 
-  test("flags truncated when the fetch hits the 200-row cap", async () => {
+  test("falls back on a 500 too — an old backend routes /stats into GET /:id", async () => {
+    // Verified against prod: with no /stats route the path matches `/:id` as
+    // id="stats", reaches SQL and returns 500 "Conversion failed when converting
+    // the nvarchar value 'stats' to data type int" — NOT a 404. Keying the
+    // fallback on 404 alone left the command hard-failing on every backend that
+    // predates the route.
+    get.mockRejectedValueOnce(new CliError("Conversion failed", 500));
+    get.mockResolvedValueOnce([{ feedbackId: 1, status: "open", kind: "bug", scope: "cli" }]);
+    const out = await runFeedbackCount(mockClient, {});
+    expect(get).toHaveBeenLastCalledWith("/api/feedback?limit=200");
+    expect(out).toMatchObject({ total: 1, byStatus: { open: 1 } });
+  });
+
+  test("the fallback still flags truncated at the 200-row cap, naming the bias", async () => {
     const rows = Array.from({ length: 200 }, (_, i) => ({
       feedbackId: i,
       status: "open",
       kind: "bug",
       scope: "cli",
     }));
+    get.mockRejectedValueOnce(new CliError("Not found", 404));
     get.mockResolvedValueOnce(rows);
     const out = await runFeedbackCount(mockClient, {});
     expect(out.truncated).toBe(true);
     expect(out.hint).toMatch(/lower bound/);
+    // The bias is the part that changes how the number should be read.
+    expect(out.hint).toMatch(/OLDEST/);
   });
 
   // Unvalidated, an unknown filter reports total:0 — "nothing open" (fb#369).
