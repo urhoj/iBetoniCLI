@@ -130,12 +130,7 @@ export interface ChangelogAddBody {
   versionTag?: string;
   bumpLevel?: string;
   feedbackId?: number;
-  /**
-   * Sent only as `false`, by --no-resolve: record the feedbackId link WITHOUT the
-   * status transition, so a deliberately multi-tranche item can accumulate
-   * several entries and stay open (fb#441). Not a column — the backend reads it
-   * as a link option and drops it.
-   */
+  /** Not a column: the backend reads it as a link option. Sent only as `false`, by --no-resolve (fb#441). */
   resolveFeedback?: boolean;
   sentryIssue?: string;
   source?: string;

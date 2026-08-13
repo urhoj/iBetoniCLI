@@ -160,7 +160,7 @@ describe("ib legal reads", () => {
     c.get.mockResolvedValue([
       { documentId: 1, version: "1.0", isActive: false, markdownContent: "BIG" },
     ]);
-    const out = await runLegalVersions(c, "TOS", undefined);
+    const out = await runLegalVersions(c, "TOS");
     expect(c.get).toHaveBeenCalledWith("/api/legal-documents/TOS/versions");
     expect(out.items[0]).not.toHaveProperty("markdownContent");
     expect(out.count).toBe(1);
@@ -169,14 +169,14 @@ describe("ib legal reads", () => {
   test("versions forwards --language, combined with --owner (Task 9)", async () => {
     const c = mockClient();
     c.get.mockResolvedValue([]);
-    await runLegalVersions(c, "TOS", 1349, undefined, "en");
+    await runLegalVersions(c, "TOS", { ownerAsiakasId: 1349, language: "en" });
     expect(c.get).toHaveBeenCalledWith("/api/legal-documents/TOS/versions?ownerAsiakasId=1349&language=en");
   });
 
   test("versions omits the language param when not given (backward-compat)", async () => {
     const c = mockClient();
     c.get.mockResolvedValue([]);
-    await runLegalVersions(c, "TOS", undefined, undefined, undefined);
+    await runLegalVersions(c, "TOS");
     expect(c.get).toHaveBeenCalledWith("/api/legal-documents/TOS/versions");
   });
 
@@ -187,7 +187,7 @@ describe("ib legal reads", () => {
       { documentId: 2, status: "draft", markdownContent: "B" },
       { documentId: 3, status: "archived", markdownContent: "C" },
     ]);
-    const out = await runLegalVersions(c, "TOS", undefined, "draft");
+    const out = await runLegalVersions(c, "TOS", { status: "draft" });
     expect(out.count).toBe(1);
     expect(out.items[0]).toMatchObject({ documentId: 2, status: "draft" });
     expect(out.items[0]).not.toHaveProperty("markdownContent");
@@ -206,7 +206,7 @@ describe("ib legal reads", () => {
     test("excludes them from the default listing", async () => {
       const c = mockClient();
       c.get.mockResolvedValue(withProbes());
-      const out = await runLegalVersions(c, "BETONIJERRY_TOS", 1349);
+      const out = await runLegalVersions(c, "BETONIJERRY_TOS", { ownerAsiakasId: 1349 });
       expect(out.count).toBe(3);
       expect(out.items.map((r) => r.status)).not.toContain("deleted");
     });
@@ -214,7 +214,7 @@ describe("ib legal reads", () => {
     test("--deleted reveals them, since the rows are kept for audit", async () => {
       const c = mockClient();
       c.get.mockResolvedValue(withProbes());
-      const out = await runLegalVersions(c, "BETONIJERRY_TOS", 1349, undefined, undefined, true);
+      const out = await runLegalVersions(c, "BETONIJERRY_TOS", { ownerAsiakasId: 1349, includeDeleted: true });
       expect(out.count).toBe(5);
     });
 
@@ -223,7 +223,7 @@ describe("ib legal reads", () => {
       // default must not override it into an empty list.
       const c = mockClient();
       c.get.mockResolvedValue(withProbes());
-      const out = await runLegalVersions(c, "BETONIJERRY_TOS", 1349, "deleted");
+      const out = await runLegalVersions(c, "BETONIJERRY_TOS", { ownerAsiakasId: 1349, status: "deleted" });
       expect(out.count).toBe(2);
       expect(out.items.every((r) => r.status === "deleted")).toBe(true);
     });

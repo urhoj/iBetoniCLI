@@ -185,27 +185,40 @@ export async function runLegalStatus(
   };
 }
 
+/**
+ * All versions of one document type, newest first.
+ *
+ * Options object rather than positionals: this grew to five parameters, four of
+ * them optional, so call sites read as `(c, "TOS", undefined, undefined, true)`
+ * with nothing naming the flag. It also rejoins the convention its siblings
+ * already follow (`runFeedbackList`, `runFeedbackCount`, `runCacheKeys`, …).
+ */
 export async function runLegalVersions(
   client: ApiClient,
   typeName: string,
-  ownerAsiakasId?: number,
-  status?: string,
-  language?: string,
-  includeDeleted = false
+  opts: {
+    ownerAsiakasId?: number;
+    status?: string;
+    language?: string;
+    includeDeleted?: boolean;
+  } = {}
 ): Promise<ListEnvelope<Row>> {
+  const { ownerAsiakasId, status, language, includeDeleted } = opts;
   const q = qs({ ownerAsiakasId, language: language || undefined });
   const rows = await client.get<Row[]>(
     `/api/legal-documents/${encodeURIComponent(typeName)}/versions${q}`
   );
   let items = (Array.isArray(rows) ? rows : []).map(stripContent);
-  // Client-side lifecycle filter — the backend returns the full history.
+  // Client-side lifecycle filter — the backend returns the full history. An
+  // explicit --status is the caller naming exactly what they want and wins
+  // outright (so `--status deleted` still selects them); otherwise soft-deleted
+  // rows are hidden by DEFAULT (fb#514). `ib legal delete` keeps the row for
+  // audit, which is right, but every throwaway verification draft then stayed
+  // visible forever on a COMPLIANCE-relevant listing — BETONIJERRY_TOS was 8
+  // rows, 3 of them dead `zz-*` probes, and reading it correctly required knowing
+  // that convention. `ib vehicle list` is the precedent: excluded by default,
+  // revealed with --deleted.
   if (status) items = items.filter((r) => r.status === status);
-  // Soft-deleted versions are hidden by DEFAULT (fb#514). `ib legal delete` keeps
-  // the row for audit, which is right, but every throwaway verification draft then
-  // stayed visible forever on a COMPLIANCE-relevant listing — BETONIJERRY_TOS was
-  // 8 rows, 3 of them dead `zz-*` probes, and reading it correctly required
-  // knowing that convention. `ib vehicle list` is the precedent: excluded by
-  // default, revealed with --deleted. An explicit `--status deleted` still wins.
   else if (!includeDeleted) items = items.filter((r) => r.status !== "deleted");
   return listEnvelope(items);
 }
@@ -220,7 +233,7 @@ export async function runLegalVersions(
 export async function runLegalDrafts(client: ApiClient): Promise<ListEnvelope<Row>> {
   const types = await runLegalTypes(client);
   const perType = await Promise.all(
-    types.items.map((t) => runLegalVersions(client, t.typeName, undefined, "draft").then((v) => v.items))
+    types.items.map((t) => runLegalVersions(client, t.typeName, { status: "draft" }).then((v) => v.items))
   );
   const items = perType.flat();
   return listEnvelope(items);
@@ -284,7 +297,7 @@ export async function runLegalDiff(
   let docA: Row;
   let docB: Row;
   if ("type" in input) {
-    const versions = await runLegalVersions(client, input.type, input.owner);
+    const versions = await runLegalVersions(client, input.type, { ownerAsiakasId: input.owner });
     const active = versions.items.find((r) => r.status === "active");
     const draft = versions.items.find((r) => r.status === "draft"); // newest first (createdTime DESC)
     if (!active) {
@@ -680,7 +693,12 @@ export function registerLegalCommands(
         const language = normalizeLegalLanguage(opts.language);
         const client = await getClient();
         writeJson(
-          await runLegalVersions(client, typeName, opts.owner, opts.status, language, opts.deleted)
+          await runLegalVersions(client, typeName, {
+            ownerAsiakasId: opts.owner,
+            status: opts.status,
+            language,
+            includeDeleted: opts.deleted,
+          })
         );
       })
     );
