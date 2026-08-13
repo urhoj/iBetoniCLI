@@ -2030,7 +2030,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { changelogId, relinkedFrom?, feedbackStatus? } | { dryRun, wouldCreate, validation }. \`relinkedFrom\` appears only when --feedback named a row already resolved by a DIFFERENT entry, and carries that entry's id. \`feedbackStatus\` appears only when the link did NOT close the row, and carries the status it was left at (a preserved \`reviewed\`, or \`open\` under --no-resolve). Each also emits a one-line note on stderr.
+  { changelogId, relinkedFrom?, feedbackStatus?, feedbackLinked? } | { dryRun, wouldCreate, validation }. \`relinkedFrom\` appears only when --feedback named a row already resolved by a DIFFERENT entry, and carries that entry's id. \`feedbackStatus\` appears only when the link did NOT close the row, and carries the status it was left at (a preserved \`reviewed\`, or \`open\` under --no-resolve). \`feedbackLinked: false\` means --feedback named an id that does not exist — the ENTRY was still created, only the link failed (fb#543). Each also emits a one-line note on stderr.
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer access required → use a developer token

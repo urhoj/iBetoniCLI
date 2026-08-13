@@ -476,13 +476,19 @@ export function warnIfPatchIgnored(patch, result, warn = warnNote) {
  *    deliberately (a `reviewed` legal draft awaiting activation) or because
  *    --no-resolve was passed. Worth saying, since linking a row normally DOES
  *    close it and the caller may be expecting that (fb#517/fb#441).
+ * 3. NOT LINKED AT ALL — the id matched no row. The entry is still created, so
+ *    the response looks like success; a typo'd id otherwise left the caller
+ *    believing the row was closed while it stayed open forever (fb#543).
  *
  * stderr only — the stdout JSON contract is untouched.
  */
 export function warnFeedbackLinkEffects(result, warn = warnNote) {
     if (!result || typeof result !== "object")
         return;
-    const { relinkedFrom, feedbackStatus, changelogId } = result;
+    const { relinkedFrom, feedbackStatus, feedbackLinked, changelogId } = result;
+    if (feedbackLinked === false)
+        warn(`[ib] ⚠ --feedback named a row that does not exist — cl#${changelogId} was created but NOTHING was linked. ` +
+            `Check the id with \`ib dev feedback get <id>\`, then attach it with \`ib dev changelog update ${changelogId} --feedback <id>\`.`);
     if (typeof relinkedFrom === "number")
         warn(`[ib] note: that feedback row was already resolved by cl#${relinkedFrom}; cl#${changelogId} now owns the link. ` +
             `If you meant to cross-reference rather than re-resolve, restore it with \`ib dev changelog update ${relinkedFrom} --feedback <id>\`.`);
@@ -863,7 +869,7 @@ export const CHANGELOG_SPECS = [
         writeFlags: true,
         dryRunKind: "server",
         mutates: true,
-        outputShape: "{ changelogId, relinkedFrom?, feedbackStatus? } | { dryRun, wouldCreate, validation }. `relinkedFrom` appears only when --feedback named a row already resolved by a DIFFERENT entry, and carries that entry's id. `feedbackStatus` appears only when the link did NOT close the row, and carries the status it was left at (a preserved `reviewed`, or `open` under --no-resolve). Each also emits a one-line note on stderr.",
+        outputShape: "{ changelogId, relinkedFrom?, feedbackStatus?, feedbackLinked? } | { dryRun, wouldCreate, validation }. `relinkedFrom` appears only when --feedback named a row already resolved by a DIFFERENT entry, and carries that entry's id. `feedbackStatus` appears only when the link did NOT close the row, and carries the status it was left at (a preserved `reviewed`, or `open` under --no-resolve). `feedbackLinked: false` means --feedback named an id that does not exist — the ENTRY was still created, only the link failed (fb#543). Each also emits a one-line note on stderr.",
         errors: [
             {
                 http: 403,

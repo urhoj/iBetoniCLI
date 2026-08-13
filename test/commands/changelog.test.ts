@@ -1090,6 +1090,24 @@ describe("warnFeedbackLinkEffects — the link did not close the row (fb#517/fb#
     );
     expect(warn).toHaveBeenCalledTimes(2);
   });
+
+  test("warns loudly when --feedback named an id that does not exist (fb#543)", () => {
+    // The entry IS created, so the response looks like success; without this a
+    // typo'd id left the caller believing the row was closed while it stayed open.
+    const warn = vi.fn();
+    warnFeedbackLinkEffects({ changelogId: 1300, feedbackLinked: false }, warn);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toMatch(/does not exist/);
+    expect(warn.mock.calls[0][0]).toMatch(/NOTHING was linked/);
+    // Must carry the repair, naming the entry that was actually created.
+    expect(warn.mock.calls[0][0]).toMatch(/changelog update 1300 --feedback/);
+  });
+
+  test("stays silent when feedbackLinked is absent — the normal success shape", () => {
+    const warn = vi.fn();
+    warnFeedbackLinkEffects({ changelogId: 1300 }, warn);
+    expect(warn).not.toHaveBeenCalled();
+  });
 });
 
 describe("normalizeSeverity — one flag name, two different ladders (fb#359)", () => {
