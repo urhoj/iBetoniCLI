@@ -7,7 +7,7 @@ import { parseRefId, assertEnum, intFlag } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { COORDINATED as COORDINATED_REPOS, normalizeRepoCsv } from "./repos.js";
 import { jsonAction, guarded } from "../_shared/action.js";
-import { explicitFlags, foldAliases } from "../_shared/flags.js";
+import { explicitFlags, foldAliases, warnIfShellMangled } from "../_shared/flags.js";
 import { payloadKeyMap as sharedPayloadKeyMap, normalizeFromJson, applyFromJson as sharedApplyFromJson, } from "../_shared/fromJson.js";
 import { qs } from "../../api/query.js";
 const TYPES = ["feature", "improvement", "bugfix"];
@@ -527,6 +527,9 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--language <l>")
         .option("--from-json <file>")).action(guarded(async (description, o, cmd) => {
         applyFromJson(cmd, o);
+        // A changelog entry is a permanent record whose prose routinely names flags
+        // and identifiers — the text most likely to carry backticks (fb#552).
+        warnIfShellMangled({ description: description ?? o.description, body: o.body, impact: o.impact, benefits: o.benefits });
         o.type = normalizeType(o.type);
         o.severity = normalizeSeverity(o.severity);
         requireAddFields(description, o);

@@ -6291,7 +6291,7 @@ ARGUMENTS
 FLAGS
   --owner NUMBER    Filter by ownerAsiakasId tenant scope
   --status STRING    Filter by lifecycle status: draft|active|archived|deleted
-  --deleted    Include soft-deleted versions, which the default listing hides (fb#514). A deletion here keeps the row for audit rather than removing it, so discarded verification drafts would otherwise clutter a compliance-relevant listing forever. Same shape as \`ib vehicle list --deleted\`.
+  --deleted    Include soft-deleted versions, which the default listing hides (fb#514). A deletion here keeps the row for audit rather than removing it, so discarded verification drafts would otherwise clutter a compliance-relevant listing forever. Same shape as \`ib vehicle list --deleted\`. An explicit --status overrides this flag (--status names exactly what you want, so \`--status deleted\` selects them and \`--status active --deleted\` is just --status active).
   --language STRING    Filter by document language: fi (binding original) or en (unofficial translation) (default: fi)
 
 GLOBAL FLAGS

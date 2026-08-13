@@ -19,7 +19,7 @@ import { failWith, writeJson } from "../../output/json.js";
 import { assertEnum, assertEnumCsv, parseRefId } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { guarded, jsonAction } from "../_shared/action.js";
-import { foldAliases } from "../_shared/flags.js";
+import { foldAliases, warnIfShellMangled } from "../_shared/flags.js";
 import { applyFromJson, type FromJsonConfig } from "../_shared/fromJson.js";
 import { qs } from "../../api/query.js";
 import { CliError } from "../../api/errors.js";
@@ -694,6 +694,9 @@ export function registerFeedbackCommands(
         // JSON object (--kind/--scope carry defaults, fb#299); unknown or
         // wrong-typed JSON keys exit 4 (fb#298).
         applyFromJson(cmd, opts as Record<string, unknown>, CREATE_FROM_JSON);
+        // A filed report is a permanent record and is exactly the prose most
+        // likely to quote an identifier in backticks (fb#552).
+        warnIfShellMangled({ description: description ?? opts.description, body: opts.body });
         const client = await getClient();
         writeJson(
           await runFeedbackCreate(client, {
@@ -771,6 +774,9 @@ export function registerFeedbackCommands(
         // Shared merge: only EXPLICITLY-typed flags outrank the JSON object
         // (feedback #327); unknown or wrong-typed JSON keys exit 4 (fb#298).
         applyFromJson(cmd, opts as Record<string, unknown>, RESOLVE_FROM_JSON);
+        // Checked BEFORE the write: a resolution note is a permanent record, and
+        // an eaten backtick would otherwise land in it with no diagnostic (fb#552).
+        warnIfShellMangled({ note: opts.note, resolution: opts.resolution, reason: opts.reason });
         const client = await getClient();
         writeJson(
           await runWithSiblingHint(client, id, "changelog", () =>

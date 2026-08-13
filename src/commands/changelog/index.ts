@@ -33,7 +33,7 @@ import { parseRefId, assertEnum, intFlag } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { COORDINATED as COORDINATED_REPOS, normalizeRepoCsv } from "./repos.js";
 import { jsonAction, guarded } from "../_shared/action.js";
-import { explicitFlags, foldAliases } from "../_shared/flags.js";
+import { explicitFlags, foldAliases, warnIfShellMangled } from "../_shared/flags.js";
 import {
   type FromJsonConfig,
   payloadKeyMap as sharedPayloadKeyMap,
@@ -700,6 +700,9 @@ export function registerChangelogCommands(
       cmd: Command
     ) => {
       applyFromJson(cmd, o as Record<string, unknown>);
+      // A changelog entry is a permanent record whose prose routinely names flags
+      // and identifiers — the text most likely to carry backticks (fb#552).
+      warnIfShellMangled({ description: description ?? o.description, body: o.body, impact: o.impact, benefits: o.benefits });
       o.type = normalizeType(o.type)!;
       o.severity = normalizeSeverity(o.severity)!;
       requireAddFields(description, o as Record<string, unknown>);

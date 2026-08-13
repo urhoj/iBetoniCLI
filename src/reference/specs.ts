@@ -3612,7 +3612,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         name: "deleted",
         type: "boolean",
         description:
-          "Include soft-deleted versions, which the default listing hides (fb#514). A deletion here keeps the row for audit rather than removing it, so discarded verification drafts would otherwise clutter a compliance-relevant listing forever. Same shape as `ib vehicle list --deleted`.",
+          "Include soft-deleted versions, which the default listing hides (fb#514). A deletion here keeps the row for audit rather than removing it, so discarded verification drafts would otherwise clutter a compliance-relevant listing forever. Same shape as `ib vehicle list --deleted`. An explicit --status overrides this flag (--status names exactly what you want, so `--status deleted` selects them and `--status active --deleted` is just --status active).",
       },
       {
         name: "language",
