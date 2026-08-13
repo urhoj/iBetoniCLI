@@ -5162,7 +5162,7 @@ exports[`Help snapshots — contract stability > help for ib jerry request get m
   ib jerry request get <requestId> [flags]
 
 DESCRIPTION
-  Get one pump request. Default is the customer-owned recap (GET /api/pumppuRequests/:id, scoped to the caller's personId). --provider returns the provider-facing detail (GET /api/pumppuRequests/:id/provider-detail, requires provider role) including your own offer + attachments. Under the open-details model this returns the FULL customer lead (name, address, lat/lng, phone, email) to every matched provider as soon as the request is open — it is NOT masked pre-acceptance. Masking applies to the \`--open\` inbox list and the fan-out email, not here.
+  Get one pump request. Default is the customer-owned recap (GET /api/pumppuRequests/:id, scoped to the caller's personId). --provider returns the provider-facing detail (GET /api/pumppuRequests/:id/provider-detail, requires provider role) including your own offer + attachments. This returns the FULL customer lead (name, address, lat/lng, phone, email) to every matched provider as soon as the request is open — it is NOT masked pre-acceptance. Masking applies to the \`--open\` inbox list and the fan-out email, not here.
   Permissions: requires --provider: provider company (isPumppuToimittaja).
 
 ARGUMENTS

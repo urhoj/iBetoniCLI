@@ -89,7 +89,7 @@ export const TOPICS = [
     {
         id: "jerry-lifecycle",
         title: "BetoniJerry RFQ lifecycle",
-        body: "Request: draft -> open (provider inbox). Offer: draft -> pending (provider `offer send`) -> accepted (CUSTOMER `offer accept`, siblings rejected) -> confirmed (PROVIDER `offer confirm`, which BUILDS a keikka). Customer PII is masked to providers until their offer is accepted. Use `ib jerry check-address` to debug 'no offers'.",
+        body: "Request: draft -> open (provider inbox). Offer: draft -> pending (provider `offer send`) -> accepted (CUSTOMER `offer accept`, siblings rejected) -> confirmed (PROVIDER `offer confirm`, which BUILDS a keikka). Customer PII is masked on the provider inbox (`request list --open`) and in the fan-out email, but NOT on `request get --provider`: every matched provider sees the full lead (name, address, lat/lng, phone, email) as soon as the request is open. Use `ib jerry check-address` to debug 'no offers'.",
     },
     {
         id: "write-safety",
