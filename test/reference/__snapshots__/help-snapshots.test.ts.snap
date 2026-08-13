@@ -975,7 +975,7 @@ FLAGS
   --postal-code STRING    Billing postal code (laskutusPostinumero)
   --city STRING    Billing city (laskutusKaupunki)
   --get-or-create    If a customer with this yTunnus already exists, return it (reused:true) instead of creating a duplicate
-  --body JSON    Raw JSON body (overrides typed flags)
+  --body JSON    Raw JSON body (overrides typed flags) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see \`ib help shell-quoting\`).
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -1024,7 +1024,7 @@ FLAGS
   --address STRING    Billing street address (laskutusOsoite)
   --postal-code STRING    Billing postal code (laskutusPostinumero)
   --city STRING    Billing city (laskutusKaupunki)
-  --body JSON    Raw JSON body (overrides typed flags)
+  --body JSON    Raw JSON body (overrides typed flags) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see \`ib help shell-quoting\`).
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -1643,7 +1643,7 @@ FLAGS
   --postal-code STRING    Billing postal code (laskutusPostinumero)
   --city STRING    Billing city (laskutusKaupunki)
   --from-prh STRING    Refresh name + yTunnus + billing address from PRH (explicit flags still win)
-  --body JSON    Raw JSON body (overrides typed flags)
+  --body JSON    Raw JSON body (overrides typed flags) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see \`ib help shell-quoting\`).
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -1987,7 +1987,7 @@ exports[`Help snapshots — contract stability > help for ib dev changelog add m
   (also: ib dev changelog create)
 
 DESCRIPTION
-  Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row to status=applied.
+  Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> links that cliFeedback row and advances it to status=applied — but only from \`open\`; a status set deliberately (e.g. \`reviewed\`) is preserved, and --no-resolve links without touching the status at all.
   Auth: requires login (any authenticated user).
   Timezone: dates interpreted in active company timezone (Europe/Helsinki).
 
@@ -2011,7 +2011,8 @@ FLAGS
   --commit STRING    Alias for --sha — Commit SHAs (CSV); if both are given, they must match
   --vtag STRING    Version tag (max 200 chars)
   --bump-level STRING    App version bump this implies: none|patch|minor|major (default: patch)
-  --feedback NUMBER    cliFeedback id this entry resolves — also marks that row applied and points resolvedByChangelogId here. If the row was ALREADY resolved by another entry, this TAKES the link (the correction path for a wrong first link) and says so on stderr; any hand-written resolution note is preserved (fb#366).
+  --feedback NUMBER    cliFeedback id this entry resolves — points resolvedByChangelogId here and advances the row to applied. The status only advances FROM \`open\`: a deliberately-set status (\`reviewed\` = draft saved, awaiting human activation) is preserved and reported on stderr, because "an entry exists" and "the change is live" are different facts (fb#517). If the row was ALREADY resolved by another entry, this TAKES the link (the correction path for a wrong first link) and says so on stderr; any hand-written resolution note is preserved (fb#366).
+  --no-resolve    Record the --feedback link WITHOUT any status change, for work that is staged but not shipped, or for one tranche of a deliberately long-running item — several entries can then reference the same row and it stays open until you close it yourself (fb#441). Requires --feedback. The auto-resolution note reads \`Related:\` instead of \`Shipped:\`.
   --sentry STRING    Sentry issue short id or URL this entry fixes (stored, not sent to Sentry)
   --source STRING    Source: human (default) | routine (automated AI-routine entry)
   --date DATE    Entry date (YYYY-MM-DD|today)
@@ -2029,7 +2030,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { changelogId, relinkedFrom? } | { dryRun, wouldCreate, validation }. \`relinkedFrom\` appears only when --feedback named a row already resolved by a DIFFERENT entry, and carries that entry's id; a one-line note also goes to stderr.
+  { changelogId, relinkedFrom?, feedbackStatus? } | { dryRun, wouldCreate, validation }. \`relinkedFrom\` appears only when --feedback named a row already resolved by a DIFFERENT entry, and carries that entry's id. \`feedbackStatus\` appears only when the link did NOT close the row, and carries the status it was left at (a preserved \`reviewed\`, or \`open\` under --no-resolve). Each also emits a one-line note on stderr.
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer access required → use a developer token
@@ -2327,7 +2328,8 @@ FLAGS
   --commit STRING    Alias for --sha — Commit SHAs (CSV); if both are given, they must match
   --vtag STRING    Version tag (max 200 chars)
   --bump-level STRING    Correct the app version bump this entry implies: none|patch|minor|major. NO default — omitting it leaves the recorded level untouched. Refused once the entry is RELEASED (has a versionTag).
-  --feedback NUMBER    cliFeedback id this entry resolves — also marks that row applied and sets resolvedByChangelogId back to this entry. Taking the link from a prior resolver is noted on stderr and echoed as \`relinkedFrom\`; a hand-written resolution note is preserved (fb#366).
+  --feedback NUMBER    cliFeedback id this entry resolves — sets resolvedByChangelogId back to this entry and advances the row to applied, but only FROM \`open\`; a deliberately-set status is preserved and reported (fb#517). Taking the link from a prior resolver is noted on stderr and echoed as \`relinkedFrom\`; a hand-written resolution note is preserved (fb#366).
+  --no-resolve    Record the --feedback link WITHOUT any status change — the cross-reference form, for one tranche of a long-running item (fb#441). Requires --feedback.
   --sentry STRING    Sentry issue short id or URL this entry fixes (stored, not sent to Sentry)
   --source STRING    Source: human|routine
   --date DATE    Entry date (YYYY-MM-DD|today)
@@ -2668,7 +2670,7 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - --note/--reason/--resolution write the SAME stored note. Passing several with different values merges them (joined in note→resolution→reason order) instead of dropping any — so mixing up --reason with the audit header loses nothing.
   - A note WITHOUT --status does NOT close the row — it stays open/reviewed and the ack carries a hint saying so; pass --status applied|dismissed to close (feedback #270).
-  - The two ways to close a row have OPPOSITE defaults, so don't assume this one closes: \`ib dev changelog add --feedback <id>\` closes it for you (status=applied plus a \`Shipped: changelog #N\` resolution), while this command leaves the status alone unless you pass --status. Recording the fix in the changelog is the one-call path (feedback #293).
+  - The two ways to close a row have OPPOSITE defaults, so don't assume this one closes: \`ib dev changelog add --feedback <id>\` closes it for you (status=applied plus a \`Shipped: changelog #N\` resolution), while this command leaves the status alone unless you pass --status. Recording the fix in the changelog is the one-call path (feedback #293). Note the one-call path only advances a row from \`open\` — if you set this row to \`reviewed\` first, a later \`changelog add --feedback\` will preserve that and tell you so, rather than claiming shipped work that is only staged (fb#517).
   - SHELL QUOTING (fb#327): a resolution note quotes commands and errors, and a quote-split can even store the note TRUNCATED at the first quote — use --from-json <file|-> for any quote-bearing note; see \`ib help shell-quoting\`.
 
 SEE ALSO
@@ -4987,7 +4989,7 @@ DESCRIPTION
   Permissions: requires edit-tier on the target company (tarjousAdmin / company admin).
 
 FLAGS
-  --body JSON    JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo?, website?, publicSlug?, publicListingConsent? }. Mutually exclusive with --from-json.
+  --body JSON    JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo?, website?, publicSlug?, publicListingConsent? }. Mutually exclusive with --from-json. ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see \`ib help shell-quoting\`).
   --from-json STRING    Read the JSON body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body.
   --asiakas NUMBER    Target company asiakasId (default: your own)
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
@@ -6022,7 +6024,7 @@ FLAGS
   --file STRING    Read markdown content from a local file
   --content STRING    Inline markdown content (use over /api/cli/exec — no local FS there)
   --owner NUMBER    ownerAsiakasId tenant scope (1349 = BetoniJerry); omit for global
-  --notes STRING    Internal notes
+  --notes STRING    Internal notes — what the ACTIVATOR reads at the moment of activation, so this is where the activation GATES belong: the deploy gate, whether to batch with other pending edits, an EN re-translation that must land with it, and the verification evidence. No length limit (widened 500 → nvarchar(MAX) on 2026-08-12); the old ceiling is what truncated a gate set and lost it (fb#453/fb#512).
   --effective-date DATE    Effective date YYYY-MM-DD (default: now)
   --activate    Publish immediately (archives the prior active version). Default: inactive draft
   --validate-json    Validate the embedded \`\`\`json block parses to an object before saving (recommended for BETONIJERRY_* structured types)
@@ -6275,7 +6277,7 @@ exports[`Help snapshots — contract stability > help for ib legal versions matc
   ib legal versions <typeName> [flags]
 
 DESCRIPTION
-  All versions of a document type, newest first. Every row carries a lifecycle status: draft (saved, never published) | active (live now, also isActive=1) | archived (superseded former-active) | deleted (soft-deleted). Use --status to filter. Content stripped; fetch one version with ib legal get, or compare two with ib legal diff.
+  All versions of a document type, newest first. Every row carries a lifecycle status: draft (saved, never published) | active (live now, also isActive=1) | archived (superseded former-active) | deleted (soft-deleted). Soft-deleted versions are EXCLUDED by default — pass --deleted (or --status deleted) to see them. Use --status to filter. Content stripped; fetch one version with ib legal get, or compare two with ib legal diff.
   Auth: requires login (any authenticated user).
 
 ARGUMENTS
@@ -6284,6 +6286,7 @@ ARGUMENTS
 FLAGS
   --owner NUMBER    Filter by ownerAsiakasId tenant scope
   --status STRING    Filter by lifecycle status: draft|active|archived|deleted
+  --deleted    Include soft-deleted versions, which the default listing hides (fb#514). A deletion here keeps the row for audit rather than removing it, so discarded verification drafts would otherwise clutter a compliance-relevant listing forever. Same shape as \`ib vehicle list --deleted\`.
   --language STRING    Filter by document language: fi (binding original) or en (unofficial translation) (default: fi)
 
 GLOBAL FLAGS
@@ -8804,7 +8807,7 @@ FLAGS
   --asiakas NUMBER    Owner asiakasId (defaults to your active company)
   --global    Create a global, owner-less person (ownerAsiakasId=null). Mutually exclusive with --asiakas.
   --get-or-create    On a duplicate email, return the existing person (reused:true) when visible to you; an email owned by a company you can't access errors with guidance
-  --body JSON    Raw JSON body, merged under typed flags (optional)
+  --body JSON    Raw JSON body, merged under typed flags (optional) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see \`ib help shell-quoting\`).
   --from-json STRING    Read the JSON body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body.
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
@@ -9721,7 +9724,7 @@ FLAGS
   --phone STRING    personPhone
   --email STRING    personEmail (pass "" to clear)
   --memo STRING    personMemo — free-text note/comment
-  --body JSON    Patch body (JSON), merged UNDER the typed flags. Mutually exclusive with --from-json.
+  --body JSON    Patch body (JSON), merged UNDER the typed flags. Mutually exclusive with --from-json. ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see \`ib help shell-quoting\`).
   --from-json STRING    Read the patch body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body.
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
@@ -10175,7 +10178,7 @@ DESCRIPTION
   Permissions: requires auth.page.sijainnit.edit.
 
 FLAGS
-  --body JSON    JSON object with the new sijainti fields (optional if typed flags given)
+  --body JSON    JSON object with the new sijainti fields (optional if typed flags given) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see \`ib help shell-quoting\`).
   --name STRING    sijaintiNimi (REQUIRED)
   --address STRING    sijaintiOsoite1 (street)
   --type NUMBER    sijaintiTypeId (REQUIRED; see \`ib sijainti types\`)
@@ -10621,7 +10624,7 @@ DESCRIPTION
   Permissions: requires auth.page.sijainnit.edit.
 
 FLAGS
-  --body JSON    JSON object with fields to update (optional if typed flags given)
+  --body JSON    JSON object with fields to update (optional if typed flags given) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see \`ib help shell-quoting\`).
   --id NUMBER    Target sijaintiId (or include sijaintiId in --body)
   --name STRING    sijaintiNimi
   --address STRING    sijaintiOsoite1 (street)

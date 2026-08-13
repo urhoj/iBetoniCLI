@@ -451,27 +451,35 @@ export function warnIfPatchIgnored(patch, result, warn = warnNote) {
             `these became editable in a later puminet5api version, so this endpoint is silently ignoring them (fb#303). The rest of the patch was applied.`);
 }
 /**
- * Warn on stderr when --feedback took a row's resolvedByChangelogId away from a
- * DIFFERENT entry.
+ * Warn on stderr about what `--feedback` did to the row beyond linking it.
  *
- * A row's work often lands in more than one entry — a fix, then a follow-up, a
- * revert, a doc pass — and `--feedback` reads as "this entry relates to fb#N",
- * not "this entry is now the sole resolver of fb#N". Re-pointing is still
- * allowed (it is the correction path when the FIRST link was wrong), but it
- * used to be completely silent: the response was a bare {"changelogId":N} and
- * the only way to notice was to go and look. Anyone following the feedback row
- * afterwards lands on the follow-up instead of the fix (fb#366).
+ * Two side effects the caller did not ask for, both previously invisible in a
+ * response that was a bare {"changelogId":N}:
+ *
+ * 1. RELINK — the row's resolvedByChangelogId was taken from a DIFFERENT entry.
+ *    A row's work often lands in more than one entry (a fix, then a follow-up, a
+ *    revert, a doc pass), and `--feedback` reads as "this entry relates to fb#N",
+ *    not "this entry is now the sole resolver of fb#N". Re-pointing stays allowed
+ *    — it is the correction path when the FIRST link was wrong — but anyone
+ *    following the row afterwards lands on the follow-up instead of the fix, and
+ *    the only way to notice was to go and look (fb#366).
+ * 2. NOT RESOLVED — the link did not close the row, because its status was set
+ *    deliberately (a `reviewed` legal draft awaiting activation) or because
+ *    --no-resolve was passed. Worth saying, since linking a row normally DOES
+ *    close it and the caller may be expecting that (fb#517/fb#441).
  *
  * stderr only — the stdout JSON contract is untouched.
  */
-export function warnIfFeedbackRelinked(result, warn = warnNote) {
+export function warnFeedbackLinkEffects(result, warn = warnNote) {
     if (!result || typeof result !== "object")
         return;
-    const { relinkedFrom, changelogId } = result;
-    if (typeof relinkedFrom !== "number")
-        return;
-    warn(`[ib] note: that feedback row was already resolved by cl#${relinkedFrom}; cl#${changelogId} now owns the link. ` +
-        `If you meant to cross-reference rather than re-resolve, restore it with \`ib dev changelog update ${relinkedFrom} --feedback <id>\`.`);
+    const { relinkedFrom, feedbackStatus, changelogId } = result;
+    if (typeof relinkedFrom === "number")
+        warn(`[ib] note: that feedback row was already resolved by cl#${relinkedFrom}; cl#${changelogId} now owns the link. ` +
+            `If you meant to cross-reference rather than re-resolve, restore it with \`ib dev changelog update ${relinkedFrom} --feedback <id>\`.`);
+    if (typeof feedbackStatus === "string")
+        warn(`[ib] note: cl#${changelogId} is linked to that feedback row, but the row was left at \`${feedbackStatus}\` — NOT marked applied. ` +
+            `A status set deliberately is preserved (only \`open\` auto-advances). Close it with \`ib dev feedback resolve <id> --status applied\` once the change is actually live.`);
 }
 export function registerChangelogCommands(parent, getClient, opts = {}) {
     const c = parent
@@ -503,6 +511,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         .option("--vtag <s>")
         .option("--bump-level <l>", "", "patch")
         .option("--feedback <id>", "", intFlag("--feedback"))
+        .option("--no-resolve")
         .option("--sentry <ref>")
         .option("--source <s>")
         .option("--date <d>")
@@ -557,6 +566,11 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
             body.versionTag = o.vtag;
         if (o.feedback !== undefined)
             body.feedbackId = o.feedback;
+        // Only sent when --no-resolve was actually passed: Commander defaults
+        // `resolve` to true, and shipping that default would make every add assert a
+        // resolve intent it never expressed.
+        if (o.resolve === false)
+            body.resolveFeedback = false;
         if (o.sentry)
             body.sentryIssue = normalizeSentryRef(o.sentry);
         if (o.source)
@@ -566,7 +580,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
             body.language = addLang;
         body.bumpLevel = o.bumpLevel || "patch";
         const added = await runChangelogAdd(await getClient(), body, o);
-        warnIfFeedbackRelinked(added);
+        warnFeedbackLinkEffects(added);
         writeJson(added);
     }));
     c.command("list")
@@ -631,6 +645,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         // `patch` and mis-drive the next deploy. Absent flag = field untouched.
         .option("--bump-level <l>")
         .option("--feedback <id>", "", intFlag("--feedback"))
+        .option("--no-resolve")
         .option("--sentry <ref>")
         .option("--source <s>")
         .option("--date <d>")
@@ -679,6 +694,8 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
             patch.bumpLevel = o.bumpLevel;
         if (o.feedback !== undefined)
             patch.feedbackId = o.feedback;
+        if (o.resolve === false)
+            patch.resolveFeedback = false;
         if (o.sentry)
             patch.sentryIssue = normalizeSentryRef(o.sentry);
         const updLang = normalizeLanguage(o.language);
@@ -687,7 +704,7 @@ export function registerChangelogCommands(parent, getClient, opts = {}) {
         const client = await getClient();
         const result = await runWithSiblingHint(client, id, "feedback", () => runChangelogUpdate(client, id, patch, o));
         warnIfPatchIgnored(patch, result);
-        warnIfFeedbackRelinked(result);
+        warnFeedbackLinkEffects(result);
         writeJson(result);
     }));
     c.command("report")
@@ -741,7 +758,7 @@ export const CHANGELOG_SPECS = [
     {
         command: "ib dev changelog add",
         aliases: ["ib dev changelog create"],
-        description: "Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> auto-resolves that cliFeedback row to status=applied.",
+        description: "Add a change entry (feature|improvement|bugfix). The monthly report is generated from these. --feedback <id> links that cliFeedback row and advances it to status=applied — but only from `open`; a status set deliberately (e.g. `reviewed`) is preserved, and --no-resolve links without touching the status at all.",
         auth: "any",
         tier: "developer",
         args: [{ name: "description", type: "string", description: "Kuvaus (or pass as --description) — free length, the column is nvarchar(max)" }],
@@ -801,7 +818,12 @@ export const CHANGELOG_SPECS = [
             {
                 name: "feedback",
                 type: "number",
-                description: "cliFeedback id this entry resolves — also marks that row applied and points resolvedByChangelogId here. If the row was ALREADY resolved by another entry, this TAKES the link (the correction path for a wrong first link) and says so on stderr; any hand-written resolution note is preserved (fb#366).",
+                description: "cliFeedback id this entry resolves — points resolvedByChangelogId here and advances the row to applied. The status only advances FROM `open`: a deliberately-set status (`reviewed` = draft saved, awaiting human activation) is preserved and reported on stderr, because \"an entry exists\" and \"the change is live\" are different facts (fb#517). If the row was ALREADY resolved by another entry, this TAKES the link (the correction path for a wrong first link) and says so on stderr; any hand-written resolution note is preserved (fb#366).",
+            },
+            {
+                name: "no-resolve",
+                type: "boolean",
+                description: "Record the --feedback link WITHOUT any status change, for work that is staged but not shipped, or for one tranche of a deliberately long-running item — several entries can then reference the same row and it stays open until you close it yourself (fb#441). Requires --feedback. The auto-resolution note reads `Related:` instead of `Shipped:`.",
             },
             {
                 name: "sentry",
@@ -829,7 +851,7 @@ export const CHANGELOG_SPECS = [
         writeFlags: true,
         dryRunKind: "server",
         mutates: true,
-        outputShape: "{ changelogId, relinkedFrom? } | { dryRun, wouldCreate, validation }. `relinkedFrom` appears only when --feedback named a row already resolved by a DIFFERENT entry, and carries that entry's id; a one-line note also goes to stderr.",
+        outputShape: "{ changelogId, relinkedFrom?, feedbackStatus? } | { dryRun, wouldCreate, validation }. `relinkedFrom` appears only when --feedback named a row already resolved by a DIFFERENT entry, and carries that entry's id. `feedbackStatus` appears only when the link did NOT close the row, and carries the status it was left at (a preserved `reviewed`, or `open` under --no-resolve). Each also emits a one-line note on stderr.",
         errors: [
             {
                 http: 403,
@@ -1057,7 +1079,12 @@ export const CHANGELOG_SPECS = [
             {
                 name: "feedback",
                 type: "number",
-                description: "cliFeedback id this entry resolves — also marks that row applied and sets resolvedByChangelogId back to this entry. Taking the link from a prior resolver is noted on stderr and echoed as `relinkedFrom`; a hand-written resolution note is preserved (fb#366).",
+                description: "cliFeedback id this entry resolves — sets resolvedByChangelogId back to this entry and advances the row to applied, but only FROM `open`; a deliberately-set status is preserved and reported (fb#517). Taking the link from a prior resolver is noted on stderr and echoed as `relinkedFrom`; a hand-written resolution note is preserved (fb#366).",
+            },
+            {
+                name: "no-resolve",
+                type: "boolean",
+                description: "Record the --feedback link WITHOUT any status change — the cross-reference form, for one tranche of a long-running item (fb#441). Requires --feedback.",
             },
             {
                 name: "sentry",

@@ -193,6 +193,42 @@ describe("ib legal reads", () => {
     expect(out.items[0]).not.toHaveProperty("markdownContent");
   });
 
+  describe("versions hides soft-deleted rows by default (fb#514)", () => {
+    /** BETONIJERRY_TOS as reported: 5 real versions plus 3 dead `zz-*` probes. */
+    const withProbes = () => [
+      { documentId: 1, version: "tos-2026-08-12", status: "draft" },
+      { documentId: 2, version: "tos-2026-07-21", status: "active" },
+      { documentId: 3, version: "gate1-2026-05-13", status: "archived" },
+      { documentId: 4, version: "zz-fb453-probe", status: "deleted" },
+      { documentId: 5, version: "zz-probe-en", status: "deleted" },
+    ];
+
+    test("excludes them from the default listing", async () => {
+      const c = mockClient();
+      c.get.mockResolvedValue(withProbes());
+      const out = await runLegalVersions(c, "BETONIJERRY_TOS", 1349);
+      expect(out.count).toBe(3);
+      expect(out.items.map((r) => r.status)).not.toContain("deleted");
+    });
+
+    test("--deleted reveals them, since the rows are kept for audit", async () => {
+      const c = mockClient();
+      c.get.mockResolvedValue(withProbes());
+      const out = await runLegalVersions(c, "BETONIJERRY_TOS", 1349, undefined, undefined, true);
+      expect(out.count).toBe(5);
+    });
+
+    test("an explicit --status deleted still selects them", async () => {
+      // The status filter is the caller naming exactly what they want; the new
+      // default must not override it into an empty list.
+      const c = mockClient();
+      c.get.mockResolvedValue(withProbes());
+      const out = await runLegalVersions(c, "BETONIJERRY_TOS", 1349, "deleted");
+      expect(out.count).toBe(2);
+      expect(out.items.every((r) => r.status === "deleted")).toBe(true);
+    });
+  });
+
   test("drafts fans out over types and keeps only status=draft", async () => {
     const c = mockClient();
     c.get

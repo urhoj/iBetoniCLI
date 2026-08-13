@@ -190,7 +190,8 @@ export async function runLegalVersions(
   typeName: string,
   ownerAsiakasId?: number,
   status?: string,
-  language?: string
+  language?: string,
+  includeDeleted = false
 ): Promise<ListEnvelope<Row>> {
   const q = qs({ ownerAsiakasId, language: language || undefined });
   const rows = await client.get<Row[]>(
@@ -199,6 +200,13 @@ export async function runLegalVersions(
   let items = (Array.isArray(rows) ? rows : []).map(stripContent);
   // Client-side lifecycle filter — the backend returns the full history.
   if (status) items = items.filter((r) => r.status === status);
+  // Soft-deleted versions are hidden by DEFAULT (fb#514). `ib legal delete` keeps
+  // the row for audit, which is right, but every throwaway verification draft then
+  // stayed visible forever on a COMPLIANCE-relevant listing — BETONIJERRY_TOS was
+  // 8 rows, 3 of them dead `zz-*` probes, and reading it correctly required
+  // knowing that convention. `ib vehicle list` is the precedent: excluded by
+  // default, revealed with --deleted. An explicit `--status deleted` still wins.
+  else if (!includeDeleted) items = items.filter((r) => r.status !== "deleted");
   return listEnvelope(items);
 }
 
@@ -662,15 +670,18 @@ export function registerLegalCommands(
     .command("versions <typeName>")
     .option("--owner <id>", "", Number)
     .option("--status <status>")
+    .option("--deleted")
     .option("--language <l>", LANGUAGE_FLAG_DESC, "fi")
     .action(
-      guarded(async (typeName: string, opts: { owner?: number; status?: string; language?: string }) => {
+      guarded(async (typeName: string, opts: { owner?: number; status?: string; deleted?: boolean; language?: string }) => {
         if (opts.status && !LEGAL_STATUSES.includes(opts.status as (typeof LEGAL_STATUSES)[number])) {
           failWith(`Invalid --status "${opts.status}". Valid: ${LEGAL_STATUSES.join(", ")}`, 4);
         }
         const language = normalizeLegalLanguage(opts.language);
         const client = await getClient();
-        writeJson(await runLegalVersions(client, typeName, opts.owner, opts.status, language));
+        writeJson(
+          await runLegalVersions(client, typeName, opts.owner, opts.status, language, opts.deleted)
+        );
       })
     );
 

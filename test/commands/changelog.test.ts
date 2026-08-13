@@ -237,7 +237,7 @@ describe("changelog add bumpLevel", () => {
   });
 });
 
-import { runChangelogPending, runChangelogRelease, runChangelogReleaseMap, registerChangelogCommands, payloadKeyMap, normalizeChangelogJson, mergeChangelogInput, warnIfPatchIgnored, warnIfFeedbackRelinked } from "../../src/commands/changelog/index.js";
+import { runChangelogPending, runChangelogRelease, runChangelogReleaseMap, registerChangelogCommands, payloadKeyMap, normalizeChangelogJson, mergeChangelogInput, warnIfPatchIgnored, warnFeedbackLinkEffects } from "../../src/commands/changelog/index.js";
 import { Command } from "commander";
 
 describe("changelog pending/release", () => {
@@ -427,6 +427,41 @@ describe("validateFieldLengths — bounded free-text caps (fb#206)", () => {
     ));
     expect(exitCode).toBe(4);
     expect(asPost()).not.toHaveBeenCalled();
+  });
+});
+
+describe("changelog add --no-resolve (fb#441/fb#517)", () => {
+  /** Run `changelog add` through the real Commander tree and return the POSTed body. */
+  async function addWith(args: string[]): Promise<Record<string, unknown>> {
+    asPost().mockResolvedValue({ changelogId: 1199 });
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    await program.parseAsync(
+      ["changelog", "add", "--type", "bugfix", "--area", "cli", "--title", "t",
+        "--description", "d", ...args],
+      { from: "user" }
+    );
+    return asPost().mock.calls[0][1] as Record<string, unknown>;
+  }
+
+  test("sends resolveFeedback:false so the row keeps its status", async () => {
+    const body = await addWith(["--feedback", "416", "--no-resolve"]);
+    expect(body.feedbackId).toBe(416);
+    expect(body.resolveFeedback).toBe(false);
+  });
+
+  test("omits the key entirely without the flag — Commander's `true` default must not ride along", async () => {
+    // Sending resolveFeedback:true on every add would assert an intent the caller
+    // never expressed, and the backend would have no way to tell a deliberate
+    // resolve request from the flag's mere presence.
+    const body = await addWith(["--feedback", "416"]);
+    expect(body).not.toHaveProperty("resolveFeedback");
+  });
+
+  test("omits it on an add with no --feedback at all", async () => {
+    const body = await addWith([]);
+    expect(body).not.toHaveProperty("resolveFeedback");
+    expect(body).not.toHaveProperty("feedbackId");
   });
 });
 
@@ -971,14 +1006,14 @@ describe("warnIfPatchIgnored — deploy gate (fb#303)", () => {
   });
 });
 
-describe("warnIfFeedbackRelinked — silent link theft (fb#366)", () => {
+describe("warnFeedbackLinkEffects — silent link theft (fb#366)", () => {
   test("warns when the entry took the link from a different entry", () => {
     // The reported case: fb#362 was fixed by cl#1054, then a follow-up entry
     // passed --feedback 362 to cross-reference it and silently became the
     // row's resolver. Anyone following the feedback row afterwards lands on
     // the follow-up instead of the fix.
     const warn = vi.fn();
-    warnIfFeedbackRelinked({ changelogId: 1062, relinkedFrom: 1054 }, warn);
+    warnFeedbackLinkEffects({ changelogId: 1062, relinkedFrom: 1054 }, warn);
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toMatch(/cl#1054/);
     expect(warn.mock.calls[0][0]).toMatch(/cl#1062/);
@@ -989,22 +1024,53 @@ describe("warnIfFeedbackRelinked — silent link theft (fb#366)", () => {
 
   test("stays silent on a first resolve, which is the overwhelmingly common case", () => {
     const warn = vi.fn();
-    warnIfFeedbackRelinked({ changelogId: 1062 }, warn);
+    warnFeedbackLinkEffects({ changelogId: 1062 }, warn);
     expect(warn).not.toHaveBeenCalled();
   });
 
   test("stays silent under --dry-run and on a non-object result", () => {
     const warn = vi.fn();
-    warnIfFeedbackRelinked({ dryRun: true, wouldCreate: {} }, warn);
-    warnIfFeedbackRelinked(null, warn);
-    warnIfFeedbackRelinked("nope", warn);
+    warnFeedbackLinkEffects({ dryRun: true, wouldCreate: {} }, warn);
+    warnFeedbackLinkEffects(null, warn);
+    warnFeedbackLinkEffects("nope", warn);
     expect(warn).not.toHaveBeenCalled();
   });
 
   test("ignores a non-numeric relinkedFrom rather than printing 'cl#undefined'", () => {
     const warn = vi.fn();
-    warnIfFeedbackRelinked({ changelogId: 1062, relinkedFrom: null }, warn);
+    warnFeedbackLinkEffects({ changelogId: 1062, relinkedFrom: null }, warn);
     expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe("warnFeedbackLinkEffects — the link did not close the row (fb#517/fb#441)", () => {
+  test("says so when the row was left at a preserved status", () => {
+    // The reported case: fb#446 was a BETONIJERRY_TOS amendment deliberately set
+    // to `reviewed` (draft saved, awaiting activation). The entry recording the
+    // drafting work flipped it to `applied` — claiming shipped-to-production for
+    // a document still status=draft that no user had ever seen.
+    const warn = vi.fn();
+    warnFeedbackLinkEffects({ changelogId: 1208, feedbackStatus: "reviewed" }, warn);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toMatch(/left at `reviewed`/);
+    expect(warn.mock.calls[0][0]).toMatch(/NOT marked applied/);
+    // Must carry the way to close it, so the row is not simply forgotten.
+    expect(warn.mock.calls[0][0]).toMatch(/feedback resolve <id> --status applied/);
+  });
+
+  test("stays silent when the row did become applied — the common path", () => {
+    const warn = vi.fn();
+    warnFeedbackLinkEffects({ changelogId: 1054 }, warn);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test("reports both effects when a relink ALSO failed to close the row", () => {
+    const warn = vi.fn();
+    warnFeedbackLinkEffects(
+      { changelogId: 1199, relinkedFrom: 1054, feedbackStatus: "open" },
+      warn
+    );
+    expect(warn).toHaveBeenCalledTimes(2);
   });
 });
 

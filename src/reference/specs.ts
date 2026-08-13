@@ -1148,7 +1148,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "postal-code", type: "string", description: "Billing postal code (laskutusPostinumero)" },
       { name: "city", type: "string", description: "Billing city (laskutusKaupunki)" },
       { name: "get-or-create", type: "boolean", description: "If a customer with this yTunnus already exists, return it (reused:true) instead of creating a duplicate" },
-      { name: "body", type: "json", description: "Raw JSON body (overrides typed flags)" },
+      { name: "body", type: "json", description: "Raw JSON body (overrides typed flags) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -1181,7 +1181,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "postal-code", type: "string", description: "Billing postal code (laskutusPostinumero)" },
       { name: "city", type: "string", description: "Billing city (laskutusKaupunki)" },
       { name: "from-prh", type: "string", description: "Refresh name + yTunnus + billing address from PRH (explicit flags still win)" },
-      { name: "body", type: "json", description: "Raw JSON body (overrides typed flags)" },
+      { name: "body", type: "json", description: "Raw JSON body (overrides typed flags) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -1213,7 +1213,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "address", type: "string", description: "Billing street address (laskutusOsoite)" },
       { name: "postal-code", type: "string", description: "Billing postal code (laskutusPostinumero)" },
       { name: "city", type: "string", description: "Billing city (laskutusKaupunki)" },
-      { name: "body", type: "json", description: "Raw JSON body (overrides typed flags)" },
+      { name: "body", type: "json", description: "Raw JSON body (overrides typed flags) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -3197,7 +3197,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "Create a new sijainti (POST /api/geocode/sijainti/add). REQUIRED: --name (sijaintiNimi) and --type (sijaintiTypeId). The CLI auto-fills the other NOT NULL columns the add proc needs: --lyh defaults to --name (truncated to 50 chars), --max-distance is the general delivery radius in km (default 50; independent of BetoniJerry enrolment), and --asiakas to your active company. Coordinates (--lat/--lng or --geocode) are persisted via a follow-up updateLatLng call (the add proc binds no lat/lng) and echoed as { lat, lng, coordsPersisted } so geocoding is verifiable without a re-read. Provide typed flags or --body JSON; typed flags win over --body.",
     permissions: ["auth.page.sijainnit.edit"],
     flags: [
-      { name: "body", type: "json", description: "JSON object with the new sijainti fields (optional if typed flags given)" },
+      { name: "body", type: "json", description: "JSON object with the new sijainti fields (optional if typed flags given) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
       { name: "name", type: "string", description: "sijaintiNimi (REQUIRED)" },
       { name: "address", type: "string", description: "sijaintiOsoite1 (street)" },
       { name: "type", type: "number", description: "sijaintiTypeId (REQUIRED; see `ib sijainti types`)" },
@@ -3232,7 +3232,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "Update a sijainti via read-merge-write (GET current row + POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Omitted fields KEEP their current values (the save proc assigns directly — a sparse body would NULL e.g. jerryActiveUntil, dates, phone); pass an explicit null in --body to clear a field. --max-distance is the general delivery radius in km (stored as maxDeliveryDistance), independent of BetoniJerry enrolment. An address change re-geocodes the new address automatically when no --lat/--lng are given (soft-fail: geocodeFailed echoed; --geocode forces re-resolution and fails fast). --lat/--lng are persisted via a follow-up updateLatLng call (the save proc itself binds no lat/lng) and echoed as { lat, lng, coordsPersisted }. Provide typed flags or --body JSON; typed flags win over --body.",
     permissions: ["auth.page.sijainnit.edit"],
     flags: [
-      { name: "body", type: "json", description: "JSON object with fields to update (optional if typed flags given)" },
+      { name: "body", type: "json", description: "JSON object with fields to update (optional if typed flags given) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
       { name: "id", type: "number", description: "Target sijaintiId (or include sijaintiId in --body)" },
       { name: "name", type: "string", description: "sijaintiNimi" },
       { name: "address", type: "string", description: "sijaintiOsoite1 (street)" },
@@ -3602,12 +3602,18 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib legal versions",
     description:
-      "All versions of a document type, newest first. Every row carries a lifecycle status: draft (saved, never published) | active (live now, also isActive=1) | archived (superseded former-active) | deleted (soft-deleted). Use --status to filter. Content stripped; fetch one version with ib legal get, or compare two with ib legal diff.",
+      "All versions of a document type, newest first. Every row carries a lifecycle status: draft (saved, never published) | active (live now, also isActive=1) | archived (superseded former-active) | deleted (soft-deleted). Soft-deleted versions are EXCLUDED by default — pass --deleted (or --status deleted) to see them. Use --status to filter. Content stripped; fetch one version with ib legal get, or compare two with ib legal diff.",
     auth: "any",
     args: [{ name: "typeName", type: "string", description: "Document type name (see ib legal types)" }],
     flags: [
       { name: "owner", type: "number", description: "Filter by ownerAsiakasId tenant scope" },
       { name: "status", type: "string", description: "Filter by lifecycle status: draft|active|archived|deleted", allowed: ["draft", "active", "archived", "deleted"] },
+      {
+        name: "deleted",
+        type: "boolean",
+        description:
+          "Include soft-deleted versions, which the default listing hides (fb#514). A deletion here keeps the row for audit rather than removing it, so discarded verification drafts would otherwise clutter a compliance-relevant listing forever. Same shape as `ib vehicle list --deleted`.",
+      },
       {
         name: "language",
         type: "string",
@@ -3703,7 +3709,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "file", type: "string", description: "Read markdown content from a local file" },
       { name: "content", type: "string", description: "Inline markdown content (use over /api/cli/exec — no local FS there)" },
       { name: "owner", type: "number", description: "ownerAsiakasId tenant scope (1349 = BetoniJerry); omit for global" },
-      { name: "notes", type: "string", description: "Internal notes" },
+      {
+        name: "notes",
+        type: "string",
+        description:
+          "Internal notes — what the ACTIVATOR reads at the moment of activation, so this is where the activation GATES belong: the deploy gate, whether to batch with other pending edits, an EN re-translation that must land with it, and the verification evidence. No length limit (widened 500 → nvarchar(MAX) on 2026-08-12); the old ceiling is what truncated a gate set and lost it (fb#453/fb#512).",
+      },
       { name: "effective-date", type: "date", description: "Effective date YYYY-MM-DD (default: now)" },
       { name: "activate", type: "boolean", description: "Publish immediately (archives the prior active version). Default: inactive draft" },
       { name: "validate-json", type: "boolean", description: "Validate the embedded ```json block parses to an object before saving (recommended for BETONIJERRY_* structured types)" },
@@ -4154,7 +4165,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "asiakas", type: "number", description: "Owner asiakasId (defaults to your active company)" },
       { name: "global", type: "boolean", description: "Create a global, owner-less person (ownerAsiakasId=null). Mutually exclusive with --asiakas." },
       { name: "get-or-create", type: "boolean", description: "On a duplicate email, return the existing person (reused:true) when visible to you; an email owned by a company you can't access errors with guidance" },
-      { name: "body", type: "json", description: "Raw JSON body, merged under typed flags (optional)" },
+      { name: "body", type: "json", description: "Raw JSON body, merged under typed flags (optional) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
       { name: "from-json", type: "string", description: "Read the JSON body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body." },
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
@@ -4189,7 +4200,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "phone", type: "string", description: "personPhone" },
       { name: "email", type: "string", description: "personEmail (pass \"\" to clear)" },
       { name: "memo", type: "string", description: "personMemo — free-text note/comment" },
-      { name: "body", type: "json", description: "Patch body (JSON), merged UNDER the typed flags. Mutually exclusive with --from-json." },
+      { name: "body", type: "json", description: "Patch body (JSON), merged UNDER the typed flags. Mutually exclusive with --from-json. ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
       { name: "from-json", type: "string", description: "Read the patch body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body." },
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
@@ -4736,7 +4747,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "Upsert a provider company's BetoniJerry settings (PUT /api/jerry-provider-settings). Partial-payload-safe: only the body keys present are written (omit a key to preserve it). jerryPersonId must belong to the target company. --asiakas targets another company. Returns the FULL saved settings (no follow-up GET needed) plus changed:boolean (whether anything actually changed vs an idempotent no-op). companyDescription is nvarchar — ä/ö are preserved. Requires --reason. Writable keys: jerryPersonId, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsent. `publicListingConsent` is a BOOLEAN intent flag — the server stamps publicListingConsentAt/By from your token; never send a timestamp. Re-granting an already-granted consent does not re-stamp the original date. On Windows PowerShell use --from-json <file>: PowerShell splits a quoted --body value on its inner double-quotes.",
     permissions: ["edit-tier on the target company (tarjousAdmin / company admin)"],
     flags: [
-      { name: "body", type: "json", description: "JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo?, website?, publicSlug?, publicListingConsent? }. Mutually exclusive with --from-json." },
+      { name: "body", type: "json", description: "JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo?, website?, publicSlug?, publicListingConsent? }. Mutually exclusive with --from-json. ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
       { name: "from-json", type: "string", description: "Read the JSON body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body." },
       { name: "asiakas", type: "number", description: "Target company asiakasId (default: your own)" },
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
@@ -6312,7 +6323,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       "--note/--reason/--resolution write the SAME stored note. Passing several with different values merges them (joined in note→resolution→reason order) instead of dropping any — so mixing up --reason with the audit header loses nothing.",
       "A note WITHOUT --status does NOT close the row — it stays open/reviewed and the ack carries a hint saying so; pass --status applied|dismissed to close (feedback #270).",
-      "The two ways to close a row have OPPOSITE defaults, so don't assume this one closes: `ib dev changelog add --feedback <id>` closes it for you (status=applied plus a `Shipped: changelog #N` resolution), while this command leaves the status alone unless you pass --status. Recording the fix in the changelog is the one-call path (feedback #293).",
+      "The two ways to close a row have OPPOSITE defaults, so don't assume this one closes: `ib dev changelog add --feedback <id>` closes it for you (status=applied plus a `Shipped: changelog #N` resolution), while this command leaves the status alone unless you pass --status. Recording the fix in the changelog is the one-call path (feedback #293). Note the one-call path only advances a row from `open` — if you set this row to `reviewed` first, a later `changelog add --feedback` will preserve that and tell you so, rather than claiming shipped work that is only staged (fb#517).",
       "SHELL QUOTING (fb#327): a resolution note quotes commands and errors, and a quote-split can even store the note TRUNCATED at the first quote — use --from-json <file|-> for any quote-bearing note; see `ib help shell-quoting`.",
     ],
     seeAlso: ["ib dev changelog add", "ib dev feedback list"],
