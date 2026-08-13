@@ -463,6 +463,24 @@ describe("changelog add --no-resolve (fb#441/fb#517)", () => {
     expect(body).not.toHaveProperty("resolveFeedback");
     expect(body).not.toHaveProperty("feedbackId");
   });
+
+  test("`resolve` is NOT an accepted --from-json key (fb#541)", () => {
+    // Registering --no-resolve exposed Commander attribute `resolve`, which the
+    // derived key map picked up for free. normalizeFromJson only accepts strings,
+    // so the key was advertised and then unusable BOTH ways: `false` exited 4, and
+    // `"false"` was accepted and silently dropped — force-applying the row anyway,
+    // the exact fb#298 class this pipeline exists to prevent. Excluding it makes
+    // the key a loud unknown instead. No capability lost: --no-resolve takes no
+    // value, so it composes with --from-json on argv.
+    const program = new Command();
+    registerChangelogCommands(program, async () => client);
+    const group = program.commands.find((c) => c.name() === "changelog")!;
+    for (const leaf of ["add", "update"]) {
+      const keys = payloadKeyMap(group.commands.find((c) => c.name() === leaf)!);
+      expect([...keys.keys()]).not.toContain("resolve");
+      expect([...keys.keys()]).not.toContain("no-resolve");
+    }
+  });
 });
 
 describe("changelog add description positional-or-flag (fb#172)", () => {

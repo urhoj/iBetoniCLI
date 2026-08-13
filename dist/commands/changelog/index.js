@@ -382,7 +382,16 @@ const READ_SHAPE_KEY_ALIASES = {
  * - numericFields/csvFields: how Commander parses the matching flags.
  */
 const CHANGELOG_FROM_JSON = {
-    nonPayload: new Set(["fromJson", "dryRun", "idempotencyKey", "reason", "help"]),
+    // `resolve` is --no-resolve's Commander attribute name, so registering that flag
+    // added it to the derived accepted-key list for free — and then it was unusable
+    // in both spellings: `"resolve": false` exited 4 ("must be a string"), and
+    // `"resolve": "false"` was accepted and SILENTLY DROPPED, force-applying the row
+    // anyway. That is the fb#298 silent-drop class this whole pipeline exists to
+    // prevent, so ADVERTISING the key is worse than omitting it: excluded here, it is
+    // loudly rejected as unknown (fb#541). No capability is lost — --no-resolve is a
+    // valueless flag, so it has no shell-quoting problem and every caller that needs
+    // --from-json for its prose can still pass --no-resolve on argv alongside it.
+    nonPayload: new Set(["fromJson", "dryRun", "idempotencyKey", "reason", "help", "resolve"]),
     readShapeAliases: READ_SHAPE_KEY_ALIASES,
     numericFields: new Set(["feedback"]),
     csvFields: new Set(["files", "repo", "sha", "commit"]),
@@ -902,6 +911,7 @@ export const CHANGELOG_SPECS = [
             'CROSS-LANE ENTRIES: --repo is a CSV, and the versioning model has two lanes (coordinated apps vs standalone betonicli/@ibetoni/*), so a change that spans them names both — --repo "puminet5api,betonicli". Each token is bumped/stamped on its own (a CSV mixing lanes bumps only its coordinated tokens), and the resulting entry is findable under either name. Recording only one lane and putting the other in --files loses the attribution and takes an `update` to repair (fb#408).',
             "--feedback on a row that is ALREADY resolved TAKES the link from the earlier entry. That is intended (it is how a wrong first link gets corrected), but a row's work often spans several entries — a fix, then a follow-up, a revert, a doc pass — so a cross-reference silently becomes the sole resolver and a reader following the feedback row lands on the follow-up instead of the fix. The response now carries `relinkedFrom` and stderr names the displaced entry; restore it with `ib dev changelog update <thatId> --feedback <id>` (fb#366).",
             "DEPLOY-GATED (fb#366): `relinkedFrom` and its stderr note come from a later puminet5api version. Against an older backend the re-link still happens and is still SILENT — check the row with `ib dev feedback get <id>` after linking an already-resolved one.",
+            "DEPLOY-GATED (fb#441/fb#517): --no-resolve, the preserve-a-set-status rule, and the `feedbackStatus` echo all need a later puminet5api version. Against an older backend --no-resolve is dropped as an unknown body key and the row is force-flipped to applied ANYWAY, silently — i.e. the exact outcome the flag exists to prevent. Verify with `ib dev feedback get <id>` after linking, and reset with `ib dev feedback resolve <id> --status reviewed` if it flipped.",
             "Developer-gated.",
         ],
         seeAlso: ["ib dev changelog report", "ib dev feedback resolve"],
@@ -1143,6 +1153,7 @@ export const CHANGELOG_SPECS = [
             "THE CORRECTION PATH FOR --bump-level (fb#303). Deploy Step 0 bumps each coordinated repo from the MAX bump level across the UNRELEASED entries naming it, so a wrong level mis-drives a real release. Fix it here — do NOT delete + re-add, which mints a new changelogId and orphans the cliFeedback row pointing at the old one.",
             "--bump-level has NO default here (unlike `add`, where it defaults to patch): omitting it leaves the recorded level untouched, so an unrelated `update --status …` cannot silently downgrade a deliberate minor.",
             "--feedback also marks that cliFeedback row applied and sets resolvedByChangelogId back to this entry — the only way to re-establish a link lost to delete + re-add (`ib dev feedback resolve` sets status/resolution but not the link).",
+            "DEPLOY-GATED (fb#441/fb#517): --no-resolve and the preserve-a-set-status rule need a later puminet5api version. Against an older backend --no-resolve is dropped as an unknown body key and the row is force-flipped to applied ANYWAY, silently. Verify with `ib dev feedback get <id>` after linking.",
             "DEPLOY-GATED: --bump-level/--feedback/--sentry became editable in a later puminet5api version. Against an older backend the PUT succeeds and echoes the row unchanged; the CLI compares the echo and warns on stderr rather than letting the edit vanish silently.",
         ],
         seeAlso: ["ib dev changelog pending", "ib dev changelog get"],
