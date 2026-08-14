@@ -74,6 +74,24 @@ describe("pretty output", () => {
     expect(out).toContain('{"x":1}');
   });
 
+  // fb#604: a cell containing NEWLINES hit a cli-table3 0.6.5 path that is
+  // O(lines × chars²) — `ib dev feedback get 528 --pretty` (a 5134-char,
+  // ~50-line description) took 18.6 s and read as a hang. See the
+  // `patchTableTruncate` comment in src/output/pretty.ts. Unpatched this test
+  // takes ~17 s; the 2 s budget is a ~100× margin over the 3 ms it now costs,
+  // so it fails loudly on a regression without being timing-flaky.
+  test("renderRecord stays fast on a long multi-line field", () => {
+    const description = Array.from(
+      { length: 50 },
+      (_, i) => `Line ${i}: ${"lorem ipsum dolor sit amet ".repeat(3)}`
+    ).join("\n");
+    const started = Date.now();
+    const out = stripAnsi(renderRecord({ feedbackId: 528, description }));
+    expect(Date.now() - started).toBeLessThan(2000);
+    // and nothing was dropped on the way — the LAST line survives
+    expect(out).toContain("Line 49:");
+  });
+
   test("renderList caps table width and keeps narrow columns intact", () => {
     // The blobs must DIFFER: two identical rows make every column constant, so
     // the fold below would empty the table and this would stop testing width.

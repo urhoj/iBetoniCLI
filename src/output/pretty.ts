@@ -17,7 +17,40 @@ function cjsRequire(): NodeJS.Require {
 let _Table: typeof import("cli-table3") | null = null;
 
 function tableCtor(): typeof import("cli-table3") {
-  return (_Table ??= cjsRequire()("cli-table3"));
+  if (_Table) return _Table;
+  patchTableTruncate();
+  return (_Table = cjsRequire()("cli-table3"));
+}
+
+/**
+ * Work around a cli-table3 0.6.5 bug that makes any cell containing a NEWLINE
+ * render in O(lines × chars²) — `ib dev feedback get 528 --pretty` took 18.6 s
+ * against 0.45 s for the same command in JSON, which reads as a hang (fb#604).
+ * 0.6.5 is the newest published release, so there is no upgrade that fixes it.
+ *
+ * `Cell.draw` (cell.js:136) runs `utils.truncate(this.content, 10)` on EVERY
+ * output line of the cell, purely to build a debug string it then discards. On
+ * multi-line input that call takes truncate's slow branch — `strlen` of a
+ * multi-line string is its longest LINE, not its total length, so
+ * `truncateWidth`'s `str.length === strlen(str)` fast path misses and it slices
+ * ONE character at a time, each iteration re-running `strlen` → `string-width`
+ * → `strip-ansi` → `ansi-regex()`, which rebuilds a ~4 KB regex per call (6.4 s
+ * of an 8.9 s profile). Same-length SINGLE-line text renders in 7 ms.
+ *
+ * Safe to patch because `utils.truncate` has exactly two call sites and only
+ * the debug one can be handed a multi-line string: the other (cell.js:259)
+ * truncates one line off `this.lines`. Output is byte-identical, 17482 → 3 ms.
+ */
+function patchTableTruncate(): void {
+  const utils = cjsRequire()("cli-table3/src/utils.js") as {
+    truncate: (str: string, len: number, char?: string) => string;
+  };
+  const slow = utils.truncate;
+  utils.truncate = (str, len, char) => {
+    if (typeof str !== "string" || !str.includes("\n")) return slow(str, len, char);
+    if (str.length <= len) return str;
+    return str.slice(0, Math.max(0, len - 1)) + (char || ELLIPSIS);
+  };
 }
 
 type Chalk = typeof import("chalk").default;
