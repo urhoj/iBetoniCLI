@@ -46,6 +46,19 @@ export interface FromJsonConfig {
   numericFields?: Set<string>;
   /** Payload fields whose flag takes a CSV — a --from-json array of strings is joined for these. */
   csvFields?: Set<string>;
+  /**
+   * The subset of `csvFields` that ALSO accepts a bare JSON number, coerced to
+   * its string form (fb#576 fix round 1). Opt-in and separate from `csvFields`
+   * on purpose: a csv field is CSV precisely because its elements are usually
+   * NOT numeric (file paths, commit SHAs, repo names), so a bare `{"sha": 12345}`
+   * is much more likely a caller's mistake than a deliberate single-element
+   * list — the "must be a string or an array of strings" rejection is the
+   * correct, loud behaviour for those. Only a field whose CSV elements happen
+   * to be numeric ids (`--feedback`) should be listed here, and only because
+   * the natural way to author it is templating off a read row whose column IS
+   * a number (`changelog list`'s `feedbackId`).
+   */
+  numericTolerantCsvFields?: Set<string>;
   /** Flag name used as the error prefix (default `--from-json`). */
   flagName?: string;
 }
@@ -91,10 +104,11 @@ export function payloadKeyMap(
 export function normalizeFromJson(
   json: Record<string, unknown>,
   keys: Map<string, string>,
-  cfg: Pick<FromJsonConfig, "numericFields" | "csvFields" | "flagName"> = {}
+  cfg: Pick<FromJsonConfig, "numericFields" | "csvFields" | "numericTolerantCsvFields" | "flagName"> = {}
 ): Record<string, unknown> {
   const numeric = cfg.numericFields ?? new Set<string>();
   const csv = cfg.csvFields ?? new Set<string>();
+  const numericTolerant = cfg.numericTolerantCsvFields ?? new Set<string>();
   const flagName = cfg.flagName ?? "--from-json";
   const out: Record<string, unknown> = {};
   const unknown: string[] = [];
@@ -117,12 +131,12 @@ export function normalizeFromJson(
       else out[key] = value.map((v) => v.trim()).filter(Boolean).join(",");
       continue;
     }
-    // A csv field that happens to hold a single NUMERIC element (e.g. --feedback,
-    // fb#576) round-trips a JSON number too — the natural shape when the JSON was
-    // templated off a read row whose column is itself a number (changelog list's
-    // feedbackId). A bare number is otherwise indistinguishable from every other
-    // wrong-typed value below, so it needs its own branch ahead of that check.
-    if (csv.has(key) && typeof value === "number" && Number.isFinite(value)) {
+    // A field OPTED IN to numeric tolerance (e.g. --feedback, fb#576) round-trips
+    // a JSON number too — the natural shape when the JSON was templated off a
+    // read row whose column is itself a number (changelog list's feedbackId).
+    // Deliberately NOT every csvFields entry: see numericTolerantCsvFields' doc
+    // for why a bare number is a real error for files/repo/sha/commit.
+    if (numericTolerant.has(key) && typeof value === "number" && Number.isFinite(value)) {
       out[key] = String(value);
       continue;
     }

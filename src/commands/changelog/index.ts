@@ -534,6 +534,11 @@ const CHANGELOG_FROM_JSON: FromJsonConfig = {
   // string or an array of strings — see normalizeFeedbackIds below for why that
   // still needs a second parse pass once it lands on `o.feedback`.
   csvFields: new Set(["files", "repo", "sha", "commit", "feedback"]),
+  // Scoped opt-in (fb#576 fix round 1): ONLY --feedback also accepts a bare JSON
+  // number (templating off a read row's numeric feedbackId column). files/repo/
+  // sha/commit stay string-or-array-only — a numeric --repo/--sha/--files/--commit
+  // is a real caller mistake and must still exit 4, not silently coerce.
+  numericTolerantCsvFields: new Set(["feedback"]),
 };
 
 /** Changelog's key map — the shared {@link sharedPayloadKeyMap} with {@link CHANGELOG_FROM_JSON}. */

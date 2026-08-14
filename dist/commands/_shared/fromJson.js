@@ -40,6 +40,7 @@ export function payloadKeyMap(cmd, cfg) {
 export function normalizeFromJson(json, keys, cfg = {}) {
     const numeric = cfg.numericFields ?? new Set();
     const csv = cfg.csvFields ?? new Set();
+    const numericTolerant = cfg.numericTolerantCsvFields ?? new Set();
     const flagName = cfg.flagName ?? "--from-json";
     const out = {};
     const unknown = [];
@@ -67,12 +68,12 @@ export function normalizeFromJson(json, keys, cfg = {}) {
                 out[key] = value.map((v) => v.trim()).filter(Boolean).join(",");
             continue;
         }
-        // A csv field that happens to hold a single NUMERIC element (e.g. --feedback,
-        // fb#576) round-trips a JSON number too — the natural shape when the JSON was
-        // templated off a read row whose column is itself a number (changelog list's
-        // feedbackId). A bare number is otherwise indistinguishable from every other
-        // wrong-typed value below, so it needs its own branch ahead of that check.
-        if (csv.has(key) && typeof value === "number" && Number.isFinite(value)) {
+        // A field OPTED IN to numeric tolerance (e.g. --feedback, fb#576) round-trips
+        // a JSON number too — the natural shape when the JSON was templated off a
+        // read row whose column is itself a number (changelog list's feedbackId).
+        // Deliberately NOT every csvFields entry: see numericTolerantCsvFields' doc
+        // for why a bare number is a real error for files/repo/sha/commit.
+        if (numericTolerant.has(key) && typeof value === "number" && Number.isFinite(value)) {
             out[key] = String(value);
             continue;
         }

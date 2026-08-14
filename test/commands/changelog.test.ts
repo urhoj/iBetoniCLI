@@ -831,6 +831,26 @@ describe("changelog add/update --from-json (fb#300)", () => {
       .toEqual({ files: "a.ts,b.ts", repo: "betonicli" });
   });
 
+  // fb#576 fix round 1: the number-tolerance added for --feedback must NOT leak
+  // to every other csvFields entry. Before the fix, `csv.has(key) && typeof
+  // value === "number"` was the gate — scoped only to `key`, not the field — so
+  // a bare numeric repo/sha/files/commit silently coerced to a string instead of
+  // the loud rejection the help text promises ("An unknown or wrong-typed key
+  // exits 4, never silently dropped").
+  test("a bare JSON number on repo/sha/files/commit still exits 4 (NOT silently coerced)", () => {
+    for (const [key, value] of [["repo", 5], ["sha", 12345], ["files", 7], ["commit", 42]] as const) {
+      const err = captureThrow(() => normalizeChangelogJson({ [key]: value }, addKeyMap()));
+      expect(err.exitCode).toBe(4);
+      expect((err as unknown as Error).message).toMatch(
+        new RegExp(`"${key}" must be a string or an array of strings \\(got number\\)`)
+      );
+    }
+  });
+
+  test("a bare JSON number on --feedback is still accepted (the round-trip this exists for)", () => {
+    expect(normalizeChangelogJson({ feedback: 357 }, addKeyMap())).toEqual({ feedback: "357" });
+  });
+
   test("a quote-bearing entry round-trips, and JSON supplies the required trio", async () => {
     asPost().mockResolvedValue({ changelogId: 300 });
     const description =
@@ -1317,6 +1337,9 @@ describe("intCsvFlag", () => {
   });
   it("exits 4 on a cl# anchor — the wrong ref type", () => {
     expect(() => intCsvFlag("--feedback")("cl#1281")).toThrow();
+  });
+  it("exits 4 on an empty element (e.g. a trailing/double comma)", () => {
+    expect(() => intCsvFlag("--feedback")("541,,544")).toThrow(/must be an integer/);
   });
 });
 
