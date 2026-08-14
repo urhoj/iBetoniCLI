@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { CliError, errorMessage, exitCodeFromStatus } from "./errors.js";
+import { looksLikeHtml, summarizeHtmlErrorBody } from "./htmlErrorBody.js";
 import { recordRequest, statsEnabled } from "../stats.js";
 import { getAmbientCommandPath } from "../commandContext.js";
 import { warnNote } from "../output/json.js";
@@ -20,9 +21,16 @@ const BETONIJERRY_UMBRELLA_ASIAKAS_ID = 1349;
  * `"[object Object]"`, defeating the machine-parseable-error contract — so dig
  * out a real string before falling back to `HTTP <status>`.
  */
-function errorMessageFromBody(parsed: unknown, status: number): string {
+function errorMessageFromBody(parsed: unknown, status: number, contentType = ""): string {
   const fallback = `HTTP ${status}`;
-  if (typeof parsed === "string" && parsed) return parsed;
+  if (typeof parsed === "string" && parsed) {
+    // ~130 chars of `<html><head><title>502 Bad Gateway...` inside the envelope's
+    // `error` string is pure noise on the CLI's machine-readable channel, and a
+    // CF challenge page or a 5xx carrying a ray id would be far worse. The full
+    // body stays reachable under --verbose, which dumps it raw (fb#577).
+    if (looksLikeHtml(parsed, contentType)) return summarizeHtmlErrorBody(parsed, status);
+    return parsed;
+  }
   if (!parsed || typeof parsed !== "object") return fallback;
   const body = parsed as Record<string, unknown>;
   const err = body.error ?? body.message;
@@ -35,6 +43,15 @@ function errorMessageFromBody(parsed: unknown, status: number): string {
     return JSON.stringify(err);
   }
   return fallback;
+}
+
+/** Truncation metadata a list route reports out of band (fb#605). */
+export interface ListMeta {
+  truncated: true;
+  /** The limit the server actually applied after clamping. */
+  limit?: number;
+  /** The route's hard cap, so a client can say "you asked for N, the max is M". */
+  maxLimit?: number;
 }
 
 interface ApiClientOptions {
@@ -153,6 +170,8 @@ export function createApiClient({
   // request unless the caller pinned one) — captured so the --verbose failure
   // diagnostic can print the id to correlate with Sentry/backend logs.
   let lastRequestId = requestId;
+  /** Set from the X-Result-* headers on every response; null when absent (fb#605). */
+  let lastListMeta: ListMeta | null = null;
 
   /**
    * Print the acting-as company once, before the process's first write. No-op
@@ -335,6 +354,16 @@ export function createApiClient({
       recordRequest({ apiMs: Date.now() - startedAt, serverTiming: res.headers.get("Server-Timing") });
     }
 
+    // Reset per response, so a later uncapped read cannot inherit an earlier
+    // page's truncation flag.
+    lastListMeta = res.headers.get("X-Result-Truncated") === "1"
+      ? {
+          truncated: true,
+          limit: Number(res.headers.get("X-Result-Limit")) || undefined,
+          maxLimit: Number(res.headers.get("X-Result-Limit-Max")) || undefined,
+        }
+      : null;
+
     const contentType = res.headers.get("content-type") || "";
     // Guard the body parse: a non-OK response can carry an empty or malformed
     // body even with a JSON content-type — don't let a SyntaxError escape the
@@ -355,7 +384,7 @@ export function createApiClient({
         );
       }
       throw new CliError(
-        errorMessageFromBody(parsed, res.status),
+        errorMessageFromBody(parsed, res.status, contentType),
         res.status,
         parsed,
         exitCodeFromStatus(res.status)
@@ -406,6 +435,16 @@ export function createApiClient({
     delete: <T = unknown>(path: string, opts?: FetchOptions) =>
       request<T>("DELETE", path, undefined, opts),
     getCurrentToken: () => currentToken,
+    /**
+     * Truncation metadata from the LAST response, or null (fb#605).
+     *
+     * The list routes answer with a bare array and clamp `limit` server-side, so
+     * there is nowhere in the payload to say "this page is capped". The backend
+     * signals it out of band instead — the same channel `--stats` already reads
+     * `Server-Timing` on. `null` means either "not capped" or "backend predates
+     * the header", which is why the callers keep a client-side fallback.
+     */
+    getLastListMeta: () => lastListMeta,
   };
 }
 

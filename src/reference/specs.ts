@@ -6422,8 +6422,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "complexity", type: "string", description: "Only items with this exact complexity 1-5, or `none` for the rows with NO estimate at all (deploy-gated). ⚠ A NUMERIC value EXCLUDES unestimated rows, which is most of the table — absent means unestimated, not complex; `--complexity none` is how you select exactly that set for a backfill pass (fb#535)." },
       { name: "max-complexity", type: "number", description: "Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls (deploy-gated). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex; use `--complexity none` to find those." },
       { name: "oldest", type: "boolean", description: "Oldest-first (createdAt ASC) — FIFO drain order so the triage loop clears the backlog before newer arrivals; default is newest-first" },
-      { name: "limit", type: "number", default: "50", description: "Max rows (cap 200)" },
-      { name: "offset", type: "number", default: "0", description: "Pagination offset" },
+      { name: "limit", type: "number", default: "50", description: "Max rows, HARD-CAPPED at 200 by the backend. Asking for more is not an error and not honoured — you get 200 rows and a stderr warning; `truncated: true` says the page was capped (fb#605). Page the rest with --offset." },
+      { name: "offset", type: "number", default: "0", description: "Skip N rows — how you reach anything beyond the 200-row cap. `--limit 200`, then `--limit 200 --offset 200`, and so on." },
       { name: "full", type: "boolean", description: "Return untruncated description/resolution (default: each capped at 200 chars)" },
     ],
     outputShape:

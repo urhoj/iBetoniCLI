@@ -15,6 +15,11 @@
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
+import {
+  FEEDBACK_LIST_CAP,
+  FEEDBACK_LIST_DEFAULT,
+  warnIfLimitCapped,
+} from "../../api/listCaps.js";
 import { failWith, writeJson } from "../../output/json.js";
 import { assertEnum, assertEnumCsv, parseRefId } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
@@ -68,7 +73,13 @@ function validateComplexity(value: unknown, flag = "--complexity"): number {
 }
 
 const MAX_FREETEXT = 200;
-const CAP = 200;
+/**
+ * The server's row cap. Was a local literal duplicating the backend constant,
+ * and was applied ONLY on the multi-status merge path below — the single-status
+ * path (which `--all` takes) never set `truncated` at all, so `--limit 1000`
+ * answered 200 rows of 604 and looked complete (fb#605). Now one shared mirror.
+ */
+const CAP = FEEDBACK_LIST_CAP;
 const TRUNCATED_FIELDS = ["description", "resolution", "errorText"] as const;
 const TRUNCATE_HINT =
   "description/resolution truncated to 200 chars; ib dev feedback get <id> for full text";
@@ -329,6 +340,8 @@ export async function runFeedbackList(
   let items: Record<string, unknown>[];
   let truncated = false;
 
+  warnIfLimitCapped(opts.limit, CAP, "ib dev feedback list");
+
   if (!statuses || statuses.length <= 1) {
     items = await fetchRows(client, {
       status: statuses?.[0],
@@ -341,6 +354,12 @@ export async function runFeedbackList(
       offset: opts.offset,
       oldest: opts.oldest,
     });
+    // The path the merge branch below already covered, and this one did not:
+    // a FULL page means more rows exist. The effective limit is min(requested,
+    // CAP) — checking against the RAW request is what missed the case, since
+    // asking for 1000 and receiving 200 fails `items.length >= 1000` (fb#605).
+    const effective = Math.min(opts.limit ?? FEEDBACK_LIST_DEFAULT, CAP);
+    if (client.getLastListMeta?.()?.truncated || items.length >= effective) truncated = true;
   } else {
     const pages = await Promise.all(
       statuses.map((s) =>

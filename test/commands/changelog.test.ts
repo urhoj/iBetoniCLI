@@ -1544,3 +1544,33 @@ describe("warnFeedbackUnlinkEffects (fb#585)", () => {
     expect(msgs[0]).toContain("still in place");
   });
 });
+
+/**
+ * fb#605: `ib dev changelog list` capped at 500 rows with no `truncated`, no
+ * cursor and NO --offset — so nothing below changelogId 838 was reachable
+ * through the command at all. The backend had bound `offset` all along.
+ */
+describe("changelog list — the row cap is reachable and reported (fb#605)", () => {
+  it("forwards --offset, the only way past the 500-row cap", async () => {
+    const client = mockApiClient({ get: vi.fn().mockResolvedValue([]) });
+    await runChangelogList(client, { limit: 500, offset: 500 });
+    const url = client.get.mock.calls[0][0] as string;
+    expect(url).toContain("limit=500");
+    expect(url).toContain("offset=500");
+  });
+
+  it("flags a full page as truncated so a sweep cannot read as complete", async () => {
+    const client = mockApiClient({
+      get: vi.fn().mockResolvedValue(Array.from({ length: 500 }, (_, i) => ({ changelogId: i }))),
+    });
+    const env = await runChangelogList(client, { limit: 2000 });
+    expect(env.truncated).toBe(true);
+    expect(env.count).toBe(500);
+  });
+
+  it("says nothing on a short page — the ordinary case is unchanged", async () => {
+    const client = mockApiClient({ get: vi.fn().mockResolvedValue([{ changelogId: 1 }]) });
+    const env = await runChangelogList(client, {});
+    expect(env.truncated).toBeUndefined();
+  });
+});

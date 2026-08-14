@@ -2354,14 +2354,15 @@ FLAGS
   --has-sentry    Only entries linked to a Sentry issue (deploy-gated)
   --unreleased    List only UNRELEASED/pending entries (versionTag IS NULL) + the max bump level — routes to \`changelog pending\`
   --pending    Alias for --unreleased
-  --limit NUMBER    Max rows
+  --limit NUMBER    Max rows, HARD-CAPPED at 500 by the backend. Asking for more is not an error and not honoured — you get 500 rows and a stderr warning; \`truncated: true\` in the envelope says the page was capped (fb#605). Page the rest with --offset. (default: 100)
+  --offset NUMBER    Skip N rows — the ONLY way to reach entries beyond the 500-row cap (the backend has always supported it; the flag was missing until fb#605). Combine with --limit to page: \`--limit 500\`, then \`--limit 500 --offset 500\`. (default: 0)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<entry> | (with --unreleased) { items, entries, maxBumpLevel, count }
+  ListEnvelope<entry> (\`truncated: true\` when the row cap bit — the page is NOT the whole result) | (with --unreleased) { items, entries, maxBumpLevel, count }
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
@@ -2838,8 +2839,8 @@ FLAGS
   --complexity STRING    Only items with this exact complexity 1-5, or \`none\` for the rows with NO estimate at all (deploy-gated). ⚠ A NUMERIC value EXCLUDES unestimated rows, which is most of the table — absent means unestimated, not complex; \`--complexity none\` is how you select exactly that set for a backfill pass (fb#535).
   --max-complexity NUMBER    Only items with complexity <= n — the autonomously-workable slice a batch-fix agent pulls (deploy-gated). ⚠ EXCLUDES rows with no estimate, which is most of the table — absent means unestimated, not complex; use \`--complexity none\` to find those.
   --oldest    Oldest-first (createdAt ASC) — FIFO drain order so the triage loop clears the backlog before newer arrivals; default is newest-first
-  --limit NUMBER    Max rows (cap 200) (default: 50)
-  --offset NUMBER    Pagination offset (default: 0)
+  --limit NUMBER    Max rows, HARD-CAPPED at 200 by the backend. Asking for more is not an error and not honoured — you get 200 rows and a stderr warning; \`truncated: true\` says the page was capped (fb#605). Page the rest with --offset. (default: 50)
+  --offset NUMBER    Skip N rows — how you reach anything beyond the 200-row cap. \`--limit 200\`, then \`--limit 200 --offset 200\`, and so on. (default: 0)
   --full    Return untruncated description/resolution (default: each capped at 200 chars)
 
 GLOBAL FLAGS

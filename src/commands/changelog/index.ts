@@ -18,7 +18,12 @@
  */
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { toListEnvelope, type ListEnvelope } from "../../api/envelopes.js";
+import { cappedListEnvelope, type ListEnvelope } from "../../api/envelopes.js";
+import {
+  CHANGELOG_LIST_CAP,
+  CHANGELOG_LIST_DEFAULT,
+  warnIfLimitCapped,
+} from "../../api/listCaps.js";
 import type { CommandSpec } from "../../output/help.js";
 import {
   type WriteFlags,
@@ -163,12 +168,18 @@ export async function runChangelogList(client: ApiClient, opts: Record<string, s
   const p: Record<string, string | number | boolean | undefined> = {
     month: opts.month, type: opts.type, area: opts.area, repo: opts.repo,
     feedbackId: opts.feedback, sentryIssue: opts.sentry, source: opts.source,
-    search: opts.search, status: opts.status, limit: opts.limit,
+    search: opts.search, status: opts.status, limit: opts.limit, offset: opts.offset,
   };
   if (opts.hasFeedback) p.hasFeedback = "1";
   if (opts.hasSentry) p.hasSentry = "1";
   const rows = await client.get<Row[]>(`/api/changelog${qs(p)}`);
-  return toListEnvelope<Row>(rows);
+  warnIfLimitCapped(opts.limit, CHANGELOG_LIST_CAP, "ib dev changelog list");
+  return cappedListEnvelope<Row>(rows, {
+    requested: opts.limit as number | undefined,
+    serverCap: CHANGELOG_LIST_CAP,
+    serverDefault: CHANGELOG_LIST_DEFAULT,
+    meta: client.getLastListMeta?.(),
+  });
 }
 
 export async function runChangelogGet(
@@ -928,6 +939,11 @@ export function registerChangelogCommands(
     .option("--unreleased")
     .option("--pending")
     .option("--limit <n>", "", Number)
+    // The backend has ALWAYS supported offset (listEntries binds it); only the
+    // flag was missing, which made everything below the 500-row cap unreachable
+    // through this command (fb#605). Its sibling `ib dev feedback list` has had
+    // --offset all along.
+    .option("--offset <n>", "", Number)
     .action(
       guarded(async (o: Record<string, string | number | boolean>) => {
         // --unreleased/--pending is the pending-queue view, not a month filter;
@@ -1336,9 +1352,20 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         description: "List only UNRELEASED/pending entries (versionTag IS NULL) + the max bump level — routes to `changelog pending`",
       },
       { name: "pending", type: "boolean", description: "Alias for --unreleased" },
-      { name: "limit", type: "number", description: "Max rows" },
+      {
+        name: "limit",
+        type: "number",
+        default: "100",
+        description: "Max rows, HARD-CAPPED at 500 by the backend. Asking for more is not an error and not honoured — you get 500 rows and a stderr warning; `truncated: true` in the envelope says the page was capped (fb#605). Page the rest with --offset.",
+      },
+      {
+        name: "offset",
+        type: "number",
+        default: "0",
+        description: "Skip N rows — the ONLY way to reach entries beyond the 500-row cap (the backend has always supported it; the flag was missing until fb#605). Combine with --limit to page: `--limit 500`, then `--limit 500 --offset 500`.",
+      },
     ],
-    outputShape: "ListEnvelope<entry> | (with --unreleased) { items, entries, maxBumpLevel, count }",
+    outputShape: "ListEnvelope<entry> (`truncated: true` when the row cap bit — the page is NOT the whole result) | (with --unreleased) { items, entries, maxBumpLevel, count }",
     errors: [
       {
         http: 403,

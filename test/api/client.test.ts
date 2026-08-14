@@ -579,3 +579,48 @@ describe("verbose failure diagnostic", () => {
     expect(stderrSpy).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * fb#577: the raw Cloudflare interstitial landed in the CliError message, i.e.
+ * on the CLI's machine-readable channel, whose primary consumer is an AI.
+ */
+describe("ApiClient — an HTML error body is collapsed (fb#577)", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  const CF_502 =
+    "<html>\r\n<head><title>502 Bad Gateway</title></head>\r\n<body>\r\n<center><h1>502 Bad Gateway</h1></center>\r\n<hr><center>cloudflare</center>\r\n</body>\r\n</html>\r\n";
+
+  test("the thrown message is one line, and the raw page stays on the body", async () => {
+    mockFetch.mockResolvedValue(
+      new Response(CF_502, { status: 502, headers: { "content-type": "text/html" } })
+    );
+    const client = createApiClient({ endpoint: "https://api.example", token: "t", version: "1" });
+    await expect(client.get("/api/x")).rejects.toMatchObject({
+      message: "502 Bad Gateway (HTML response from an edge proxy, not the application)",
+      statusCode: 502,
+      // Untouched on `body`, so --verbose can still dump it and nothing is lost.
+      body: CF_502,
+    });
+  });
+
+  test("a JSON error body is unchanged — the envelope contract still holds", async () => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ error: "Entry not found" }), {
+        status: 404,
+        headers: { "content-type": "application/json" },
+      })
+    );
+    const client = createApiClient({ endpoint: "https://api.example", token: "t", version: "1" });
+    await expect(client.get("/api/x")).rejects.toMatchObject({ message: "Entry not found" });
+  });
+
+  test("a plain-text error body is unchanged", async () => {
+    mockFetch.mockResolvedValue(
+      new Response("upstream timed out", { status: 504, headers: { "content-type": "text/plain" } })
+    );
+    const client = createApiClient({ endpoint: "https://api.example", token: "t", version: "1" });
+    await expect(client.get("/api/x")).rejects.toMatchObject({ message: "upstream timed out" });
+  });
+});

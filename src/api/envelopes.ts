@@ -35,6 +35,47 @@ export function listEnvelope<T>(
  * non-array body (null, an error object) yields an empty envelope rather than
  * throwing.
  */
+/**
+ * Wrap a bare-array response from a route that CAPS its row count, and report
+ * the cap honestly (fb#605).
+ *
+ * The failure this exists to prevent: `--limit 1000` against a route capped at
+ * 200 returned 200 rows with no `truncated`, no cursor and no hint. A sweep over
+ * every feedback row therefore looked complete at 200 of 604 — the newest fifth
+ * — and would have produced a confident "all links repaired" claim over a third
+ * of the data.
+ *
+ * Two sources, in order:
+ *  1. `meta` from the backend's X-Result-* headers — authoritative, and immune
+ *     to the caps drifting.
+ *  2. A client-side fallback for a backend predating those headers: a FULL page
+ *     means there may be more. `serverCap` mirrors the backend constant, so the
+ *     effective limit is min(requested, cap) rather than the raw request — which
+ *     is the whole point, since asking for 1000 and receiving 200 is exactly the
+ *     case the naive `items.length >= requested` rule misses.
+ *
+ * Over-reporting on an exact boundary is the deliberate direction: one wasted
+ * page beats silently losing rows.
+ */
+export function cappedListEnvelope<T>(
+  raw: unknown,
+  opts: { requested?: number | string; serverCap: number; serverDefault: number; meta?: ListMetaLike | null }
+): ListEnvelope<T> {
+  const items = Array.isArray(raw) ? (raw as T[]) : [];
+  const requested = Number(opts.requested);
+  const asked = Number.isFinite(requested) && requested > 0 ? requested : opts.serverDefault;
+  const effective = Math.min(asked, opts.serverCap);
+  const truncated = opts.meta?.truncated === true || items.length >= effective;
+  return listEnvelope(items, truncated ? { truncated: true } : undefined);
+}
+
+/** Structural mirror of the client's ListMeta, kept here so envelopes.ts stays a leaf. */
+export interface ListMetaLike {
+  truncated?: boolean;
+  limit?: number;
+  maxLimit?: number;
+}
+
 export function toListEnvelope<T>(raw: unknown): ListEnvelope<T> {
   const items = Array.isArray(raw) ? (raw as T[]) : [];
   return listEnvelope(items);

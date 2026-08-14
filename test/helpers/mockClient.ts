@@ -20,6 +20,7 @@ export type MockApiClient = ApiClient & {
   patch: Mock;
   delete: Mock;
   getCurrentToken: Mock;
+  getLastListMeta: Mock;
 };
 
 /**
@@ -30,7 +31,7 @@ export type MockApiClient = ApiClient & {
  */
 export type MockApiClientOverrides = Partial<
   Record<
-    "get" | "post" | "put" | "patch" | "delete" | "getCurrentToken",
+    "get" | "post" | "put" | "patch" | "delete" | "getCurrentToken" | "getLastListMeta",
     Mock | ReturnType<typeof vi.fn>
   >
 > & { endpoint?: string };
@@ -49,6 +50,10 @@ export function mockApiClient(overrides?: MockApiClientOverrides): MockApiClient
     patch: vi.fn(),
     delete: vi.fn(),
     getCurrentToken: vi.fn(),
+    // Defaults to null = "no truncation header on the last response", which is
+    // both the common case and what an older backend sends — so every existing
+    // test exercises the CLIENT-SIDE fallback path (fb#605).
+    getLastListMeta: vi.fn(() => null),
     ...overrides,
   } as unknown as MockApiClient;
 }

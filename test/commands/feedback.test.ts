@@ -1364,3 +1364,32 @@ describe("feedback resolve — the note is positional too (fb#583)", () => {
     expect(mockClient.put).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * fb#605: the single-status path never set `truncated`. `--limit 1000 --all`
+ * returned 200 rows of 604 and looked like the whole table — a sweep over every
+ * row would have reported itself complete having seen the newest fifth. The
+ * multi-status merge path below it had guarded this all along.
+ */
+describe("ib feedback list — the 200-row cap is reported (fb#605)", () => {
+  test("THE BUG: --all --limit 1000 returns a capped page and now says so", async () => {
+    get.mockResolvedValueOnce(Array.from({ length: 200 }, (_, i) => ({ feedbackId: i })));
+    const out = await runFeedbackList(mockClient, { all: true, limit: 1000 });
+    // 200 never equals the requested 1000, which is why comparing against the
+    // RAW request missed it; the effective limit is min(requested, cap).
+    expect(out.truncated).toBe(true);
+    expect(out.count).toBe(200);
+  });
+
+  test("a default-sized full page is truncated too", async () => {
+    get.mockResolvedValueOnce(Array.from({ length: 50 }, (_, i) => ({ feedbackId: i })));
+    const out = await runFeedbackList(mockClient, { all: true });
+    expect(out.truncated).toBe(true);
+  });
+
+  test("a short page stays quiet — no false alarm on the ordinary read", async () => {
+    get.mockResolvedValueOnce([{ feedbackId: 1 }, { feedbackId: 2 }]);
+    const out = await runFeedbackList(mockClient, { all: true, limit: 50 });
+    expect(out.truncated).toBeUndefined();
+  });
+});

@@ -1,4 +1,5 @@
 import type { CommandError } from "../output/help.js";
+import { looksLikeHtml } from "./htmlErrorBody.js";
 
 /** The locally-raised half of {@link CommandError}. */
 type ClientCommandError = Extract<CommandError, { origin: "client" }>;
@@ -184,6 +185,16 @@ export function hintForError(
       // ROUTE_NOT_FOUND catch-all (their unmatched routes still 404 without a code).
       return "not found — no such resource; if it IS tenant-scoped, check the active company with `ib auth whoami`. (On a current backend an undeployed endpoint instead returns code \"ROUTE_NOT_FOUND\"; older backends omit it, so a 404 there can still mean not-deployed — check `ib version`.)";
     default:
+      // An HTML body on a 5xx did not come from the API — Cloudflare replaces an
+      // origin 5xx with its own page and discards the JSON, and serves the same
+      // page when the origin is briefly unreachable (fb#577). So the generic
+      // remedy below is actively WRONG here: it sends the caller to --verbose
+      // and to file a backend bug, i.e. to debug an application the request
+      // most likely never reached. `ib version` would then report the app
+      // healthy, which reads as a mystery rather than as the answer.
+      if (err.statusCode >= 500 && looksLikeHtml(err.body)) {
+        return "this came from the EDGE (a proxy interstitial), not the application — the request most likely never reached the backend. Retry: it is usually transient. Confirm with `ib version` before assuming an app fault, and use --verbose to see the raw page.";
+      }
       if (err.statusCode >= 500) return "backend error — retry with --verbose; if it persists, file `ib dev feedback create --kind bug`";
       return null;
   }
