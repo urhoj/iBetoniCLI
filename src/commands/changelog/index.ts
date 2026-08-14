@@ -622,6 +622,11 @@ export function warnIfPatchIgnored(
  *    — it is the correction path when the FIRST link was wrong — but anyone
  *    following the row afterwards lands on the follow-up instead of the fix, and
  *    the only way to notice was to go and look (fb#366).
+ * 1b. LINK KEPT — the mirror of 1: under `--no-resolve` the row was already owned
+ *    by another entry, so the link was LEFT there and this entry is a plain
+ *    cross-reference. Worth saying precisely because the old behaviour was the
+ *    opposite (it took the link and reported a relink, fb#548) — a caller who
+ *    remembers that would otherwise go "restore" a link that never moved.
  * 2. NOT RESOLVED — the link did not close the row, because its status was set
  *    deliberately (a `reviewed` legal draft awaiting activation) or because
  *    --no-resolve was passed. Worth saying, since linking a row normally DOES
@@ -637,7 +642,8 @@ export function warnFeedbackLinkEffects(
   warn: (msg: string) => void = warnNote
 ): void {
   if (!result || typeof result !== "object") return;
-  const { relinkedFrom, feedbackStatus, feedbackLinked, changelogId } = result as Record<string, unknown>;
+  const { relinkedFrom, linkKeptBy, feedbackStatus, feedbackLinked, changelogId } =
+    result as Record<string, unknown>;
   if (feedbackLinked === false)
     warn(
       `[ib] ⚠ --feedback named a row that does not exist — cl#${changelogId} was created but NOTHING was linked. ` +
@@ -647,6 +653,11 @@ export function warnFeedbackLinkEffects(
     warn(
       `[ib] note: that feedback row was already resolved by cl#${relinkedFrom}; cl#${changelogId} now owns the link. ` +
         `If you meant to cross-reference rather than re-resolve, restore it with \`ib dev changelog update ${relinkedFrom} --feedback <id>\`.`
+    );
+  if (typeof linkKeptBy === "number")
+    warn(
+      `[ib] note: that feedback row is still resolved by cl#${linkKeptBy} — --no-resolve left the link there, and cl#${changelogId} is recorded as a cross-reference only. ` +
+        `Nothing to restore. To make cl#${changelogId} the resolver instead, re-run without --no-resolve (or \`ib dev changelog update ${changelogId} --feedback <id>\`).`
     );
   if (typeof feedbackStatus === "string")
     warn(
@@ -1032,7 +1043,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         name: "no-resolve",
         type: "boolean",
         description:
-          "Record the --feedback link WITHOUT any status change, for work that is staged but not shipped, or for one tranche of a deliberately long-running item — several entries can then reference the same row and it stays open until you close it yourself (fb#441). Requires --feedback. The auto-resolution note reads `Related:` instead of `Shipped:`.",
+          "Record the --feedback link WITHOUT any status change, for work that is staged but not shipped, or for one tranche of a deliberately long-running item — several entries can then reference the same row and it stays open until you close it yourself (fb#441). Requires --feedback. The auto-resolution note reads `Related:` instead of `Shipped:`. NON-DESTRUCTIVE by contract (fb#548): if the row is ALREADY resolved by another entry, that entry keeps both the link and its `Shipped:` note and this one is recorded as a cross-reference (echoed as `linkKeptBy`) — so cross-referencing another session's shipped fix cannot steal its credit. Only an unowned row gets the link.",
       },
       {
         name: "sentry",
@@ -1114,6 +1125,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       "--feedback on a row that is ALREADY resolved TAKES the link from the earlier entry. That is intended (it is how a wrong first link gets corrected), but a row's work often spans several entries — a fix, then a follow-up, a revert, a doc pass — so a cross-reference silently becomes the sole resolver and a reader following the feedback row lands on the follow-up instead of the fix. The response now carries `relinkedFrom` and stderr names the displaced entry; restore it with `ib dev changelog update <thatId> --feedback <id>` (fb#366).",
       "DEPLOY-GATED (fb#366): `relinkedFrom` and its stderr note come from a later puminet5api version. Against an older backend the re-link still happens and is still SILENT — check the row with `ib dev feedback get <id>` after linking an already-resolved one.",
       "DEPLOY-GATED (fb#441/fb#517): --no-resolve, the preserve-a-set-status rule, and the `feedbackStatus` echo all need a later puminet5api version. Against an older backend --no-resolve is dropped as an unknown body key and the row is force-flipped to applied ANYWAY, silently — i.e. the exact outcome the flag exists to prevent. Verify with `ib dev feedback get <id>` after linking, and reset with `ib dev feedback resolve <id> --status reviewed` if it flipped.",
+      "DEPLOY-GATED (fb#548): --no-resolve leaving an ALREADY-RESOLVED row's link with its current owner (and echoing `linkKeptBy`) needs a later puminet5api version still. Against a backend without it, --no-resolve suppresses the status change but TAKES the link anyway and reports `relinkedFrom` — the prior entry silently loses the credit. Restore it with `ib dev changelog update <priorId> --feedback <id>`.",
       "Developer-gated.",
     ],
     seeAlso: ["ib dev changelog report", "ib dev feedback resolve"],
@@ -1300,7 +1312,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         name: "no-resolve",
         type: "boolean",
         description:
-          "Record the --feedback link WITHOUT any status change — the cross-reference form, for one tranche of a long-running item (fb#441). Requires --feedback.",
+          "Record the --feedback link WITHOUT any status change — the cross-reference form, for one tranche of a long-running item (fb#441). Requires --feedback. Never displaces an existing resolver: an already-owned row keeps its link and `Shipped:` note, echoed as `linkKeptBy` (fb#548).",
       },
       {
         name: "sentry",
@@ -1325,7 +1337,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     mutates: true,
     dryRunKind: "client",
     outputShape:
-      "entry & { relinkedFrom? } | { dryRun, wouldUpdate: { id, patch } }. `relinkedFrom` appears only when --feedback took the link from a row already resolved by a DIFFERENT entry (see the flag).",
+      "entry & { relinkedFrom?, linkKeptBy? } | { dryRun, wouldUpdate: { id, patch } }. `relinkedFrom` appears only when --feedback took the link from a row already resolved by a DIFFERENT entry; `linkKeptBy` is its mirror — under --no-resolve the prior resolver KEPT the link and this entry is a cross-reference (see the flags).",
     errors: [
       {
         http: 403,

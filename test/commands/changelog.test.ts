@@ -1116,6 +1116,48 @@ describe("warnFeedbackLinkEffects — the link did not close the row (fb#517/fb#
   });
 });
 
+// fb#548 — the mirror of the fb#366 relink note. --no-resolve used to suppress
+// the STATUS change but take the LINK anyway, so cross-referencing a follow-up
+// onto another session's already-shipped fix stole its credit and reported
+// `relinkedFrom`. The backend now leaves the link put and echoes `linkKeptBy`.
+describe("warnFeedbackLinkEffects — the link stayed with its owner (fb#548)", () => {
+  test("says the link did NOT move, and does not send the caller off to restore it", () => {
+    const warn = vi.fn();
+    warnFeedbackLinkEffects({ changelogId: 1284, linkKeptBy: 1276 }, warn);
+    expect(warn).toHaveBeenCalledTimes(1);
+    const msg = warn.mock.calls[0][0];
+    expect(msg).toMatch(/still resolved by cl#1276/);
+    expect(msg).toMatch(/cross-reference only/);
+    expect(msg).toMatch(/Nothing to restore/);
+    // Must NOT read as the fb#366 relink note — that would have the caller
+    // "repair" a link that never moved, swapping the problem back and forth.
+    expect(msg).not.toMatch(/now owns the link/);
+  });
+
+  test("offers the way to become the resolver, for a caller who did mean to take it", () => {
+    const warn = vi.fn();
+    warnFeedbackLinkEffects({ changelogId: 1284, linkKeptBy: 1276 }, warn);
+    expect(warn.mock.calls[0][0]).toMatch(/changelog update 1284 --feedback/);
+  });
+
+  test("relinkedFrom and linkKeptBy are mutually exclusive in practice, but both render", () => {
+    // The backend emits exactly one; assert the renderer keeps them distinct
+    // rather than collapsing to whichever it checks first.
+    const warn = vi.fn();
+    warnFeedbackLinkEffects({ changelogId: 1284, relinkedFrom: 1276 }, warn);
+    expect(warn.mock.calls[0][0]).toMatch(/now owns the link/);
+    warn.mockClear();
+    warnFeedbackLinkEffects({ changelogId: 1284, linkKeptBy: 1276 }, warn);
+    expect(warn.mock.calls[0][0]).toMatch(/still resolved by/);
+  });
+
+  test("ignores a non-numeric linkKeptBy rather than printing 'cl#undefined'", () => {
+    const warn = vi.fn();
+    warnFeedbackLinkEffects({ changelogId: 1284, linkKeptBy: null }, warn);
+    expect(warn).not.toHaveBeenCalled();
+  });
+});
+
 describe("normalizeSeverity — one flag name, two different ladders (fb#359)", () => {
   test("passes the canonical Finnish urgency values through", () => {
     for (const v of ["Kriittinen", "Korkea", "Normaali", "Matala"]) {

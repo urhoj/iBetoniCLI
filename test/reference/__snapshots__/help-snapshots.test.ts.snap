@@ -2012,7 +2012,7 @@ FLAGS
   --vtag STRING    Version tag (max 200 chars)
   --bump-level STRING    App version bump this implies: none|patch|minor|major (default: patch)
   --feedback NUMBER    cliFeedback id this entry resolves — points resolvedByChangelogId here and advances the row to applied. The status only advances FROM \`open\`: a deliberately-set status (\`reviewed\` = draft saved, awaiting human activation) is preserved and reported on stderr, because "an entry exists" and "the change is live" are different facts (fb#517). If the row was ALREADY resolved by another entry, this TAKES the link (the correction path for a wrong first link) and says so on stderr; any hand-written resolution note is preserved (fb#366).
-  --no-resolve    Record the --feedback link WITHOUT any status change, for work that is staged but not shipped, or for one tranche of a deliberately long-running item — several entries can then reference the same row and it stays open until you close it yourself (fb#441). Requires --feedback. The auto-resolution note reads \`Related:\` instead of \`Shipped:\`.
+  --no-resolve    Record the --feedback link WITHOUT any status change, for work that is staged but not shipped, or for one tranche of a deliberately long-running item — several entries can then reference the same row and it stays open until you close it yourself (fb#441). Requires --feedback. The auto-resolution note reads \`Related:\` instead of \`Shipped:\`. NON-DESTRUCTIVE by contract (fb#548): if the row is ALREADY resolved by another entry, that entry keeps both the link and its \`Shipped:\` note and this one is recorded as a cross-reference (echoed as \`linkKeptBy\`) — so cross-referencing another session's shipped fix cannot steal its credit. Only an unowned row gets the link.
   --sentry STRING    Sentry issue short id or URL this entry fixes (stored, not sent to Sentry)
   --source STRING    Source: human (default) | routine (automated AI-routine entry)
   --date DATE    Entry date (YYYY-MM-DD|today)
@@ -2050,6 +2050,7 @@ NOTES
   - --feedback on a row that is ALREADY resolved TAKES the link from the earlier entry. That is intended (it is how a wrong first link gets corrected), but a row's work often spans several entries — a fix, then a follow-up, a revert, a doc pass — so a cross-reference silently becomes the sole resolver and a reader following the feedback row lands on the follow-up instead of the fix. The response now carries \`relinkedFrom\` and stderr names the displaced entry; restore it with \`ib dev changelog update <thatId> --feedback <id>\` (fb#366).
   - DEPLOY-GATED (fb#366): \`relinkedFrom\` and its stderr note come from a later puminet5api version. Against an older backend the re-link still happens and is still SILENT — check the row with \`ib dev feedback get <id>\` after linking an already-resolved one.
   - DEPLOY-GATED (fb#441/fb#517): --no-resolve, the preserve-a-set-status rule, and the \`feedbackStatus\` echo all need a later puminet5api version. Against an older backend --no-resolve is dropped as an unknown body key and the row is force-flipped to applied ANYWAY, silently — i.e. the exact outcome the flag exists to prevent. Verify with \`ib dev feedback get <id>\` after linking, and reset with \`ib dev feedback resolve <id> --status reviewed\` if it flipped.
+  - DEPLOY-GATED (fb#548): --no-resolve leaving an ALREADY-RESOLVED row's link with its current owner (and echoing \`linkKeptBy\`) needs a later puminet5api version still. Against a backend without it, --no-resolve suppresses the status change but TAKES the link anyway and reports \`relinkedFrom\` — the prior entry silently loses the credit. Restore it with \`ib dev changelog update <priorId> --feedback <id>\`.
   - Developer-gated.
 
 SEE ALSO
@@ -2330,7 +2331,7 @@ FLAGS
   --vtag STRING    Version tag (max 200 chars)
   --bump-level STRING    Correct the app version bump this entry implies: none|patch|minor|major. NO default — omitting it leaves the recorded level untouched. Refused once the entry is RELEASED (has a versionTag).
   --feedback NUMBER    cliFeedback id this entry resolves — sets resolvedByChangelogId back to this entry and advances the row to applied, but only FROM \`open\`; a deliberately-set status is preserved and reported (fb#517). Taking the link from a prior resolver is noted on stderr and echoed as \`relinkedFrom\`; a hand-written resolution note is preserved (fb#366).
-  --no-resolve    Record the --feedback link WITHOUT any status change — the cross-reference form, for one tranche of a long-running item (fb#441). Requires --feedback.
+  --no-resolve    Record the --feedback link WITHOUT any status change — the cross-reference form, for one tranche of a long-running item (fb#441). Requires --feedback. Never displaces an existing resolver: an already-owned row keeps its link and \`Shipped:\` note, echoed as \`linkKeptBy\` (fb#548).
   --sentry STRING    Sentry issue short id or URL this entry fixes (stored, not sent to Sentry)
   --source STRING    Source: human|routine
   --date DATE    Entry date (YYYY-MM-DD|today)
@@ -2347,7 +2348,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  entry & { relinkedFrom? } | { dryRun, wouldUpdate: { id, patch } }. \`relinkedFrom\` appears only when --feedback took the link from a row already resolved by a DIFFERENT entry (see the flag).
+  entry & { relinkedFrom?, linkKeptBy? } | { dryRun, wouldUpdate: { id, patch } }. \`relinkedFrom\` appears only when --feedback took the link from a row already resolved by a DIFFERENT entry; \`linkKeptBy\` is its mirror — under --no-resolve the prior resolver KEPT the link and this entry is a cross-reference (see the flags).
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
