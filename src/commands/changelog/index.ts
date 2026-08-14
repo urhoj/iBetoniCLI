@@ -1365,7 +1365,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
         name: "feedback",
         type: "string",
         description:
-          "cliFeedback id(s) this entry relates to — a single id or a comma-separated list (`541,542,544`), each optionally `fb#`-anchored. Each is recorded in devChangelogFeedback with role `resolves` (default) or `references` (--no-resolve), and a `resolves` link advances the row to applied. The status only advances FROM `open`: a deliberately-set status (`reviewed` = draft awaiting activation) is preserved and reported on stderr (fb#517), and so is a deliberately REOPENED `open` row (fb#576). If a row was ALREADY resolved by another entry, a `resolves` link TAKES it (the correction path) and says so on stderr; any hand-written resolution note is preserved (fb#366).",
+          "cliFeedback id(s) this entry relates to — a single id or a comma-separated list (`541,542,544`), each optionally `fb#`-anchored. Each is recorded in devChangelogFeedback with role `resolves` (default) or `references` (--no-resolve). Recording a link here NEVER changes the row's status (fb#578) — `update` is the CORRECTION path, so it repairs a displaced link and leaves the status to you; close a row with `ib dev feedback resolve <id> --status applied`. (`changelog add` is what reports shipped work, and it is the command that advances a row.) If a row was ALREADY resolved by another entry, a `resolves` link TAKES it (the correction path) and says so on stderr; any hand-written resolution note is preserved (fb#366), and so is an auto `Shipped:` note on a row left open — that note is what marks the row as deliberately REOPENED (fb#576/fb#587).",
       },
       {
         name: "no-resolve",
