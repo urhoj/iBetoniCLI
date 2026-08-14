@@ -29,7 +29,7 @@ import { readJsonInput } from "../../api/parseBody.js";
 import { writeJson, failWith, failUsage, failValidation, warnNote } from "../../output/json.js";
 import type { FlagProblem } from "../../output/validationEnvelope.js";
 import { resolveDate } from "../../dates.js";
-import { parseRefId, assertEnum, intFlag } from "../../targets.js";
+import { parseRefId, assertEnum, intFlag, intCsvFlag } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { COORDINATED as COORDINATED_REPOS, normalizeRepoCsv } from "./repos.js";
 import { jsonAction, guarded } from "../_shared/action.js";
@@ -129,7 +129,8 @@ export interface ChangelogAddBody {
   commitShas?: string;
   versionTag?: string;
   bumpLevel?: string;
-  feedbackId?: number;
+  /** fb#576: a single --feedback id, OR a CSV of several, one link per id. */
+  feedbackId?: number | number[];
   /** Not a column: the backend reads it as a link option. Sent only as `false`, by --no-resolve (fb#441). */
   resolveFeedback?: boolean;
   sentryIssue?: string;
@@ -504,6 +505,7 @@ const READ_SHAPE_KEY_ALIASES: Record<string, string> = {
   commitShas: "sha",
   versionTag: "vtag",
   feedbackId: "feedback",
+  feedbackIds: "feedback", // fb#576: the read shape now emits the plural too
   sentryIssue: "sentry",
   entryDate: "date",
 };
@@ -526,8 +528,12 @@ const CHANGELOG_FROM_JSON: FromJsonConfig = {
   // --from-json for its prose can still pass --no-resolve on argv alongside it.
   nonPayload: new Set(["fromJson", "dryRun", "idempotencyKey", "reason", "help", "resolve"]),
   readShapeAliases: READ_SHAPE_KEY_ALIASES,
-  numericFields: new Set(["feedback"]),
-  csvFields: new Set(["files", "repo", "sha", "commit"]),
+  numericFields: new Set([]),
+  // fb#576: --feedback is now CSV (a single id or several); csvFields is the
+  // shape the shared --from-json pipeline uses for a flag whose JSON form is a
+  // string or an array of strings — see normalizeFeedbackIds below for why that
+  // still needs a second parse pass once it lands on `o.feedback`.
+  csvFields: new Set(["files", "repo", "sha", "commit", "feedback"]),
 };
 
 /** Changelog's key map — the shared {@link sharedPayloadKeyMap} with {@link CHANGELOG_FROM_JSON}. */
@@ -610,6 +616,23 @@ export function warnIfPatchIgnored(
 }
 
 /**
+ * Normalize `o.feedback` into `number[]` after the --from-json merge (fb#576).
+ *
+ * An EXPLICIT `--feedback` flag already arrives as `number[]` — Commander ran
+ * {@link intCsvFlag} at parse time. But `--from-json`'s shared csvFields
+ * handling (`_shared/fromJson.ts`) has no idea a field is meant to end up
+ * numeric: it only knows how to produce a CSV STRING (pass a JSON string
+ * through unchanged, or join a JSON array-of-strings with commas) — the same
+ * treatment `files`/`repo`/`sha` get. So post-merge, `o.feedback` is either
+ * already `number[]` (CLI-typed) or a raw CSV string (JSON-supplied), and the
+ * string form still needs the same anchor-aware parse the flag itself uses.
+ */
+function normalizeFeedbackIds(v: unknown): number[] | undefined {
+  if (v === undefined) return undefined;
+  return Array.isArray(v) ? (v as number[]) : intCsvFlag("--feedback")(String(v));
+}
+
+/**
  * Warn on stderr about what `--feedback` did to the row beyond linking it.
  *
  * Two side effects the caller did not ask for, both previously invisible in a
@@ -642,28 +665,41 @@ export function warnFeedbackLinkEffects(
   warn: (msg: string) => void = warnNote
 ): void {
   if (!result || typeof result !== "object") return;
-  const { relinkedFrom, linkKeptBy, feedbackStatus, feedbackLinked, changelogId } =
-    result as Record<string, unknown>;
-  if (feedbackLinked === false)
-    warn(
-      `[ib] ⚠ --feedback named a row that does not exist — cl#${changelogId} was created but NOTHING was linked. ` +
-        `Check the id with \`ib dev feedback get <id>\`, then attach it with \`ib dev changelog update ${changelogId} --feedback <id>\`.`
-    );
-  if (typeof relinkedFrom === "number")
-    warn(
-      `[ib] note: that feedback row was already resolved by cl#${relinkedFrom}; cl#${changelogId} now owns the link. ` +
-        `If you meant to cross-reference rather than re-resolve, restore it with \`ib dev changelog update ${relinkedFrom} --feedback <id>\`.`
-    );
-  if (typeof linkKeptBy === "number")
-    warn(
-      `[ib] note: that feedback row is still resolved by cl#${linkKeptBy} — --no-resolve left the link there, and cl#${changelogId} is recorded as a cross-reference only. ` +
-        `Nothing to restore. To make cl#${changelogId} the resolver instead, re-run without --no-resolve (or \`ib dev changelog update ${changelogId} --feedback <id>\`).`
-    );
-  if (typeof feedbackStatus === "string")
-    warn(
-      `[ib] note: cl#${changelogId} is linked to that feedback row, but the row was left at \`${feedbackStatus}\` — NOT marked applied. ` +
-        `A status set deliberately is preserved (only \`open\` auto-advances). Close it with \`ib dev feedback resolve <id> --status applied\` once the change is actually live.`
-    );
+  const row = result as Record<string, unknown>;
+  const { changelogId } = row;
+  // A backend without fb#576 sends the outcome keys at the top level; a rebuilt
+  // one sends feedbackLinks (one entry per --feedback id). Reading both keeps
+  // the CLI useful across the deploy window in BOTH directions.
+  const links = Array.isArray(row.feedbackLinks)
+    ? (row.feedbackLinks as Array<Record<string, unknown>>)
+    : [{ feedbackId: row.feedbackId, ...row }];
+
+  for (const l of links) {
+    const { relinkedFrom, linkKeptBy, feedbackStatus, feedbackLinked, feedbackId } = l;
+    // Only name the row when there is a row to name — the legacy single-link
+    // shape may not carry the id at all.
+    const at = typeof feedbackId === "number" ? `fb#${feedbackId}: ` : "";
+    if (feedbackLinked === false)
+      warn(
+        `[ib] ⚠ ${at}--feedback named a row that does not exist — cl#${changelogId} was created but NOTHING was linked for it. ` +
+          `Check the id with \`ib dev feedback get <id>\`, then attach it with \`ib dev changelog update ${changelogId} --feedback <id>\`.`
+      );
+    if (typeof relinkedFrom === "number")
+      warn(
+        `[ib] note: ${at}that feedback row was already resolved by cl#${relinkedFrom}; cl#${changelogId} now owns the link. ` +
+          `If you meant to cross-reference rather than re-resolve, restore it with \`ib dev changelog update ${relinkedFrom} --feedback <id>\`.`
+      );
+    if (typeof linkKeptBy === "number")
+      warn(
+        `[ib] note: ${at}that feedback row is still resolved by cl#${linkKeptBy} — --no-resolve left the link there, and cl#${changelogId} is recorded as a cross-reference only. ` +
+          `Nothing to restore. To make cl#${changelogId} the resolver instead, re-run without --no-resolve (or \`ib dev changelog update ${changelogId} --feedback <id>\`).`
+      );
+    if (typeof feedbackStatus === "string")
+      warn(
+        `[ib] note: ${at}cl#${changelogId} is linked to that feedback row, but the row was left at \`${feedbackStatus}\` — NOT marked applied. ` +
+          `A status set deliberately is preserved (only \`open\` auto-advances, and a REOPENED row does not). Close it with \`ib dev feedback resolve <id> --status applied\` once the change is actually live.`
+      );
+  }
 }
 
 export function registerChangelogCommands(
@@ -703,7 +739,7 @@ export function registerChangelogCommands(
       .option("--commit <csv>")
       .option("--vtag <s>")
       .option("--bump-level <l>", "", "patch")
-      .option("--feedback <id>", "", intFlag("--feedback"))
+      .option("--feedback <ids>", "", intCsvFlag("--feedback"))
       .option("--no-resolve")
       .option("--sentry <ref>")
       .option("--source <s>")
@@ -715,7 +751,7 @@ export function registerChangelogCommands(
   ).action(
     guarded(async (
       description: string | undefined,
-      o: Record<string, string> & WriteFlags & { feedback?: number; resolve?: boolean; vtag?: string; bumpLevel?: string; fromJson?: string },
+      o: Record<string, string> & WriteFlags & { feedback?: number[]; resolve?: boolean; vtag?: string; bumpLevel?: string; fromJson?: string },
       cmd: Command
     ) => {
       applyFromJson(cmd, o as Record<string, unknown>);
@@ -766,7 +802,7 @@ export function registerChangelogCommands(
       }
       if (o.sha) body.commitShas = o.sha;
       if (o.vtag) body.versionTag = o.vtag;
-      if (o.feedback !== undefined) body.feedbackId = o.feedback;
+      if (o.feedback !== undefined) body.feedbackId = normalizeFeedbackIds(o.feedback);
       // Only sent when --no-resolve was actually passed: Commander defaults
       // `resolve` to true, and shipping that default would make every add assert a
       // resolve intent it never expressed.
@@ -855,7 +891,7 @@ export function registerChangelogCommands(
       // --status Deployed` would silently rewrite a deliberate `minor` back to
       // `patch` and mis-drive the next deploy. Absent flag = field untouched.
       .option("--bump-level <l>")
-      .option("--feedback <id>", "", intFlag("--feedback"))
+      .option("--feedback <ids>", "", intCsvFlag("--feedback"))
       .option("--no-resolve")
       .option("--sentry <ref>")
       .option("--source <s>")
@@ -864,7 +900,7 @@ export function registerChangelogCommands(
       .option(
         "--from-json <file>"
       )
-  ).action(guarded(async (idStr: string, o: Record<string, string> & WriteFlags & { vtag?: string; bumpLevel?: string; feedback?: number; resolve?: boolean; fromJson?: string }, cmd: Command) => {
+  ).action(guarded(async (idStr: string, o: Record<string, string> & WriteFlags & { vtag?: string; bumpLevel?: string; feedback?: number[]; resolve?: boolean; fromJson?: string }, cmd: Command) => {
     const id = parseRefId(idStr, "changelog", "update");
     applyFromJson(cmd, o as Record<string, unknown>);
     if (o.type !== undefined) o.type = normalizeType(o.type)!;
@@ -901,7 +937,7 @@ export function registerChangelogCommands(
     if (o.vtag) patch.versionTag = o.vtag;
     if (o.date) patch.entryDate = resolveDate(o.date)!;
     if (o.bumpLevel !== undefined) patch.bumpLevel = o.bumpLevel;
-    if (o.feedback !== undefined) patch.feedbackId = o.feedback;
+    if (o.feedback !== undefined) patch.feedbackId = normalizeFeedbackIds(o.feedback);
     if (o.resolve === false) patch.resolveFeedback = false;
     if (o.sentry) patch.sentryIssue = normalizeSentryRef(o.sentry);
     const updLang = normalizeLanguage(o.language);
@@ -1035,15 +1071,15 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       { name: "bump-level", type: "string", default: "patch", allowed: BUMP_LEVELS, description: "App version bump this implies: none|patch|minor|major" },
       {
         name: "feedback",
-        type: "number",
+        type: "string",
         description:
-          "cliFeedback id this entry resolves — points resolvedByChangelogId here and advances the row to applied. The status only advances FROM `open`: a deliberately-set status (`reviewed` = draft saved, awaiting human activation) is preserved and reported on stderr, because \"an entry exists\" and \"the change is live\" are different facts (fb#517). If the row was ALREADY resolved by another entry, this TAKES the link (the correction path for a wrong first link) and says so on stderr; any hand-written resolution note is preserved (fb#366).",
+          "cliFeedback id(s) this entry relates to — a single id or a comma-separated list (`541,542,544`), each optionally `fb#`-anchored. Each is recorded in devChangelogFeedback with role `resolves` (default) or `references` (--no-resolve), and a `resolves` link advances the row to applied. The status only advances FROM `open`: a deliberately-set status (`reviewed` = draft awaiting activation) is preserved and reported on stderr (fb#517), and so is a deliberately REOPENED `open` row (fb#576). If a row was ALREADY resolved by another entry, a `resolves` link TAKES it (the correction path) and says so on stderr; any hand-written resolution note is preserved (fb#366).",
       },
       {
         name: "no-resolve",
         type: "boolean",
         description:
-          "Record the --feedback link WITHOUT any status change, for work that is staged but not shipped, or for one tranche of a deliberately long-running item — several entries can then reference the same row and it stays open until you close it yourself (fb#441). Requires --feedback. The auto-resolution note reads `Related:` instead of `Shipped:`. NON-DESTRUCTIVE by contract (fb#548): if the row is ALREADY resolved by another entry, that entry keeps both the link and its `Shipped:` note and this one is recorded as a cross-reference (echoed as `linkKeptBy`) — so cross-referencing another session's shipped fix cannot steal its credit. Only an unowned row gets the link.",
+          "Record the link(s) with role `references` instead of `resolves`: no status change, and an already-resolved row keeps its resolver (fb#548). Applies to EVERY id in the list — the flag describes the ENTRY (\"this records staged work\"), not individual rows. For a mixed entry, add the resolving ids first and cross-reference the rest with a second `changelog update ... --no-resolve`.",
       },
       {
         name: "sentry",
@@ -1073,7 +1109,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     mutates: true,
     outputShape:
-      "{ changelogId, relinkedFrom?, feedbackStatus?, feedbackLinked? } | { dryRun, wouldCreate, validation }. `relinkedFrom` appears only when --feedback named a row already resolved by a DIFFERENT entry, and carries that entry's id. `feedbackStatus` appears only when the link did NOT close the row, and carries the status it was left at (a preserved `reviewed`, or `open` under --no-resolve). `feedbackLinked: false` means --feedback named an id that does not exist — the ENTRY was still created, only the link failed (fb#543). Each also emits a one-line note on stderr.",
+      "{ changelogId, feedbackLinks: [{ feedbackId, role, relinkedFrom?, linkKeptBy?, feedbackStatus?, feedbackLinked? }] } | { dryRun, wouldCreate, validation }. One entry per --feedback id, in the order given. `role` is `resolves` or `references`. `relinkedFrom` carries the entry a `resolves` link took the row from; `linkKeptBy` is its mirror under --no-resolve; `feedbackStatus` appears only when the link did NOT close the row; `feedbackLinked: false` means that id does not exist — the ENTRY was still created, only that link failed (fb#543). For a SINGLE id these keys are also mirrored to the top level, for compatibility with CLI builds predating fb#576. Each emits a one-line note on stderr, prefixed with its fb# id.",
     errors: [
       {
         http: 403,
@@ -1126,6 +1162,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       "DEPLOY-GATED (fb#366): `relinkedFrom` and its stderr note come from a later puminet5api version. Against an older backend the re-link still happens and is still SILENT — check the row with `ib dev feedback get <id>` after linking an already-resolved one.",
       "DEPLOY-GATED (fb#441/fb#517): --no-resolve, the preserve-a-set-status rule, and the `feedbackStatus` echo all need a later puminet5api version. Against an older backend --no-resolve is dropped as an unknown body key and the row is force-flipped to applied ANYWAY, silently — i.e. the exact outcome the flag exists to prevent. Verify with `ib dev feedback get <id>` after linking, and reset with `ib dev feedback resolve <id> --status reviewed` if it flipped.",
       "DEPLOY-GATED (fb#548): --no-resolve leaving an ALREADY-RESOLVED row's link with its current owner (and echoing `linkKeptBy`) needs a later puminet5api version still. Against a backend without it, --no-resolve suppresses the status change but TAKES the link anyway and reports `relinkedFrom` — the prior entry silently loses the credit. Restore it with `ib dev changelog update <priorId> --feedback <id>`.",
+      "DEPLOY-GATED (fb#576): a comma-separated --feedback list, the `role` split, and the `feedbackLinks` echo need a later puminet5api version. Against an older backend a CSV is rejected by validation as a non-integer — a clean exit 4, not a silent single link. Also note the behaviour change once it IS deployed: --no-resolve on a row nobody has resolved yet now leaves resolvedByChangelogId NULL and records a `references` link, where it previously claimed the link for want of anywhere else to record the reference.",
       "Developer-gated.",
     ],
     seeAlso: ["ib dev changelog report", "ib dev feedback resolve"],
@@ -1304,15 +1341,15 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       },
       {
         name: "feedback",
-        type: "number",
+        type: "string",
         description:
-          "cliFeedback id this entry resolves — sets resolvedByChangelogId back to this entry and advances the row to applied, but only FROM `open`; a deliberately-set status is preserved and reported (fb#517). Taking the link from a prior resolver is noted on stderr and echoed as `relinkedFrom`; a hand-written resolution note is preserved (fb#366).",
+          "cliFeedback id(s) this entry relates to — a single id or a comma-separated list (`541,542,544`), each optionally `fb#`-anchored. Each is recorded in devChangelogFeedback with role `resolves` (default) or `references` (--no-resolve), and a `resolves` link advances the row to applied. The status only advances FROM `open`: a deliberately-set status (`reviewed` = draft awaiting activation) is preserved and reported on stderr (fb#517), and so is a deliberately REOPENED `open` row (fb#576). If a row was ALREADY resolved by another entry, a `resolves` link TAKES it (the correction path) and says so on stderr; any hand-written resolution note is preserved (fb#366).",
       },
       {
         name: "no-resolve",
         type: "boolean",
         description:
-          "Record the --feedback link WITHOUT any status change — the cross-reference form, for one tranche of a long-running item (fb#441). Requires --feedback. Never displaces an existing resolver: an already-owned row keeps its link and `Shipped:` note, echoed as `linkKeptBy` (fb#548).",
+          "Record the link(s) with role `references` instead of `resolves`: no status change, and an already-resolved row keeps its resolver (fb#548). Applies to EVERY id in the list — the flag describes the ENTRY (\"this records staged work\"), not individual rows. For a mixed entry, add the resolving ids first and cross-reference the rest with a second `changelog update ... --no-resolve`.",
       },
       {
         name: "sentry",
@@ -1337,7 +1374,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
     mutates: true,
     dryRunKind: "client",
     outputShape:
-      "entry & { relinkedFrom?, linkKeptBy? } | { dryRun, wouldUpdate: { id, patch } }. `relinkedFrom` appears only when --feedback took the link from a row already resolved by a DIFFERENT entry; `linkKeptBy` is its mirror — under --no-resolve the prior resolver KEPT the link and this entry is a cross-reference (see the flags).",
+      "entry & { feedbackLinks: [{ feedbackId, role, relinkedFrom?, linkKeptBy?, feedbackStatus?, feedbackLinked? }] } | { dryRun, wouldUpdate: { id, patch } }. One entry per --feedback id, in the order given. `role` is `resolves` or `references`. `relinkedFrom` carries the entry a `resolves` link took the row from; `linkKeptBy` is its mirror under --no-resolve; `feedbackStatus` appears only when the link did NOT close the row; `feedbackLinked: false` means that id does not exist. For a SINGLE id these keys are also mirrored to the top level, for compatibility with CLI builds predating fb#576. Each emits a one-line note on stderr, prefixed with its fb# id.",
     errors: [
       {
         http: 403,
@@ -1381,6 +1418,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       "--feedback also marks that cliFeedback row applied and sets resolvedByChangelogId back to this entry — the only way to re-establish a link lost to delete + re-add (`ib dev feedback resolve` sets status/resolution but not the link).",
       "DEPLOY-GATED (fb#441/fb#517): --no-resolve and the preserve-a-set-status rule need a later puminet5api version. Against an older backend --no-resolve is dropped as an unknown body key and the row is force-flipped to applied ANYWAY, silently. Verify with `ib dev feedback get <id>` after linking.",
       "DEPLOY-GATED: --bump-level/--feedback/--sentry became editable in a later puminet5api version. Against an older backend the PUT succeeds and echoes the row unchanged; the CLI compares the echo and warns on stderr rather than letting the edit vanish silently.",
+      "DEPLOY-GATED (fb#576): a comma-separated --feedback list, the `role` split, and the `feedbackLinks` echo need a later puminet5api version. Against an older backend a CSV is rejected by validation as a non-integer — a clean exit 4, not a silent single link. Also note the behaviour change once it IS deployed: --no-resolve on a row nobody has resolved yet now leaves resolvedByChangelogId NULL and records a `references` link, where it previously claimed the link for want of anywhere else to record the reference.",
     ],
     seeAlso: ["ib dev changelog pending", "ib dev changelog get"],
     examples: [

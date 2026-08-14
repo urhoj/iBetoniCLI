@@ -67,6 +67,15 @@ export function normalizeFromJson(json, keys, cfg = {}) {
                 out[key] = value.map((v) => v.trim()).filter(Boolean).join(",");
             continue;
         }
+        // A csv field that happens to hold a single NUMERIC element (e.g. --feedback,
+        // fb#576) round-trips a JSON number too — the natural shape when the JSON was
+        // templated off a read row whose column is itself a number (changelog list's
+        // feedbackId). A bare number is otherwise indistinguishable from every other
+        // wrong-typed value below, so it needs its own branch ahead of that check.
+        if (csv.has(key) && typeof value === "number" && Number.isFinite(value)) {
+            out[key] = String(value);
+            continue;
+        }
         if (typeof value !== "string") {
             problems.push(`"${rawKey}" must be a string${csv.has(key) ? " or an array of strings" : ""} (got ${Array.isArray(value) ? "array" : typeof value})`);
             continue;

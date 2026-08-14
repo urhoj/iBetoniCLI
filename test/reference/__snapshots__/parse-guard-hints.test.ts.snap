@@ -21,16 +21,32 @@ ib betoni laatu list --asiakas <id>
   ! --asiakas must be an integer >= 1
   > (no hint)
 
-ib changelog add --feedback <id>
-  ! --feedback must be an integer >= 1
+ib changelog add --feedback <ids>
+  ! --feedback must be an integer >= 1 (empty element in "")
+  > (no hint)
+
+ib changelog add --feedback <ids>
+  ! --feedback must be an integer >= 1 (got "-5")
+  > (no hint)
+
+ib changelog add --feedback <ids>
+  ! --feedback must be an integer >= 1 (got "abc")
   > (no hint)
 
 ib changelog list --feedback <id>
   ! --feedback must be an integer >= 1
   > (no hint)
 
-ib changelog update --feedback <id>
-  ! --feedback must be an integer >= 1
+ib changelog update --feedback <ids>
+  ! --feedback must be an integer >= 1 (empty element in "")
+  > (no hint)
+
+ib changelog update --feedback <ids>
+  ! --feedback must be an integer >= 1 (got "-5")
+  > (no hint)
+
+ib changelog update --feedback <ids>
+  ! --feedback must be an integer >= 1 (got "abc")
   > (no hint)
 
 ib company switch --to <asiakasId>
@@ -41,16 +57,32 @@ ib customer merge --owner <id>
   ! --owner must be an integer >= 1
   > --owner takes an ownerAsiakasId (an integer) — omit it entirely to read the active company, or resolve one with \`ib company list\`
 
-ib dev changelog add --feedback <id>
-  ! --feedback must be an integer >= 1
+ib dev changelog add --feedback <ids>
+  ! --feedback must be an integer >= 1 (empty element in "")
+  > (no hint)
+
+ib dev changelog add --feedback <ids>
+  ! --feedback must be an integer >= 1 (got "-5")
+  > (no hint)
+
+ib dev changelog add --feedback <ids>
+  ! --feedback must be an integer >= 1 (got "abc")
   > (no hint)
 
 ib dev changelog list --feedback <id>
   ! --feedback must be an integer >= 1
   > (no hint)
 
-ib dev changelog update --feedback <id>
-  ! --feedback must be an integer >= 1
+ib dev changelog update --feedback <ids>
+  ! --feedback must be an integer >= 1 (empty element in "")
+  > (no hint)
+
+ib dev changelog update --feedback <ids>
+  ! --feedback must be an integer >= 1 (got "-5")
+  > (no hint)
+
+ib dev changelog update --feedback <ids>
+  ! --feedback must be an integer >= 1 (got "abc")
   > (no hint)
 
 ib jerry admin onboarding log --time <iso>

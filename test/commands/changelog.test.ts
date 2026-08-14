@@ -1,4 +1,4 @@
-import { test, expect, vi, beforeEach, describe } from "vitest";
+import { test, it, expect, vi, beforeEach, describe } from "vitest";
 import { mockApiClient } from "../helpers/mockClient.js";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
@@ -9,6 +9,7 @@ import { readJsonInput } from "../../src/api/parseBody.js";
 import type { ChangelogAddBody } from "../../src/commands/changelog/index.js";
 import { writeFlagsToHeaders } from "../../src/api/writeFlags.js";
 import type { ValidationEnvelope } from "../../src/output/validationEnvelope.js";
+import { intCsvFlag } from "../../src/targets.js";
 
 const client = mockApiClient();
 
@@ -451,8 +452,10 @@ describe("changelog add --no-resolve (fb#441/fb#517)", () => {
   }
 
   test("sends resolveFeedback:false so the row keeps its status", async () => {
+    // fb#576: --feedback is now CSV-typed, so even a single id arrives as
+    // number[] — was toBe(416).
     const body = await addWith(["--feedback", "416", "--no-resolve"]);
-    expect(body.feedbackId).toBe(416);
+    expect(body.feedbackId).toEqual([416]);
     expect(body.resolveFeedback).toBe(false);
   });
 
@@ -850,7 +853,9 @@ describe("changelog add/update --from-json (fb#300)", () => {
         type: "improvement", area: "cli", title: 'argv-safe "changelog add"',
         description, entryDate: "2026-08-05", repo: "betonicli",
         files: JSON.stringify(["src/commands/changelog/index.ts"]),
-        feedbackId: 300, bumpLevel: "none",
+        // fb#576: --feedback is now CSV-typed, so even a JSON-supplied bare
+        // number is normalized to number[] — was feedbackId: 300.
+        feedbackId: [300], bumpLevel: "none",
       },
       { headers: {} }
     );
@@ -979,9 +984,11 @@ describe("changelog update — bumpLevel/feedback/sentry (fb#303)", () => {
   test("--feedback and --sentry reach the patch, the Sentry ref normalized", async () => {
     asPut().mockResolvedValue({ changelogId: 386, feedbackId: 303 });
     await parse(["386", "--feedback", "303", "--sentry", "https://x.sentry.io/issues/PUMINET5API-1A2/"]);
+    // fb#576: --feedback is now CSV-typed, so even a single id arrives as
+    // number[] — was feedbackId: 303.
     expect(asPut()).toHaveBeenCalledWith(
       "/api/changelog/386",
-      { feedbackId: 303, sentryIssue: "PUMINET5API-1A2" },
+      { feedbackId: [303], sentryIssue: "PUMINET5API-1A2" },
       expect.any(Object)
     );
   });
@@ -1256,9 +1263,13 @@ describe("payloadKeyMap accepts the READ shape as input (fb#357)", () => {
       feedbackId: 357, sentryIssue: "IB-1", entryDate: "2026-08-07",
     };
     const out = normalizeChangelogJson(row, addKeys());
+    // fb#576: --feedback is now CSV-typed (a single id or several), so this
+    // layer normalizes a numeric feedbackId column to its CSV-STRING form —
+    // same as sha/vtag above — and the action parses it into number[] downstream
+    // (see normalizeFeedbackIds), same as an explicit --feedback flag would be.
     expect(out).toMatchObject({
       sha: "abc123", vtag: "betonicli@1.1.12",
-      feedback: 357, sentry: "IB-1", date: "2026-08-07",
+      feedback: "357", sentry: "IB-1", date: "2026-08-07",
     });
   });
 
@@ -1280,5 +1291,79 @@ describe("payloadKeyMap accepts the READ shape as input (fb#357)", () => {
     // so entryDate must NOT resolve to a flag update cannot apply.
     expect(update.get("commitShas")).toBe("sha");
     expect(update.has("entryDate")).toBe(update.has("date"));
+  });
+});
+
+/**
+ * fb#576: --feedback became multi-valued, so every per-link warning has to name
+ * the id it belongs to — otherwise three links produce three unattributable
+ * notes and the caller cannot tell which row was relinked.
+ */
+describe("intCsvFlag", () => {
+  it("parses a single id", () => {
+    expect(intCsvFlag("--feedback")("541")).toEqual([541]);
+  });
+  it("parses a CSV in order", () => {
+    expect(intCsvFlag("--feedback")("541,542,544")).toEqual([541, 542, 544]);
+  });
+  it("tolerates whitespace", () => {
+    expect(intCsvFlag("--feedback")(" 541 , 542 ")).toEqual([541, 542]);
+  });
+  it("strips an fb# anchor per element, so the house style keeps working", () => {
+    expect(intCsvFlag("--feedback")("fb#541,542")).toEqual([541, 542]);
+  });
+  it("exits 4 on a malformed element rather than dropping it", () => {
+    expect(() => intCsvFlag("--feedback")("541,abc")).toThrow(/must be an integer/);
+  });
+  it("exits 4 on a cl# anchor — the wrong ref type", () => {
+    expect(() => intCsvFlag("--feedback")("cl#1281")).toThrow();
+  });
+});
+
+describe("warnFeedbackLinkEffects — per-id", () => {
+  it("prefixes each note with its feedback id, in input order", () => {
+    const msgs: string[] = [];
+    warnFeedbackLinkEffects(
+      {
+        changelogId: 1281,
+        feedbackLinks: [
+          { feedbackId: 541, role: "resolves" },
+          { feedbackId: 542, role: "resolves", relinkedFrom: 1054 },
+          { feedbackId: 544, feedbackLinked: false },
+        ],
+      },
+      (m) => msgs.push(m)
+    );
+    expect(msgs).toHaveLength(2);
+    expect(msgs[0]).toContain("fb#542");
+    expect(msgs[0]).toContain("cl#1054");
+    expect(msgs[1]).toContain("fb#544");
+    expect(msgs[1]).toContain("NOTHING was linked");
+  });
+
+  it("reports linkKeptBy per id under --no-resolve", () => {
+    const msgs: string[] = [];
+    warnFeedbackLinkEffects(
+      { changelogId: 1284, feedbackLinks: [{ feedbackId: 539, role: "references", linkKeptBy: 1276 }] },
+      (m) => msgs.push(m)
+    );
+    expect(msgs[0]).toContain("fb#539");
+    expect(msgs[0]).toContain("cl#1276");
+  });
+
+  it("still reads the legacy top-level shape, so an older backend keeps warning", () => {
+    const msgs: string[] = [];
+    warnFeedbackLinkEffects({ changelogId: 1062, relinkedFrom: 1054 }, (m) => msgs.push(m));
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toContain("cl#1054");
+  });
+
+  it("says nothing on a clean multi-link", () => {
+    const msgs: string[] = [];
+    warnFeedbackLinkEffects(
+      { changelogId: 1281, feedbackLinks: [{ feedbackId: 541, role: "resolves" }] },
+      (m) => msgs.push(m)
+    );
+    expect(msgs).toHaveLength(0);
   });
 });

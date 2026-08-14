@@ -109,6 +109,41 @@ export function intFlag(
 }
 
 /**
+ * Commander argParser: a comma-separated list of integers >= min; exit 4 on ANY
+ * malformed element (fb#576). The CSV sibling of {@link intFlag}.
+ *
+ * An element shaped like an anchor (`fb#541`, `cl#1281`, letters followed by an
+ * optional separator and digits) goes through {@link parseRefId}, so the house
+ * `fb#` prefix keeps working per element — `--feedback fb#541,542` is the
+ * natural way to write it — and a `cl#` anchor is caught here (wrong ref type)
+ * rather than silently linking the wrong table. Anything else is parsed as a
+ * bare integer directly, so a typo like "abc" reports THIS flag's own
+ * `must be an integer` wording instead of parseRefId's `invalid feedbackId`.
+ *
+ * A bad element voids the WHOLE list: linking two of three ids and reporting
+ * success is the silent-partial-write class this CLI's validation exists to
+ * prevent, and the response has no shape that could say which two landed.
+ */
+export function intCsvFlag(
+  flag: string,
+  min = 1
+): (value: string) => number[] {
+  return (value: string) => {
+    const parts = (value ?? "").split(",");
+    return parts.map((p) => {
+      const s = p.trim();
+      if (!s) failWith(`${flag} must be an integer >= ${min} (empty element in "${value}")`, 4);
+      if (/^[a-z]+[#:_-]?\d+$/i.test(s)) return parseRefId(s, "feedback", "get");
+      const n = Number(s);
+      if (!Number.isSafeInteger(n) || n < min) {
+        failWith(`${flag} must be an integer >= ${min} (got "${s}")`, 4);
+      }
+      return n;
+    });
+  };
+}
+
+/**
  * Commander argParser: finite number within `[min, max]`; exit 4 otherwise. The
  * FLOAT sibling of {@link intFlag}, for the values that are genuinely fractional
  * — coordinates, metres — and so cannot use the integer guard.
