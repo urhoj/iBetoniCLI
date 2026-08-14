@@ -8,7 +8,10 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("performImpersonate", () => {
   test("POSTs to /api/auth/impersonate with personId and returns the token", async () => {
-    const fetchMock = vi.fn(async () =>
+    // Declare the fetch signature so `mock.calls[0]` is the [input, init] tuple
+    // rather than `[]` — a paramless `vi.fn()` makes every call-arg assertion
+    // an out-of-bounds index.
+    const fetchMock = vi.fn(async (..._args: Parameters<typeof fetch>) =>
       new Response(JSON.stringify({ token: "IMP" }), { status: 200, headers: { "content-type": "application/json" } }),
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -21,7 +24,10 @@ describe("performImpersonate", () => {
   });
 
   test("sends email when given instead of personId", async () => {
-    const fetchMock = vi.fn(async () =>
+    // Declare the fetch signature so `mock.calls[0]` is the [input, init] tuple
+    // rather than `[]` — a paramless `vi.fn()` makes every call-arg assertion
+    // an out-of-bounds index.
+    const fetchMock = vi.fn(async (..._args: Parameters<typeof fetch>) =>
       new Response(JSON.stringify({ token: "IMP" }), { status: 200, headers: { "content-type": "application/json" } }),
     );
     vi.stubGlobal("fetch", fetchMock);

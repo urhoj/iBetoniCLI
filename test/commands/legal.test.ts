@@ -501,7 +501,13 @@ describe("resolveTypeNameTarget (accept dual-target, feedback #32)", () => {
 });
 
 describe("assertDeveloperClaims", () => {
-  const CLAIMS: DecodedClaims = { personId: 5, ownerAsiakasId: 10, isSystemAdmin: false, isDeveloper: false };
+  // isActiveCompanyAdmin/companies were added to DecodedClaims later and this
+  // fixture never followed (fb#487). Both fail-closed here: not an admin, no
+  // switch targets — the shape a short/absent token decodes to.
+  const CLAIMS: DecodedClaims = {
+    personId: 5, ownerAsiakasId: 10,
+    isSystemAdmin: false, isDeveloper: false, isActiveCompanyAdmin: false, companies: [],
+  };
   test("non-dev throws exit-3", () => {
     expect(() => assertDeveloperClaims(CLAIMS)).toThrowError();
   });

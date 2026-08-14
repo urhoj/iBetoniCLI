@@ -39,7 +39,7 @@ function fake(path: string, opts: Record<string, unknown> = {}): Command {
   const parts = path.split(" ");
   let parent: FakeCmd | null = null;
   for (const p of parts.slice(0, -1)) {
-    const prev = parent;
+    const prev: FakeCmd | null = parent;
     parent = { name: () => p, parent: prev, opts: () => ({}) };
   }
   const leaf: FakeCmd = { name: () => parts[parts.length - 1], parent, opts: () => opts };

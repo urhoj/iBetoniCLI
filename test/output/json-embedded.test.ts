@@ -1,11 +1,16 @@
 import { describe, test, expect, vi } from "vitest";
-import { runEmbedded, type EmbeddedCtx } from "../../src/embedded.js";
+import { runEmbedded, makeEmbeddedCtx, type EmbeddedCtx } from "../../src/embedded.js";
 import { writeJson, exitWithError, setExitCode } from "../../src/output/json.js";
 import { CliError } from "../../src/api/errors.js";
 import { runReferenceDump } from "../../src/reference/dump.js";
 
-function ctx(): EmbeddedCtx {
-  return { token: "t", endpoint: "x", readOnly: false, outputMode: "json", activeCommandErrors: null, stdout: [], stderr: [], exitCode: null };
+// Built through the factory, never as a literal (fb#487): this helper used to
+// declare `: EmbeddedCtx` while omitting listColumns/tier/commandPath (and later
+// projectionColumns), which is a compile error anywhere in src/ but was invisible
+// here — and an incomplete ctx does not fail loudly, it falls through to module
+// state inside embedded mode.
+function ctx(seed: Partial<EmbeddedCtx> = {}): EmbeddedCtx {
+  return makeEmbeddedCtx({ token: "t", endpoint: "x", tier: "developer", ...seed });
 }
 
 describe("json.ts embedded routing", () => {
@@ -55,7 +60,7 @@ describe("json.ts embedded routing", () => {
   // concurrent non-embedded write stays unprojected.
   test("--columns projection is ctx-scoped in embedded mode", async () => {
     const spy = vi.spyOn(process.stdout, "write").mockReturnValue(true);
-    const c = { ...ctx(), projectionColumns: ["a"] } as EmbeddedCtx;
+    const c = ctx({ projectionColumns: ["a"] });
     await runEmbedded(c, async () => writeJson({ a: 1, b: 2 }));
     expect(c.stdout.join("")).toBe('{"a":1}\n');
     writeJson({ a: 1, b: 2 });

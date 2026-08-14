@@ -3,7 +3,26 @@ import {
   buildAsiakasCreateBody,
   extractAsiakasId,
   buildAsiakasUpdateBody,
+  type CustomerFlat,
 } from "../../src/commands/customer/index.js";
+import type { PrhCompany } from "../../src/prh.js";
+
+/**
+ * One PRH fixture builder, so a field added to `PrhCompany` is filled in ONE
+ * place. Every literal here used to be spelled out per test and had silently
+ * drifted: `companySituations` (the dead-customer signal — KONK/SELTILA/SANE)
+ * was added to the interface and to none of them.
+ */
+const prhCompany = (over: Partial<PrhCompany> = {}): PrhCompany => ({
+  businessId: "0145937-9",
+  name: "PRH Name",
+  tradeNames: [],
+  address: null,
+  companyForm: null,
+  status: "active",
+  companySituations: [],
+  ...over,
+});
 
 describe("buildAsiakasCreateBody", () => {
   test("injects ownerAsiakasId and maps flags to createY columns", () => {
@@ -21,10 +40,7 @@ describe("buildAsiakasCreateBody", () => {
   });
 
   test("precedence: --body > explicit flags > PRH prefill", () => {
-    const prh = {
-      businessId: "0145937-9", name: "PRH Name", tradeNames: [], address: null,
-      companyForm: null, status: "active",
-    };
+    const prh = prhCompany();
     const body = buildAsiakasCreateBody(
       { name: "Flag Name", body: '{"asiakasNimi":"Body Name"}' },
       1349,
@@ -36,21 +52,17 @@ describe("buildAsiakasCreateBody", () => {
   });
 
   test("does not prefill the 'Unknown' PRH name sentinel as asiakasNimi", () => {
-    const prh = {
-      businessId: "0145937-9", name: "Unknown", tradeNames: [], address: null,
-      companyForm: null, status: "active",
-    };
+    const prh = prhCompany({ name: "Unknown" });
     const body = buildAsiakasCreateBody({}, 1349, prh);
     expect(body.yTunnus).toBe("0145937-9");
     expect("asiakasNimi" in body).toBe(false);
   });
 
   test("prefills billing address from PRH; explicit flags override", () => {
-    const prh = {
-      businessId: "0145937-9", name: "PRH Oy", tradeNames: [],
+    const prh = prhCompany({
+      name: "PRH Oy",
       address: { street: "Tehtaankatu 1", postCode: "00150", city: "Helsinki", full: "..." },
-      companyForm: null, status: "active",
-    };
+    });
     const body = buildAsiakasCreateBody({ city: "Espoo" }, 1349, prh);
     expect(body.laskutusOsoite).toBe("Tehtaankatu 1");
     expect(body.laskutusPostinumero).toBe("00150");
@@ -79,10 +91,12 @@ describe("extractAsiakasId", () => {
 });
 
 describe("buildAsiakasUpdateBody (read-merge-write, no clobber)", () => {
-  const current = {
+  // `registeredAt` was added to CustomerFlat later and this fixture never
+  // followed — invisible until test/ got a type-check lane (fb#487).
+  const current: CustomerFlat = {
     asiakasId: 26, name: "Old Oy", yTunnus: "1111111-1", type: 1,
     address: "A St", postalCode: "02100", city: "Espoo", email: "old@x.fi", phone: null,
-    contactPersonId: 777, shortName: "OldOy", comment: "note",
+    contactPersonId: 777, shortName: "OldOy", comment: "note", registeredAt: null,
   };
 
   test("seeds every setData field from current (incl. billing address) + saveGlobalAsiakas", () => {
@@ -110,11 +124,11 @@ describe("buildAsiakasUpdateBody (read-merge-write, no clobber)", () => {
   });
 
   test("--from-prh refreshes name/yTunnus/address from the registry; explicit flags still win", () => {
-    const prh = {
-      businessId: "9999999-9", name: "PRH Refreshed Oy", tradeNames: [],
+    const prh = prhCompany({
+      businessId: "9999999-9",
+      name: "PRH Refreshed Oy",
       address: { street: "Uusi katu 5", postCode: "33100", city: "Tampere", full: "..." },
-      companyForm: null, status: "active",
-    };
+    });
     const body = buildAsiakasUpdateBody(current, { city: "Override City" }, prh);
     expect(body.asiakasNimi).toBe("PRH Refreshed Oy");
     expect(body.ytunnus).toBe("9999999-9");

@@ -16,7 +16,7 @@ import { runArgv } from "../src/runArgv.js";
 describe("parser errors → JSON envelope", () => {
   let stderrSpy: ReturnType<typeof vi.spyOn>;
   let stdoutSpy: ReturnType<typeof vi.spyOn>;
-  let prevExitCode: number | string | undefined;
+  let prevExitCode: typeof process.exitCode;
 
   beforeEach(() => {
     stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
@@ -159,7 +159,7 @@ describe("parser errors → JSON envelope", () => {
   test("bare group renders its help text (not an envelope), exit 1", async () => {
     await run(["company"]);
     expect(process.exitCode).toBe(1);
-    const text = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    const text = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
     expect(text).toMatch(/SUBCOMMANDS|Usage/i);
     expect(text).not.toMatch(/"code":"USAGE"/);
   });
@@ -187,7 +187,7 @@ describe("parser errors → JSON envelope", () => {
  */
 describe("parse-time guard errors resolve the command's own ERRORS remedy", () => {
   let stderrSpy: ReturnType<typeof vi.spyOn>;
-  let prevExitCode: number | string | undefined;
+  let prevExitCode: typeof process.exitCode;
 
   beforeEach(() => {
     stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);

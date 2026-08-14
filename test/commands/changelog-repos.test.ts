@@ -78,7 +78,7 @@ describe("changelog add --repo fail-safe warning (fb#228)", () => {
     );
   };
   const failSafeWarned = () =>
-    errSpy.mock.calls.some((c) => String(c[0]).includes("fail-safe-bumps"));
+    errSpy.mock.calls.some((c: unknown[]) => String(c[0]).includes("fail-safe-bumps"));
 
   test("valid mixed CSV (2 coordinated + 1 @ibetoni passthrough) does NOT warn", async () => {
     await add("puminet7-functions-app,puminet5api,@ibetoni/prh-utils");

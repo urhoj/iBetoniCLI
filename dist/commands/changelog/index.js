@@ -1135,8 +1135,12 @@ export const CHANGELOG_SPECS = [
                 remedy: "dev token",
             },
             {
-                // ONE row per status — hintForError serves the FIRST http match, so a
-                // second 400 row here would be dead and mis-remedy the other case (fb#374).
+                // ONE row per status was once forced: hintForError served the FIRST http
+                // match, so a second 400 row was dead and mis-remedied the other case
+                // (fb#374). A second row is now possible IF it carries `match` (fb#485) —
+                // this one stays the catch-all (no `match`), and both causes it names are
+                // reported by the same backend validator, so splitting them would need a
+                // substring that reliably tells them apart.
                 http: 400,
                 exit: 4,
                 meaning: "Validation — a bad enum/language value, OR --bump-level on an already-RELEASED entry (one carrying a versionTag; that bump has already shipped)",

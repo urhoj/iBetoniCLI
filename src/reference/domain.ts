@@ -105,6 +105,11 @@ export const TOPICS: Topic[] = [
   },
   {
     id: "jerry-lifecycle",
+    // The PII-masking sentence below (masked on the provider inbox and the fan-out
+    // email, NOT on `request get --provider`) is also stated in the `ib jerry request
+    // get` spec description in reference/specs.ts — keep both in sync. Commit c37700d
+    // corrected two copies of this claim and missed THIS one, leaving the catalogue
+    // self-contradictory until a494ac5 (fb#551).
     title: "BetoniJerry RFQ lifecycle",
     body:
       "Request: draft -> open (provider inbox). Offer: draft -> pending (provider `offer send`) -> accepted (CUSTOMER `offer accept`, siblings rejected) -> confirmed (PROVIDER `offer confirm`, which BUILDS a keikka). Customer PII is masked on the provider inbox (`request list --open`) and in the fan-out email, but NOT on `request get --provider`: every matched provider sees the full lead (name, address, lat/lng, phone, email) as soon as the request is open. Use `ib jerry check-address` to debug 'no offers'.",

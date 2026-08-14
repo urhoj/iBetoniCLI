@@ -17,6 +17,10 @@ const EMPTY_GLOBAL: GlobalOptions = {
   verbose: false,
   pretty: false,
   json: false,
+  readOnly: false,
+  asiakas: null,
+  stats: false,
+  columns: null,
 };
 
 describe("createCliContext", () => {
@@ -234,5 +238,100 @@ describe("createCliContext — --endpoint differs from stored session endpoint (
     expect(mockFetch.mock.calls[1][0]).toContain("/api/auth/refresh-token");
     const creds = await createStore(file).load();
     expect(creds?.jwt).toBe("eyJfresh");
+  });
+});
+
+// feedback #484: the fb#465 diagnostic above only covered the command's own
+// request. `--endpoint <other> --company <id>` 401s EARLIER — in performSwitch,
+// which runs with the stored token before the API client (and its refresh
+// callback) exists — so that combination still got the generic "run `ib auth
+// refresh`" framing for a session that was never expired.
+describe("createCliContext — --company switch under an endpoint mismatch (feedback #484)", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "ib-ctx-484-"));
+    vi.mocked(performSwitch).mockReset();
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  async function switchUnder(global: Partial<GlobalOptions>): Promise<CliError> {
+    const file = join(dir, "credentials.json");
+    await createStore(file).save({
+      jwt: "eyJstored",
+      refreshToken: "r",
+      issuedAt: "",
+      expiresAt: "",
+      personId: 42,
+      ownerAsiakasId: 8,
+      ownerAsiakasName: "Kalle Urho Oy",
+      endpoint: "https://api.example.com",
+    });
+    try {
+      await createCliContext({
+        credentialsPath: file,
+        version: "1.0.0",
+        global: { ...EMPTY_GLOBAL, ...global },
+      });
+    } catch (e) {
+      return e as CliError;
+    }
+    throw new Error("createCliContext did not throw");
+  }
+
+  test("a switch 401 under a mismatched --endpoint names the mismatch, not an expired session", async () => {
+    vi.mocked(performSwitch).mockRejectedValue(
+      new CliError("Company switch failed: HTTP 401 Invalid Token", 401, null, 2)
+    );
+
+    const err = await switchUnder({ endpoint: "http://127.0.0.1:8080", asiakas: 1349 });
+
+    // Client-origin (statusCode 0) — locally fabricated, same contract as fb#465.
+    expect(err.statusCode).toBe(0);
+    expect(err.exitCode).toBe(2);
+    expect(err.message).toContain("--company switch");
+    expect(err.message).toContain("http://127.0.0.1:8080");
+    expect(err.message).toContain("https://api.example.com");
+    expect(err.message).toMatch(/endpoint-specific/);
+    expect(err.hint).toContain("ib auth login --endpoint http://127.0.0.1:8080");
+    expect(err.hint).toContain("mint-local-token.js");
+    // Never routed through the generic 401 remedy.
+    expect(hintForError(err, null)).toBe(err.hint);
+  });
+
+  test("a switch 401 WITHOUT an endpoint override propagates untouched", async () => {
+    vi.mocked(performSwitch).mockRejectedValue(
+      new CliError("Company switch failed: HTTP 401 Invalid Token", 401, null, 2)
+    );
+
+    const err = await switchUnder({ asiakas: 1349 });
+
+    expect(err.statusCode).toBe(401);
+    expect(err.message).not.toMatch(/endpoint-specific/);
+    expect(err.hint).toBeUndefined();
+  });
+
+  test("a normalization-equal override is NOT a mismatch — the 401 propagates untouched", async () => {
+    vi.mocked(performSwitch).mockRejectedValue(
+      new CliError("Company switch failed: HTTP 401 Invalid Token", 401, null, 2)
+    );
+
+    const err = await switchUnder({ endpoint: "https://API.example.com/", asiakas: 1349 });
+
+    expect(err.statusCode).toBe(401);
+    expect(err.message).not.toMatch(/endpoint-specific/);
+  });
+
+  test("the 403 branch still wins under a mismatch (fb#311 note is not shadowed)", async () => {
+    vi.mocked(performSwitch).mockRejectedValue(
+      new CliError("Company switch failed: HTTP 403 no access", 403, null, 3)
+    );
+
+    const err = await switchUnder({ endpoint: "http://127.0.0.1:8080", asiakas: 1349 });
+
+    expect(err.statusCode).toBe(403);
+    expect(err.message).toMatch(/MEMBER of/);
+    expect(err.hint).toBe("");
   });
 });

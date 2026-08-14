@@ -1,9 +1,9 @@
 import { describe, test, expect, vi } from "vitest";
 import { buildProgram, enableParserThrow, handleParseRejection } from "../src/program.js";
-import { runEmbedded, type EmbeddedCtx } from "../src/embedded.js";
+import { runEmbedded, makeEmbeddedCtx, type EmbeddedCtx } from "../src/embedded.js";
 
 function ctx(): EmbeddedCtx {
-  return { token: "t", endpoint: "http://127.0.0.1:9/x", readOnly: false, outputMode: "json", activeCommandErrors: null, stdout: [], stderr: [], exitCode: null };
+  return makeEmbeddedCtx({ token: "t", endpoint: "http://127.0.0.1:9/x", tier: "developer" });
 }
 
 describe("embedded parser-error routing", () => {

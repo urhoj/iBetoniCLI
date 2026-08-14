@@ -39,6 +39,14 @@ interface CommandErrorBase {
   exit: number;
   meaning: string;
   remedy: string;
+  /**
+   * Substring of the REAL error message this row documents — or several
+   * alternatives, when one row covers a family of messages (match is ANY-of,
+   * case-insensitive). Binds the row to its OWN failure instead of to any error
+   * sharing its exit code / HTTP status. Optional on both origins, but the
+   * fallback rule differs — see the two variants below.
+   */
+  match?: string | string[];
 }
 
 /**
@@ -60,39 +68,56 @@ interface CommandErrorBase {
  */
 export type CommandError =
   | (CommandErrorBase & {
-      /** HTTP status when API-originated (401/403/404/409/429/400/500). */
+      /**
+       * HTTP status when API-originated (401/403/404/409/429/400/500).
+       *
+       * Matched by status. Historically that was the WHOLE key, so a command
+       * with two different causes behind one status served the first-listed
+       * row's remedy for both — observed on `ib legal save`, where a truncation
+       * 400 ("Arvo on liian pitkä sarakkeeseen 'title'.") answered with the
+       * required-fields remedy even though every field was provided (fb#485).
+       *
+       * An optional `match` narrows a row to its own cause. Resolution order:
+       * a row whose `match` hits the message wins; otherwise the first row with
+       * NO `match` (the catch-all) wins, which is exactly the pre-fb#485
+       * behaviour, so existing specs are unaffected. If every row at the status
+       * declares `match` and none hit, the generic per-status hint is used.
+       *
+       * That last step is where http rows differ from client rows below: a
+       * server message is usually self-explanatory and the generic per-status
+       * hint is a decent floor, whereas a bare exit code says nothing. This
+       * narrows matching WITHIN a status — it must never become an exit-code
+       * fallback for HTTP errors (see the union doc above, fb#289).
+       */
       http: number;
       origin?: never;
     })
   | (CommandErrorBase & {
       http?: never;
-      /** The CLI raised this locally (guard, parse, filesystem, read-only lock). */
-      origin: "client";
       /**
-       * Substring of the REAL error message this row documents — or several
-       * alternatives, when one row covers a family of guard messages (match is
-       * ANY-of). Binds the row to its own failure instead of to any error
-       * sharing its exit code.
+       * The CLI raised this locally (guard, parse, filesystem, read-only lock).
        *
-       * Client rows are matched by exit code, and exit 4 covers nearly every
-       * local guard — so a command with two client exit-4 rows served whichever
-       * was listed FIRST to every hintless `failWith(msg, 4)` in the command.
-       * Real examples: `ib commands nosuchdomain` answered with "--mutations and
-       * --reads are mutually exclusive"; a bad `--asiakas` on `jerry
-       * check-address` answered with "pass metres ≥ 0" (feedback #305/#306).
+       * Matched by exit code, and exit 4 covers nearly every local guard — so a
+       * command with two client exit-4 rows served whichever was listed FIRST to
+       * every hintless `failWith(msg, 4)` in the command. Real examples: `ib
+       * commands nosuchdomain` answered with "--mutations and --reads are
+       * mutually exclusive"; a bad `--asiakas` on `jerry check-address` answered
+       * with "pass metres ≥ 0" (feedback #305/#306).
        *
-       * A row carrying `match` NEVER wins by exit code alone — it fires only on
-       * a real substring hit. Exit-only matching survives only for a command's
-       * single unambiguous client row. `error-origins.test.ts` enforces that
-       * client rows sharing an exit code each carry `match`, so a second
-       * ambiguous row cannot be added silently.
+       * A client row carrying `match` NEVER wins by exit code alone — it fires
+       * only on a real substring hit. Exit-only matching survives only for a
+       * command's single unambiguous client row; an ambiguous set yields NO
+       * hint, because silence beats a confidently wrong remedy and there is no
+       * useful generic exit-code hint to fall back to. `error-origins.test.ts`
+       * enforces that client rows sharing an exit code each carry `match`, so a
+       * second ambiguous row cannot be added silently.
        *
        * Note that rows documenting PARSE-level failures (excess args, unknown
        * option) are unreachable at runtime regardless: `handleParseRejection`
        * and `failValidation` build their own hint and never consult specs.
        * `match` keeps those documentation-only rows from being mis-served.
        */
-      match?: string | string[];
+      origin: "client";
     });
 
 export interface CommandArg {

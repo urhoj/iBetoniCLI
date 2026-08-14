@@ -1,5 +1,5 @@
 import { buildProgram, enableParserThrow, handleParseRejection, applySpecErrors } from "./program.js";
-import { runEmbedded } from "./embedded.js";
+import { runEmbedded, makeEmbeddedCtx } from "./embedded.js";
 import { resolveCallerTier } from "./tier.js";
 import { setAmbientCommandPath, commandPathOf } from "./commandContext.js";
 import { getGlobalOptions } from "./globals.js";
@@ -32,20 +32,12 @@ export async function runArgv(argv, opts) {
     // them ahead of the module-global ambient holders, so interleaved in-process
     // calls can never clobber each other's discovery render or X-Ib-Command
     // header. (This used to be a documented set/restore race on module globals.)
-    const ctx = {
+    const ctx = makeEmbeddedCtx({
         token: opts.token,
         endpoint: opts.endpoint,
         readOnly: opts.readOnly ?? false,
-        outputMode: "json",
-        activeCommandErrors: null,
-        listColumns: null,
-        projectionColumns: null,
         tier: resolveCallerTier(opts.token),
-        commandPath: null,
-        stdout: [],
-        stderr: [],
-        exitCode: null,
-    };
+    });
     await runEmbedded(ctx, async () => {
         try {
             await program.parseAsync(["node", "ib", ...argv]);

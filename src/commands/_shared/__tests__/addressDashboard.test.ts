@@ -77,7 +77,7 @@ describe("assembleReport", () => {
     });
     const data = r.parcel.data as {
       coords: { lat: number };
-      parcel: { palstat: Array<{ geometry?: unknown }>; rawData?: unknown };
+      parcel: { palstat: Array<{ geometry?: unknown }>; rawData?: unknown; totalAreaM2?: number };
       rawProperties?: unknown;
       nested: { rawGeometry?: unknown };
     };

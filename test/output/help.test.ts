@@ -74,7 +74,7 @@ describe("formatHelp", () => {
   });
 
   test("renders WRITE-SAFETY FLAGS block only when writeFlags is true", () => {
-    const withWrite = formatHelp({ ...sampleSpec, writeFlags: true });
+    const withWrite = formatHelp({ ...sampleSpec, writeFlags: true, dryRunKind: "server" });
     expect(withWrite).toContain("WRITE-SAFETY FLAGS");
     expect(withWrite).toContain("--dry-run");
     expect(withWrite).toContain("--idempotency-key");

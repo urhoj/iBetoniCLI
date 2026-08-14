@@ -4,19 +4,15 @@ import {
   assertPersistedSwitchAllowed,
 } from "../../src/auth/switch.js";
 import { CliError } from "../../src/api/errors.js";
-import { runEmbedded, type EmbeddedCtx } from "../../src/embedded.js";
+import { runEmbedded, makeEmbeddedCtx, type EmbeddedCtx } from "../../src/embedded.js";
 
 function embeddedCtx(readOnly = false): EmbeddedCtx {
-  return {
+  return makeEmbeddedCtx({
     token: "eyJembedded",
     endpoint: "https://api.example.test",
+    tier: "developer",
     readOnly,
-    outputMode: "json",
-    activeCommandErrors: null,
-    stdout: [],
-    stderr: [],
-    exitCode: null,
-  };
+  });
 }
 
 const mockFetch = vi.fn();

@@ -26,6 +26,8 @@ const SAMPLE: CommandSpec[] = [
     permissions: ["auth.page.vehicle.edit"],
     flags: [],
     writeFlags: true,
+    // Required alongside writeFlags:true — the CommandSpec union discriminates on it.
+    dryRunKind: "server",
     outputShape: "{}",
     errors: [],
     examples: [],

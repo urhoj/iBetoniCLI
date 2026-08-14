@@ -1,6 +1,6 @@
 import { describe, test, expect, vi } from "vitest";
 import { mockApiClient } from "../../helpers/mockClient.js";
-import type { ApiClient } from "../../../src/api/client.js";
+import type { MockApiClient, MockApiClientOverrides } from "../../helpers/mockClient.js";
 import { runDbTargetShow, runDbTargetSet } from "../../../src/commands/dev/db-target/index.js";
 
 const DEV = {
@@ -13,7 +13,7 @@ const DEV = {
   complete: true,
 };
 
-function mockClient(over: Partial<ApiClient> = {}): ApiClient {
+function mockClient(over: MockApiClientOverrides = {}): MockApiClient {
   return mockApiClient({
     get: vi.fn(async () => DEV),
     post: vi.fn(async () => ({ ...DEV, changed: true })),

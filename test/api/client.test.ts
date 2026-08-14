@@ -133,7 +133,9 @@ describe("ApiClient", () => {
       token: "x",
       version: "1.0.0",
     });
-    const err = await client.get("/api/x").catch((e) => e as Error);
+    // `<never>` on the success branch so the awaited union is just `Error` —
+    // the default `T = unknown` would swallow the catch's narrowing.
+    const err = await client.get<never>("/api/x").catch((e) => e as Error);
     expect(err.message).not.toContain("[object Object]");
     expect(err.message).toContain("WEIRD");
   });
@@ -181,7 +183,7 @@ describe("ApiClient", () => {
 
     test("a GET failing every attempt exits 7 and reports the attempt count", async () => {
       mockFetch.mockRejectedValue(new TypeError("fetch failed"));
-      const err = await client().get("/api/x").catch((e) => e as Error);
+      const err = await client().get<never>("/api/x").catch((e) => e as Error);
       expect(mockFetch).toHaveBeenCalledTimes(3); // initial + 2 retries
       expect(err.message).toContain("after 3 attempts");
     });

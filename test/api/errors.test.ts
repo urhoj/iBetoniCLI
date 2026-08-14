@@ -205,3 +205,63 @@ describe("hintForError — empty hint suppresses an HTTP row (feedback #311)", (
     expect(hintForError(err, perm403)).toBe("check auth.page.person.read");
   });
 });
+
+// fb#485 — http rows used to match by STATUS alone, so a command with two causes
+// behind one status served the first-listed remedy for both. Observed on `ib
+// legal save`: a SQL truncation 400 ("Arvo on liian pitkä sarakkeeseen 'title'.")
+// answered with "provide --type --doc-version --title and content" even though
+// every field was provided.
+describe("hintForError — http rows disambiguated by `match` (fb#485)", () => {
+  const legalSave400s = [
+    {
+      http: 400, exit: 4, match: ["liian pitkä", "string or binary data"],
+      meaning: "field too long", remedy: "shorten the field the message names",
+    },
+    { http: 400, exit: 4, meaning: "required fields missing", remedy: "provide --type --doc-version --title and content" },
+  ];
+
+  test("the matching row wins over the status catch-all", () => {
+    const err = new CliError("400 Arvo on liian pitkä sarakkeeseen 'title'.", 400, null, 4);
+    expect(hintForError(err, legalSave400s)).toBe("shorten the field the message names");
+  });
+
+  test("a message hitting no `match` falls back to the status catch-all", () => {
+    const err = new CliError("400 Required fields missing", 400, null, 4);
+    expect(hintForError(err, legalSave400s)).toBe("provide --type --doc-version --title and content");
+  });
+
+  test("matching is case-insensitive and fires on ANY array alternative", () => {
+    const err = new CliError("400 String or Binary Data would be truncated", 400, null, 4);
+    expect(hintForError(err, legalSave400s)).toBe("shorten the field the message names");
+  });
+
+  test("the catch-all is the first row with NO match, whatever the listing order", () => {
+    const reordered = [legalSave400s[1], legalSave400s[0]];
+    const err = new CliError("400 Arvo on liian pitkä sarakkeeseen 'title'.", 400, null, 4);
+    expect(hintForError(err, reordered)).toBe("shorten the field the message names");
+  });
+
+  test("a status-only spec is byte-for-byte unaffected (the pre-fb#485 contract)", () => {
+    const statusOnly = [
+      { http: 400, exit: 4, meaning: "first", remedy: "first remedy" },
+      { http: 400, exit: 4, meaning: "second", remedy: "second remedy" },
+    ];
+    const err = new CliError("400 anything at all", 400, null, 4);
+    expect(hintForError(err, statusOnly)).toBe("first remedy");
+  });
+
+  test("all rows carry `match` and none hit → the generic per-status hint, not a wrong remedy", () => {
+    const allMatched = [
+      { http: 404, exit: 5, match: "no such keikka", meaning: "a", remedy: "a remedy" },
+      { http: 404, exit: 5, match: "no such vehicle", meaning: "b", remedy: "b remedy" },
+    ];
+    const err = new CliError("404 no such worksite", 404, { code: null }, 5);
+    expect(hintForError(err, allMatched)).toMatch(/no such resource/i);
+  });
+
+  test("`match` on http rows does NOT reintroduce exit-code fallback (fb#289 guard holds)", () => {
+    // A client-origin error at the same exit code must still find no http row.
+    const err = new CliError("liian pitkä", 0, null, 4);
+    expect(hintForError(err, legalSave400s)).toBeNull();
+  });
+});

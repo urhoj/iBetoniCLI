@@ -76,7 +76,9 @@ afterEach(() => {
 
 describe("embedded invocation context", () => {
   test("getEndpoint resolves the embedded endpoint, not the host session's", async () => {
-    const fetchMock = vi.fn(async () =>
+    // Params declared so `mock.calls[0][0]` is in bounds (a paramless vi.fn()
+    // types every call as an empty tuple).
+    const fetchMock = vi.fn(async (..._args: Parameters<typeof fetch>) =>
       jsonResponse({ app: "puminet5api", version: "1.2.3", commit: "abc1234" })
     );
     vi.stubGlobal("fetch", fetchMock);

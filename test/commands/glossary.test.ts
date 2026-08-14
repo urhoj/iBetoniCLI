@@ -168,7 +168,10 @@ describe("glossary set/import JSON input", () => {
   });
 
   test("runGlossaryImport: PUTs each entry, reports ok/failed", async () => {
-    const put = vi.fn(async (p: string) => ({ term: p.split("/").pop() }));
+    // `_body` declared so `put.mock.calls[0][1]` is in bounds — a one-param
+    // vi.fn() types calls as a 1-tuple and every body assertion below is then
+    // an out-of-range index.
+    const put = vi.fn(async (p: string, _body?: unknown) => ({ term: p.split("/").pop() }));
     const res = await runGlossaryImport(
       mkClient({ put }),
       [{ term: "loma", definition: "d1", synonyms: ["lomat"] }, { definition: "no term" }],
@@ -307,7 +310,10 @@ describe("glossary assessment fields from --from-json (fb#298)", () => {
   });
 
   test("import forwards a per-entry aiConfidence — a bulk groom no longer wipes every score", async () => {
-    const put = vi.fn(async (p: string) => ({ term: p.split("/").pop() }));
+    // `_body` declared so `put.mock.calls[0][1]` is in bounds — a one-param
+    // vi.fn() types calls as a 1-tuple and every body assertion below is then
+    // an out-of-range index.
+    const put = vi.fn(async (p: string, _body?: unknown) => ({ term: p.split("/").pop() }));
     await runGlossaryImport(
       mkClient({ put }),
       [{ term: "loma", definition: "d", aiConfidence: 85, needsHumanReview: true }],

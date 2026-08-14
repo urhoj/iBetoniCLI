@@ -1,0 +1,26 @@
+// Type-check lane for test/ (fb#487).
+//
+// The build tsconfig is src-only (rootDir src, `test` excluded), which is right
+// for emit — dist must contain no test output. The side effect was that NOTHING
+// ever type-checked test/: an EmbeddedCtx literal in a test could omit a
+// required field and stay green forever, so adding `projectionColumns` for
+// fb#451 broke no build and no test while being a compile error anywhere in src.
+//
+// Same compiler options, `noEmit`, and the include widened to cover both trees.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // NOTE: do NOT add "DOM" to `lib` to satisfy a fetch-stub type in a test.
+    // DOM's fetch overloads replace undici's and reject a Node `Buffer` body,
+    // which breaks src/commands/attachment/index.ts's real upload. Stubs should
+    // derive their types from the ambient fetch instead: `Parameters<typeof
+    // fetch>[0]` / `[1]`.
+    // rootDir/outDir are emit concerns; with two source roots and no emit they
+    // would only fail the "not under rootDir" check.
+    "rootDir": ".",
+    "outDir": null
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

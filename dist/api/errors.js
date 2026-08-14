@@ -74,10 +74,34 @@ function isRouteNotFound(body) {
 function matchClientRow(err, specErrors) {
     const rows = (specErrors ?? []).filter((r) => r.origin === "client" && r.exit === err.exitCode);
     const message = err.message.toLowerCase();
-    const matched = rows.find((r) => (r.match === undefined ? [] : Array.isArray(r.match) ? r.match : [r.match]).some((m) => message.includes(m.toLowerCase())));
+    const matched = rows.find((r) => rowMatches(r, message));
     if (matched)
         return matched;
     return rows.length === 1 && rows[0].match === undefined ? rows[0] : undefined;
+}
+/** True when a row declares a `match` and any of its alternatives is in `lowerMessage`. */
+function rowMatches(row, lowerMessage) {
+    const m = row.match;
+    if (m === undefined)
+        return false;
+    return (Array.isArray(m) ? m : [m]).some((s) => lowerMessage.includes(s.toLowerCase()));
+}
+/**
+ * Pick the ERRORS row documenting THIS server-originated failure.
+ *
+ * Keyed on HTTP status — NEVER on exit code (that fallback would reach ~84
+ * client rows and mis-hint them, feedback #289). Within the status, a row whose
+ * `match` substring is in the message wins over the catch-all, so one status
+ * with two causes can carry a remedy for each (fb#485). The catch-all is the
+ * FIRST row declaring no `match`, which is byte-for-byte the old behaviour for
+ * every spec that has not adopted `match`. When every row at the status declares
+ * a `match` and none hit, no row is returned and the caller falls through to the
+ * generic per-status hint.
+ */
+function matchHttpRow(err, specErrors) {
+    const rows = (specErrors ?? []).filter((r) => r.http !== undefined && r.http === err.statusCode);
+    const message = err.message.toLowerCase();
+    return rows.find((r) => rowMatches(r, message)) ?? rows.find((r) => r.match === undefined);
 }
 /**
  * Remedy hint for an error, echoed into the stderr error envelope as `hint`.
@@ -85,11 +109,12 @@ function matchClientRow(err, specErrors) {
  * When the running command's spec ERRORS rows are supplied (resolved by the
  * bin preAction hook), the row matching this error wins: the agent gets the
  * command's OWN documented remedy (e.g. "switch to a provider company")
- * instead of a generic one. A server failure matches by HTTP status; a
- * locally-raised one (statusCode 0) goes through {@link matchClientRow}, which
- * prefers a row's `match` substring and only falls back to exit-code matching
- * when the command has a single unambiguous client row at that exit.
- * Falls back to the per-status generic hint so an
+ * instead of a generic one. A server failure goes through {@link matchHttpRow}
+ * (status, then a `match` substring to separate two causes behind one status,
+ * then the catch-all row); a locally-raised one (statusCode 0) goes through
+ * {@link matchClientRow}, which prefers a row's `match` substring and only falls
+ * back to exit-code matching when the command has a single unambiguous client
+ * row at that exit. Falls back to the per-status generic hint so an
  * agent that hasn't read --help beforehand still gets pointed at the next
  * step (most importantly the 404 deploy-gate ambiguity). `null` = no hint.
  */
@@ -113,7 +138,7 @@ export function hintForError(err, specErrors) {
     // one): an HTTP failure matches by status, a locally-raised one (statusCode 0)
     // by exit code. Never fall back to exit-matching for HTTP errors — see the
     // CommandError doc comment for why that mis-hints ~84 rows (feedback #289).
-    const httpRow = specErrors?.find((r) => r.http !== undefined && r.http === err.statusCode);
+    const httpRow = matchHttpRow(err, specErrors);
     if (httpRow?.remedy)
         return httpRow.remedy;
     const clientRow = err.statusCode === 0 ? matchClientRow(err, specErrors) : undefined;

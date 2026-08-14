@@ -10,12 +10,21 @@ import {
 import { levenshtein } from "../../src/output/unknownCommand.js";
 import type { CommandSpec } from "../../src/output/help.js";
 
-const spec = (command: string, extra: Partial<CommandSpec> = {}): CommandSpec => ({
+// `extra` deliberately cannot reach the fields the CommandSpec union
+// discriminates on (writeFlags/dryRunKind) or the required `examples` — a
+// Partial<CommandSpec> spread would re-widen them back to `| undefined` and
+// stop the literal satisfying either branch. Lint only reads command/
+// description/flags anyway.
+const spec = (
+  command: string,
+  extra: Partial<Omit<CommandSpec, "command" | "examples" | "writeFlags" | "dryRunKind">> = {}
+): CommandSpec => ({
   command,
   description: "",
   flags: [],
   outputShape: "",
   errors: [],
+  examples: [],
   ...extra,
 });
 

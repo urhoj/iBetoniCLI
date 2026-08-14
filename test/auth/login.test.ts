@@ -44,7 +44,7 @@ describe("performLogin", () => {
     // Our stubbed fetch handles the authorize preflight (fb#274) and the token
     // exchange. The simulated browser callback uses node:http directly to
     // bypass the stub and exercise the real callback listener.
-    mockFetch.mockImplementation(async (input: RequestInfo | URL) => {
+    mockFetch.mockImplementation(async (input: Parameters<typeof fetch>[0]) => {
       const urlStr = input.toString();
       if (urlStr.includes("/oauth/authorize")) {
         // Server-side success: 302 redirect to the frontend login page.
@@ -139,7 +139,7 @@ describe("performLogin", () => {
   test("fails fast when the authorize preflight returns 4xx (fb#274)", async () => {
     // fb#271 scenario: OAuth client registration missing → 400 error page that
     // previously only rendered in the browser while the CLI hung for 5 min.
-    mockFetch.mockImplementation(async (input: RequestInfo | URL) => {
+    mockFetch.mockImplementation(async (input: Parameters<typeof fetch>[0]) => {
       const urlStr = input.toString();
       if (urlStr.includes("/oauth/authorize")) {
         return new Response(
@@ -183,7 +183,7 @@ describe("performLogin", () => {
     // A slow cold-start must not block a login the browser could complete:
     // TimeoutError → warn + fail-open.
     const fakeJwt = buildFakeJwt({ personId: 42, ownerAsiakasId: 1349 });
-    mockFetch.mockImplementation(async (input: RequestInfo | URL) => {
+    mockFetch.mockImplementation(async (input: Parameters<typeof fetch>[0]) => {
       const urlStr = input.toString();
       if (urlStr.includes("/oauth/authorize")) {
         throw Object.assign(new Error("The operation timed out"), {

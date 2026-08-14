@@ -8,11 +8,17 @@ import { runChangelogAdd, runChangelogList, runChangelogReport, runChangelogGet,
 import { readJsonInput } from "../../src/api/parseBody.js";
 import type { ChangelogAddBody } from "../../src/commands/changelog/index.js";
 import { writeFlagsToHeaders } from "../../src/api/writeFlags.js";
+import type { ValidationEnvelope } from "../../src/output/validationEnvelope.js";
 
 const client = mockApiClient();
 
-/** Run a fn expected to throw and return the thrown value for structural assertions. */
-function captureThrow(fn: () => void): { exitCode?: number; body?: { problems?: Array<{ flag: string; got?: string; allowed?: string[]; synonyms?: Record<string, string> }>; sample?: string } } {
+/**
+ * Run a fn expected to throw and return the thrown value for structural
+ * assertions. Typed off the real `ValidationEnvelope`/`FlagProblem` rather than
+ * a hand-restated shape — the local copy had already drifted (no `remedy`, no
+ * `issue`), which an untyped test/ tree could not surface (fb#487).
+ */
+function captureThrow(fn: () => void): { exitCode?: number; body?: Partial<ValidationEnvelope> } {
   try {
     fn();
   } catch (e) {

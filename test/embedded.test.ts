@@ -1,8 +1,8 @@
 import { describe, test, expect } from "vitest";
-import { getEmbeddedCtx, runEmbedded, type EmbeddedCtx } from "../src/embedded.js";
+import { getEmbeddedCtx, runEmbedded, makeEmbeddedCtx, type EmbeddedCtx } from "../src/embedded.js";
 
 function freshCtx(): EmbeddedCtx {
-  return { token: "t", endpoint: "http://x", readOnly: false, outputMode: "json", activeCommandErrors: null, stdout: [], stderr: [], exitCode: null };
+  return makeEmbeddedCtx({ token: "t", endpoint: "http://x", tier: "developer" });
 }
 
 describe("embedded context", () => {

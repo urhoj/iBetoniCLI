@@ -15,7 +15,16 @@ import {
 import { writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CliError } from "../../src/api/errors.js";
+import { CliError, exitCodeFromStatus } from "../../src/api/errors.js";
+
+/**
+ * A server error shaped exactly like the client throws one. These fixtures used
+ * to pass only (message, status), leaving `exitCode` undefined - harmless for
+ * the status-keyed assertions here, but an untyped test/ tree let the arity
+ * drift go unnoticed (fb#487).
+ */
+const httpError = (message: string, status: number) =>
+  new CliError(message, status, null, exitCodeFromStatus(status));
 
 const mockClient = mockApiClient();
 
@@ -1184,7 +1193,7 @@ describe("ib feedback count", () => {
 
   test("falls back to the client-side rollup on a backend without the route", async () => {
     // Deploy-gated: degrade to the previous behaviour rather than break outright.
-    get.mockRejectedValueOnce(new CliError("Not found", 404));
+    get.mockRejectedValueOnce(httpError("Not found", 404));
     get.mockResolvedValueOnce([
       { feedbackId: 1, status: "open", kind: "improvement", scope: "cli", complexity: 2 },
       { feedbackId: 2, status: "open", kind: "bug", scope: "app", complexity: null },
@@ -1204,7 +1213,7 @@ describe("ib feedback count", () => {
   test("a permission error propagates instead of silently degrading", async () => {
     // Actionable, and the fallback call would fail identically — answering a
     // permissions problem with quietly capped numbers would be worse than an error.
-    get.mockRejectedValueOnce(new CliError("Permission denied", 403));
+    get.mockRejectedValueOnce(httpError("Permission denied", 403));
     await expect(runFeedbackCount(mockClient, {})).rejects.toMatchObject({ statusCode: 403 });
   });
 
@@ -1214,7 +1223,7 @@ describe("ib feedback count", () => {
     // the nvarchar value 'stats' to data type int" — NOT a 404. Keying the
     // fallback on 404 alone left the command hard-failing on every backend that
     // predates the route.
-    get.mockRejectedValueOnce(new CliError("Conversion failed", 500));
+    get.mockRejectedValueOnce(httpError("Conversion failed", 500));
     get.mockResolvedValueOnce([{ feedbackId: 1, status: "open", kind: "bug", scope: "cli" }]);
     const out = await runFeedbackCount(mockClient, {});
     expect(get).toHaveBeenLastCalledWith("/api/feedback?limit=200");
@@ -1228,7 +1237,7 @@ describe("ib feedback count", () => {
       kind: "bug",
       scope: "cli",
     }));
-    get.mockRejectedValueOnce(new CliError("Not found", 404));
+    get.mockRejectedValueOnce(httpError("Not found", 404));
     get.mockResolvedValueOnce(rows);
     const out = await runFeedbackCount(mockClient, {});
     expect(out.truncated).toBe(true);

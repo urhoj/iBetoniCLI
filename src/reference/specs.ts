@@ -46,12 +46,25 @@ import {
 } from "../commands/feedback/index.js";
 import { EXECUTORS as TASK_EXECUTORS, AGENTS as TASK_AGENTS } from "../commands/task/index.js";
 
-/** API error row: derive the exit code from the HTTP status. */
-const apiErr = (http: number, meaning: string, remedy: string): CommandError => ({
+/**
+ * API error row: derive the exit code from the HTTP status.
+ *
+ * `match` (optional, ANY-of) narrows the row to ONE cause behind a status that
+ * has several — `hintForError` prefers a matching row over the status's
+ * catch-all (fb#485). List the narrow rows BEFORE the catch-all for readability;
+ * order does not decide the winner, the substring hit does.
+ */
+const apiErr = (
+  http: number,
+  meaning: string,
+  remedy: string,
+  match?: string | string[]
+): CommandError => ({
   http,
   exit: exitCodeFromStatus(http),
   meaning,
   remedy,
+  ...(match === undefined ? {} : { match }),
 });
 
 /**
@@ -1867,9 +1880,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "--all-companies is an unindexed cross-tenant scan (IX_person_owner is a tenant-first index), so it is bounded server-side by --limit. Prefer --asiakas <id> when you know the company.",
     ],
     errors: authErrors(
-      // ONE 403 row on purpose: hintForError matches the FIRST row with this
-      // status, so splitting the three causes into three rows would leave two
-      // permanently unreachable (the dead-row trap of feedback #280/#289).
+      // ONE 403 row on purpose. Splitting the three causes used to leave two
+      // permanently unreachable, because hintForError served the FIRST row at a
+      // status (the dead-row trap of feedback #280/#289). Splitting is now
+      // possible if each row carries a `match` substring (fb#485) — but the
+      // backend returns the same generic 403 text for all three causes, so there
+      // is nothing to match on. The combined remedy stays the honest answer.
       apiErr(
         403,
         "Permission denied (page permission, or no access to the requested scope)",
@@ -3748,6 +3764,17 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         remedy: "shorten the version string to 20 characters or fewer",
         match: "limited to 20 characters",
       },
+      // Two causes, one status. The truncation 400 is raised by SQL Server (in
+      // Finnish, naming the column), so it can hit any nvarchar-bounded field —
+      // `title` is nvarchar(200), and a 201-char title used to answer with the
+      // required-fields remedy below even though every field WAS provided
+      // (fb#485). Listed first for readability; the substring is what wins.
+      apiErr(
+        400,
+        "A field exceeds its DB column length (SQL Server truncation error, names the column)",
+        "shorten the field the message names — title is nvarchar(200), --doc-version nvarchar(20); --notes and content are unbounded",
+        ["liian pitkä", "would be truncated", "string or binary data"]
+      ),
       apiErr(400, "Required fields missing", "provide --type --doc-version --title and content"),
       ...LEGAL_DEV_ERRORS,
     ],
@@ -4305,6 +4332,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     command: "ib jerry request get",
+    // The masking sentences at the end of this description are also stated in the
+    // `jerry-lifecycle` TOPICS entry in reference/domain.ts (served by `ib help
+    // jerry-lifecycle` and embedded in every `ib reference dump` primer) — keep both
+    // in sync. Editing THIS file is exactly where the last drift started: c37700d
+    // corrected two copies and missed domain.ts (fb#551).
     description:
       "Get one pump request. Default is the customer-owned recap (GET /api/pumppuRequests/:id, scoped to the caller's personId). --provider returns the provider-facing detail (GET /api/pumppuRequests/:id/provider-detail, requires provider role) including your own offer + attachments. This returns the FULL customer lead (name, address, lat/lng, phone, email) to every matched provider as soon as the request is open — it is NOT masked pre-acceptance. Masking applies to the `--open` inbox list and the fan-out email, not here.",
     permissions: ["--provider: provider company (isPumppuToimittaja)"],

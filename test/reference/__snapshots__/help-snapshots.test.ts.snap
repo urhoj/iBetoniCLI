@@ -6056,6 +6056,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Missing --reason / no content / --file unreadable or combined with --content / --validate-json failed → pass --file OR --content, and --reason unless --dry-run
   exit 4 (client-side)  Edit mode (--replace/--append/--prepend) resolved to a document in a DIFFERENT language than --language — Task 8's read falls back to the fi row when no active en row exists, so this refuses rather than silently publishing Finnish content tagged language:en → create the target language version with a full --file/--content save first, then retry the edit
   exit 4 (client-side)  --doc-version exceeds 20 characters (DB column legalDocuments.version is nvarchar(20)) → shorten the version string to 20 characters or fewer
+  exit 4 (HTTP 400)  A field exceeds its DB column length (SQL Server truncation error, names the column) → shorten the field the message names — title is nvarchar(200), --doc-version nvarchar(20); --notes and content are unbounded
   exit 4 (HTTP 400)  Required fields missing → provide --type --doc-version --title and content
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
