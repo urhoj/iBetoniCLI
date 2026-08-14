@@ -29,6 +29,7 @@ export const DOMAIN_OVERVIEW = "betoni.online is a concrete-delivery management 
  */
 export const DOMAIN_BLURBS = {
     keikka: "Concrete delivery/pumping orders — the central entity.",
+    betoni: "Concrete reference data: grades (betoniLaatu), additives (betoniAttr), and the fixed lookup lists. Read-only. `asiakasId 0` = the SHARED (yhteinen) rows every tenant sees; each row carries a derived `shared` boolean.",
     customer: "Customer companies you deliver to.",
     worksite: "Construction sites where concrete is delivered.",
     sijainti: "Geocoded locations — depots, plants, destinations.",

@@ -5,6 +5,22 @@ exports[`parse-time guard → hint pairing > every argParser guard resolves a hi
   ! --to must be an integer >= 1
   > (no hint)
 
+ib betoni attr get --owner <id>
+  ! --owner must be an integer >= 1
+  > (no hint)
+
+ib betoni attr list --owner <id>
+  ! --owner must be an integer >= 1
+  > (no hint)
+
+ib betoni laatu get --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > (no hint)
+
+ib betoni laatu list --asiakas <id>
+  ! --asiakas must be an integer >= 1
+  > (no hint)
+
 ib changelog add --feedback <id>
   ! --feedback must be an integer >= 1
   > (no hint)
@@ -163,15 +179,15 @@ ib sijainti closest --worksite <id>
 
 ib task add --asiakas <id>
   ! --asiakas must be an integer >= 1
-  > --title, --executor (human|ai) and --cadence (<count>/<unit>) are required (from flags or --from-json); --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
+  > --title, --executor (human|ai) and one of --cadence (<count>/<unit>) or --once are required (from flags or --from-json); --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
 
 ib task add --assignee <personId>
   ! --assignee must be an integer >= 1
-  > --title, --executor (human|ai) and --cadence (<count>/<unit>) are required (from flags or --from-json); --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
+  > --title, --executor (human|ai) and one of --cadence (<count>/<unit>) or --once are required (from flags or --from-json); --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
 
 ib task add --feedback <id>
   ! --feedback must be an integer >= 1
-  > --title, --executor (human|ai) and --cadence (<count>/<unit>) are required (from flags or --from-json); --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
+  > --title, --executor (human|ai) and one of --cadence (<count>/<unit>) or --once are required (from flags or --from-json); --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
 
 ib task list --asiakas <id>
   ! --asiakas must be an integer >= 1

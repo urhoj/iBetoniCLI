@@ -13,6 +13,9 @@ import {
   registerTaskCommands,
 } from "../../src/commands/task/index.js";
 import { payloadKeyMap } from "../../src/commands/_shared/fromJson.js";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 function mockClient(): MockApiClient {
   return mockApiClient({
@@ -162,6 +165,66 @@ describe("runTaskAdd", () => {
   });
 });
 
+// fb#534 — every task was recurring, so a genuine single-shot reminder had to be
+// dressed up as --cadence 120/month (~10 years) so completion rolled nextDueAt to
+// 2036 instead of nagging monthly. It worked, and read as a mistake.
+describe("runTaskAdd --once (fb#534)", () => {
+  test("sends cadenceUnit 'once' and NO cadenceCount", async () => {
+    await runTaskAdd(
+      client,
+      { title: "Activate Hyvinkaan Betoni", executor: "human", once: true, firstDue: "2026-11-02" },
+      { reason: "one-time activation" }
+    );
+    const body = client.post.mock.calls[0][1];
+    expect(body).toMatchObject({ cadenceUnit: "once", firstDueAt: "2026-11-02" });
+    // Inventing a count here would put a meaningless number on the wire — the
+    // 120/month problem in miniature. The backend normalizes the NOT NULL column.
+    expect(body).not.toHaveProperty("cadenceCount");
+  });
+
+  test("--once with --cadence exits 4 — a one-off has no interval", async () => {
+    await expect(
+      runTaskAdd(client, { title: "x", executor: "human", once: true, cadence: "1/month" }, {})
+    ).rejects.toThrowError(/mutually exclusive/);
+    expect(client.post).not.toHaveBeenCalled();
+  });
+
+  test("neither --once nor --cadence still exits 4, now naming both ways out", async () => {
+    await expect(
+      runTaskAdd(client, { title: "x", executor: "human" }, {})
+    ).rejects.toThrowError(/--once/);
+  });
+
+  test("--once is registered on argv, so it can ride alongside --from-json", () => {
+    // Deliberately NOT a --from-json key (fb#541 class): a valueless boolean
+    // advertised as a JSON key cannot work — `true` exits 4 and `"true"` is
+    // silently dropped, yielding a RECURRING task the caller believes is
+    // one-off. The end-to-end rejection is asserted in the --from-json block.
+    const program = new Command();
+    registerTaskCommands(program, async () => client as never);
+    const add = program.commands
+      .find((c) => c.name() === "task")!
+      .commands.find((c) => c.name() === "add")!;
+    expect(add.options.some((o) => o.long === "--once")).toBe(true);
+  });
+});
+
+describe("runTaskSet --once (fb#534 conversion path)", () => {
+  test("converts an existing task, leaving the meaningless cadenceCount alone", async () => {
+    await runTaskSet(client, 5, { once: true }, { reason: "was faking once as 120/month" });
+    const body = client.put.mock.calls[0][1];
+    expect(body).toEqual({ cadenceUnit: "once" });
+    expect(body).not.toHaveProperty("cadenceCount");
+  });
+
+  test("--once with --cadence exits 4 here too", async () => {
+    await expect(
+      runTaskSet(client, 5, { once: true, cadence: "1/month" }, {})
+    ).rejects.toThrowError(/mutually exclusive/);
+    expect(client.put).not.toHaveBeenCalled();
+  });
+});
+
 // fb#450: --from-json parity for the command whose --instructions is exactly
 // the long quote-bearing prose the JSON path exists to protect.
 describe("task add --from-json wiring (fb#450)", () => {
@@ -194,6 +257,38 @@ describe("task add --from-json wiring (fb#450)", () => {
     expect(keys.get("first-due")).toBe("firstDue");
     for (const k of ["fromJson", "dryRun", "idempotencyKey", "reason", "help"]) {
       expect(keys.has(k), k).toBe(false);
+    }
+  });
+
+  // fb#534 + fb#541: `once` is a VALUELESS boolean, so as a JSON key it can only
+  // fail — `true` exits 4 ("must be a string") and `"true"` is accepted and
+  // silently dropped, producing a recurring task the caller believes is one-off.
+  // It is excluded from the accepted keys so it is loudly rejected as unknown.
+  test("a --from-json payload naming `once` exits 4 as an unknown key, never silently dropped", async () => {
+    const file = join(tmpdir(), `ib-task-once-${process.pid}.json`);
+    writeFileSync(file, JSON.stringify({ title: "x", executor: "human", once: true }), "utf8");
+    const prevExit = process.exitCode;
+    process.exitCode = undefined;
+    const chunks: string[] = [];
+    const spy = vi.spyOn(process.stderr, "write").mockImplementation((s: unknown) => {
+      chunks.push(String(s));
+      return true;
+    });
+    try {
+      const program = new Command();
+      registerTaskCommands(program, async () => client as never);
+      await program.parseAsync(["task", "add", "--from-json", file, "--reason", "r"], { from: "user" });
+
+      expect(process.exitCode).toBe(4);
+      const envelope = JSON.parse(chunks.join("")) as { error: string };
+      expect(envelope.error).toMatch(/unknown key once/);
+      // The accepted-key list must NOT advertise it — that is the whole point.
+      expect(envelope.error).not.toMatch(/accepted:.*\bonce\b/);
+      expect(client.post).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+      process.exitCode = prevExit;
+      unlinkSync(file);
     }
   });
 });

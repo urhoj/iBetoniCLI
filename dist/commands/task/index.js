@@ -13,6 +13,18 @@ const SERVER_LIST_CAP = 200;
 // Uncapped cadenceCount only fails at COMPLETE time (SQL DATEADD overflow 517,
 // far from the bad input) — cap it where it is typed. 120 months = 10 years.
 const CADENCE_COUNT_MAX = 120;
+/**
+ * cadenceUnit for a task that runs ONCE and is then retired (active=0) rather
+ * than rolling nextDueAt forward (fb#534).
+ *
+ * Before `--once`, --cadence was REQUIRED, so a genuine single-shot reminder
+ * ("activate Hyvinkään Betoni when the non-compete lapses in Nov 2026") had to
+ * be dressed up as `--cadence 120/month` — the documented maximum, ~10 years —
+ * so completing it rolled nextDueAt to 2036 instead of nagging monthly. It
+ * worked, but read as a mistake to the next person and left a magic number with
+ * no explanation at the call site.
+ */
+const ONE_OFF_UNIT = "once";
 /** Parse "<count>/<unit>" (e.g. 1/month, 2/week) → cadence fields; exit 4 otherwise. */
 export function parseCadence(value) {
     const m = /^(\d+)\/(day|week|month)$/.exec((value ?? "").trim());
@@ -74,15 +86,25 @@ export async function runTaskAdd(client, input, flags) {
         failWith(`--executor is required and must be one of: ${EXECUTORS.join(", ")}`, 4);
     }
     assertEnum(input.agent, AGENTS, "--agent");
-    if (!input.cadence)
-        failWith("--cadence is required (e.g. 1/month)", 4);
-    const { cadenceCount, cadenceUnit } = parseCadence(input.cadence);
+    if (input.once && input.cadence) {
+        failWith("--once and --cadence are mutually exclusive — a one-off has no interval", 4);
+    }
+    if (!input.once && !input.cadence) {
+        failWith("--cadence is required (e.g. 1/month), or --once for a single-shot task", 4);
+    }
+    // A one-off sends no cadenceCount at all: the backend normalizes it (the
+    // column is NOT NULL), and inventing a value here would put a meaningless
+    // number on the wire — which is exactly the 120/month problem in miniature.
+    const cadence = input.once
+        ? { cadenceUnit: ONE_OFF_UNIT, cadenceCount: undefined }
+        : parseCadence(input.cadence);
     const body = {
         title: input.title.trim(),
         executor: input.executor,
-        cadenceUnit,
-        cadenceCount,
+        cadenceUnit: cadence.cadenceUnit,
     };
+    if (cadence.cadenceCount !== undefined)
+        body.cadenceCount = cadence.cadenceCount;
     if (input.instructions)
         body.instructions = input.instructions;
     if (input.skill)
@@ -108,7 +130,15 @@ export async function runTaskAdd(client, input, flags) {
  * the carrier flag itself are non-payload.
  */
 const ADD_FROM_JSON = {
-    nonPayload: new Set(["fromJson", "dryRun", "idempotencyKey", "reason", "help"]),
+    // `once` is excluded for the fb#541 reason: the accepted-key list is derived
+    // from the command's flags, so registering a VALUELESS boolean would advertise
+    // a JSON key that cannot work — `"once": true` exits 4 ("must be a string")
+    // and `"once": "true"` is accepted and SILENTLY DROPPED, creating a recurring
+    // task the caller believes is one-off. Advertising it is worse than omitting
+    // it: excluded here it is loudly rejected as unknown, and nothing is lost —
+    // --once takes no value, so it has no shell-quoting problem and can be passed
+    // on argv alongside --from-json.
+    nonPayload: new Set(["fromJson", "dryRun", "idempotencyKey", "reason", "help", "once"]),
     numericFields: new Set(["assignee", "asiakas", "feedback"]),
 };
 /** POST /api/tasks/:id/complete — done (default) / --skipped / --failed. */
@@ -155,7 +185,15 @@ export async function runTaskSet(client, id, input, flags) {
         body.assigneePersonId = input.assignee;
     if (input.asiakas !== undefined)
         body.asiakasId = input.asiakas;
-    if (input.cadence !== undefined) {
+    if (input.once && input.cadence !== undefined) {
+        failWith("--once and --cadence are mutually exclusive — a one-off has no interval", 4);
+    }
+    // The CONVERSION path for tasks already faking "once" as --cadence 120/month.
+    // cadenceCount is left untouched: it is meaningless for a one-off, and
+    // rewriting it would be a second write with no effect on behaviour.
+    if (input.once)
+        body.cadenceUnit = ONE_OFF_UNIT;
+    else if (input.cadence !== undefined) {
         const { cadenceCount, cadenceUnit } = parseCadence(input.cadence);
         body.cadenceUnit = cadenceUnit;
         body.cadenceCount = cadenceCount;
@@ -213,6 +251,7 @@ export function registerTaskCommands(parent, getClient, opts = {}) {
         .option("--assignee <personId>", "", intFlag("--assignee"))
         .option("--asiakas <id>", "", intFlag("--asiakas"))
         .option("--cadence <spec>")
+        .option("--once")
         .option("--first-due <date>")
         .option("--feedback <id>", "", intFlag("--feedback"))
         .option("--from-json <file>")).action(jsonAction(getClient, (client, opts, cmd) => {
@@ -235,6 +274,7 @@ export function registerTaskCommands(parent, getClient, opts = {}) {
         .option("--assignee <personId>", "", intFlag("--assignee"))
         .option("--asiakas <id>", "", intFlag("--asiakas"))
         .option("--cadence <spec>")
+        .option("--once")
         .option("--next-due <date>")
         .option("--activate")
         .option("--deactivate")).action(jsonAction(getClient, (client, idStr, opts) => runTaskSet(client, parseTaskId(idStr, "set"), opts, opts)));

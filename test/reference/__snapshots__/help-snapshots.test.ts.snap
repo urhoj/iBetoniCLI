@@ -784,6 +784,193 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib betoni attr get matches snapshot 1`] = `
+"USAGE
+  ib betoni attr get <attrId> [flags]
+
+DESCRIPTION
+  One concrete additive by attrId, scoped to an owning tenant (GET /api/betoni/attr/get/:attrId/:ownerAsiakasId). The route returns a recordset even for one row; this unwraps it.
+  Permissions: requires read access on the target ownerAsiakasId.
+
+ARGUMENTS
+  <attrId> NUMBER    attrId (the PK of betoniAttr) (required)
+
+FLAGS
+  --owner NUMBER    Owning tenant (ownerAsiakasId); default = your active company
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { attrId, attrNimike, attrSelite, attrYksikkö, hinta, betoniAsiakasId, ownerAsiakasId, shared, isEnabled, showInDropDown, ... }
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (client-side)  no such attribute for that owner → the id may belong to ANOTHER tenant — the backend does not distinguish that from 'no such row'. Cross-check with \`ib betoni attr list <betoniAsiakasId> --owner <id>\`
+  exit 4 (client-side)  no usable ownerAsiakasId on the token → pass --owner <asiakasId>, or \`ib auth switch\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  No read access to the requested ownerAsiakasId → check \`ib auth whoami\`
+
+SEE ALSO
+  ib betoni attr list
+
+EXAMPLES
+  ib betoni attr get 12
+  ib betoni attr get 12 --owner 1349
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib betoni attr list matches snapshot 1`] = `
+"USAGE
+  ib betoni attr list <betoniAsiakasId> [flags]
+
+DESCRIPTION
+  List concrete additives (betoniAttr) for one supplier under one owning tenant (GET /api/betoni/attr/list/:betoniAsiakasId/:ownerAsiakasId). Both scope columns treat 0 as "any", and the backend matches each independently.
+  Permissions: requires read access on the target ownerAsiakasId.
+
+ARGUMENTS
+  <betoniAsiakasId> NUMBER    Supplier scope (0 = any supplier) (required)
+
+FLAGS
+  --owner NUMBER    Owning tenant (ownerAsiakasId); default = your active company
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ attrId, attrNimike, attrSelite, attrYksikkö, hinta, betoniAsiakasId, ownerAsiakasId, shared, isEnabled, showInDropDown, attrShortCuts, attrHelpId, entryTime, lastModifiedTime }>
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  no usable ownerAsiakasId on the token → pass --owner <asiakasId>, or \`ib auth switch\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+  exit 3 (HTTP 403)  No read access to the requested ownerAsiakasId → you may only read a tenant you have access to — check \`ib auth whoami\`
+
+NOTES
+  - \`shared\` is true only when BOTH betoniAsiakasId AND ownerAsiakasId are 0. A row global on one axis is still scoped on the other, so a single 0 does not mean "everyone sees it".
+  - \`hinta\` is decimal(10,2) NULL — null means NO PRICE SET, which is distinct from 0.
+
+SEE ALSO
+  ib betoni attr get
+
+EXAMPLES
+  ib betoni attr list 0
+  ib betoni attr list 8 --owner 1349
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib betoni laatu get matches snapshot 1`] = `
+"USAGE
+  ib betoni laatu get <laatuId> [flags]
+
+DESCRIPTION
+  One concrete grade by laatuId. Resolved from the supplier's list rather than a get endpoint (the backend mounts no route for \`betoniLaatu.get\`), so visibility is identical to \`laatu list\` — you can only get a grade you could already list.
+  Auth: requires login (any authenticated user).
+
+ARGUMENTS
+  <laatuId> NUMBER    laatuId (the PK of betoniLaatu) (required)
+
+FLAGS
+  --asiakas NUMBER    Supplier whose catalogue to search; default = your active company
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { laatuId, laatuNimike, laatuLyhenne, laatuLaji, laatuSelite, sortNum, asiakasId, shared, isEnabled, showInDropDown, ... }
+
+ERRORS (stderr, exit non-zero)
+  exit 5 (client-side)  no such grade in the resolved catalogue → \`ib betoni laatu list\` to see it; a grade owned by ANOTHER supplier needs --asiakas <supplierId>
+  exit 4 (client-side)  no usable ownerAsiakasId on the token → pass --asiakas <supplierId>, or \`ib auth switch\`
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+
+SEE ALSO
+  ib betoni laatu list
+
+EXAMPLES
+  ib betoni laatu get 42
+  ib betoni laatu get 42 --asiakas 8
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib betoni laatu list matches snapshot 1`] = `
+"USAGE
+  ib betoni laatu list [flags]
+
+DESCRIPTION
+  List the concrete grades one supplier can offer (GET /api/betoni/laatu/list/:betoniToimittajaAsiakasId): its OWN rows plus the shared (yhteinen) ones, in sortNum order. Each row carries a derived \`shared\` boolean so the two populations the response mixes can be told apart.
+  Auth: requires login (any authenticated user).
+
+FLAGS
+  --asiakas NUMBER    Supplier (betoniToimittajaAsiakasId) whose catalogue to read; default = your active company
+  --search STRING    Client-side substring filter over laatuNimike / laatuLyhenne / laatuSelite
+  --shared-only    Only the shared (asiakasId 0) grades
+  --own-only    Only the supplier's own grades (excludes the shared ones)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  ListEnvelope<{ laatuId, laatuNimike, laatuLyhenne, laatuLaji, laatuSelite, sortNum, asiakasId, shared, isEnabled, showInDropDown, laatuAllowedS, laatuAllowedRae, laatuAllowedC, laatuShortCuts, laatuHelpId }>
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  --shared-only and --own-only both given → they name two disjoint sets — pass one, or neither for both
+  exit 4 (client-side)  no usable ownerAsiakasId on the token → pass --asiakas <supplierId>, or \`ib auth switch\`
+  exit 4 (HTTP 400)  Invalid betoniToimittajaAsiakasId → --asiakas must be a non-negative integer
+  exit 2 (HTTP 401)  Token expired          → ib auth refresh
+
+NOTES
+  - asiakasId 0 is the SHARED (yhteinen) grade pool visible to every tenant; anything else is that supplier's own. The backend returns both in one list with no marker — \`shared\` is derived client-side.
+  - Deliberately NOT restricted to your own tenant: a customer legitimately reads its SUPPLIER's catalogue, which is why the backend scopes the cache key by supplier rather than by caller.
+  - The rows come from betoniLaatuView. laatuAllowedRae/laatuAllowedS/laatuAllowedC are expressed in the vocabularies \`ib betoni reference\` returns.
+
+SEE ALSO
+  ib betoni laatu get, ib betoni reference
+
+EXAMPLES
+  ib betoni laatu list
+  ib betoni laatu list --asiakas 8 --shared-only
+  ib betoni laatu list --search rapid --pretty
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib betoni reference matches snapshot 1`] = `
+"USAGE
+  ib betoni reference [flags]
+
+DESCRIPTION
+  The four fixed concrete lookup lists — raekoko (aggregate size), lujuus (strength), notkeus (consistency), kayttoika (working life) — in ONE call. These are the vocabularies a grade's laatuAllowedRae / laatuAllowedS / laatuAllowedC fields are expressed in.
+  Auth: none (public).
+
+FLAGS
+  --kind STRING    Return only one list
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { raekoko: [...], lujuus: [...], notkeus: [...], kayttoika: [...] } — narrowed to the single key when --kind is given
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  unknown --kind value   → one of: raekoko, lujuus, notkeus, kayttoika
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Bundled rather than split into four leaves because they are read together: decoding one grade's allowed-values fields needs all four vocabularies at once.
+  - These four routes are unauthenticated reference data, cached server-side with a 2-hour TTL.
+
+SEE ALSO
+  ib betoni laatu list
+
+EXAMPLES
+  ib betoni reference
+  ib betoni reference --kind raekoko
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib commands matches snapshot 1`] = `
 "USAGE
   ib commands [<domain>] [flags]
@@ -3013,12 +3200,15 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { tables:[{name,columns}], foreignKeys:[{table,column,refTable,refColumn}], views:[{name}], procs:[{name,type,parameters}], triggers:[{name,table,timing,events,disabled}] }
+  { tables:[{name,columns}], foreignKeys:[{table,column,refTable,refColumn,disabled?,notTrusted?}], views:[{name}], procs:[{name,type,parameters}], triggers:[{name,table,timing,events,disabled}] }
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - The FK \`disabled\`/\`notTrusted\` keys are OMITTED when false, so filtering the dump's foreignKeys for either key answers "which constraints in the whole schema are not enforced" in ONE call (fb#425).
 
 EXAMPLES
   ib dev schema dump
@@ -3142,14 +3332,17 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], inboundForeignKeys:[{refTable,refColumn,column}], indexes:[{name,columns,unique}], triggers:[{name,timing,events,disabled}] }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false). precision/scale are null for non-numeric types (varchar → maxLength); a DECIMAL(5,2) reports precision 5 / scale 2, an int precision 10 / scale 0. \`triggers\` is a SUMMARY (no T-SQL) — read a body with \`ib dev schema trigger <name>\`.
+  single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn,name,disabled?,notTrusted?}], checkConstraints:[{name,column,definition,disabled?,notTrusted?}], inboundForeignKeys:[{refTable,refColumn,column}], indexes:[{name,columns,unique}], triggers:[{name,timing,events,disabled}] }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false). precision/scale are null for non-numeric types (varchar → maxLength); a DECIMAL(5,2) reports precision 5 / scale 2, an int precision 10 / scale 0. \`triggers\` is a SUMMARY (no T-SQL) — read a body with \`ib dev schema trigger <name>\`.
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Not a developer        → run \`ib auth whoami\`; if not a developer, \`ib auth login\` as a developer account (same person re-login won't grant it). Gate is server-side — a new DB flag only applies once --endpoint's backend is redeployed.
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
   exit 4 (HTTP 400)  Invalid name (letters/digits/underscore only) → use the bare object name, no schema prefix
-  exit 5 (HTTP 404)  Table not found        → check the name via \`ib dev schema tables\` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → \`ib dev schema trigger\`)
+  exit 5 (HTTP 404)  Table not found        → check the name via \`ib dev schema tables\`. The 404 disambiguates for you: when the name exists as another object CLASS it names the command that reads it (a trigger → \`ib dev schema trigger\`), and when \`<name>Id\` is some table's PRIMARY KEY it names that table (\`tuote\` → \`tuotteet\`). So a not-found on a name you are sure of means wrong COMMAND or wrong WORD, not a typo.
+
+NOTES
+  - ENFORCEMENT, not just existence (fb#425): \`disabled\` on a foreign key or CHECK means it is NOT checked on write — the constraint is inert and violating rows can land. \`notTrusted\` means it was re-enabled without a re-check, so existing rows may already violate it. BOTH KEYS ARE OMITTED WHEN FALSE, so their presence is the signal; a healthy table shows neither. Constraint state differs between environments — a dev-vs-prod FK failure is usually this.
 
 EXAMPLES
   ib dev schema table keikka
@@ -10726,7 +10919,8 @@ DESCRIPTION
 FLAGS
   --title STRING    Task title, max 200 chars (required)
   --executor STRING    human | ai (required)
-  --cadence STRING    <count>/<unit>, unit day|week|month, count 1-120, e.g. 1/month or 2/week (required)
+  --cadence STRING    <count>/<unit>, unit day|week|month, count 1-120, e.g. 1/month or 2/week. Required unless --once.
+  --once    SINGLE-SHOT task: completing it (done/skipped) retires the task (active=0) instead of rolling nextDueAt, so it is done forever. Mutually exclusive with --cadence. Pair with --first-due for a 'chase this in N months' reminder. A \`failed\` completion still leaves it due — a failed attempt has not done the thing.
   --instructions STRING    Freetext checklist for humans / prompt context for the AI runner
   --skill STRING    Workspace skill the AI runner invokes (e.g. cleanup-docs); omit for human tasks
   --agent STRING    claude | hermes — recommended AI executor tier (claude = code/advanced, hermes = light local-LLM work)
@@ -10750,14 +10944,19 @@ OUTPUT (JSON, stdout)
   { taskId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldWrite:{...} } (server-side preview).
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (client-side)  Validation             → --title, --executor (human|ai) and --cadence (<count>/<unit>) are required (from flags or --from-json); --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
+  exit 4 (client-side)  Validation             → --title, --executor (human|ai) and one of --cadence (<count>/<unit>) or --once are required (from flags or --from-json); --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - DEPLOY-GATED (fb#534): --once needs a later puminet5api version. Against an older backend it is rejected with \`cadenceUnit must be one of: day, week, month\` — a clean 400, not a silent recurring task.
+  - --once is NOT a --from-json key. It takes no value, so \`"once": true\` would exit 4 and \`"once": "true"\` would be silently dropped, creating a recurring task you believe is one-off (the fb#541 class). Pass --once on argv alongside --from-json.
 
 EXAMPLES
   ib task add --title "Open purchase invoices review" --executor human --assignee 10 --cadence 1/month --reason "monthly finance check"
   ib task add --title "Docs prune sweep" --executor ai --agent claude --skill cleanup-docs --cadence 1/month --reason "ops hygiene"
   ib task add --title "KU-oy invoice chase" --executor human --asiakas 8 --cadence 2/week --first-due tomorrow --reason "per-company cadence"
+  ib task add --title "Activate Hyvinkaan Betoni (non-compete lapses)" --executor human --once --first-due 2026-11-02 --reason "one-time activation"
 "
 `;
 
@@ -10931,7 +11130,8 @@ FLAGS
   --agent STRING    claude | hermes ("" clears)
   --assignee NUMBER    New assignee personId
   --asiakas NUMBER    New company scope (asiakasId)
-  --cadence STRING    <count>/<unit>, unit day|week|month, count 1-120
+  --cadence STRING    <count>/<unit>, unit day|week|month, count 1-120. Mutually exclusive with --once.
+  --once    Convert to a SINGLE-SHOT task (cadenceUnit=once): completion retires it instead of rolling nextDueAt. This is the conversion path for a task already faking 'once' as --cadence 120/month. cadenceCount is left untouched — it is meaningless for a one-off.
   --next-due STRING    Override nextDueAt (YYYY-MM-DD or today/tomorrow)
   --activate    Reactivate; mutually exclusive with --deactivate
   --deactivate    Soft-retire the task (active=0)

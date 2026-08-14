@@ -764,6 +764,123 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   // (The `ib company modules|settings` signpost specs were retired with their
   // commands — the sibling-group resolver in unknownCommand.ts answers now.)
 
+  // ─── betoni (5) — concrete reference data, read-only (fb#426) ────────────
+  {
+    command: "ib betoni laatu list",
+    description:
+      "List the concrete grades one supplier can offer (GET /api/betoni/laatu/list/:betoniToimittajaAsiakasId): its OWN rows plus the shared (yhteinen) ones, in sortNum order. Each row carries a derived `shared` boolean so the two populations the response mixes can be told apart.",
+    auth: "any",
+    flags: [
+      { name: "asiakas", type: "number", description: "Supplier (betoniToimittajaAsiakasId) whose catalogue to read; default = your active company" },
+      { name: "search", type: "string", description: "Client-side substring filter over laatuNimike / laatuLyhenne / laatuSelite" },
+      { name: "shared-only", type: "boolean", description: "Only the shared (asiakasId 0) grades" },
+      { name: "own-only", type: "boolean", description: "Only the supplier's own grades (excludes the shared ones)" },
+    ],
+    outputShape:
+      "ListEnvelope<{ laatuId, laatuNimike, laatuLyhenne, laatuLaji, laatuSelite, sortNum, asiakasId, shared, isEnabled, showInDropDown, laatuAllowedS, laatuAllowedRae, laatuAllowedC, laatuShortCuts, laatuHelpId }>",
+    prettyColumns: ["laatuId", "laatuNimike", "laatuLyhenne", "asiakasId", "shared", "isEnabled", "sortNum"],
+    errors: [
+      { origin: "client", exit: 4, match: "mutually exclusive", meaning: "--shared-only and --own-only both given", remedy: "they name two disjoint sets — pass one, or neither for both" },
+      { origin: "client", exit: 4, match: "could not resolve active company", meaning: "no usable ownerAsiakasId on the token", remedy: "pass --asiakas <supplierId>, or `ib auth switch`" },
+      { http: 400, exit: 4, meaning: "Invalid betoniToimittajaAsiakasId", remedy: "--asiakas must be a non-negative integer" },
+      { http: 401, exit: 2, meaning: "Token expired", remedy: "ib auth refresh" },
+    ],
+    notes: [
+      "asiakasId 0 is the SHARED (yhteinen) grade pool visible to every tenant; anything else is that supplier's own. The backend returns both in one list with no marker — `shared` is derived client-side.",
+      "Deliberately NOT restricted to your own tenant: a customer legitimately reads its SUPPLIER's catalogue, which is why the backend scopes the cache key by supplier rather than by caller.",
+      "The rows come from betoniLaatuView. laatuAllowedRae/laatuAllowedS/laatuAllowedC are expressed in the vocabularies `ib betoni reference` returns.",
+    ],
+    seeAlso: ["ib betoni laatu get", "ib betoni reference"],
+    examples: [
+      "ib betoni laatu list",
+      "ib betoni laatu list --asiakas 8 --shared-only",
+      "ib betoni laatu list --search rapid --pretty",
+    ],
+  },
+  {
+    command: "ib betoni laatu get",
+    description:
+      "One concrete grade by laatuId. Resolved from the supplier's list rather than a get endpoint (the backend mounts no route for `betoniLaatu.get`), so visibility is identical to `laatu list` — you can only get a grade you could already list.",
+    auth: "any",
+    args: [{ name: "laatuId", type: "number", description: "laatuId (the PK of betoniLaatu)" }],
+    flags: [
+      { name: "asiakas", type: "number", description: "Supplier whose catalogue to search; default = your active company" },
+    ],
+    outputShape: "{ laatuId, laatuNimike, laatuLyhenne, laatuLaji, laatuSelite, sortNum, asiakasId, shared, isEnabled, showInDropDown, ... }",
+    errors: [
+      { origin: "client", exit: 5, match: "not found in this supplier's catalogue", meaning: "no such grade in the resolved catalogue", remedy: "`ib betoni laatu list` to see it; a grade owned by ANOTHER supplier needs --asiakas <supplierId>" },
+      { origin: "client", exit: 4, match: "could not resolve active company", meaning: "no usable ownerAsiakasId on the token", remedy: "pass --asiakas <supplierId>, or `ib auth switch`" },
+      { http: 401, exit: 2, meaning: "Token expired", remedy: "ib auth refresh" },
+    ],
+    seeAlso: ["ib betoni laatu list"],
+    examples: ["ib betoni laatu get 42", "ib betoni laatu get 42 --asiakas 8"],
+  },
+  {
+    command: "ib betoni attr list",
+    description:
+      "List concrete additives (betoniAttr) for one supplier under one owning tenant (GET /api/betoni/attr/list/:betoniAsiakasId/:ownerAsiakasId). Both scope columns treat 0 as \"any\", and the backend matches each independently.",
+    auth: "any",
+    permissions: ["read access on the target ownerAsiakasId"],
+    args: [{ name: "betoniAsiakasId", type: "number", description: "Supplier scope (0 = any supplier)" }],
+    flags: [
+      { name: "owner", type: "number", description: "Owning tenant (ownerAsiakasId); default = your active company" },
+    ],
+    outputShape:
+      "ListEnvelope<{ attrId, attrNimike, attrSelite, attrYksikkö, hinta, betoniAsiakasId, ownerAsiakasId, shared, isEnabled, showInDropDown, attrShortCuts, attrHelpId, entryTime, lastModifiedTime }>",
+    prettyColumns: ["attrId", "attrNimike", "attrYksikkö", "hinta", "betoniAsiakasId", "ownerAsiakasId", "shared", "isEnabled"],
+    errors: [
+      { origin: "client", exit: 4, match: "could not resolve active company", meaning: "no usable ownerAsiakasId on the token", remedy: "pass --owner <asiakasId>, or `ib auth switch`" },
+      { http: 401, exit: 2, meaning: "Token expired", remedy: "ib auth refresh" },
+      { http: 403, exit: 3, meaning: "No read access to the requested ownerAsiakasId", remedy: "you may only read a tenant you have access to — check `ib auth whoami`" },
+    ],
+    notes: [
+      "`shared` is true only when BOTH betoniAsiakasId AND ownerAsiakasId are 0. A row global on one axis is still scoped on the other, so a single 0 does not mean \"everyone sees it\".",
+      "`hinta` is decimal(10,2) NULL — null means NO PRICE SET, which is distinct from 0.",
+    ],
+    seeAlso: ["ib betoni attr get"],
+    examples: ["ib betoni attr list 0", "ib betoni attr list 8 --owner 1349"],
+  },
+  {
+    command: "ib betoni attr get",
+    description:
+      "One concrete additive by attrId, scoped to an owning tenant (GET /api/betoni/attr/get/:attrId/:ownerAsiakasId). The route returns a recordset even for one row; this unwraps it.",
+    auth: "any",
+    permissions: ["read access on the target ownerAsiakasId"],
+    args: [{ name: "attrId", type: "number", description: "attrId (the PK of betoniAttr)" }],
+    flags: [
+      { name: "owner", type: "number", description: "Owning tenant (ownerAsiakasId); default = your active company" },
+    ],
+    outputShape: "{ attrId, attrNimike, attrSelite, attrYksikkö, hinta, betoniAsiakasId, ownerAsiakasId, shared, isEnabled, showInDropDown, ... }",
+    errors: [
+      { origin: "client", exit: 5, match: "Attribute not found", meaning: "no such attribute for that owner", remedy: "the id may belong to ANOTHER tenant — the backend does not distinguish that from 'no such row'. Cross-check with `ib betoni attr list <betoniAsiakasId> --owner <id>`" },
+      { origin: "client", exit: 4, match: "could not resolve active company", meaning: "no usable ownerAsiakasId on the token", remedy: "pass --owner <asiakasId>, or `ib auth switch`" },
+      { http: 401, exit: 2, meaning: "Token expired", remedy: "ib auth refresh" },
+      { http: 403, exit: 3, meaning: "No read access to the requested ownerAsiakasId", remedy: "check `ib auth whoami`" },
+    ],
+    seeAlso: ["ib betoni attr list"],
+    examples: ["ib betoni attr get 12", "ib betoni attr get 12 --owner 1349"],
+  },
+  {
+    command: "ib betoni reference",
+    description:
+      "The four fixed concrete lookup lists — raekoko (aggregate size), lujuus (strength), notkeus (consistency), kayttoika (working life) — in ONE call. These are the vocabularies a grade's laatuAllowedRae / laatuAllowedS / laatuAllowedC fields are expressed in.",
+    auth: "none",
+    flags: [
+      { name: "kind", type: "string", description: "Return only one list", allowed: ["raekoko", "lujuus", "notkeus", "kayttoika"] },
+    ],
+    outputShape: "{ raekoko: [...], lujuus: [...], notkeus: [...], kayttoika: [...] } — narrowed to the single key when --kind is given",
+    errors: [
+      { origin: "client", exit: 4, match: "--kind must be one of", meaning: "unknown --kind value", remedy: "one of: raekoko, lujuus, notkeus, kayttoika" },
+      { http: 500, exit: 6, meaning: "Backend error", remedy: "retry with --verbose" },
+    ],
+    notes: [
+      "Bundled rather than split into four leaves because they are read together: decoding one grade's allowed-values fields needs all four vocabularies at once.",
+      "These four routes are unauthenticated reference data, cached server-side with a 2-hour TTL.",
+    ],
+    seeAlso: ["ib betoni laatu list"],
+    examples: ["ib betoni reference", "ib betoni reference --kind raekoko"],
+  },
+
   // ─── keikka (6) ──────────────────────────────────────────────────────────
   {
     command: "ib keikka list",
@@ -5302,8 +5419,19 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         tier: "developer",
         args: [{ name: "name", type: "string", description: "bare dbo object name (no schema prefix); comma-separated for a batch (a,b,c)" }],
         flags: [],
-        outputShape: "single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn}], inboundForeignKeys:[{refTable,refColumn,column}], indexes:[{name,columns,unique}], triggers:[{name,timing,events,disabled}] }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false). precision/scale are null for non-numeric types (varchar → maxLength); a DECIMAL(5,2) reports precision 5 / scale 2, an int precision 10 / scale 0. `triggers` is a SUMMARY (no T-SQL) — read a body with `ib dev schema trigger <name>`.",
-        errors: [...devErrors, invalidNameErr, apiErr(404, "Table not found", "check the name via `ib dev schema tables` — when the name DOES exist but is another object class, the 404 says so and names the command that reads it (a trigger → `ib dev schema trigger`)")],
+        outputShape: "single name → { name, columns:[{name,dataType,maxLength,precision,scale,nullable,default,key}], primaryKey:[…], foreignKeys:[{column,refTable,refColumn,name,disabled?,notTrusted?}], checkConstraints:[{name,column,definition,disabled?,notTrusted?}], inboundForeignKeys:[{refTable,refColumn,column}], indexes:[{name,columns,unique}], triggers:[{name,timing,events,disabled}] }; comma-separated → { items:[{ name, found, object }], nextCursor:null, count } (missing names → found:false). precision/scale are null for non-numeric types (varchar → maxLength); a DECIMAL(5,2) reports precision 5 / scale 2, an int precision 10 / scale 0. `triggers` is a SUMMARY (no T-SQL) — read a body with `ib dev schema trigger <name>`.",
+        errors: [
+          ...devErrors,
+          invalidNameErr,
+          apiErr(
+            404,
+            "Table not found",
+            "check the name via `ib dev schema tables`. The 404 disambiguates for you: when the name exists as another object CLASS it names the command that reads it (a trigger → `ib dev schema trigger`), and when `<name>Id` is some table's PRIMARY KEY it names that table (`tuote` → `tuotteet`). So a not-found on a name you are sure of means wrong COMMAND or wrong WORD, not a typo."
+          ),
+        ],
+        notes: [
+          "ENFORCEMENT, not just existence (fb#425): `disabled` on a foreign key or CHECK means it is NOT checked on write — the constraint is inert and violating rows can land. `notTrusted` means it was re-enabled without a re-check, so existing rows may already violate it. BOTH KEYS ARE OMITTED WHEN FALSE, so their presence is the signal; a healthy table shows neither. Constraint state differs between environments — a dev-vs-prod FK failure is usually this.",
+        ],
         examples: ["ib dev schema table keikka", "ib dev schema table keikka,asiakas,tyomaa"],
       },
       {
@@ -5382,8 +5510,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         permissions: DEV_PERMS,
         tier: "developer",
         flags: [],
-        outputShape: "{ tables:[{name,columns}], foreignKeys:[{table,column,refTable,refColumn}], views:[{name}], procs:[{name,type,parameters}], triggers:[{name,table,timing,events,disabled}] }",
+        outputShape: "{ tables:[{name,columns}], foreignKeys:[{table,column,refTable,refColumn,disabled?,notTrusted?}], views:[{name}], procs:[{name,type,parameters}], triggers:[{name,table,timing,events,disabled}] }",
         errors: devErrors,
+        notes: [
+          "The FK `disabled`/`notTrusted` keys are OMITTED when false, so filtering the dump's foreignKeys for either key answers \"which constraints in the whole schema are not enforced\" in ONE call (fb#425).",
+        ],
         examples: ["ib dev schema dump"],
       },
       {
@@ -7617,7 +7748,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [
       { name: "title", type: "string", description: "Task title, max 200 chars (required)" },
       { name: "executor", type: "string", description: "human | ai (required)", allowed: [...TASK_EXECUTORS] },
-      { name: "cadence", type: "string", description: "<count>/<unit>, unit day|week|month, count 1-120, e.g. 1/month or 2/week (required)" },
+      { name: "cadence", type: "string", description: "<count>/<unit>, unit day|week|month, count 1-120, e.g. 1/month or 2/week. Required unless --once." },
+      { name: "once", type: "boolean", description: "SINGLE-SHOT task: completing it (done/skipped) retires the task (active=0) instead of rolling nextDueAt, so it is done forever. Mutually exclusive with --cadence. Pair with --first-due for a 'chase this in N months' reminder. A `failed` completion still leaves it due — a failed attempt has not done the thing." },
       { name: "instructions", type: "string", description: "Freetext checklist for humans / prompt context for the AI runner" },
       { name: "skill", type: "string", description: "Workspace skill the AI runner invokes (e.g. cleanup-docs); omit for human tasks" },
       { name: "agent", type: "string", description: "claude | hermes — recommended AI executor tier (claude = code/advanced, hermes = light local-LLM work)", allowed: [...TASK_AGENTS] },
@@ -7629,14 +7761,19 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "{ taskId } on success (HTTP 201). With --dry-run: { dryRun:true, wouldWrite:{...} } (server-side preview).",
     errors: [
-      { origin: "client", exit: 4, meaning: "Validation", remedy: "--title, --executor (human|ai) and --cadence (<count>/<unit>) are required (from flags or --from-json); --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers" },
+      { origin: "client", exit: 4, meaning: "Validation", remedy: "--title, --executor (human|ai) and one of --cadence (<count>/<unit>) or --once are required (from flags or --from-json); --agent must be claude|hermes; unit must be day|week|month, count 1-120; --assignee/--asiakas/--feedback must be integers" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    notes: [
+      "DEPLOY-GATED (fb#534): --once needs a later puminet5api version. Against an older backend it is rejected with `cadenceUnit must be one of: day, week, month` — a clean 400, not a silent recurring task.",
+      "--once is NOT a --from-json key. It takes no value, so `\"once\": true` would exit 4 and `\"once\": \"true\"` would be silently dropped, creating a recurring task you believe is one-off (the fb#541 class). Pass --once on argv alongside --from-json.",
     ],
     examples: [
       'ib task add --title "Open purchase invoices review" --executor human --assignee 10 --cadence 1/month --reason "monthly finance check"',
       'ib task add --title "Docs prune sweep" --executor ai --agent claude --skill cleanup-docs --cadence 1/month --reason "ops hygiene"',
       'ib task add --title "KU-oy invoice chase" --executor human --asiakas 8 --cadence 2/week --first-due tomorrow --reason "per-company cadence"',
+      'ib task add --title "Activate Hyvinkaan Betoni (non-compete lapses)" --executor human --once --first-due 2026-11-02 --reason "one-time activation"',
     ],
   },
   {
@@ -7687,7 +7824,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "agent", type: "string", description: 'claude | hermes ("" clears)', allowed: [...TASK_AGENTS] },
       { name: "assignee", type: "number", description: "New assignee personId" },
       { name: "asiakas", type: "number", description: "New company scope (asiakasId)" },
-      { name: "cadence", type: "string", description: "<count>/<unit>, unit day|week|month, count 1-120" },
+      { name: "cadence", type: "string", description: "<count>/<unit>, unit day|week|month, count 1-120. Mutually exclusive with --once." },
+      { name: "once", type: "boolean", description: "Convert to a SINGLE-SHOT task (cadenceUnit=once): completion retires it instead of rolling nextDueAt. This is the conversion path for a task already faking 'once' as --cadence 120/month. cadenceCount is left untouched — it is meaningless for a one-off." },
       { name: "next-due", type: "string", description: "Override nextDueAt (YYYY-MM-DD or today/tomorrow)" },
       { name: "activate", type: "boolean", description: "Reactivate; mutually exclusive with --deactivate" },
       { name: "deactivate", type: "boolean", description: "Soft-retire the task (active=0)" },
