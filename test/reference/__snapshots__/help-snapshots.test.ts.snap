@@ -2685,6 +2685,53 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev feedback claim matches snapshot 1`] = `
+"USAGE
+  ib dev feedback claim <id> [flags]
+
+DESCRIPTION
+  Take (or renew) the work claim on a feedback row so no other agent starts the same item (developer-only). Mutual exclusion is REAL: the backend acquires via one atomic UPDATE, so exactly one of two racing agents wins and the other gets 409. A REAL write — blocked under --read-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <id> NUMBER    feedbackId — accepts an optional \`fb#\` anchor (required)
+
+FLAGS
+  --by STRING    The claiming agent/session label. Defaults to $IB_CLAIM_ID, then user@host. Every agent authenticates as the same person, so this label is the ONLY thing that distinguishes sessions — pass your session short id.
+  --ttl-hours NUMBER    Lease length in hours, 1-24 (default 24). The 24h ceiling is ABSOLUTE: it is measured from your FIRST acquire, so renewing cannot extend past it.
+  --steal    Take a row that is under another agent's LIVE claim. For human recovery; normal contention should pick a different item instead.
+  --reason STRING    X-Action-Reason audit header
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  The claimed feedback row, including claimedBy, claimedAt and claimExpiresAt.
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  Validation             → --ttl-hours must be 1-24
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\`
+  exit 4 (HTTP 409)  Already claimed, or already closed → the message names the holder and expiry — pick another item with \`ib dev feedback list --unclaimed\`, or pass --steal to take it anyway
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Claiming is how concurrent AI agents avoid duplicating work. Browse with \`ib dev feedback list --unclaimed\`, choose an item yourself, then claim it. On a 409, pick a different item — do not wait.
+  - Re-claiming an item you already hold is idempotent and doubles as the RENEWAL path; there is no separate renew command. It cannot extend the lease past 24h from your first acquire.
+  - An abandoned claim frees itself: expiry is evaluated at read time, so after 24h the row is claimable again with no sweeper and no manual cleanup.
+  - Closing a row (\`resolve --status applied|dismissed\`) releases the claim automatically.
+
+SEE ALSO
+  ib dev feedback release, ib dev feedback list, ib dev feedback resolve
+
+EXAMPLES
+  ib dev feedback claim 42 --by c6b96c
+  ib dev feedback claim 42 --by c6b96c --ttl-hours 4
+  ib dev feedback claim 42 --by c6b96c --steal
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev feedback count matches snapshot 1`] = `
 "USAGE
   ib dev feedback count [flags]
@@ -2870,6 +2917,48 @@ EXAMPLES
   ib dev feedback list --search IDOR
   ib dev feedback list --max-complexity 3 --unresolved
   ib dev feedback list --scope cli --oldest
+"
+`;
+
+exports[`Help snapshots — contract stability > help for ib dev feedback release matches snapshot 1`] = `
+"USAGE
+  ib dev feedback release [<id>] [flags]
+
+DESCRIPTION
+  Release a work claim you hold, so another agent can pick the item up (developer-only). --all releases every claim held by your label — what a session should do on exit. A REAL write — blocked under --read-only.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <id> NUMBER    feedbackId — omit when using --all (optional)
+
+FLAGS
+  --by STRING    The holder label. Defaults to $IB_CLAIM_ID, then user@host — must match the label used to claim.
+  --all    Release EVERY claim held by this label instead of one row
+  --reason STRING    X-Action-Reason audit header
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { feedbackId, released:true } for one row; { by, released:<count> } with --all.
+
+ERRORS (stderr, exit non-zero)
+  exit 4 (client-side)  Validation             → pass a feedbackId, or --all to release every claim
+  exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
+  exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\`
+  exit 4 (HTTP 409)  You do not hold that claim → check the holder with \`ib dev feedback get <id>\`; --by must match the label used to claim
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - Releasing is an optimisation, not the correctness mechanism — an abandoned claim expires on its own after 24h. Release so the item frees in seconds instead.
+
+SEE ALSO
+  ib dev feedback claim, ib dev feedback list
+
+EXAMPLES
+  ib dev feedback release 42 --by c6b96c
+  ib dev feedback release --all --by c6b96c
 "
 `;
 

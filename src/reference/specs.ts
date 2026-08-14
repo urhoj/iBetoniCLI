@@ -6583,6 +6583,71 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
   },
   {
+    command: "ib dev feedback claim",
+    description:
+      "Take (or renew) the work claim on a feedback row so no other agent starts the same item (developer-only). Mutual exclusion is REAL: the backend acquires via one atomic UPDATE, so exactly one of two racing agents wins and the other gets 409. A REAL write — blocked under --read-only.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    tier: "developer",
+    mutates: true,
+    args: [{ name: "id", type: "number", description: "feedbackId — accepts an optional `fb#` anchor" }],
+    flags: [
+      { name: "by", type: "string", description: "The claiming agent/session label. Defaults to $IB_CLAIM_ID, then user@host. Every agent authenticates as the same person, so this label is the ONLY thing that distinguishes sessions — pass your session short id." },
+      { name: "ttl-hours", type: "number", description: "Lease length in hours, 1-24 (default 24). The 24h ceiling is ABSOLUTE: it is measured from your FIRST acquire, so renewing cannot extend past it." },
+      { name: "steal", type: "boolean", description: "Take a row that is under another agent's LIVE claim. For human recovery; normal contention should pick a different item instead." },
+      { name: "reason", type: "string", description: "X-Action-Reason audit header" },
+    ],
+    outputShape: "The claimed feedback row, including claimedBy, claimedAt and claimExpiresAt.",
+    errors: [
+      { origin: "client", exit: 4, match: "ttlhours", meaning: "Validation", remedy: "--ttl-hours must be 1-24" },
+      apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
+      apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
+      apiErr(409, "Already claimed, or already closed", "the message names the holder and expiry — pick another item with `ib dev feedback list --unclaimed`, or pass --steal to take it anyway"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    notes: [
+      "Claiming is how concurrent AI agents avoid duplicating work. Browse with `ib dev feedback list --unclaimed`, choose an item yourself, then claim it. On a 409, pick a different item — do not wait.",
+      "Re-claiming an item you already hold is idempotent and doubles as the RENEWAL path; there is no separate renew command. It cannot extend the lease past 24h from your first acquire.",
+      "An abandoned claim frees itself: expiry is evaluated at read time, so after 24h the row is claimable again with no sweeper and no manual cleanup.",
+      "Closing a row (`resolve --status applied|dismissed`) releases the claim automatically.",
+    ],
+    seeAlso: ["ib dev feedback release", "ib dev feedback list", "ib dev feedback resolve"],
+    examples: [
+      "ib dev feedback claim 42 --by c6b96c",
+      "ib dev feedback claim 42 --by c6b96c --ttl-hours 4",
+      "ib dev feedback claim 42 --by c6b96c --steal",
+    ],
+  },
+  {
+    command: "ib dev feedback release",
+    description:
+      "Release a work claim you hold, so another agent can pick the item up (developer-only). --all releases every claim held by your label — what a session should do on exit. A REAL write — blocked under --read-only.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    tier: "developer",
+    mutates: true,
+    args: [{ name: "id", type: "number", required: false, description: "feedbackId — omit when using --all" }],
+    flags: [
+      { name: "by", type: "string", description: "The holder label. Defaults to $IB_CLAIM_ID, then user@host — must match the label used to claim." },
+      { name: "all", type: "boolean", description: "Release EVERY claim held by this label instead of one row" },
+      { name: "reason", type: "string", description: "X-Action-Reason audit header" },
+    ],
+    outputShape: "{ feedbackId, released:true } for one row; { by, released:<count> } with --all.",
+    errors: [
+      { origin: "client", exit: 4, match: "provide a feedbackid", meaning: "Validation", remedy: "pass a feedbackId, or --all to release every claim" },
+      apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
+      apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
+      apiErr(409, "You do not hold that claim", "check the holder with `ib dev feedback get <id>`; --by must match the label used to claim"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    notes: [
+      "Releasing is an optimisation, not the correctness mechanism — an abandoned claim expires on its own after 24h. Release so the item frees in seconds instead.",
+    ],
+    seeAlso: ["ib dev feedback claim", "ib dev feedback list"],
+    examples: [
+      "ib dev feedback release 42 --by c6b96c",
+      "ib dev feedback release --all --by c6b96c",
+    ],
+  },
+  {
     command: "ib dev feedback count",
     description:
       "Aggregate counts of filed feedback by status, kind, and scope, plus how many rows still have NO complexity estimate (developer-only). The cheapest way to answer \"is there any open feedback?\" — a tiny fixed-size response instead of a row dump. Aggregated server-side over the WHOLE table, so the totals stay correct at any volume.",

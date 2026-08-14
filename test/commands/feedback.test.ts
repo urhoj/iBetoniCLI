@@ -706,10 +706,11 @@ describe("ib feedback resolve", () => {
       status: "applied",
       note: "shipped in v1.3",
     });
-    expect(put).toHaveBeenCalledWith("/api/feedback/42", {
-      status: "applied",
-      resolution: "shipped in v1.3",
-    });
+    expect(put).toHaveBeenCalledWith(
+      "/api/feedback/42",
+      { status: "applied", resolution: "shipped in v1.3" },
+      expect.anything()
+    );
     expect(out).toMatchObject({ status: "applied" });
   });
 
@@ -759,10 +760,11 @@ describe("ib feedback resolve", () => {
           { from: "user" }
         );
       });
-      expect(put).toHaveBeenCalledWith("/api/feedback/9", {
-        status: "applied",
-        resolution: "from file\n\nfrom argv",
-      });
+      expect(put).toHaveBeenCalledWith(
+        "/api/feedback/9",
+        { status: "applied", resolution: "from file\n\nfrom argv" },
+        expect.anything()
+      );
     });
 
     test("an unknown JSON key exits 4 naming it and the accepted keys (no PUT)", async () => {
@@ -790,10 +792,11 @@ describe("ib feedback resolve", () => {
         registerFeedbackCommands(program, async () => mockClient);
         await program.parseAsync(["feedback", "resolve", "320", "--from-json", p], { from: "user" });
       });
-      expect(put).toHaveBeenCalledWith("/api/feedback/320", {
-        status: "dismissed",
-        resolution: note,
-      });
+      expect(put).toHaveBeenCalledWith(
+        "/api/feedback/320",
+        { status: "dismissed", resolution: note },
+        expect.anything()
+      );
     });
 
     test("an explicit --status overrides the file's status", async () => {
@@ -806,7 +809,11 @@ describe("ib feedback resolve", () => {
           { from: "user" }
         );
       });
-      expect(put).toHaveBeenCalledWith("/api/feedback/5", { status: "applied", resolution: "n" });
+      expect(put).toHaveBeenCalledWith(
+        "/api/feedback/5",
+        { status: "applied", resolution: "n" },
+        expect.anything()
+      );
     });
 
     test("`resolution` is accepted as a JSON key (same alias set as the flags)", async () => {
@@ -816,10 +823,11 @@ describe("ib feedback resolve", () => {
         registerFeedbackCommands(program, async () => mockClient);
         await program.parseAsync(["feedback", "resolve", "6", "--from-json", p], { from: "user" });
       });
-      expect(put).toHaveBeenCalledWith("/api/feedback/6", {
-        status: "applied",
-        resolution: "via the output field name",
-      });
+      expect(put).toHaveBeenCalledWith(
+        "/api/feedback/6",
+        { status: "applied", resolution: "via the output field name" },
+        expect.anything()
+      );
     });
   });
 
@@ -831,10 +839,11 @@ describe("ib feedback resolve", () => {
       ["feedback", "resolve", "7", "--status", "dismissed", "--resolution", "by design"],
       { from: "user" }
     );
-    expect(put).toHaveBeenCalledWith("/api/feedback/7", {
-      status: "dismissed",
-      resolution: "by design",
-    });
+    expect(put).toHaveBeenCalledWith(
+      "/api/feedback/7",
+      { status: "dismissed", resolution: "by design" },
+      expect.anything()
+    );
   });
 
   test("distinct values across --resolution + --reason merge into one note (feedback #216)", async () => {
@@ -846,10 +855,11 @@ describe("ib feedback resolve", () => {
         "--resolution", "detailed verification text", "--reason", "verified via ib legal"],
       { from: "user" }
     );
-    expect(put).toHaveBeenCalledWith("/api/feedback/8", {
-      status: "applied",
-      resolution: "detailed verification text\n\nverified via ib legal",
-    });
+    expect(put).toHaveBeenCalledWith(
+      "/api/feedback/8",
+      { status: "applied", resolution: "detailed verification text\n\nverified via ib legal" },
+      expect.anything()
+    );
   });
 
   test("mergeNoteFlags dedupes identical values and returns undefined when none given", () => {
@@ -907,7 +917,11 @@ describe("ib feedback resolve", () => {
   test("note-only resolve that leaves the row open acks with a hint (feedback #270)", async () => {
     put.mockResolvedValueOnce({ feedbackId: 42, status: "open", resolution: "investigated" });
     const out = await runFeedbackResolve(mockClient, 42, { note: "investigated" });
-    expect(put).toHaveBeenCalledWith("/api/feedback/42", { resolution: "investigated" });
+    expect(put).toHaveBeenCalledWith(
+      "/api/feedback/42",
+      { resolution: "investigated" },
+      expect.anything()
+    );
     expect(out.hint).toBe(
       "status unchanged (open) - pass --status applied|dismissed to close"
     );
@@ -939,24 +953,65 @@ describe("ib feedback resolve", () => {
   });
 });
 
+// ─── x-claim-id header (resolve/update) ────────────────────────────────────────
+
+/**
+ * The claim controller (Task 4) reads `req.headers["x-claim-id"]` to tell a
+ * writer's own claim apart from someone else's, so it can suppress the
+ * advisory warning when the writer IS the claim holder — without this header
+ * every agent resolving its own claimed row gets warned about its own claim.
+ * `resolve`/`update` have no `--by` flag, so the header always carries
+ * `resolveClaimId(undefined)`: $IB_CLAIM_ID if set, else user@host.
+ */
+describe("ib feedback resolve/update — x-claim-id header (claim leases)", () => {
+  const saved = process.env.IB_CLAIM_ID;
+  beforeEach(() => {
+    process.env.IB_CLAIM_ID = "test-session";
+  });
+  afterEach(() => {
+    if (saved === undefined) delete process.env.IB_CLAIM_ID;
+    else process.env.IB_CLAIM_ID = saved;
+  });
+
+  test("resolve sends the resolved claim label as x-claim-id", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42, status: "applied" });
+    await runFeedbackResolve(mockClient, 42, { status: "applied" });
+    expect(put).toHaveBeenCalledWith(
+      "/api/feedback/42",
+      expect.anything(),
+      { headers: { "x-claim-id": "test-session" } }
+    );
+  });
+
+  test("update sends the resolved claim label as x-claim-id", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42, scope: "security" });
+    await runFeedbackUpdate(mockClient, 42, { scope: "security" });
+    expect(put).toHaveBeenCalledWith(
+      "/api/feedback/42",
+      expect.anything(),
+      { headers: { "x-claim-id": "test-session" } }
+    );
+  });
+});
+
 // ─── update ──────────────────────────────────────────────────────────────────
 
 describe("ib feedback update", () => {
   test("PUTs scope to /api/feedback/:id", async () => {
     put.mockResolvedValueOnce({ feedbackId: 42, scope: "security" });
     const out = await runFeedbackUpdate(mockClient, 42, { scope: "security" });
-    expect(put).toHaveBeenCalledWith("/api/feedback/42", { scope: "security" });
+    expect(put).toHaveBeenCalledWith("/api/feedback/42", { scope: "security" }, expect.anything());
     expect(out).toMatchObject({ scope: "security" });
   });
 
   test("PUTs kind + severity + trimmed description together", async () => {
     put.mockResolvedValueOnce({ feedbackId: 42, kind: "bug", severity: "major" });
     await runFeedbackUpdate(mockClient, 42, { kind: "bug", severity: "major", description: "  x  " });
-    expect(put).toHaveBeenCalledWith("/api/feedback/42", {
-      kind: "bug",
-      severity: "major",
-      description: "x",
-    });
+    expect(put).toHaveBeenCalledWith(
+      "/api/feedback/42",
+      { kind: "bug", severity: "major", description: "x" },
+      expect.anything()
+    );
   });
 
   test.each([
@@ -972,7 +1027,7 @@ describe("ib feedback update", () => {
   test("promotes complexity on its own (the promote-after-investigation path)", async () => {
     put.mockResolvedValueOnce({ feedbackId: 42, complexity: 4 });
     const out = await runFeedbackUpdate(mockClient, 42, { complexity: 4 });
-    expect(put).toHaveBeenCalledWith("/api/feedback/42", { complexity: 4 });
+    expect(put).toHaveBeenCalledWith("/api/feedback/42", { complexity: 4 }, expect.anything());
     expect(out).toMatchObject({ complexity: 4 });
   });
 
@@ -1026,7 +1081,11 @@ describe("ib feedback update", () => {
         registerFeedbackCommands(program, async () => mockClient);
         await program.parseAsync(["feedback", "update", "42", "--from-json", p], { from: "user" });
       });
-      expect(put).toHaveBeenCalledWith("/api/feedback/42", { description: "via body" });
+      expect(put).toHaveBeenCalledWith(
+        "/api/feedback/42",
+        { description: "via body" },
+        expect.anything()
+      );
     });
 
     test("an unknown JSON key exits 4 naming it and the accepted keys (no PUT)", async () => {
@@ -1054,7 +1113,11 @@ describe("ib feedback update", () => {
         registerFeedbackCommands(program, async () => mockClient);
         await program.parseAsync(["feedback", "update", "42", "--from-json", p], { from: "user" });
       });
-      expect(put).toHaveBeenCalledWith("/api/feedback/42", { scope: "cli", description });
+      expect(put).toHaveBeenCalledWith(
+        "/api/feedback/42",
+        { scope: "cli", description },
+        expect.anything()
+      );
     });
 
     test("--append-description reads the current row and appends, preserving the original", async () => {
@@ -1062,16 +1125,22 @@ describe("ib feedback update", () => {
       put.mockResolvedValueOnce({ feedbackId: 42 });
       await runFeedbackUpdate(mockClient, 42, { appendDescription: "  Later finding.  " });
       expect(get).toHaveBeenCalledWith("/api/feedback/42");
-      expect(put).toHaveBeenCalledWith("/api/feedback/42", {
-        description: "Original report.\n\nLater finding.",
-      });
+      expect(put).toHaveBeenCalledWith(
+        "/api/feedback/42",
+        { description: "Original report.\n\nLater finding." },
+        expect.anything()
+      );
     });
 
     test("appending to an empty description does not leave leading blank lines", async () => {
       get.mockResolvedValueOnce({ feedbackId: 42, description: "" });
       put.mockResolvedValueOnce({ feedbackId: 42 });
       await runFeedbackUpdate(mockClient, 42, { appendDescription: "First text." });
-      expect(put).toHaveBeenCalledWith("/api/feedback/42", { description: "First text." });
+      expect(put).toHaveBeenCalledWith(
+        "/api/feedback/42",
+        { description: "First text." },
+        expect.anything()
+      );
     });
 
     test("--description and --append-description are mutually exclusive (exit 4, no reads/writes)", async () => {
@@ -1111,7 +1180,11 @@ describe("ib feedback update", () => {
     await program.parseAsync(["feedback", "update", "42", "--body", "edited via body"], {
       from: "user",
     });
-    expect(put).toHaveBeenCalledWith("/api/feedback/42", { description: "edited via body" });
+    expect(put).toHaveBeenCalledWith(
+      "/api/feedback/42",
+      { description: "edited via body" },
+      expect.anything()
+    );
   });
 
   test("rejects --description and --body with different values (exit 4, no PUT)", async () => {
@@ -1303,7 +1376,8 @@ describe("feedback resolve — the note is positional too (fb#583)", () => {
     );
     expect(mockClient.put).toHaveBeenCalledWith(
       "/api/feedback/553",
-      expect.objectContaining({ status: "applied", resolution: "Folded into fb#576" })
+      expect.objectContaining({ status: "applied", resolution: "Folded into fb#576" }),
+      expect.anything()
     );
   });
 
@@ -1318,7 +1392,8 @@ describe("feedback resolve — the note is positional too (fb#583)", () => {
     );
     expect(mockClient.put).toHaveBeenCalledWith(
       "/api/feedback/42",
-      expect.objectContaining({ resolution: "positional half\n\nflag half" })
+      expect.objectContaining({ resolution: "positional half\n\nflag half" }),
+      expect.anything()
     );
   });
 
@@ -1333,7 +1408,8 @@ describe("feedback resolve — the note is positional too (fb#583)", () => {
     );
     expect(mockClient.put).toHaveBeenCalledWith(
       "/api/feedback/42",
-      expect.objectContaining({ resolution: "same text" })
+      expect.objectContaining({ resolution: "same text" }),
+      expect.anything()
     );
   });
 

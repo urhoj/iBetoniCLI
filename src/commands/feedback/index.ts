@@ -12,6 +12,7 @@
  * are developer-only; `resolve` is a real write (blocked under read-only).
  * `--dry-run` (create + resolve) resolves CLIENT-SIDE: prints the payload, no send.
  */
+import os from "node:os";
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, type ListEnvelope } from "../../api/envelopes.js";
@@ -28,6 +29,7 @@ import { foldAliases, warnIfShellMangled } from "../_shared/flags.js";
 import { applyFromJson, type FromJsonConfig } from "../_shared/fromJson.js";
 import { qs } from "../../api/query.js";
 import { CliError } from "../../api/errors.js";
+import { writeFlagsToHeaders } from "../../api/writeFlags.js";
 
 // Exported for specs.ts: the spec flags declare these as machine-readable
 // `allowed:` sets (validation envelopes), single-sourced from here.
@@ -548,7 +550,9 @@ export async function runFeedbackResolve(
   if (input.dryRun) {
     return { dryRun: true, wouldSend: { method: "PUT", path: `/api/feedback/${id}`, body } };
   }
-  const row = await client.put<Record<string, unknown>>(`/api/feedback/${id}`, body);
+  const row = await client.put<Record<string, unknown>>(`/api/feedback/${id}`, body, {
+    headers: { "x-claim-id": resolveClaimId(undefined) },
+  });
   const out = input.full ? { ...row } : compactAck(row);
   if (input.status === undefined && (row.status === "open" || row.status === "reviewed")) {
     out.hint = `status unchanged (${row.status}) - pass --status applied|dismissed to close`;
@@ -642,8 +646,84 @@ export async function runFeedbackUpdate(
   if (input.dryRun) {
     return { dryRun: true, wouldSend: { method: "PUT", path: `/api/feedback/${id}`, body } };
   }
-  const row = await client.put<Record<string, unknown>>(`/api/feedback/${id}`, body);
+  const row = await client.put<Record<string, unknown>>(`/api/feedback/${id}`, body, {
+    headers: { "x-claim-id": resolveClaimId(undefined) },
+  });
   return input.full ? row : compactUpdateAck(row);
+}
+
+/** Column width of cliFeedback.claimedBy — labels are capped to match. */
+const CLAIM_LABEL_MAX = 120;
+
+/**
+ * Resolve the claiming agent's label — the identity mechanism `runFeedbackClaim`
+ * / `runFeedbackRelease` key mutual exclusion on, and that `runFeedbackResolve` /
+ * `runFeedbackUpdate` echo back as `x-claim-id` so the backend can tell a
+ * writer's own claim apart from someone else's.
+ *
+ * Every agent authenticates as the SAME person (personId 10), so the backend
+ * cannot tell two sessions apart — the label is the only thing that can.
+ * **`$IB_CLAIM_ID` is the PRIMARY mechanism**: set it once per session/cron/
+ * Hermes run and every command that touches claims (claim, release, and the
+ * `x-claim-id` header on resolve/update) agrees on who is who, with nothing to
+ * remember per call. `--by` is a per-command OVERRIDE for a one-off call —
+ * `resolve`/`update` have no `--by` flag at all, so an agent that identifies
+ * itself only via `--by` on `claim` will mismatch on the `x-claim-id` header
+ * sent by `resolve`/`update` and get warned about its own claim. Order:
+ * explicit --by, then IB_CLAIM_ID (Hermes / cron / CI), then user@host as a
+ * coarse machine-level fallback that is never empty.
+ */
+export function resolveClaimId(explicit?: string): string {
+  const v = explicit ?? process.env.IB_CLAIM_ID;
+  if (v && v.trim()) return v.trim().slice(0, CLAIM_LABEL_MAX);
+  let user = "unknown";
+  try {
+    user = os.userInfo().username;
+  } catch {
+    // os.userInfo() throws on some locked-down containers; the host half is
+    // still a useful discriminator, so degrade rather than fail the command.
+  }
+  return `${user}@${os.hostname()}`.slice(0, CLAIM_LABEL_MAX);
+}
+
+/** POST /api/feedback/:id/claim — take or renew the lease. A REAL write. */
+export async function runFeedbackClaim(
+  client: ApiClient,
+  id: number,
+  input: { by?: string; ttlHours?: number; steal?: boolean; reason?: string }
+): Promise<Record<string, unknown>> {
+  const body: Record<string, unknown> = { by: resolveClaimId(input.by) };
+  if (input.ttlHours !== undefined) body.ttlHours = input.ttlHours;
+  if (input.steal) body.steal = true;
+  return client.post<Record<string, unknown>>(`/api/feedback/${id}/claim`, body, {
+    headers: writeFlagsToHeaders({ reason: input.reason }),
+  });
+}
+
+/** Release one lease (DELETE) or every lease held by the label (--all). */
+export async function runFeedbackRelease(
+  client: ApiClient,
+  id: number | null,
+  input: { by?: string; all?: boolean; reason?: string }
+): Promise<Record<string, unknown>> {
+  const by = resolveClaimId(input.by);
+  const headers = writeFlagsToHeaders({ reason: input.reason });
+  const hasReason = Object.keys(headers).length > 0;
+  if (input.all) {
+    return hasReason
+      ? client.post<Record<string, unknown>>("/api/feedback/claims/release", { by }, { headers })
+      : client.post<Record<string, unknown>>("/api/feedback/claims/release", { by });
+  }
+  if (id == null) failWith("Provide a feedbackId, or --all to release every claim", 4);
+  // ⚠ `ApiClient.delete` is `(path, opts?: FetchOptions)` and FetchOptions has NO
+  // `body` field — passing `{ by }` as the second argument would be read as fetch
+  // options and the label would never reach the backend, which would then 400.
+  // The label therefore rides in the query string; the controller reads
+  // `req.body?.by ?? req.query?.by`.
+  const path = `/api/feedback/${id}/claim?by=${encodeURIComponent(by)}`;
+  return hasReason
+    ? client.delete<Record<string, unknown>>(path, { headers })
+    : client.delete<Record<string, unknown>>(path);
 }
 
 /**
@@ -653,6 +733,9 @@ export async function runFeedbackUpdate(
  *   get      GET  /api/feedback/:id (developer-only)
  *   resolve  PUT  /api/feedback/:id (developer-only; status/note write)
  *   update   PUT  /api/feedback/:id (developer-only; scope/kind/severity/description edit)
+ *   claim    POST /api/feedback/:id/claim (developer-only; take/renew the work lease)
+ *   release  DELETE /api/feedback/:id/claim, or POST /api/feedback/claims/release --all
+ *            (developer-only; release the work lease)
  */
 export function registerFeedbackCommands(
   parent: Command,
@@ -884,6 +967,31 @@ export function registerFeedbackCommands(
             })
           )
         );
+      })
+    );
+
+  f.command("claim <id>")
+    .option("--by <label>", "The claiming agent/session label (defaults to $IB_CLAIM_ID, then user@host)")
+    .option("--ttl-hours <n>", "Lease length in hours, 1-24 (default 24, measured from FIRST acquire)", Number)
+    .option("--steal", "Take a row under another agent's LIVE claim")
+    .option("--reason <text>", "Human-readable why-string stored in audit logs (X-Action-Reason)")
+    .action(
+      guarded(async (idStr: string, opts: { by?: string; ttlHours?: number; steal?: boolean; reason?: string }) => {
+        const id = parseRefId(idStr, "feedback", "claim");
+        const client = await getClient();
+        writeJson(await runFeedbackClaim(client, id, opts));
+      })
+    );
+
+  f.command("release [id]")
+    .option("--by <label>", "The holder label — must match the label used to claim")
+    .option("--all", "Release EVERY claim held by this label instead of one row")
+    .option("--reason <text>", "Human-readable why-string stored in audit logs (X-Action-Reason)")
+    .action(
+      guarded(async (idStr: string | undefined, opts: { by?: string; all?: boolean; reason?: string }) => {
+        const id = idStr === undefined ? null : parseRefId(idStr, "feedback", "release");
+        const client = await getClient();
+        writeJson(await runFeedbackRelease(client, id, opts));
       })
     );
 
