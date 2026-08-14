@@ -252,7 +252,13 @@ export function deriveClaimState(row, me) {
     const until = row.claimExpiresAt;
     if (typeof by !== "string" || !by)
         return "free";
-    if (!until || new Date(String(until)).getTime() <= Date.now())
+    // A malformed/unparseable claimExpiresAt must degrade toward FREE, not HELD:
+    // `new Date(garbage).getTime()` is NaN, and `NaN <= Date.now()` is false, so
+    // an unguarded comparison would fall through to "held"/"mine" — the opposite
+    // of this feature's whole premise, that a lease can never get permanently
+    // stuck. Corrupt data is exactly the case the clock-based check exists for.
+    const t = new Date(String(until)).getTime();
+    if (!until || Number.isNaN(t) || t <= Date.now())
         return "free";
     return by === me ? "mine" : "held";
 }

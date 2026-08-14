@@ -165,14 +165,28 @@ describe("deriveClaimState", () => {
   test("a live claim by me is mine", () => {
     expect(deriveClaimState({ claimedBy: "me", claimExpiresAt: FUTURE }, "me")).toBe("mine");
   });
+
+  // Fix round 1: `new Date("garbage").getTime()` is NaN, and `NaN <= Date.now()`
+  // is false — an unguarded comparison would fall through to "held", which is
+  // backwards for a mechanism whose whole point is that a lease self-heals.
+  // Malformed data must degrade toward FREE, not lock in as permanently held.
+  test("an UNPARSEABLE claimExpiresAt degrades to free, not held (fix round 1)", () => {
+    expect(deriveClaimState({ claimedBy: "them", claimExpiresAt: "not-a-date" }, "me")).toBe(
+      "free"
+    );
+  });
 });
 
 describe("runFeedbackList — claim filters are mutually exclusive", () => {
-  test("--unclaimed with --mine exits 4", async () => {
+  // Fix round 1: assert BOTH the exit code (not just "some rejection") AND that
+  // the guard fires before any network call — proving it's a pre-flight check,
+  // not a wasted round trip that happens to also throw afterward.
+  test("--unclaimed with --mine exits 4, before any fetch", async () => {
     const client = mockClient();
     await expect(
       runFeedbackList(client, { unclaimed: true, mine: true } as never)
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ exitCode: 4 });
+    expect((client as never as { get: ReturnType<typeof vi.fn> }).get).not.toHaveBeenCalled();
   });
 });
 
