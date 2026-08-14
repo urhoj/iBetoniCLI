@@ -80,6 +80,8 @@ export const DOMAIN_REGISTRARS = new Map([
             // Same shape as impersonation: canonical only under `ib dev`, no hidden
             // top-level alias (it never had a top-level path).
             (await import("./commands/dev/db-target/index.js")).registerDbTargetCommands(dev, d.getClient);
+            // Same shape again: canonical only under `ib dev`, no top-level alias.
+            (await import("./commands/dev/email-health/index.js")).registerEmailHealthCommand(dev, d.getClient);
         },
     ],
     // Hidden back-compat aliases at the old top-level paths (still executable).

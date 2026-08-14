@@ -6322,6 +6322,31 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   },
     ];
   })(),
+  // ─── email-health (1) ────────────────────────────────────────────────────
+  {
+    command: "ib dev email-health",
+    description:
+      "Account-wide deliverability watch for our SendGrid sender (noreply@ibetoni.fi), read from our own webhook event log — daily volume, deferral rate, hard failures, and WHICH addresses the volume went to. Distinct from `ib jerry email-activity`: that one asks SendGrid's API about the betonijerry.fi domain and needs the read-only diagnostic key; this one needs no key and is the only view that shows recipient CONCENTRATION, which is what an internal notification firehose looks like.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    tier: "developer",
+    flags: [{ name: "days", type: "number", default: "7", description: "Window in days (1..90)" }],
+    outputShape:
+      "{ days, checkedAt, coverage:{ oldestEvent, newestEvent, daysWithData }, totals:{ processed, delivered, deferredEvents, deferredMessages, failed, spam }, daily:[{ date, processed, delivered, deferredEvents, deferredMessages, failed, spam }], recipients:[{ email, processed, deferredEvents, failed, sharePct }] (top 10 by volume), verdict:{ healthy, flags:[{ code, severity, detail }] } } — read `verdict.healthy` for the one-bit answer. Flag codes: deferral-rate | single-recipient-share | volume-spike | failure-rate | spam-rate.",
+    errors: [
+      { origin: "client", exit: 2, meaning: "Not logged in", remedy: "ib auth login (or set IB_TOKEN)" },
+      apiErr(401, "Token expired or invalid", "ib auth refresh (IB_TOKEN sessions: mint a fresh JWT)"),
+      apiErr(403, "Developer/sysadmin only (server-enforced)", "use a developer account token"),
+      apiErr(404, "Route not deployed yet", "the backend half is deploy-gated — deploy puminet5api first"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    notes: [
+      "deferredMessages, NOT deferredEvents, is the number of throttled sends: SendGrid re-emits `deferred` on every retry of the SAME message, so events over-count (fb#575 saw 19 events from 12 messages).",
+      "coverage.oldestEvent bounds what the window can possibly show — the log is young, so a --days 30 request can silently cover far fewer days. A quiet report is not proof of a quiet month.",
+      "A deferral is transient and the mail still arrives, which is why the deploy health check ignores it. The RATE is the signal: 421 4.7.28 is the polite warning that precedes real blocking.",
+    ],
+    seeAlso: ["ib jerry email-activity"],
+    examples: ["ib dev email-health", "ib dev email-health --days 30 --pretty"],
+  },
   // ─── feedback (5) ────────────────────────────────────────────────────────
   // NOTE on classification: feedback create/resolve carry custom write semantics
   // (meta-exempt create, client-side --dry-run, no idempotency/reason), so they

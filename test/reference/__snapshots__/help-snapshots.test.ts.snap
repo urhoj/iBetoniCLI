@@ -2640,6 +2640,45 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev email-health matches snapshot 1`] = `
+"USAGE
+  ib dev email-health [flags]
+
+DESCRIPTION
+  Account-wide deliverability watch for our SendGrid sender (noreply@ibetoni.fi), read from our own webhook event log — daily volume, deferral rate, hard failures, and WHICH addresses the volume went to. Distinct from \`ib jerry email-activity\`: that one asks SendGrid's API about the betonijerry.fi domain and needs the read-only diagnostic key; this one needs no key and is the only view that shows recipient CONCENTRATION, which is what an internal notification firehose looks like.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+FLAGS
+  --days NUMBER    Window in days (1..90) (default: 7)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  { days, checkedAt, coverage:{ oldestEvent, newestEvent, daysWithData }, totals:{ processed, delivered, deferredEvents, deferredMessages, failed, spam }, daily:[{ date, processed, delivered, deferredEvents, deferredMessages, failed, spam }], recipients:[{ email, processed, deferredEvents, failed, sharePct }] (top 10 by volume), verdict:{ healthy, flags:[{ code, severity, detail }] } } — read \`verdict.healthy\` for the one-bit answer. Flag codes: deferral-rate | single-recipient-share | volume-spike | failure-rate | spam-rate.
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (client-side)  Not logged in          → ib auth login (or set IB_TOKEN)
+  exit 2 (HTTP 401)  Token expired or invalid → ib auth refresh (IB_TOKEN sessions: mint a fresh JWT)
+  exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
+  exit 5 (HTTP 404)  Route not deployed yet → the backend half is deploy-gated — deploy puminet5api first
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - deferredMessages, NOT deferredEvents, is the number of throttled sends: SendGrid re-emits \`deferred\` on every retry of the SAME message, so events over-count (fb#575 saw 19 events from 12 messages).
+  - coverage.oldestEvent bounds what the window can possibly show — the log is young, so a --days 30 request can silently cover far fewer days. A quiet report is not proof of a quiet month.
+  - A deferral is transient and the mail still arrives, which is why the deploy health check ignores it. The RATE is the signal: 421 4.7.28 is the polite warning that precedes real blocking.
+
+SEE ALSO
+  ib jerry email-activity
+
+EXAMPLES
+  ib dev email-health
+  ib dev email-health --days 30 --pretty
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev feedback count matches snapshot 1`] = `
 "USAGE
   ib dev feedback count [flags]
