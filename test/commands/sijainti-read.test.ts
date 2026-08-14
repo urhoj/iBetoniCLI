@@ -153,12 +153,39 @@ describe("ib sijainti types", () => {
     expect(get).toHaveBeenCalledWith("/api/geocode/sijaintiTypes");
     expect(result).toEqual({
       items: [
-        { sijaintiTypeId: 1, selite: "Betoniasema" },
-        { sijaintiTypeId: 6, selite: "Toimipiste / konttori" },
+        { sijaintiTypeId: 1, selite: "Betoniasema", useJerry: false },
+        { sijaintiTypeId: 6, selite: "Toimipiste / konttori", useJerry: false },
       ],
       nextCursor: null,
       count: 2,
     });
+  });
+
+  /**
+   * fb#608: the backend SELECTs useJerry and the projection threw it away, so
+   * the only way to learn which types are Jerry-eligible was to run the command
+   * twice (with and without --jerry) and diff the id sets.
+   */
+  test("runSijaintiTypes: surfaces useJerry, the column --jerry filters on", async () => {
+    get.mockResolvedValueOnce([
+      { sijaintiTypeId: 1, sijaintiTypeSelite: "Betoniasema", useJerry: true },
+      { sijaintiTypeId: 3, sijaintiTypeSelite: "Ylijäämäbetonin vastaanottoasema", useJerry: false },
+    ]);
+    const result = await runSijaintiTypes(mockClient);
+    expect(result.items).toEqual([
+      { sijaintiTypeId: 1, selite: "Betoniasema", useJerry: true },
+      { sijaintiTypeId: 3, selite: "Ylijäämäbetonin vastaanottoasema", useJerry: false },
+    ]);
+  });
+
+  test("runSijaintiTypes: tolerates the BIT column arriving as 0/1 or missing", async () => {
+    get.mockResolvedValueOnce([
+      { sijaintiTypeId: 1, sijaintiTypeSelite: "A", useJerry: 1 },
+      { sijaintiTypeId: 2, sijaintiTypeSelite: "B", useJerry: 0 },
+      { sijaintiTypeId: 3, sijaintiTypeSelite: "C" },
+    ]);
+    const result = await runSijaintiTypes(mockClient);
+    expect(result.items.map((t) => t.useJerry)).toEqual([true, false, false]);
   });
 
   test("runSijaintiTypes: --jerry appends ?useJerry=1", async () => {

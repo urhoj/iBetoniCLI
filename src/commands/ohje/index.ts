@@ -79,6 +79,17 @@ export interface OhjeListOptions {
   limit?: number;
   /** Keep only rows whose `shorttext` is blank — the grooming backfill targets. */
   emptyShorttext?: boolean;
+  /**
+   * Case-insensitive substring over helpId + title + shorttext (fb#607).
+   *
+   * `--search` is the reflex on a list command — it works on `glossary list`,
+   * `feedback list`, `changelog list`, `schema procs` and `schema tables` — so
+   * reaching for it here and getting exit 4 is a pure consistency failure.
+   * Matches the same three human-readable columns a caller would eyeball;
+   * `htmltext` is deliberately excluded, since a body-text hit would return the
+   * row without showing why it matched.
+   */
+  search?: string;
   /** Project each row to just these columns (e.g. skip the large `htmltext`). */
   fields?: string[];
   /** `"field:dir"` (e.g. `accessCount:desc`); numeric fields compare numerically. */
@@ -104,6 +115,14 @@ export async function runOhjeList(
 ): Promise<ListEnvelope<OhjeRecord>> {
   const rows = await client.get<OhjeRecord[]>("/api/helps/getAll");
   let all = Array.isArray(rows) ? rows : [];
+  if (opts.search) {
+    const needle = opts.search.toLowerCase();
+    all = all.filter((r) =>
+      [r.helpId, r.title, r.shorttext].some((v) =>
+        String(v ?? "").toLowerCase().includes(needle)
+      )
+    );
+  }
   if (opts.emptyShorttext) {
     all = all.filter((r) => !String(r.shorttext ?? "").trim());
   }
@@ -335,6 +354,7 @@ export function registerOhjeCommands(
   addNeedsReviewFlags(
     o.command("list")
       .option("--limit <n>", "", (v: string) => Number(v))
+      .option("--search <text>")
       .option("--empty-shorttext")
       .option(
         "--fields <cols>",
@@ -344,7 +364,7 @@ export function registerOhjeCommands(
       .option("--sort <field:dir>")
   )
     .action(
-      jsonAction(getClient, (client, opts: { limit?: number; emptyShorttext?: boolean; fields?: string[]; sort?: string; needsReview?: boolean; maxConfidence?: number; }) =>
+      jsonAction(getClient, (client, opts: { limit?: number; search?: string; emptyShorttext?: boolean; fields?: string[]; sort?: string; needsReview?: boolean; maxConfidence?: number; }) =>
         runOhjeList(client, opts)
       )
     );

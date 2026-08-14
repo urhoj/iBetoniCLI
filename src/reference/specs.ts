@@ -3472,9 +3472,9 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "List sijainti type categories (the 'Sijainnin laji' lookup). Resolves the sijaintiTypeId values used by `sijainti list --type` (which also accepts these names, e.g. betoniasema) and `create/update --type`.",
     permissions: ["auth.page.sijainnit.read"],
     flags: [
-      { name: "jerry", type: "boolean", description: "Use the BetoniJerry type set (useJerry=1)" },
+      { name: "jerry", type: "boolean", description: "Return ONLY the BetoniJerry-eligible types (useJerry=1). Since fb#608 every row carries `useJerry`, so the unfiltered call already answers which types are eligible — this flag is now a convenience, not the only way to find out." },
     ],
-    outputShape: "ListEnvelope<{ sijaintiTypeId, selite }>",
+    outputShape: "ListEnvelope<{ sijaintiTypeId, selite, useJerry }> — `useJerry` is the column --jerry filters on (fb#608); before it was surfaced, learning the eligible set meant running the command twice and diffing the id sets. NOTE: sijaintitypes.isPublic is deliberately NOT reported — cross-tenant visibility is per ROW (dbo.sijainti.isPublic), not per type, so a type-level flag cannot answer 'is this location public'.",
     errors: permErrors("auth.page.sijainnit.read"),
     examples: ["ib sijainti types", "ib sijainti types --jerry"],
   },
@@ -3566,6 +3566,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     auth: "any",
     flags: [
       { name: "limit", type: "number", description: "Max rows to return (client-side cap, after filter+sort)" },
+      { name: "search", type: "string", description: "Case-insensitive substring over helpId + title + shorttext — the reflex filter every other list command has (fb#607). Applied CLIENT-SIDE like the rest, and BEFORE --limit, so a search plus a limit returns the first N MATCHES rather than searching the first N rows. htmltext is deliberately not searched: a body-text hit would return a row without showing why it matched." },
       { name: "empty-shorttext", type: "boolean", description: "Only rows whose shorttext is blank (grooming backfill targets)" },
       { name: "fields", type: "string", description: "Comma-separated columns to keep, e.g. helpId,title,shorttext,accessCount (drops the large htmltext)" },
       { name: "sort", type: "string", description: "Sort by a column, e.g. accessCount:desc (numeric fields compare numerically)" },

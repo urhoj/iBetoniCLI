@@ -369,6 +369,9 @@ export async function runSijaintiTypes(client, useJerry) {
     const items = (rows || []).map((r) => ({
         sijaintiTypeId: r.sijaintiTypeId,
         selite: r.sijaintiTypeSelite ?? null,
+        // BIT column: node-mssql yields a boolean, but tolerate a raw 0/1 the way
+        // OhjeRecord.needsHumanReview does.
+        useJerry: r.useJerry === true || r.useJerry === 1,
     }));
     return listEnvelope(items);
 }
@@ -402,7 +405,11 @@ function numericTypeId(input) {
     const n = Number(input);
     return Number.isInteger(n) && n > 0 ? n : undefined;
 }
-export function resolveSijaintiTypeId(types, input) {
+export function resolveSijaintiTypeId(
+// Declares only the two fields it reads, rather than the whole row: adding
+// `useJerry` to SijaintiTypeItem (fb#608) would otherwise have forced every
+// name-resolution fixture to carry a field this function never looks at.
+types, input) {
     const passthrough = numericTypeId(input);
     if (passthrough !== undefined)
         return passthrough;

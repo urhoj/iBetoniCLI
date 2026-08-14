@@ -518,6 +518,13 @@ export async function runSijaintiUndelete(
 export interface SijaintiTypeItem {
   sijaintiTypeId: number;
   selite: string | null;
+  /**
+   * Whether this type is BetoniJerry-eligible — the column `--jerry` filters on
+   * (fb#608). It was selected by the backend and thrown away here, so the only
+   * way to learn which types are Jerry-eligible was to run the command twice
+   * and diff the two id sets.
+   */
+  useJerry: boolean;
 }
 
 /**
@@ -531,11 +538,14 @@ export async function runSijaintiTypes(
   useJerry?: boolean
 ): Promise<ListEnvelope<SijaintiTypeItem>> {
   const rows = await client.get<
-    Array<{ sijaintiTypeId: number; sijaintiTypeSelite?: string | null }>
+    Array<{ sijaintiTypeId: number; sijaintiTypeSelite?: string | null; useJerry?: boolean | number | null }>
   >(`/api/geocode/sijaintiTypes${useJerry ? "?useJerry=1" : ""}`);
   const items = (rows || []).map((r) => ({
     sijaintiTypeId: r.sijaintiTypeId,
     selite: r.sijaintiTypeSelite ?? null,
+    // BIT column: node-mssql yields a boolean, but tolerate a raw 0/1 the way
+    // OhjeRecord.needsHumanReview does.
+    useJerry: r.useJerry === true || r.useJerry === 1,
   }));
   return listEnvelope(items);
 }
@@ -580,7 +590,10 @@ function numericTypeId(input: string): number | undefined {
 }
 
 export function resolveSijaintiTypeId(
-  types: SijaintiTypeItem[],
+  // Declares only the two fields it reads, rather than the whole row: adding
+  // `useJerry` to SijaintiTypeItem (fb#608) would otherwise have forced every
+  // name-resolution fixture to carry a field this function never looks at.
+  types: Pick<SijaintiTypeItem, "sijaintiTypeId" | "selite">[],
   input: string
 ): number {
   const passthrough = numericTypeId(input);

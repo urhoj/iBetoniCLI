@@ -36,6 +36,10 @@ export async function runOhjeGet(client, helpId) {
 export async function runOhjeList(client, opts = {}) {
     const rows = await client.get("/api/helps/getAll");
     let all = Array.isArray(rows) ? rows : [];
+    if (opts.search) {
+        const needle = opts.search.toLowerCase();
+        all = all.filter((r) => [r.helpId, r.title, r.shorttext].some((v) => String(v ?? "").toLowerCase().includes(needle)));
+    }
     if (opts.emptyShorttext) {
         all = all.filter((r) => !String(r.shorttext ?? "").trim());
     }
@@ -219,6 +223,7 @@ export function registerOhjeCommands(parent, getClient) {
     }));
     addNeedsReviewFlags(o.command("list")
         .option("--limit <n>", "", (v) => Number(v))
+        .option("--search <text>")
         .option("--empty-shorttext")
         .option("--fields <cols>", "", (v) => v.split(",").map((s) => s.trim()).filter(Boolean))
         .option("--sort <field:dir>"))

@@ -388,3 +388,63 @@ describe("ib ohje update — edit mode (in-field partial)", () => {
     expect(mockClient.put).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * fb#607: `--search` works on glossary/feedback/changelog/schema list commands,
+ * so reaching for it on `ib ohje list` is the obvious move — and it exited 4.
+ * Applied client-side like every other shaping flag here (the route takes no
+ * query params).
+ */
+describe("ohje list --search (fb#607)", () => {
+  const ROWS = [
+    { helpId: "tila:2", title: "Keikan tila", shorttext: "Tilan selite", htmltext: "<p>pumppu</p>" },
+    { helpId: "puomi", title: "Puomin pituus", shorttext: "Metreinä", htmltext: "<p>x</p>" },
+    { helpId: "laatu", title: "Betonin laatu", shorttext: null, htmltext: "<p>tila</p>" },
+  ];
+
+  test("matches on helpId, title and shorttext, case-insensitively", async () => {
+    asGet().mockResolvedValueOnce(ROWS);
+    expect((await runOhjeList(mockClient, { search: "PUOMI" })).items.map((r) => r.helpId)).toEqual(["puomi"]);
+    asGet().mockResolvedValueOnce(ROWS);
+    expect((await runOhjeList(mockClient, { search: "keikan" })).items.map((r) => r.helpId)).toEqual(["tila:2"]);
+    asGet().mockResolvedValueOnce(ROWS);
+    expect((await runOhjeList(mockClient, { search: "metreinä" })).items.map((r) => r.helpId)).toEqual(["puomi"]);
+  });
+
+  /**
+   * htmltext is deliberately NOT searched: row 3's body contains "tila" but its
+   * helpId/title/shorttext do not, so returning it would give the caller a hit
+   * they cannot see in the output.
+   */
+  test("does NOT match on htmltext — a hit must be visible in the row", async () => {
+    asGet().mockResolvedValueOnce(ROWS);
+    const res = await runOhjeList(mockClient, { search: "tila" });
+    expect(res.items.map((r) => r.helpId)).toEqual(["tila:2"]);
+  });
+
+  test("a null shorttext is skipped rather than throwing", async () => {
+    asGet().mockResolvedValueOnce(ROWS);
+    const res = await runOhjeList(mockClient, { search: "betonin" });
+    expect(res.items.map((r) => r.helpId)).toEqual(["laatu"]);
+  });
+
+  /**
+   * Order is filter → sort → limit, so a search plus a limit returns the first N
+   * MATCHES. Filtering after the cap would search only the first N rows — the
+   * shape that makes a search look like it found nothing.
+   */
+  test("runs BEFORE --limit, so --search --limit returns matches not a searched page", async () => {
+    asGet().mockResolvedValueOnce([
+      { helpId: "a", title: "x" },
+      { helpId: "b", title: "x" },
+      { helpId: "needle", title: "x" },
+    ]);
+    const res = await runOhjeList(mockClient, { search: "needle", limit: 2 });
+    expect(res.items.map((r) => r.helpId)).toEqual(["needle"]);
+  });
+
+  test("no --search leaves every row, as before", async () => {
+    asGet().mockResolvedValueOnce(ROWS);
+    expect((await runOhjeList(mockClient, {})).count).toBe(3);
+  });
+});
