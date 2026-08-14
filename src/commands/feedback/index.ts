@@ -142,6 +142,8 @@ async function fetchRows(
     limit?: number;
     offset?: number;
     oldest?: boolean;
+    unclaimed?: boolean;
+    claimedBy?: string;
   }
 ): Promise<Record<string, unknown>[]> {
   const suffix = qs({
@@ -157,6 +159,11 @@ async function fetchRows(
     // backend's newest-first, which suits human "what just broke" triage.
     orderBy: params.oldest ? "createdAt" : undefined,
     orderDirection: params.oldest ? "ASC" : undefined,
+    // The backend's truthy set is EXACTLY "1"/"true" (deliberately, so
+    // ?unclaimed=false can't filter as if true) — send the literal "1", not a
+    // stringified boolean shortcut that might drift from that contract.
+    unclaimed: params.unclaimed ? "1" : undefined,
+    claimedBy: params.claimedBy || undefined,
   });
   const rows = await client.get<Record<string, unknown>[]>(`/api/feedback${suffix}`);
   return Array.isArray(rows) ? rows : [];
@@ -306,6 +313,24 @@ function resolveStatuses(opts: {
 }
 
 /**
+ * Classify one row's lease against the caller.
+ *
+ * An EXPIRED claim is "free", not "held" — the lease invariant is evaluated
+ * against the clock at read time, never against a stored flag. Rendering a
+ * lapsed lease as "held" would hide exactly the rows the 24h reclamation frees.
+ */
+export function deriveClaimState(
+  row: { claimedBy?: unknown; claimExpiresAt?: unknown },
+  me: string
+): "free" | "held" | "mine" {
+  const by = row.claimedBy;
+  const until = row.claimExpiresAt;
+  if (typeof by !== "string" || !by) return "free";
+  if (!until || new Date(String(until)).getTime() <= Date.now()) return "free";
+  return by === me ? "mine" : "held";
+}
+
+/**
  * GET /api/feedback — developer-only. Defaults to the active bucket
  * (`open` + `reviewed`); pass `--all` for every status or `--status`/`--unresolved`
  * to filter. One status is a single server-filtered GET; the default,
@@ -318,6 +343,12 @@ function resolveStatuses(opts: {
  * them (feedback #369): both are forwarded to the server as SQL filters, so an
  * unknown value returns an empty list — which reads as "nothing is filed under
  * that kind", not "you typed a kind that does not exist".
+ *
+ * Claim filters (`--unclaimed` / `--mine` / `--claimed-by`) are mutually
+ * exclusive — each answers a different question ("what can I pick up" vs
+ * "what do I hold" vs "what does labelX hold") and combining them has no
+ * coherent meaning. Every returned row also carries a derived `claimState`
+ * (see `deriveClaimState`) regardless of which filter (if any) was used.
  */
 export async function runFeedbackList(
   client: ApiClient,
@@ -334,10 +365,19 @@ export async function runFeedbackList(
     all?: boolean;
     full?: boolean;
     oldest?: boolean;
+    unclaimed?: boolean;
+    mine?: boolean;
+    claimedBy?: string;
   }
 ): Promise<ListEnvelope<Record<string, unknown>>> {
   assertEnum(opts.kind, KINDS, "--kind");
   assertEnum(opts.scope, SCOPES, "--scope");
+  const claimFilters = [opts.unclaimed, opts.mine, opts.claimedBy].filter(Boolean).length;
+  if (claimFilters > 1) {
+    failWith("Use only one of --unclaimed / --mine / --claimed-by", 4);
+  }
+  const me = resolveClaimId(undefined);
+  const claimedBy = opts.mine ? me : opts.claimedBy;
   const statuses = resolveStatuses(opts);
   let items: Record<string, unknown>[];
   let truncated = false;
@@ -355,6 +395,8 @@ export async function runFeedbackList(
       limit: opts.limit,
       offset: opts.offset,
       oldest: opts.oldest,
+      unclaimed: opts.unclaimed,
+      claimedBy,
     });
     // The path the merge branch below already covered, and this one did not:
     // a FULL page means more rows exist. The effective limit is min(requested,
@@ -374,6 +416,8 @@ export async function runFeedbackList(
           maxComplexity: opts.maxComplexity,
           limit: CAP,
           oldest: opts.oldest,
+          unclaimed: opts.unclaimed,
+          claimedBy,
         })
       )
     );
@@ -389,6 +433,8 @@ export async function runFeedbackList(
     if (merged.length > offset + limit) truncated = true;
     items = merged.slice(offset, offset + limit);
   }
+
+  items = items.map((r) => ({ ...r, claimState: deriveClaimState(r, me) }));
 
   let cut = false;
   if (!opts.full) {
@@ -837,8 +883,11 @@ export function registerFeedbackCommands(
     .option("--oldest")
     .option("--limit <n>", "", Number)
     .option("--offset <n>", "", Number)
+    .option("--unclaimed")
+    .option("--mine")
+    .option("--claimed-by <label>", "", String)
     .action(
-      jsonAction(getClient, (client, opts: { status?: string; kind?: string; scope?: string; search?: string; complexity?: number | string; maxComplexity?: number; limit?: number; offset?: number; unresolved?: boolean; all?: boolean; full?: boolean; oldest?: boolean; }) =>
+      jsonAction(getClient, (client, opts: { status?: string; kind?: string; scope?: string; search?: string; complexity?: number | string; maxComplexity?: number; limit?: number; offset?: number; unresolved?: boolean; all?: boolean; full?: boolean; oldest?: boolean; unclaimed?: boolean; mine?: boolean; claimedBy?: string; }) =>
         runFeedbackList(client, opts)
       )
     );

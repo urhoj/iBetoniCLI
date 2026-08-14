@@ -6426,6 +6426,9 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "limit", type: "number", default: "50", description: "Max rows, HARD-CAPPED at 200 by the backend. Asking for more is not an error and not honoured — you get 200 rows and a stderr warning; `truncated: true` says the page was capped (fb#605). Page the rest with --offset." },
       { name: "offset", type: "number", default: "0", description: "Skip N rows — how you reach anything beyond the 200-row cap. `--limit 200`, then `--limit 200 --offset 200`, and so on." },
       { name: "full", type: "boolean", description: "Return untruncated description/resolution (default: each capped at 200 chars)" },
+      { name: "unclaimed", type: "boolean", description: "Only items no agent currently holds — the set you should pick from. Includes rows whose claim EXPIRED (the 24h reclamation), not just never-claimed ones. Mutually exclusive with --mine/--claimed-by." },
+      { name: "mine", type: "boolean", description: "Only items YOU currently hold (shorthand for --claimed-by <your resolved label>)" },
+      { name: "claimed-by", type: "string", description: "Only items held by this label, and only while the claim is still LIVE" },
     ],
     outputShape:
       "{ items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }",
@@ -6444,6 +6447,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "--search is a server-side substring filter added in a later backend version; against an older backend it is silently ignored (the list returns unfiltered) — deploy-gated.",
       "--complexity / --max-complexity filter on the AI-triage complexity estimate (1-5). `--max-complexity 3 --unresolved` is the autonomously-workable backlog for a batch-fix agent; also deploy-gated (ignored by an older backend).",
       "--oldest sorts createdAt ASC so the automated triage loop drains the backlog oldest-first (FIFO) instead of favouring the newest reports it reads first; the human default stays newest-first. Layer it under a priority filter (e.g. `--kind bug --oldest`) to keep breakages ahead of age.",
+      "Each row carries claimState (free|held|mine). An expired claim reads as `free` — the lease is evaluated against the clock, never a stored flag, so a lapsed 24h claim reappears here automatically.",
     ],
     examples: [
       "ib dev feedback list",

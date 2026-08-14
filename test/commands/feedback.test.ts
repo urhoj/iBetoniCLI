@@ -490,7 +490,10 @@ describe("ib feedback list", () => {
     const out = await runFeedbackList(mockClient, { status: "open", kind: "bug", limit: 20 });
     expect(get).toHaveBeenCalledWith("/api/feedback?status=open&kind=bug&limit=20");
     expect(out).toEqual({
-      items: [{ feedbackId: 1 }, { feedbackId: 2 }],
+      items: [
+        { feedbackId: 1, claimState: "free" },
+        { feedbackId: 2, claimState: "free" },
+      ],
       nextCursor: null,
       count: 2,
     });

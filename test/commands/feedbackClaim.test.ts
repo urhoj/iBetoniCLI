@@ -3,6 +3,8 @@ import {
   resolveClaimId,
   runFeedbackClaim,
   runFeedbackRelease,
+  runFeedbackList,
+  deriveClaimState,
 } from "../../src/commands/feedback/index.js";
 import { CliError, exitCodeFromStatus, hintForError } from "../../src/api/errors.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
@@ -141,5 +143,66 @@ describe("ib dev feedback claim — ttl-hours 400 remedy is reachable (fix round
     };
     const err = new CliError("ttlHours must be a number 1-24", 400, null, exitCodeFromStatus(400));
     expect(hintForError(err, [deadRow])).toBeNull();
+  });
+});
+
+describe("deriveClaimState", () => {
+  const FUTURE = new Date(Date.now() + 3_600_000).toISOString();
+  const PAST = new Date(Date.now() - 3_600_000).toISOString();
+
+  test("no claim is free", () => {
+    expect(deriveClaimState({ claimedBy: null, claimExpiresAt: null }, "me")).toBe("free");
+  });
+
+  test("an EXPIRED claim is free, not held — this is the 24h reclamation", () => {
+    expect(deriveClaimState({ claimedBy: "them", claimExpiresAt: PAST }, "me")).toBe("free");
+  });
+
+  test("a live claim by someone else is held", () => {
+    expect(deriveClaimState({ claimedBy: "them", claimExpiresAt: FUTURE }, "me")).toBe("held");
+  });
+
+  test("a live claim by me is mine", () => {
+    expect(deriveClaimState({ claimedBy: "me", claimExpiresAt: FUTURE }, "me")).toBe("mine");
+  });
+});
+
+describe("runFeedbackList — claim filters are mutually exclusive", () => {
+  test("--unclaimed with --mine exits 4", async () => {
+    const client = mockClient();
+    await expect(
+      runFeedbackList(client, { unclaimed: true, mine: true } as never)
+    ).rejects.toThrow();
+  });
+});
+
+/**
+ * The backend's truthy check is EXACTLY `req.query.unclaimed === "1" ||
+ * req.query.unclaimed === "true"` — a bare `?unclaimed` (Express yields `""`)
+ * or any other spelling reads as false and the filter goes silently inert.
+ * Pin the emitted query string, not just that SOME value was sent.
+ */
+describe("runFeedbackList — claim filters reach the wire correctly", () => {
+  test("--unclaimed emits the literal query string unclaimed=1", async () => {
+    const client = mockClient();
+    await runFeedbackList(client, { unclaimed: true });
+    const url = (client as never as { get: ReturnType<typeof vi.fn> }).get.mock.calls[0][0] as string;
+    expect(url).toContain("unclaimed=1");
+  });
+
+  test("--mine resolves to claimedBy=<resolved label> on the wire", async () => {
+    const client = mockClient();
+    await runFeedbackList(client, { mine: true });
+    const url = (client as never as { get: ReturnType<typeof vi.fn> }).get.mock.calls[0][0] as string;
+    const expected = new URLSearchParams({ claimedBy: resolveClaimId(undefined) }).toString();
+    expect(url).toContain(expected);
+  });
+
+  test("--claimed-by <label> passes the label through verbatim", async () => {
+    const client = mockClient();
+    await runFeedbackList(client, { claimedBy: "hermes/groom" });
+    const url = (client as never as { get: ReturnType<typeof vi.fn> }).get.mock.calls[0][0] as string;
+    const expected = new URLSearchParams({ claimedBy: "hermes/groom" }).toString();
+    expect(url).toContain(expected);
   });
 });
