@@ -1055,6 +1055,26 @@ describe("warnIfPatchIgnored — deploy gate (fb#303)", () => {
     expect(warn.mock.calls[0][0]).toMatch(/--feedback/);
     expect(warn.mock.calls[0][0]).toMatch(/--sentry/);
   });
+
+  test("does not cry wolf on a --feedback list — the row echoes the SCALAR column (fb#576)", () => {
+    // The patch now carries number[]; the response echoes devChangelog.feedbackId,
+    // the scalar projection (the FIRST id). `541 !== [541]` is always true, so
+    // this warned on every SUCCESSFUL --feedback update — and made the detector
+    // permanently useless for the flag, since a real deploy-gated ignore became
+    // indistinguishable. The test above (scalar patch) could not cover it.
+    const warn = vi.fn();
+    warnIfPatchIgnored({ feedbackId: [541] }, { changelogId: 1281, feedbackId: 541 }, warn);
+    warnIfPatchIgnored({ feedbackId: [541, 542, 544] }, { changelogId: 1281, feedbackId: 541 }, warn);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test("still catches a genuinely ignored --feedback now that the shapes match", () => {
+    const warn = vi.fn();
+    warnIfPatchIgnored({ feedbackId: [541] }, { changelogId: 1281, feedbackId: null }, warn);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toMatch(/--feedback/);
+    expect(warn.mock.calls[0][0]).toMatch(/fb#303/);
+  });
 });
 
 describe("warnFeedbackLinkEffects — silent link theft (fb#366)", () => {
@@ -1300,6 +1320,27 @@ describe("payloadKeyMap accepts the READ shape as input (fb#357)", () => {
     expect(accepted.has("sha")).toBe(true);
     expect(accepted.has("commitShas")).toBe(false);
     expect(accepted.has("versionTag")).toBe(false);
+  });
+
+  test("feedbackLinks is a read-only OUTPUT field and stays rejected (fb#576)", () => {
+    // The read row's `feedbackLinks` is [{feedbackId, role}] — link RECORDS, not
+    // a flag value. Mapping it onto --feedback would drop the roles and re-post
+    // every id as a RESOLVING link, so round-tripping a row that carries a
+    // `references` link would silently steal that link from the entry which
+    // shipped the fix — the exact fb#548 failure this junction removes. It is in
+    // the same class as changelogId/personId/isDeleted/createdAt (all rejected
+    // above), so it gets the same loud exit 4. `feedbackIds` was an alias for a
+    // key the backend never emits — dead, and removed.
+    const keys = addKeys();
+    expect(keys.has("feedbackLinks")).toBe(false);
+    expect(keys.has("feedbackIds")).toBe(false);
+    const err = captureThrow(() =>
+      normalizeChangelogJson({ feedbackLinks: [{ feedbackId: 535, role: "resolves" }] }, keys)
+    );
+    expect(err.exitCode).toBe(4);
+    expect((err as unknown as Error).message).toMatch(/unknown key feedbackLinks/);
+    // The SCALAR column keeps round-tripping — that is the live alias.
+    expect(normalizeChangelogJson({ feedbackId: 535 }, keys)).toEqual({ feedback: "535" });
   });
 
   test("update only accepts read keys whose flag it actually registers", () => {

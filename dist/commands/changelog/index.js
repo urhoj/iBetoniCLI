@@ -367,12 +367,21 @@ export function normalizeLanguage(lang) {
  * (feedback #357) — the emitted shape is untouched, and the flag names stay
  * canonical. Also used (reversed) by {@link warnIfPatchIgnored} to name the
  * flag for a deploy-gated column the backend ignored.
+ *
+ * `feedbackLinks` (fb#576) is deliberately NOT here. It is a read-only OUTPUT
+ * field — a list of `{feedbackId, role}` link records, not a flag value — in the
+ * same class as changelogId/personId/isDeleted/createdAt/updatedAt, which the
+ * pipeline also rejects as unknown keys. Mapping it onto `--feedback` would drop
+ * the roles and re-post every id as a resolving link, so round-tripping a row
+ * carrying a `references` link would silently STEAL that link from the entry
+ * that shipped the fix — the exact fb#548 failure this junction exists to
+ * remove. A loud exit 4 naming the key is the right answer. (An earlier
+ * `feedbackIds` entry here named a key nothing emits and was simply dead.)
  */
 const READ_SHAPE_KEY_ALIASES = {
     commitShas: "sha",
     versionTag: "vtag",
     feedbackId: "feedback",
-    feedbackIds: "feedback", // fb#576: the read shape now emits the plural too
     sentryIssue: "sentry",
     entryDate: "date",
 };
@@ -464,7 +473,18 @@ export function warnIfPatchIgnored(patch, result, warn = warnNote) {
     if (!result || typeof result !== "object" || result.dryRun)
         return;
     const row = result;
-    const ignored = DEPLOY_GATED_PATCH_FIELDS.filter((f) => patch[f] !== undefined && f in row && row[f] !== patch[f]);
+    const ignored = DEPLOY_GATED_PATCH_FIELDS.filter((f) => {
+        const sent = patch[f];
+        if (sent === undefined || !(f in row))
+            return false;
+        // fb#576: --feedback is a LIST on the wire, but the row echoes the SCALAR
+        // projection column (devChangelog.feedbackId = the first id given). `541 !==
+        // [541]` is always true, so this fired on every SUCCESSFUL --feedback update
+        // — and worse, it made the detector permanently USELESS for that flag: a
+        // genuinely deploy-gated ignore became indistinguishable from the normal
+        // case. Compare like with like.
+        return row[f] !== (Array.isArray(sent) ? sent[0] : sent);
+    });
     if (ignored.length)
         warn(`[ib] ⚠ the backend did not apply ${ignored.map((f) => `--${READ_SHAPE_KEY_ALIASES[f] ?? f.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase())}`).join(", ")} — ` +
             `these became editable in a later puminet5api version, so this endpoint is silently ignoring them (fb#303). The rest of the patch was applied.`);
