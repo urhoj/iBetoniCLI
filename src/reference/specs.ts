@@ -4896,44 +4896,48 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "Upsert a provider company's BetoniJerry settings (PUT /api/jerry-provider-settings). Partial-payload-safe: only the body keys present are written (omit a key to preserve it). jerryPersonId must belong to the target company. --asiakas targets another company. Returns the FULL saved settings (no follow-up GET needed) plus changed:boolean (whether anything actually changed vs an idempotent no-op). companyDescription is nvarchar — ä/ö are preserved. Requires --reason. Writable keys: jerryPersonId, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsent. `publicListingConsent` is a BOOLEAN intent flag — the server stamps publicListingConsentAt/By from your token; never send a timestamp. Re-granting an already-granted consent does not re-stamp the original date. On Windows PowerShell use --from-json <file>: PowerShell splits a quoted --body value on its inner double-quotes.",
     permissions: ["edit-tier on the target company (tarjousAdmin / company admin)"],
     flags: [
-      { name: "body", type: "json", description: "JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo?, website?, publicSlug?, publicListingConsent? }. Mutually exclusive with --from-json. ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
+      { name: "body", type: "json", description: "JSON: { jerryPersonId?, offerNotificationEmail?, openingHours?, companyDescription?, maintainsOrderInfo?, website?, publicSlug?, publicListingConsent? }. Mutually exclusive with --from-json. ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
       { name: "from-json", type: "string", description: "Read the JSON body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body." },
+      { name: "email", type: "string", description: "Address tarjouspyyntö mail is DELIVERED to (offerNotificationEmail). May be a shared inbox — it is a mailbox, not a login, so jerryPersonId stays a named person who signs in. Wins over jerryPersonId's own address when set, and over the same key in --body; pass \"\" to clear and fall back to it." },
       { name: "asiakas", type: "number", description: "Target company asiakasId (default: your own)" },
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
     writeFlags: true,
     dryRunKind: "server",
     reasonPolicy: "always",
-    outputShape: "{ asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, jerryPersonEmail, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsentAt, publicListingConsentBy, changed } · { dryRun: true, wouldUpdate: {...} } on --dry-run",
+    outputShape: "{ asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, jerryPersonEmail, offerNotificationEmail, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsentAt, publicListingConsentBy, changed } · { dryRun: true, wouldUpdate: {...} } on --dry-run",
     errors: [
-      apiErr(400, "Invalid field / contact not in company", "check jerryPersonId belongs to the company"),
+      apiErr(400, "Invalid field / contact not in company", "check jerryPersonId belongs to the company; offerNotificationEmail must be a valid address"),
       apiErr(403, "No edit rights on company", "use a tarjousAdmin/admin token for that company"),
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
       "On Windows PowerShell inline --body JSON often fails (the shell strips the inner double-quotes) — pass --from-json <file|-> (a file, or - for stdin) to avoid shell quoting entirely.",
+      "offerNotificationEmail vs jerryPersonId: the FIRST is where tarjouspyyntö mail is DELIVERED (may be a shared inbox), the SECOND is WHO signs in and acts on it (always a named person, always a personal login). Before fb#532 one field did both jobs, which pushed operators into configuring shared login accounts — the welcome email forbids those on GDPR/audit grounds, and the one account set up that way went three weeks without a single login.",
     ],
     examples: [
       'ib jerry provider-settings set --body \'{"openingHours":"ma-pe 7-16","maintainsOrderInfo":true}\' --reason "update opening hours"',
       'ib jerry provider-settings set --from-json ./settings.json --reason "update opening hours"',
       'ib jerry provider-settings set --body \'{"jerryPersonId":6233}\' --asiakas 1402 --reason "set contact"',
+      'ib jerry provider-settings set --email tarjoukset@yritys.fi --asiakas 1409 --reason "route offers to the shared inbox"',
     ],
   },
   {
     command: "ib jerry admin list",
     description:
-      "List Jerry-active companies (isPumppuToimittaja + HAS_JERRY setting) with per-company counts (admins, tarjousAdmins, pumpparit, vehicles, Jerry/non-Jerry varikot, matchable varikot). GET /api/admin/jerry-companies. System-admin only. Health check: a row with matchableVarikkoCount 0 is Jerry-active but CANNOT receive a single tarjouspyyntö — its varikot are enrolled yet fail the geofence (no coords, or no delivery radius). Diagnose with `ib jerry check-address --explain`.",
+      "List Jerry-active companies (isPumppuToimittaja + HAS_JERRY setting) with per-company counts (admins, tarjousAdmins, pumpparit, vehicles, Jerry/non-Jerry varikot, matchable varikot) AND login reality (lastLoginTime, jerryContactLastLoginTime). GET /api/admin/jerry-companies. System-admin only. TWO health checks: matchableVarikkoCount 0 means Jerry-active but its varikot fail the geofence, so it CANNOT receive a tarjouspyyntö (diagnose with `ib jerry check-address --explain`); jerryContactLastLoginTime null means it receives them but the contact they are mailed to has never signed in, so nobody there can open one.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     flags: [],
     outputShape:
-      "ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, sijaintiNonJerryCount, ajoneuvotEnabled, matchableVarikkoCount? }>. matchableVarikkoCount counts varikot that pass the REAL fan-out geofence (enrolled AND coords AND maxDeliveryDistance > 0); sijaintiJerryCount counts enrolment only, so matchableVarikkoCount 0 with sijaintiJerryCount > 0 means the company is Jerry-active but invisible to every tarjouspyyntö.",
+      "ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, sijaintiNonJerryCount, ajoneuvotEnabled, matchableVarikkoCount?, lastLoginTime?, jerryContactPersonId?, jerryContactLastLoginTime? }>. matchableVarikkoCount counts varikot that pass the REAL fan-out geofence (enrolled AND coords AND maxDeliveryDistance > 0); sijaintiJerryCount counts enrolment only, so matchableVarikkoCount 0 with sijaintiJerryCount > 0 means the company is Jerry-active but invisible to every tarjouspyyntö. lastLoginTime is the MAX over the company's admins/tarjousAdmins; jerryContactLastLoginTime is the jerry contact's own — they differ when the company is alive but the notified address is dead. jerryContactPersonId null means no contact is configured at all (a different defect from a configured contact who never signed in).",
     errors: [
       SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
     ],
     notes: [
       "The health check is `matchableVarikkoCount === 0 && sijaintiJerryCount > 0` — Jerry-active, varikot enrolled, yet invisible to every tarjouspyyntö. Diagnose the individual depot with `ib jerry check-address --explain`.",
+      "The second health check is `jerryContactLastLoginTime === null` — the enrolment is live and mailed, but the recipient has never signed in, so they cannot see customer details or leave an offer. Two providers sat like this for weeks looking identical to healthy rows; finding them used to need a per-person `ib person activity` sweep (fb#532). Remedy: re-send the tervetuloa email (it now explains the one-time-code login), or check whether offerNotificationEmail should carry the shared inbox instead.",
     ],
     seeAlso: ["ib jerry check-address"],
     examples: ["ib jerry admin list", "ib jerry admin list --pretty"],
@@ -4958,7 +4962,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin detail",
     description:
-      "Company Jerry drill-down: people by role (admins/tarjousAdmins/pumpparit), vehicles, and each sijainti's Jerry enrolment status (GET /api/admin/jerry-companies/:asiakasId/detail). System-admin only.",
+      "Company Jerry drill-down: people by role (admins/tarjousAdmins/pumpparit) WITH each person's lastLoginTime, vehicles, and each sijainti's Jerry enrolment status (GET /api/admin/jerry-companies/:asiakasId/detail). System-admin only. Use it to name WHO at a company has never signed in once `ib jerry admin list` flags the company (fb#532).",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "asiakasId", type: "number", required: false, description: "company asiakasId (or pass --asiakas)" }],
@@ -4966,7 +4970,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       ASIAKAS_TARGET_FLAG,
     ],
     outputShape:
-      "{ admins:[{personId,name}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,isJerry}] }",
+      "{ admins:[{personId,name,lastLoginTime}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,isJerry}] }. lastLoginTime null = that person has never signed in.",
     errors: [
       apiErr(400, "Invalid asiakasId", "pass a numeric asiakasId"),
       SYSADMIN_403,

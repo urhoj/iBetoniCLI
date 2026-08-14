@@ -759,13 +759,30 @@ export function registerJerryCommands(parent, getClient) {
         .command("set")
         .option("--body <json>")
         .option("--from-json <file>")
+        // `--email`, not `--offer-email`: the latter is a near-spelling of the
+        // established `--offer` (a pumppuOfferId on 5 commands) and reads as "the
+        // email of offer N" — flag-vocabulary.test.ts rejects it. `--email` is the
+        // majority spelling and unambiguous here, since this is the only address
+        // the command sets (same shape as `ib customer update --email`).
+        .option("--email <email>")
         .option("--asiakas <id>", "", Number)).action(guarded(async (opts) => {
         const client = await getClient();
         const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson });
-        if (!parsed) {
-            failWith("provider-settings set requires a body via --body or --from-json", 4);
+        // A typed shortcut for the one field an operator most often sets alone, and
+        // PowerShell mangles inline --body JSON (fb#437). Compared against undefined,
+        // not falsiness: `--email ""` is the documented way to CLEAR the address and
+        // fall back to the contact person's own.
+        const hasOfferEmail = opts.email !== undefined;
+        if (!parsed && !hasOfferEmail) {
+            failWith("provider-settings set requires a body via --body, --from-json or --email", 4);
         }
-        writeJson(await runJerryProviderSettingsSet(client, parsed, opts.asiakas, opts));
+        // Typed flag wins over the same key in --body: it is the more specific
+        // instruction, and silently ignoring it would be the worse failure.
+        const payload = {
+            ...(parsed ?? {}),
+            ...(hasOfferEmail ? { offerNotificationEmail: opts.email } : {}),
+        };
+        writeJson(await runJerryProviderSettingsSet(client, payload, opts.asiakas, opts));
     }));
     // admin ──────────────────────────────────────────────────────────────────────
     const admin = j

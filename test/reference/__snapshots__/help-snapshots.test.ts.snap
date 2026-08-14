@@ -3928,7 +3928,7 @@ exports[`Help snapshots — contract stability > help for ib jerry admin detail 
   ib jerry admin detail [<asiakasId>] [flags]
 
 DESCRIPTION
-  Company Jerry drill-down: people by role (admins/tarjousAdmins/pumpparit), vehicles, and each sijainti's Jerry enrolment status (GET /api/admin/jerry-companies/:asiakasId/detail). System-admin only.
+  Company Jerry drill-down: people by role (admins/tarjousAdmins/pumpparit) WITH each person's lastLoginTime, vehicles, and each sijainti's Jerry enrolment status (GET /api/admin/jerry-companies/:asiakasId/detail). System-admin only. Use it to name WHO at a company has never signed in once \`ib jerry admin list\` flags the company (fb#532).
   Permissions: requires isSystemAdmin.
 
 ARGUMENTS
@@ -3942,7 +3942,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { admins:[{personId,name}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,isJerry}] }
+  { admins:[{personId,name,lastLoginTime}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,isJerry}] }. lastLoginTime null = that person has never signed in.
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Invalid asiakasId      → pass a numeric asiakasId
@@ -4050,7 +4050,7 @@ exports[`Help snapshots — contract stability > help for ib jerry admin list ma
   ib jerry admin list [flags]
 
 DESCRIPTION
-  List Jerry-active companies (isPumppuToimittaja + HAS_JERRY setting) with per-company counts (admins, tarjousAdmins, pumpparit, vehicles, Jerry/non-Jerry varikot, matchable varikot). GET /api/admin/jerry-companies. System-admin only. Health check: a row with matchableVarikkoCount 0 is Jerry-active but CANNOT receive a single tarjouspyyntö — its varikot are enrolled yet fail the geofence (no coords, or no delivery radius). Diagnose with \`ib jerry check-address --explain\`.
+  List Jerry-active companies (isPumppuToimittaja + HAS_JERRY setting) with per-company counts (admins, tarjousAdmins, pumpparit, vehicles, Jerry/non-Jerry varikot, matchable varikot) AND login reality (lastLoginTime, jerryContactLastLoginTime). GET /api/admin/jerry-companies. System-admin only. TWO health checks: matchableVarikkoCount 0 means Jerry-active but its varikot fail the geofence, so it CANNOT receive a tarjouspyyntö (diagnose with \`ib jerry check-address --explain\`); jerryContactLastLoginTime null means it receives them but the contact they are mailed to has never signed in, so nobody there can open one.
   Permissions: requires isSystemAdmin.
 
 FLAGS
@@ -4061,7 +4061,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, sijaintiNonJerryCount, ajoneuvotEnabled, matchableVarikkoCount? }>. matchableVarikkoCount counts varikot that pass the REAL fan-out geofence (enrolled AND coords AND maxDeliveryDistance > 0); sijaintiJerryCount counts enrolment only, so matchableVarikkoCount 0 with sijaintiJerryCount > 0 means the company is Jerry-active but invisible to every tarjouspyyntö.
+  ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, sijaintiNonJerryCount, ajoneuvotEnabled, matchableVarikkoCount?, lastLoginTime?, jerryContactPersonId?, jerryContactLastLoginTime? }>. matchableVarikkoCount counts varikot that pass the REAL fan-out geofence (enrolled AND coords AND maxDeliveryDistance > 0); sijaintiJerryCount counts enrolment only, so matchableVarikkoCount 0 with sijaintiJerryCount > 0 means the company is Jerry-active but invisible to every tarjouspyyntö. lastLoginTime is the MAX over the company's admins/tarjousAdmins; jerryContactLastLoginTime is the jerry contact's own — they differ when the company is alive but the notified address is dead. jerryContactPersonId null means no contact is configured at all (a different defect from a configured contact who never signed in).
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
@@ -4070,6 +4070,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - The health check is \`matchableVarikkoCount === 0 && sijaintiJerryCount > 0\` — Jerry-active, varikot enrolled, yet invisible to every tarjouspyyntö. Diagnose the individual depot with \`ib jerry check-address --explain\`.
+  - The second health check is \`jerryContactLastLoginTime === null\` — the enrolment is live and mailed, but the recipient has never signed in, so they cannot see customer details or leave an offer. Two providers sat like this for weeks looking identical to healthy rows; finding them used to need a per-person \`ib person activity\` sweep (fb#532). Remedy: re-send the tervetuloa email (it now explains the one-time-code login), or check whether offerNotificationEmail should carry the shared inbox instead.
 
 SEE ALSO
   ib jerry check-address
@@ -5190,8 +5191,9 @@ DESCRIPTION
   Permissions: requires edit-tier on the target company (tarjousAdmin / company admin).
 
 FLAGS
-  --body JSON    JSON: { jerryPersonId?, openingHours?, companyDescription?, maintainsOrderInfo?, website?, publicSlug?, publicListingConsent? }. Mutually exclusive with --from-json. ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see \`ib help shell-quoting\`).
+  --body JSON    JSON: { jerryPersonId?, offerNotificationEmail?, openingHours?, companyDescription?, maintainsOrderInfo?, website?, publicSlug?, publicListingConsent? }. Mutually exclusive with --from-json. ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see \`ib help shell-quoting\`).
   --from-json STRING    Read the JSON body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body.
+  --email STRING    Address tarjouspyyntö mail is DELIVERED to (offerNotificationEmail). May be a shared inbox — it is a mailbox, not a login, so jerryPersonId stays a named person who signs in. Wins over jerryPersonId's own address when set, and over the same key in --body; pass "" to clear and fall back to it.
   --asiakas NUMBER    Target company asiakasId (default: your own)
   --reason STRING    Audit-log reason (X-Action-Reason); REQUIRED
 
@@ -5206,21 +5208,23 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, jerryPersonEmail, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsentAt, publicListingConsentBy, changed } · { dryRun: true, wouldUpdate: {...} } on --dry-run
+  { asiakasId, jerryPersonId, jerryPersonName, jerryPersonPhone, jerryPersonEmail, offerNotificationEmail, openingHours, companyDescription, maintainsOrderInfo, website, publicSlug, publicListingConsentAt, publicListingConsentBy, changed } · { dryRun: true, wouldUpdate: {...} } on --dry-run
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Invalid field / contact not in company → check jerryPersonId belongs to the company
+  exit 4 (HTTP 400)  Invalid field / contact not in company → check jerryPersonId belongs to the company; offerNotificationEmail must be a valid address
   exit 3 (HTTP 403)  No edit rights on company → use a tarjousAdmin/admin token for that company
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
 NOTES
   - On Windows PowerShell inline --body JSON often fails (the shell strips the inner double-quotes) — pass --from-json <file|-> (a file, or - for stdin) to avoid shell quoting entirely.
+  - offerNotificationEmail vs jerryPersonId: the FIRST is where tarjouspyyntö mail is DELIVERED (may be a shared inbox), the SECOND is WHO signs in and acts on it (always a named person, always a personal login). Before fb#532 one field did both jobs, which pushed operators into configuring shared login accounts — the welcome email forbids those on GDPR/audit grounds, and the one account set up that way went three weeks without a single login.
 
 EXAMPLES
   ib jerry provider-settings set --body '{"openingHours":"ma-pe 7-16","maintainsOrderInfo":true}' --reason "update opening hours"
   ib jerry provider-settings set --from-json ./settings.json --reason "update opening hours"
   ib jerry provider-settings set --body '{"jerryPersonId":6233}' --asiakas 1402 --reason "set contact"
+  ib jerry provider-settings set --email tarjoukset@yritys.fi --asiakas 1409 --reason "route offers to the shared inbox"
 "
 `;
 
