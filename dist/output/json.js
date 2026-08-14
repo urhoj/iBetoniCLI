@@ -68,6 +68,36 @@ export function setProjectionColumns(cols) {
 }
 const isRow = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 /**
+ * A single record's real payload usually lives in a NESTED list — `ib dev schema
+ * table X` returns `{name, columns[], indexes[], triggers[], …}` — which a
+ * TOP-LEVEL projection drops in silence. `--columns name` there READS as "the
+ * columns' name" but matches the record's own `name` (the TABLE name), so the
+ * caller gets `{name:"X"}` while 27 column rows go unmentioned — and the
+ * no-match exit-4 guard below is unreachable precisely BECAUSE a column matched
+ * (fb#596). Silence is the bug: `{name:"sijainti"}` reads as a successful answer,
+ * so a caller can conclude "this table has no columns" rather than "wrong flag".
+ *
+ * Warn rather than descend into the list: in that same output `name` exists at
+ * BOTH levels and there are SEVEN array fields, so picking one would be a guess
+ * — and returning its rows would change a record command's output SHAPE from
+ * object to array, breaking any caller that parses a record.
+ *
+ * Array-of-objects only, so scalar arrays (`synonyms`, `tags`) stay quiet; and
+ * record-only, because for a list the ROW is the payload and firing per item
+ * would be noise.
+ */
+function warnDroppedNestedLists(record, projected) {
+    const dropped = Object.entries(record)
+        .filter(([k, v]) => !(k in projected) && Array.isArray(v) && v.length > 0 && isRow(v[0]))
+        .map(([k, v]) => {
+        const n = v.length;
+        return `${k} (${n} ${n === 1 ? "row" : "rows"})`;
+    });
+    if (dropped.length === 0)
+        return;
+    warnNote(`[ib] --columns projects TOP-LEVEL fields only — dropped nested list(s): ${dropped.join(", ")}. Re-run without --columns to get them.`);
+}
+/**
  * Apply the global `--columns` projection to a command's success output
  * (fb#451). A `ListEnvelope` / raw array projects each object row (envelope
  * metadata — `nextCursor`/`count`/`truncated`/`hint` — is kept); a single
@@ -76,6 +106,10 @@ const isRow = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
  * requested column matches, or the output is a scalar that cannot be
  * projected at all, the command exits 4 naming what IS available instead of
  * returning the unprojected payload as if the flag had been applied.
+ *
+ * TOP-LEVEL ONLY — it never reaches into a nested list. A record whose payload
+ * lives in one warns instead (fb#596); see {@link warnDroppedNestedLists} for
+ * why that case cannot use the exit-4 guard above.
  */
 export function applyColumnsProjection(value, cols) {
     let rows;
@@ -119,7 +153,10 @@ export function applyColumnsProjection(value, cols) {
     }
     if (Array.isArray(value))
         return value.map((it) => (isRow(it) ? pick(it) : it));
-    return pick(value);
+    const record = value;
+    const projected = pick(record);
+    warnDroppedNestedLists(record, projected);
+    return projected;
 }
 export function setOutputMode(m) {
     const ctx = getEmbeddedCtx();

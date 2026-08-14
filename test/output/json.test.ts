@@ -177,6 +177,58 @@ describe("JSON output", () => {
       });
     });
 
+    // fb#596: `ib dev schema table X --columns name` matches the record's OWN
+    // `name` (the TABLE name), so the no-match exit-4 guard cannot fire, and the
+    // 27-row `columns[]` the caller actually meant is dropped in silence —
+    // {name:"X"} reads as a successful "this table has no columns".
+    test("a record whose payload is a nested list still projects, but warns", () => {
+      setProjectionColumns(["name"]);
+      writeJson({
+        name: "sijainti",
+        columns: [{ name: "sijaintiId" }, { name: "asiakasId" }],
+        indexes: [{ name: "PK_sijainti" }],
+      });
+      expect(JSON.parse(String(stdoutSpy.mock.calls.at(-1)![0]))).toEqual({
+        name: "sijainti",
+      });
+      const warn = String(stderrSpy.mock.calls.at(-1)![0]);
+      expect(warn).toContain("columns (2 rows)");
+      expect(warn).toContain("indexes (1 row)");
+      expect(warn).toContain("TOP-LEVEL");
+    });
+
+    // NB the spies are re-attached, never restored, so calls ACCUMULATE across
+    // tests in this file — `not.toHaveBeenCalled()` would pick up an earlier
+    // test's warning. Compare the count before/after, as the stdout cases do.
+    test("a record with no nested list projects silently", () => {
+      setProjectionColumns(["feedbackId"]);
+      const before = stderrSpy.mock.calls.length;
+      writeJson({ feedbackId: 596, status: "open" });
+      expect(stderrSpy.mock.calls.length).toBe(before);
+    });
+
+    // Guards the array-OF-OBJECTS condition: dropping a scalar array is
+    // unremarkable, and warning on it would bury the signal above.
+    test("a dropped scalar array does not warn", () => {
+      setProjectionColumns(["term"]);
+      const before = stderrSpy.mock.calls.length;
+      writeJson({ term: "puomi", synonyms: ["puomisto", "masto"] });
+      expect(stderrSpy.mock.calls.length).toBe(before);
+    });
+
+    // The nested-list warning is record-only — for a list the ROW is the
+    // payload, so firing once per item would be noise.
+    test("list rows with nested lists do not warn", () => {
+      setProjectionColumns(["a"]);
+      const before = stderrSpy.mock.calls.length;
+      writeJson({
+        items: [{ a: 1, kids: [{ b: 2 }] }, { a: 3, kids: [{ b: 4 }] }],
+        nextCursor: null,
+        count: 2,
+      });
+      expect(stderrSpy.mock.calls.length).toBe(before);
+    });
+
     test("partially unknown columns project the rest and warn on stderr", () => {
       setProjectionColumns(["a", "nope"]);
       writeJson({ a: 1, b: 2 });

@@ -46,6 +46,11 @@ export interface GlobalOptions {
    * cannot be projected (a scalar), exits 4 naming what IS available.
    * `null` = not set.
    *
+   * TOP-LEVEL ONLY — it never reaches into a nested list, and a record whose
+   * payload lives in one (`ib dev schema table X` → `columns[]`) warns on stderr
+   * rather than failing, because a top-level key DID match and the exit-4 guard
+   * is therefore unreachable (fb#596).
+   *
    * Named `--columns`, NOT `--fields`: a root option is recognized anywhere in
    * argv and would SHADOW the per-command `--fields <csv>` that
    * `customer list` / `ohje list` already own (the same trap documented on
@@ -79,7 +84,10 @@ const GLOBAL_OPTIONS: ReadonlyArray<readonly [flags: string, description: string
     "Run this one command in another company's context (ephemeral switch, not persisted)",
   ],
   ["--stats", "Print API, SQL, and cache hit/miss timing for this command to stderr"],
-  ["--columns <csv>", "Only output these fields (projects lists and single records; loud on no match)"],
+  [
+    "--columns <csv>",
+    "Only output these TOP-LEVEL fields (projects list rows and single records; never reaches into a nested list; loud on no match)",
+  ],
 ];
 
 /** The `-x` / `--xxx` tokens in a Commander flags string (`-e, --endpoint <url>`). */
