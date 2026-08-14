@@ -133,6 +133,8 @@ export interface ChangelogAddBody {
   feedbackId?: number | number[];
   /** Not a column: the backend reads it as a link option. Sent only as `false`, by --no-resolve (fb#441). */
   resolveFeedback?: boolean;
+  /** Not a column either: ids whose link to THIS entry is removed (--unlink, fb#585). `update` only. */
+  unlinkFeedbackId?: number | number[];
   sentryIssue?: string;
   source?: string;
   language?: string;
@@ -679,6 +681,10 @@ function normalizeFeedbackIds(v: unknown): number[] | undefined {
  * 3. NOT LINKED AT ALL — the id matched no row. The entry is still created, so
  *    the response looks like success; a typo'd id otherwise left the caller
  *    believing the row was closed while it stayed open forever (fb#543).
+ * 4. THE LINK FAILED for this id (fb#586) — a DB-level failure on one id of a
+ *    multi-id set. Distinct from 3: 3 is "no such row", 4 is "could not". Worth
+ *    saying because the batch is one transaction PER id, so the rest of the set
+ *    may have landed, and the entry itself certainly did.
  *
  * stderr only — the stdout JSON contract is untouched.
  */
@@ -701,7 +707,10 @@ export function warnFeedbackLinkEffects(
     // Only name the row when there is a row to name — the legacy single-link
     // shape may not carry the id at all.
     const at = typeof feedbackId === "number" ? `fb#${feedbackId}: ` : "";
-    if (feedbackLinked === false)
+    // `feedbackLinked:false` covers BOTH "no such row" and "the link failed"
+    // (fb#586), and they need opposite remedies — check the id vs retry it — so
+    // the presence of `error` decides which of the two fires, never both.
+    if (feedbackLinked === false && typeof l.error !== "string")
       warn(
         `[ib] ⚠ ${at}--feedback named a row that does not exist — cl#${changelogId} was created but NOTHING was linked for it. ` +
           `Check the id with \`ib dev feedback get <id>\`, then attach it with \`ib dev changelog update ${changelogId} --feedback <id>\`.`
@@ -720,6 +729,70 @@ export function warnFeedbackLinkEffects(
       warn(
         `[ib] note: ${at}cl#${changelogId} is linked to that feedback row, but the row was left at \`${feedbackStatus}\` — NOT marked applied. ` +
           `A status set deliberately is preserved (only \`open\` auto-advances, and a REOPENED row does not). Close it with \`ib dev feedback resolve <id> --status applied\` once the change is actually live.`
+      );
+    // 4. THE LINK FAILED for this id alone (fb#586). The other ids in the set
+    //    may well have landed, and the entry exists either way, so the remedy is
+    //    to finish the set — NOT to re-run `add`, which would mint a duplicate
+    //    entry. Named per id because that is the whole point: before this, a
+    //    mid-batch failure surfaced as a 500 that said nothing about which half
+    //    of the list had already committed.
+    if (typeof l.error === "string")
+      warn(
+        `[ib] ⚠ ${at}the link FAILED (${l.error}). cl#${changelogId} exists and the other ids in this call are reported separately — ` +
+          `do NOT re-run \`add\` (that mints a duplicate entry); finish the set with \`ib dev changelog update ${changelogId} --feedback <the ids that failed>\`.`
+      );
+  }
+}
+
+/**
+ * Report what `--unlink` removed, and the one thing it deliberately did NOT do
+ * (fb#585).
+ *
+ * Unlinking clears the junction row and both projections, but never touches the
+ * feedback row's STATUS — silently reopening it would be the implicit status
+ * side effect fb#578/fb#587 exist to remove. So when the removed link was the
+ * one that had CLOSED the row, the row is left closed with no resolver, and the
+ * caller has a decision to make. That is the case this names.
+ *
+ * The absence of `feedbackUnlinks` on the response is the DEPLOY GATE: an older
+ * backend drops `unlinkFeedbackId` as an unknown body key and returns 200, so
+ * without this check `--unlink` would report a confident success having removed
+ * nothing.
+ */
+export function warnFeedbackUnlinkEffects(
+  result: unknown,
+  requestedIds: number[] | undefined,
+  warn: (msg: string) => void = warnNote
+): void {
+  if (!requestedIds || requestedIds.length === 0) return;
+  const row = (result && typeof result === "object" ? result : {}) as Record<string, unknown>;
+  const { changelogId } = row;
+  const unlinks = Array.isArray(row.feedbackUnlinks)
+    ? (row.feedbackUnlinks as Array<Record<string, unknown>>)
+    : null;
+
+  if (!unlinks) {
+    warn(
+      `[ib] ⚠ --unlink had NO effect: this backend does not support it yet, and dropped it as an unknown field (the PUT still returned 200). ` +
+        `Every link named is still in place — verify with \`ib dev changelog get ${changelogId}\`, and retry once puminet5api has deployed.`
+    );
+    return;
+  }
+
+  for (const u of unlinks) {
+    const { feedbackId, unlinked, feedbackStatus, error } = u;
+    const at = typeof feedbackId === "number" ? `fb#${feedbackId}: ` : "";
+    if (typeof error === "string")
+      warn(`[ib] ⚠ ${at}the unlink FAILED (${error}). The link is still in place; retry it.`);
+    else if (unlinked === false)
+      warn(
+        `[ib] note: ${at}there was no link to cl#${changelogId} to remove — nothing changed. ` +
+          `Check which entry actually holds it with \`ib dev feedback get <id>\`.`
+      );
+    else if (typeof feedbackStatus === "string")
+      warn(
+        `[ib] note: ${at}the link is gone, but the row is still \`${feedbackStatus}\` — unlinking never changes a status. ` +
+          `If it was closed by the link you just removed, reopen it with \`ib dev feedback resolve ${typeof feedbackId === "number" ? feedbackId : "<id>"} --status open\`.`
       );
   }
 }
@@ -914,6 +987,9 @@ export function registerChangelogCommands(
       // `patch` and mis-drive the next deploy. Absent flag = field untouched.
       .option("--bump-level <l>")
       .option("--feedback <ids>", "", intCsvFlag("--feedback"))
+      // `update` only: there is nothing to unlink from an entry `add` is still
+      // creating (fb#585).
+      .option("--unlink <ids>", "", intCsvFlag("--unlink"))
       .option("--no-resolve")
       .option("--sentry <ref>")
       .option("--source <s>")
@@ -922,7 +998,7 @@ export function registerChangelogCommands(
       .option(
         "--from-json <file>"
       )
-  ).action(guarded(async (idStr: string, o: Record<string, string> & WriteFlags & { vtag?: string; bumpLevel?: string; feedback?: number[]; resolve?: boolean; fromJson?: string }, cmd: Command) => {
+  ).action(guarded(async (idStr: string, o: Record<string, string> & WriteFlags & { vtag?: string; bumpLevel?: string; feedback?: number[]; unlink?: number[]; resolve?: boolean; fromJson?: string }, cmd: Command) => {
     const id = parseRefId(idStr, "changelog", "update");
     applyFromJson(cmd, o as Record<string, unknown>);
     if (o.type !== undefined) o.type = normalizeType(o.type)!;
@@ -960,6 +1036,7 @@ export function registerChangelogCommands(
     if (o.date) patch.entryDate = resolveDate(o.date)!;
     if (o.bumpLevel !== undefined) patch.bumpLevel = o.bumpLevel;
     if (o.feedback !== undefined) patch.feedbackId = normalizeFeedbackIds(o.feedback);
+    if (o.unlink !== undefined) patch.unlinkFeedbackId = normalizeFeedbackIds(o.unlink);
     if (o.resolve === false) patch.resolveFeedback = false;
     if (o.sentry) patch.sentryIssue = normalizeSentryRef(o.sentry);
     const updLang = normalizeLanguage(o.language);
@@ -970,6 +1047,7 @@ export function registerChangelogCommands(
     );
     warnIfPatchIgnored(patch, result);
     warnFeedbackLinkEffects(result);
+    warnFeedbackUnlinkEffects(result, o.unlink);
     writeJson(result);
   }));
 
@@ -1368,6 +1446,12 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
           "cliFeedback id(s) this entry relates to — a single id or a comma-separated list (`541,542,544`), each optionally `fb#`-anchored. Each is recorded in devChangelogFeedback with role `resolves` (default) or `references` (--no-resolve). Recording a link here NEVER changes the row's status (fb#578) — `update` is the CORRECTION path, so it repairs a displaced link and leaves the status to you; close a row with `ib dev feedback resolve <id> --status applied`. (`changelog add` is what reports shipped work, and it is the command that advances a row.) If a row was ALREADY resolved by another entry, a `resolves` link TAKES it (the correction path) and says so on stderr; any hand-written resolution note is preserved (fb#366), and so is an auto `Shipped:` note on a row left open — that note is what marks the row as deliberately REOPENED (fb#576/fb#587).",
       },
       {
+        name: "unlink",
+        type: "string",
+        description:
+          "REMOVE this entry's link to the named cliFeedback id(s) — a single id or a comma-separated list, each optionally `fb#`-anchored. The undo for a mistyped --feedback (fb#585): under the junction model --feedback ADDS a link rather than replacing one, so `--feedback 541` when you meant 542 otherwise left fb#541 attached with no way back short of raw SQL. Deletes the junction row and clears both projections it fed — the row's resolvedByChangelogId (only when it pointed HERE) and this entry's own primary-link column, which falls back to whatever link remains. An auto `Shipped:`/`Related:` note naming THIS entry is cleared with it; a hand-written note is kept (fb#366). It does NOT change the feedback row's status — a row closed by the link you just removed stays closed, and is reported on stderr so you can reopen it with `ib dev feedback resolve <id> --status open`. Repair a mistype in one call: `--unlink 541 --feedback 542`. Naming the same id in BOTH flags is refused (exit 4).",
+      },
+      {
         name: "no-resolve",
         type: "boolean",
         description:
@@ -1437,7 +1521,10 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       "SHELL QUOTING (fb#300): this is the CORRECTION command, so the retry hits the quoting hazard again — pass quote-bearing prose via --from-json <file|->; see `ib help shell-quoting`.",
       "THE CORRECTION PATH FOR --bump-level (fb#303). Deploy Step 0 bumps each coordinated repo from the MAX bump level across the UNRELEASED entries naming it, so a wrong level mis-drives a real release. Fix it here — do NOT delete + re-add, which mints a new changelogId and orphans the cliFeedback row pointing at the old one.",
       "--bump-level has NO default here (unlike `add`, where it defaults to patch): omitting it leaves the recorded level untouched, so an unrelated `update --status …` cannot silently downgrade a deliberate minor.",
-      "--feedback also marks that cliFeedback row applied and sets resolvedByChangelogId back to this entry — the only way to re-establish a link lost to delete + re-add (`ib dev feedback resolve` sets status/resolution but not the link).",
+      "--feedback re-establishes a link lost to delete + re-add — the only way to do it (`ib dev feedback resolve` sets status/resolution but not the link). It sets resolvedByChangelogId back to this entry but does NOT mark the row applied: since fb#578 this command writes no status at all, so close the row yourself with `ib dev feedback resolve <id> --status applied` once the change is live.",
+      "--unlink is the UNDO for --feedback (fb#585). --feedback ADDS a link (the junction allows many), so it cannot correct a mistyped id on its own — `--unlink 541 --feedback 542` does, in one call, and the unlink is applied first. It never changes a status: a row closed by the removed link stays closed and is reported on stderr.",
+      "A multi-id --feedback/--unlink set is one transaction PER id, not one across the set (fb#586). If one id fails, the others still run and each is reported separately — finish the set with another `changelog update`, and do NOT re-run `add`, which mints a duplicate entry.",
+      "DEPLOY-GATED (fb#585): --unlink needs a later puminet5api version. An older backend drops it as an unknown body key and returns 200 with every link still in place — the CLI detects the missing `feedbackUnlinks` in the response and warns rather than reporting a phantom success.",
       "DEPLOY-GATED (fb#441/fb#517): --no-resolve and the preserve-a-set-status rule need a later puminet5api version. Against an older backend --no-resolve is dropped as an unknown body key and the row is force-flipped to applied ANYWAY, silently. Verify with `ib dev feedback get <id>` after linking.",
       "DEPLOY-GATED: --bump-level/--feedback/--sentry became editable in a later puminet5api version. Against an older backend the PUT succeeds and echoes the row unchanged; the CLI compares the echo and warns on stderr rather than letting the edit vanish silently.",
       "DEPLOY-GATED (fb#576): a comma-separated --feedback list, the `role` split, and the `feedbackLinks` echo need a later puminet5api version. Against an older backend a CSV is rejected by validation as a non-integer — a clean exit 4, not a silent single link. Also note the behaviour change once it IS deployed: --no-resolve on a row nobody has resolved yet now leaves resolvedByChangelogId NULL and records a `references` link, where it previously claimed the link for want of anywhere else to record the reference.",
@@ -1448,6 +1535,7 @@ export const CHANGELOG_SPECS: CommandSpec[] = [
       "ib dev changelog update 386 --language en",
       'ib dev changelog update 386 --bump-level none --reason "docs-only, should not bump"',
       "ib dev changelog update 386 --from-json ./patch.json",
+      'ib dev changelog update 1280 --unlink 541 --feedback 542 --reason "linked the wrong fb id"',
     ],
   },
   {

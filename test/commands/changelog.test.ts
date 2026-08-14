@@ -244,7 +244,7 @@ describe("changelog add bumpLevel", () => {
   });
 });
 
-import { runChangelogPending, runChangelogRelease, runChangelogReleaseMap, registerChangelogCommands, payloadKeyMap, normalizeChangelogJson, mergeChangelogInput, warnIfPatchIgnored, warnFeedbackLinkEffects } from "../../src/commands/changelog/index.js";
+import { runChangelogPending, runChangelogRelease, runChangelogReleaseMap, registerChangelogCommands, payloadKeyMap, normalizeChangelogJson, mergeChangelogInput, warnIfPatchIgnored, warnFeedbackLinkEffects, warnFeedbackUnlinkEffects } from "../../src/commands/changelog/index.js";
 import { Command } from "commander";
 
 describe("changelog pending/release", () => {
@@ -1429,5 +1429,118 @@ describe("warnFeedbackLinkEffects — per-id", () => {
       (m) => msgs.push(m)
     );
     expect(msgs).toHaveLength(0);
+  });
+});
+
+/**
+ * fb#586: linkFeedbacks runs one transaction PER id, so a mid-batch failure left
+ * some ids committed, later ids never attempted, and the entry already created —
+ * reported as a bare 500 that said nothing about which half landed. The natural
+ * retry (`changelog add` again) then minted a DUPLICATE entry.
+ */
+describe("warnFeedbackLinkEffects — a per-id link failure (fb#586)", () => {
+  it("names the failed id, its error, and the remedy that does NOT duplicate the entry", () => {
+    const msgs: string[] = [];
+    warnFeedbackLinkEffects(
+      {
+        changelogId: 1281,
+        feedbackLinks: [
+          { feedbackId: 541, role: "resolves" },
+          { feedbackId: 542, feedbackLinked: false, error: "Transaction was deadlocked" },
+        ],
+      },
+      (m) => msgs.push(m)
+    );
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toContain("fb#542");
+    expect(msgs[0]).toContain("deadlocked");
+    // The whole point: `add` would mint a second entry for work already recorded.
+    expect(msgs[0]).toMatch(/do NOT re-run `add`/);
+    expect(msgs[0]).toContain("changelog update 1281 --feedback");
+  });
+
+  it("distinguishes a FAILED link from an id that matched no row (fb#543)", () => {
+    const msgs: string[] = [];
+    warnFeedbackLinkEffects(
+      { changelogId: 1281, feedbackLinks: [{ feedbackId: 99999, feedbackLinked: false }] },
+      (m) => msgs.push(m)
+    );
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toContain("does not exist");
+    expect(msgs[0]).not.toContain("FAILED");
+  });
+});
+
+/**
+ * fb#585: --unlink is the undo for a mistyped --feedback. Two things it must
+ * always say: that a row left closed by the removed link is still closed (the
+ * deliberate non-write), and that an older backend silently did nothing.
+ */
+describe("warnFeedbackUnlinkEffects (fb#585)", () => {
+  it("stays silent when --unlink was not used at all", () => {
+    const msgs: string[] = [];
+    warnFeedbackUnlinkEffects({ changelogId: 1280 }, undefined, (m) => msgs.push(m));
+    warnFeedbackUnlinkEffects({ changelogId: 1280 }, [], (m) => msgs.push(m));
+    expect(msgs).toHaveLength(0);
+  });
+
+  /**
+   * THE deploy gate. An older backend drops `unlinkFeedbackId` as an unknown
+   * body key and answers 200 with the row — indistinguishable from success
+   * unless the CLI checks for the echo it should have got back.
+   */
+  it("warns loudly when the backend did not understand --unlink", () => {
+    const msgs: string[] = [];
+    warnFeedbackUnlinkEffects({ changelogId: 1280 }, [541], (m) => msgs.push(m));
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toContain("NO effect");
+    expect(msgs[0]).toContain("changelog get 1280");
+  });
+
+  it("reports a row left closed by the link it just removed, with the reopen command", () => {
+    const msgs: string[] = [];
+    warnFeedbackUnlinkEffects(
+      {
+        changelogId: 1280,
+        feedbackUnlinks: [{ feedbackId: 541, unlinked: true, role: "resolves", feedbackStatus: "applied" }],
+      },
+      [541],
+      (m) => msgs.push(m)
+    );
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toContain("unlinking never changes a status");
+    expect(msgs[0]).toContain("ib dev feedback resolve 541 --status open");
+  });
+
+  it("says nothing extra when the row was already open — there is no decision to make", () => {
+    const msgs: string[] = [];
+    warnFeedbackUnlinkEffects(
+      { changelogId: 1280, feedbackUnlinks: [{ feedbackId: 541, unlinked: true, role: "resolves" }] },
+      [541],
+      (m) => msgs.push(m)
+    );
+    expect(msgs).toHaveLength(0);
+  });
+
+  it("reports an id that had no link to remove", () => {
+    const msgs: string[] = [];
+    warnFeedbackUnlinkEffects(
+      { changelogId: 1280, feedbackUnlinks: [{ feedbackId: 999, unlinked: false }] },
+      [999],
+      (m) => msgs.push(m)
+    );
+    expect(msgs[0]).toContain("no link to cl#1280 to remove");
+  });
+
+  it("reports a failed unlink separately from one that had nothing to do", () => {
+    const msgs: string[] = [];
+    warnFeedbackUnlinkEffects(
+      { changelogId: 1280, feedbackUnlinks: [{ feedbackId: 541, unlinked: false, error: "deadlocked" }] },
+      [541],
+      (m) => msgs.push(m)
+    );
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toContain("FAILED");
+    expect(msgs[0]).toContain("still in place");
   });
 });

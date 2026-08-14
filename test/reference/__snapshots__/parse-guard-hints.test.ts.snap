@@ -49,6 +49,18 @@ ib changelog update --feedback <ids>
   ! --feedback must be an integer >= 1 (got "abc")
   > (no hint)
 
+ib changelog update --unlink <ids>
+  ! --unlink must be an integer >= 1 (empty element in "")
+  > (no hint)
+
+ib changelog update --unlink <ids>
+  ! --unlink must be an integer >= 1 (got "-5")
+  > (no hint)
+
+ib changelog update --unlink <ids>
+  ! --unlink must be an integer >= 1 (got "abc")
+  > (no hint)
+
 ib company switch --to <asiakasId>
   ! --to must be an integer >= 1
   > (no hint)
@@ -83,6 +95,18 @@ ib dev changelog update --feedback <ids>
 
 ib dev changelog update --feedback <ids>
   ! --feedback must be an integer >= 1 (got "abc")
+  > (no hint)
+
+ib dev changelog update --unlink <ids>
+  ! --unlink must be an integer >= 1 (empty element in "")
+  > (no hint)
+
+ib dev changelog update --unlink <ids>
+  ! --unlink must be an integer >= 1 (got "-5")
+  > (no hint)
+
+ib dev changelog update --unlink <ids>
+  ! --unlink must be an integer >= 1 (got "abc")
   > (no hint)
 
 ib jerry admin onboarding log --time <iso>
