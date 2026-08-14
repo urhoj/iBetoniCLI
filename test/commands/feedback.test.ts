@@ -1240,6 +1240,80 @@ describe("ib feedback update", () => {
   });
 });
 
+// ─── claim-lease advisory warning (resolve/update) ─────────────────────────────
+
+/**
+ * PUT /api/feedback/:id attaches a `warning` field when the write just landed
+ * on a row another agent currently holds under a LIVE claim — advisory only,
+ * never blocking. This is the half of the claim-lease feature that was
+ * silently discarded: `compactAck`/`compactUpdateAck` are field WHITELISTS
+ * that did not list `warning`, and nothing printed it to stderr either, so an
+ * agent overwriting someone else's live claim got no signal at all.
+ */
+describe("ib feedback resolve/update — claim-lease advisory warning", () => {
+  // The warning flows through warnNote → emitStderr (ctx-aware channel) —
+  // same spy pattern as the changelog --repo fail-safe warning tests.
+  let errSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    errSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  });
+  afterEach(() => errSpy.mockRestore());
+
+  const WARNING =
+    "Feedback 42 is claimed by other-agent until 2026-08-15T00:00:00.000Z — your change was applied anyway";
+  const warnedOnStderr = () =>
+    errSpy.mock.calls.some((c: unknown[]) => String(c[0]).includes(WARNING));
+
+  test("resolve: the warning survives into the compact ack", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42, status: "applied", warning: WARNING });
+    const out = await runFeedbackResolve(mockClient, 42, { status: "applied" });
+    expect(out).toMatchObject({ warning: WARNING });
+  });
+
+  test("resolve: the warning survives under --full too", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42, status: "applied", warning: WARNING });
+    const out = await runFeedbackResolve(mockClient, 42, { status: "applied", full: true });
+    expect(out).toMatchObject({ warning: WARNING });
+  });
+
+  test("resolve: a response WITH a warning prints it to stderr", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42, status: "applied", warning: WARNING });
+    await runFeedbackResolve(mockClient, 42, { status: "applied" });
+    expect(warnedOnStderr()).toBe(true);
+  });
+
+  test("resolve: a response WITHOUT a warning prints nothing", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42, status: "applied" });
+    await runFeedbackResolve(mockClient, 42, { status: "applied" });
+    expect(warnedOnStderr()).toBe(false);
+  });
+
+  test("resolve: the warning is printed exactly once", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42, status: "applied", warning: WARNING });
+    await runFeedbackResolve(mockClient, 42, { status: "applied" });
+    const hits = errSpy.mock.calls.filter((c: unknown[]) => String(c[0]).includes(WARNING));
+    expect(hits).toHaveLength(1);
+  });
+
+  test("update: the warning survives into the compact ack", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42, scope: "security", warning: WARNING });
+    const out = await runFeedbackUpdate(mockClient, 42, { scope: "security" });
+    expect(out).toMatchObject({ warning: WARNING });
+  });
+
+  test("update: a response WITH a warning prints it to stderr", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42, scope: "security", warning: WARNING });
+    await runFeedbackUpdate(mockClient, 42, { scope: "security" });
+    expect(warnedOnStderr()).toBe(true);
+  });
+
+  test("update: a response WITHOUT a warning prints nothing", async () => {
+    put.mockResolvedValueOnce({ feedbackId: 42, scope: "security" });
+    await runFeedbackUpdate(mockClient, 42, { scope: "security" });
+    expect(warnedOnStderr()).toBe(false);
+  });
+});
+
 // ─── count ───────────────────────────────────────────────────────────────────
 
 describe("ib feedback count", () => {

@@ -6595,7 +6595,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     mutates: true,
     args: [{ name: "id", type: "number", description: "feedbackId — accepts an optional `fb#` anchor" }],
     flags: [
-      { name: "by", type: "string", description: "The claiming agent/session label. Defaults to $IB_CLAIM_ID, then user@host. Every agent authenticates as the same person, so this label is the ONLY thing that distinguishes sessions — pass your session short id." },
+      { name: "by", type: "string", description: "The claiming agent/session label. Defaults to $IB_CLAIM_ID, then user@host. Every agent authenticates as the same person, so this label is the ONLY thing that distinguishes sessions — pass your session short id. REQUIRED when running via MCP ib_exec / POST /api/cli/exec: $IB_CLAIM_ID does not travel to that server-side process, so every hosted caller would otherwise share one identity and claims would stop being exclusive." },
       { name: "ttl-hours", type: "number", description: "Lease length in hours, 1-24 (default 24). The 24h ceiling is ABSOLUTE: it is measured from your FIRST acquire, so renewing cannot extend past it." },
       { name: "steal", type: "boolean", description: "Take a row that is under another agent's LIVE claim. For human recovery; normal contention should pick a different item instead." },
       { name: "reason", type: "string", description: "X-Action-Reason audit header" },
@@ -6635,7 +6635,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     mutates: true,
     args: [{ name: "id", type: "number", required: false, description: "feedbackId — omit when using --all" }],
     flags: [
-      { name: "by", type: "string", description: "The holder label. Defaults to $IB_CLAIM_ID, then user@host — must match the label used to claim." },
+      { name: "by", type: "string", description: "The holder label. Defaults to $IB_CLAIM_ID, then user@host — must match the label used to claim. REQUIRED when running via MCP ib_exec / POST /api/cli/exec: $IB_CLAIM_ID does not travel to that server-side process, so every hosted caller would otherwise share one identity." },
       { name: "all", type: "boolean", description: "Release EVERY claim held by this label instead of one row" },
       { name: "reason", type: "string", description: "X-Action-Reason audit header" },
     ],

@@ -15,7 +15,7 @@
 import os from "node:os";
 import { listEnvelope } from "../../api/envelopes.js";
 import { FEEDBACK_LIST_CAP, FEEDBACK_LIST_DEFAULT, warnIfLimitCapped, } from "../../api/listCaps.js";
-import { failWith, writeJson } from "../../output/json.js";
+import { failWith, warnNote, writeJson } from "../../output/json.js";
 import { assertEnum, assertEnumCsv, parseRefId } from "../../targets.js";
 import { runWithSiblingHint } from "../../refHint.js";
 import { guarded, jsonAction } from "../_shared/action.js";
@@ -434,7 +434,24 @@ async function countClientSide(client, opts) {
     }
     return out;
 }
-/** Project a resolved row to the compact write-ack fields (resolution capped). */
+/**
+ * PUT /api/feedback/:id responses may carry an advisory `warning` when the
+ * write just landed on a row another agent currently holds under a LIVE
+ * claim lease (the lease never blocks a write, only warns — feedback #585).
+ * Printed to stderr exactly once per call regardless of `--full`: it is a
+ * safety signal, not a verbosity detail, so it must reach the caller even in
+ * compact mode. Never stdout — the JSON data contract stays untouched.
+ */
+function warnClaimAdvisory(row) {
+    if (typeof row.warning === "string" && row.warning) {
+        warnNote(`[ib] ⚠ ${row.warning}`);
+    }
+}
+/**
+ * Project a resolved row to the compact write-ack fields (resolution capped).
+ * `warning` (the claim-lease advisory — see {@link warnClaimAdvisory}) rides
+ * through even in compact mode: it is a safety signal, not verbosity.
+ */
 function compactAck(row) {
     const ack = {};
     for (const k of ["feedbackId", "status", "updatedAt"]) {
@@ -443,6 +460,8 @@ function compactAck(row) {
     }
     if ("resolution" in row)
         ack.resolution = truncateField(row.resolution).value;
+    if ("warning" in row)
+        ack.warning = row.warning;
     return ack;
 }
 /**
@@ -493,13 +512,18 @@ export async function runFeedbackResolve(client, id, input) {
     const row = await client.put(`/api/feedback/${id}`, body, {
         headers: { "x-claim-id": resolveClaimId(undefined) },
     });
+    warnClaimAdvisory(row);
     const out = input.full ? { ...row } : compactAck(row);
     if (input.status === undefined && (row.status === "open" || row.status === "reviewed")) {
         out.hint = `status unchanged (${row.status}) - pass --status applied|dismissed to close`;
     }
     return out;
 }
-/** Project an updated row to the compact edit-ack fields (description capped). */
+/**
+ * Project an updated row to the compact edit-ack fields (description capped).
+ * `warning` (the claim-lease advisory — see {@link warnClaimAdvisory}) rides
+ * through even in compact mode: it is a safety signal, not verbosity.
+ */
 function compactUpdateAck(row) {
     const ack = {};
     for (const k of ["feedbackId", "scope", "kind", "severity", "complexity", "updatedAt"]) {
@@ -508,6 +532,8 @@ function compactUpdateAck(row) {
     }
     if ("description" in row)
         ack.description = truncateField(row.description).value;
+    if ("warning" in row)
+        ack.warning = row.warning;
     return ack;
 }
 /**
@@ -574,6 +600,7 @@ export async function runFeedbackUpdate(client, id, input) {
     const row = await client.put(`/api/feedback/${id}`, body, {
         headers: { "x-claim-id": resolveClaimId(undefined) },
     });
+    warnClaimAdvisory(row);
     return input.full ? row : compactUpdateAck(row);
 }
 /** Column width of cliFeedback.claimedBy — labels are capped to match. */
