@@ -6,6 +6,7 @@ import {
   runSijaintiDelete,
   runSijaintiUndelete,
   runSijaintiSetJerry,
+  runSijaintiSetPublic,
   runSijaintiSaveLatLng,
   persistSijaintiCoords,
   applyGeocodeToBody,
@@ -522,5 +523,85 @@ describe("ib sijainti delete/undelete", () => {
       {},
       { headers: { "X-Action-Reason": "restored" } }
     );
+  });
+});
+
+describe("runSijaintiSetPublic (cross-tenant visibility)", () => {
+  const mGet = () => mockClient.get;
+  const mPost = () => mockClient.post;
+  beforeEach(() => {
+    mGet().mockReset();
+    mPost().mockReset();
+  });
+
+  test("--on publishes and preserves the rest of the row", async () => {
+    mGet().mockResolvedValueOnce({
+      sijaintiId: 42,
+      isPublic: false,
+      jerryActiveUntil: "9999-12-31 23:59:59",
+      maxDeliveryDistance: 35,
+      sijaintiPhone: "040123",
+    });
+    mPost().mockResolvedValueOnce({ ok: true });
+    await runSijaintiSetPublic(mockClient, 42, true, {});
+    // Read-merge-write: sijainti_save assigns most columns directly, so a sparse
+    // body would NULL the enrolment, phone and dates.
+    expect(mPost().mock.calls[0][1]).toMatchObject({
+      sijaintiId: 42,
+      isPublic: true,
+      jerryActiveUntil: "9999-12-31 23:59:59",
+      maxDeliveryDistance: 35,
+      sijaintiPhone: "040123",
+    });
+  });
+
+  test("--off unpublishes", async () => {
+    mGet().mockResolvedValueOnce({ sijaintiId: 42, isPublic: true });
+    mPost().mockResolvedValueOnce({ ok: true });
+    await runSijaintiSetPublic(mockClient, 42, false, {});
+    expect((mPost().mock.calls[0][1] as Record<string, unknown>).isPublic).toBe(false);
+  });
+
+  test("goes through updateSijainti — the route that carries cache invalidation", async () => {
+    // A bespoke endpoint would bypass SIJAINTI_UPDATE's wildcard sweep of
+    // geocode:sijaintiList:* / geocode:closest:*, so a list cached while the row
+    // was public would keep being served after it is made private.
+    mGet().mockResolvedValueOnce({ sijaintiId: 42 });
+    mPost().mockResolvedValueOnce({ ok: true });
+    await runSijaintiSetPublic(mockClient, 42, true, {});
+    expect(mGet().mock.calls[0][0]).toBe("/api/geocode/sijainti/get/42");
+    expect(mPost().mock.calls[0][0]).toBe("/api/geocode/updateSijainti");
+  });
+
+  test("carries the write-flag headers", async () => {
+    mGet().mockResolvedValueOnce({ sijaintiId: 42 });
+    mPost().mockResolvedValueOnce({ ok: true });
+    await runSijaintiSetPublic(mockClient, 42, true, { reason: "plant open to customers" });
+    expect(mPost().mock.calls[0][2]).toMatchObject({
+      headers: { "X-Action-Reason": "plant open to customers" },
+    });
+  });
+});
+
+describe("buildSijaintiBody — isPublic is tri-state", () => {
+  test("the flag ABSENT leaves isPublic out of the body entirely", () => {
+    // Load-bearing: an absent key reaches sijainti_save as NULL, whose
+    // COALESCE(@isPublic, isPublic) then keeps the stored value. Sending false
+    // here would unpublish a supplier's plant on any unrelated --name edit.
+    const body = buildSijaintiBody({}, { name: "Depot A" });
+    expect("isPublic" in body).toBe(false);
+  });
+
+  test("--public sets it true, --private sets it false", () => {
+    expect(buildSijaintiBody({}, { public: true }).isPublic).toBe(true);
+    expect(buildSijaintiBody({}, { public: false }).isPublic).toBe(false);
+  });
+
+  test("a typed flag wins over --body, like every other field", () => {
+    expect(buildSijaintiBody({ isPublic: true }, { public: false }).isPublic).toBe(false);
+  });
+
+  test("--body alone still passes isPublic through untouched", () => {
+    expect(buildSijaintiBody({ isPublic: true }, {}).isPublic).toBe(true);
   });
 });

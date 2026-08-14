@@ -47,6 +47,14 @@ export interface SijaintiTypedFields {
   puomiMin?: number;
   /** puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching; null/absent = unbounded). */
   puomiMax?: number;
+  /**
+   * isPublic — cross-tenant visibility. true = readable by every authenticated
+   * user of every tenant (how the keikka flow finds a supplier's plants);
+   * false = only the owning tenant. Changing it needs company-admin rights.
+   * ABSENT ≠ false: the backend keeps the stored value when the field is
+   * omitted, which is what makes an unrelated update safe.
+   */
+  public?: boolean;
 }
 
 /**
@@ -71,6 +79,11 @@ export function buildSijaintiBody(
   if (typed.asiakasId !== undefined) body.asiakasId = typed.asiakasId;
   if (typed.puomiMin !== undefined) body.puomiMin = typed.puomiMin;
   if (typed.puomiMax !== undefined) body.puomiMax = typed.puomiMax;
+  // Only when the flag was actually given. An absent isPublic must stay absent
+  // all the way to sijainti_save, whose COALESCE(@isPublic, isPublic) then keeps
+  // the stored value — sending `false` by default would silently unpublish a
+  // supplier's plant on any unrelated `--nimi` edit.
+  if (typed.public !== undefined) body.isPublic = typed.public;
   return body;
 }
 
@@ -171,6 +184,19 @@ export interface SijaintiListFilter {
    * surviving row. Off by default; the default list output is unchanged.
    */
   jerry?: boolean;
+  /**
+   * Cross-tenant visibility lens (`--public` / `--private`). `true` keeps only
+   * PUBLISHED rows, `false` only private ones, `undefined` filters nothing.
+   * Client-side filter on the server-emitted `isPublic` field — deploy-gated:
+   * an older backend omits the field, so `--public` matches NOTHING and
+   * `--private` matches EVERYTHING there. Worth knowing before trusting a sweep.
+   *
+   * The audit this exists for: `ib sijainti list --type betoniasema --all
+   * --private` names every concrete plant NOT visible to the customers who need
+   * to pick it — the failure mode of a plant created before the UI seeds the
+   * flag, which is otherwise silent (the plant simply never appears).
+   */
+  public?: boolean;
 }
 
 /**
@@ -485,6 +511,44 @@ export async function runSijaintiSetJerry(
 }
 
 /**
+ * Publish/unpublish a sijainti (dbo.sijainti.isPublic).
+ *
+ * `isPublic = 1` means readable by EVERY authenticated user of EVERY tenant —
+ * that is what lets the keikka flow fetch a supplier's concrete plants — so this
+ * is a cross-tenant exposure control, not a display preference. The backend
+ * requires company-admin (or sysadmin/developer) rights to CHANGE it and refuses
+ * on --dry-run too, so an unauthorized caller gets exit 3 rather than a
+ * misleading successful preview.
+ *
+ * Same GET+merge as set-jerry, and for the same reason: there is no partial
+ * update route, and `sijainti_save` assigns most columns directly, so a sparse
+ * body would NULL jerryActiveUntil, the dates, phone and comment. Going through
+ * /api/geocode/updateSijainti is also load-bearing for CACHE correctness — that
+ * route carries the SIJAINTI_UPDATE invalidation whose wildcard sweep of
+ * geocode:sijaintiList:* / geocode:closest:* is what stops a list cached while
+ * the row was public from being served after it is made private. A dedicated
+ * "set visibility" endpoint would bypass that and reopen the stale-cache leak.
+ */
+export async function runSijaintiSetPublic(
+  client: ApiClient,
+  sijaintiId: number,
+  on: boolean,
+  flags: WriteFlags
+): Promise<unknown> {
+  const current = await client.get<Record<string, unknown>>(
+    `/api/geocode/sijainti/get/${sijaintiId}`
+  );
+  const body: Record<string, unknown> = {
+    ...current,
+    sijaintiId,
+    isPublic: on,
+  };
+  return client.post<unknown>("/api/geocode/updateSijainti", body, {
+    headers: writeFlagsToHeaders(flags),
+  });
+}
+
+/**
  * DELETE /api/geocode/sijainti/delete/:sijaintiId — soft-delete (sets
  * deletedTime). Server-side gate: validateSijaintiWriteAccess. Write flags
  * surface as the universal headers; --reason is enforced at the CLI layer.
@@ -644,7 +708,8 @@ export async function runSijaintiListJoined(
   client: ApiClient,
   opts: SijaintiListJoinedOptions
 ): Promise<ListEnvelope<Record<string, unknown>>> {
-  const clientFiltered = !!opts.search || opts.owner !== undefined || !!opts.jerry;
+  const clientFiltered =
+    !!opts.search || opts.owner !== undefined || !!opts.jerry || opts.public !== undefined;
   const list = (typeId: number | undefined) =>
     runSijaintiList(client, {
       type: typeId !== undefined ? String(typeId) : undefined,
@@ -691,6 +756,11 @@ export async function runSijaintiListJoined(
       matched = matched
         .filter((r) => r.jerryActiveUntil != null)
         .map((r) => ({ ...r, matchable: sijaintiMatchable(r, now) }));
+    }
+    if (opts.public !== undefined) {
+      // Coerced, not identity-compared: the field arrives as a JSON boolean from
+      // the CLI route but as 1/0 from anything reading the column raw.
+      matched = matched.filter((r) => !!r.isPublic === opts.public);
     }
     const cap = opts.limit ?? DEFAULT_LIST_LIMIT;
     truncated = truncated || matched.length > cap;
@@ -997,6 +1067,8 @@ export function registerSijaintiCommands(
     .option(
       "--jerry"
     )
+    .option("--public")
+    .option("--private")
     .action(
       guarded(async (opts: {
         type?: string;
@@ -1007,8 +1079,16 @@ export function registerSijaintiCommands(
         all?: boolean;
         asiakas?: number;
         jerry?: boolean;
+        public?: boolean;
+        private?: boolean;
       }) => {
         assertValidAsiakasFlag(opts.asiakas);
+        // Two flags rather than Commander's --no-public: declaring a negated
+        // option defaults the value to TRUE, which would silently turn "no
+        // filter" into "published only".
+        if (opts.public && opts.private) {
+          failWith("Pass at most one of --public / --private", 4);
+        }
         const client = await getClient();
         const result = await runSijaintiListJoined(client, {
           type: opts.type,
@@ -1019,6 +1099,7 @@ export function registerSijaintiCommands(
           all: opts.all,
           owner: opts.asiakas,
           jerry: opts.jerry,
+          public: opts.public ? true : opts.private ? false : undefined,
         });
         writeJson(result);
       })
@@ -1068,6 +1149,7 @@ export function registerSijaintiCommands(
     .option("--asiakas <id>", "", Number)
     .option("--puomi-min <m>", "", Number)
     .option("--puomi-max <m>", "", Number)
+    .option("--public")
     .option(
       "--geocode"
     );
@@ -1084,6 +1166,7 @@ export function registerSijaintiCommands(
       asiakas?: number;
       puomiMin?: number;
       puomiMax?: number;
+      public?: boolean;
       geocode?: boolean;
     }) => {
       assertPuomiFlags(opts.puomiMin, opts.puomiMax);
@@ -1102,6 +1185,10 @@ export function registerSijaintiCommands(
         asiakasId: opts.asiakas,
         puomiMin: opts.puomiMin,
         puomiMax: opts.puomiMax,
+        // Opt-in only. A new row defaults PRIVATE server-side, and the CLI
+        // deliberately does NOT infer publicity from `--type betoniasema` —
+        // publishing is always an explicit act by a caller entitled to it.
+        public: opts.public,
       });
       // asiakasId is a NOT NULL FK the add proc inserts directly — default it
       // to the caller's active company when neither --asiakas nor --body gave one.
@@ -1144,6 +1231,8 @@ export function registerSijaintiCommands(
     .option("--max-distance <n>", "", Number)
     .option("--puomi-min <m>", "", Number)
     .option("--puomi-max <m>", "", Number)
+    .option("--public")
+    .option("--private")
     .option(
       "--geocode"
     );
@@ -1160,9 +1249,14 @@ export function registerSijaintiCommands(
       maxDistance?: number;
       puomiMin?: number;
       puomiMax?: number;
+      public?: boolean;
+      private?: boolean;
       geocode?: boolean;
     }) => {
       assertPuomiFlags(opts.puomiMin, opts.puomiMax);
+      if (opts.public && opts.private) {
+        failWith("Pass at most one of --public / --private", 4);
+      }
       const client = await getClient();
       const parsed = opts.body
         ? parseJsonBodyFlag(opts.body)
@@ -1178,6 +1272,9 @@ export function registerSijaintiCommands(
         maxDeliveryDistance: opts.maxDistance,
         puomiMin: opts.puomiMin,
         puomiMax: opts.puomiMax,
+        // Neither flag = field absent = the stored value survives the
+        // read-merge-write. Changing it requires company-admin server-side.
+        public: opts.public ? true : opts.private ? false : undefined,
       });
       if (body.sijaintiId === undefined) {
         failWith("update requires sijaintiId — pass --id or include it in --body", 4);
@@ -1246,6 +1343,27 @@ export function registerSijaintiCommands(
         opts.puomiMin !== undefined || opts.puomiMax !== undefined
           ? { min: opts.puomiMin, max: opts.puomiMax }
           : undefined
+      );
+      writeJson(result);
+    })
+  );
+
+  const setPublicCmd = s
+    .command("set-public <sijaintiId>")
+    .option("--on")
+    .option("--off");
+  addWriteFlagsToCommand(setPublicCmd).action(
+    guarded(async (idStr: string, opts: WriteFlags & { on?: boolean; off?: boolean }) => {
+      if (opts.on === opts.off) {
+        // neither or both given — ambiguous. Never guess on a visibility flip.
+        failWith("Pass exactly one of --on / --off", 4);
+      }
+      const client = await getClient();
+      const result = await runSijaintiSetPublic(
+        client,
+        parseId(idStr, "sijaintiId"),
+        !!opts.on,
+        opts
       );
       writeJson(result);
     })

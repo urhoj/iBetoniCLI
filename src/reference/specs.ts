@@ -3200,7 +3200,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
   },
 
-  // ─── sijainti (12) ───────────────────────────────────────────────────────
+  // ─── sijainti (14) ───────────────────────────────────────────────────────
   {
     command: "ib sijainti list",
     description:
@@ -3215,11 +3215,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "all", type: "boolean", description: "Include ALL companies' sijainnit, not just own + shared (ownerAsiakasId 0)" },
       { name: "asiakas", type: "number", description: "Only rows owned by this asiakasId (client-side filter on ownerAsiakasId; combine with --all for another company's rows)" },
       { name: "jerry", type: "boolean", description: "BetoniJerry audit lens: only Jerry-enrolled varikot (jerryActiveUntil set; expired included), each stamped with a derived `matchable` boolean" },
+      { name: "public", type: "boolean", description: "Only PUBLISHED rows (isPublic=1) — readable cross-tenant by every authenticated user" },
+      { name: "private", type: "boolean", description: "Only private rows (isPublic=0) — visible to the owning tenant alone. Mutually exclusive with --public" },
     ],
     outputShape:
-      "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil, maxDeliveryDistance }> (+matchable:boolean on each row when --jerry is set; +truncated:true when the result hit the limit; +hint pointing at --all / --all --asiakas <id> when 0 rows came back without --all)",
+      "ListEnvelope<{ sijaintiId, name, address, coords:{lat,lng}, type, typeName, ownerAsiakasId, ownerName, jerryActiveUntil, maxDeliveryDistance, isPublic }> (+matchable:boolean on each row when --jerry is set; +truncated:true when the result hit the limit; +hint pointing at --all / --all --asiakas <id> when 0 rows came back without --all)",
     errors: [
-      { origin: "client", exit: 4, meaning: "Unknown or ambiguous --type name", remedy: "the error lists the valid types; or run `ib sijainti types`" },
+      { origin: "client", exit: 4, match: "sijainti type", meaning: "Unknown or ambiguous --type name", remedy: "the error lists the valid types; or run `ib sijainti types`" },
+      { origin: "client", exit: 4, match: "at most one of --public", meaning: "Both --public and --private given", remedy: "pass at most one — omit both to filter nothing" },
       ...permErrors("auth.page.sijainnit.read"),
     ],
     notes: [
@@ -3231,8 +3234,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "An unknown numeric --type id is passed through and simply returns zero rows; an unknown type NAME exits 4.",
       "--asiakas filters client-side on the server-emitted ownerAsiakasId field — needs a backend deployed ≥ 2026-06-11 (older backends omit the field, so it matches nothing).",
       "--jerry (fb#108) is a client-side BetoniJerry audit lens: keeps only Jerry-ENROLLED rows (jerryActiveUntil non-null; expired enrolments INCLUDED so lapsed varikot surface) and stamps each with `matchable` = enrolment active (jerryActiveUntil >= now) AND coords present AND maxDeliveryDistance > 0. So `matchable:false` spots an enrolled-but-not-matchable varikko (expired, no GPS pin, or 0 km radius) in ONE command. Boom range (puomiMin/puomiMax) is NOT part of matchable — use `ib sijainti get <id>`.",
+      "isPublic is CROSS-TENANT VISIBILITY, not a display preference: 1 = readable by every authenticated user of every tenant (this is how the keikka flow finds a supplier's concrete plants), 0 = the owning tenant only. It moved from the location TYPE to the ROW on 2026-08-14, so two plants of the same type can now differ.",
+      "--public/--private filter client-side on isPublic and are DEPLOY-GATED: a backend older than the per-row change omits the field entirely, so there --public matches NOTHING and --private matches EVERYTHING. Check one row carries isPublic before trusting a sweep.",
+      "`ib sijainti list --type betoniasema --all --private` is the exposure audit: it names every concrete plant that customers CANNOT see. That is the silent failure mode — a plant created private simply never appears in the tehdas picker, and the keikka editor quietly auto-selects a farther one instead of erroring.",
     ],
-    seeAlso: ["ib sijainti plants", "ib sijainti types", "ib sijainti set-jerry", "ib search", "ib vehicle visits", "ib vehicle timeline"],
+    seeAlso: ["ib sijainti plants", "ib sijainti types", "ib sijainti set-jerry", "ib sijainti set-public", "ib search", "ib vehicle visits", "ib vehicle timeline"],
     examples: [
       "ib sijainti list",
       "ib sijainti list --type jäteasema",
@@ -3240,6 +3246,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ib sijainti list --all --asiakas 30",
       "ib sijainti list --valid-at today",
       "ib sijainti list --jerry",
+      "ib sijainti list --type betoniasema --all --private",
     ],
   },
   {
@@ -3341,6 +3348,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "asiakas", type: "number", description: "Owner asiakasId (defaults to your active company)" },
       { name: "puomi-min", type: "number", description: "puomiMin (m) — STORED ONLY, not used for matching (fb#415): no pump has a boom minimum, so a floor could only hide you from work you can do" },
       { name: "puomi-max", type: "number", description: "puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)" },
+      { name: "public", type: "boolean", description: "Create the row PUBLISHED (isPublic=1, readable cross-tenant). Omit for private — the default; requires company-admin rights" },
       { name: "geocode", type: "boolean", description: "Resolve lat/lng from the address via Google Maps when coordinates are not given (then persisted + echoed)" },
     ],
     writeFlags: true,
@@ -3376,6 +3384,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "max-distance", type: "number", description: "Delivery radius in km, stored as maxDeliveryDistance (not Jerry-only)" },
       { name: "puomi-min", type: "number", description: "puomiMin (m) — STORED ONLY, not used for matching (fb#415): no pump has a boom minimum, so a floor could only hide you from work you can do" },
       { name: "puomi-max", type: "number", description: "puomiMax — largest boom (m) served from this sijainti (BetoniJerry matching; empty = unbounded)" },
+      { name: "public", type: "boolean", description: "Publish (isPublic=1, readable cross-tenant). Requires company-admin rights; omit BOTH flags to leave visibility untouched" },
+      { name: "private", type: "boolean", description: "Unpublish (isPublic=0, owning tenant only). Mutually exclusive with --public; see `ib sijainti set-public`" },
       { name: "geocode", type: "boolean", description: "Force re-resolving lat/lng from the address via Google Maps (fails fast on no match). Address changes auto-geocode even without this flag when no coordinates are given" },
     ],
     writeFlags: true,
@@ -3385,13 +3395,16 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(400, "Validation failed", "fix --body fields"),
       apiErr(400, 'Address could not be geocoded (--geocode, status ZERO_RESULTS)', "supply a fuller --address or pass --lat/--lng directly"),
       apiErr(404, "Sijainti not found", "verify sijaintiId"),
-      { origin: "client", exit: 4, meaning: "--puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max — would otherwise clear the stored bound", remedy: "pass metres 0–999.99 with min ≤ max" },
+      { origin: "client", exit: 4, match: ["non-negative number of metres", "cannot exceed"], meaning: "--puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max — would otherwise clear the stored bound", remedy: "pass metres 0–999.99 with min ≤ max" },
+      { origin: "client", exit: 4, match: "at most one of --public", meaning: "Both --public and --private given", remedy: "pass at most one — omit both to leave visibility untouched" },
+      apiErr(403, "Not a company admin — only admins may CHANGE isPublic", "drop --public/--private to edit the other fields, or ask a company admin; see `ib sijainti set-public`"),
       ...permErrors("auth.page.sijainnit.edit"),
     ],
     examples: [
       'ib sijainti update --id 42 --name "Renamed depot"',
       'ib sijainti update --id 42 --address "Teollisuuskatu 9, Helsinki" --geocode',
       "ib sijainti update --body '{\"sijaintiId\":42,\"sijaintiNimi\":\"Renamed depot\"}'",
+      "ib sijainti update --id 42 --public --reason 'open this plant to customers'",
     ],
   },
   {
@@ -3427,6 +3440,41 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ib sijainti set-jerry 42 --on --radius 60 --reason 'pilot varikko, 60 km radius'",
       "ib sijainti set-jerry 42 --on --reason 'enrol with default 50 km radius'",
       "ib sijainti set-jerry 42 --off --reason 'seasonal pause'",
+    ],
+  },
+  {
+    command: "ib sijainti set-public",
+    description:
+      "Publish or unpublish a sijainti — set dbo.sijainti.isPublic (POST /api/geocode/updateSijainti). Publishing makes the row readable CROSS-TENANT by every authenticated user, which is how the keikka flow finds a supplier's concrete plants.",
+    permissions: ["auth.page.sijainnit.edit", "company admin (to change isPublic)"],
+    args: [{ name: "sijaintiId", type: "number", description: "sijaintiId to publish/unpublish" }],
+    flags: [
+      { name: "on", type: "boolean", description: "Publish (isPublic = 1) — readable by every tenant" },
+      { name: "off", type: "boolean", description: "Unpublish (isPublic = 0) — owning tenant only" },
+    ],
+    writeFlags: true,
+    dryRunKind: "server",
+    outputShape:
+      "{ ok: true, ... } (raw backend response) or { dryRun: true, wouldUpdate: {...} }",
+    errors: [
+      { origin: "client", exit: 4, meaning: "Neither or both of --on/--off given", remedy: "pass exactly one — visibility is never inferred" },
+      apiErr(403, "Not a company admin — only admins may change visibility", "the edit tier can change every other field; ask a company admin (or a developer) to flip this one"),
+      apiErr(404, "Sijainti not found", "verify sijaintiId"),
+      ...permErrors("auth.page.sijainnit.edit"),
+    ],
+    notes: [
+      "isPublic = 1 means readable by every authenticated user of EVERY tenant, competitors included — it is a cross-tenant exposure control, not a display preference. `ib sijainti get` on a published row succeeds for any caller; on a private row it 403s unless you are entitled to the owner.",
+      "PER-ROW since 2026-08-14. It used to live on the location TYPE, so a supplier's plants were all readable or none were; now a decommissioned or contract-only plant can be withheld while the rest stay listed.",
+      "The 403 applies to --dry-run too: an authorization refusal must not be reported as a successful preview. Changing OTHER fields is unaffected — the gate is on this field, not on the route.",
+      "Replicates the EditSijainti save: reads the row, overrides isPublic, writes back, so jerryActiveUntil / dates / phone / comment survive. Going through updateSijainti is also required for CACHE correctness — that route's invalidation sweep is what stops a list cached while the row was public from being served after it is made private.",
+      "Unpublishing a concrete plant removes it from every customer's tehdas picker. That is silent by design on their side: the keikka editor simply auto-selects a different plant. Audit with `ib sijainti list --type betoniasema --all --private`.",
+      "Flips are recorded to changeTracker as \"Julkinen sijainti\" (who/when/old→new), so --reason is worth passing even though it is not enforced.",
+    ],
+    seeAlso: ["ib sijainti list", "ib sijainti get", "ib sijainti update", "ib sijainti set-jerry"],
+    examples: [
+      "ib sijainti set-public 42 --on --reason 'plant open to customers'",
+      "ib sijainti set-public 42 --off --reason 'decommissioned, hide from pickers'",
+      "ib sijainti set-public 42 --on --dry-run",
     ],
   },
   {
