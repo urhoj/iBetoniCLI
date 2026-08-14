@@ -754,7 +754,12 @@ export function registerFeedbackCommands(
       })
     );
 
-  f.command("resolve <id>")
+  // `[note]` is positional so this command AGREES with its sibling
+  // `feedback create <description>` (fb#583). Both take one id-ish thing plus
+  // one block of prose, and they used to disagree about where the prose goes —
+  // which is what made `resolve <id> -- "text"` feel natural enough to get typed
+  // twice in a row, for an exit 4 that never mentioned --note.
+  f.command("resolve <id> [note]")
     .option("--status <status>")
     .option("--note <text>")
     .option("--reason <text>")
@@ -767,6 +772,7 @@ export function registerFeedbackCommands(
     .action(
       guarded(async (
         idStr: string,
+        notePositional: string | undefined,
         opts: { status?: string; note?: string; reason?: string; resolution?: string; fromJson?: string; dryRun?: boolean; full?: boolean },
         cmd: Command
       ) => {
@@ -776,15 +782,23 @@ export function registerFeedbackCommands(
         applyFromJson(cmd, opts as Record<string, unknown>, RESOLVE_FROM_JSON);
         // Checked BEFORE the write: a resolution note is a permanent record, and
         // an eaten backtick would otherwise land in it with no diagnostic (fb#552).
-        warnIfShellMangled({ note: opts.note, resolution: opts.resolution, reason: opts.reason });
+        // The POSITIONAL is checked too — it is the form most exposed to the
+        // shell, not least.
+        warnIfShellMangled({
+          note: notePositional ?? opts.note,
+          resolution: opts.resolution,
+          reason: opts.reason,
+        });
         const client = await getClient();
         writeJson(
           await runWithSiblingHint(client, id, "changelog", () =>
             runFeedbackResolve(client, id, {
               status: opts.status,
-              // The three note aliases merge AFTER the per-key merge, so a note
-              // from JSON and a different one typed on argv are both kept.
-              note: mergeNoteFlags(opts.note, opts.resolution, opts.reason),
+              // The positional and the three flag aliases merge AFTER the
+              // per-key merge, so a note from JSON and a different one typed on
+              // argv are both kept. mergeNoteFlags de-dupes, so passing the same
+              // text positionally AND as --note stores it once.
+              note: mergeNoteFlags(notePositional, opts.note, opts.resolution, opts.reason),
               dryRun: opts.dryRun,
               full: opts.full,
             })

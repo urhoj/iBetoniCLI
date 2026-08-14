@@ -6490,10 +6490,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     tier: "developer",
     mutates: true,
     dryRunKind: "client",
-    args: [{ name: "id", type: "number", description: "feedbackId — accepts an optional `fb#` anchor (e.g. `fb#42`); a `cl#` id is rejected (exit 4) with the changelog command to use (feedback #230)" }],
+    args: [
+      { name: "id", type: "number", description: "feedbackId — accepts an optional `fb#` anchor (e.g. `fb#42`); a `cl#` id is rejected (exit 4) with the changelog command to use (feedback #230)" },
+      { name: "note", type: "string", required: false, description: "The resolution note, positionally — the same field as --note, so `resolve 42 --status applied -- \"…\"` works exactly like `--note \"…\"`. Mirrors its sibling `ib dev feedback create <description>`, which has always taken its prose positionally (fb#583). Giving both is fine: distinct values merge, identical ones store once." },
+    ],
     flags: [
       { name: "status", type: "string", description: "open | reviewed | applied | dismissed", allowed: [...FEEDBACK_STATUSES] },
-      { name: "note", type: "string", description: "Resolution note stored on the row" },
+      { name: "note", type: "string", description: "Resolution note stored on the row (same field as the positional)" },
       { name: "reason", type: "string", description: "Alias for --note — here it IS the stored note, NOT the X-Action-Reason audit header" },
       { name: "resolution", type: "string", description: "Alias for --note (matches the output field name); distinct values across the three note flags are merged into one note" },
       { name: "from-json", type: "string", description: "Read the payload from a JSON object file (or - for stdin); explicit flags override. Keys: status, note (or reason/resolution). An unknown or wrong-typed key exits 4 (never silently dropped). Shell-safe: the only way to pass a note containing quotes on Windows PowerShell." },
@@ -6507,13 +6510,17 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       // unmatched row would win by exit alone and serve the wrong remedy
       // (the fb#305/#306 ambiguity).
       { origin: "client", exit: 4, match: ["provide --status", "--status must be one of"], meaning: "Validation", remedy: "provide --status and/or --note; status must be a known value" },
-      { origin: "client", exit: 4, match: "too many arguments", meaning: "The shell split the note on its inner double-quotes (typical on Windows PowerShell)", remedy: "pass the note via --from-json <file|-> instead of argv" },
+      // Since fb#583 ONE excess positional is the note, so reaching this row
+      // takes TWO or more — which on Windows PowerShell means the shell split
+      // the note rather than the caller passing two notes on purpose.
+      { origin: "client", exit: 4, match: "too many arguments", meaning: "The shell split the note on its inner double-quotes (typical on Windows PowerShell) — a single positional note is accepted", remedy: "pass the note via --from-json <file|-> instead of argv" },
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(404, "Not found", "check the id via `ib dev feedback list` — a bare id that is actually a changelog id 404s here and the error hint names the changelog command (feedback #230)"),
       apiErr(500, "Backend error", "retry with --verbose"),
     ],
     notes: [
-      "--note/--reason/--resolution write the SAME stored note. Passing several with different values merges them (joined in note→resolution→reason order) instead of dropping any — so mixing up --reason with the audit header loses nothing.",
+      "The note can be POSITIONAL or a flag — `resolve 42 --status applied -- \"…\"` and `resolve 42 --status applied --note \"…\"` are the same call (fb#583). The positional matches `ib dev feedback create <description>`; the two sibling commands used to disagree about where prose goes, which is the whole reason this was worth changing.",
+      "--note/--reason/--resolution and the positional write the SAME stored note. Passing several with different values merges them (joined in positional→note→resolution→reason order) instead of dropping any — so mixing up --reason with the audit header loses nothing, and repeating the same text stores it once.",
       "A note WITHOUT --status does NOT close the row — it stays open/reviewed and the ack carries a hint saying so; pass --status applied|dismissed to close (feedback #270).",
       "The two ways to close a row have OPPOSITE defaults, so don't assume this one closes: `ib dev changelog add --feedback <id>` closes it for you (status=applied plus a `Shipped: changelog #N` resolution), while this command leaves the status alone unless you pass --status. Recording the fix in the changelog is the one-call path (feedback #293). Note the one-call path only advances a row from `open` — if you set this row to `reviewed` first, a later `changelog add --feedback` will preserve that and tell you so, rather than claiming shipped work that is only staged (fb#517).",
       "SHELL QUOTING (fb#327): a resolution note quotes commands and errors, and a quote-split can even store the note TRUNCATED at the first quote — use --from-json <file|-> for any quote-bearing note; see `ib help shell-quoting`.",
@@ -6521,6 +6528,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     seeAlso: ["ib dev changelog add", "ib dev feedback list"],
     examples: [
       'ib dev feedback resolve 42 --status applied --note "added row counts in CLI v1.3"',
+      'ib dev feedback resolve 42 --status applied -- "the note works positionally too"',
       'ib dev feedback resolve 42 --status dismissed --note "by design"',
       "ib dev feedback resolve 42 --from-json ./resolution.json",
       "ib dev feedback resolve 42 --from-json ./resolution.json --status dismissed",

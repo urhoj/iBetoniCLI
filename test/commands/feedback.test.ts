@@ -1283,3 +1283,84 @@ describe("complexity filters announce their NULL blind spot (fb#362)", () => {
     expect(env.hint).toMatch(/EXCLUDES rows with no estimate/);
   });
 });
+
+/**
+ * fb#583: `feedback create <description>` takes its prose POSITIONALLY and
+ * `feedback resolve <id>` did not — two sibling commands in one group, each
+ * taking one id-ish thing plus one block of prose, disagreeing about where the
+ * prose goes. The reporter typed `resolve 553 --status applied -- "…"` twice in
+ * a row and got an exit 4 that never mentioned --note.
+ */
+describe("feedback resolve — the note is positional too (fb#583)", () => {
+  test("a positional note is stored as the resolution, like --note", async () => {
+    const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn() };
+    mockClient.put.mockResolvedValue({ feedbackId: 553, status: "applied", resolution: "Folded into fb#576" });
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient as never);
+    await program.parseAsync(
+      ["feedback", "resolve", "553", "--status", "applied", "--", "Folded into fb#576"],
+      { from: "user" }
+    );
+    expect(mockClient.put).toHaveBeenCalledWith(
+      "/api/feedback/553",
+      expect.objectContaining({ status: "applied", resolution: "Folded into fb#576" })
+    );
+  });
+
+  test("positional and --note merge when they differ, rather than one being dropped", async () => {
+    const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn() };
+    mockClient.put.mockResolvedValue({ feedbackId: 42, status: "applied" });
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient as never);
+    await program.parseAsync(
+      ["feedback", "resolve", "42", "positional half", "--note", "flag half"],
+      { from: "user" }
+    );
+    expect(mockClient.put).toHaveBeenCalledWith(
+      "/api/feedback/42",
+      expect.objectContaining({ resolution: "positional half\n\nflag half" })
+    );
+  });
+
+  test("the same text given both ways is stored ONCE — mergeNoteFlags de-dupes", async () => {
+    const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn() };
+    mockClient.put.mockResolvedValue({ feedbackId: 42, status: "applied" });
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient as never);
+    await program.parseAsync(
+      ["feedback", "resolve", "42", "same text", "--note", "same text"],
+      { from: "user" }
+    );
+    expect(mockClient.put).toHaveBeenCalledWith(
+      "/api/feedback/42",
+      expect.objectContaining({ resolution: "same text" })
+    );
+  });
+
+  test("no note at all still works — a status-only resolve is unchanged", async () => {
+    const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn() };
+    mockClient.put.mockResolvedValue({ feedbackId: 42, status: "dismissed" });
+    const program = new Command();
+    registerFeedbackCommands(program, async () => mockClient as never);
+    await program.parseAsync(["feedback", "resolve", "42", "--status", "dismissed"], { from: "user" });
+    const body = mockClient.put.mock.calls[0][1] as Record<string, unknown>;
+    expect(body.status).toBe("dismissed");
+    expect(body.resolution).toBeUndefined();
+  });
+
+  /**
+   * The excess-args row survives and gets MORE accurate: one positional is now
+   * the note, so reaching exit 4 takes two or more — which on PowerShell means
+   * the shell split the note, exactly what that row's remedy addresses.
+   */
+  test("TWO excess positionals still exit 4 — that is the shell-split case", async () => {
+    const mockClient = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), getCurrentToken: vi.fn() };
+    const program = new Command();
+    program.exitOverride();
+    registerFeedbackCommands(program, async () => mockClient as never);
+    await expect(
+      program.parseAsync(["feedback", "resolve", "42", "note one", "note two"], { from: "user" })
+    ).rejects.toThrow();
+    expect(mockClient.put).not.toHaveBeenCalled();
+  });
+});
