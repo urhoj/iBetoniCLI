@@ -6598,7 +6598,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "The claimed feedback row, including claimedBy, claimedAt and claimExpiresAt.",
     errors: [
-      { origin: "client", exit: 4, match: "ttlhours", meaning: "Validation", remedy: "--ttl-hours must be 1-24" },
+      // The 1-24 range check is SERVER-side (feedback.js claim(): sendValidationError
+      // -> HTTP 400), not client-side — runFeedbackClaim forwards ttlHours unchecked.
+      // An `origin:"client"` row here is unreachable (matchClientRow only runs when
+      // statusCode===0; a real 400 never hits it), which silently drops the remedy
+      // for the most likely misuse. Must key on `http:400` so matchHttpRow finds it.
+      apiErr(400, "Validation", "--ttl-hours must be 1-24", "ttlhours"),
       apiErr(403, "Permission denied", "requires a developer token; also refused under --read-only"),
       apiErr(404, "Not found", "check the id via `ib dev feedback list`"),
       apiErr(409, "Already claimed, or already closed", "the message names the holder and expiry — pick another item with `ib dev feedback list --unclaimed`, or pass --steal to take it anyway"),
