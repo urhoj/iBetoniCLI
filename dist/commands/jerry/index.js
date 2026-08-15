@@ -276,9 +276,17 @@ export async function runJerryProviderSettingsSet(client, body, asiakasId, flags
     });
 }
 // ─── admin (system-admin Jerry dashboard) ───────────────────────────────────
-/** List Jerry-active companies with per-company counts (GET /api/admin/jerry-companies). System-admin only. */
-export async function runJerryAdminList(client) {
-    return toListEnvelope(await client.get("/api/admin/jerry-companies"));
+/**
+ * List Jerry-active companies with per-company counts (GET /api/admin/jerry-companies).
+ * System-admin only.
+ *
+ * `withNotification` adds the RESOLVED tarjouspyyntö recipient per row
+ * (notificationSource / notificationEmail / notificationRecipientCount) — the
+ * fleet-wide "which address does each provider's notification actually reach?"
+ * in one call (fb#567). Opt-in: it costs the backend extra queries per company.
+ */
+export async function runJerryAdminList(client, withNotification = false) {
+    return toListEnvelope(await client.get(`/api/admin/jerry-companies${qs({ withNotification: withNotification ? 1 : undefined })}`));
 }
 /** Search non-Jerry companies for the Add picker (GET /api/admin/jerry-companies/search?q=). System-admin only. */
 export async function runJerryAdminSearch(client, q) {
@@ -790,7 +798,8 @@ export function registerJerryCommands(parent, getClient) {
         .description("System-admin Jerry dashboard (enable/disable + listings)");
     admin
         .command("list")
-        .action(jsonAction(getClient, runJerryAdminList));
+        .option("--with-notification")
+        .action(jsonAction(getClient, (client, opts) => runJerryAdminList(client, opts.withNotification ?? false)));
     admin
         .command("search [query]")
         .option("--search <s>")

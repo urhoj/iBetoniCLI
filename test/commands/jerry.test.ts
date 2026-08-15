@@ -334,6 +334,15 @@ describe("ib jerry admin", () => {
     expect(result.count).toBe(1);
   });
 
+  test("list --with-notification asks the backend for the resolved recipient (fb#567)", async () => {
+    get.mockResolvedValueOnce([
+      { asiakasId: 1402, asiakasNimi: "Acme", notificationSource: "billingEmail", notificationEmail: "laskut@acme.fi" },
+    ]);
+    const result = await runJerryAdminList(mockClient, true);
+    expect(get).toHaveBeenCalledWith("/api/admin/jerry-companies?withNotification=1");
+    expect((result.items[0] as { notificationSource?: string }).notificationSource).toBe("billingEmail");
+  });
+
   test("search url-encodes the query", async () => {
     get.mockResolvedValueOnce([]);
     await runJerryAdminSearch(mockClient, "Betoni Oy");

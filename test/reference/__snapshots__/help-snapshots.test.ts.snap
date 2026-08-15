@@ -4083,13 +4083,22 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { admins:[{personId,name,lastLoginTime}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,isJerry}] }. lastLoginTime null = that person has never signed in.
+  { admins:[{personId,name,lastLoginTime}], tarjousAdmins:[…], pumpparit:[…], vehicles:[{vehicleId,vehicleRegNo}], sijainnit:[{sijaintiId,name,isJerry}], notification:{jerryPersonId,source,recipients:[{email,name,personId}]} }. lastLoginTime null = that person has never signed in.
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Invalid asiakasId      → pass a numeric asiakasId
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - \`notification\` answers WHERE this provider's tarjouspyyntö actually lands, and WHICH branch produced it: source is offerNotificationEmail | jerryContactPerson | billingEmail | adminUser, in that precedence. It is resolved by the same function the real send calls, so it cannot drift from what is emailed (fb#567).
+  - \`source: "billingEmail"\` is an operational smell — the request reaches an invoicing inbox rather than a person who can answer it. \`source: null\` with empty recipients is worse: the chain fell through every branch and NOBODY is notified.
+  - \`notification.jerryPersonId\` is the CONFIGURED contact, which is a different question from the resolved one: an explicit offerNotificationEmail outranks it, so a company can have a contact set and still be notified elsewhere.
+  - Deploy-gated: \`notification\` is simply absent against a backend that predates it.
+
+SEE ALSO
+  ib jerry admin list
 
 EXAMPLES
   ib jerry admin detail 1402
@@ -4195,14 +4204,14 @@ DESCRIPTION
   Permissions: requires isSystemAdmin.
 
 FLAGS
-  (none)
+  --with-notification    Add the RESOLVED tarjouspyyntö recipient to every row (notificationSource / notificationEmail / notificationRecipientCount) — the whole fleet's real notification addresses in ONE call. Opt-in: costs the backend 1-4 extra queries per company.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, sijaintiNonJerryCount, ajoneuvotEnabled, matchableVarikkoCount?, lastLoginTime?, jerryContactPersonId?, jerryContactLastLoginTime? }>. matchableVarikkoCount counts varikot that pass the REAL fan-out geofence (enrolled AND coords AND maxDeliveryDistance > 0); sijaintiJerryCount counts enrolment only, so matchableVarikkoCount 0 with sijaintiJerryCount > 0 means the company is Jerry-active but invisible to every tarjouspyyntö. lastLoginTime is the MAX over the company's admins/tarjousAdmins; jerryContactLastLoginTime is the jerry contact's own — they differ when the company is alive but the notified address is dead. jerryContactPersonId null means no contact is configured at all (a different defect from a configured contact who never signed in).
+  ListEnvelope<{ asiakasId, asiakasNimi, adminCount, tarjousAdminCount, pumppariCount, vehicleCount, sijaintiJerryCount, sijaintiNonJerryCount, ajoneuvotEnabled, matchableVarikkoCount?, lastLoginTime?, jerryContactPersonId?, jerryContactLastLoginTime?, notificationSource?, notificationEmail?, notificationRecipientCount? }>. The three notification* fields appear only with --with-notification. matchableVarikkoCount counts varikot that pass the REAL fan-out geofence (enrolled AND coords AND maxDeliveryDistance > 0); sijaintiJerryCount counts enrolment only, so matchableVarikkoCount 0 with sijaintiJerryCount > 0 means the company is Jerry-active but invisible to every tarjouspyyntö. lastLoginTime is the MAX over the company's admins/tarjousAdmins; jerryContactLastLoginTime is the jerry contact's own — they differ when the company is alive but the notified address is dead. jerryContactPersonId null means no contact is configured at all (a different defect from a configured contact who never signed in).
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not a system admin     → use a system-admin token
@@ -4212,13 +4221,15 @@ ERRORS (stderr, exit non-zero)
 NOTES
   - The health check is \`matchableVarikkoCount === 0 && sijaintiJerryCount > 0\` — Jerry-active, varikot enrolled, yet invisible to every tarjouspyyntö. Diagnose the individual depot with \`ib jerry check-address --explain\`.
   - The second health check is \`jerryContactLastLoginTime === null\` — the enrolment is live and mailed, but the recipient has never signed in, so they cannot see customer details or leave an offer. Two providers sat like this for weeks looking identical to healthy rows; finding them used to need a per-person \`ib person activity\` sweep (fb#532). Remedy: re-send the tervetuloa email (it now explains the one-time-code login), or check whether offerNotificationEmail should carry the shared inbox instead.
+  - --with-notification is the third check, and the one jerryContactPersonId cannot answer: it reports the RESOLVED address per provider and which branch produced it (offerNotificationEmail | jerryContactPerson | billingEmail | adminUser). Scan for \`billingEmail\` (the request lands in an invoicing inbox, not with a person who can answer it) and for a null source (the chain reached NOBODY). Resolved by the same function the real send calls, so it cannot drift from what is emailed (fb#567).
 
 SEE ALSO
-  ib jerry check-address
+  ib jerry check-address, ib jerry admin detail
 
 EXAMPLES
   ib jerry admin list
   ib jerry admin list --pretty
+  ib jerry admin list --with-notification
 "
 `;
 
