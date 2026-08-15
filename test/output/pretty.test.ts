@@ -77,9 +77,16 @@ describe("pretty output", () => {
   // fb#604: a cell containing NEWLINES hit a cli-table3 0.6.5 path that is
   // O(lines × chars²) — `ib dev feedback get 528 --pretty` (a 5134-char,
   // ~50-line description) took 18.6 s and read as a hang. See the
-  // `patchTableTruncate` comment in src/output/pretty.ts. Unpatched this test
-  // takes ~17 s; the 2 s budget is a ~100× margin over the 3 ms it now costs,
-  // so it fails loudly on a regression without being timing-flaky.
+  // `patchTableTruncate` comment in src/output/pretty.ts.
+  //
+  // Measured on THIS fixture (not fb#528's, which is the bigger 17 s one):
+  // 8-11 s unpatched depending on machine load, ~4 ms patched. So the 2 s
+  // budget sits >=4x under broken and ~500x over healthy — loud on a
+  // regression, not timing-flaky. Do NOT raise it above ~4 s: a runner that
+  // hands the worker a wide TTY stops the table wrapping, and that is the
+  // cheapest the BROKEN path ever gets (~4.4 s). Shrinking the fixture has the
+  // same effect — halve the lines and broken lands near the budget — so leave
+  // the 50 x ~89 chars alone.
   test("renderRecord stays fast on a long multi-line field", () => {
     const description = Array.from(
       { length: 50 },

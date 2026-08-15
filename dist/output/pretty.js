@@ -35,17 +35,25 @@ function tableCtor() {
  *
  * Safe to patch because `utils.truncate` has exactly two call sites and only
  * the debug one can be handed a multi-line string: the other (cell.js:259)
- * truncates one line off `this.lines`. Output is byte-identical, 17482 → 3 ms.
+ * truncates one line off `this.lines`, which `computeLines` built by splitting
+ * on "\n". Rendered output is byte-identical; renderRecord on fb#528's row
+ * goes 17482 → 3 ms.
+ *
+ * The multi-line return is deliberately NOT upstream-equivalent — upstream
+ * compares the longest LINE's width, this compares total length, so the two
+ * disagree on a short multi-line cell. Harmless: the value is only interpolated
+ * into a debug message that `debug.js` discards at its default level. It is
+ * kept short because the function is called `truncate` and was asked for 10
+ * characters, not for any measured saving (returning `str` whole also renders
+ * in 2 ms).
  */
 function patchTableTruncate() {
     const utils = cjsRequire()("cli-table3/src/utils.js");
     const slow = utils.truncate;
     utils.truncate = (str, len, char) => {
-        if (typeof str !== "string" || !str.includes("\n"))
+        if (!str.includes("\n"))
             return slow(str, len, char);
-        if (str.length <= len)
-            return str;
-        return str.slice(0, Math.max(0, len - 1)) + (char || ELLIPSIS);
+        return str.slice(0, len - 1) + (char || ELLIPSIS);
     };
 }
 let _chalk = null;
@@ -119,10 +127,12 @@ function fitColumns(natural) {
 /**
  * Table options for constrained tables. wrapOnWordBoundary:false hard-wraps at
  * the column width — cli-table3's word-boundary mode TRUNCATES tokens longer
- * than the column (e.g. JSON blobs) with "…", which loses data.
+ * than the column (e.g. JSON blobs) with "…", which loses data. Takes the
+ * already-computed widths rather than the natural ones so `renderList` — which
+ * needs them for `clampCell` too, and is the path where losing a JSON blob
+ * actually costs something — shares this rule instead of re-inlining it.
  */
-function fittedOptions(natural) {
-    const colWidths = fitColumns(natural);
+function fittedOptions(colWidths) {
     return colWidths ? { colWidths, wordWrap: true, wrapOnWordBoundary: false } : {};
 }
 /** First line of a (possibly multi-line) cell, marked when lines were dropped. */
@@ -207,7 +217,7 @@ export function renderList(envelope, columns) {
     }
     const table = new (tableCtor())({
         head: headers.map((h) => chalk().bold(h)),
-        ...(colWidths ? { colWidths, wordWrap: true, wrapOnWordBoundary: false } : {}),
+        ...fittedOptions(colWidths),
     });
     for (const row of rows)
         table.push(row);
@@ -238,7 +248,7 @@ export function renderRecord(record) {
         Math.max(...entries.map(([k]) => k.length)),
         Math.max(...entries.map(([, v]) => visibleWidth(v))),
     ];
-    const table = new (tableCtor())(fittedOptions(natural));
+    const table = new (tableCtor())(fittedOptions(fitColumns(natural)));
     for (const [k, v] of entries) {
         table.push({ [chalk().bold(k)]: v });
     }
