@@ -9,6 +9,12 @@ export interface RunArgvOpts {
   token: string;
   endpoint: string;
   readOnly?: boolean;
+  /**
+   * Per-caller feedback-claim label (fb#616). Threaded through the ctx rather
+   * than read from process.env, because in-process calls share ONE env and a
+   * lease whose holders are indistinguishable does not lock anything.
+   */
+  claimId?: string;
 }
 
 export interface RunArgvResult {
@@ -53,6 +59,7 @@ export async function runArgv(
   const ctx = makeEmbeddedCtx({
     token: opts.token,
     endpoint: opts.endpoint,
+    claimId: opts.claimId,
     readOnly: opts.readOnly ?? false,
     tier: resolveCallerTier(opts.token),
   });

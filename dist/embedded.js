@@ -28,6 +28,7 @@ export function makeEmbeddedCtx(seed) {
         listColumns: seed.listColumns ?? null,
         projectionColumns: seed.projectionColumns ?? null,
         commandPath: seed.commandPath ?? null,
+        claimId: seed.claimId ?? null,
         stdout: [],
         stderr: [],
         exitCode: null,

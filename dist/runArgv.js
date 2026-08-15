@@ -35,6 +35,7 @@ export async function runArgv(argv, opts) {
     const ctx = makeEmbeddedCtx({
         token: opts.token,
         endpoint: opts.endpoint,
+        claimId: opts.claimId,
         readOnly: opts.readOnly ?? false,
         tier: resolveCallerTier(opts.token),
     });

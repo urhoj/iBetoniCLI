@@ -20,6 +20,14 @@ export interface EmbeddedCtx {
   tier: CallerTier;
   /** The running command's path for X-Ib-Command — ctx-aware for the same reason. */
   commandPath: string | null;
+  /**
+   * The caller's feedback-claim label, ctx-aware for the same reason as `tier`
+   * (fb#616). In-process calls share ONE process env, so reading IB_CLAIM_ID
+   * from `process.env` would give every concurrent hosted caller the same
+   * identity — and a claim lease whose holders are indistinguishable does not
+   * lock anything. Null = no identity was supplied; see resolveClaimId.
+   */
+  claimId: string | null;
   stdout: string[];
   stderr: string[];
   exitCode: number | null;
@@ -63,6 +71,7 @@ export function makeEmbeddedCtx(seed: EmbeddedCtxSeed): EmbeddedCtx {
     listColumns: seed.listColumns ?? null,
     projectionColumns: seed.projectionColumns ?? null,
     commandPath: seed.commandPath ?? null,
+    claimId: seed.claimId ?? null,
     stdout: [],
     stderr: [],
     exitCode: null,

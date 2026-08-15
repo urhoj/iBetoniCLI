@@ -28,6 +28,7 @@ import { guarded, jsonAction } from "../_shared/action.js";
 import { foldAliases, warnIfShellMangled } from "../_shared/flags.js";
 import { applyFromJson, type FromJsonConfig } from "../_shared/fromJson.js";
 import { qs } from "../../api/query.js";
+import { getEmbeddedCtx } from "../../embedded.js";
 import { CliError } from "../../api/errors.js";
 import { writeFlagsToHeaders } from "../../api/writeFlags.js";
 
@@ -748,11 +749,17 @@ const CLAIM_LABEL_MAX = 120;
  * `resolve`/`update` have no `--by` flag at all, so an agent that identifies
  * itself only via `--by` on `claim` will mismatch on the `x-claim-id` header
  * sent by `resolve`/`update` and get warned about its own claim. Order:
- * explicit --by, then IB_CLAIM_ID (Hermes / cron / CI), then user@host as a
- * coarse machine-level fallback that is never empty.
+ * explicit --by, then the embedded ctx (in-process hosted calls), then
+ * IB_CLAIM_ID (Hermes / cron / CI / the spawned hosted child), then user@host as
+ * a coarse machine-level fallback that is never empty.
+ *
+ * The ctx read comes BEFORE the env read for the same reason `tier` is ctx-aware
+ * (fb#616): interleaved in-process calls share one `process.env`, so an env-only
+ * lookup would hand every concurrent hosted caller the same label — and a lease
+ * whose holders are indistinguishable does not lock anything.
  */
 export function resolveClaimId(explicit?: string): string {
-  const v = explicit ?? process.env.IB_CLAIM_ID;
+  const v = explicit ?? getEmbeddedCtx()?.claimId ?? process.env.IB_CLAIM_ID;
   if (v && v.trim()) return v.trim().slice(0, CLAIM_LABEL_MAX);
   let user = "unknown";
   try {
@@ -765,11 +772,42 @@ export function resolveClaimId(explicit?: string): string {
 }
 
 /** POST /api/feedback/:id/claim — take or renew the lease. A REAL write. */
+/**
+ * Refuse to key a lease on an identity the backend cannot tell callers apart by
+ * (fb#616).
+ *
+ * The hosted bridge sets IB_CLAIM_ID_SHARED=1 when it could not derive a
+ * per-caller label, because on that path the CLI's own `user@host` fallback
+ * resolves to the App Service container — ONE identical label for every hosted
+ * caller. Two agents then both match `claimedBy = @by`, both take the renewal
+ * branch, and both get 200: the lock is ABSENT, not merely weak, and both
+ * believe they hold the row.
+ *
+ * So this fails closed rather than warning. A refused claim costs one round trip
+ * and a flag; an accepted-but-shared claim costs two agents doing the same work
+ * and finding out from the diff.
+ *
+ * Only guards the two commands whose whole purpose is exclusivity. Reads
+ * (`list --mine`) and advisory writes (resolve/update) stay usable — they
+ * degrade to a wrong-but-harmless label, and blocking them would strand work
+ * behind an identity problem.
+ */
+function assertClaimIdentity(explicit: string | undefined, action: string): void {
+  if (explicit || getEmbeddedCtx()?.claimId || process.env.IB_CLAIM_ID) return;
+  if (process.env.IB_CLAIM_ID_SHARED !== "1") return;
+  failWith(
+    `cannot ${action}: this backend could not derive a per-caller identity, so the claim would be keyed on a label SHARED by every hosted caller — it would not actually lock the row. ` +
+      `Pass --by <label> (a stable id for THIS agent, e.g. an agent/session name), or set IB_CLAIM_ID before invoking.`,
+    4
+  );
+}
+
 export async function runFeedbackClaim(
   client: ApiClient,
   id: number,
   input: { by?: string; ttlHours?: number; steal?: boolean; reason?: string }
 ): Promise<Record<string, unknown>> {
+  assertClaimIdentity(input.by, "claim");
   const body: Record<string, unknown> = { by: resolveClaimId(input.by) };
   if (input.ttlHours !== undefined) body.ttlHours = input.ttlHours;
   if (input.steal) body.steal = true;
@@ -784,6 +822,9 @@ export async function runFeedbackRelease(
   id: number | null,
   input: { by?: string; all?: boolean; reason?: string }
 ): Promise<Record<string, unknown>> {
+  // --all only: a shared label would release every hosted caller's claims, not
+  // just this one's. Releasing a SINGLE named id is safe either way.
+  if (input.all) assertClaimIdentity(input.by, "release --all");
   const by = resolveClaimId(input.by);
   const headers = writeFlagsToHeaders({ reason: input.reason });
   const hasReason = Object.keys(headers).length > 0;

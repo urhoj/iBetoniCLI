@@ -7,6 +7,7 @@ import {
   deriveClaimState,
 } from "../../src/commands/feedback/index.js";
 import { CliError, exitCodeFromStatus, hintForError } from "../../src/api/errors.js";
+import { makeEmbeddedCtx, runEmbedded } from "../../src/embedded.js";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
 
 function mockClient() {
@@ -218,5 +219,137 @@ describe("runFeedbackList — claim filters reach the wire correctly", () => {
     const url = (client as never as { get: ReturnType<typeof vi.fn> }).get.mock.calls[0][0] as string;
     const expected = new URLSearchParams({ claimedBy: "hermes/groom" }).toString();
     expect(url).toContain(expected);
+  });
+});
+
+/**
+ * fb#616: claim leases were NOT mutually exclusive over MCP / POST
+ * /api/cli/exec. buildChildEnv is a strict allow-list with no way to carry a
+ * claim label, so resolveClaimId fell back to the App Service container's
+ * user@host — ONE identical label for every hosted caller. Two agents both
+ * matched `claimedBy = @by`, both took the renewal branch, and both got 200:
+ * the lock was absent rather than weak, and `release --all` wiped everyone's.
+ */
+describe("claim identity — hosted callers (fb#616)", () => {
+  const savedId = process.env.IB_CLAIM_ID;
+  const savedShared = process.env.IB_CLAIM_ID_SHARED;
+  beforeEach(() => {
+    delete process.env.IB_CLAIM_ID;
+    delete process.env.IB_CLAIM_ID_SHARED;
+  });
+  afterEach(() => {
+    if (savedId === undefined) delete process.env.IB_CLAIM_ID; else process.env.IB_CLAIM_ID = savedId;
+    if (savedShared === undefined) delete process.env.IB_CLAIM_ID_SHARED; else process.env.IB_CLAIM_ID_SHARED = savedShared;
+  });
+
+  test("the spawned child's IB_CLAIM_ID is used, so an MCP session is its own holder", async () => {
+    process.env.IB_CLAIM_ID = "mcp:9f1c-42";
+    const client = mockClient();
+    await runFeedbackClaim(client, 42, {});
+    expect((client as unknown as { post: ReturnType<typeof vi.fn> }).post).toHaveBeenCalledWith(
+      "/api/feedback/42/claim",
+      { by: "mcp:9f1c-42" },
+      expect.any(Object)
+    );
+  });
+
+  /**
+   * THE FAIL-CLOSED GUARD. Without it the command succeeds and returns a lease
+   * keyed on a label shared by every hosted caller — the caller believes it
+   * holds the row exclusively and works it concurrently with whoever else
+   * "holds" it. Refusing costs one round trip; accepting costs duplicated work
+   * discovered from the diff.
+   */
+  test("refuses to claim when the backend could not derive an identity", async () => {
+    process.env.IB_CLAIM_ID_SHARED = "1";
+    const client = mockClient();
+    await expect(runFeedbackClaim(client, 42, {})).rejects.toThrow(/would not actually lock/i);
+    expect((client as unknown as { post: ReturnType<typeof vi.fn> }).post).not.toHaveBeenCalled();
+  });
+
+  test("--by satisfies the guard — the caller named itself explicitly", async () => {
+    process.env.IB_CLAIM_ID_SHARED = "1";
+    const client = mockClient();
+    await runFeedbackClaim(client, 42, { by: "agent-7" });
+    expect((client as unknown as { post: ReturnType<typeof vi.fn> }).post).toHaveBeenCalledWith(
+      "/api/feedback/42/claim",
+      { by: "agent-7" },
+      expect.any(Object)
+    );
+  });
+
+  test("IB_CLAIM_ID also satisfies it, so a normal hosted spawn is unaffected", async () => {
+    process.env.IB_CLAIM_ID_SHARED = "1";
+    process.env.IB_CLAIM_ID = "mcp:abc";
+    const client = mockClient();
+    await runFeedbackClaim(client, 42, {});
+    expect((client as unknown as { post: ReturnType<typeof vi.fn> }).post).toHaveBeenCalled();
+  });
+
+  test("release --all is guarded too — a shared label would drop other agents' claims", async () => {
+    process.env.IB_CLAIM_ID_SHARED = "1";
+    const client = mockClient();
+    await expect(runFeedbackRelease(client, null, { all: true })).rejects.toThrow(/would not actually lock/i);
+  });
+
+  /**
+   * Releasing ONE named id is safe under a shared label (you name the row), and
+   * blocking it would strand work behind an identity problem — the guard is
+   * scoped to the two commands whose purpose is exclusivity.
+   */
+  test("releasing a SINGLE id is still allowed under a shared label", async () => {
+    process.env.IB_CLAIM_ID_SHARED = "1";
+    const client = mockClient();
+    await runFeedbackRelease(client, 42, {});
+    expect((client as unknown as { delete: ReturnType<typeof vi.fn> }).delete).toHaveBeenCalled();
+  });
+
+  test("the marker alone never blocks a LOCAL run — it is only set by the hosted bridge", async () => {
+    const client = mockClient();
+    await runFeedbackClaim(client, 42, {});
+    expect((client as unknown as { post: ReturnType<typeof vi.fn> }).post).toHaveBeenCalled();
+  });
+});
+
+/**
+ * The in-process half of fb#616. `IB_EXEC_INPROCESS=1` runs betonicli inside the
+ * backend process, where every concurrent hosted call shares ONE `process.env` —
+ * so an env-carried label would give them all the same identity, which is the
+ * original bug wearing a different hat. The label therefore rides in the
+ * per-call EmbeddedCtx, the same mechanism `tier` uses for the same reason.
+ */
+describe("claim identity — in-process ctx (fb#616)", () => {
+  const saved = process.env.IB_CLAIM_ID;
+  beforeEach(() => { delete process.env.IB_CLAIM_ID; });
+  afterEach(() => { if (saved === undefined) delete process.env.IB_CLAIM_ID; else process.env.IB_CLAIM_ID = saved; });
+
+  const ctx = (claimId: string | null) =>
+    makeEmbeddedCtx({ token: "t", endpoint: "http://x", tier: "developer", claimId });
+
+  test("the ctx label wins over the shared process env", async () => {
+    process.env.IB_CLAIM_ID = "the-shared-container-label";
+    const seen = await runEmbedded(ctx("mcp:per-caller"), async () => resolveClaimId(undefined));
+    expect(seen).toBe("mcp:per-caller");
+  });
+
+  test("two interleaved ctxs keep their own identities", async () => {
+    // The property the module-global/env approach could not provide.
+    const [a, b] = await Promise.all([
+      runEmbedded(ctx("agent-a"), async () => resolveClaimId(undefined)),
+      runEmbedded(ctx("agent-b"), async () => resolveClaimId(undefined)),
+    ]);
+    expect([a, b]).toEqual(["agent-a", "agent-b"]);
+  });
+
+  test("an explicit --by still wins over the ctx", async () => {
+    const seen = await runEmbedded(ctx("from-ctx"), async () => resolveClaimId("explicit"));
+    expect(seen).toBe("explicit");
+  });
+
+  test("no ctx label falls through to the env, then to user@host", async () => {
+    process.env.IB_CLAIM_ID = "from-env";
+    expect(await runEmbedded(ctx(null), async () => resolveClaimId(undefined))).toBe("from-env");
+    delete process.env.IB_CLAIM_ID;
+    expect(await runEmbedded(ctx(null), async () => resolveClaimId(undefined))).toMatch(/@/);
   });
 });
