@@ -449,6 +449,20 @@ function warnClaimAdvisory(row) {
     }
 }
 /**
+ * Shared PUT + advisory-warn step behind both `resolve` and `update`: send the
+ * body with the caller's claim identity riding on `x-claim-id` (so the backend
+ * can tell a writer's own claim apart from someone else's), then surface any
+ * lease warning the response carries. Callers still do their own
+ * post-processing (compact ack shape, status hint, …).
+ */
+async function putWithClaimAdvisory(client, id, body) {
+    const row = await client.put(`/api/feedback/${id}`, body, {
+        headers: { "x-claim-id": resolveClaimId(undefined) },
+    });
+    warnClaimAdvisory(row);
+    return row;
+}
+/**
  * Project a resolved row to the compact write-ack fields (resolution capped).
  * `warning` (the claim-lease advisory — see {@link warnClaimAdvisory}) rides
  * through even in compact mode: it is a safety signal, not verbosity.
@@ -510,10 +524,7 @@ export async function runFeedbackResolve(client, id, input) {
     if (input.dryRun) {
         return { dryRun: true, wouldSend: { method: "PUT", path: `/api/feedback/${id}`, body } };
     }
-    const row = await client.put(`/api/feedback/${id}`, body, {
-        headers: { "x-claim-id": resolveClaimId(undefined) },
-    });
-    warnClaimAdvisory(row);
+    const row = await putWithClaimAdvisory(client, id, body);
     const out = input.full ? { ...row } : compactAck(row);
     if (input.status === undefined && (row.status === "open" || row.status === "reviewed")) {
         out.hint = `status unchanged (${row.status}) - pass --status applied|dismissed to close`;
@@ -598,10 +609,7 @@ export async function runFeedbackUpdate(client, id, input) {
     if (input.dryRun) {
         return { dryRun: true, wouldSend: { method: "PUT", path: `/api/feedback/${id}`, body } };
     }
-    const row = await client.put(`/api/feedback/${id}`, body, {
-        headers: { "x-claim-id": resolveClaimId(undefined) },
-    });
-    warnClaimAdvisory(row);
+    const row = await putWithClaimAdvisory(client, id, body);
     return input.full ? row : compactUpdateAck(row);
 }
 /** Column width of cliFeedback.claimedBy — labels are capped to match. */
@@ -692,11 +700,8 @@ export async function runFeedbackRelease(client, id, input) {
         assertClaimIdentity(input.by, "release --all");
     const by = resolveClaimId(input.by);
     const headers = writeFlagsToHeaders({ reason: input.reason });
-    const hasReason = Object.keys(headers).length > 0;
     if (input.all) {
-        return hasReason
-            ? client.post("/api/feedback/claims/release", { by }, { headers })
-            : client.post("/api/feedback/claims/release", { by });
+        return client.post("/api/feedback/claims/release", { by }, { headers });
     }
     if (id == null)
         failWith("Provide a feedbackId, or --all to release every claim", 4);
@@ -706,9 +711,7 @@ export async function runFeedbackRelease(client, id, input) {
     // The label therefore rides in the query string; the controller reads
     // `req.body?.by ?? req.query?.by`.
     const path = `/api/feedback/${id}/claim?by=${encodeURIComponent(by)}`;
-    return hasReason
-        ? client.delete(path, { headers })
-        : client.delete(path);
+    return client.delete(path, { headers });
 }
 /**
  * Register all `ib feedback` subcommands:

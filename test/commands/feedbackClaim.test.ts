@@ -80,7 +80,8 @@ describe("runFeedbackRelease", () => {
     const client = mockClient();
     await runFeedbackRelease(client, 42, { by: "c6b96c" });
     expect((client as never as { delete: ReturnType<typeof vi.fn> }).delete).toHaveBeenCalledWith(
-      "/api/feedback/42/claim?by=c6b96c"
+      "/api/feedback/42/claim?by=c6b96c",
+      expect.anything()
     );
   });
 
@@ -89,7 +90,8 @@ describe("runFeedbackRelease", () => {
     await runFeedbackRelease(client, null, { by: "c6b96c", all: true });
     expect((client as never as { post: ReturnType<typeof vi.fn> }).post).toHaveBeenCalledWith(
       "/api/feedback/claims/release",
-      { by: "c6b96c" }
+      { by: "c6b96c" },
+      expect.anything()
     );
   });
 });
