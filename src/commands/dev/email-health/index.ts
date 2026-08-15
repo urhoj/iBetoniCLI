@@ -19,37 +19,21 @@
  */
 import type { Command } from "commander";
 import type { ApiClient } from "../../../api/client.js";
+import { qs } from "../../../api/query.js";
 import { jsonAction } from "../../_shared/action.js";
 
-export interface EmailHealthFlag {
-  code: string;
-  severity: "critical" | "warning";
-  detail: string;
-}
-
-export interface EmailHealthReport {
-  days: number;
-  checkedAt: string;
-  coverage: { oldestEvent: string | null; newestEvent: string | null; daysWithData: number };
-  totals: {
-    processed: number;
-    delivered: number;
-    deferredEvents: number;
-    deferredMessages: number;
-    failed: number;
-    spam: number;
-  };
-  daily: Record<string, unknown>[];
-  recipients: { email: string; processed: number; sharePct: number }[];
-  verdict: { healthy: boolean; flags: EmailHealthFlag[] };
-}
-
+/**
+ * Pass-through: the report shape is documented once, in the CommandSpec's
+ * `outputShape`. A mirrored TS interface would buy nothing here (nothing reads
+ * a field off it, and `client.get` does not validate) while silently rotting
+ * every time the backend adds a column — this one had already drifted two
+ * fields behind `senderHealth.js` within a day of being written.
+ */
 export async function runDevEmailHealth(
   client: ApiClient,
   opts: { days?: number } = {}
-): Promise<EmailHealthReport> {
-  const qs = opts.days ? `?days=${encodeURIComponent(String(opts.days))}` : "";
-  return client.get<EmailHealthReport>(`/api/email-health${qs}`);
+): Promise<Record<string, unknown>> {
+  return client.get(`/api/email-health${qs({ days: opts.days })}`);
 }
 
 export function registerEmailHealthCommand(
@@ -60,7 +44,5 @@ export function registerEmailHealthCommand(
     .command("email-health")
     .description("Account-wide SendGrid sender health — volume, deferral rate, recipient concentration")
     .option("--days <n>", "Window in days (1..90, default 7)", Number)
-    .action(
-      jsonAction(getClient, (client, opts: { days?: number }) => runDevEmailHealth(client, opts))
-    );
+    .action(jsonAction(getClient, runDevEmailHealth));
 }
