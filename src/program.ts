@@ -20,6 +20,7 @@ import { DOMAIN_REGISTRARS, resolveArgvDomain, argvRestAfterDomain, type DomainD
 import { runReferenceDump, fetchPrimerGlossary } from "./reference/dump.js";
 import { runReferenceDetail, runReferenceDetailSet, runReferenceDetailList, runReferenceDetailEdit, runReferenceDetailDelete, runReferenceDetailLint, type ReferenceDetailListOptions } from "./reference/detail.js";
 import { addEditFlags, parseEditOp } from "./textEdit.js";
+import { intFlag } from "./targets.js";
 import { addWriteFlagsToCommand, type WriteFlags, requireReason } from "./api/writeFlags.js";
 import { assertAiConfidence, addAssessWriteFlags, addNeedsReviewFlags } from "./assess.js";
 import { buildCommandsList, buildDomainIndex, fullyHiddenDomains, assertKnownDomain } from "./reference/commandsList.js";
@@ -267,11 +268,15 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
   addNeedsReviewFlags(
     detail
       .command("list")
-      .option("--stalest <n>", "", (v: string) => Number(v))
+      // intFlag, not a bare Number: a NaN cap is dropped by `stalest || undefined`
+      // and the server then returns the WHOLE catalog — the fb#249 failure shape,
+      // where a typo silently widens the result instead of failing.
+      .option("--stalest <n>", "", intFlag("--stalest", 1))
       .option("--domain <d>")
       .option("--with-detail")
       .option("--search <substr>")
       .option("--orphans")
+      .option("--limit <n>", "", intFlag("--limit", 1))
   ).action(guarded(async (opts: ReferenceDetailListOptions) => {
     // Validate the domain offline (exit 4 on unknown) before any network call,
     // mirroring `ib commands <domain>`.

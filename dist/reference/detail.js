@@ -25,7 +25,7 @@ export async function runReferenceDetail(client, commandParts, tier = getCallerT
     return client.get(`/api/cli/command-catalog/${encodeURIComponent(command)}`);
 }
 export async function runReferenceDetailList(client, opts = {}) {
-    const { stalest, domain, withDetail, needsReview, maxConfidence, search, orphans } = opts;
+    const { stalest, domain, withDetail, needsReview, maxConfidence, search, orphans, limit } = opts;
     const res = await client.get(`/api/cli/command-catalog${qs({
         stalest: stalest || undefined,
         domain: domain || undefined,
@@ -34,20 +34,29 @@ export async function runReferenceDetailList(client, opts = {}) {
         needsReview: needsReview ? 1 : undefined,
         maxConfidence: needsReview && maxConfidence != null ? maxConfidence : undefined,
     })}`);
-    if (!search && !orphans)
+    if (!search && !orphans && limit == null)
         return res;
     // Compare orphans against the FULL spec set (NOT tier-filtered) — a
     // developer-tier command still has a spec, so its row is not an orphan.
     const live = orphans ? new Set(COMMAND_SPECS.map((s) => s.command)) : null;
     const needle = search?.toLowerCase();
-    const items = res.items.filter((row) => {
+    const filtered = res.items.filter((row) => {
         if (live && live.has(row.command))
             return false;
         if (needle && !row.command.toLowerCase().includes(needle))
             return false;
         return true;
     });
-    return { ...res, items, count: items.length };
+    // Cap LAST, so `--limit` means "at most N of what I asked for" rather than
+    // "N fetched rows, then narrowed to fewer" — the latter would silently return
+    // less than N with the filters applied, which reads as an empty result.
+    const items = limit == null ? filtered : filtered.slice(0, limit);
+    return {
+        ...res,
+        items,
+        count: items.length,
+        ...(items.length < filtered.length ? { truncated: true } : {}),
+    };
 }
 /**
  * Normalize a command path to the exact catalog key format (`ib <path>`) WITHOUT

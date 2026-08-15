@@ -6003,14 +6003,18 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "max-confidence", type: "number", description: "Threshold for --needs-review (default 90)." },
       { name: "search", type: "string", description: "Only rows whose command PATH contains this substring (case-insensitive). Client-side, so it works without a raw DB LIKE — the discover half of `reference detail delete`." },
       { name: "orphans", type: "boolean", description: "Only ORPHAN rows: keys whose command no longer exists in the live catalogue (re-homed/renamed leftovers). Same set as `reference detail lint`, but streamed as normal list rows so you can pipe → `delete`. Compose with --search to narrow." },
+      { name: "limit", type: "number", description: "Return at most N rows. A client-side payload CAP applied LAST (after --search/--orphans), not a pager — there is no cursor, so the rows past N are simply not returned and `truncated: true` says so." },
     ],
-    outputShape: "{ items: [{ command, summary, lastReviewed, runs, aiConfidence, needsHumanReview, detail? }], count } — `detail` present only with --with-detail. --search/--orphans filter client-side and recompute count.",
+    outputShape: "{ items: [{ command, summary, lastReviewed, runs, aiConfidence, needsHumanReview, detail? }], count, truncated? } — `detail` present only with --with-detail. --search/--orphans filter client-side and recompute count; `truncated: true` appears only when --limit actually cut rows.",
     errors: [
       { origin: "client", exit: 2, meaning: "Not authenticated", remedy: "Run `ib auth login`" },
-      { origin: "client", exit: 4, meaning: "Unknown --domain", remedy: "`ib commands` for valid domains" },
+      { origin: "client", exit: 4, match: "unknown domain", meaning: "Unknown --domain", remedy: "`ib commands` for valid domains" },
+      { origin: "client", exit: 4, match: ["--limit", "--stalest"], meaning: "--limit / --stalest is not an integer >= 1", remedy: "pass a positive integer; a bad cap is rejected rather than dropped, which would silently return the WHOLE catalog" },
     ],
     notes: [
       "--search and --orphans are client-side post-filters (no backend deploy needed): the full catalog is fetched, then narrowed locally.",
+      "NARROWING, not paging, is the model here: the backend returns the whole catalog in one shot and there is no cursor. Reach for --domain/--search/--needs-review/--stalest to ask a smaller question; --limit only caps the payload you get back (useful against --with-detail, which is ~154 large rows).",
+      "--stalest and --limit are different caps: --stalest caps the SERVER page and orders it least-recently-reviewed first, --limit caps client-side AFTER the filters. Passing both gives you at most --limit of the stalest --stalest.",
       "Because --stalest caps the server page first, run --orphans WITHOUT --stalest for a full-catalog orphan scan (with --stalest it only scans that page).",
       "--orphans returns the same set as `reference detail lint` but as plain list rows, so `reference detail list --orphans` → `reference detail delete <key>` is a self-contained discover→prune workflow for an MCP/exec-only caller.",
     ],
@@ -6022,6 +6026,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ib reference detail list --needs-review --max-confidence 90",
       "ib reference detail list --search 'dev bug'",
       "ib reference detail list --orphans",
+      "ib reference detail list --with-detail --limit 20",
     ],
   },
   {

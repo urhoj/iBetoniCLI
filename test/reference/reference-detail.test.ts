@@ -168,6 +168,40 @@ describe("runReferenceDetail", () => {
       expect(out.items.map((r) => r.command)).toEqual(["ib dev bug create"]);
       expect(out.count).toBe(1);
     });
+
+    describe("--limit (fb#619)", () => {
+      test("caps the rows and marks the result truncated", async () => {
+        const c = client({ get: vi.fn().mockResolvedValue(CATALOG) });
+        const out = await runReferenceDetailList(c, { limit: 2 });
+        expect(out.items.map((r) => r.command)).toEqual(["ib keikka list", "ib keikka latest"]);
+        expect(out.count).toBe(2);
+        expect(out.truncated).toBe(true);
+        // client-side only: the cap must not leak into the query string
+        expect(c.get).toHaveBeenCalledWith("/api/cli/command-catalog");
+      });
+
+      test("does not mark truncated when the limit is not reached", async () => {
+        const c = client({ get: vi.fn().mockResolvedValue(CATALOG) });
+        const out = await runReferenceDetailList(c, { limit: 99 });
+        expect(out.count).toBe(4);
+        expect(out.truncated).toBeUndefined();
+      });
+
+      test("caps AFTER --search/--orphans, so N means N of the filtered set", async () => {
+        const c = client({ get: vi.fn().mockResolvedValue(CATALOG) });
+        const out = await runReferenceDetailList(c, { orphans: true, limit: 1 });
+        // Capping first would have kept `ib keikka list` and then filtered it
+        // away, returning ZERO orphans for a --limit 1 orphan scan.
+        expect(out.items.map((r) => r.command)).toEqual(["ib dev bug create"]);
+        expect(out.count).toBe(1);
+        expect(out.truncated).toBe(true);
+      });
+
+      test("no limit and no filters still passes the server response through untouched", async () => {
+        const c = client({ get: vi.fn().mockResolvedValue(CATALOG) });
+        expect(await runReferenceDetailList(c, {})).toBe(CATALOG);
+      });
+    });
   });
 });
 

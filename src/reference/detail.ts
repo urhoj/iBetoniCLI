@@ -52,6 +52,10 @@ export interface ReferenceDetailListResult {
     detail?: string | null;
   }>;
   count: number;
+  // Set only when `--limit` actually cut rows off the end. There is no cursor
+  // here (the backend returns the whole catalog in one shot), so this flag is
+  // the only signal that what you got is not the whole answer.
+  truncated?: boolean;
 }
 
 /**
@@ -65,6 +69,11 @@ export interface ReferenceDetailListResult {
  * keeps rows whose command PATH contains the substring (the `LIKE` an exec-only
  * caller can't run); `orphans` keeps only rows whose command no longer exists in
  * the live spec catalogue (the discover half of the discover→delete flow).
+ *
+ * `limit` is a client-side payload CAP, not a pager (there is no cursor to page
+ * with). It exists because `--limit` is near-universal across the ib list
+ * surface, so an AI reaches for it by pattern and lost a round-trip to exit 4
+ * (fb#619). Distinct from `stalest`, which caps the SERVER page and orders it.
  */
 export interface ReferenceDetailListOptions {
   stalest?: number;
@@ -74,13 +83,14 @@ export interface ReferenceDetailListOptions {
   maxConfidence?: number;
   search?: string;
   orphans?: boolean;
+  limit?: number;
 }
 
 export async function runReferenceDetailList(
   client: ApiClient,
   opts: ReferenceDetailListOptions = {}
 ): Promise<ReferenceDetailListResult> {
-  const { stalest, domain, withDetail, needsReview, maxConfidence, search, orphans } = opts;
+  const { stalest, domain, withDetail, needsReview, maxConfidence, search, orphans, limit } = opts;
   const res = await client.get<ReferenceDetailListResult>(
     `/api/cli/command-catalog${qs({
       stalest: stalest || undefined,
@@ -91,17 +101,26 @@ export async function runReferenceDetailList(
       maxConfidence: needsReview && maxConfidence != null ? maxConfidence : undefined,
     })}`
   );
-  if (!search && !orphans) return res;
+  if (!search && !orphans && limit == null) return res;
   // Compare orphans against the FULL spec set (NOT tier-filtered) — a
   // developer-tier command still has a spec, so its row is not an orphan.
   const live = orphans ? new Set(COMMAND_SPECS.map((s) => s.command)) : null;
   const needle = search?.toLowerCase();
-  const items = res.items.filter((row) => {
+  const filtered = res.items.filter((row) => {
     if (live && live.has(row.command)) return false;
     if (needle && !row.command.toLowerCase().includes(needle)) return false;
     return true;
   });
-  return { ...res, items, count: items.length };
+  // Cap LAST, so `--limit` means "at most N of what I asked for" rather than
+  // "N fetched rows, then narrowed to fewer" — the latter would silently return
+  // less than N with the filters applied, which reads as an empty result.
+  const items = limit == null ? filtered : filtered.slice(0, limit);
+  return {
+    ...res,
+    items,
+    count: items.length,
+    ...(items.length < filtered.length ? { truncated: true } : {}),
+  };
 }
 
 /**

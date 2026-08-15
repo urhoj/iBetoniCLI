@@ -217,6 +217,14 @@ ib person notify --data <json>
   ! Invalid --data JSON: Unexpected token 'a', "abc" is not valid JSON
   > received: abc
 
+ib reference detail list --limit <n>
+  ! --limit must be an integer >= 1
+  > pass a positive integer; a bad cap is rejected rather than dropped, which would silently return the WHOLE catalog
+
+ib reference detail list --stalest <n>
+  ! --stalest must be an integer >= 1
+  > pass a positive integer; a bad cap is rejected rather than dropped, which would silently return the WHOLE catalog
+
 ib sijainti closest --asiakas <id>
   ! --asiakas must be an integer >= 1
   > name the worksite once (--worksite OR --tyomaa) and pass integer ids
