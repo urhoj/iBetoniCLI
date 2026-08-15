@@ -12,6 +12,7 @@ import {
   runJerryCoverage,
   runJerryProviderSettingsGet,
   runJerryProviderSettingsSet,
+  buildJerryProviderSettingsBody,
   runJerryAdminList,
   runJerryAdminRequestStats,
   runJerryAdminSearch,
@@ -279,6 +280,46 @@ describe("ib jerry admin request stats", () => {
     };
     get.mockResolvedValueOnce(rollup);
     expect(await runJerryAdminRequestStats(mockClient, { from: "2026-05-01" })).toEqual(rollup);
+  });
+});
+
+// The typed --email merge (fb#532). These assert the pure builder rather than the
+// action, because the action is unreachable from this suite by design — tests
+// never spawn the CLI. Before the extraction the `--email ""` clear path had no
+// test at all: swapping `!== undefined` for a truthy check broke it silently and
+// every jerry test still passed.
+describe("buildJerryProviderSettingsBody (typed-flag merge, fb#532)", () => {
+  test("maps --email to offerNotificationEmail", () => {
+    expect(buildJerryProviderSettingsBody(null, { email: "tarjoukset@yritys.fi" })).toEqual({
+      offerNotificationEmail: "tarjoukset@yritys.fi",
+    });
+  });
+
+  test("an explicit empty string is KEPT, not omitted — it is how the address is cleared", () => {
+    expect(buildJerryProviderSettingsBody(null, { email: "" })).toEqual({
+      offerNotificationEmail: "",
+    });
+  });
+
+  test("omits the key entirely when the flag was not provided", () => {
+    const body = buildJerryProviderSettingsBody({ website: "https://x.fi" }, {});
+    expect("offerNotificationEmail" in body).toBe(false);
+    expect(body).toEqual({ website: "https://x.fi" });
+  });
+
+  test("the typed flag wins over the same key in --body; other body keys pass through", () => {
+    expect(
+      buildJerryProviderSettingsBody(
+        { offerNotificationEmail: "body@yritys.fi", openingHours: "ma-pe 7-16" },
+        { email: "flag@yritys.fi" }
+      )
+    ).toEqual({ offerNotificationEmail: "flag@yritys.fi", openingHours: "ma-pe 7-16" });
+  });
+
+  test("does not mutate the caller's parsed body", () => {
+    const parsed = { website: "https://x.fi" };
+    buildJerryProviderSettingsBody(parsed, { email: "a@b.fi" });
+    expect(parsed).toEqual({ website: "https://x.fi" });
   });
 });
 

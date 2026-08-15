@@ -4329,7 +4329,7 @@ DESCRIPTION
   Permissions: requires isSystemAdmin.
 
 FLAGS
-  --status STRING    Filter by pipeline status key: ei_aloitettu → ilmoittautunut → email1_lahetetty → muistutus_lahetetty → vastasi_kylla → tiedot_pyydetty → tervetuloa_lahetetty (pipeline order; ilmoittautunut is set by self-apply); terminal: vastasi_ei / ei_vastausta / ei_sovellu
+  --status STRING    Filter by pipeline status key: ei_aloitettu â†’ ilmoittautunut â†’ email1_lahetetty â†’ muistutus_lahetetty â†’ vastasi_kylla â†’ tiedot_pyydetty â†’ tervetuloa_lahetetty (pipeline order; ilmoittautunut is set by self-apply); terminal: vastasi_ei / ei_vastausta / ei_sovellu
   --tier NUMBER    Tier filter (1 priority / 2 secondary)
   --due    Only rows where the email1b reminder is due (parked rows are excluded — a hold suppresses the reminder until it lapses)
   --search STRING    Case-insensitive substring on asiakasNimi / outreachName / outreachEmail / contactPersonName / contactPersonEmail
@@ -4373,7 +4373,7 @@ FLAGS
   --type STRING    Event kind: call | response | note; REQUIRED
   --text STRING    Event text; REQUIRED
   --time STRING    Backdated event time. Offset-less (2026-08-11T12:00) = Helsinki wall-clock; a zoned form (…+03:00, …Z) is converted to that instant
-  --set-status STRING    Also set the pipeline status. Keys: ei_aloitettu → ilmoittautunut → email1_lahetetty → muistutus_lahetetty → vastasi_kylla → tiedot_pyydetty → tervetuloa_lahetetty (pipeline order; ilmoittautunut is set by self-apply); terminal: vastasi_ei / ei_vastausta / ei_sovellu
+  --set-status STRING    Also set the pipeline status. Keys: ei_aloitettu â†’ ilmoittautunut â†’ email1_lahetetty â†’ muistutus_lahetetty â†’ vastasi_kylla â†’ tiedot_pyydetty â†’ tervetuloa_lahetetty (pipeline order; ilmoittautunut is set by self-apply); terminal: vastasi_ei / ei_vastausta / ei_sovellu
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -4421,7 +4421,7 @@ ARGUMENTS
   <asiakasId> NUMBER    company asiakasId (required)
 
 FLAGS
-  --status STRING    Pipeline status key: ei_aloitettu → ilmoittautunut → email1_lahetetty → muistutus_lahetetty → vastasi_kylla → tiedot_pyydetty → tervetuloa_lahetetty (pipeline order; ilmoittautunut is set by self-apply); terminal: vastasi_ei / ei_vastausta / ei_sovellu
+  --status STRING    Pipeline status key: ei_aloitettu â†’ ilmoittautunut â†’ email1_lahetetty â†’ muistutus_lahetetty â†’ vastasi_kylla â†’ tiedot_pyydetty â†’ tervetuloa_lahetetty (pipeline order; ilmoittautunut is set by self-apply); terminal: vastasi_ei / ei_vastausta / ei_sovellu
   --tier NUMBER    1/2
   --malli STRING    Email variant label — FREE TEXT (not server-validated); the convention is A or B
   --kanava STRING    Preferred channel
@@ -5371,7 +5371,7 @@ ERRORS (stderr, exit non-zero)
 
 NOTES
   - On Windows PowerShell inline --body JSON often fails (the shell strips the inner double-quotes) — pass --from-json <file|-> (a file, or - for stdin) to avoid shell quoting entirely.
-  - offerNotificationEmail vs jerryPersonId: the FIRST is where tarjouspyyntö mail is DELIVERED (may be a shared inbox), the SECOND is WHO signs in and acts on it (always a named person, always a personal login). Before fb#532 one field did both jobs, which pushed operators into configuring shared login accounts — the welcome email forbids those on GDPR/audit grounds, and the one account set up that way went three weeks without a single login.
+  - Before fb#532 jerryPersonId did both jobs — WHERE offer mail lands and WHO signs in — which pushed operators into configuring shared login accounts. The welcome email forbids those on GDPR/audit grounds, and the one account set up that way went three weeks without a single login.
 
 EXAMPLES
   ib jerry provider-settings set --body '{"openingHours":"ma-pe 7-16","maintainsOrderInfo":true}' --reason "update opening hours"

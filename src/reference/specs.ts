@@ -4962,7 +4962,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     notes: [
       "On Windows PowerShell inline --body JSON often fails (the shell strips the inner double-quotes) — pass --from-json <file|-> (a file, or - for stdin) to avoid shell quoting entirely.",
-      "offerNotificationEmail vs jerryPersonId: the FIRST is where tarjouspyyntö mail is DELIVERED (may be a shared inbox), the SECOND is WHO signs in and acts on it (always a named person, always a personal login). Before fb#532 one field did both jobs, which pushed operators into configuring shared login accounts — the welcome email forbids those on GDPR/audit grounds, and the one account set up that way went three weeks without a single login.",
+      "Before fb#532 jerryPersonId did both jobs — WHERE offer mail lands and WHO signs in — which pushed operators into configuring shared login accounts. The welcome email forbids those on GDPR/audit grounds, and the one account set up that way went three weeks without a single login.",
     ],
     examples: [
       'ib jerry provider-settings set --body \'{"openingHours":"ma-pe 7-16","maintainsOrderInfo":true}\' --reason "update opening hours"',

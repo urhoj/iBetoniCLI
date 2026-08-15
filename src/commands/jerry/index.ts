@@ -1,4 +1,4 @@
-import { Option } from "commander";
+﻿import { Option } from "commander";
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
 import { listEnvelope, toListEnvelope, type ListEnvelope } from "../../api/envelopes.js";
@@ -16,10 +16,10 @@ import { qs } from "../../api/query.js";
 
 type Row = Record<string, unknown>;
 
-// ─── request reads ──────────────────────────────────────────────────────────
+// â”€â”€â”€ request reads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
- * Tabs the provider lifecycle view (`--provider`) accepts — mirrors the
+ * Tabs the provider lifecycle view (`--provider`) accepts â€” mirrors the
  * backend's VALID_TABS (puminet5api routes/pumppuRequestRoutes.js), which 400s
  * ("tab virheellinen") on anything else. Shared with the CommandSpec.
  */
@@ -35,10 +35,10 @@ export interface JerryRequestListOpts {
 }
 
 /**
- * List pump requests (tarjouspyynnöt). Three views:
- *   --mine     → GET /api/pumppuRequests/mine          (the caller's own requests; default)
- *   --open     → GET /api/pumppuRequests/open          (provider inbox; isProvider; PII masked until your offer is accepted)
- *   --provider → GET /api/pumppuRequests/provider-list (provider lifecycle; isProvider; incl. your sent offers),
+ * List pump requests (tarjouspyynnÃ¶t). Three views:
+ *   --mine     â†’ GET /api/pumppuRequests/mine          (the caller's own requests; default)
+ *   --open     â†’ GET /api/pumppuRequests/open          (provider inbox; isProvider; PII masked until your offer is accepted)
+ *   --provider â†’ GET /api/pumppuRequests/provider-list (provider lifecycle; isProvider; incl. your sent offers),
  *                filtered by --tab (default avoimet): avoimet=open to bid on, tarjotut=offered (pending),
  *                voitetut=won (offer accepted/confirmed), paattyneet=ended (expired/no_supply/lost).
  * `--status` (CSV) and `--limit` apply to the --mine view only. Projected into
@@ -69,7 +69,7 @@ export async function runJerryRequestList(
 /**
  * Get a single pump request. Default is the customer-owned recap
  * (GET /api/pumppuRequests/:id). `--provider` switches to the provider-facing
- * detail (GET /api/pumppuRequests/:id/provider-detail; requires isProvider) —
+ * detail (GET /api/pumppuRequests/:id/provider-detail; requires isProvider) â€”
  * which reveals the FULL customer lead (name, address, lat/lng, phone, email) to
  * every matched provider while the request is open. Masking lives on the `--open`
  * list and the fan-out email, not here.
@@ -99,7 +99,7 @@ export async function runJerryRequestOffers(
   );
 }
 
-// ─── offer writes ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ offer writes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface JerryOfferCreateBody {
   priceCents: number;
@@ -115,7 +115,7 @@ export interface JerryOfferCreateBody {
 /**
  * Create or update (upsert) the caller's offer on a request
  * (POST /api/pumppuRequests/:id/offers). Provider-only. A new offer starts as
- * 'draft' (invisible to the customer) — transition it with `offer send`.
+ * 'draft' (invisible to the customer) â€” transition it with `offer send`.
  * Re-running while still draft/pending edits the existing offer.
  */
 export async function runJerryOfferCreate(
@@ -130,7 +130,7 @@ export async function runJerryOfferCreate(
 }
 
 /**
- * Send a draft offer (draft → pending; POST /:id/offers/:offerId/send) — makes
+ * Send a draft offer (draft â†’ pending; POST /:id/offers/:offerId/send) â€” makes
  * it visible to the customer. Provider-only; you must own the offer.
  */
 export async function runJerryOfferSend(
@@ -148,7 +148,7 @@ export async function runJerryOfferSend(
 
 /**
  * Withdraw your sent offer before the customer accepts it
- * (pending → withdrawn; POST /:id/offers/:offerId/withdraw). Provider-only; own offer.
+ * (pending â†’ withdrawn; POST /:id/offers/:offerId/withdraw). Provider-only; own offer.
  */
 export async function runJerryOfferWithdraw(
   client: ApiClient,
@@ -165,7 +165,7 @@ export async function runJerryOfferWithdraw(
 
 /**
  * Hard-delete your OWN DRAFT offer (DELETE /:id/offers/:offerId). Provider-only;
- * own offer; DRAFT status only — a sent offer 409s (use `offer withdraw` for
+ * own offer; DRAFT status only â€” a sent offer 409s (use `offer withdraw` for
  * pending). Mirrors the request-draft delete; the offer's attachments are
  * soft-deleted server-side. Returns { success, pumppuOfferId, deleted } (or the
  * dry-run wouldDelete echo).
@@ -218,7 +218,7 @@ export async function runJerryOfferConfirm(
   );
 }
 
-// ─── request write (customer tarjouspyyntö) ─────────────────────────────────
+// â”€â”€â”€ request write (customer tarjouspyyntÃ¶) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface JerryRequestCreateBody {
   osoite: string;
@@ -249,7 +249,7 @@ export async function runJerryRequestCancel(
  * Decline a whole request (provider-side; POST /api/pumppuRequests/:id/decline).
  * The caller's company bows out WITHOUT making an offer; `reason` (also carried as
  * the audit X-Action-Reason) is stored and shown to the customer, who is notified
- * (email + push). Blocked (409) if the caller already has an active offer — use
+ * (email + push). Blocked (409) if the caller already has an active offer â€” use
  * `offer withdraw` instead. Idempotent. The request leaves the provider's Avoimet
  * tab. Requires provider role.
  */
@@ -282,8 +282,8 @@ export async function runJerryRequestUndecline(
 }
 
 /**
- * Create a customer pump request / tarjouspyyntö (POST /api/pumppuRequests).
- * CUSTOMER side — distinct from `runJerryOfferCreate` (the provider bid). The
+ * Create a customer pump request / tarjouspyyntÃ¶ (POST /api/pumppuRequests).
+ * CUSTOMER side â€” distinct from `runJerryOfferCreate` (the provider bid). The
  * backend geocodes `osoite` and inserts the request as status:'open', visible
  * to every matching provider. Body keys are the Finnish field names the route
  * reads verbatim. `--dry-run` is deploy-gated (see the command notes).
@@ -318,8 +318,8 @@ export async function runJerryCounts(
  * Weekly marketplace funnel (GET /api/admin/jerry-searches/weekly). System-admin only.
  *
  * The trend counterpart to `counts`: where `counts` is a lifecycle snapshot of
- * your own requests, this is the whole funnel week by week — visitors, address
- * searches, wizard sessions, requests, offers — so a change in demand or a
+ * your own requests, this is the whole funnel week by week â€” visitors, address
+ * searches, wizard sessions, requests, offers â€” so a change in demand or a
  * provider side that has gone quiet is visible as a shape, not a single number.
  */
 export async function runJerryStats(
@@ -355,7 +355,7 @@ export interface JerryCheckAddressOpts {
 
 /**
  * Anonymous geofence feasibility probe (POST /api/pumppuRequests/checkAddress).
- * Answers "does any provider varikko cover this address?" — the root-cause tool
+ * Answers "does any provider varikko cover this address?" â€” the root-cause tool
  * for "no offers". `--address` maps to the required `osoite` body field; if
  * `--lat`/`--lng`/`--place-id` are all supplied the server trusts them instead
  * of re-geocoding. Not a mutation, so no write-safety flags. The `providers`
@@ -363,7 +363,7 @@ export interface JerryCheckAddressOpts {
  *
  * `--explain` adds a `considered[]` array of the varikot that did NOT match, each
  * with the FIRST gate that excluded it (no-coords / company-gate / not-enrolled /
- * radius / boom) — the "why no offers?" diagnostic. Like `providers`, it is
+ * radius / boom) â€” the "why no offers?" diagnostic. Like `providers`, it is
  * returned only to developer/admin tokens. `--asiakas <id>` force-includes one
  * (possibly not-yet-enabled) company's varikot so onboarding sees company-gate.
  */
@@ -383,13 +383,13 @@ export async function runJerryCheckAddress(
   return client.post<Row>("/api/pumppuRequests/checkAddress", body, { read: true });
 }
 
-// ─── coverage (developer supply map) ─────────────────────────────────────────
+// â”€â”€â”€ coverage (developer supply map) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface CoverageArea { covered?: boolean; tailRegion?: string; [k: string]: unknown }
 
 /**
  * Developer view of BetoniJerry supply coverage (GET /api/betonijerry/coverage-areas/detail;
- * developer/admin only — 403 otherwise). Returns the candidate-area coverage table
+ * developer/admin only â€” 403 otherwise). Returns the candidate-area coverage table
  * (covered + not, with providerCount) and the raw enrolled depot circles, then
  * derives a summary + the distinct covered regions (the ad-geo-targeting answer).
  */
@@ -427,7 +427,7 @@ export async function runJerryCoverage(client: ApiClient): Promise<Row> {
  * BetoniJerry SendGrid deliverability / activity diagnostic (developer-only;
  * GET /api/betonijerry/email-activity). READ-ONLY: domain-auth validity, 7-day
  * send stats (delivered/bounces/spam), and recent suppressions. Backed by a
- * separate read-only SendGrid key on the server — never the app's send key.
+ * separate read-only SendGrid key on the server â€” never the app's send key.
  */
 export interface JerryEmailActivityOpts {
   days?: number;
@@ -442,7 +442,7 @@ export async function runJerryEmailActivity(
   );
 }
 
-// ─── provider settings ──────────────────────────────────────────────────────
+// â”€â”€â”€ provider settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Read a provider company's BetoniJerry settings (GET /api/jerry-provider-settings).
@@ -454,6 +454,30 @@ export async function runJerryProviderSettingsGet(
   asiakasId?: number
 ): Promise<Row> {
   return client.get<Row>(`/api/jerry-provider-settings${qs({ asiakasId })}`);
+}
+
+/**
+ * Merge the typed `--email` flag over a parsed --body/--from-json patch (typed
+ * flag wins) into the /api/jerry-provider-settings body. Mirrors
+ * buildWorksiteUpdateBody / buildPersonUpdateBody (fb#234).
+ *
+ * Compared against `undefined`, NOT falsiness: `--email ""` is the documented
+ * way to CLEAR the address. The backend normalises the empty string to NULL and
+ * resolveProviderRecipients then falls back to the contact person's own address,
+ * so an empty string must survive all the way through. A truthiness check here
+ * would silently drop the clear and leave the old address delivering â€” which is
+ * exactly why this lives in a tested pure function rather than inline in the
+ * action, where the suite cannot reach it (tests never spawn the CLI).
+ */
+export function buildJerryProviderSettingsBody(
+  parsedBody: Row | null,
+  typed: { email?: string }
+): Row {
+  const body: Row = { ...(parsedBody ?? {}) };
+  // Typed flag wins over the same key in --body: it is the more specific
+  // instruction, and silently ignoring it would be the worse failure.
+  if (typed.email !== undefined) body.offerNotificationEmail = typed.email;
+  return body;
 }
 
 /**
@@ -474,14 +498,14 @@ export async function runJerryProviderSettingsSet(
   });
 }
 
-// ─── admin (system-admin Jerry dashboard) ───────────────────────────────────
+// â”€â”€â”€ admin (system-admin Jerry dashboard) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * List Jerry-active companies with per-company counts (GET /api/admin/jerry-companies).
  * System-admin only.
  *
- * `withNotification` adds the RESOLVED tarjouspyyntö recipient per row
- * (notificationSource / notificationEmail / notificationRecipientCount) — the
+ * `withNotification` adds the RESOLVED tarjouspyyntÃ¶ recipient per row
+ * (notificationSource / notificationEmail / notificationRecipientCount) â€” the
  * fleet-wide "which address does each provider's notification actually reach?"
  * in one call (fb#567). Opt-in: it costs the backend extra queries per company.
  */
@@ -513,7 +537,7 @@ export async function runJerryAdminDetail(
 }
 
 /**
- * Enable (`on=true`) or disable (`on=false`) the Jerry module for a company —
+ * Enable (`on=true`) or disable (`on=false`) the Jerry module for a company â€”
  * the audited toggle that sets both isPumppuToimittaja and the HAS_JERRY
  * setting (POST /api/admin/jerry-companies/:id/{enable,disable}). System-admin
  * only. Write flags surface as headers.
@@ -532,16 +556,16 @@ export async function runJerryAdminToggle(
   );
 }
 
-// ─── admin onboarding (provider-acquisition pipeline) ───────────────────────
+// â”€â”€â”€ admin onboarding (provider-acquisition pipeline) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
- * Valid onboarding pipeline status keys — mirrors backend ALL_STATUSES
+ * Valid onboarding pipeline status keys â€” mirrors backend ALL_STATUSES
  * (puminet5api modules/jerryAdmin/onboardingStatus.js): the ranked pipeline
  * first, then the three terminal states. The server 400s on anything else.
  *
  * `ilmoittautunut` is set by the backend when an operator self-applies
  * (source='self_apply'); an operator rarely sets it by hand, but it IS a valid
- * value on every status flag — omitting it here made self-applied prospects
+ * value on every status flag â€” omitting it here made self-applied prospects
  * look unfilterable/unsettable through the documented vocabulary (fb#377).
  */
 export const ONBOARDING_PIPELINE_STATUSES = [
@@ -559,22 +583,22 @@ export const ONBOARDING_STATUSES = [
   ...ONBOARDING_TERMINAL_STATUSES,
 ] as const;
 
-/** Prose rendering of {@link ONBOARDING_STATUSES} for flag help — single-sourced from the arrays. */
-export const ONBOARDING_STATUS_KEYS = `${ONBOARDING_PIPELINE_STATUSES.join(" → ")} (pipeline order; ilmoittautunut is set by self-apply); terminal: ${ONBOARDING_TERMINAL_STATUSES.join(" / ")}`;
+/** Prose rendering of {@link ONBOARDING_STATUSES} for flag help â€” single-sourced from the arrays. */
+export const ONBOARDING_STATUS_KEYS = `${ONBOARDING_PIPELINE_STATUSES.join(" â†’ ")} (pipeline order; ilmoittautunut is set by self-apply); terminal: ${ONBOARDING_TERMINAL_STATUSES.join(" / ")}`;
 
-/** Prospect company categories — backend COMPANY_TYPES (400 "Unknown companyType"). */
+/** Prospect company categories â€” backend COMPANY_TYPES (400 "Unknown companyType"). */
 export const COMPANY_TYPES = ["pumppu", "betoni", "all", "owner"] as const;
 
-/** How a prospect entered the pipeline — backend-validated (400 "Invalid source"). */
+/** How a prospect entered the pipeline â€” backend-validated (400 "Invalid source"). */
 export const ONBOARDING_SOURCES = ["manual", "import", "scheduled"] as const;
 
-/** Contact-history event kinds — backend-validated (400 "eventType must be call, response or note"). */
+/** Contact-history event kinds â€” backend-validated (400 "eventType must be call, response or note"). */
 export const ONBOARDING_EVENT_TYPES = ["call", "response", "note"] as const;
 
 /**
  * Every event kind that can APPEAR in the trail: the three a caller may write
  * plus the two the backend writes itself (`status_change` on every status move,
- * `email_sent` with the sent-body snapshot). Read-side only — passing either of
+ * `email_sent` with the sent-body snapshot). Read-side only â€” passing either of
  * the extra two to `onboarding note` is a 400.
  */
 export const ONBOARDING_EVENT_TYPES_ALL = [
@@ -660,7 +684,7 @@ export interface JerryOnboardingEventsOpts {
 
 /**
  * How much of an `email_sent` snapshot the default view keeps. One `email3`
- * body is ~3 KB, so a prospect with three sends buries its own timeline —
+ * body is ~3 KB, so a prospect with three sends buries its own timeline â€”
  * the same cap-and-hint shape `ib dev feedback list` uses on `description`.
  */
 export const ONBOARDING_EVENT_BODY_CAP = 200;
@@ -670,7 +694,7 @@ export const ONBOARDING_EVENT_BODY_CAP = 200;
  * (GET /api/admin/jerry-onboarding/:asiakasId/events).
  *
  * The read half of `onboarding note`. The trail is append-only and is where a
- * decision's REASON lives — why a prospect was parked, what the welcome email
+ * decision's REASON lives â€” why a prospect was parked, what the welcome email
  * actually said, when the status last moved and who moved it. None of that is
  * on the prospect row, so without this command a terminal status like
  * `ei_sovellu` cannot be told apart from a deliberate hold without leaving the
@@ -699,7 +723,7 @@ export async function runJerryOnboardingEvents(
       const body = r.emailBody;
       if (typeof body === "string" && body.length > ONBOARDING_EVENT_BODY_CAP) {
         bodiesCut++;
-        return { ...r, emailBody: `${body.slice(0, ONBOARDING_EVENT_BODY_CAP)}…` };
+        return { ...r, emailBody: `${body.slice(0, ONBOARDING_EVENT_BODY_CAP)}â€¦` };
       }
       return r;
     });
@@ -709,7 +733,7 @@ export async function runJerryOnboardingEvents(
     ...(cut ? { truncated: true } : {}),
     ...(bodiesCut > 0
       ? {
-          hint: `${bodiesCut} emailBody snapshot(s) cut to ${ONBOARDING_EVENT_BODY_CAP} chars — pass --full for the sent text`,
+          hint: `${bodiesCut} emailBody snapshot(s) cut to ${ONBOARDING_EVENT_BODY_CAP} chars â€” pass --full for the sent text`,
         }
       : {}),
   });
@@ -730,7 +754,7 @@ export async function runJerryOnboardingLog(
 }
 
 /**
- * Statuses the admin request list can filter on — mirrors VALID_STATUSES in
+ * Statuses the admin request list can filter on â€” mirrors VALID_STATUSES in
  * puminet5api modules/jerryAdmin/jerryAdminRequestsSql.js. The server SILENTLY
  * DROPS an unknown status from the IN list (and returns every status when that
  * empties the filter), so the CLI guards the value client-side rather than
@@ -784,7 +808,7 @@ export interface JerryAdminRequestStatsOpts {
 }
 
 /**
- * Windowed tarjouspyyntö rollup (GET /api/admin/jerry-requests/stats).
+ * Windowed tarjouspyyntÃ¶ rollup (GET /api/admin/jerry-requests/stats).
  * System-admin only.
  *
  * The aggregate sibling of `runJerryAdminRequests` (feedback #314): answering
@@ -822,11 +846,11 @@ export async function runJerryAdminRequestOffers(
   return toListEnvelope<Row>(await client.get<unknown>(`/api/admin/jerry-requests/${id}/offers`));
 }
 
-// ─── admin searches (Osoitehaut: address demand + conversion funnel) ─────────
+// â”€â”€â”€ admin searches (Osoitehaut: address demand + conversion funnel) â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Coverage filter for the address-demand list. The backend translates these
- * into a HAVING clause and IGNORES anything else — an unknown value silently
+ * into a HAVING clause and IGNORES anything else â€” an unknown value silently
  * returns the unfiltered list, which reads as "every address is covered".
  * Guarded client-side for that reason.
  */
@@ -850,7 +874,7 @@ export interface JerryAdminFunnelOpts {
 
 /**
  * Aggregated searched-address demand (GET /api/admin/jerry-searches). System-admin only.
- * Each row is one address (collapsed by place), with searchCount + noSupplyCount — the
+ * Each row is one address (collapsed by place), with searchCount + noSupplyCount â€” the
  * signal for where to expand provider coverage. --deliverable no_supply isolates the gaps.
  */
 export async function runJerryAdminSearches(
@@ -884,7 +908,7 @@ export async function runJerryAdminFunnel(
   );
 }
 
-// ─── admin request write commands ────────────────────────────────────────────
+// â”€â”€â”€ admin request write commands â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Factory for admin request status-transition commands (expire/cancel/resend).
@@ -905,7 +929,7 @@ export const runJerryAdminRequestResend = adminReqWrite("resend");
 
 /**
  * Extend a request's validity (POST /api/admin/jerry-requests/:id/extend). Sends
- * `until` (absolute ISO) when given, else `days` (omitted → backend default 14).
+ * `until` (absolute ISO) when given, else `days` (omitted â†’ backend default 14).
  * System-admin only.
  */
 export async function runJerryAdminRequestExtend(
@@ -930,17 +954,17 @@ export async function runJerryAdminRequestDelete(
   return client.delete<unknown>(`/api/admin/jerry-requests/${id}`, { headers: writeFlagsToHeaders(flags) });
 }
 
-// ─── registration ────────────────────────────────────────────────────────────
+// â”€â”€â”€ registration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type WriteOpts = WriteFlags;
 
-/** Parse a tri-state boolean flag value ("true"/"1" → true, else false). */
+/** Parse a tri-state boolean flag value ("true"/"1" â†’ true, else false). */
 function parseBool(v: string): boolean {
   return v === "true" || v === "1";
 }
 
 /**
- * Resolve the worksite address from the positional OR the --address flag —
+ * Resolve the worksite address from the positional OR the --address flag â€”
  * {@link resolveDualString} with this command's names.
  */
 function resolveAddress(positional: string | undefined, flag: string | undefined): string {
@@ -948,20 +972,20 @@ function resolveAddress(positional: string | undefined, flag: string | undefined
 }
 
 /**
- * Register the `ib jerry` command group — the BetoniJerry marketplace surface:
- *   request list/get/offers   read tarjouspyynnöt + their offers
+ * Register the `ib jerry` command group â€” the BetoniJerry marketplace surface:
+ *   request list/get/offers   read tarjouspyynnÃ¶t + their offers
  *   counts                    lifecycle counts (customer or provider view)
  *   check-address             anonymous geofence feasibility probe
  *   provider-settings get/set per-provider Jerry config
  *   admin list/search/detail/enable/disable   system-admin Jerry dashboard
  *
  * All commands reuse the existing /api/pumppuRequests, /api/jerry-provider-settings
- * and /api/admin/jerry-companies routes — the CLI projects array responses into
+ * and /api/admin/jerry-companies routes â€” the CLI projects array responses into
  * the universal list envelope. Mutations accept --dry-run / --idempotency-key /
  * --reason; admin enable/disable + provider-settings set require --reason.
  *
- * Exit codes follow the universal contract via exitWithError (2 auth · 3 perm ·
- * 4 validation · 5 not-found · 6 server · 7 network · 1 generic).
+ * Exit codes follow the universal contract via exitWithError (2 auth Â· 3 perm Â·
+ * 4 validation Â· 5 not-found Â· 6 server Â· 7 network Â· 1 generic).
  */
 export function registerJerryCommands(
   parent: Command,
@@ -969,8 +993,8 @@ export function registerJerryCommands(
 ): void {
   const j = parent.command("jerry").description("BetoniJerry marketplace commands");
 
-  // request ──────────────────────────────────────────────────────────────────
-  const request = j.command("request").description("Pump requests (tarjouspyynnöt)");
+  // request â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const request = j.command("request").description("Pump requests (tarjouspyynnÃ¶t)");
 
   request
     .command("list")
@@ -1066,7 +1090,7 @@ export function registerJerryCommands(
   );
   registerRequestLifecycle("undecline", runJerryRequestUndecline);
 
-  // offer ──────────────────────────────────────────────────────────────────────
+  // offer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const offer = j.command("offer").description("Act on offers (create/send/accept/confirm)");
 
   addWriteFlagsToCommand(
@@ -1158,7 +1182,7 @@ export function registerJerryCommands(
   registerOfferLifecycle("withdraw", runJerryOfferWithdraw);
   registerOfferLifecycle("delete", runJerryOfferDelete);
 
-  // counts ─────────────────────────────────────────────────────────────────────
+  // counts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   j.command("counts")
     .option("--provider")
     .option("--mine")
@@ -1168,7 +1192,7 @@ export function registerJerryCommands(
       )
     );
 
-  // stats ──────────────────────────────────────────────────────────────────────
+  // stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   j.command("stats")
     .option("--weeks <n>", "", Number)
     .action(
@@ -1177,7 +1201,7 @@ export function registerJerryCommands(
       )
     );
 
-  // check-address ────────────────────────────────────────────────────────────
+  // check-address â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   j.command("check-address")
     .requiredOption("--address <s>")
     .option("--lat <n>", "", Number)
@@ -1204,9 +1228,9 @@ export function registerJerryCommands(
         asiakas?: number;
         gate?: string[];
       }) => {
-        // Reject a NaN --boom (e.g. Commander coercing "abc" → NaN) so the probe
+        // Reject a NaN --boom (e.g. Commander coercing "abc" â†’ NaN) so the probe
         // fails loudly instead of silently dropping the boom filter the operator
-        // asked for — misleading during onboarding verification.
+        // asked for â€” misleading during onboarding verification.
         if (opts.boom !== undefined && (!Number.isFinite(opts.boom) || opts.boom < 0)) {
           failWith("--boom must be a non-negative number of metres", 4);
         }
@@ -1223,7 +1247,7 @@ export function registerJerryCommands(
           if (!opts.explain) {
             failWith("--gate only applies with --explain", 4);
           }
-          // Reject an unknown gate here rather than letting the server drop it —
+          // Reject an unknown gate here rather than letting the server drop it â€”
           // a silently-narrowed diagnostic reads as "nothing else is wrong".
           assertEnumCsv(opts.gate, CHECK_ADDRESS_GATES, "--gate");
         }
@@ -1232,11 +1256,11 @@ export function registerJerryCommands(
       })
     );
 
-  // coverage ─────────────────────────────────────────────────────────────────
+  // coverage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   j.command("coverage")
     .action(jsonAction(getClient, runJerryCoverage));
 
-  // email-activity ─────────────────────────────────────────────────────────────
+  // email-activity â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   j.command("email-activity")
     .option("--days <n>", "", (v: string) => Math.min(90, Math.max(1, Number(v))))
     .option("--domain <d>")
@@ -1246,7 +1270,7 @@ export function registerJerryCommands(
       )
     );
 
-  // provider-settings ──────────────────────────────────────────────────────────
+  // provider-settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const ps = j
     .command("provider-settings")
     .description("Per-provider BetoniJerry settings (contact, opening hours, description)");
@@ -1270,34 +1294,30 @@ export function registerJerryCommands(
       )
       // `--email`, not `--offer-email`: the latter is a near-spelling of the
       // established `--offer` (a pumppuOfferId on 5 commands) and reads as "the
-      // email of offer N" — flag-vocabulary.test.ts rejects it. `--email` is the
+      // email of offer N" â€” flag-vocabulary.test.ts rejects it. `--email` is the
       // majority spelling and unambiguous here, since this is the only address
       // the command sets (same shape as `ib customer update --email`).
       .option("--email <email>")
       .option("--asiakas <id>", "", Number)
   ).action(guarded(async (opts: WriteOpts & { body?: string; fromJson?: string; email?: string; asiakas?: number }) => {
-    const client = await getClient();
     const parsed = resolveJsonObjectBody({ body: opts.body, fromJson: opts.fromJson }) as Row | null;
-    // A typed shortcut for the one field an operator most often sets alone, and
-    // PowerShell mangles inline --body JSON (fb#437). Compared against undefined,
-    // not falsiness: `--email ""` is the documented way to CLEAR the address and
-    // fall back to the contact person's own.
-    const hasOfferEmail = opts.email !== undefined;
-    if (!parsed && !hasOfferEmail) {
+    if (!parsed && opts.email === undefined) {
       failWith("provider-settings set requires a body via --body, --from-json or --email", 4);
     }
-    // Typed flag wins over the same key in --body: it is the more specific
-    // instruction, and silently ignoring it would be the worse failure.
-    const payload: Row = {
-      ...(parsed ?? {}),
-      ...(hasOfferEmail ? { offerNotificationEmail: opts.email } : {}),
-    };
+    // getClient AFTER the guard so a usage error exits 4, not 2 ("Not logged
+    // in") â€” matches `worksite update` / `person update`.
+    const client = await getClient();
     writeJson(
-      await runJerryProviderSettingsSet(client, payload, opts.asiakas, opts)
+      await runJerryProviderSettingsSet(
+        client,
+        buildJerryProviderSettingsBody(parsed, opts),
+        opts.asiakas,
+        opts
+      )
     );
   }));
 
-  // admin ──────────────────────────────────────────────────────────────────────
+  // admin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const admin = j
     .command("admin")
     .description("System-admin Jerry dashboard (enable/disable + listings)");
@@ -1342,7 +1362,7 @@ export function registerJerryCommands(
     );
   }
 
-  // admin onboarding — provider-acquisition pipeline ──────────────────────────
+  // admin onboarding â€” provider-acquisition pipeline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const onboarding = admin
     .command("onboarding")
     .description("Provider onboarding pipeline (prospects + contact history)");
@@ -1431,9 +1451,9 @@ export function registerJerryCommands(
     );
 
   // Canonical writer is `note`; `log` stays as a hidden, still-executable alias.
-  // Every other `ib … log` in this CLI is an audit-trail READ (`ib person log`,
+  // Every other `ib â€¦ log` in this CLI is an audit-trail READ (`ib person log`,
   // `ib log latest/range/by-entity-date`), so the old name actively mispointed
-  // callers looking for the history — the read now lives at `events` (fb#391).
+  // callers looking for the history â€” the read now lives at `events` (fb#391).
   const onboardingNoteAction = guarded(
     async (idStr: string, opts: WriteOpts & Record<string, unknown>) => {
       const client = await getClient();
@@ -1451,7 +1471,7 @@ export function registerJerryCommands(
       // Normalized at PARSE time so both `note` and its hidden `log` alias get
       // it: offset-less input is Helsinki wall-clock, zoned input is converted
       // to the real UTC instant. Posting the raw string let the DATETIME2 bind
-      // drop the offset — 12:00+03:00 stored as 12:00Z, silently (fb#412).
+      // drop the offset â€” 12:00+03:00 stored as 12:00Z, silently (fb#412).
       .option("--time <iso>", "", (v: string) => resolveDateTime(v))
       .option("--set-status <key>");
 
@@ -1465,10 +1485,10 @@ export function registerJerryCommands(
     )
   ).action(onboardingNoteAction);
 
-  // admin request — lifecycle subgroup (reads + write transitions) ─────────────
+  // admin request â€” lifecycle subgroup (reads + write transitions) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const adminRequest = admin
     .command("request")
-    .description("Admin tarjouspyyntö lifecycle (list/get/offers/expire/cancel/resend/extend/delete)");
+    .description("Admin tarjouspyyntÃ¶ lifecycle (list/get/offers/expire/cancel/resend/extend/delete)");
 
   adminRequest
     .command("list")
@@ -1481,7 +1501,7 @@ export function registerJerryCommands(
     .action(
       guarded(async (opts: JerryAdminRequestsOpts) => {
         // Reject an unknown status here: the server drops it from the IN list,
-        // and a filter that emptied out returns EVERY status — a wider answer
+        // and a filter that emptied out returns EVERY status â€” a wider answer
         // than the one asked, with nothing saying so.
         if (opts.status) {
           assertEnumCsv(
@@ -1551,7 +1571,7 @@ export function registerJerryCommands(
     writeJson(await runJerryAdminRequestExtend(client, parseId(idStr, "requestId"), opts));
   }));
 
-  // admin searches — Osoitehaut: address demand + conversion funnel ─────────────
+  // admin searches â€” Osoitehaut: address demand + conversion funnel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const adminSearches = admin
     .command("searches")
     .description("Address-search demand + wizard conversion funnel (Osoitehaut)");
@@ -1563,7 +1583,7 @@ export function registerJerryCommands(
     .option("--deliverable <k>")
     .option("--search <text>")
     // Back-compat alias for the pre-rename spelling (fb#388). `--q` was the lone
-    // outlier among 20 search commands — 19 spell it `--search` — and guessing
+    // outlier among 20 search commands â€” 19 spell it `--search` â€” and guessing
     // the majority form did not merely fail here, it redirected the caller to
     // `ib jerry admin search`, a DIFFERENT command (coverage check, not demand).
     // Hidden: the spec documents only `--search`.
@@ -1572,7 +1592,7 @@ export function registerJerryCommands(
     .action(
       guarded(async (opts: JerryAdminSearchesOpts) => {
         // An unknown --deliverable is ignored server-side (no HAVING clause), so
-        // the caller gets the UNFILTERED list — "no_suply" would read as "every
+        // the caller gets the UNFILTERED list â€” "no_suply" would read as "every
         // address we ever checked is covered".
         assertEnum(opts.deliverable, SEARCH_DELIVERABLE, "--deliverable");
         const client = await getClient();
