@@ -11,6 +11,8 @@ import {
   runFeedbackCount,
   resolveFeedbackCreateDescription,
   registerFeedbackCommands,
+  type FeedbackResolveInput,
+  type FeedbackUpdateInput,
 } from "../../src/commands/feedback/index.js";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1264,53 +1266,47 @@ describe("ib feedback resolve/update — claim-lease advisory warning", () => {
   const warnedOnStderr = () =>
     errSpy.mock.calls.some((c: unknown[]) => String(c[0]).includes(WARNING));
 
-  test("resolve: the warning survives into the compact ack", async () => {
-    put.mockResolvedValueOnce({ feedbackId: 42, status: "applied", warning: WARNING });
-    const out = await runFeedbackResolve(mockClient, 42, { status: "applied" });
-    expect(out).toMatchObject({ warning: WARNING });
-  });
+  // Both commands get identical coverage — resolve and update previously
+  // diverged (update was missing the --full and printed-exactly-once cases).
+  describe.each<["resolve" | "update", Record<string, unknown>]>([
+    ["resolve", { status: "applied" }],
+    ["update", { scope: "security" }],
+  ])("%s", (cmd, extraInput) => {
+    const run = (id: number, input: Record<string, unknown>) =>
+      cmd === "resolve"
+        ? runFeedbackResolve(mockClient, id, input as FeedbackResolveInput)
+        : runFeedbackUpdate(mockClient, id, input as FeedbackUpdateInput);
 
-  test("resolve: the warning survives under --full too", async () => {
-    put.mockResolvedValueOnce({ feedbackId: 42, status: "applied", warning: WARNING });
-    const out = await runFeedbackResolve(mockClient, 42, { status: "applied", full: true });
-    expect(out).toMatchObject({ warning: WARNING });
-  });
+    test("the warning survives into the compact ack", async () => {
+      put.mockResolvedValueOnce({ feedbackId: 42, ...extraInput, warning: WARNING });
+      const out = await run(42, extraInput);
+      expect(out).toMatchObject({ warning: WARNING });
+    });
 
-  test("resolve: a response WITH a warning prints it to stderr", async () => {
-    put.mockResolvedValueOnce({ feedbackId: 42, status: "applied", warning: WARNING });
-    await runFeedbackResolve(mockClient, 42, { status: "applied" });
-    expect(warnedOnStderr()).toBe(true);
-  });
+    test("the warning survives under --full too", async () => {
+      put.mockResolvedValueOnce({ feedbackId: 42, ...extraInput, warning: WARNING });
+      const out = await run(42, { ...extraInput, full: true });
+      expect(out).toMatchObject({ warning: WARNING });
+    });
 
-  test("resolve: a response WITHOUT a warning prints nothing", async () => {
-    put.mockResolvedValueOnce({ feedbackId: 42, status: "applied" });
-    await runFeedbackResolve(mockClient, 42, { status: "applied" });
-    expect(warnedOnStderr()).toBe(false);
-  });
+    test("a response WITH a warning prints it to stderr", async () => {
+      put.mockResolvedValueOnce({ feedbackId: 42, ...extraInput, warning: WARNING });
+      await run(42, extraInput);
+      expect(warnedOnStderr()).toBe(true);
+    });
 
-  test("resolve: the warning is printed exactly once", async () => {
-    put.mockResolvedValueOnce({ feedbackId: 42, status: "applied", warning: WARNING });
-    await runFeedbackResolve(mockClient, 42, { status: "applied" });
-    const hits = errSpy.mock.calls.filter((c: unknown[]) => String(c[0]).includes(WARNING));
-    expect(hits).toHaveLength(1);
-  });
+    test("a response WITHOUT a warning prints nothing", async () => {
+      put.mockResolvedValueOnce({ feedbackId: 42, ...extraInput });
+      await run(42, extraInput);
+      expect(warnedOnStderr()).toBe(false);
+    });
 
-  test("update: the warning survives into the compact ack", async () => {
-    put.mockResolvedValueOnce({ feedbackId: 42, scope: "security", warning: WARNING });
-    const out = await runFeedbackUpdate(mockClient, 42, { scope: "security" });
-    expect(out).toMatchObject({ warning: WARNING });
-  });
-
-  test("update: a response WITH a warning prints it to stderr", async () => {
-    put.mockResolvedValueOnce({ feedbackId: 42, scope: "security", warning: WARNING });
-    await runFeedbackUpdate(mockClient, 42, { scope: "security" });
-    expect(warnedOnStderr()).toBe(true);
-  });
-
-  test("update: a response WITHOUT a warning prints nothing", async () => {
-    put.mockResolvedValueOnce({ feedbackId: 42, scope: "security" });
-    await runFeedbackUpdate(mockClient, 42, { scope: "security" });
-    expect(warnedOnStderr()).toBe(false);
+    test("the warning is printed exactly once", async () => {
+      put.mockResolvedValueOnce({ feedbackId: 42, ...extraInput, warning: WARNING });
+      await run(42, extraInput);
+      const hits = errSpy.mock.calls.filter((c: unknown[]) => String(c[0]).includes(WARNING));
+      expect(hits).toHaveLength(1);
+    });
   });
 });
 

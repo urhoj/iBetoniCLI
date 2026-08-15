@@ -571,18 +571,28 @@ async function putWithClaimAdvisory(
 }
 
 /**
- * Project a resolved row to the compact write-ack fields (resolution capped).
- * `warning` (the claim-lease advisory — see {@link warnClaimAdvisory}) rides
- * through even in compact mode: it is a safety signal, not verbosity.
+ * Shared shape for the write-ack projectors below: copy a whitelist of keys
+ * verbatim, copy one capped free-text field, then carry `warning` (the
+ * claim-lease advisory — see {@link warnClaimAdvisory}) through even in
+ * compact mode, since it's a safety signal, not verbosity.
  */
-function compactAck(row: Record<string, unknown>): Record<string, unknown> {
+function buildAck(
+  row: Record<string, unknown>,
+  keys: string[],
+  cappedField: string
+): Record<string, unknown> {
   const ack: Record<string, unknown> = {};
-  for (const k of ["feedbackId", "status", "updatedAt"]) {
+  for (const k of keys) {
     if (k in row) ack[k] = row[k];
   }
-  if ("resolution" in row) ack.resolution = truncateField(row.resolution).value;
+  if (cappedField in row) ack[cappedField] = truncateField(row[cappedField]).value;
   if ("warning" in row) ack.warning = row.warning;
   return ack;
+}
+
+/** Project a resolved row to the compact write-ack fields (resolution capped). */
+function compactAck(row: Record<string, unknown>): Record<string, unknown> {
+  return buildAck(row, ["feedbackId", "status", "updatedAt"], "resolution");
 }
 
 export interface FeedbackResolveInput {
@@ -649,19 +659,13 @@ export async function runFeedbackResolve(
   return out;
 }
 
-/**
- * Project an updated row to the compact edit-ack fields (description capped).
- * `warning` (the claim-lease advisory — see {@link warnClaimAdvisory}) rides
- * through even in compact mode: it is a safety signal, not verbosity.
- */
+/** Project an updated row to the compact edit-ack fields (description capped). */
 function compactUpdateAck(row: Record<string, unknown>): Record<string, unknown> {
-  const ack: Record<string, unknown> = {};
-  for (const k of ["feedbackId", "scope", "kind", "severity", "complexity", "updatedAt"]) {
-    if (k in row) ack[k] = row[k];
-  }
-  if ("description" in row) ack.description = truncateField(row.description).value;
-  if ("warning" in row) ack.warning = row.warning;
-  return ack;
+  return buildAck(
+    row,
+    ["feedbackId", "scope", "kind", "severity", "complexity", "updatedAt"],
+    "description"
+  );
 }
 
 export interface FeedbackUpdateInput {

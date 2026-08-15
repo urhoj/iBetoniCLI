@@ -6664,7 +6664,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "by", type: "string", description: "The claiming agent/session label. Defaults to the hosted bridge's per-caller identity, then $IB_CLAIM_ID, then user@host. Every agent authenticates as the same person, so this label is the ONLY thing that distinguishes sessions — pass your session short id. Over MCP ib_exec this is now an OVERRIDE rather than a requirement: the bridge supplies the MCP session id as `mcp:<uuid>` (fb#616). Over POST /api/cli/exec, pass `claimId` in the request body or --by here — that path is stateless and has no identity to derive. If the backend can supply neither, `claim` REFUSES rather than issuing a lease keyed on a label every hosted caller shares." },
       { name: "ttl-hours", type: "number", description: "Lease length in hours, 1-24 (default 24). The 24h ceiling is ABSOLUTE: it is measured from your FIRST acquire, so renewing cannot extend past it." },
       { name: "steal", type: "boolean", description: "Take a row that is under another agent's LIVE claim. For human recovery; normal contention should pick a different item instead." },
-      { name: "reason", type: "string", description: "X-Action-Reason audit header" },
+      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason)" },
     ],
     outputShape: "The claimed feedback row, including claimedBy, claimedAt and claimExpiresAt.",
     errors: [
@@ -6703,7 +6703,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [
       { name: "by", type: "string", description: "The holder label. Defaults to the hosted bridge's per-caller identity, then $IB_CLAIM_ID, then user@host — must match the label used to claim. Over MCP ib_exec the bridge supplies `mcp:<session-uuid>` automatically (fb#616), so this is an override; over POST /api/cli/exec supply `claimId` in the body or --by here. Without any identity, `--all` REFUSES (it would release every hosted caller's claims, not just yours); releasing a single named id is still allowed." },
       { name: "all", type: "boolean", description: "Release EVERY claim held by this label instead of one row" },
-      { name: "reason", type: "string", description: "X-Action-Reason audit header" },
+      { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason)" },
     ],
     outputShape: "{ feedbackId, released:true } for one row; { by, released:<count> } with --all.",
     errors: [

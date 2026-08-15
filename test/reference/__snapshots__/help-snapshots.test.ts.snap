@@ -2700,7 +2700,7 @@ FLAGS
   --by STRING    The claiming agent/session label. Defaults to the hosted bridge's per-caller identity, then $IB_CLAIM_ID, then user@host. Every agent authenticates as the same person, so this label is the ONLY thing that distinguishes sessions — pass your session short id. Over MCP ib_exec this is now an OVERRIDE rather than a requirement: the bridge supplies the MCP session id as \`mcp:<uuid>\` (fb#616). Over POST /api/cli/exec, pass \`claimId\` in the request body or --by here — that path is stateless and has no identity to derive. If the backend can supply neither, \`claim\` REFUSES rather than issuing a lease keyed on a label every hosted caller shares.
   --ttl-hours NUMBER    Lease length in hours, 1-24 (default 24). The 24h ceiling is ABSOLUTE: it is measured from your FIRST acquire, so renewing cannot extend past it.
   --steal    Take a row that is under another agent's LIVE claim. For human recovery; normal contention should pick a different item instead.
-  --reason STRING    X-Action-Reason audit header
+  --reason STRING    Audit-log reason (X-Action-Reason)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -2939,7 +2939,7 @@ ARGUMENTS
 FLAGS
   --by STRING    The holder label. Defaults to the hosted bridge's per-caller identity, then $IB_CLAIM_ID, then user@host — must match the label used to claim. Over MCP ib_exec the bridge supplies \`mcp:<session-uuid>\` automatically (fb#616), so this is an override; over POST /api/cli/exec supply \`claimId\` in the body or --by here. Without any identity, \`--all\` REFUSES (it would release every hosted caller's claims, not just yours); releasing a single named id is still allowed.
   --all    Release EVERY claim held by this label instead of one row
-  --reason STRING    X-Action-Reason audit header
+  --reason STRING    Audit-log reason (X-Action-Reason)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
