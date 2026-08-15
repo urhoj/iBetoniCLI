@@ -2735,6 +2735,7 @@ EXAMPLES
 exports[`Help snapshots — contract stability > help for ib dev feedback count matches snapshot 1`] = `
 "USAGE
   ib dev feedback count [flags]
+  (also: ib dev feedback stats)
 
 DESCRIPTION
   Aggregate counts of filed feedback by status, kind, and scope, plus how many rows still have NO complexity estimate (developer-only). The cheapest way to answer "is there any open feedback?" — a tiny fixed-size response instead of a row dump. Aggregated server-side over the WHOLE table, so the totals stay correct at any volume.
@@ -10293,6 +10294,7 @@ FLAGS
   --append STRING    Edit mode: append text to the target field (verbatim)
   --prepend STRING    Edit mode: prepend text to the target field (verbatim)
   --all    With --replace: substitute every occurrence
+  --from-json STRING    Read the content fields from a JSON object file (or - for stdin); argv-safe route for prose containing Finnish ä/ö or an em-dash. Accepts summary, detail, aiConfidence, field, replace, with, append, prepend. Explicit flags outrank the file; unknown or wrong-typed keys exit 4.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -10315,11 +10317,13 @@ NOTES
   - --dry-run has two resolutions. EDIT mode (--replace/--append/--prepend) resolves CLIENT-side and never PUTs — safe on any backend. A plain --summary/--detail --dry-run is SERVER-side (X-Dry-Run) and DEPLOY-GATED: the PUT handler ignored the header until puminet5api shipped the wouldSave branch, so against an older backend a plain --dry-run WRITES FOR REAL and overwrites the entry (fb#286). Until that backend deploys, preview a full-field rewrite with \`reference detail get\` first, or use edit mode.
   - Caps are validated BEFORE the dry-run branch, so an over-cap payload still exits 4 under --dry-run rather than reporting a would-be write.
   - The save proc COALESCEs the CONTENT fields — an omitted --summary/--detail keeps its current value (pass "" to clear), which is why the dry-run's \`writes\` lists only the fields you sent. aiConfidence/needsHumanReview are DIRECT-assigned: omitting them RESETS the score and un-parks the row for the grooming routine.
+  - PASS PROSE VIA --from-json, NOT argv, whenever it contains a non-ASCII character (fb#613). Windows PowerShell reinterprets UTF-8 native arguments as latin1, so \`Ylijäämäbetonin\` is stored as \`YlijÃ¤Ã¤mÃ¤betonin\` while the call exits 0 and echoes a success payload. The corruption is invisible here in a way it is not elsewhere: this catalog is served to AI agents as authoritative, lives outside git, and nothing diffs or lints it. --needs-human-review and --all take no value, so they stay on argv alongside --from-json and are deliberately NOT accepted as JSON keys.
 
 EXAMPLES
   ib reference detail set keikka list --summary 'Lists delivery orders' --reason 'initial fill'
   ib reference detail set keikka list --detail '## Keikka list\\nReturns ...' --reason 'update'
   ib reference detail set keikka list --replace '14 latest' --with '20 latest' --reason 'fix count' --dry-run
+  ib reference detail set sijainti types --from-json ./detail.json --reason 'refresh catalog'
 "
 `;
 

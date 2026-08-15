@@ -1118,6 +1118,13 @@ export function registerFeedbackCommands(
     );
 
   f.command("count")
+    // `stats` — hidden alias: the backend route this wraps is GET
+    // /api/feedback/stats (modules/feedback/feedback.js `stats()`), so anyone
+    // who read the route table or the module reaches for `feedback stats` and
+    // dead-ended on exit 4. Worse than a plain miss: the envelope pointed at
+    // `ib stats`, a top-level DELIVERY-statistics domain, routing the caller
+    // away from the answer rather than to it (fb#611).
+    .alias("stats")
     .option("--kind <kind>")
     .option("--scope <scope>")
     .action(

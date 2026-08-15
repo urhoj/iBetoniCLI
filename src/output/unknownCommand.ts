@@ -18,6 +18,7 @@ import { canonicalPath } from "../reference/aliasPaths.js";
 import type { CommandSpec } from "./help.js";
 import { commandDomains, fullyHiddenDomains } from "../reference/commandsList.js";
 import { isHiddenAtTier, type CallerTier } from "../tier.js";
+import packageJson from "../../package.json" with { type: "json" };
 
 // The matcher itself lives in the leaf module ./nearest.js so `targets.ts`
 // (assertEnum's did-you-mean) can reach it without importing this file, which
@@ -227,6 +228,16 @@ export interface UnknownCommandEnvelope {
    *  the one entry here that is not a leaf; `hint` renders it with the caller's
    *  remaining args, e.g. `ib task list`). */
   availableElsewhere: string[];
+  /**
+   * The RUNNING build's version (fb#615). "This command does not exist" and "my
+   * binary predates it" are the same envelope otherwise, and the caller cannot
+   * tell them apart — which matters because the copy vendored into
+   * `puminet5api` routinely lags `betonicli` master, so an agent hitting a
+   * genuinely-new leaf through that copy reads a real command as nonexistent.
+   * With the version in hand it can compare against `ib version` / the
+   * changelog instead of concluding the capability is missing.
+   */
+  cliVersion: string;
   hint: string;
 }
 
@@ -292,6 +303,7 @@ export function buildUnknownCommandEnvelope(
     didYouMean,
     available,
     availableElsewhere: [...elsewhere.map((e) => e.path), ...descendants],
+    cliVersion: packageJson.version,
     hint: `${crossGroup}${suggestion}${availableStr}Run ${discover} to discover them.`,
   };
 }

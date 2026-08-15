@@ -2,6 +2,7 @@ import { COMMAND_SPECS } from "../reference/specs.js";
 import { canonicalPath } from "../reference/aliasPaths.js";
 import { commandDomains, fullyHiddenDomains } from "../reference/commandsList.js";
 import { isHiddenAtTier } from "../tier.js";
+import packageJson from "../../package.json" with { type: "json" };
 // The matcher itself lives in the leaf module ./nearest.js so `targets.ts`
 // (assertEnum's did-you-mean) can reach it without importing this file, which
 // pulls reference/specs.js and would close an import cycle. Re-exported here:
@@ -214,6 +215,7 @@ export function buildUnknownCommandEnvelope(cmd, unknownToken, tier) {
         didYouMean,
         available,
         availableElsewhere: [...elsewhere.map((e) => e.path), ...descendants],
+        cliVersion: packageJson.version,
         hint: `${crossGroup}${suggestion}${availableStr}Run ${discover} to discover them.`,
     };
 }

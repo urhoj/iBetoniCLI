@@ -30,8 +30,9 @@ import { COMMAND_SPECS } from "./reference/specs.js";
 import { canonicalPath } from "./reference/aliasPaths.js";
 import { writeJson, exitWithError, failWith, failUsage, emitStdout, emitStderr, writeErrorEnvelope, setActiveCommandErrors, setListColumns, setExitCode as setExit, errorMessage } from "./output/json.js";
 import { guarded, jsonAction } from "./commands/_shared/action.js";
+import { applyFromJson, type FromJsonConfig } from "./commands/_shared/fromJson.js";
 import { buildValidationEnvelope, type FlagProblem } from "./output/validationEnvelope.js";
-import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, buildExcessArgumentsEnvelope, dateFlagSuggestion, excessPositionals, commandPath } from "./output/unknownCommand.js";
+import { buildUnknownCommandEnvelope, buildUnknownOptionEnvelope, buildExcessArgumentsEnvelope, dateFlagSuggestion, excessPositionals, commandPath, type UnknownCommandEnvelope } from "./output/unknownCommand.js";
 import { getEmbeddedCtx } from "./embedded.js";
 import { CliError } from "./api/errors.js";
 import { getCallerTier } from "./tier.js";
@@ -285,12 +286,42 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
     writeJson(await runReferenceDetailList(client, opts));
   }));
 
+  // `ib reference detail set` writes long Finnish-bearing prose into
+  // dbo.ibcli_commandCatalog, and Windows PowerShell reinterprets UTF-8 native
+  // arguments as latin1 — so `Ylijäämäbetonin` stored as `YlijÃ¤Ã¤mÃ¤betonin`
+  // while the call exited 0 and echoed success (fb#613). That is uniquely bad
+  // here: the catalog is served to AI agents as authoritative, lives outside
+  // git, and nothing diffs or lints it, so a corrupted write is invisible until
+  // somebody reads the row back and happens to look at the Finnish. `--from-json`
+  // sidesteps argv entirely — the same reason `ib glossary set/import` took it.
+  //
+  // needsHumanReview / all are EXCLUDED for the fb#541 reason: the accepted-key
+  // list is derived from the command's flags, so advertising a VALUELESS boolean
+  // creates a key that cannot work — `true` exits 4 ("must be a string") and
+  // `"true"` is accepted and SILENTLY DROPPED, parking (or failing to park) a row
+  // against the caller's belief. Nothing is lost by omitting them: neither takes
+  // a value, so neither has a shell-quoting problem, and both can be passed on
+  // argv alongside --from-json. Excluded here they are loudly rejected as unknown.
+  const DETAIL_SET_FROM_JSON: FromJsonConfig = {
+    nonPayload: new Set([
+      "fromJson",
+      "dryRun",
+      "idempotencyKey",
+      "reason",
+      "help",
+      "needsHumanReview",
+      "all",
+    ]),
+    numericFields: new Set(["aiConfidence"]),
+  };
+
   const detailSet = detail
     .command("set")
     .argument("<command...>", "Command path after `ib` (e.g. keikka latest)")
     .option("--summary <text>")
     .option("--detail <text>")
-    .option("--field <name>");
+    .option("--field <name>")
+    .option("--from-json <file>");
   addEditFlags(detailSet);
   addWriteFlagsToCommand(addAssessWriteFlags(detailSet)).action(
     guarded(async (
@@ -306,8 +337,13 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
         append?: string;
         prepend?: string;
         all?: boolean;
-      }
+        fromJson?: string;
+      },
+      cmd: Command
     ) => {
+      // MUST precede parseEditOp: --from-json fills the option values the mode
+      // guards below then read (fb#613).
+      applyFromJson(cmd, opts as Record<string, unknown>, DETAIL_SET_FROM_JSON);
       const editOp = parseEditOp(opts);
       if (opts.field !== undefined && !editOp) {
         failUsage("--field only applies in edit mode (--replace / --append / --prepend)");
@@ -550,6 +586,41 @@ function isCommanderError(err: unknown): err is CommanderErrorLike {
   );
 }
 
+/**
+ * Is `token` a subcommand registered on `cmd` — by name OR by any alias?
+ *
+ * Registration, deliberately NOT tier visibility: a tier-hidden leaf still
+ * parses and executes (hiding is discovery secrecy, not access control — see
+ * CLAUDE.md), so reporting one as unknown would contradict that and tell the
+ * caller a command they can actually run does not exist.
+ */
+function isRegisteredSubcommand(cmd: Command, token: string): boolean {
+  return cmd.commands.some((c) => c.name() === token || c.aliases().includes(token));
+}
+
+/**
+ * `ib <group> <unknown-leaf> --help` → the unknown-command envelope, exit 4
+ * (fb#615). Returns null when this rejection is an ordinary help/version
+ * display.
+ *
+ * Commander resolves `--help` on the GROUP before it ever rejects the unknown
+ * operand, so this branch used to exit 0 after printing the group's help. Two
+ * costs, both real: `--help` could not be used for capability detection, and —
+ * worse — the exit-0-plus-help-text reads as CONFIRMATION that the leaf exists.
+ * Against a stale/vendored binary lacking a newer leaf that is a false positive
+ * that sends a whole verification run at a build without the command. The same
+ * argv WITHOUT `--help` already exits 4, so the two disagreed about the same
+ * input; asking for help about a nonexistent command is a usage error either
+ * way. Guarded on the command having subcommands, so a leaf's own positional
+ * args (`ib reference detail get keikka list --help`) never trip it.
+ */
+function unknownLeafHelpEnvelope(cmd: Command | null): UnknownCommandEnvelope | null {
+  if (!cmd || cmd.commands.length === 0) return null;
+  const token = String((cmd.args ?? [])[0] ?? "");
+  if (!token || token.startsWith("-") || isRegisteredSubcommand(cmd, token)) return null;
+  return buildUnknownCommandEnvelope(cmd, token, getCallerTier());
+}
+
 function missingMandatoryOptions(cmd: Command): string[] {
   const missing: string[] = [];
   for (let c: Command | null = cmd; c; c = c.parent) {
@@ -624,6 +695,11 @@ export function handleParseRejection(
   if (isCommanderError(err)) {
     const text = parserText?.() ?? "";
     if (err.exitCode === 0 || err.code === "commander.help") {
+      // Help ABOUT a command that does not exist is a usage error, not help
+      // (fb#615) — checked before the pass-through so `--help` cannot report
+      // success for a leaf this build does not have.
+      const unknownLeaf = erroringCommand ? unknownLeafHelpEnvelope(erroringCommand()) : null;
+      if (unknownLeaf) return emitUsageEnvelope(err, unknownLeaf);
       if (text) emitStderr(text);
       setExit(err.exitCode ?? 0);
       return;

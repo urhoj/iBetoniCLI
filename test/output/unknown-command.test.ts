@@ -56,6 +56,13 @@ describe("levenshtein / closestName (#1)", () => {
     // an edit-distance near-match still wins over the synonym table
     expect(closestName("add", ["aad", "create"])).toBe("aad");
   });
+  test("bidirectional synonym stats↔count (fb#611)", () => {
+    // 5 edits apart with no shared prefix — unreachable by distance alone.
+    expect(closestName("stats", ["count", "list"])).toBe("count");
+    expect(closestName("count", ["stats", "list"])).toBe("stats");
+    // Cannot invent a name: silent when neither spelling is a real sibling.
+    expect(closestName("stats", ["list", "get"])).toBeNull();
+  });
   test("retired-name synonym changes→log (#402)", () => {
     expect(closestName("changes", ["log", "keikka"])).toBe("log");
     // A real edit-distance match still outranks the synonym — and this pair is
@@ -598,6 +605,12 @@ describe("verb aliases (#229)", () => {
   });
   test("`changelog add` answers to `create` (reciprocal)", () => {
     expect(leafOf("changelog", "add").aliases()).toContain("create");
+  });
+  test("`feedback count` answers to `stats` (fb#611)", () => {
+    // The backend route is GET /api/feedback/stats, so anyone who read the
+    // route table or the module reaches for `stats`; it used to dead-end on
+    // exit 4 and point at `ib stats`, an unrelated delivery-statistics domain.
+    expect(leafOf("feedback", "count").aliases()).toContain("stats");
   });
 });
 

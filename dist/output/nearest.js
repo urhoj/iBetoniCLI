@@ -43,6 +43,16 @@ export function levenshtein(a, b) {
  * gone, and `changes` sits 6 edits from `log` with no shared prefix, i.e. exactly
  * the guess no derived layer can reach. Docs written before the rename keep
  * teaching it, so the miss recurs long after the break.
+ *
+ * `stats`↔`count` is the SAME-CONCEPT-TWO-SPELLINGS case (fb#611), and it is
+ * bidirectional because both spellings are live in the catalogue: `count` on
+ * `ib dev feedback`, `stats` on `ib dev perf` / `ib jerry admin request`. So
+ * whichever one a caller has just used, the other is wrong somewhere — exactly
+ * the condition {@link FLAG_SYNONYMS} documents for its bidirectional pairs.
+ * Edit distance cannot bridge them (5 apart, no shared prefix). `ib dev
+ * feedback stats` ALSO resolves as a real hidden alias on the command itself,
+ * so that particular miss now succeeds outright; this entry covers the rest of
+ * the catalogue and any group added later.
  */
 export const VERB_SYNONYMS = {
     add: ["create"],
@@ -50,6 +60,8 @@ export const VERB_SYNONYMS = {
     show: ["get"],
     view: ["get"],
     changes: ["log"],
+    stats: ["count"],
+    count: ["stats"],
 };
 /**
  * FLAG synonyms — the option analogue of {@link VERB_SYNONYMS} (feedback #388).

@@ -6075,12 +6075,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "append", type: "string", description: "Edit mode: append text to the target field (verbatim)" },
       { name: "prepend", type: "string", description: "Edit mode: prepend text to the target field (verbatim)" },
       { name: "all", type: "boolean", description: "With --replace: substitute every occurrence" },
+      { name: "from-json", type: "string", description: "Read the content fields from a JSON object file (or - for stdin); argv-safe route for prose containing Finnish ä/ö or an em-dash. Accepts summary, detail, aiConfidence, field, replace, with, append, prepend. Explicit flags outrank the file; unknown or wrong-typed keys exit 4." },
     ],
     outputShape: "{ command, runs, … } (backend response) | plain --dry-run: {dryRun:true, wouldSave:{command, exists, writes:{summaryChars?, detailChars?}, aiConfidence, needsHumanReview}, validation} | edit-mode --dry-run: {dryRun:true, command, field, matchCount?, addedLines, removedLines, sameContent, unified}",
     notes: [
       "--dry-run has two resolutions. EDIT mode (--replace/--append/--prepend) resolves CLIENT-side and never PUTs — safe on any backend. A plain --summary/--detail --dry-run is SERVER-side (X-Dry-Run) and DEPLOY-GATED: the PUT handler ignored the header until puminet5api shipped the wouldSave branch, so against an older backend a plain --dry-run WRITES FOR REAL and overwrites the entry (fb#286). Until that backend deploys, preview a full-field rewrite with `reference detail get` first, or use edit mode.",
       "Caps are validated BEFORE the dry-run branch, so an over-cap payload still exits 4 under --dry-run rather than reporting a would-be write.",
       "The save proc COALESCEs the CONTENT fields — an omitted --summary/--detail keeps its current value (pass \"\" to clear), which is why the dry-run's `writes` lists only the fields you sent. aiConfidence/needsHumanReview are DIRECT-assigned: omitting them RESETS the score and un-parks the row for the grooming routine.",
+      "PASS PROSE VIA --from-json, NOT argv, whenever it contains a non-ASCII character (fb#613). Windows PowerShell reinterprets UTF-8 native arguments as latin1, so `Ylijäämäbetonin` is stored as `YlijÃ¤Ã¤mÃ¤betonin` while the call exits 0 and echoes a success payload. The corruption is invisible here in a way it is not elsewhere: this catalog is served to AI agents as authoritative, lives outside git, and nothing diffs or lints it. --needs-human-review and --all take no value, so they stay on argv alongside --from-json and are deliberately NOT accepted as JSON keys.",
     ],
     errors: [
       {
@@ -6100,6 +6102,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "ib reference detail set keikka list --summary 'Lists delivery orders' --reason 'initial fill'",
       "ib reference detail set keikka list --detail '## Keikka list\\nReturns ...' --reason 'update'",
       "ib reference detail set keikka list --replace '14 latest' --with '20 latest' --reason 'fix count' --dry-run",
+      "ib reference detail set sijainti types --from-json ./detail.json --reason 'refresh catalog'",
     ],
   },
   {
@@ -6723,6 +6726,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     command: "ib dev feedback count",
     description:
       "Aggregate counts of filed feedback by status, kind, and scope, plus how many rows still have NO complexity estimate (developer-only). The cheapest way to answer \"is there any open feedback?\" — a tiny fixed-size response instead of a row dump. Aggregated server-side over the WHOLE table, so the totals stay correct at any volume.",
+    // `stats` mirrors the backend route this wraps (GET /api/feedback/stats), so
+    // a caller who read the route table or the module reaches for that spelling
+    // (fb#611). It previously dead-ended on exit 4 and — worse — pointed at
+    // `ib stats`, an unrelated delivery-statistics domain.
+    aliases: ["ib dev feedback stats"],
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     flags: [

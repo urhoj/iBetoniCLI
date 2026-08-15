@@ -327,3 +327,65 @@ describe("path-segment flags reject NaN at parse time (fb#371)", () => {
     expect(JSON.parse(stderr).error).toMatch(/--duration must be an integer/);
   });
 });
+
+/**
+ * fb#615 — `--help` on a nonexistent leaf must FAIL, so it can be used for
+ * capability detection. Commander resolves --help on the group before it
+ * rejects the unknown operand, so this used to render the group's help and exit
+ * 0 — indistinguishable from success, and against a stale/vendored binary that
+ * lacks a newer leaf it reads as "the command exists".
+ */
+describe("unknown leaf + --help → exit 4 (fb#615)", () => {
+  const opts = { token: "", endpoint: "https://example.invalid" };
+
+  test("--help on an unknown leaf exits 4 with the unknown-command envelope", async () => {
+    const { exitCode, stderr } = await runArgv(
+      ["dev", "feedback", "nosuchleaf", "--help"],
+      opts
+    );
+    expect(exitCode).toBe(4);
+    const env = JSON.parse(stderr);
+    expect(env.code).toBe("USAGE");
+    expect(env.unknownCommand).toBe("nosuchleaf");
+    expect(env.group).toBe("ib dev feedback");
+    // Tier-filtered like every other discovery surface: the token is empty, so
+    // the caller resolves to "standard" and the developer-only leaves (count,
+    // list, get, resolve…) are correctly absent.
+    expect(env.available).toEqual(["create"]);
+  });
+
+  test("--help and no---help agree on the same argv", async () => {
+    const withHelp = await runArgv(["dev", "feedback", "nosuchleaf", "--help"], opts);
+    const without = await runArgv(["dev", "feedback", "nosuchleaf"], opts);
+    expect(withHelp.exitCode).toBe(without.exitCode);
+    expect(JSON.parse(withHelp.stderr).unknownCommand).toBe(
+      JSON.parse(without.stderr).unknownCommand
+    );
+  });
+
+  test("the envelope carries the running build's version", async () => {
+    const { stderr } = await runArgv(["dev", "feedback", "nosuchleaf"], opts);
+    // Distinguishes "no such command" from "my binary predates it" — the
+    // vendored puminet5api copy routinely lags betonicli master.
+    expect(JSON.parse(stderr).cliVersion).toMatch(/^\d+\.\d+\.\d+/);
+  });
+
+  // The guard must not fire on legitimate help. A GROUP's own help, a LEAF's
+  // help, and a leaf whose POSITIONAL args look like operands all stay exit 0.
+  test.each([
+    [["dev", "feedback", "--help"], "group help"],
+    [["dev", "feedback", "count", "--help"], "leaf help"],
+    [["reference", "detail", "get", "keikka", "list", "--help"], "leaf help past positionals"],
+    [["--help"], "root help"],
+    [["--version"], "version"],
+  ])("%s (%s) still exits 0", async (argv) => {
+    const { exitCode } = await runArgv(argv as string[], opts);
+    expect(exitCode).toBe(0);
+  });
+
+  test("a registered ALIAS is not reported as unknown", async () => {
+    // `stats` is a hidden alias of `count` (fb#611); --help on it is real help.
+    const { exitCode } = await runArgv(["dev", "feedback", "stats", "--help"], opts);
+    expect(exitCode).toBe(0);
+  });
+});
