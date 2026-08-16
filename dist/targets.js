@@ -304,7 +304,15 @@ export function resolveDateInput(positional, flag, argName = "date") {
  * required; passing both is allowed only when they match (after trim). A
  * missing / whitespace-only value exits 4.
  */
-export function resolveDualString(positional, flag, positionalName, flagName) {
+export function resolveDualString(positional, flag, positionalName, flagName, 
+/**
+ * Extra remedy appended to the MISSING-value error only. Optional because the
+ * generic "pass it positionally or via --flag" already states the mechanics;
+ * this is for callers whose value is not guessable from the flag name and who
+ * can point at the command that discovers it (`ib dev cache pattern` → run
+ * `ib dev cache keys` first to see what a glob matches).
+ */
+hint) {
     const norm = (s) => {
         const t = s?.trim();
         return t ? t : undefined;
@@ -313,7 +321,7 @@ export function resolveDualString(positional, flag, positionalName, flagName) {
     const fl = norm(flag);
     const value = pos ?? fl;
     if (value === undefined) {
-        failWith(`missing ${positionalName}: pass <${positionalName}> positionally or via --${flagName} <s>`, 4);
+        failWith(`missing ${positionalName}: pass <${positionalName}> positionally or via --${flagName} <s>`, 4, hint);
     }
     if (pos !== undefined && fl !== undefined && pos !== fl) {
         failWith(`positional ${positionalName} ("${pos}") and --${flagName} ("${fl}") differ — pass only one`, 4);

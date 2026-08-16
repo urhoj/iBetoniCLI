@@ -12,6 +12,8 @@ import {
   resolveGlob,
 } from "../../src/commands/cache/index.js";
 import type { ApiClient } from "../../src/api/client.js";
+import { hintDetailForError } from "../../src/api/errors.js";
+import { COMMAND_SPECS } from "../../src/reference/specs.js";
 
 describe("assertWritableEndpoint", () => {
   test("allows localhost without --force-prod", () => {
@@ -231,6 +233,55 @@ describe("resolveGlob dual-shape (fb#645)", () => {
   });
 
   test("an empty glob is refused, not sent as a match-nothing pattern", () => {
-    expect(() => resolveGlob("", undefined)).toThrow(/missing target/);
+    expect(() => resolveGlob("", undefined)).toThrow(/missing glob/);
+  });
+});
+
+// The spec's ERRORS rows are matched against the thrown MESSAGE TEXT
+// (`matchClientRow` in src/api/errors.ts). Delegating resolveGlob to the shared
+// resolveDualString changed that text from "missing target:" to "missing glob:",
+// which would have left the row's `match: "missing target"` DEAD — and silently,
+// because this command now has TWO client rows at exit 4, so the
+// single-unambiguous-row fallback cannot rescue a stale string. That is the
+// failure class of feedback #280/#289, found twice before by manual audit.
+// These tests catch the next one mechanically.
+describe("cache pattern exit-4 remedies actually resolve (dead-row guard)", () => {
+  const spec = COMMAND_SPECS.find((s) => s.command === "ib dev cache pattern");
+
+  test("the command declares exactly the three exit-4 client rows we expect", () => {
+    const rows = (spec?.errors ?? []).filter(
+      (e) => "origin" in e && e.origin === "client" && e.exit === 4
+    );
+    // missing-glob · both-given-and-differ · dry-run+confirm contradiction.
+    expect(rows).toHaveLength(3);
+  });
+
+  test("the MISSING-glob message reaches its own remedy, not the generic hint", () => {
+    let thrown: CliError | undefined;
+    try {
+      resolveGlob(undefined, undefined);
+    } catch (e) {
+      thrown = e as CliError;
+    }
+    expect(thrown).toBeInstanceOf(CliError);
+    const detail = hintDetailForError(thrown!, spec?.errors);
+    // `source: "error"` — resolveDualString's own hint param wins, which is the
+    // point of threading it through rather than losing the cache-keys pointer.
+    expect(detail.hint).toContain("ib dev cache keys");
+    expect(detail.source).toBe("error");
+  });
+
+  test("the CONTRADICTORY-flags message reaches its spec row", () => {
+    let thrown: CliError | undefined;
+    try {
+      resolveGlob("keikka:*", "person:*");
+    } catch (e) {
+      thrown = e as CliError;
+    }
+    expect(thrown).toBeInstanceOf(CliError);
+    // Differing globs carry no bespoke hint, so this one must land on a SPEC
+    // row — the case a stale `match` string would silently break.
+    const detail = hintDetailForError(thrown!, spec?.errors);
+    expect(detail.hint).toBeTruthy();
   });
 });

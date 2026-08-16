@@ -89,6 +89,10 @@ Every mutation command attaches the three universal flags via `addWriteFlagsToCo
 
 `--dry-run` is **server-side per handler** (the backend skips persistence when it honours `X-Dry-Run`) — so a `--dry-run` against an endpoint whose guard is not deployed will still persist. Read-merge-write commands instead resolve `--dry-run` **client-side** (e.g. `vehicle update` returns a `wouldChange` field-level diff via `src/diff.ts` and never POSTs) — safe-by-construction, but skips backend validation.
 
+**One group INVERTS this idiom: `ib dev cache invalidate|clear|pattern`** (fb#645). Everywhere else a write PERFORMS by default and `--dry-run` previews; there it PREVIEWS by default and `--confirm` performs. `--dry-run` is accepted as an explicit spelling of that default so the two idioms compose, and `--dry-run --confirm` exits 4 rather than picking a winner — on the execute side the wrong winner deletes cache keys. If you add another inverted-idiom group, give it the same `--dry-run` no-op, or the unknown-option hint below has to guess.
+
+Because the trio is a CLI-WIDE convention rather than a per-command capability, `buildUnknownOptionEnvelope` special-cases it — see `writeSafetyIdiomHint` in the parse-error section.
+
 ### Read-only mode (`--read-only` / `IB_READ_ONLY`)
 
 A session write-lock for AI/CI use. Set the `--read-only` global flag or `IB_READ_ONLY=1`; `getGlobalOptions` resolves it into `GlobalOptions.readOnly`, `cliContext` passes it to `createApiClient`, and the client refuses every **non-GET** request (exit `3`) before any fetch — the single chokepoint guaranteeing no create/update/delete leaves the process. GETs (including the read half of a read-merge-write) still work.
@@ -112,6 +116,7 @@ The matcher is `closestName` in **`src/output/nearest.ts`** — a LEAF module th
 Redirect layers, in the order the hint renders them:
 
 - `OPTION_REDIRECTS` — curated per `"<command> <flag>"`, consulted only at runtime (never enters the spec dump, so the tier-scrub contract holds). Wins over the derived layers.
+- `writeSafetyIdiomHint` (fb#646) — the rejected flag is one of the write-safety trio (`--dry-run`/`--idempotency-key`/`--reason`), so the sibling scan is SUPPRESSED and the command explains its own idiom instead ("previews by default, `--confirm` applies" when it owns `--confirm`; "does not mutate, so it does not apply" for a read). The trio is special because it is a **convention**, not because it is common: `--reason` 126 / `--dry-run` 125 / `--idempotency-key` 120 of 328 specs, so any three siblings named are arbitrary — but a frequency THRESHOLD is the wrong fix, because the next tier down (`--limit` 50, `--search` 23) is exactly where the fb#308 win lives. Naming siblings here was also substantively FALSE on an inverted-idiom command: it says the capability lives elsewhere when this command has it under another spelling, pointing the reader at the destructive flag. Gated by `redirect` and `didYouMean` like every layer below it — without the `redirect` guard a curated redirect on a trio flag renders BOTH sentences, silently.
 - `siblingsAcceptingOption` (fb#308) — sibling commands in the same domain whose spec accepts the flag. Derived from `COMMAND_SPECS`, tier-gated, capped at 3; a leaf named after the flag wins over catalogue order.
 - `siblingsAcceptingSynonym` (fb#388) — the same scan retried under synonym spellings, for when the capability lives on a sibling under a *different* name. Sets `acceptedAs` on the envelope, because those commands do NOT accept the rejected spelling and `acceptedBy` alone would misreport that. Suppressed when a same-command did-you-mean already fired.
 - `GROUP_SIBLING_DOMAINS` (fb#343) — curated `company`↔`customer` pair (two views of one `asiakas`). Curated, not derived: nearly every domain owns a `get`, so a scan would suggest noise.
@@ -218,6 +223,19 @@ All three reads build their query suffix through one `qs()` helper. Coverage cav
 - `cacheHits` / `cacheMisses` — only when the backend emits `cacheHit`/`cacheMiss` Server-Timing metrics. Deliberately **absent** (not `0/0`) on routes that did no cached read, so raw-query routes don't read as "all misses". A cache hit shows `sqlMs:0` (no proc ran) with `cacheHits:1` — the pair disambiguates "served from cache" from "no SQL".
 
 `--pretty` renders a human line: `[ib] stats: api=120ms sql=45ms (3 procs, executeQuery-path-only) cache=2 hit / 1 miss`. JSON mode emits `{"stats":{…}}`. The backend half lives in `puminet5api` (`modules/monitoring/requestSqlTiming.js` AsyncLocalStorage scope + `app.js` `Server-Timing` response wrapper).
+
+### Global `--print-payload` flag
+
+`--print-payload` (fb#636) emits each RESOLVED request — `{ method, path, headers, body }` — to **stderr** immediately before it is sent, at the single `request()` chokepoint in `src/api/client.ts`. It answers "did my flag parse into the body I intended?", which nothing else could: server `--dry-run` is deploy-gated and can still persist against an ungated handler, and `--read-only` refuses naming only the method and path while the assembled body is discarded unseen. (Verifying fb#634 previously required a standalone Commander harness that RE-DECLARED the command's options — which proves something about the harness.)
+
+- Fires **ahead of the read-only gate**, so `--read-only --print-payload` SHOWS the write and then refuses it — the "show me, send nothing" mode.
+- **Emits and CONTINUES**, never print-and-abort: no `run*` function is ever handed a fabricated response to project into garbage.
+- Covers **GETs** too, so the read half of a read-merge-write is visible — that is where a silently-dropped merge field hides.
+- Two deliberate distortions of the literal bytes, so the line cannot become its own silent lie: `Authorization` is redacted to `Bearer ***` (this gets pasted into bug reports), and `X-Request-ID` renders as `<minted per attempt>` unless pinned via `--request-id`, because a fresh UUID is minted per attempt and a plausible-but-wrong correlation id is worse than none.
+
+`buildHeaders` is therefore **pure** — `doFetch`, the single real-send site, is the only writer of `lastRequestId` (the `--verbose` correlation id), so a previewed-then-refused request cannot leave behind an id that was never on the wire.
+
+The one-line GLOBAL FLAGS summary in every `--help` is derived from the `GLOBAL_OPTIONS` table via `globalFlagsSummary()`, not restated — a hand-maintained copy had already drifted, leaving a working global undiscoverable with nothing failing.
 
 ### Domain vocabulary (Finnish)
 

@@ -2145,6 +2145,7 @@ ERRORS (stderr, exit non-zero)
   exit 3 (client-side)  Blocked by read-only mode → executing a cache write needs --confirm and a session without --read-only/IB_READ_ONLY (previews still work)
   exit 4 (client-side)  --dry-run and --confirm passed together → drop --dry-run to execute, or drop --confirm to preview (preview is the default)
   exit 4 (client-side)  No glob given, positionally or via --pattern → pass the glob positionally (\`ib dev cache pattern 'keikka:*'\`) or as --pattern 'keikka:*'
+  exit 4 (client-side)  The positional glob and --pattern were both given and disagree → pass the glob ONCE — only one of the two could be honoured, so the CLI refuses rather than silently picking
 
 EXAMPLES
   ib dev cache pattern 'keikka:*'

@@ -3,6 +3,7 @@ import { writeJson, failWith } from "../../output/json.js";
 import { assertWritableEndpoint } from "../../api/endpointGuard.js";
 import { CACHE_ENTITIES } from "./entities.js";
 import { jsonAction, guarded } from "../_shared/action.js";
+import { resolveDualString } from "../../targets.js";
 // Shared request shaping for the three destructive verbs:
 // - preview (no --confirm): dry-run → X-Dry-Run header + { read: true } so it is
 //   allowed under --read-only and skips the endpoint guard.
@@ -32,23 +33,17 @@ function writeRequestOptions(client, opts) {
 }
 /**
  * Resolve the SCAN glob for `cache pattern`, which accepts it positionally
- * (canonical) or as `--pattern <glob>` — the string twin of `resolveTarget` /
- * `resolveDateInput` in `src/targets.ts`. Exactly one is required; both are
- * allowed only when they agree, so a copy-paste that supplies each once is not
- * punished while two DIFFERENT globs (only one of which could be honoured) is.
+ * (canonical) or as `--pattern <glob>` — the sibling `cache keys` spells the very
+ * same concept as a flag, so reaching for it here is the natural error (fb#645).
  *
- * Not routed through `resolveTarget`: that one coerces to a positive integer,
- * which every glob would fail.
+ * Delegates to the shared {@link resolveDualString} rather than re-implementing
+ * the exactly-one-required / both-only-if-equal rule, which is what
+ * `resolveSearchQuery` already does for `<query>` / `--search`. (Its numeric twin
+ * `resolveTarget` is the wrong helper — it coerces to a positive integer, which
+ * every glob would fail.)
  */
 export function resolveGlob(positional, flag) {
-    const glob = positional ?? flag;
-    if (glob === undefined || glob === "") {
-        failWith("missing target: pass <glob> positionally or via --pattern <glob>", 4, "use `ib dev cache keys --pattern '<glob>'` first to see what a glob matches");
-    }
-    if (positional !== undefined && flag !== undefined && positional !== flag) {
-        failWith(`positional glob (${positional}) and --pattern (${flag}) differ — pass only one`, 4);
-    }
-    return glob;
+    return resolveDualString(positional, flag, "glob", "pattern", "use `ib dev cache keys --pattern '<glob>'` first to see what a glob matches");
 }
 export async function runCacheStats(client) {
     return client.get("/api/cli/cache/stats");
@@ -74,6 +69,28 @@ export async function runCachePattern(client, pattern, opts) {
     const { dryRun, fetchOpts } = writeRequestOptions(client, opts);
     return client.post("/api/cli/cache/pattern", { pattern, confirmed: !dryRun }, fetchOpts);
 }
+/** Flags shared by the three destructive verbs, in one place so adding a fourth
+ *  (as fb#645 did with `--dry-run`) cannot reach two call sites and miss the
+ *  third. Same shape as `addWriteFlagsToCommand` / `addAsiakasTargetOption`;
+ *  registration ORDER is preserved, so `--help` renders as before. */
+function addCacheWriteOptions(cmd) {
+    return cmd
+        .option("--confirm")
+        .option("--dry-run")
+        .option("--force-prod")
+        .option("--reason <text>");
+}
+/** Commander opts → {@link CacheWriteOpts}. Extra keys on the source (`id`,
+ *  `cascade`, `pattern`) are ignored — passing the existing object rather than a
+ *  fresh literal keeps TS excess-property checking out of the way. */
+function toCacheWriteOpts(opts) {
+    return {
+        confirm: !!opts.confirm,
+        dryRun: !!opts.dryRun,
+        forceProd: !!opts.forceProd,
+        reason: opts.reason,
+    };
+}
 /**
  * Register `ib cache` subcommands. Inspect verbs (stats/keys) are GETs and
  * developer-gated server-side. Destructive verbs (invalidate/clear/pattern)
@@ -87,7 +104,7 @@ export function registerCacheCommands(parent, getClient, opts = {}) {
     c.command("keys")
         .option("--pattern <glob>", "", "*")
         .action(jsonAction(getClient, (client, opts) => runCacheKeys(client, opts)));
-    c.command("invalidate <entityType>")
+    addCacheWriteOptions(c.command("invalidate <entityType>")
         .option("--id <n>", "", (v) => Number(v))
         .option("--asiakas <n>", "", (v) => Number(v))
         // Back-compat alias for the pre-rename spelling (fb#388). `--asiakas-id` was
@@ -96,36 +113,13 @@ export function registerCacheCommands(parent, getClient, opts = {}) {
         // everywhere else. Hidden: the spec documents only `--asiakas`, so `--help`
         // and `reference dump` show one spelling while old scripts keep working.
         .addOption(new Option("--asiakas-id <n>").argParser((v) => Number(v)).hideHelp())
-        .option("--cascade")
-        .option("--confirm")
-        .option("--dry-run")
-        .option("--force-prod")
-        .option("--reason <text>")
-        .action(jsonAction(getClient, (client, entityType, opts) => runCacheInvalidate(client, { entityType, id: opts.id, asiakasId: opts.asiakas ?? opts.asiakasId, cascade: opts.cascade }, { confirm: !!opts.confirm, dryRun: !!opts.dryRun, forceProd: !!opts.forceProd, reason: opts.reason })));
-    c.command("clear")
-        .option("--confirm")
-        .option("--dry-run")
-        .option("--force-prod")
-        .option("--reason <text>")
-        .action(jsonAction(getClient, (client, opts) => runCacheClear(client, { confirm: !!opts.confirm, dryRun: !!opts.dryRun, forceProd: !!opts.forceProd, reason: opts.reason })));
-    // The glob is dual-shaped: positional (canonical) OR `--pattern <glob>`. The
-    // sibling `cache keys` spells the very same concept — a Redis SCAN glob — as a
-    // flag, so reaching for `--pattern` here is the natural error rather than a
-    // careless one (fb#645). Flag-vs-positional twin of the `src/targets.ts`
-    // dual-target pattern; resolved inline because the value is a glob string, not
-    // a positive-integer id.
-    c.command("pattern [glob]")
-        .option("--pattern <glob>", "Raw Redis key glob (alias for the positional)")
-        .option("--confirm")
-        .option("--dry-run")
-        .option("--force-prod")
-        .option("--reason <text>")
-        .action(jsonAction(getClient, (client, glob, opts) => runCachePattern(client, resolveGlob(glob, opts.pattern), {
-        confirm: !!opts.confirm,
-        dryRun: !!opts.dryRun,
-        forceProd: !!opts.forceProd,
-        reason: opts.reason,
-    })));
+        .option("--cascade")).action(jsonAction(getClient, (client, entityType, opts) => runCacheInvalidate(client, { entityType, id: opts.id, asiakasId: opts.asiakas ?? opts.asiakasId, cascade: opts.cascade }, toCacheWriteOpts(opts))));
+    addCacheWriteOptions(c.command("clear")).action(jsonAction(getClient, (client, opts) => runCacheClear(client, toCacheWriteOpts(opts))));
+    // The glob is dual-shaped: positional (canonical) OR `--pattern <glob>` — see
+    // {@link resolveGlob} for why that alias exists (fb#645).
+    addCacheWriteOptions(c
+        .command("pattern [glob]")
+        .option("--pattern <glob>", "Raw Redis key glob (alias for the positional)")).action(jsonAction(getClient, (client, glob, opts) => runCachePattern(client, resolveGlob(glob, opts.pattern), toCacheWriteOpts(opts))));
     c.command("entities")
         .action(guarded(() => {
         writeJson({ items: CACHE_ENTITIES, count: CACHE_ENTITIES.length });

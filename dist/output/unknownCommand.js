@@ -1,6 +1,6 @@
 import { COMMAND_SPECS } from "../reference/specs.js";
 import { canonicalPath } from "../reference/aliasPaths.js";
-import { commandDomains, fullyHiddenDomains } from "../reference/commandsList.js";
+import { commandDomains, fullyHiddenDomains, isWriteSpec } from "../reference/commandsList.js";
 import { isHiddenAtTier } from "../tier.js";
 import packageJson from "../../package.json" with { type: "json" };
 // The matcher itself lives in the leaf module ./nearest.js so `targets.ts`
@@ -338,7 +338,7 @@ export function writeSafetyIdiomHint(unknownOption, availableOptions, spec) {
     if (availableOptions.includes("--confirm")) {
         return `\`${flag}\` is a CLI-wide write-safety convention, but this command inverts the usual idiom: it PREVIEWS by default and applies only with \`--confirm\`.`;
     }
-    if (spec && (spec.mutates ?? !!spec.writeFlags)) {
+    if (spec && isWriteSpec(spec)) {
         return `\`${flag}\` is a CLI-wide write-safety convention, but this write does not accept it — check the accepted flags below rather than assuming a sibling owns it.`;
     }
     return `\`${flag}\` is a CLI-wide write-safety convention and this command does not mutate, so it does not apply here.`;
@@ -549,7 +549,14 @@ export function buildUnknownOptionEnvelope(cmd, unknownOption, tier = "developer
     // false when the command previews by default under another spelling (fb#646).
     // Suppressed when `didYouMean` fired: a near-spelling on this command
     // (`-reason` → `--reason`) is the better answer, same as the guards below.
-    const idiomHint = didYouMean
+    //
+    // ALSO suppressed by `redirect`, which every other guard in this chain already
+    // honours. Without it a curated redirect on a trio flag rendered BOTH its
+    // hand-written sentence and this generic one — silently, since the render step
+    // has no mutual exclusion — contradicting "a curated redirect wins" below.
+    // Latent (today's sole OPTION_REDIRECTS key is `--pattern`), but reachable:
+    // `ib keikka get --dry-run` with a redirect injected emits both.
+    const idiomHint = redirect || didYouMean
         ? null
         : writeSafetyIdiomHint(unknownOption, availableOptions, spec);
     // A curated redirect is hand-written for this exact command+flag, so it wins;

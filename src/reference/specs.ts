@@ -7029,9 +7029,21 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
           {
             origin: "client",
             exit: 4,
-            match: "missing target",
+            // Matches the shared resolveDualString message ("missing glob: …").
+            // matchClientRow keys on the message TEXT, and this command now has
+            // two client rows at exit 4, so the single-row fallback cannot
+            // rescue a stale string — it would silently serve no remedy at all
+            // (the dead-row class of feedback #280/#289).
+            match: "missing glob",
             meaning: "No glob given, positionally or via --pattern",
             remedy: "pass the glob positionally (`ib dev cache pattern 'keikka:*'`) or as --pattern 'keikka:*'",
+          },
+          {
+            origin: "client",
+            exit: 4,
+            match: "differ",
+            meaning: "The positional glob and --pattern were both given and disagree",
+            remedy: "pass the glob ONCE — only one of the two could be honoured, so the CLI refuses rather than silently picking",
           },
         ],
         examples: [

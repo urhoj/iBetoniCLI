@@ -391,7 +391,15 @@ export function resolveDualString(
   positional: string | undefined,
   flag: string | undefined,
   positionalName: string,
-  flagName: string
+  flagName: string,
+  /**
+   * Extra remedy appended to the MISSING-value error only. Optional because the
+   * generic "pass it positionally or via --flag" already states the mechanics;
+   * this is for callers whose value is not guessable from the flag name and who
+   * can point at the command that discovers it (`ib dev cache pattern` → run
+   * `ib dev cache keys` first to see what a glob matches).
+   */
+  hint?: string
 ): string {
   const norm = (s: string | undefined): string | undefined => {
     const t = s?.trim();
@@ -403,7 +411,8 @@ export function resolveDualString(
   if (value === undefined) {
     failWith(
       `missing ${positionalName}: pass <${positionalName}> positionally or via --${flagName} <s>`,
-      4
+      4,
+      hint
     );
   }
   if (pos !== undefined && fl !== undefined && pos !== fl) {

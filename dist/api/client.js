@@ -122,15 +122,13 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
      *    concrete value printed here would differ from the one actually sent — and
      *    a plausible-but-wrong correlation id is worse than none.
      *
-     * `buildHeaders` writes `lastRequestId` as a side effect (the --verbose
-     * correlation id), so it is snapshotted and restored: a previewed request that
-     * is then REFUSED by the read-only lock must not leave an id behind that was
+     * Safe to call before the read-only gate: `buildHeaders` is PURE (only
+     * `doFetch`, the single real-send site, records `lastRequestId`), so a
+     * previewed-then-refused request cannot leave behind a correlation id that was
      * never on the wire.
      */
     function emitResolvedPayload(method, path, payload, opts) {
-        const savedRequestId = lastRequestId;
         const headers = buildHeaders(opts.headers, payload !== undefined);
-        lastRequestId = savedRequestId;
         headers.Authorization = "Bearer ***";
         if (!requestId)
             headers["X-Request-ID"] = "<minted per attempt>";
@@ -167,18 +165,19 @@ export function createApiClient({ endpoint, token, version, requestId, onRefresh
         for (const key of Object.keys(merged)) {
             merged[key] = sanitizeHeaderValue(merged[key]);
         }
-        lastRequestId = merged["X-Request-ID"];
         return merged;
     }
     // `payload` is the already-serialized body (undefined = no body) — serialized
     // ONCE in `request` so the 401-refresh retry re-sends the same bytes instead
     // of re-running JSON.stringify over the identical object.
     async function doFetch(method, path, payload, opts) {
-        return fetch(`${endpoint}${path}`, {
-            method,
-            headers: buildHeaders(opts.headers, payload !== undefined),
-            body: payload,
-        });
+        const headers = buildHeaders(opts.headers, payload !== undefined);
+        // The ONLY writer of `lastRequestId`: recorded here, at the single site that
+        // actually puts bytes on the wire, so the --verbose correlation id can never
+        // name a request that was not sent. (A 401-refresh retry re-enters here and
+        // correctly overwrites it with the retry's own id.)
+        lastRequestId = headers["X-Request-ID"];
+        return fetch(`${endpoint}${path}`, { method, headers, body: payload });
     }
     // A fetch rejection (DNS failure, connection refused, TLS error, …) is a
     // network problem, not an HTTP status — surface it as a CliError mapped to

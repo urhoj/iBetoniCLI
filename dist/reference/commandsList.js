@@ -4,8 +4,14 @@ import { CliError } from "../api/errors.js";
 import { domainBlurb } from "./domain.js";
 import { visibleSpecs, domainOf, hiddenDomainsAtTier, getCallerTier, } from "../tier.js";
 import { listEnvelope } from "../api/envelopes.js";
-/** Single source for the write classification used by `ib commands`. */
-const isWriteSpec = (s) => s.mutates ?? !!s.writeFlags;
+/**
+ * Single source for the write classification used by `ib commands` — and by
+ * `buildUnknownOptionEnvelope`, which needs the same "does this command mutate?"
+ * answer to phrase a rejected write-safety flag (fb#646). Exported so that
+ * claim stays true: a second inline copy of `mutates ?? !!writeFlags` is exactly
+ * how it silently stopped being single.
+ */
+export const isWriteSpec = (s) => s.mutates ?? !!s.writeFlags;
 function commandRelativePath(command) {
     return command.replace(/^ib\s+/, "");
 }
