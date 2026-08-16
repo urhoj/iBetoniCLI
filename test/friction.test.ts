@@ -35,6 +35,19 @@ afterAll(() => {
   }
 });
 
+/**
+ * The whole log, or "" before anything has been written. ENOENT-tolerant so a
+ * single-test run (`vitest -t …`) does not depend on an earlier test having
+ * created the file.
+ */
+function read(): string {
+  try {
+    return readFileSync(frictionPath(), "utf8");
+  } catch {
+    return "";
+  }
+}
+
 function lastEntry(): Record<string, unknown> {
   const lines = readFileSync(frictionPath(), "utf8").trim().split("\n");
   return JSON.parse(lines[lines.length - 1]);
@@ -199,8 +212,6 @@ describe("recordFriction", () => {
 // gate and cost a triage round to reach the conclusion the gate's instructions
 // already prescribe ("skip expected 404s").
 describe("anticipated not-found is not friction (#579)", () => {
-  const read = () => readFileSync(frictionPath(), "utf8");
-
   test("exit 5 WITH a command-owned remedy is not captured", () => {
     const before = read();
     recordFriction(
@@ -230,7 +241,6 @@ describe("anticipated not-found is not friction (#579)", () => {
 // passes it. writeError is the funnel every command error goes through, so a
 // correct helper wired to nothing would leave the bug fully live.
 describe("writeError → friction wiring (#579)", () => {
-  const read = () => readFileSync(frictionPath(), "utf8");
   const laatuSpec = [
     {
       http: 404,
@@ -240,34 +250,53 @@ describe("writeError → friction wiring (#579)", () => {
     },
   ];
 
-  test("a 404 answered by the command's own ERRORS row is not logged", () => {
-    const prevExitCode = process.exitCode;
+  /** Run `writeError` with a command's ERRORS rows active, stderr muted. */
+  function underCommand(rows: unknown, fn: () => void): void {
     const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     try {
-      setActiveCommandErrors(laatuSpec);
-      const before = read();
-      writeError(new CliError("Grade not found in this supplier's catalogue: 2", 404, null, 5));
-      expect(read()).toBe(before);
+      setActiveCommandErrors(rows as never);
+      fn();
     } finally {
       setActiveCommandErrors(null);
       stderrSpy.mockRestore();
-      process.exitCode = prevExitCode;
     }
+  }
+
+  // THE REPORTED CASE, in its real shape. `betoni laatu get` throws
+  // `CliError(msg, 0, null, 5, remedy)` — statusCode 0 with the remedy on the
+  // ERROR, so it resolves as source "error", not "spec". The http-404 tests
+  // below exercise a different (also real) route to the same skip; without this
+  // one, narrowing the rule to `source === "spec"` would still look green.
+  test("the fb#579 case itself — exit 5 with a throw-site remedy — is not logged", () => {
+    underCommand(laatuSpec, () => {
+      const before = read();
+      writeError(
+        new CliError(
+          "Grade not found in this supplier's catalogue: 2",
+          0,
+          null,
+          5,
+          "list the catalogue with `ib betoni laatu list`; a grade owned by ANOTHER supplier is not visible here"
+        )
+      );
+      expect(read()).toBe(before);
+    });
+  });
+
+  test("a 404 answered by the command's own ERRORS row is not logged", () => {
+    underCommand(laatuSpec, () => {
+      const before = read();
+      writeError(new CliError("Grade not found in this supplier's catalogue: 2", 404, null, 5));
+      expect(read()).toBe(before);
+    });
   });
 
   test("an undeployed-route 404 IS logged even while that ERRORS row is active", () => {
-    const prevExitCode = process.exitCode;
-    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    try {
-      setActiveCommandErrors(laatuSpec);
+    underCommand(laatuSpec, () => {
       writeError(new CliError("Route not found", 404, { code: "ROUTE_NOT_FOUND" }, 5));
       const e = lastEntry();
       expect(e.exitCode).toBe(5);
       expect(String(e.message)).toMatch(/not deployed/i);
-    } finally {
-      setActiveCommandErrors(null);
-      stderrSpy.mockRestore();
-      process.exitCode = prevExitCode;
-    }
+    });
   });
 });

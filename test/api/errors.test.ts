@@ -313,6 +313,12 @@ describe("hintDetailForError — hint provenance", () => {
   // An empty err.hint deliberately SUPPRESSES the spec remedy (the message is
   // already the whole remedy). That is a null hint, so there is nothing to
   // attribute — and it must not read as a curated witness.
+  //
+  // Semantically debatable at exit 5: an empty hint is arguably the STRONGEST
+  // "the command anticipated this and the message IS the remedy" signal, so such
+  // a 404 would be captured as friction despite being answered. Unreachable
+  // today (every failWith(…, 5) site passes a real hint or none, and failUsage
+  // is exit-4 only). If a `failWith(msg, 5, "")` ever appears, revisit this.
   test("an empty error-carried hint suppresses the hint and reports no source", () => {
     const err = new CliError("self-explanatory", 400, null, 4, "");
     expect(hintDetailForError(err, [{ http: 400, exit: 4, meaning: "m", remedy: "r" }])).toEqual({

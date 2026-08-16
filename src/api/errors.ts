@@ -146,9 +146,15 @@ export function hintForError(
 
 /**
  * Where a hint came from. `spec` (a matching ERRORS row) and `error` (a remedy
- * the throwing code attached via `failUsage`) mean the COMMAND anticipated this
- * failure; `route-not-found` and `generic` are the CLI's own fallbacks and say
- * nothing about whether the command handled the case.
+ * carried on the error itself — the `hint` argument of the {@link CliError}
+ * constructor, i.e. `failWith(msg, exit, hint)`) mean the COMMAND anticipated
+ * this failure; `route-not-found` and `generic` are the CLI's own fallbacks and
+ * say nothing about whether the command handled the case.
+ *
+ * Do NOT read `error` as "failUsage": that wrapper is hard-wired to exit 4, so
+ * citing it makes the `error` arm look unreachable at exit 5 — when that is
+ * exactly the arm the fb#579 case runs on (`betoni laatu get` throws
+ * `CliError(msg, 0, null, 5, remedy)` directly).
  */
 export type HintSource = "route-not-found" | "error" | "spec" | "generic";
 export type HintDetail = { hint: string | null; source: HintSource | null };
