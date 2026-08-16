@@ -35,4 +35,39 @@ export function warnIfLimitCapped(requested, cap, command, warn = warnNote) {
     warn(`[ib] ⚠ --limit ${n} exceeds this route's maximum of ${cap}; at most ${cap} rows are returned. ` +
         `The result is NOT the whole table — page through it with \`${command} --offset ${cap}\` (and so on), or narrow the query with a filter.`);
 }
+/**
+ * Say out loud that a list came back CAPPED (fb#641).
+ *
+ * The twin of {@link warnIfLimitCapped}, for the other direction: that one fires
+ * when the caller ASKED for more than the route gives, this one when the caller
+ * asked for nothing in particular and the default cap bit anyway. Only the
+ * response knows that, so it reads the envelope the backend already sends.
+ *
+ * Why a warning rather than a bigger default: the payload has carried
+ * `truncated`/`hint` since fb#606 and it changed nothing, because a caller who
+ * does not think to check `truncated` also does not think to raise `--limit`.
+ * The reported failure was not a caller who read the flag and ignored it — it
+ * was `ib dev schema procs` answering with 200 of 535 rows, exit 0, and a
+ * derived index that then "proved" whole families of procs did not exist. Raising
+ * the default only moves that cliff (see puminet5api utils/listTruncation.js,
+ * which rejects the same shortcut for the same reason); stderr removes it,
+ * because a truncated read now costs one line the caller cannot not see.
+ *
+ * Prefers the backend's own `hint` — it names the route's real maximum, so a cap
+ * that later changes server-side cannot leave a stale number mirrored here.
+ *
+ * stderr only — the stdout JSON contract is untouched.
+ */
+export function warnIfTruncated(env, command, warn = warnNote) {
+    if (!env || env.truncated !== true)
+        return;
+    // The backend's hint already says "this is NOT the full list" and names the
+    // route's real maximum, so do not restate either — the fallback carries both
+    // only for a backend that sends no hint at all.
+    const detail = typeof env.hint === "string" && env.hint
+        ? env.hint
+        : "this is NOT the whole list — re-run with a higher --limit, or narrow it with --search";
+    warn(`[ib] ⚠ \`${command}\` returned ${env.count} row(s) and was TRUNCATED: ${detail}. ` +
+        `Anything derived from this page (a "no such object exists" conclusion especially) is unsafe until the read is complete.`);
+}
 //# sourceMappingURL=listCaps.js.map

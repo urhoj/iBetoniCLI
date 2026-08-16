@@ -2204,7 +2204,7 @@ FLAGS
   --source STRING    Source: human (default) | routine (automated AI-routine entry)
   --date DATE    Entry date (YYYY-MM-DD|today)
   --language STRING    Entry language (fi|en), default en
-  --from-json STRING    Read the whole entry from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase: description (or summary/body), title (≤300), type, area, benefits, impact (≤500), status (≤30), severity (≤20), files, repo (≤200), sha (≤500), commit, vtag (≤200), bumpLevel (\`bump-level\` also accepted), feedback, sentry, source, date, language. files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input, so a row from \`ib dev changelog list\` can be edited and posted straight back: commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date. An unknown or wrong-typed key exits 4 (never silently dropped). The length caps apply to a JSON value exactly as to a flag — --from-json sidesteps shell quoting, not column width.
+  --from-json STRING    Read the whole entry's CONTENT from a JSON object file (or - for stdin); explicitly-typed flags override. Content keys, in camelCase: description (or summary/body), title (≤300), type, area, benefits, impact (≤500), status (≤30), severity (≤20), files, repo (≤200), sha (≤500), commit, vtag (≤200), bumpLevel (\`bump-level\` also accepted), feedback, sentry, source, date, language. files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input, so a row from \`ib dev changelog list\` can be edited and posted straight back: commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date. NOT every flag has a JSON twin (fb#631): the BEHAVIOURAL modifiers — --no-resolve (link role) and the write-safety trio --dry-run / --reason / --idempotency-key — stay on the command line, and \`noResolve\`/\`resolve\` in the file exit 4. Nothing is lost: they are valueless or short flags with no shell-quoting problem, so pass them alongside the file (\`ib dev changelog add --from-json entry.json --no-resolve\`). An unknown or wrong-typed key exits 4 (never silently dropped). The length caps apply to a JSON value exactly as to a flag — --from-json sidesteps shell quoting, not column width.
 
 WRITE-SAFETY FLAGS
   --dry-run            Validate without persisting (server-side X-Dry-Run). Returns the would-be response.
@@ -2217,7 +2217,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { changelogId, feedbackLinks: [{ feedbackId, role, relinkedFrom?, linkKeptBy?, feedbackStatus?, feedbackLinked? }] } | { dryRun, wouldCreate, validation }. One entry per --feedback id, in the order given. \`role\` is \`resolves\` or \`references\`. \`relinkedFrom\` carries the entry a \`resolves\` link took the row from; \`linkKeptBy\` is its mirror under --no-resolve; \`feedbackStatus\` appears only when the link did NOT close the row; \`feedbackLinked: false\` means that id does not exist — the ENTRY was still created, only that link failed (fb#543). For a SINGLE id these keys are also mirrored to the top level, for compatibility with CLI builds predating fb#576. Each emits a one-line note on stderr, prefixed with its fb# id.
+  { changelogId, feedbackLinks: [{ feedbackId, role, relinkedFrom?, linkKeptBy?, feedbackStatus?, feedbackLinked?, resolutionPreserved? }] } | { dryRun, wouldCreate, validation }. One entry per --feedback id, in the order given. \`role\` is \`resolves\` or \`references\`. \`relinkedFrom\` carries the entry a \`resolves\` link took the row from; \`linkKeptBy\` is its mirror under --no-resolve; \`feedbackStatus\` appears only when the link did NOT close the row; \`feedbackLinked: false\` means that id does not exist — the ENTRY was still created, only that link failed (fb#543); \`resolutionPreserved\` carries the row's existing hand-written resolution note when the link advanced the status to \`applied\` but KEPT that note (fb#633) — status and note may now contradict each other, so re-read the row. For a SINGLE id these keys are also mirrored to the top level, for compatibility with CLI builds predating fb#576. Each emits a one-line note on stderr, prefixed with its fb# id.
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer access required → use a developer token
@@ -2526,7 +2526,7 @@ FLAGS
   --source STRING    Source: human|routine
   --date DATE    Entry date (YYYY-MM-DD|today)
   --language STRING    Entry language (fi|en)
-  --from-json STRING    Read the patch from a JSON object file (or - for stdin); explicitly-typed flags override. Keys are the flag names in camelCase (description/summary/body, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (\`bump-level\` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a row from \`ib dev changelog list\` can be edited and posted straight back. An unknown or wrong-typed key exits 4 (never silently dropped).
+  --from-json STRING    Read the patch CONTENT from a JSON object file (or - for stdin); explicitly-typed flags override. Content keys, in camelCase (description/summary/body, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (\`bump-level\` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a row from \`ib dev changelog list\` can be edited and posted straight back. NOT every flag has a JSON twin (fb#631): the BEHAVIOURAL modifiers — --no-resolve (link role) and the write-safety trio --dry-run / --reason / --idempotency-key — stay on the command line, and \`noResolve\`/\`resolve\` in the file exit 4. Pass them alongside the file. (\`unlink\` IS a content key and belongs in the file.) An unknown or wrong-typed key exits 4 (never silently dropped).
 
 WRITE-SAFETY FLAGS
   --dry-run            CLIENT-side preview: resolves locally, no write reaches the wire (works under --read-only).
@@ -2538,7 +2538,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  entry & { feedbackLinks: [{ feedbackId, role, relinkedFrom?, linkKeptBy?, feedbackStatus?, feedbackLinked? }] } | { dryRun, wouldUpdate: { id, patch } }. One entry per --feedback id, in the order given. \`role\` is \`resolves\` or \`references\`. \`relinkedFrom\` carries the entry a \`resolves\` link took the row from; \`linkKeptBy\` is its mirror under --no-resolve; \`feedbackStatus\` appears only when the link did NOT close the row; \`feedbackLinked: false\` means that id does not exist. For a SINGLE id these keys are also mirrored to the top level, for compatibility with CLI builds predating fb#576. Each emits a one-line note on stderr, prefixed with its fb# id.
+  entry & { feedbackLinks: [{ feedbackId, role, relinkedFrom?, linkKeptBy?, feedbackStatus?, feedbackLinked?, resolutionPreserved? }] } | { dryRun, wouldUpdate: { id, patch } }. One entry per --feedback id, in the order given. \`role\` is \`resolves\` or \`references\`. \`relinkedFrom\` carries the entry a \`resolves\` link took the row from; \`linkKeptBy\` is its mirror under --no-resolve; \`feedbackStatus\` appears only when the link did NOT close the row; \`feedbackLinked: false\` means that id does not exist; \`resolutionPreserved\` carries the row's existing hand-written resolution note when the link advanced the status to \`applied\` but KEPT that note (fb#633). For a SINGLE id these keys are also mirrored to the top level, for compatibility with CLI builds predating fb#576. Each emits a one-line note on stderr, prefixed with its fb# id.
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
@@ -3403,14 +3403,14 @@ DESCRIPTION
 
 FLAGS
   --search STRING    Filter object names by substring
-  --limit NUMBER    Max rows (max 1000) (default: 200)
+  --limit NUMBER    Max rows (max 1000). The default CAPS the catalogue — dbo holds ~240 tables and ~535 procs, so a default \`procs\`/\`tables\` read is a PARTIAL list; pass --limit 1000 whenever you intend to enumerate. (default: 200)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { items: [{ name, type:'P'|'FN'|'TF'|'IF' }], nextCursor: null, count }
+  { items: [{ name, type:'P'|'FN'|'TF'|'IF' }], nextCursor: null, count, truncated?, hint? }. \`truncated: true\` (with a \`hint\` naming the way out) means the row cap bit and this page is NOT the whole catalogue — it also prints a warning on stderr. Never conclude an object does not exist from a truncated page; re-run with --limit 1000 or --search first.
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -3420,6 +3420,7 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib dev schema procs
   ib dev schema procs --search asiakas
+  ib dev schema procs --limit 1000
 "
 `;
 
@@ -3439,7 +3440,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { items: [{ name, type:'table', rows, createdAt, state:'expired'|'malformed'|'unstamped'|'stamped', dropAfter, origin, reason, daysOverdue }], nextCursor: null, count } — ordered action-first: expired (most overdue) → malformed → unstamped → stamped.
+  { items: [{ name, type:'table', rows, createdAt, state:'expired'|'malformed'|'unstamped'|'stamped', dropAfter, origin, reason, daysOverdue }], nextCursor: null, count, truncated?, hint? } — ordered action-first: expired (most overdue) → malformed → unstamped → stamped. \`truncated: true\` (with a \`hint\` naming the way out) means the row cap bit and this page is NOT the whole catalogue — it also prints a warning on stderr. Never conclude an object does not exist from a truncated page; re-run with --limit 1000 or --search first.
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -3504,14 +3505,14 @@ DESCRIPTION
 
 FLAGS
   --search STRING    Filter object names by substring
-  --limit NUMBER    Max rows (max 1000) (default: 200)
+  --limit NUMBER    Max rows (max 1000). The default CAPS the catalogue — dbo holds ~240 tables and ~535 procs, so a default \`procs\`/\`tables\` read is a PARTIAL list; pass --limit 1000 whenever you intend to enumerate. (default: 200)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { items: [{ name, type:'table', columnCount }], nextCursor: null, count }
+  { items: [{ name, type:'table', columnCount }], nextCursor: null, count, truncated?, hint? }. \`truncated: true\` (with a \`hint\` naming the way out) means the row cap bit and this page is NOT the whole catalogue — it also prints a warning on stderr. Never conclude an object does not exist from a truncated page; re-run with --limit 1000 or --search first.
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -3521,6 +3522,7 @@ ERRORS (stderr, exit non-zero)
 EXAMPLES
   ib dev schema tables
   ib dev schema tables --search keikka
+  ib dev schema tables --limit 1000
 "
 `;
 
@@ -3568,7 +3570,7 @@ DESCRIPTION
 
 FLAGS
   --search STRING    Filter object names by substring
-  --limit NUMBER    Max rows (max 1000) (default: 200)
+  --limit NUMBER    Max rows (max 1000). The default CAPS the catalogue — dbo holds ~240 tables and ~535 procs, so a default \`procs\`/\`tables\` read is a PARTIAL list; pass --limit 1000 whenever you intend to enumerate. (default: 200)
   --table STRING    Only triggers whose parent table is this (exact name)
 
 GLOBAL FLAGS
@@ -3576,7 +3578,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { items: [{ name, table, timing:'AFTER'|'INSTEAD OF', events:['INSERT'|'UPDATE'|'DELETE'], disabled, type:'trigger' }], nextCursor: null, count }
+  { items: [{ name, table, timing:'AFTER'|'INSTEAD OF', events:['INSERT'|'UPDATE'|'DELETE'], disabled, type:'trigger' }], nextCursor: null, count, truncated?, hint? }. \`truncated: true\` (with a \`hint\` naming the way out) means the row cap bit and this page is NOT the whole catalogue — it also prints a warning on stderr. Never conclude an object does not exist from a truncated page; re-run with --limit 1000 or --search first.
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -3638,14 +3640,14 @@ DESCRIPTION
 
 FLAGS
   --search STRING    Filter object names by substring
-  --limit NUMBER    Max rows (max 1000) (default: 200)
+  --limit NUMBER    Max rows (max 1000). The default CAPS the catalogue — dbo holds ~240 tables and ~535 procs, so a default \`procs\`/\`tables\` read is a PARTIAL list; pass --limit 1000 whenever you intend to enumerate. (default: 200)
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  { items: [{ name, type:'view', columnCount }], nextCursor: null, count }
+  { items: [{ name, type:'view', columnCount }], nextCursor: null, count, truncated?, hint? }. \`truncated: true\` (with a \`hint\` naming the way out) means the row cap bit and this page is NOT the whole catalogue — it also prints a warning on stderr. Never conclude an object does not exist from a truncated page; re-run with --limit 1000 or --search first.
 
 ERRORS (stderr, exit non-zero)
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -3654,6 +3656,7 @@ ERRORS (stderr, exit non-zero)
 
 EXAMPLES
   ib dev schema views
+  ib dev schema views --limit 1000
 "
 `;
 
@@ -9396,7 +9399,7 @@ OUTPUT (JSON, stdout)
   { deleted: number } or { dryRun: true, wouldDelete: { personId } }
 
 ERRORS (stderr, exit non-zero)
-  exit 5 (HTTP 404)  Person not found       → verify personId
+  exit 5 (HTTP 404)  Person not found IN SCOPE → the id may be fine and the SCOPE wrong — these commands read the ACTIVE company only. Either the personId does not exist, or it belongs to another tenant: retry with \`--asiakas <id>\` (on \`person get\`), find them with \`ib customer person list --asiakas <id>\` or \`ib person search --my-companies\`, or switch lens with \`ib company switch <id>\`. Do NOT conclude the person does not exist and create a new one — that mints a duplicate.
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.person.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -9607,14 +9610,14 @@ exports[`Help snapshots — contract stability > help for ib person get matches 
   ib person get <personId> [flags]
 
 DESCRIPTION
-  Get a single person by personId. Global persons (ownerAsiakasId=null) are fetchable by anyone.
+  Get a single person by personId. Global persons (ownerAsiakasId=null) are fetchable by anyone. --asiakas reads a person owned by ANOTHER company (cross-tenant; developer/admin lever) — without it the lookup is scoped to the active company and a foreign personId returns 404.
   Permissions: requires auth.page.person.read.
 
 ARGUMENTS
   <personId> NUMBER    personId to fetch (required)
 
 FLAGS
-  (none)
+  --asiakas NUMBER    Read a person owned by this company (cross-tenant). Requires membership of that company, or sysadmin/developer; default = active company.
 
 GLOBAL FLAGS
   --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV
@@ -9624,13 +9627,21 @@ OUTPUT (JSON, stdout)
   { personId, name, email, phone, roles:number[] }
 
 ERRORS (stderr, exit non-zero)
-  exit 5 (HTTP 404)  Person not found       → verify personId
+  exit 5 (HTTP 404)  Person not found IN SCOPE → the id may be fine and the SCOPE wrong — these commands read the ACTIVE company only. Either the personId does not exist, or it belongs to another tenant: retry with \`--asiakas <id>\` (on \`person get\`), find them with \`ib customer person list --asiakas <id>\` or \`ib person search --my-companies\`, or switch lens with \`ib company switch <id>\`. Do NOT conclude the person does not exist and create a new one — that mints a duplicate.
+  exit 3 (HTTP 403)  Not a member of the --asiakas company → cross-tenant person reads need membership of the target company, or sysadmin/developer. Check what you can reach with \`ib company list\`.
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.person.read
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
+NOTES
+  - Person reads are TENANT-SCOPED to your active company (plus global persons, ownerAsiakasId=null, and always yourself). A 404 therefore means 'not in this scope', not 'not in the database'.
+
+SEE ALSO
+  ib customer person list, ib person search
+
 EXAMPLES
   ib person get 6233
+  ib person get 6300 --asiakas 1380
 "
 `;
 
@@ -9862,7 +9873,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Not allowed to change this person's owner → see the authz rules above (developer/self/company-admin)
-  exit 5 (HTTP 404)  Person not found       → verify personId
+  exit 5 (HTTP 404)  Person not found IN SCOPE → the id may be fine and the SCOPE wrong — these commands read the ACTIVE company only. Either the personId does not exist, or it belongs to another tenant: retry with \`--asiakas <id>\` (on \`person get\`), find them with \`ib customer person list --asiakas <id>\` or \`ib person search --my-companies\`, or switch lens with \`ib company switch <id>\`. Do NOT conclude the person does not exist and create a new one — that mints a duplicate.
   exit 4 (client-side)  Bad flags              → provide exactly one of --global / --asiakas and a --reason
 
 EXAMPLES
@@ -10103,7 +10114,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  No fields to update    → pass at least one typed flag (--first/--last/--phone/--email/--memo) or a --body/--from-json patch
-  exit 5 (HTTP 404)  Person not found       → verify personId
+  exit 5 (HTTP 404)  Person not found IN SCOPE → the id may be fine and the SCOPE wrong — these commands read the ACTIVE company only. Either the personId does not exist, or it belongs to another tenant: retry with \`--asiakas <id>\` (on \`person get\`), find them with \`ib customer person list --asiakas <id>\` or \`ib person search --my-companies\`, or switch lens with \`ib company switch <id>\`. Do NOT conclude the person does not exist and create a new one — that mints a duplicate.
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.person.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose

@@ -61,6 +61,27 @@ describe("ib person list/get/search", () => {
     expect((result as { personId: number }).personId).toBe(6233);
   });
 
+  /**
+   * fb#620 — `ib person get 6300` returned "not found, verify personId" for a
+   * person that exists, because the read is scoped to the active company and
+   * there was no way to widen it. `ib vehicle get --asiakas` already had the
+   * lever; this is the same shape on the person side.
+   */
+  test("runPersonGet: --asiakas widens the read to another tenant", async () => {
+    mockClient.get.mockResolvedValueOnce({ personId: 6300 });
+    await runPersonGet(mockClient, 6300, 1380);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/person/get/6300?asiakas=1380");
+  });
+
+  test("runPersonGet: no --asiakas leaves the path bare (active-company scope)", async () => {
+    // The default must not start sending `?asiakas=` — a cross-tenant read is
+    // uncached server-side, so an always-present param would quietly drop every
+    // person get out of the cache.
+    mockClient.get.mockResolvedValueOnce({ personId: 6233 });
+    await runPersonGet(mockClient, 6233, undefined);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/cli/person/get/6233");
+  });
+
   test("runPersonSearch: POSTs /api/person/search with {searchString} body as a read", async () => {
     mockClient.post.mockResolvedValueOnce([
       { personId: 6233, name: "Jerry" },

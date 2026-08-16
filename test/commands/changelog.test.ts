@@ -1114,6 +1114,83 @@ describe("warnFeedbackLinkEffects — silent link theft (fb#366)", () => {
   });
 });
 
+/**
+ * fb#633 — the one preserved-effect that used to pass unannounced.
+ *
+ * Shipping fb#567: the row carried a hand-written cross-session note opening
+ * "STILL OPEN — but a building block now exists". The link correctly advanced it
+ * open -> applied and correctly KEPT the note (the fb#366 rule). The row then
+ * read `status: applied` under prose declaring it still open — and the next
+ * triage session reading that note would reasonably redo finished work.
+ *
+ * The fix is a SIGNAL, never a mutation: a machine edit of the note is exactly
+ * the destruction the preservation rule exists to prevent.
+ */
+describe("warnFeedbackLinkEffects — resolution preserved across a status change (fb#633)", () => {
+  const note =
+    "STILL OPEN — but a building block now exists (context for whoever picks this up), and the rest of the work is unchanged.";
+
+  test("THE BUG: warns and quotes the preserved note", () => {
+    const warn = vi.fn();
+    warnFeedbackLinkEffects(
+      { changelogId: 1371, feedbackId: 567, resolutionPreserved: note },
+      warn
+    );
+    expect(warn).toHaveBeenCalledTimes(1);
+    const msg = warn.mock.calls[0][0] as string;
+    expect(msg).toMatch(/fb#567/);
+    expect(msg).toMatch(/contradict/);
+    // The excerpt is the point — it lets the writer judge without a second read.
+    expect(msg).toContain("STILL OPEN");
+    // …and the way to correct it, named with the actual id.
+    expect(msg).toMatch(/ib dev feedback resolve 567 --status applied --note/);
+  });
+
+  test("the excerpt is capped and folded to ONE line", () => {
+    const warn = vi.fn();
+    warnFeedbackLinkEffects(
+      { changelogId: 1371, feedbackId: 567, resolutionPreserved: `line one\nline two\n${"x".repeat(300)}` },
+      warn
+    );
+    const msg = warn.mock.calls[0][0] as string;
+    expect(msg).not.toContain("\n");
+    expect(msg).toContain("…");
+  });
+
+  test("a bare true still warns, without an excerpt", () => {
+    const warn = vi.fn();
+    warnFeedbackLinkEffects({ changelogId: 1371, feedbackId: 567, resolutionPreserved: true }, warn);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toMatch(/contradict/);
+  });
+
+  test("silent when nothing was preserved — incl. an older backend that omits the key", () => {
+    const warn = vi.fn();
+    warnFeedbackLinkEffects({ changelogId: 1371, feedbackId: 567 }, warn);
+    warnFeedbackLinkEffects({ changelogId: 1371, feedbackId: 567, resolutionPreserved: false }, warn);
+    warnFeedbackLinkEffects({ changelogId: 1371, feedbackId: 567, resolutionPreserved: null }, warn);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test("reports per id in a multi-id link, alongside the other effects", () => {
+    const warn = vi.fn();
+    warnFeedbackLinkEffects(
+      {
+        changelogId: 1371,
+        feedbackLinks: [
+          { feedbackId: 567, role: "resolves", resolutionPreserved: note },
+          { feedbackId: 568, role: "resolves" },
+          { feedbackId: 569, role: "resolves", feedbackStatus: "reviewed" },
+        ],
+      },
+      warn
+    );
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls[0][0]).toMatch(/fb#567/);
+    expect(warn.mock.calls[1][0]).toMatch(/fb#569/);
+  });
+});
+
 describe("warnFeedbackLinkEffects — the link did not close the row (fb#517/fb#441)", () => {
   test("says so when the row was left at a preserved status", () => {
     // The reported case: fb#446 was a BETONIJERRY_TOS amendment deliberately set

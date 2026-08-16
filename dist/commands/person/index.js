@@ -96,8 +96,22 @@ export async function runPersonList(client, opts) {
 /**
  * GET /api/cli/person/get/:personId. Returns the flat backend record as-is.
  */
-export async function runPersonGet(client, personId) {
-    return client.get(`/api/cli/person/get/${personId}`);
+/**
+ * GET /api/cli/person/get/:personId.
+ *
+ * `asiakas` widens the read to ANOTHER tenant (fb#620), mirroring
+ * `ib vehicle get --asiakas` — same shape, same gate class (membership of the
+ * target, or sysadmin/developer). Without it the lookup is scoped to the active
+ * company, which is what made a correct personId answer "not found": a developer
+ * token that could read another tenant's FLEET could not read a person in that
+ * same tenant, and the 404 blamed the id.
+ *
+ * DEPLOY-GATED: the `?asiakas=` half needs the puminet5api route change. Against
+ * an older backend the parameter is ignored and the read stays scoped to the
+ * active company — i.e. the pre-fix 404, never a wrong person.
+ */
+export async function runPersonGet(client, personId, asiakas) {
+    return client.get(`/api/cli/person/get/${personId}${qs({ asiakas })}`);
 }
 /** Project one raw /api/person/search row to the clean PersonSearchHit shape. */
 export function projectPersonHit(row) {
@@ -413,7 +427,8 @@ export function registerPersonCommands(parent, getClient, getClientForAsiakas) {
         .option("--limit <n>", "", cappedInt(500))
         .action(jsonAction(getClient, (client, opts) => runPersonList(client, opts)));
     p.command("get <personId>")
-        .action(jsonAction(getClient, (client, idStr) => runPersonGet(client, parseId(idStr, "personId"))));
+        .option("--asiakas <id>", "", (v) => Number(v))
+        .action(jsonAction(getClient, (client, idStr, opts) => runPersonGet(client, parseId(idStr, "personId"), opts.asiakas)));
     p.command("search [query]")
         .option("--search <s>")
         .option("--limit <n>", "", cappedInt(500))

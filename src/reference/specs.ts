@@ -176,6 +176,17 @@ const VEHICLE_ORDERING_NOTE =
  *  within one response (fb#394). */
 const VEHICLE_OWNER_NOTE =
   "`asiakasId` and `ownerAsiakasId` are distinct columns and often equal. `ownerAsiakasId` is the tenant this read is scoped to, so it is the SAME on every row of one response (the active company, or `--asiakas`); `asiakasId` is the assigned company and is what the grid splits own-vs-foreign vehicles on.";
+// ─── person 404: say which DIMENSION failed (fb#620) ─────────────────────────
+// `verify personId` is the wrong instruction most of the time this fires: the
+// id is usually right and the SCOPE is wrong, because every person command is
+// scoped to the active company. An agent that believes "this person does not
+// exist" goes on to CREATE one — a duplicate row in a tenant that already had
+// it. Naming both dimensions costs one line and removes that failure.
+const PERSON_SCOPE_404_REMEDY =
+  "the id may be fine and the SCOPE wrong — these commands read the ACTIVE company only. Either the personId does not exist, or it belongs to another tenant: retry with `--asiakas <id>` (on `person get`), find them with `ib customer person list --asiakas <id>` or `ib person search --my-companies`, or switch lens with `ib company switch <id>`. Do NOT conclude the person does not exist and create a new one — that mints a duplicate.";
+const PERSON_SCOPE_NOTE =
+  "Person reads are TENANT-SCOPED to your active company (plus global persons, ownerAsiakasId=null, and always yourself). A 404 therefore means 'not in this scope', not 'not in the database'.";
+
 /** The list row is ~14 columns wide, so leftmost-fits would hide sortNo/ownership. */
 const VEHICLE_LIST_PRETTY_COLUMNS = [
   "vehicleId",
@@ -1945,17 +1956,32 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     command: "ib person get",
-    description: "Get a single person by personId. Global persons (ownerAsiakasId=null) are fetchable by anyone.",
+    description:
+      "Get a single person by personId. Global persons (ownerAsiakasId=null) are fetchable by anyone. --asiakas reads a person owned by ANOTHER company (cross-tenant; developer/admin lever) — without it the lookup is scoped to the active company and a foreign personId returns 404.",
     permissions: ["auth.page.person.read"],
     args: [{ name: "personId", type: "number", description: "personId to fetch" }],
-    flags: [],
+    flags: [
+      {
+        name: "asiakas",
+        type: "number",
+        description:
+          "Read a person owned by this company (cross-tenant). Requires membership of that company, or sysadmin/developer; default = active company.",
+      },
+    ],
     outputShape:
       "{ personId, name, email, phone, roles:number[] }",
     errors: [
-      apiErr(404, "Person not found", "verify personId"),
+      apiErr(404, "Person not found IN SCOPE", PERSON_SCOPE_404_REMEDY),
+      apiErr(
+        403,
+        "Not a member of the --asiakas company",
+        "cross-tenant person reads need membership of the target company, or sysadmin/developer. Check what you can reach with `ib company list`."
+      ),
       ...permErrors("auth.page.person.read"),
     ],
-    examples: ["ib person get 6233"],
+    notes: [PERSON_SCOPE_NOTE],
+    seeAlso: ["ib customer person list", "ib person search"],
+    examples: ["ib person get 6233", "ib person get 6300 --asiakas 1380"],
   },
   {
     command: "ib person search",
@@ -4426,7 +4452,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape: "{ ok: true, updated: { personId } } or { dryRun: true, wouldUpdate: { personId, ... } }",
     errors: [
       apiErr(400, "No fields to update", "pass at least one typed flag (--first/--last/--phone/--email/--memo) or a --body/--from-json patch"),
-      apiErr(404, "Person not found", "verify personId"),
+      apiErr(404, "Person not found IN SCOPE", PERSON_SCOPE_404_REMEDY),
       ...permErrors("auth.page.person.edit"),
     ],
     notes: [
@@ -4462,7 +4488,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape: "{ personId, ownerAsiakasId } or { dryRun: true, wouldSetOwner: { personId, from, to } }",
     errors: [
       apiErr(403, "Not allowed to change this person's owner", "see the authz rules above (developer/self/company-admin)"),
-      apiErr(404, "Person not found", "verify personId"),
+      apiErr(404, "Person not found IN SCOPE", PERSON_SCOPE_404_REMEDY),
       { origin: "client", exit: 4, meaning: "Bad flags", remedy: "provide exactly one of --global / --asiakas and a --reason" },
     ],
     examples: [
@@ -4484,7 +4510,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     reasonPolicy: "always",
     outputShape: "{ deleted: number } or { dryRun: true, wouldDelete: { personId } }",
     errors: [
-      apiErr(404, "Person not found", "verify personId"),
+      apiErr(404, "Person not found IN SCOPE", PERSON_SCOPE_404_REMEDY),
       ...permErrors("auth.page.person.edit"),
     ],
     examples: ['ib person delete 5351 --reason "departed"'],
@@ -5484,8 +5510,17 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ];
     const listFlags = [
       { name: "search", type: "string", description: "Filter object names by substring" },
-      { name: "limit", type: "number", default: "200", description: "Max rows (max 1000)" },
+      {
+        name: "limit",
+        type: "number",
+        default: "200",
+        description:
+          "Max rows (max 1000). The default CAPS the catalogue — dbo holds ~240 tables and ~535 procs, so a default `procs`/`tables` read is a PARTIAL list; pass --limit 1000 whenever you intend to enumerate.",
+      },
     ];
+    /** Appended to every schema LIST outputShape — the cap is the trap (fb#641). */
+    const truncNote =
+      " `truncated: true` (with a `hint` naming the way out) means the row cap bit and this page is NOT the whole catalogue — it also prints a warning on stderr. Never conclude an object does not exist from a truncated page; re-run with --limit 1000 or --search first.";
     const invalidNameErr = apiErr(400, "Invalid name (letters/digits/underscore only)", "use the bare object name, no schema prefix");
     return [
       {
@@ -5494,9 +5529,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         permissions: DEV_PERMS,
         tier: "developer",
         flags: listFlags,
-        outputShape: "{ items: [{ name, type:'table', columnCount }], nextCursor: null, count }",
+        outputShape:
+          "{ items: [{ name, type:'table', columnCount }], nextCursor: null, count, truncated?, hint? }." + truncNote,
         errors: devErrors,
-        examples: ["ib dev schema tables", "ib dev schema tables --search keikka"],
+        examples: ["ib dev schema tables", "ib dev schema tables --search keikka", "ib dev schema tables --limit 1000"],
       },
       {
         command: "ib dev schema table",
@@ -5526,9 +5562,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         permissions: DEV_PERMS,
         tier: "developer",
         flags: listFlags,
-        outputShape: "{ items: [{ name, type:'view', columnCount }], nextCursor: null, count }",
+        outputShape:
+          "{ items: [{ name, type:'view', columnCount }], nextCursor: null, count, truncated?, hint? }." + truncNote,
         errors: devErrors,
-        examples: ["ib dev schema views"],
+        examples: ["ib dev schema views", "ib dev schema views --limit 1000"],
       },
       {
         command: "ib dev schema view",
@@ -5547,9 +5584,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         permissions: DEV_PERMS,
         tier: "developer",
         flags: listFlags,
-        outputShape: "{ items: [{ name, type:'P'|'FN'|'TF'|'IF' }], nextCursor: null, count }",
+        outputShape:
+          "{ items: [{ name, type:'P'|'FN'|'TF'|'IF' }], nextCursor: null, count, truncated?, hint? }." + truncNote,
         errors: devErrors,
-        examples: ["ib dev schema procs", "ib dev schema procs --search asiakas"],
+        examples: ["ib dev schema procs", "ib dev schema procs --search asiakas", "ib dev schema procs --limit 1000"],
       },
       {
         command: "ib dev schema proc",
@@ -5571,7 +5609,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
           ...listFlags,
           { name: "table", type: "string", description: "Only triggers whose parent table is this (exact name)" },
         ],
-        outputShape: "{ items: [{ name, table, timing:'AFTER'|'INSTEAD OF', events:['INSERT'|'UPDATE'|'DELETE'], disabled, type:'trigger' }], nextCursor: null, count }",
+        outputShape:
+          "{ items: [{ name, table, timing:'AFTER'|'INSTEAD OF', events:['INSERT'|'UPDATE'|'DELETE'], disabled, type:'trigger' }], nextCursor: null, count, truncated?, hint? }." + truncNote,
         errors: devErrors,
         notes: [
           "Trigger bodies carry real business logic here (keikka_after_ins_trig creates keikkaBetoni/toimitus/keikkaPerson rows), so a table's writers are not fully described by its procs alone.",
@@ -5611,7 +5650,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         tier: "developer",
         flags: [{ name: "limit", type: "number", default: "200", description: "Max rows (max 1000)" }],
         outputShape:
-          "{ items: [{ name, type:'table', rows, createdAt, state:'expired'|'malformed'|'unstamped'|'stamped', dropAfter, origin, reason, daysOverdue }], nextCursor: null, count } — ordered action-first: expired (most overdue) → malformed → unstamped → stamped.",
+          "{ items: [{ name, type:'table', rows, createdAt, state:'expired'|'malformed'|'unstamped'|'stamped', dropAfter, origin, reason, daysOverdue }], nextCursor: null, count, truncated?, hint? } — ordered action-first: expired (most overdue) → malformed → unstamped → stamped." + truncNote,
         errors: devErrors,
         notes: [
           "The retention contract is an `IB_Snapshot` extended property on the table itself, so it travels with the object and dies with it. `origin` names the migration that created the snapshot; `reason` says what it holds.",

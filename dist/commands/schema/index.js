@@ -3,25 +3,46 @@ import { writeJson } from "../../output/json.js";
 import { guarded, jsonAction } from "../_shared/action.js";
 import { CliError } from "../../api/errors.js";
 import { qs } from "../../api/query.js";
+import { warnIfTruncated } from "../../api/listCaps.js";
 import { cappedInt } from "../../targets.js";
 function listQuery(path, opts) {
     return `${path}${qs({ search: opts.search || undefined, limit: opts.limit })}`;
 }
+/**
+ * Every schema list read goes through here so the cap can only ever be
+ * announced in ONE place (fb#641).
+ *
+ * These commands are the CLI's answer to "introspect the live schema instead of
+ * guessing", so a silently short page is not a missing convenience — it is a
+ * confidently wrong answer to the question the command exists for. The backend
+ * already flags it (fb#606); this is the half that puts it where a caller who
+ * reads only `items` still sees it.
+ *
+ * Deliberately NOT hoisted into `writeJson` for every list in the CLI: some
+ * commands set `truncated` for a non-cap reason (`glossary list --stalest` marks
+ * a deliberate top-N slice), so a global warning would cry wolf on results that
+ * are exactly what was asked for.
+ */
+async function getSchemaList(client, path, command) {
+    const env = await client.get(path);
+    warnIfTruncated(env, command);
+    return env;
+}
 export async function runSchemaTables(client, opts) {
-    return client.get(listQuery("/api/cli/schema/tables", opts));
+    return getSchemaList(client, listQuery("/api/cli/schema/tables", opts), "ib dev schema tables");
 }
 export async function runSchemaViews(client, opts) {
-    return client.get(listQuery("/api/cli/schema/views", opts));
+    return getSchemaList(client, listQuery("/api/cli/schema/views", opts), "ib dev schema views");
 }
 export async function runSchemaProcs(client, opts) {
-    return client.get(listQuery("/api/cli/schema/procs", opts));
+    return getSchemaList(client, listQuery("/api/cli/schema/procs", opts), "ib dev schema procs");
 }
 export async function runSchemaTriggers(client, opts) {
-    return client.get(`/api/cli/schema/triggers${qs({
+    return getSchemaList(client, `/api/cli/schema/triggers${qs({
         table: opts.table || undefined,
         search: opts.search || undefined,
         limit: opts.limit,
-    })}`);
+    })}`, "ib dev schema triggers");
 }
 export async function runSchemaTable(client, name) {
     return client.get(`/api/cli/schema/table/${name}`);
@@ -45,7 +66,7 @@ export async function runSchemaDump(client) {
  * report whose job is to be complete.
  */
 export async function runSchemaSnapshots(client, opts) {
-    return client.get(`/api/cli/schema/snapshots${qs({ limit: opts.limit })}`);
+    return getSchemaList(client, `/api/cli/schema/snapshots${qs({ limit: opts.limit })}`, "ib dev schema snapshots");
 }
 /**
  * Batch the single-object lookups (`table`/`view`/`proc`) — the comma-separated

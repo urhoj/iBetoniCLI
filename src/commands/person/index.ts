@@ -156,12 +156,27 @@ export async function runPersonList(
 /**
  * GET /api/cli/person/get/:personId. Returns the flat backend record as-is.
  */
+/**
+ * GET /api/cli/person/get/:personId.
+ *
+ * `asiakas` widens the read to ANOTHER tenant (fb#620), mirroring
+ * `ib vehicle get --asiakas` — same shape, same gate class (membership of the
+ * target, or sysadmin/developer). Without it the lookup is scoped to the active
+ * company, which is what made a correct personId answer "not found": a developer
+ * token that could read another tenant's FLEET could not read a person in that
+ * same tenant, and the 404 blamed the id.
+ *
+ * DEPLOY-GATED: the `?asiakas=` half needs the puminet5api route change. Against
+ * an older backend the parameter is ignored and the read stays scoped to the
+ * active company — i.e. the pre-fix 404, never a wrong person.
+ */
 export async function runPersonGet(
   client: ApiClient,
-  personId: number
+  personId: number,
+  asiakas?: number
 ): Promise<Record<string, unknown>> {
   return client.get<Record<string, unknown>>(
-    `/api/cli/person/get/${personId}`
+    `/api/cli/person/get/${personId}${qs({ asiakas })}`
   );
 }
 
@@ -678,9 +693,10 @@ export function registerPersonCommands(
     .action(jsonAction(getClient, (client, opts: PersonListFilter) => runPersonList(client, opts)));
 
   p.command("get <personId>")
+    .option("--asiakas <id>", "", (v: string) => Number(v))
     .action(
-      jsonAction(getClient, (client, idStr: string) =>
-        runPersonGet(client, parseId(idStr, "personId"))
+      jsonAction(getClient, (client, idStr: string, opts: { asiakas?: number }) =>
+        runPersonGet(client, parseId(idStr, "personId"), opts.asiakas)
       )
     );
 

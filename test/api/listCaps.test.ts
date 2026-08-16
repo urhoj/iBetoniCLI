@@ -2,6 +2,7 @@ import { describe, test, expect, vi } from "vitest";
 import { cappedListEnvelope } from "../../src/api/envelopes.js";
 import {
   warnIfLimitCapped,
+  warnIfTruncated,
   FEEDBACK_LIST_CAP,
   FEEDBACK_LIST_DEFAULT,
   CHANGELOG_LIST_CAP,
@@ -101,6 +102,53 @@ describe("warnIfLimitCapped", () => {
     warnIfLimitCapped(5, FEEDBACK_LIST_CAP, "x", warn);
     warnIfLimitCapped(undefined, FEEDBACK_LIST_CAP, "x", warn);
     warnIfLimitCapped("abc", FEEDBACK_LIST_CAP, "x", warn);
+    expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * fb#641. The other direction: the caller asked for nothing in particular and
+ * the DEFAULT cap bit. The payload has carried `truncated`/`hint` since fb#606
+ * and it changed nothing, because a caller who does not check `truncated` also
+ * does not raise `--limit` — `ib dev schema procs` answered with 200 of 535
+ * procs, exit 0, and the index built from it "proved" whole families of procs
+ * did not exist.
+ */
+describe("warnIfTruncated", () => {
+  test("THE BUG: a truncated page is announced on stderr, not just in the payload", () => {
+    const warn = vi.fn();
+    warnIfTruncated(
+      { count: 200, truncated: true, hint: "capped at 200 rows — re-run with --limit 1000" },
+      "ib dev schema procs",
+      warn
+    );
+    expect(warn).toHaveBeenCalledTimes(1);
+    const msg = warn.mock.calls[0][0] as string;
+    expect(msg).toContain("ib dev schema procs");
+    expect(msg).toContain("TRUNCATED");
+    expect(msg).toContain("200");
+    // The conclusion the reported failure actually reached.
+    expect(msg).toContain("no such object exists");
+  });
+
+  test("prefers the backend's hint, so a server-side cap change cannot go stale here", () => {
+    const warn = vi.fn();
+    warnIfTruncated({ count: 200, truncated: true, hint: "re-run with --limit 4000" }, "cmd", warn);
+    expect(warn.mock.calls[0][0]).toContain("--limit 4000");
+  });
+
+  test("falls back to generic advice when the backend sends no hint", () => {
+    const warn = vi.fn();
+    warnIfTruncated({ count: 200, truncated: true }, "cmd", warn);
+    expect(warn.mock.calls[0][0]).toContain("--limit");
+  });
+
+  test("stays silent on a complete page — the common case adds no noise", () => {
+    const warn = vi.fn();
+    warnIfTruncated({ count: 12, truncated: false }, "cmd", warn);
+    warnIfTruncated({ count: 12 }, "cmd", warn);
+    warnIfTruncated(null, "cmd", warn);
+    warnIfTruncated(undefined, "cmd", warn);
     expect(warn).not.toHaveBeenCalled();
   });
 });

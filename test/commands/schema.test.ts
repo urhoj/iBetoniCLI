@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { mockApiClient } from "../helpers/mockClient.js";
 import {
   runSchemaTables,
@@ -11,6 +11,7 @@ import {
   runSchemaBatch,
   runSchemaTriggers,
   runSchemaTrigger,
+  runSchemaSnapshots,
 } from "../../src/commands/schema/index.js";
 import { CliError } from "../../src/api/errors.js";
 
@@ -157,5 +158,51 @@ describe("ib schema", () => {
     await expect(
       runSchemaBatch(mockClient, runSchemaTable, ["keikka", "boom"])
     ).rejects.toBeInstanceOf(CliError);
+  });
+
+  /**
+   * fb#641 — the cap must be audible, not just present in the payload.
+   *
+   * These assert through the REAL run* functions rather than the helper, because
+   * the reported failure was a schema list specifically: a caller reading only
+   * `items` got 200 of 535 procs with exit 0 and concluded whole proc families
+   * did not exist. A unit test of warnIfTruncated alone would still pass if a
+   * run* function stopped calling it.
+   */
+  describe("truncation warning (fb#641)", () => {
+    const truncated = { items: [{ name: "a" }], nextCursor: null, count: 200, truncated: true, hint: "capped at 200 rows" };
+    let warned: string[];
+    let spy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      warned = [];
+      spy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+        warned.push(String(chunk));
+        return true;
+      });
+    });
+    afterEach(() => spy.mockRestore());
+
+    test.each([
+      ["procs", runSchemaProcs, "ib dev schema procs"],
+      ["tables", runSchemaTables, "ib dev schema tables"],
+      ["views", runSchemaViews, "ib dev schema views"],
+      ["triggers", runSchemaTriggers, "ib dev schema triggers"],
+      ["snapshots", runSchemaSnapshots, "ib dev schema snapshots"],
+    ])("%s: a truncated page warns and names its own command", async (_name, run, command) => {
+      get().mockResolvedValueOnce(truncated);
+      const env = await run(mockClient, {});
+      // The payload is unchanged — stdout's contract does not move.
+      expect(env.truncated).toBe(true);
+      const msg = warned.join("");
+      expect(msg).toContain("TRUNCATED");
+      expect(msg).toContain(command);
+    });
+
+    test("a complete page stays silent", async () => {
+      get().mockResolvedValueOnce({ items: [{ name: "a" }], nextCursor: null, count: 1 });
+      await runSchemaProcs(mockClient, {});
+      expect(warned.join("")).toBe("");
+    });
   });
 });
