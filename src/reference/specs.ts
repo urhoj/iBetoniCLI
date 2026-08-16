@@ -47,6 +47,23 @@ import {
 import { EXECUTORS as TASK_EXECUTORS, AGENTS as TASK_AGENTS } from "../commands/task/index.js";
 
 /**
+ * The empty-string CLEAR convention, carrying its PowerShell caveat.
+ *
+ * `clearHint` is the terse per-FLAG form; `clearNote` the sentence-level one for
+ * a command description that explains the convention once. Helpers rather than
+ * ~15 hand-copied sentences: the caveat existed on NONE of the sites when fb#634
+ * was filed, and duplicated prose is precisely what drifts next time. Callers
+ * concatenate rather than interpolate so the surrounding descriptions keep their
+ * existing quoting (several contain backticks, which a template literal would
+ * force us to escape). Long form: `ib help shell-quoting`.
+ */
+const clearHint = (flag: string) =>
+  `pass "" to clear — PowerShell DROPS a bare "", so use \`${flag}=\` there (same meaning in bash; \`ib help shell-quoting\`)`;
+
+const clearNote = (flag: string) =>
+  `On Windows PowerShell a bare "" is DROPPED and the NEXT flag silently becomes the value — use the equals form \`${flag}=\` there, which means the same thing in bash (\`ib help shell-quoting\`).`;
+
+/**
  * API error row: derive the exit code from the HTTP status.
  *
  * `match` (optional, ANY-of) narrows the row to ONE cause behind a status that
@@ -1296,7 +1313,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib customer update",
     description:
-      "Update a customer via read-merge-write: reads the current record, overlays the provided flags (preserving everything else — no contact-person clobber), writes back with saveGlobalAsiakas. --from-prh refreshes name+yTunnus+billing address from the registry (explicit flags still win). Billing postal address (--address/--postal-code/--city) is writable; pass an empty string to clear a field. --body raw JSON overrides flags.",
+      "Update a customer via read-merge-write: reads the current record, overlays the provided flags (preserving everything else — no contact-person clobber), writes back with saveGlobalAsiakas. --from-prh refreshes name+yTunnus+billing address from the registry (explicit flags still win). Billing postal address (--address/--postal-code/--city) is writable; pass an empty string to clear a field (" + clearNote("--address") + "). --body raw JSON overrides flags.",
     permissions: ["auth.page.asiakas.edit"],
     args: [{ name: "asiakasId", type: "number", description: "asiakasId to update" }],
     flags: [
@@ -1680,7 +1697,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib worksite update",
     description:
-      "Update a worksite via POST /api/tyomaa/set (ownerAsiakasId derived from the session JWT; yyyymmdd defaults to today). Set fields with typed flags (--name/--num/--address/--address2/--postal-code/--city/--driving-instructions/--comment/--invoice-ref/--contact-person) and/or a --body/--from-json JSON patch with backend column names (typed flags win); at least one field is required. Omitted fields are PRESERVED (the backend read-merges the stored row); pass an empty string to CLEAR a field (e.g. --comment \"\").",
+      "Update a worksite via POST /api/tyomaa/set (ownerAsiakasId derived from the session JWT; yyyymmdd defaults to today). Set fields with typed flags (--name/--num/--address/--address2/--postal-code/--city/--driving-instructions/--comment/--invoice-ref/--contact-person) and/or a --body/--from-json JSON patch with backend column names (typed flags win); at least one field is required. Omitted fields are PRESERVED (the backend read-merges the stored row); pass an empty string to CLEAR a field (e.g. --comment \"\"). " + clearNote("--comment"),
     permissions: ["auth.page.tyomaa.edit"],
     args: [{ name: "tyomaaId", type: "number", description: "tyomaaId to update" }],
     flags: [
@@ -1691,7 +1708,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "postal-code", type: "string", description: "Postal code (tyomaaOsoite3)" },
       { name: "city", type: "string", description: "City (tyomaaOsoite4)" },
       { name: "driving-instructions", type: "string", description: "Driving instructions (tyomaaAjoOhje)" },
-      { name: "comment", type: "string", description: "Free-text memo (tyomaaMemo; pass \"\" to clear)" },
+      { name: "comment", type: "string", description: "Free-text memo (tyomaaMemo; " + clearHint("--comment") + ")" },
       { name: "invoice-ref", type: "string", description: "Invoice reference (laskuViite)" },
       { name: "contact-person", type: "number", description: "Contact personId (tyomaaContactPersonId; 0 = none)" },
       {
@@ -3644,13 +3661,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "title", type: "string", description: "Help title (otsikko)" },
       { name: "shorttext", type: "string", description: "Short text" },
       { name: "htmltext", type: "string", description: "Modal body — rendered as MARKDOWN (react-markdown + GFM), NOT HTML despite the column name. Use markdown (**bold**, - bullets, blank line = paragraph); raw <p>/<ul> tags show literally." },
-      { name: "img", type: "string", description: "Image reference (pass \"\" to clear it to null)" },
+      { name: "img", type: "string", description: "Image reference (" + clearHint("--img") + ", to null)" },
       { name: "must-exist", type: "boolean", description: "Fail (exit 4) instead of creating a new row when the helpId has no entry — guards against a typo'd helpId silently spawning a junk row" },
       { name: "ai-confidence", type: "number", description: "Self-assessed completeness/correctness 0–100 (groom rubric). Omit on a human edit to reset the score and re-open the row." },
       { name: "needs-human-review", type: "boolean", description: "Park the help row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked." },
       { name: "field", type: "string", description: "Edit-mode target field: title | shorttext | htmltext (default htmltext)" },
       { name: "replace", type: "string", description: "Edit mode: replace this literal text in the target field (exactly once unless --all)" },
-      { name: "with", type: "string", description: 'Replacement for --replace ("" deletes the matched text)' },
+      { name: "with", type: "string", description: 'Replacement for --replace (empty deletes the matched text; ' + clearHint("--with") + ")" },
       { name: "append", type: "string", description: "Edit mode: append text to the target field (verbatim)" },
       { name: "prepend", type: "string", description: "Edit mode: prepend text to the target field (verbatim)" },
       { name: "all", type: "boolean", description: "With --replace: substitute every occurrence" },
@@ -3901,7 +3918,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "activate", type: "boolean", description: "Publish immediately (archives the prior active version). Default: inactive draft" },
       { name: "validate-json", type: "boolean", description: "Validate the embedded ```json block parses to an object before saving (recommended for BETONIJERRY_* structured types)" },
       { name: "replace", type: "string", description: "Edit mode: replace this literal text in the current ACTIVE version's markdown (must match exactly once unless --all)" },
-      { name: "with", type: "string", description: "Replacement for --replace (\"\" deletes the matched text)" },
+      { name: "with", type: "string", description: "Replacement for --replace (empty deletes the matched text; " + clearHint("--with") + ")" },
       { name: "append", type: "string", description: "Edit mode: append text to the end of the current markdown (verbatim)" },
       { name: "prepend", type: "string", description: "Edit mode: prepend text to the start of the current markdown (verbatim)" },
       { name: "all", type: "boolean", description: "With --replace: substitute every occurrence instead of erroring on multiple matches" },
@@ -4384,14 +4401,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib person update",
     description:
-      "Update a person. Set fields with typed flags (--first/--last/--phone/--email/--memo) and/or a --body/--from-json JSON patch (typed flags win); at least one field is required. Omitted fields are PRESERVED (the backend read-merges the stored row); pass an empty string to CLEAR a field (e.g. --email \"\"). Owner changes are separate — use `ib person owner`. Requires --reason.",
+      "Update a person. Set fields with typed flags (--first/--last/--phone/--email/--memo) and/or a --body/--from-json JSON patch (typed flags win); at least one field is required. Omitted fields are PRESERVED (the backend read-merges the stored row); pass an empty string to CLEAR a field (e.g. --email \"\"). " + clearNote("--email") + " Owner changes are separate — use `ib person owner`. Requires --reason.",
     permissions: ["auth.page.person.edit"],
     args: [{ name: "personId", type: "number", description: "personId to update" }],
     flags: [
       { name: "first", type: "string", description: "personFirstName" },
       { name: "last", type: "string", description: "personLastName" },
       { name: "phone", type: "string", description: "personPhone" },
-      { name: "email", type: "string", description: "personEmail (pass \"\" to clear)" },
+      { name: "email", type: "string", description: "personEmail (" + clearHint("--email") + ")" },
       { name: "memo", type: "string", description: "personMemo — free-text note/comment" },
       { name: "body", type: "json", description: "Patch body (JSON), merged UNDER the typed flags. Mutually exclusive with --from-json. ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
       { name: "from-json", type: "string", description: "Read the patch body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body." },
@@ -4947,7 +4964,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     flags: [
       { name: "body", type: "json", description: "JSON: { jerryPersonId?, offerNotificationEmail?, openingHours?, companyDescription?, maintainsOrderInfo?, website?, publicSlug?, publicListingConsent? }. Mutually exclusive with --from-json. ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
       { name: "from-json", type: "string", description: "Read the JSON body from a file (or - for stdin); shell-safe alternative to --body. Mutually exclusive with --body." },
-      { name: "email", type: "string", description: "Address tarjouspyyntö mail is DELIVERED to (offerNotificationEmail). May be a shared inbox — it is a mailbox, not a login, so jerryPersonId stays a named person who signs in. Wins over jerryPersonId's own address when set, and over the same key in --body; pass \"\" to clear and fall back to it." },
+      { name: "email", type: "string", description: "Address tarjouspyyntö mail is DELIVERED to (offerNotificationEmail). May be a shared inbox — it is a mailbox, not a login, so jerryPersonId stays a named person who signs in. Wins over jerryPersonId's own address when set, and over the same key in --body; " + clearHint("--email") + " and fall back to it." },
       { name: "asiakas", type: "number", description: "Target company asiakasId (default: your own)" },
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason); REQUIRED" },
     ],
@@ -5153,7 +5170,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "outreach-name", type: "string", description: "Contact override name" },
       { name: "outreach-email", type: "string", description: "Contact override email" },
       { name: "outreach-phone", type: "string", description: "Contact override phone" },
-      { name: "parked-until", type: "string", description: "Hold the prospect until this date (YYYY-MM-DD or today/tomorrow); pass \"\" to lift the hold. Does NOT change --status" },
+      { name: "parked-until", type: "string", description: "Hold the prospect until this date (YYYY-MM-DD or today/tomorrow); " + clearHint("--parked-until") + " and lift the hold. Does NOT change --status" },
     ],
     writeFlags: true,
     dryRunKind: "server",
@@ -5162,7 +5179,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "--parked-until is how you defer a prospect. Do NOT park by moving --status to a terminal key: status holds ONE fact, so overwriting it destroys the pipeline position the prospect actually reached, and the row then misstates its own history. A parked row keeps its true status, reports `parked: true`, and is suppressed from `--due` until the date passes — after which it surfaces again by itself. The change is also written to the event trail. Deploy-gated: needs the 2026-08-10-jerry-onboarding-parked-until migration.",
     ],
     errors: [
-      apiErr(400, "Unknown --status or --company-type, or malformed --parked-until", "use one of the status keys listed on --status; --company-type is pumppu|betoni|all|owner; --parked-until must be YYYY-MM-DD or \"\""),
+      apiErr(400, "Unknown --status or --company-type, or malformed --parked-until", "use one of the status keys listed on --status; --company-type is pumppu|betoni|all|owner; --parked-until must be YYYY-MM-DD or empty (`--parked-until=` on PowerShell)"),
       apiErr(404, "Prospect not found", "add it first: ib jerry admin onboarding add"),
       SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
@@ -6071,7 +6088,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "needs-human-review", type: "boolean", description: "Park the row for a human (excludes it from --needs-review); set with a low --ai-confidence when blocked." },
       { name: "field", type: "string", description: "Edit-mode target field: summary | detail (default detail)" },
       { name: "replace", type: "string", description: "Edit mode: replace this literal text in the target field (exactly once unless --all)" },
-      { name: "with", type: "string", description: 'Replacement for --replace ("" deletes the matched text)' },
+      { name: "with", type: "string", description: 'Replacement for --replace (empty deletes the matched text; ' + clearHint("--with") + ")" },
       { name: "append", type: "string", description: "Edit mode: append text to the target field (verbatim)" },
       { name: "prepend", type: "string", description: "Edit mode: prepend text to the target field (verbatim)" },
       { name: "all", type: "boolean", description: "With --replace: substitute every occurrence" },
@@ -6081,7 +6098,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       "--dry-run has two resolutions. EDIT mode (--replace/--append/--prepend) resolves CLIENT-side and never PUTs — safe on any backend. A plain --summary/--detail --dry-run is SERVER-side (X-Dry-Run) and DEPLOY-GATED: the PUT handler ignored the header until puminet5api shipped the wouldSave branch, so against an older backend a plain --dry-run WRITES FOR REAL and overwrites the entry (fb#286). Until that backend deploys, preview a full-field rewrite with `reference detail get` first, or use edit mode.",
       "Caps are validated BEFORE the dry-run branch, so an over-cap payload still exits 4 under --dry-run rather than reporting a would-be write.",
-      "The save proc COALESCEs the CONTENT fields — an omitted --summary/--detail keeps its current value (pass \"\" to clear), which is why the dry-run's `writes` lists only the fields you sent. aiConfidence/needsHumanReview are DIRECT-assigned: omitting them RESETS the score and un-parks the row for the grooming routine.",
+      "The save proc COALESCEs the CONTENT fields — an omitted --summary/--detail keeps its current value (" + clearHint("--summary") + "), which is why the dry-run's `writes` lists only the fields you sent. aiConfidence/needsHumanReview are DIRECT-assigned: omitting them RESETS the score and un-parks the row for the grooming routine.",
       "PASS PROSE VIA --from-json, NOT argv, whenever it contains a non-ASCII character (fb#613). Windows PowerShell reinterprets UTF-8 native arguments as latin1, so `Ylijäämäbetonin` is stored as `YlijÃ¤Ã¤mÃ¤betonin` while the call exits 0 and echoes a success payload. The corruption is invisible here in a way it is not elsewhere: this catalog is served to AI agents as authoritative, lives outside git, and nothing diffs or lints it. --needs-human-review and --all take no value, so they stay on argv alongside --from-json and are deliberately NOT accepted as JSON keys.",
     ],
     errors: [
@@ -7616,7 +7633,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     notes: [
       "Manager-gated (canManageThread): owning-company admin/owner, or isSystemAdmin/isDeveloper.",
-      'Pass --title "" to clear the title (sets messageThread.title = NULL).',
+      'Pass --title "" to clear the title (sets messageThread.title = NULL). ' + clearNote("--title"),
       "--dry-run resolves CLIENT-SIDE (the messages routes honour no X-Dry-Run): it returns { dryRun:true, wouldRename:{...} } and never PATCHes — works under --read-only.",
       "Deploy-gated: requires the messageThread.title migration (2026-06-21-messageThread-title.sql) to run on the DB BEFORE the rename route deploys — otherwise the backend 500s on missing column.",
     ],
@@ -7765,7 +7782,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     command: "ib glossary set",
-    description: "Create/update a glossary entry (developer only). UPSERT: creates the term if absent, pass --update-only to require it already exists (404 otherwise). PARTIAL update: only the fields you pass change — omit a flag to KEEP its current value, pass an empty value to CLEAR it. Auto-resolves a matching miss.",
+    description: "Create/update a glossary entry (developer only). UPSERT: creates the term if absent, pass --update-only to require it already exists (404 otherwise). PARTIAL update: only the fields you pass change — omit a flag to KEEP its current value, pass an empty value to CLEAR it. " + clearNote("--synonyms") + " Auto-resolves a matching miss.",
     tier: "developer",
     auth: "any",
     mutates: true,
@@ -7774,8 +7791,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     args: [{ name: "term", type: "string", required: true, description: "Canonical term" }],
     flags: [
       { name: "definition", type: "string", description: "One-paragraph definition (≤2000). Omit to keep current." },
-      { name: "synonyms", type: "string", description: 'Comma-separated aliases incl. inflections. Omit to keep; pass "" to clear.' },
-      { name: "related", type: "string", description: 'Comma-separated command paths, e.g. "ib person,ib vehicle driver board". Omit to keep; pass "" to clear.' },
+      { name: "synonyms", type: "string", description: 'Comma-separated aliases incl. inflections. Omit to keep; ' + clearHint("--synonyms") + "." },
+      { name: "related", type: "string", description: 'Comma-separated command paths, e.g. "ib person,ib vehicle driver board". Omit to keep; ' + clearHint("--related") + "." },
       { name: "entity", type: "string", description: "Related DB entity, e.g. Person / personId. Omit to keep." },
       { name: "domain", type: "string", description: "Domain grouping (e.g. vacation). Omit to keep." },
       { name: "update-only", type: "boolean", description: "Only update an existing term; do not create a new one (404 if absent)" },
@@ -7788,7 +7805,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape: "{ term, synonyms, definition, relatedCommands, relatedEntity, domain, runs }",
     notes: [
-      "PARTIAL (PATCH) semantics: an omitted flag is NOT sent, so the backend preserves the existing value — you can update just one field (e.g. only --synonyms) without re-sending the definition. To CLEAR a field pass an empty value: `--synonyms \"\"` empties the list, `--entity \"\"` blanks it. To OVERWRITE, pass the new value.",
+      "PARTIAL (PATCH) semantics: an omitted flag is NOT sent, so the backend preserves the existing value — you can update just one field (e.g. only --synonyms) without re-sending the definition. To CLEAR a field pass an empty value: `--synonyms \"\"` empties the list, `--entity \"\"` blanks it. " + clearNote("--synonyms") + " To OVERWRITE, pass the new value.",
       "Requires the partial-aware backend (COALESCE save proc) deployed; against an older backend an omitted field is still overwritten to empty/null — re-send all fields (or use --from-json) until the backend is updated.",
       "--ai-confidence / --needs-human-review are NOT partial: the backend direct-assigns them, so any write that omits them RESETS the score to null and clears the parked flag (by design — a human edit re-opens the row for grooming). A grooming write must therefore carry aiConfidence EVERY time, via the flag or the --from-json key. Both are read from --from-json since fb#298; before that fix the JSON key was silently dropped and the score wiped.",
       "Append mode (--add-synonyms / --remove-synonyms / --append-definition) edits in place without re-sending the whole field — built for no-filesystem callers (MCP ib_exec, /api/cli/exec) that can't use --from-json. The merge runs server-side and the target term must already exist (404 otherwise). Deploy-gated: against an un-updated backend these flags no-op (the value is preserved, not corrupted).",
@@ -7992,7 +8009,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib task set",
     description:
-      'Partial update of a recurring task (developer-only; a write). Omit a flag to KEEP the current value; pass "" to CLEAR a text field (--instructions/--skill/--agent). --deactivate soft-retires the task (history kept); --activate restores it. --next-due overrides the due date without logging a completion.',
+      'Partial update of a recurring task (developer-only; a write). Omit a flag to KEEP the current value; pass "" to CLEAR a text field (--instructions/--skill/--agent). ' + clearNote("--instructions") + ' --deactivate soft-retires the task (history kept); --activate restores it. --next-due overrides the due date without logging a completion.',
     permissions: ["isSystemAdmin or isDeveloper"],
     tier: "developer",
     writeFlags: true,

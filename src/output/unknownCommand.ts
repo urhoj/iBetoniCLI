@@ -567,10 +567,12 @@ export function buildExcessArgumentsEnvelope(
         "."
     );
   } else {
-    // No date to latch onto — the other common cause is the shell splitting a
-    // quoted value on its inner double-quotes (typical on Windows PowerShell).
+    // No date to latch onto — the other two common causes are both PowerShell
+    // argument mangling: a quoted value split on its inner double-quotes, or an
+    // empty-string value dropped outright so the flag swallowed the next token
+    // and left its argument stranded here (fb#634).
     parts.push(
-      "Extra positional(s) were passed. On Windows PowerShell this also happens when a quoted flag value is split on its inner double-quotes — check whether one long value became several arguments."
+      'Extra positional(s) were passed. On Windows PowerShell this also happens when a quoted flag value is split on its inner double-quotes — check whether one long value became several arguments. It ALSO happens when you pass an empty string to clear a field: PowerShell DROPS a bare "", so `--flag "" --other X` arrives as `--flag --other` and strands X here. To clear a field use the equals form `--flag=` (same meaning in bash). See `ib help shell-quoting`.'
     );
   }
   if (positionals.length) {

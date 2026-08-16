@@ -478,7 +478,8 @@ export const MESSAGE_BOARD_SPECS: CommandSpec[] = [
       {
         name: "expires-at",
         type: "date",
-        description: 'Last day visible: YYYY-MM-DD (pass "" to clear the expiry)',
+        description:
+          'Last day visible: YYYY-MM-DD (pass "" to clear the expiry — PowerShell DROPS a bare "", so use `--expires-at=` there; same meaning in bash, see `ib help shell-quoting`)',
       },
     ],
     writeFlags: true,

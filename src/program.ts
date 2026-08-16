@@ -93,9 +93,13 @@ export async function buildProgram(argv?: readonly string[]): Promise<Command> {
   });
   addGlobalOptions(program);
 
-  // Spec-declared `--reason` requirements fire before any action, for every
-  // consumer of the built tree (bin, runArgv, tests) — see enforceSpecReasonPolicy.
+  // Two pre-flight guards, for every consumer of the built tree (bin, runArgv,
+  // tests). The eaten-empty-string check runs FIRST: when PowerShell drops an
+  // empty `--reason ""` the NEXT flag becomes its value, so --reason looks
+  // satisfied and enforceSpecReasonPolicy would wave through a write whose audit
+  // reason is the literal string "--dry-run".
   program.hook("preAction", (_thisCommand, actionCommand) => {
+    assertNoEatenEmptyString(program, actionCommand);
     enforceSpecReasonPolicy(actionCommand);
   });
 
@@ -477,6 +481,73 @@ export function applySpecErrors(actionCommand: Command): void {
 function specFor(cmd: Command): CommandSpec | undefined {
   const path = canonicalPath(commandPath(cmd));
   return COMMAND_SPECS.find((s) => s.command === path);
+}
+
+/**
+ * Reject a flag whose value is another FLAG NAME that arrived as the next
+ * separate token — the signature of an empty-string argument eaten by the shell.
+ *
+ * Windows PowerShell 5.1 DROPS an empty-string argument to a native exe, so the
+ * documented clear syntax `--email ""` reaches us as `--email <next-token>`.
+ * Whether that is loud depends entirely on what followed, which is why it cannot
+ * be left to the parser:
+ *
+ *  - next token is a ROOT global (`--pretty`) → Commander refuses to consume a
+ *    known option as an option-argument and errors "argument missing". LOUD.
+ *  - next token leaves a positional stranded (`--email "" --asiakas 1380`) →
+ *    excess-arguments error, the shape fb#634 was filed from. LOUD.
+ *  - next token is a LOCAL flag or a bare word → consumed as the value, and
+ *    NOTHING fails. `--reason "" --dry-run` yields `reason: "--dry-run"` with the
+ *    dry-run silently swallowed: a rehearsal becomes a real write whose audit
+ *    reason is a flag name. `--email "" --dry-run` likewise persists the literal
+ *    string "--dry-run" into the field the caller meant to clear.
+ *
+ * That last row is what this guard exists for; the loud rows already read well
+ * (buildExcessArgumentsEnvelope carries the hint). fb#634 — same corruption class
+ * as the eaten backtick in fb#552, but on a write path and worth failing rather
+ * than warning, since the caller's intent (clear the field) definitely will not
+ * happen either way.
+ *
+ * Deliberately narrow, because a false positive would block a legitimate value:
+ * the value must EXACTLY equal a flag name reachable on this invocation, AND the
+ * two must be adjacent separate tokens in argv. The adjacency half is what keeps
+ * `--command=--dry-run` a legal literal — an escape hatch that costs nothing,
+ * since the equals form is also the fix we point callers at.
+ */
+export function assertNoEatenEmptyString(program: Command, actionCommand: Command): void {
+  // `rawArgs` is set by Commander's parse() on the root program but is absent
+  // from its public typings; narrow cast rather than `any`. Missing (a direct
+  // action() call in a test) simply disables the guard.
+  const rawArgs = (program as unknown as { rawArgs?: string[] }).rawArgs;
+  if (!rawArgs?.length) return;
+
+  // Every option name legal ANYWHERE in this argv: the command's own plus the
+  // root globals (which Commander accepts at any position).
+  const optionNames = new Set<string>();
+  for (const cmd of [actionCommand, program]) {
+    for (const o of cmd.options) {
+      if (o.long) optionNames.add(o.long);
+      if (o.short) optionNames.add(o.short);
+    }
+  }
+
+  const opts = actionCommand.opts();
+  for (const o of actionCommand.options) {
+    const value = opts[o.attributeName()];
+    if (typeof value !== "string" || !optionNames.has(value)) continue;
+    const spellings = [o.long, o.short].filter((s): s is string => !!s);
+    const adjacent = rawArgs.some((tok, i) => spellings.includes(tok) && rawArgs[i + 1] === value);
+    if (!adjacent) continue;
+    const flag = o.long ?? o.short ?? o.attributeName();
+    failWith(
+      `${flag} received the literal value '${value}', which is another option name. ` +
+        `On Windows PowerShell an empty-string argument is DROPPED, so \`${flag} ""\` becomes \`${flag} ${value}\` ` +
+        `and ${value} is silently swallowed. To CLEAR the field use the equals form: \`${flag}=\` ` +
+        `(it means the same thing in bash, so it is the one syntax that works everywhere). ` +
+        `To pass this literal value on purpose: \`${flag}=${value}\`. See \`ib help shell-quoting\`.`,
+      4
+    );
+  }
 }
 
 /**
