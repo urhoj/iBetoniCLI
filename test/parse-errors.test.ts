@@ -388,4 +388,38 @@ describe("unknown leaf + --help → exit 4 (fb#615)", () => {
     const { exitCode } = await runArgv(["dev", "feedback", "stats", "--help"], opts);
     expect(exitCode).toBe(0);
   });
+
+  test("no help prose leaks to stdout on the rejected path (fb#628)", async () => {
+    // Commander renders the group's help before it can reject the operand, so
+    // this used to exit 4 with the envelope on stderr AND help on stdout — the
+    // exit code saying failure while stdout said otherwise.
+    const { stdout } = await runArgv(["dev", "feedback", "nosuchleaf", "--help"], opts);
+    expect(stdout).toBe("");
+  });
+
+  test("--help and no---help are byte-identical, not merely same-exit (fb#628)", async () => {
+    const withHelp = await runArgv(["dev", "feedback", "nosuchleaf", "--help"], opts);
+    const without = await runArgv(["dev", "feedback", "nosuchleaf"], opts);
+    expect(withHelp).toEqual(without);
+  });
+
+  /**
+   * A group with an `isDefault` subcommand takes an UNREGISTERED token as that
+   * leaf's argument, never as an unknown command — Commander's own parse gates
+   * on `_defaultCommandName` and renders the parent's help there deliberately.
+   * `ib glossary` is the only such group (`lookup [term]`), so `puomi` is a
+   * TERM. The first shipped fb#615 guard missed this and exited 4 on it.
+   */
+  test("a default-subcommand group's argument is not an unknown leaf", async () => {
+    const { exitCode } = await runArgv(["glossary", "puomi", "--help"], opts);
+    expect(exitCode).toBe(0);
+  });
+
+  test("bare `ib glossary` still renders its help (the manual outputHelp path)", async () => {
+    // This one never throws, so it would be lost by a buffer-and-flush design —
+    // the reason fb#628 suppresses at the write instead.
+    const { exitCode, stdout } = await runArgv(["glossary"], opts);
+    expect(exitCode).toBe(0);
+    expect(stdout).toMatch(/glossary/i);
+  });
 });

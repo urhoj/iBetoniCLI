@@ -602,19 +602,30 @@ export function enableParserThrow(program: Command): ParserHooks {
   let captured = "";
   let erroringCmd: Command | null = null;
   let dispatchedCmd: Command | null = null;
-  const output = {
-    writeErr: (s: string) => {
-      captured += s;
-    },
-    // Commander writes --help / --version display through writeOut. Route it
-    // through the ctx-aware emitStdout so in-process (embedded) `ib … --help`
-    // is captured into ctx.stdout instead of leaking to the real stdout. In
-    // normal CLI mode emitStdout falls back to process.stdout — unchanged.
-    writeOut: (s: string) => {
-      emitStdout(s);
-    },
-  };
   const walk = (cmd: Command): void => {
+    const output = {
+      writeErr: (s: string) => {
+        captured += s;
+      },
+      // Commander writes --help / --version display through writeOut. Route it
+      // through the ctx-aware emitStdout so in-process (embedded) `ib … --help`
+      // is captured into ctx.stdout instead of leaking to the real stdout. In
+      // normal CLI mode emitStdout falls back to process.stdout — unchanged.
+      //
+      // DROPPED for the fb#615 case (fb#628): Commander renders the group's help
+      // BEFORE it can reject the unknown operand, so that call exited 4 with the
+      // envelope on stderr and help prose on stdout — the exit code said failure
+      // while stdout said otherwise. Suppressed at the write, per command, which
+      // is why `output` is built inside the walk: a single shared object cannot
+      // tell WHICH command is writing. The alternative — buffering every
+      // Commander stdout write and flushing conditionally — would have silently
+      // swallowed the manual `glossary.outputHelp()` call, which never throws and
+      // so would never reach a flush point.
+      writeOut: (s: string) => {
+        if (unknownLeafToken(cmd)) return;
+        emitStdout(s);
+      },
+    };
     // A callback that closes over `cmd` captures WHICH command threw, then
     // throws (Windows-safe: never reaches Commander's internal process.exit).
     cmd.exitOverride((err) => {
@@ -670,6 +681,43 @@ function isRegisteredSubcommand(cmd: Command, token: string): boolean {
 }
 
 /**
+ * Does `cmd` have a DEFAULT subcommand (a child registered `{ isDefault: true }`)?
+ *
+ * Commander records this as `_defaultCommandName` on the PARENT. Private, but
+ * the behaviour it gates is exactly what we must mirror: in `_parseCommand`,
+ * `if (this._defaultCommandName) { this._outputHelpIfRequested(unknown); return
+ * this._dispatchSubcommand(...) }` — so on such a group an UNREGISTERED token is
+ * never "unknown", it is the default leaf's argument, and rendering the parent's
+ * help for `--help` is deliberate ("Run the help for default command from parent
+ * rather than passing to default command").
+ *
+ * `ib glossary` is the only such group today (`lookup [term]`, isDefault), which
+ * is what makes `ib glossary puomi --help` legitimate: `puomi` is a TERM. The
+ * behaviour, not this field, is pinned by test — so a Commander upgrade that
+ * renames the field fails loudly instead of silently re-breaking it.
+ */
+function hasDefaultSubcommand(cmd: Command): boolean {
+  return Boolean((cmd as unknown as { _defaultCommandName?: string | null })._defaultCommandName);
+}
+
+/**
+ * The unknown-leaf token this command is about to render help for, or null.
+ *
+ * Shared by the two halves of the fb#615 fix so they can never disagree: the
+ * exit-4 envelope in {@link handleParseRejection}, and the stdout suppression in
+ * {@link enableParserThrow} (fb#628). Both need the SAME answer — emitting the
+ * envelope while still printing the help, or vice versa, is worse than either.
+ */
+function unknownLeafToken(cmd: Command | null): string | null {
+  // A leaf's own positionals are not subcommands (`ib reference detail get
+  // keikka list --help`), and a default-command group's are its argument.
+  if (!cmd || cmd.commands.length === 0 || hasDefaultSubcommand(cmd)) return null;
+  const token = String((cmd.args ?? [])[0] ?? "");
+  if (!token || token.startsWith("-") || isRegisteredSubcommand(cmd, token)) return null;
+  return token;
+}
+
+/**
  * `ib <group> <unknown-leaf> --help` → the unknown-command envelope, exit 4
  * (fb#615). Returns null when this rejection is an ordinary help/version
  * display.
@@ -682,14 +730,12 @@ function isRegisteredSubcommand(cmd: Command, token: string): boolean {
  * that sends a whole verification run at a build without the command. The same
  * argv WITHOUT `--help` already exits 4, so the two disagreed about the same
  * input; asking for help about a nonexistent command is a usage error either
- * way. Guarded on the command having subcommands, so a leaf's own positional
- * args (`ib reference detail get keikka list --help`) never trip it.
+ * way. Scoped by {@link unknownLeafToken}, which excludes a leaf's own
+ * positionals and default-command groups.
  */
 function unknownLeafHelpEnvelope(cmd: Command | null): UnknownCommandEnvelope | null {
-  if (!cmd || cmd.commands.length === 0) return null;
-  const token = String((cmd.args ?? [])[0] ?? "");
-  if (!token || token.startsWith("-") || isRegisteredSubcommand(cmd, token)) return null;
-  return buildUnknownCommandEnvelope(cmd, token, getCallerTier());
+  const token = unknownLeafToken(cmd);
+  return cmd && token ? buildUnknownCommandEnvelope(cmd, token, getCallerTier()) : null;
 }
 
 function missingMandatoryOptions(cmd: Command): string[] {
