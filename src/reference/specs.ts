@@ -5286,7 +5286,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin request list",
     description:
-      "System-wide tarjouspyyntö list with offer summary — date, customer, placing operator, worksite, m³, status, offer count, accepted/best price (GET /api/admin/jerry-requests). Filters: --status (CSV), --from/--to (createdAt), --customer, --provider, --limit. System-admin only.",
+      "System-wide tarjouspyyntö list with offer summary — date, customer, placing operator, worksite, m³, status, offer count, accepted/best price (GET /api/admin/jerry-requests). Filters: --status (CSV), --from/--to (createdAt), --customer, --provider, --limit. --provider does not only filter, it WIDENS every row with that company's own fan-out state — see OUTPUT. System-admin only.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     flags: [
@@ -5298,7 +5298,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "limit", type: "number", default: "300", description: "Max rows (max 300)" },
     ],
     outputShape:
-      "ListEnvelope<{ pumppuRequestId, status, createdAt, customerNimi, operatorName, osoite, totalM3, offerCount, acceptedPriceCents, bestPriceCents }>",
+      "ListEnvelope<{ pumppuRequestId, status, createdAt, sentAt, expiresAt, customerAsiakasId, customerNimi, operatorName, osoite, totalM3, kayttokohde, offerCount, acceptedPriceCents, bestPriceCents, sourceChannel }>. Under --provider each row ALSO carries provider: { notifiedAt, viewedAt, viewSource, viewedByPersonId, declinedAt, declineReason, offerStatus, offerPriceCents } — that one company's own fan-out state. `viewSource` is 'authenticated' | 'link' | null and is the field to read, NOT viewedAt: it separates a provider who signed in and opened the lead from somebody who clicked the tokenized link in the notification email, which viewedAt alone conflates (fb#638).",
     errors: [
       { origin: "client", exit: 4, match: "--status", meaning: "Unknown status in --status. Rejected locally because the server DROPS an unrecognised status from its filter and returns every status when that empties it — a silently wider answer", remedy: `use only: ${ADMIN_REQUEST_STATUSES.join(", ")}` },
       SYSADMIN_403,

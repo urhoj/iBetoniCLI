@@ -4720,7 +4720,7 @@ exports[`Help snapshots — contract stability > help for ib jerry admin request
   ib jerry admin request list [flags]
 
 DESCRIPTION
-  System-wide tarjouspyyntö list with offer summary — date, customer, placing operator, worksite, m³, status, offer count, accepted/best price (GET /api/admin/jerry-requests). Filters: --status (CSV), --from/--to (createdAt), --customer, --provider, --limit. System-admin only.
+  System-wide tarjouspyyntö list with offer summary — date, customer, placing operator, worksite, m³, status, offer count, accepted/best price (GET /api/admin/jerry-requests). Filters: --status (CSV), --from/--to (createdAt), --customer, --provider, --limit. --provider does not only filter, it WIDENS every row with that company's own fan-out state — see OUTPUT. System-admin only.
   Permissions: requires isSystemAdmin.
 
 FLAGS
@@ -4736,7 +4736,7 @@ GLOBAL FLAGS
   --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
 
 OUTPUT (JSON, stdout)
-  ListEnvelope<{ pumppuRequestId, status, createdAt, customerNimi, operatorName, osoite, totalM3, offerCount, acceptedPriceCents, bestPriceCents }>
+  ListEnvelope<{ pumppuRequestId, status, createdAt, sentAt, expiresAt, customerAsiakasId, customerNimi, operatorName, osoite, totalM3, kayttokohde, offerCount, acceptedPriceCents, bestPriceCents, sourceChannel }>. Under --provider each row ALSO carries provider: { notifiedAt, viewedAt, viewSource, viewedByPersonId, declinedAt, declineReason, offerStatus, offerPriceCents } — that one company's own fan-out state. \`viewSource\` is 'authenticated' | 'link' | null and is the field to read, NOT viewedAt: it separates a provider who signed in and opened the lead from somebody who clicked the tokenized link in the notification email, which viewedAt alone conflates (fb#638).
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Unknown status in --status. Rejected locally because the server DROPS an unrecognised status from its filter and returns every status when that empties it — a silently wider answer → use only: draft, open, no_supply, pending_verification, accepted, cancelled, expired
