@@ -5341,13 +5341,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
   {
     command: "ib jerry admin request get",
     description:
-      "One request's full detail — date, customer, placing operator, worksite, m³, status, offer count, accepted/best price, plus the send-time recipient list with per-company fanout state (notified/viewed/declined/hasOffer) (GET /api/admin/jerry-requests/:id). For the offers use `ib jerry admin request offers`. System-admin only.",
+      "One request's full detail — date, customer, placing operator, worksite, m³, status, offer count, accepted/best price, plus the send-time recipient list with per-company fanout state (notified/viewed/declined/hasOffer) (GET /api/admin/jerry-requests/:id). Read `viewSource`, not `viewedAt`, to judge provider engagement: a view recorded through the tokenized preview link has no authenticated person behind it, so `viewedAt` alone counts an email-link click as a provider reading the lead (fb#638). For the offers use `ib jerry admin request offers`. System-admin only.",
     permissions: ["isSystemAdmin"],
     tier: "developer",
     args: [{ name: "requestId", type: "number", description: "pumppuRequestId" }],
     flags: [],
     outputShape:
-      "{ pumppuRequestId, status, createdAt, sentAt, expiresAt, totalM3, kayttokohde, customerAsiakasId, customerNimi, operatorName, osoite, offerCount, acceptedPriceCents, bestPriceCents, recipients: [{ asiakasId, asiakasNimi, notifiedAt, viewedAt, declinedAt, declineReason, hasOffer }] }",
+      "{ pumppuRequestId, status, createdAt, sentAt, expiresAt, totalM3, kayttokohde, customerAsiakasId, customerNimi, operatorName, osoite, offerCount, acceptedPriceCents, bestPriceCents, recipients: [{ asiakasId, asiakasNimi, notifiedAt, viewedAt, viewSource, viewedByPersonId, viewedByName, declinedAt, declineReason, declinedByPersonId, declinedByName, hasOffer }] }. viewSource: null = never opened · \"authenticated\" = a signed-in person opened it (viewedByPersonId/viewedByName name them) · \"link\" = opened through the tokenized preview link, nobody authenticated.",
     errors: [
       apiErr(400, "Invalid id", "pass a numeric requestId"),
       SYSADMIN_403,
