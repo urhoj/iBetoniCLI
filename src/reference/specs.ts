@@ -3377,8 +3377,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, meaning: "--puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max", remedy: "pass metres 0–999.99 with min ≤ max" },
       ...permErrors("auth.page.sijainnit.edit"),
     ],
+    notes: [
+      "A new sijainti is created PRIVATE unless you pass --public. That is deliberate — no caller should be able to publish a location by omission — but for a BETONIASEMA (--type 1) it is rarely what you want: a private plant never appears in any customer's tehdas picker, and the keikka editor then auto-selects a farther plant and reports success. Nothing errors. Pass --public when creating a plant customers must be able to choose, or publish it afterwards with `ib sijainti set-public <id> --on`.",
+      "--public requires company-admin rights (or sysadmin/developer) and is refused with 403 on --dry-run too; every other field on create is open to the edit tier. Creating the row private and having an admin publish it is the workaround.",
+      "Before 2026-08-14 visibility was a property of the location TYPE, so `--type 1` alone produced a publicly visible plant. It no longer does — the flag is per row.",
+    ],
     examples: [
-      'ib sijainti create --name "Depot A" --type 1',
+      'ib sijainti create --name "Depot A" --type 5',
+      'ib sijainti create --name "Kivikko" --type 1 --public --reason "plant customers must be able to pick"',
       'ib sijainti create --name "Depot A" --address "Industrial St 1, Helsinki" --type 1 --geocode',
       'ib sijainti create --name "Depot A" --address "Industrial St 1" --type 1 --lat 60.17 --lng 24.94 --lyh "DEP-A" --max-distance 80',
       "ib sijainti create --body '{\"sijaintiNimi\":\"Depot A\",\"sijaintiTypeId\":1}'",
