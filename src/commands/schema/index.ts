@@ -21,8 +21,17 @@ export interface SchemaTriggerFilter extends SchemaListFilter {
 type Envelope = ListEnvelope<Record<string, unknown>>;
 type Record_ = Record<string, unknown>;
 
-function listQuery(path: string, opts: SchemaListFilter): string {
-  return `${path}${qs({ search: opts.search || undefined, limit: opts.limit })}`;
+/**
+ * One query-string builder for all five list leaves. `table` is only ever set by
+ * `triggers`; `qs` drops undefined, so the other four render unchanged. Key order
+ * is part of the asserted URL contract — keep it table, search, limit.
+ */
+function listQuery(path: string, opts: SchemaTriggerFilter): string {
+  return `${path}${qs({
+    table: opts.table || undefined,
+    search: opts.search || undefined,
+    limit: opts.limit,
+  })}`;
 }
 
 /**
@@ -63,15 +72,7 @@ export async function runSchemaTriggers(
   client: ApiClient,
   opts: SchemaTriggerFilter
 ): Promise<Envelope> {
-  return getSchemaList(
-    client,
-    `/api/cli/schema/triggers${qs({
-      table: opts.table || undefined,
-      search: opts.search || undefined,
-      limit: opts.limit,
-    })}`,
-    "ib dev schema triggers"
-  );
+  return getSchemaList(client, listQuery("/api/cli/schema/triggers", opts), "ib dev schema triggers");
 }
 export async function runSchemaTable(client: ApiClient, name: string): Promise<Record_> {
   return client.get<Record_>(`/api/cli/schema/table/${name}`);

@@ -73,7 +73,7 @@ export function warnIfTruncated(
   command: string,
   warn: (msg: string) => void = warnNote
 ): void {
-  if (!env || env.truncated !== true) return;
+  if (env?.truncated !== true) return;
   // The backend's hint already says "this is NOT the full list" and names the
   // route's real maximum, so do not restate either — the fallback carries both
   // only for a backend that sends no hint at all.

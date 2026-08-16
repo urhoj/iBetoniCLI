@@ -155,9 +155,6 @@ export async function runPersonList(
 
 /**
  * GET /api/cli/person/get/:personId. Returns the flat backend record as-is.
- */
-/**
- * GET /api/cli/person/get/:personId.
  *
  * `asiakas` widens the read to ANOTHER tenant (fb#620), mirroring
  * `ib vehicle get --asiakas` — same shape, same gate class (membership of the

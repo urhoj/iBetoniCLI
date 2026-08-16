@@ -48,6 +48,15 @@ const AREA_FLAG_DESC = "Technical layer: frontend|backend|cli|database|cicd (rep
 // "these two --severity flags are different scales" warning cannot survive on
 // one surface and go missing on the other (feedback #359).
 const SEVERITY_FLAG_DESC = "Bug severity — Kriittinen|Korkea|Normaali|Matala (an URGENCY ladder; English critical/high/normal/low and the feedback impact words major/minor/cosmetic are accepted and mapped). ⚠ NOT interchangeable with `ib dev feedback --severity` (critical|major|minor|cosmetic), which is an IMPACT ladder with no counterpart for Normaali.";
+// The three fragments `add` and `update` state IDENTICALLY. Hoisted for the same
+// reason as SEVERITY_FLAG_DESC above: a rule that lives in two string literals
+// drifts. It already did — fb#633 had to hand-edit both `outputShape`s to add
+// `resolutionPreserved`, and the two copies ended up with different tails.
+// Each leaf still appends its own closing sentence after these.
+const FROM_JSON_NON_PAYLOAD_DESC = "NOT every flag has a JSON twin (fb#631): the BEHAVIOURAL modifiers — --no-resolve (link role) and the write-safety trio --dry-run / --reason / --idempotency-key — stay on the command line, and `noResolve`/`resolve` in the file exit 4.";
+const FEEDBACK_LINKS_SHAPE_DESC = "One entry per --feedback id, in the order given. `role` is `resolves` or `references`. `relinkedFrom` carries the entry a `resolves` link took the row from; `linkKeptBy` is its mirror under --no-resolve; `feedbackStatus` appears only when the link did NOT close the row; `feedbackLinked: false` means that id does not exist";
+const RESOLUTION_PRESERVED_SHAPE_DESC = "`resolutionPreserved` carries the row's existing hand-written resolution note when the link advanced the status to `applied` but KEPT that note (fb#633) — status and note may now contradict each other, so re-read the row.";
+const SINGLE_LINK_MIRROR_DESC = "For a SINGLE id these keys are also mirrored to the top level, for compatibility with CLI builds predating fb#576. Each emits a one-line note on stderr, prefixed with its fb# id.";
 /**
  * Repo-shaped values agents predictably pass to --area (feedback #212 —
  * `ib feedback --scope` accepts "jerry", so `--area jerry` is a natural first
@@ -1041,13 +1050,20 @@ export const CHANGELOG_SPECS = [
             {
                 name: "from-json",
                 type: "string",
-                description: "Read the whole entry's CONTENT from a JSON object file (or - for stdin); explicitly-typed flags override. Content keys, in camelCase: description (or summary/body), title (≤300), type, area, benefits, impact (≤500), status (≤30), severity (≤20), files, repo (≤200), sha (≤500), commit, vtag (≤200), bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language. files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input, so a row from `ib dev changelog list` can be edited and posted straight back: commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date. NOT every flag has a JSON twin (fb#631): the BEHAVIOURAL modifiers — --no-resolve (link role) and the write-safety trio --dry-run / --reason / --idempotency-key — stay on the command line, and `noResolve`/`resolve` in the file exit 4. Nothing is lost: they are valueless or short flags with no shell-quoting problem, so pass them alongside the file (`ib dev changelog add --from-json entry.json --no-resolve`). An unknown or wrong-typed key exits 4 (never silently dropped). The length caps apply to a JSON value exactly as to a flag — --from-json sidesteps shell quoting, not column width.",
+                description: "Read the whole entry's CONTENT from a JSON object file (or - for stdin); explicitly-typed flags override. Content keys, in camelCase: description (or summary/body), title (≤300), type, area, benefits, impact (≤500), status (≤30), severity (≤20), files, repo (≤200), sha (≤500), commit, vtag (≤200), bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language. files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input, so a row from `ib dev changelog list` can be edited and posted straight back: commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date. " +
+                    FROM_JSON_NON_PAYLOAD_DESC +
+                    " Nothing is lost: they are valueless or short flags with no shell-quoting problem, so pass them alongside the file (`ib dev changelog add --from-json entry.json --no-resolve`). An unknown or wrong-typed key exits 4 (never silently dropped). The length caps apply to a JSON value exactly as to a flag — --from-json sidesteps shell quoting, not column width.",
             },
         ]),
         writeFlags: true,
         dryRunKind: "server",
         mutates: true,
-        outputShape: "{ changelogId, feedbackLinks: [{ feedbackId, role, relinkedFrom?, linkKeptBy?, feedbackStatus?, feedbackLinked?, resolutionPreserved? }] } | { dryRun, wouldCreate, validation }. One entry per --feedback id, in the order given. `role` is `resolves` or `references`. `relinkedFrom` carries the entry a `resolves` link took the row from; `linkKeptBy` is its mirror under --no-resolve; `feedbackStatus` appears only when the link did NOT close the row; `feedbackLinked: false` means that id does not exist — the ENTRY was still created, only that link failed (fb#543); `resolutionPreserved` carries the row's existing hand-written resolution note when the link advanced the status to `applied` but KEPT that note (fb#633) — status and note may now contradict each other, so re-read the row. For a SINGLE id these keys are also mirrored to the top level, for compatibility with CLI builds predating fb#576. Each emits a one-line note on stderr, prefixed with its fb# id.",
+        outputShape: "{ changelogId, feedbackLinks: [{ feedbackId, role, relinkedFrom?, linkKeptBy?, feedbackStatus?, feedbackLinked?, resolutionPreserved? }] } | { dryRun, wouldCreate, validation }. " +
+            FEEDBACK_LINKS_SHAPE_DESC +
+            " — the ENTRY was still created, only that link failed (fb#543); " +
+            RESOLUTION_PRESERVED_SHAPE_DESC +
+            " " +
+            SINGLE_LINK_MIRROR_DESC,
         errors: [
             {
                 http: 403,
@@ -1316,13 +1332,20 @@ export const CHANGELOG_SPECS = [
             {
                 name: "from-json",
                 type: "string",
-                description: "Read the patch CONTENT from a JSON object file (or - for stdin); explicitly-typed flags override. Content keys, in camelCase (description/summary/body, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a row from `ib dev changelog list` can be edited and posted straight back. NOT every flag has a JSON twin (fb#631): the BEHAVIOURAL modifiers — --no-resolve (link role) and the write-safety trio --dry-run / --reason / --idempotency-key — stay on the command line, and `noResolve`/`resolve` in the file exit 4. Pass them alongside the file. (`unlink` IS a content key and belongs in the file.) An unknown or wrong-typed key exits 4 (never silently dropped).",
+                description: "Read the patch CONTENT from a JSON object file (or - for stdin); explicitly-typed flags override. Content keys, in camelCase (description/summary/body, title, type, area, benefits, impact, status, severity, files, repo, sha, commit, vtag, bumpLevel (`bump-level` also accepted), feedback, sentry, source, date, language); files/repo/sha/commit also accept an array of strings. The READ shape is also accepted as input (commitShas→sha, versionTag→vtag, feedbackId→feedback, sentryIssue→sentry, entryDate→date), so a row from `ib dev changelog list` can be edited and posted straight back. " +
+                    FROM_JSON_NON_PAYLOAD_DESC +
+                    " Pass them alongside the file. (`unlink` IS a content key and belongs in the file.) An unknown or wrong-typed key exits 4 (never silently dropped).",
             },
         ]),
         writeFlags: true,
         mutates: true,
         dryRunKind: "client",
-        outputShape: "entry & { feedbackLinks: [{ feedbackId, role, relinkedFrom?, linkKeptBy?, feedbackStatus?, feedbackLinked?, resolutionPreserved? }] } | { dryRun, wouldUpdate: { id, patch } }. One entry per --feedback id, in the order given. `role` is `resolves` or `references`. `relinkedFrom` carries the entry a `resolves` link took the row from; `linkKeptBy` is its mirror under --no-resolve; `feedbackStatus` appears only when the link did NOT close the row; `feedbackLinked: false` means that id does not exist; `resolutionPreserved` carries the row's existing hand-written resolution note when the link advanced the status to `applied` but KEPT that note (fb#633). For a SINGLE id these keys are also mirrored to the top level, for compatibility with CLI builds predating fb#576. Each emits a one-line note on stderr, prefixed with its fb# id.",
+        outputShape: "entry & { feedbackLinks: [{ feedbackId, role, relinkedFrom?, linkKeptBy?, feedbackStatus?, feedbackLinked?, resolutionPreserved? }] } | { dryRun, wouldUpdate: { id, patch } }. " +
+            FEEDBACK_LINKS_SHAPE_DESC +
+            "; " +
+            RESOLUTION_PRESERVED_SHAPE_DESC +
+            " " +
+            SINGLE_LINK_MIRROR_DESC,
         errors: [
             {
                 http: 403,

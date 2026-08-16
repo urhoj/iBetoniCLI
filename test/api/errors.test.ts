@@ -339,3 +339,63 @@ describe("hintDetailForError — hint provenance", () => {
     }
   });
 });
+
+/**
+ * Two rows behind ONE status is only safe if at most one of them is matchless.
+ *
+ * `matchHttpRow` falls back to `rows.find(r => r.match === undefined)`, so a
+ * SECOND matchless row at the same status is unreachable — it is shadowed by
+ * whichever comes first in the array, silently. That is how adding the
+ * cross-tenant 403 to `ib person get` (fb#620) made its permission remedy
+ * unreachable: the new row answered every 403, including a plain
+ * auth.page.person.read denial. Giving the narrow row a `match` restores both.
+ */
+describe("hintForError — two causes behind one status (fb#485 mechanism)", () => {
+  const scopeRow = {
+    http: 403,
+    exit: 3,
+    meaning: "Not a member of the --asiakas company",
+    remedy: "cross-tenant person reads need membership of the target company",
+    match: ["not a member of asiakas", "cross-company person"],
+  };
+  const permRow = {
+    http: 403,
+    exit: 3,
+    meaning: "Permission denied",
+    remedy: "requires auth.page.person.read",
+  };
+  const rows = [scopeRow, permRow];
+
+  test("the cross-tenant message reaches the narrow row", () => {
+    const err = new CliError(
+      "not a member of asiakas 1380 — cross-company person reads require membership of the target company",
+      403,
+      null,
+      3
+    );
+    expect(hintForError(err, rows)).toMatch(/membership of the target company/);
+  });
+
+  test("THE REGRESSION: an ordinary 403 still reaches the PERMISSION row", () => {
+    // Before the `match`, this returned the cross-tenant remedy — telling a
+    // caller who lacks auth.page.person.read to go check their company
+    // membership, which would never fix it.
+    const err = new CliError("Permission denied", 403, null, 3);
+    expect(hintForError(err, rows)).toMatch(/auth\.page\.person\.read/);
+  });
+
+  test("matching is case-insensitive and ANY-of across the match list", () => {
+    const err = new CliError("CROSS-COMPANY PERSON reads require membership", 403, null, 3);
+    expect(hintForError(err, rows)).toMatch(/membership of the target company/);
+  });
+
+  test("WHY the match is load-bearing: two matchless rows shadow the second", () => {
+    // The shape this guards against, asserted directly so the trap is visible
+    // rather than folded into a passing case. Drop `match` and the first row
+    // answers everything — including the denial the second row exists for.
+    const shadowed = [{ ...scopeRow, match: undefined }, permRow];
+    const err = new CliError("Permission denied", 403, null, 3);
+    expect(hintForError(err, shadowed)).toMatch(/membership of the target company/);
+    expect(hintForError(err, shadowed)).not.toMatch(/auth\.page\.person\.read/);
+  });
+});

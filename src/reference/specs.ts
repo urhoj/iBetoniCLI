@@ -1972,10 +1972,15 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "{ personId, name, email, phone, roles:number[] }",
     errors: [
       apiErr(404, "Person not found IN SCOPE", PERSON_SCOPE_404_REMEDY),
+      // `match` is load-bearing, not decoration: permErrors below contributes a
+      // second 403 row and neither carries a match, so `matchHttpRow` would fall
+      // back to the FIRST matchless row and answer every 403 with this one —
+      // making the auth.page.person.read remedy unreachable (fb#485 mechanism).
       apiErr(
         403,
         "Not a member of the --asiakas company",
-        "cross-tenant person reads need membership of the target company, or sysadmin/developer. Check what you can reach with `ib company list`."
+        "cross-tenant person reads need membership of the target company, or sysadmin/developer. Check what you can reach with `ib company list`.",
+        ["not a member of asiakas", "cross-company person"]
       ),
       ...permErrors("auth.page.person.read"),
     ],

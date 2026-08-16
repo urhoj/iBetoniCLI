@@ -59,7 +59,7 @@ export function warnIfLimitCapped(requested, cap, command, warn = warnNote) {
  * stderr only — the stdout JSON contract is untouched.
  */
 export function warnIfTruncated(env, command, warn = warnNote) {
-    if (!env || env.truncated !== true)
+    if (env?.truncated !== true)
         return;
     // The backend's hint already says "this is NOT the full list" and names the
     // route's real maximum, so do not restate either — the fallback carries both

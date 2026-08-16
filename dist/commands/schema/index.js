@@ -5,8 +5,17 @@ import { CliError } from "../../api/errors.js";
 import { qs } from "../../api/query.js";
 import { warnIfTruncated } from "../../api/listCaps.js";
 import { cappedInt } from "../../targets.js";
+/**
+ * One query-string builder for all five list leaves. `table` is only ever set by
+ * `triggers`; `qs` drops undefined, so the other four render unchanged. Key order
+ * is part of the asserted URL contract — keep it table, search, limit.
+ */
 function listQuery(path, opts) {
-    return `${path}${qs({ search: opts.search || undefined, limit: opts.limit })}`;
+    return `${path}${qs({
+        table: opts.table || undefined,
+        search: opts.search || undefined,
+        limit: opts.limit,
+    })}`;
 }
 /**
  * Every schema list read goes through here so the cap can only ever be
@@ -38,11 +47,7 @@ export async function runSchemaProcs(client, opts) {
     return getSchemaList(client, listQuery("/api/cli/schema/procs", opts), "ib dev schema procs");
 }
 export async function runSchemaTriggers(client, opts) {
-    return getSchemaList(client, `/api/cli/schema/triggers${qs({
-        table: opts.table || undefined,
-        search: opts.search || undefined,
-        limit: opts.limit,
-    })}`, "ib dev schema triggers");
+    return getSchemaList(client, listQuery("/api/cli/schema/triggers", opts), "ib dev schema triggers");
 }
 export async function runSchemaTable(client, name) {
     return client.get(`/api/cli/schema/table/${name}`);
