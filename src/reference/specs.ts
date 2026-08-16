@@ -5343,13 +5343,15 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "from", type: "string", description: "createdAt from (YYYY-MM-DD/today/yesterday)" },
       { name: "to", type: "string", description: "createdAt to (inclusive)" },
       { name: "customer", type: "number", description: "Customer asiakasId" },
-      { name: "provider", type: "number", description: "Provider asiakasId" },
+      { name: "provider", type: "number", description: "Provider asiakasId — also WIDENS each row with that provider's own fan-out state (see OUTPUT)" },
       { name: "limit", type: "number", default: "300", description: "Max rows (max 300)" },
     ],
     outputShape:
       "ListEnvelope<{ pumppuRequestId, status, createdAt, sentAt, expiresAt, customerAsiakasId, customerNimi, operatorName, osoite, totalM3, kayttokohde, offerCount, acceptedPriceCents, bestPriceCents, sourceChannel }>. Under --provider each row ALSO carries provider: { notifiedAt, viewedAt, viewSource, viewedByPersonId, declinedAt, declineReason, offerStatus, offerPriceCents } — that one company's own fan-out state. `viewSource` is 'authenticated' | 'link' | null and is the field to read, NOT viewedAt: it separates a provider who signed in and opened the lead from somebody who clicked the tokenized link in the notification email, which viewedAt alone conflates (fb#638).",
     errors: [
-      { origin: "client", exit: 4, match: "--status", meaning: "Unknown status in --status. Rejected locally because the server DROPS an unrecognised status from its filter and returns every status when that empties it — a silently wider answer", remedy: `use only: ${ADMIN_REQUEST_STATUSES.join(", ")}` },
+      { origin: "client", exit: 4, match: "--status", meaning: "Unknown status in --status. Rejected here to save the round-trip; the ROUTE rejects the same value with 400 since puminet5api@1.29.0 (fb#656), so this is a round-trip saved, not a divergent contract", remedy: `use only: ${ADMIN_REQUEST_STATUSES.join(", ")}` },
+      { origin: "client", exit: 4, match: ["--customer", "--provider"], meaning: "--customer/--provider is not a positive integer. Guarded by intFlag rather than a bare Number, which would put `customerId=NaN` on the wire — qs() drops only `undefined` — and the route then 400s (fb#249, fb#656)", remedy: "pass a positive integer asiakasId; resolve one with `ib company list`" },
+      apiErr(400, "A filter value was rejected by the route: an unknown status, or a customerId/providerId/limit that is not a positive integer (fb#656). Reachable mainly via --limit, which is clamped client-side but not validated", "pass a positive integer; --status/--customer/--provider are already guarded client-side"),
       SYSADMIN_403,
       ...COMMON_AUTH_ERRORS,
     ],

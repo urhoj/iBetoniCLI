@@ -3,7 +3,7 @@ import { listEnvelope, toListEnvelope } from "../../api/envelopes.js";
 import { writeFlagsToHeaders, addWriteFlagsToCommand, } from "../../api/writeFlags.js";
 import { writeJson, failWith } from "../../output/json.js";
 import { resolveJsonObjectBody } from "../../api/parseBody.js";
-import { parseId, resolveSearchQuery, resolveDualString, resolveAsiakasTarget, cappedInt, addAsiakasTargetOption, assertEnum, assertEnumCsv, assertPositiveInt } from "../../targets.js";
+import { parseId, resolveSearchQuery, resolveDualString, resolveAsiakasTarget, cappedInt, intFlag, addAsiakasTargetOption, assertEnum, assertEnumCsv, assertPositiveInt } from "../../targets.js";
 import { resolveDate, resolveDateTime } from "../../dates.js";
 import { jsonAction, guarded } from "../_shared/action.js";
 import { qs } from "../../api/query.js";
@@ -458,10 +458,13 @@ export async function runJerryOnboardingLog(client, asiakasId, body, flags) {
 }
 /**
  * Statuses the admin request list can filter on â€” mirrors VALID_STATUSES in
- * puminet5api modules/jerryAdmin/jerryAdminRequestsSql.js. The server SILENTLY
- * DROPS an unknown status from the IN list (and returns every status when that
- * empties the filter), so the CLI guards the value client-side rather than
- * answering a wider question than the one asked.
+ * puminet5api modules/jerryAdmin/jerryAdminRequestsSql.js. Guarded client-side
+ * to skip the round-trip; the ROUTE also rejects an unknown status with 400
+ * (fb#656, puminet5api@1.29.0). Note the SQL module itself STILL drops unknown
+ * statuses silently - the route fences that off, it was not removed - so a
+ * direct module caller (e.g. modules/inbox/inboxAggregator.js) is unprotected.
+ * Keep the two lists in step: if they drift, one direction makes a valid status
+ * unreachable from the CLI, the other turns a local exit 4 into a server 400.
  */
 export const ADMIN_REQUEST_STATUSES = [
     "draft",
@@ -928,13 +931,15 @@ export function registerJerryCommands(parent, getClient) {
         .option("--status <csv>")
         .option("--from <date>", "", resolveDate)
         .option("--to <date>", "", resolveDate)
-        .option("--customer <id>", "", Number)
-        .option("--provider <id>", "", Number)
+        // intFlag, not a bare Number: a NaN id is NOT dropped by qs() (only
+        // `undefined` is), so `--customer abc` used to put `customerId=NaN` on the
+        // wire, where it 500'd on bind until fb#656 turned it into a 400. Either
+        // way the CLI should answer that locally - the fb#249 shape.
+        .option("--customer <id>", "", intFlag("--customer", 1))
+        .option("--provider <id>", "", intFlag("--provider", 1))
         .option("--limit <n>", "", cappedInt(300))
         .action(guarded(async (opts) => {
-        // Reject an unknown status here: the server drops it from the IN list,
-        // and a filter that emptied out returns EVERY status â€” a wider answer
-        // than the one asked, with nothing saying so.
+        // Guarded here to skip the round-trip; see ADMIN_REQUEST_STATUSES.
         if (opts.status) {
             assertEnumCsv(opts.status.split(",").map((s) => s.trim()).filter(Boolean), ADMIN_REQUEST_STATUSES, "--status");
         }

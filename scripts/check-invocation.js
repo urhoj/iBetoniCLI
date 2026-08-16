@@ -49,6 +49,9 @@ function refuse(what, why) {
   process.exitCode = 1;
 }
 
+// Checked FIRST on purpose: the vendored copy can legitimately carry its own
+// node_modules, so the cheaper existence test below would clear it and report
+// the wrong fault.
 if (packageName(path.dirname(root)) === "puminet5api") {
   refuse(
     `this is the VENDORED copy (${root})`,
@@ -62,8 +65,9 @@ if (packageName(path.dirname(root)) === "puminet5api") {
     `${root} has no node_modules/`,
     "Node would resolve deps by walking UP to the workspace root, which carries a\n" +
       "different major for some of them — tsc then blames a source file for what is\n" +
-      "an environment fault. In a worktree, junction its node_modules to the\n" +
-      "submodule's own copy:\n" +
-      "  New-Item -ItemType Junction -Path <worktree>\\node_modules -Target <repo>\\betonicli\\node_modules"
+      "an environment fault.\n" +
+      "  fresh checkout → run `npm install` from the workspace root\n" +
+      "  git worktree   → junction its node_modules to the submodule's own copy:\n" +
+      "    New-Item -ItemType Junction -Path <worktree>\\node_modules -Target <repo>\\betonicli\\node_modules"
   );
 }
