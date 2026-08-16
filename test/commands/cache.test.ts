@@ -9,6 +9,7 @@ import {
   runCacheInvalidate,
   runCacheClear,
   runCachePattern,
+  resolveGlob,
 } from "../../src/commands/cache/index.js";
 import type { ApiClient } from "../../src/api/client.js";
 
@@ -143,5 +144,93 @@ describe("ib cache run* functions", () => {
       { entityType: "vehicle", cascade: false, id: 5 },
       { headers: { "X-Force-Prod": "1" } }
     );
+  });
+});
+
+// fb#645 — this group INVERTS the CLI-wide write-safety idiom (previews by
+// default, --confirm applies). `--dry-run` is accepted as an explicit spelling
+// of that default so an agent moving here from any other write command is not
+// told the capability is missing — the direction of that mistake is what makes
+// it dangerous, because the flag it pushes you toward is the one that deletes.
+describe("cache write-safety idiom (fb#645)", () => {
+  // Local endpoint: the shared-cache guard is a SEPARATE refusal (covered above),
+  // and letting it fire here would mask whether the dry-run guard ran at all.
+  let mockClient: ReturnType<typeof mockApiClient>;
+  beforeEach(() => {
+    mockClient = mockApiClient({ endpoint: "http://127.0.0.1:3000" });
+  });
+
+  test("--dry-run alone previews exactly like the bare default", async () => {
+    mockClient.post.mockResolvedValue({ dryRun: true, wouldDelete: 3 });
+    await runCachePattern(mockClient, "geocode:cli:*", {
+      confirm: false,
+      dryRun: true,
+      forceProd: false,
+    });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/cli/cache/pattern",
+      { pattern: "geocode:cli:*", confirmed: false },
+      { headers: { "X-Dry-Run": "1" }, read: true }
+    );
+  });
+
+  test("--dry-run does not weaken --confirm into a preview: it refuses (exit 4)", async () => {
+    await expect(
+      runCachePattern(mockClient, "keikka:*", { confirm: true, dryRun: true, forceProd: false })
+    ).rejects.toThrow(/mutually exclusive/);
+    // The decisive assertion: nothing was sent either way round.
+    expect(mockClient.post).not.toHaveBeenCalled();
+  });
+
+  test("the contradiction is refused on clear and invalidate too", async () => {
+    await expect(
+      runCacheClear(mockClient, { confirm: true, dryRun: true, forceProd: false })
+    ).rejects.toThrow(/mutually exclusive/);
+    await expect(
+      runCacheInvalidate(
+        mockClient,
+        { entityType: "keikka", id: 1 },
+        { confirm: true, dryRun: true, forceProd: false }
+      )
+    ).rejects.toThrow(/mutually exclusive/);
+    expect(mockClient.post).not.toHaveBeenCalled();
+  });
+
+  test("omitting dryRun entirely keeps the pre-fb#645 behaviour", async () => {
+    mockClient.post.mockResolvedValue({ deleted: 2 });
+    await runCacheClear(mockClient, { confirm: true, forceProd: false });
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/api/cli/cache/clear",
+      { confirmed: true },
+      { headers: {} }
+    );
+  });
+});
+
+// fb#645 — `cache keys --pattern <glob>` vs `cache pattern <glob>`: one concept,
+// two syntaxes. Reaching for --pattern on the latter is the natural error.
+describe("resolveGlob dual-shape (fb#645)", () => {
+  test("accepts the positional (canonical)", () => {
+    expect(resolveGlob("keikka:*", undefined)).toBe("keikka:*");
+  });
+
+  test("accepts --pattern, the sibling command's spelling", () => {
+    expect(resolveGlob(undefined, "keikka:*")).toBe("keikka:*");
+  });
+
+  test("accepts both when they agree", () => {
+    expect(resolveGlob("keikka:*", "keikka:*")).toBe("keikka:*");
+  });
+
+  test("refuses two DIFFERENT globs rather than silently honouring one", () => {
+    expect(() => resolveGlob("keikka:*", "person:*")).toThrow(/differ/);
+  });
+
+  test("refuses neither, naming both ways to pass it", () => {
+    expect(() => resolveGlob(undefined, undefined)).toThrow(/--pattern/);
+  });
+
+  test("an empty glob is refused, not sent as a match-nothing pattern", () => {
+    expect(() => resolveGlob("", undefined)).toThrow(/missing target/);
   });
 });

@@ -58,6 +58,21 @@ export interface GlobalOptions {
    * client-side over the returned payload, so the two compose (intersection).
    */
   columns: string[] | null;
+  /**
+   * Request introspection (`--print-payload`): the client emits each RESOLVED
+   * request — method, path, headers (Authorization redacted), body — to stderr
+   * just before it is sent. Answers "did my flags parse into the body I
+   * intended?", which fb#636 could not answer through `ib` at all: server
+   * `--dry-run` is deploy-gated and can still persist, and `--read-only` refuses
+   * naming only the method and path, discarding the assembled body unseen.
+   *
+   * Emits and CONTINUES rather than print-and-abort, so no `run*` function ever
+   * receives a stub response to project into garbage. Pair with `--read-only`
+   * for "show me, send nothing" — the payload prints, then the write-lock
+   * refuses. Covers GETs too, so the read half of a read-merge-write is visible;
+   * that is precisely where a silently-dropped merge field hides.
+   */
+  printPayload: boolean;
 }
 
 /** Truthy spellings accepted for the IB_READ_ONLY environment variable. */
@@ -88,6 +103,10 @@ const GLOBAL_OPTIONS: ReadonlyArray<readonly [flags: string, description: string
     "--columns <csv>",
     "Only output these TOP-LEVEL fields (projects list rows and single records; never reaches into a nested list; loud on no match)",
   ],
+  [
+    "--print-payload",
+    "Print each resolved request (method, path, headers, body) to stderr before it is sent; combine with --read-only to inspect a write without sending it",
+  ],
 ];
 
 /** The `-x` / `--xxx` tokens in a Commander flags string (`-e, --endpoint <url>`). */
@@ -104,6 +123,25 @@ export function addGlobalOptions(cmd: Command): Command {
   return cmd;
 }
 
+/**
+ * The one-line GLOBAL FLAGS summary rendered into every command's `--help`,
+ * derived from {@link GLOBAL_OPTIONS} rather than restated.
+ *
+ * It was a hand-maintained string literal in `output/help.ts`, which is a silent
+ * drift hazard of exactly the kind this CLI keeps getting bitten by: adding a
+ * global wires it up everywhere EXCEPT the help text, so the flag works but is
+ * undiscoverable, and nothing fails. `--print-payload` (fb#636) was the first
+ * one to notice it.
+ *
+ * `<url>` renders as `URL` to match the established shape (`--company ID`,
+ * `--columns CSV`); valueless flags render as-is.
+ */
+export function globalFlagsSummary(): string {
+  return GLOBAL_OPTIONS.map(([flags]) =>
+    flags.replace(/<([^>]+)>/g, (_m, name: string) => name.toUpperCase())
+  ).join("  ");
+}
+
 export function getGlobalOptions(cmd: Command): GlobalOptions {
   const o = cmd.opts<{
     endpoint?: string;
@@ -116,6 +154,7 @@ export function getGlobalOptions(cmd: Command): GlobalOptions {
     company?: string;
     stats?: boolean;
     columns?: string;
+    printPayload?: boolean;
   }>();
   const envReadOnly = READ_ONLY_ENV_TRUE.has(
     (process.env.IB_READ_ONLY ?? "").trim().toLowerCase()
@@ -153,6 +192,7 @@ export function getGlobalOptions(cmd: Command): GlobalOptions {
     asiakas,
     stats: !!o.stats,
     columns: columns.length > 0 ? columns : null,
+    printPayload: !!o.printPayload,
   };
 }
 

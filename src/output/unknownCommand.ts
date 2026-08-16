@@ -428,6 +428,54 @@ export function siblingsAcceptingSynonym(
 }
 
 /**
+ * The three CLI-WIDE write-safety conventions (`src/api/writeFlags.ts`). They are
+ * declared by ~120 commands each — `--reason` 126, `--dry-run` 125,
+ * `--idempotency-key` 120 out of 328 specs, against 50 for the next-commonest
+ * flag — so for these, and only these, the sibling scan carries no information.
+ */
+const WRITE_SAFETY_FLAGS = new Set(["--dry-run", "--idempotency-key", "--reason"]);
+
+/**
+ * Explain a rejected write-safety flag in terms of THIS command's own idiom,
+ * instead of naming siblings (fb#646).
+ *
+ * `siblingsAcceptingOption` is right for a flag one neighbour OWNS — rejecting
+ * `--pattern` on `ib dev cache pattern` and naming `ib dev cache keys` as its
+ * home is exactly the fb#308 win, and `--search` (23 commands) still earns it.
+ * It misfires for a universal convention: `ib dev cache pattern --dry-run` named
+ * three arbitrary `ib dev feedback` leaves — arbitrary because ~125 commands
+ * declare the flag and the scan simply reports whichever sorted first.
+ *
+ * Worse, the sentence was substantively FALSE. It says the capability lives
+ * elsewhere, when this command previews by default and merely spells it
+ * `--confirm` — so a reader who trusts the hint concludes cache commands cannot
+ * preview, the exact opposite of the truth, and reaches for the flag that
+ * DELETES. Hence a threshold on frequency alone would be the wrong fix (it
+ * would also silence the useful `--search` case): the trio is special because
+ * it is a CONVENTION, not because it is common.
+ *
+ * Returns null for a flag outside the trio, leaving the sibling layers intact.
+ */
+export function writeSafetyIdiomHint(
+  unknownOption: string,
+  availableOptions: string[],
+  spec: CommandSpec | undefined
+): string | null {
+  const flag = `--${unknownOption.replace(/^-+/, "")}`;
+  if (!WRITE_SAFETY_FLAGS.has(flag)) return null;
+  // Inverted idiom (the `ib dev cache` write group): previews by default,
+  // `--confirm` applies. Name the flag that actually performs, so the caller
+  // cannot conclude preview is unavailable here.
+  if (availableOptions.includes("--confirm")) {
+    return `\`${flag}\` is a CLI-wide write-safety convention, but this command inverts the usual idiom: it PREVIEWS by default and applies only with \`--confirm\`.`;
+  }
+  if (spec && (spec.mutates ?? !!spec.writeFlags)) {
+    return `\`${flag}\` is a CLI-wide write-safety convention, but this write does not accept it — check the accepted flags below rather than assuming a sibling owns it.`;
+  }
+  return `\`${flag}\` is a CLI-wide write-safety convention and this command does not mutate, so it does not apply here.`;
+}
+
+/**
  * Recognize a surplus positional that is unmistakably a DATE, and normalize it
  * to the `YYYY-MM-DD` the CLI documents (feedback #328).
  *
@@ -669,20 +717,29 @@ export function buildUnknownOptionEnvelope(
   );
   const didYouMean = guess ? `--${guess}` : null;
   const redirect = OPTION_REDIRECTS[`${command} ${unknownOption}`];
+  // A rejected write-safety flag is answered by THIS command's own idiom, never
+  // by a sibling list — ~125 commands declare each of the trio, so any three
+  // named would be arbitrary, and claiming the capability lives elsewhere is
+  // false when the command previews by default under another spelling (fb#646).
+  // Suppressed when `didYouMean` fired: a near-spelling on this command
+  // (`-reason` → `--reason`) is the better answer, same as the guards below.
+  const idiomHint = didYouMean
+    ? null
+    : writeSafetyIdiomHint(unknownOption, availableOptions, spec);
   // A curated redirect is hand-written for this exact command+flag, so it wins;
   // the derived sibling list is the general case behind it. Also suppressed when
   // `didYouMean` fired (fb#443/#449): the flag exists on THIS command under a
   // near spelling (e.g. the single-dash `-reason` typo), which beats redirecting
   // the caller to a sibling — same principle as the `viaSynonym` guard below.
   const acceptedLiteral =
-    redirect || didYouMean
+    redirect || didYouMean || idiomHint
       ? []
       : siblingsAcceptingOption(canonicalPath(command), unknownOption, tier);
   // Nothing accepts it verbatim — a synonym spelling still might (fb#388).
   // Suppressed when `didYouMean` fired: the flag exists on THIS command under
   // another name, which beats redirecting the caller to a sibling.
   const viaSynonym =
-    redirect || didYouMean || acceptedLiteral.length
+    redirect || didYouMean || idiomHint || acceptedLiteral.length
       ? null
       : siblingsAcceptingSynonym(canonicalPath(command), unknownOption, tier);
   const acceptedBy = viaSynonym ? viaSynonym.commands : acceptedLiteral;
@@ -694,6 +751,7 @@ export function buildUnknownOptionEnvelope(
 
   const parts: string[] = [];
   if (redirect) parts.push(redirect);
+  if (idiomHint) parts.push(idiomHint);
   if (viaSynonym && acceptedBy.length === 1) {
     parts.push(
       `\`${unknownOption}\` is not accepted here or by any sibling, but \`${viaSynonym.flag}\` is the same thing — send it to \`${acceptedBy[0]}\`.`

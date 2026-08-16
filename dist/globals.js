@@ -26,6 +26,10 @@ const GLOBAL_OPTIONS = [
         "--columns <csv>",
         "Only output these TOP-LEVEL fields (projects list rows and single records; never reaches into a nested list; loud on no match)",
     ],
+    [
+        "--print-payload",
+        "Print each resolved request (method, path, headers, body) to stderr before it is sent; combine with --read-only to inspect a write without sending it",
+    ],
 ];
 /** The `-x` / `--xxx` tokens in a Commander flags string (`-e, --endpoint <url>`). */
 const flagTokens = (flags) => flags.split(/[\s,|]+/).filter((t) => t.startsWith("-"));
@@ -35,6 +39,22 @@ export function addGlobalOptions(cmd) {
     for (const [flags, description] of GLOBAL_OPTIONS)
         cmd.option(flags, description);
     return cmd;
+}
+/**
+ * The one-line GLOBAL FLAGS summary rendered into every command's `--help`,
+ * derived from {@link GLOBAL_OPTIONS} rather than restated.
+ *
+ * It was a hand-maintained string literal in `output/help.ts`, which is a silent
+ * drift hazard of exactly the kind this CLI keeps getting bitten by: adding a
+ * global wires it up everywhere EXCEPT the help text, so the flag works but is
+ * undiscoverable, and nothing fails. `--print-payload` (fb#636) was the first
+ * one to notice it.
+ *
+ * `<url>` renders as `URL` to match the established shape (`--company ID`,
+ * `--columns CSV`); valueless flags render as-is.
+ */
+export function globalFlagsSummary() {
+    return GLOBAL_OPTIONS.map(([flags]) => flags.replace(/<([^>]+)>/g, (_m, name) => name.toUpperCase())).join("  ");
 }
 export function getGlobalOptions(cmd) {
     const o = cmd.opts();
@@ -67,6 +87,7 @@ export function getGlobalOptions(cmd) {
         asiakas,
         stats: !!o.stats,
         columns: columns.length > 0 ? columns : null,
+        printPayload: !!o.printPayload,
     };
 }
 /** Fallback API endpoint when neither --endpoint nor the active profile sets one. */

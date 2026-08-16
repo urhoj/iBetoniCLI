@@ -1013,6 +1013,11 @@ export async function runCustomerPersonList(client, asiakasId, roleName, include
         personId: r.personId,
         name: `${r.personFirstName || ""} ${r.personLastName || ""}`.trim(),
         email: r.personEmail || null,
+        // Canonical spellings passed through verbatim (fb#621) — the backend already
+        // sends exactly these names; this command was the one renaming them.
+        personFirstName: r.personFirstName || null,
+        personLastName: r.personLastName || null,
+        personEmail: r.personEmail || null,
         roleTypeId: r.asiakasPersonSettingTypeId || null,
     }));
     // --include-roles: each list row carries only ONE filter-echo typeId, so to

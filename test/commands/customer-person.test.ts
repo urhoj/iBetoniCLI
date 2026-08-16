@@ -115,3 +115,60 @@ describe("runCustomerPersonList", () => {
     expect(result.items[0].permissionRoles).toEqual(["asiakasAdmin", "tyosuhteessa"]);
   });
 });
+
+// fb#621 — `ib person get` returns personFirstName/personLastName/personEmail;
+// this list returned only name/email. Projecting the sibling's spelling here
+// produced no error and no warning, just blank cells — which read as "four
+// people with no name or email on file" rather than "wrong field name". For a
+// CLI whose audience is AI assistants, silently-empty is the worst outcome,
+// because the empty result gets reported onward as a finding.
+describe("runCustomerPersonList person vocabulary (fb#621)", () => {
+  beforeEach(() => {
+    mockClient.get.mockReset();
+  });
+
+  test("rows carry the canonical person* names alongside name/email", async () => {
+    mockClient.get.mockResolvedValueOnce([
+      { personId: 5351, personFirstName: "Juha", personLastName: "Urho", personEmail: "j@example.com" },
+    ]);
+    const result = await runCustomerPersonList(mockClient, 26);
+    expect(result.items[0]).toMatchObject({
+      personId: 5351,
+      // The short vocabulary this command has always returned — unchanged, so
+      // nothing consuming the list breaks.
+      name: "Juha Urho",
+      email: "j@example.com",
+      // The canonical vocabulary `ib person get` uses.
+      personFirstName: "Juha",
+      personLastName: "Urho",
+      personEmail: "j@example.com",
+    });
+  });
+
+  test("a missing name is null, not an empty string masquerading as a value", async () => {
+    mockClient.get.mockResolvedValueOnce([{ personId: 77 }]);
+    const result = await runCustomerPersonList(mockClient, 26);
+    expect(result.items[0]).toMatchObject({
+      personId: 77,
+      name: "",
+      email: null,
+      personFirstName: null,
+      personLastName: null,
+      personEmail: null,
+    });
+  });
+
+  test("both vocabularies survive the mssql-wrapper unwrap path", async () => {
+    mockClient.get.mockResolvedValueOnce({
+      recordset: [
+        { personId: 9, personFirstName: "Aino", personLastName: "Virtanen", personEmail: "a@example.com" },
+      ],
+    });
+    const result = await runCustomerPersonList(mockClient, 26);
+    expect(result.items[0]).toMatchObject({
+      name: "Aino Virtanen",
+      personFirstName: "Aino",
+      personEmail: "a@example.com",
+    });
+  });
+});

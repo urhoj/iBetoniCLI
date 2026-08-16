@@ -1,7 +1,7 @@
 import { Option } from "commander";
 import type { Command } from "commander";
 import type { ApiClient } from "../../api/client.js";
-import { writeJson } from "../../output/json.js";
+import { writeJson, failWith } from "../../output/json.js";
 import { assertWritableEndpoint } from "../../api/endpointGuard.js";
 import { CACHE_ENTITIES } from "./entities.js";
 import { jsonAction, guarded } from "../_shared/action.js";
@@ -9,6 +9,16 @@ export interface CacheWriteOpts {
   confirm: boolean;
   forceProd: boolean;
   reason?: string;
+  /**
+   * The CLI-wide preview spelling, accepted here as an explicit no-op — this
+   * group already previews by DEFAULT (see {@link writeRequestOptions}), so
+   * `--dry-run` names the behaviour you already get (fb#645).
+   *
+   * It exists because the inverted idiom was a trap with a direction: an agent
+   * told `--dry-run` is unsupported concludes preview is unavailable and reaches
+   * for the flag that DOES run, and on this group that flag deletes keys.
+   */
+  dryRun?: boolean;
 }
 
 // Shared request shaping for the three destructive verbs:
@@ -22,6 +32,17 @@ function writeRequestOptions(client: ApiClient, opts: CacheWriteOpts): {
   dryRun: boolean;
   fetchOpts: { headers: Record<string, string>; read?: boolean };
 } {
+  // `--dry-run --confirm` states both intentions at once. Silently letting one
+  // win is exactly the failure mode this group already had: whichever we picked,
+  // half the callers would get the opposite of what they asked for, and on the
+  // execute side that means deleted keys. Refuse and make them choose (fb#645).
+  if (opts.dryRun && opts.confirm) {
+    failWith(
+      "--dry-run and --confirm are mutually exclusive: --dry-run previews (the default here) and --confirm executes",
+      4,
+      "drop --dry-run to execute, or drop --confirm to preview"
+    );
+  }
   const dryRun = !opts.confirm;
   if (!dryRun) assertWritableEndpoint(client.endpoint, opts.forceProd);
   const headers: Record<string, string> = {};
@@ -29,6 +50,37 @@ function writeRequestOptions(client: ApiClient, opts: CacheWriteOpts): {
   if (!dryRun && opts.forceProd) headers["X-Force-Prod"] = "1";
   if (opts.reason) headers["X-Action-Reason"] = opts.reason;
   return { dryRun, fetchOpts: dryRun ? { headers, read: true } : { headers } };
+}
+
+/**
+ * Resolve the SCAN glob for `cache pattern`, which accepts it positionally
+ * (canonical) or as `--pattern <glob>` — the string twin of `resolveTarget` /
+ * `resolveDateInput` in `src/targets.ts`. Exactly one is required; both are
+ * allowed only when they agree, so a copy-paste that supplies each once is not
+ * punished while two DIFFERENT globs (only one of which could be honoured) is.
+ *
+ * Not routed through `resolveTarget`: that one coerces to a positive integer,
+ * which every glob would fail.
+ */
+export function resolveGlob(
+  positional: string | undefined,
+  flag: string | undefined
+): string {
+  const glob = positional ?? flag;
+  if (glob === undefined || glob === "") {
+    failWith(
+      "missing target: pass <glob> positionally or via --pattern <glob>",
+      4,
+      "use `ib dev cache keys --pattern '<glob>'` first to see what a glob matches"
+    );
+  }
+  if (positional !== undefined && flag !== undefined && positional !== flag) {
+    failWith(
+      `positional glob (${positional}) and --pattern (${flag}) differ — pass only one`,
+      4
+    );
+  }
+  return glob;
 }
 
 export async function runCacheStats(client: ApiClient): Promise<unknown> {
@@ -97,35 +149,50 @@ export function registerCacheCommands(parent: Command, getClient: () => Promise<
     )
     .option("--cascade")
     .option("--confirm")
+    .option("--dry-run")
     .option("--force-prod")
     .option("--reason <text>")
     .action(
-      jsonAction(getClient, (client, entityType: string, opts: { id?: number; asiakas?: number; asiakasId?: number; cascade?: boolean; confirm?: boolean; forceProd?: boolean; reason?: string }) =>
+      jsonAction(getClient, (client, entityType: string, opts: { id?: number; asiakas?: number; asiakasId?: number; cascade?: boolean; confirm?: boolean; dryRun?: boolean; forceProd?: boolean; reason?: string }) =>
         runCacheInvalidate(
           client,
           { entityType, id: opts.id, asiakasId: opts.asiakas ?? opts.asiakasId, cascade: opts.cascade },
-          { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason }
+          { confirm: !!opts.confirm, dryRun: !!opts.dryRun, forceProd: !!opts.forceProd, reason: opts.reason }
         )
       )
     );
 
   c.command("clear")
     .option("--confirm")
+    .option("--dry-run")
     .option("--force-prod")
     .option("--reason <text>")
     .action(
-      jsonAction(getClient, (client, opts: { confirm?: boolean; forceProd?: boolean; reason?: string }) =>
-        runCacheClear(client, { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason })
+      jsonAction(getClient, (client, opts: { confirm?: boolean; dryRun?: boolean; forceProd?: boolean; reason?: string }) =>
+        runCacheClear(client, { confirm: !!opts.confirm, dryRun: !!opts.dryRun, forceProd: !!opts.forceProd, reason: opts.reason })
       )
     );
 
-  c.command("pattern <glob>")
+  // The glob is dual-shaped: positional (canonical) OR `--pattern <glob>`. The
+  // sibling `cache keys` spells the very same concept — a Redis SCAN glob — as a
+  // flag, so reaching for `--pattern` here is the natural error rather than a
+  // careless one (fb#645). Flag-vs-positional twin of the `src/targets.ts`
+  // dual-target pattern; resolved inline because the value is a glob string, not
+  // a positive-integer id.
+  c.command("pattern [glob]")
+    .option("--pattern <glob>", "Raw Redis key glob (alias for the positional)")
     .option("--confirm")
+    .option("--dry-run")
     .option("--force-prod")
     .option("--reason <text>")
     .action(
-      jsonAction(getClient, (client, glob: string, opts: { confirm?: boolean; forceProd?: boolean; reason?: string }) =>
-        runCachePattern(client, glob, { confirm: !!opts.confirm, forceProd: !!opts.forceProd, reason: opts.reason })
+      jsonAction(getClient, (client, glob: string | undefined, opts: { pattern?: string; confirm?: boolean; dryRun?: boolean; forceProd?: boolean; reason?: string }) =>
+        runCachePattern(client, resolveGlob(glob, opts.pattern), {
+          confirm: !!opts.confirm,
+          dryRun: !!opts.dryRun,
+          forceProd: !!opts.forceProd,
+          reason: opts.reason,
+        })
       )
     );
 

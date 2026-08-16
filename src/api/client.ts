@@ -97,6 +97,23 @@ interface ApiClientOptions {
    * NOT gated on `quiet` — an explicit --verbose wins.
    */
   verbose?: boolean;
+  /**
+   * `--print-payload`: emit each RESOLVED request (method, path, headers with
+   * Authorization redacted, body) to stderr immediately before it is sent.
+   *
+   * Exists because "did my flag parse into the body I intended?" had no answer
+   * through `ib` (fb#636): the server `--dry-run` is deploy-gated and can still
+   * persist against an ungated handler, and the read-only refusal names only the
+   * method and path while the assembled body is discarded unseen. Every
+   * read-merge-write body and typed-flag/`--body` merge has the same question,
+   * and the merge is exactly where a dropped field hides.
+   *
+   * Emits and CONTINUES — it never fabricates a response, so no `run*` function
+   * projects a stub into garbage. Compose with `readOnly` for "show me, send
+   * nothing". Like `verbose`, an explicit request for diagnostics wins over
+   * `quiet`.
+   */
+  printPayload?: boolean;
 }
 
 interface FetchOptions {
@@ -161,6 +178,7 @@ export function createApiClient({
   actingAs,
   quiet = false,
   verbose = false,
+  printPayload = false,
 }: ApiClientOptions) {
   const platform = `${process.platform} node-${process.versions.node}`;
   const userAgent = `ib-cli/${version} (${platform})`;
@@ -193,6 +211,54 @@ export function createApiClient({
         : "";
     warnNote(
       `[ib] write · acting as asiakasId ${actingAs.ownerAsiakasId}${name}${umbrella}`
+    );
+  }
+
+  /**
+   * `--print-payload`: emit the resolved request to stderr before it is sent
+   * (fb#636). One JSON line on stderr — never stdout, so the data contract is
+   * untouched (same channel as the acting-as and `--stats` diagnostics).
+   *
+   * Two deliberate distortions of the literal outgoing bytes, both so the line
+   * cannot itself become a silent lie:
+   *  - `Authorization` is redacted. The whole point is to paste this into a bug
+   *    report, and a full superuser JWT has leaked that way before.
+   *  - `X-Request-ID` renders as a placeholder unless the caller pinned one with
+   *    `--request-id`. `buildHeaders` mints a fresh UUID per ATTEMPT, so any
+   *    concrete value printed here would differ from the one actually sent — and
+   *    a plausible-but-wrong correlation id is worse than none.
+   *
+   * `buildHeaders` writes `lastRequestId` as a side effect (the --verbose
+   * correlation id), so it is snapshotted and restored: a previewed request that
+   * is then REFUSED by the read-only lock must not leave an id behind that was
+   * never on the wire.
+   */
+  function emitResolvedPayload(
+    method: string,
+    path: string,
+    payload: string | undefined,
+    opts: FetchOptions
+  ): void {
+    const savedRequestId = lastRequestId;
+    const headers = buildHeaders(opts.headers, payload !== undefined);
+    lastRequestId = savedRequestId;
+    headers.Authorization = "Bearer ***";
+    if (!requestId) headers["X-Request-ID"] = "<minted per attempt>";
+    let body: unknown;
+    if (payload !== undefined) {
+      try {
+        body = JSON.parse(payload);
+      } catch {
+        body = payload;
+      }
+    }
+    warnNote(
+      `[ib] payload · ${JSON.stringify({
+        method,
+        path,
+        headers,
+        ...(payload !== undefined ? { body } : {}),
+      })}`
     );
   }
 
@@ -289,6 +355,16 @@ export function createApiClient({
     body?: unknown,
     opts: FetchOptions = {}
   ): Promise<T> {
+    // Serialized ONCE, up here rather than after the gates, so `--print-payload`
+    // can show the very bytes the fetch will carry (and the 401-refresh retry
+    // re-sends the same string instead of re-running JSON.stringify).
+    const payload =
+      method !== "GET" && body !== undefined ? JSON.stringify(body) : undefined;
+    // Ahead of the read-only gate on purpose: `--read-only --print-payload` must
+    // SHOW the write and then refuse it. Printing after the gate would surface
+    // the refusal alone — which is precisely the fb#636 dead end, where the
+    // assembled body is thrown away unseen.
+    if (printPayload) emitResolvedPayload(method, path, payload, opts);
     // Read-only write-lock: refuse every mutation before it leaves the process.
     // Mapped to exit 3 (forbidden) — the closest documented contract code for a
     // refused write. GETs pass through, so reads (and the read half of a
@@ -311,8 +387,6 @@ export function createApiClient({
     // Meta requests skip this — they don't write tenant data under any company lens.
     // Read-over-POST requests skip this — they don't mutate tenant data.
     if (method !== "GET" && !opts.meta && !opts.read) announceActingAs();
-    const payload =
-      method !== "GET" && body !== undefined ? JSON.stringify(body) : undefined;
     const startedAt = Date.now();
     let res = await fetchOrNetworkError(method, path, payload, opts);
 

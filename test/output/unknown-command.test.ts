@@ -675,3 +675,61 @@ describe("unknown option — alias identity and prose tokens (fb#342 / fb#359)",
     expect(hint).not.toMatch(/--description/);
   });
 });
+
+// fb#646 — the sibling scan answers "which neighbour OWNS this flag?", which is
+// the right question for a flag one command owns and a meaningless one for a
+// CLI-wide convention. `--reason`/`--dry-run`/`--idempotency-key` are declared
+// by ~120 of 328 specs each (next-commonest: --limit at 50), so naming three is
+// arbitrary — and on an inverted-idiom command it is actively false.
+describe("write-safety flags explain their own idiom (fb#646)", () => {
+  // The captured repro was `ib dev cache pattern --dry-run`. fb#645 fixed that
+  // one at the source (the flag is now accepted), so this asserts the pair:
+  // the original argv parses, and the REMAINING trio member on the same command
+  // no longer misdirects.
+  test("the fb#646 repro command now accepts --dry-run outright", () => {
+    const cmd = leafByPath("dev", "cache", "pattern");
+    expect(cmd.options.map((o) => o.long)).toContain("--dry-run");
+  });
+
+  test("no longer points a trio flag at three unrelated feedback commands", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("dev", "cache", "pattern"), "--idempotency-key");
+    // Pre-fix this read: "belongs to a sibling command: `ib dev feedback
+    // create`, `ib dev feedback resolve`, `ib dev feedback update`."
+    expect(env.acceptedBy).toEqual([]);
+    expect(env.hint).not.toContain("ib dev feedback");
+    expect(env.hint).not.toContain("belongs to a sibling command");
+  });
+
+  test("states the inverted idiom, naming the flag that actually applies", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("dev", "cache", "clear"), "--idempotency-key");
+    expect(env.hint).toContain("PREVIEWS by default");
+    expect(env.hint).toContain("--confirm");
+  });
+
+  test("a READ command says the convention does not apply, not 'ask a sibling'", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("keikka", "get"), "--dry-run");
+    expect(env.acceptedBy).toEqual([]);
+    expect(env.hint).toContain("does not mutate");
+  });
+
+  test("the trio is special because it is a CONVENTION, not because it is common: --search still redirects (fb#308)", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("person", "list"), "--search");
+    expect(env.acceptedBy).toEqual(["ib person search"]);
+    expect(env.hint).toContain("ib person search");
+  });
+
+  test("a near-spelling on THIS command still wins over the idiom note", () => {
+    // `-reason` is the captured single-dash typo: the flag IS accepted here, so
+    // the answer is the correct spelling, not a lecture about conventions.
+    const env = buildUnknownOptionEnvelope(leafByPath("jerry", "admin", "enable"), "-reason");
+    expect(env.didYouMean).toBe("--reason");
+    expect(env.hint).toContain("Did you mean `--reason`?");
+    expect(env.hint).not.toContain("CLI-wide write-safety convention");
+  });
+
+  test("the accepted-flags list and --help pointer are still rendered", () => {
+    const env = buildUnknownOptionEnvelope(leafByPath("dev", "cache", "clear"), "--dry-run");
+    expect(env.hint).toContain("Accepted flags:");
+    expect(env.hint).toContain("--help");
+  });
+});

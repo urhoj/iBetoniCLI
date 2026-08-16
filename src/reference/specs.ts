@@ -4271,12 +4271,15 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "role", type: "string", description: "Filter by role name (e.g. keikkaHandler)" },
       { name: "include-roles", type: "boolean", description: "Add permissionRoles[] (full per-company role names) to each person — N extra GETs, opt-in" },
     ],
-    outputShape: "ListEnvelope<{ personId, name, email, roleTypeId: number|null, permissionRoles?: string[] }>",
+    outputShape: "ListEnvelope<{ personId, name, email, personFirstName, personLastName, personEmail, roleTypeId: number|null, permissionRoles?: string[] }>",
     errors: [
       apiErr(400, "Unknown role name", "see ROLE_TYPEID_BY_NAME in @ibetoni/constants"),
       ...permErrors("auth.page.asiakas.read"),
     ],
-    seeAlso: ["ib person role list"],
+    notes: [
+      "Rows carry BOTH vocabularies (fb#621): the short `name` (first+last joined) and `email`, plus the canonical `personFirstName`/`personLastName`/`personEmail` that `ib person get` uses. Projecting the sibling's spelling here used to yield blank cells with no error — silently-empty data that reads as 'these people have no name on file'.",
+    ],
+    seeAlso: ["ib person role list", "ib person get"],
     examples: ["ib customer person list 26", "ib customer person list --asiakas 26 --role keikkaHandler", "ib customer person list 27 --include-roles"],
   },
   {
@@ -6890,9 +6893,17 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     };
     const writeFlags = [
       { name: "confirm", type: "boolean", description: "Execute the operation (default is dry-run preview)" },
+      { name: "dry-run", type: "boolean", description: "Preview without deleting — the DEFAULT here, so this flag is an explicit no-op. Accepted because it is the CLI-wide preview spelling; this group inverts the usual idiom and previews unless --confirm. Passing it WITH --confirm exits 4 rather than picking a winner." },
       { name: "force-prod", type: "boolean", description: "Execute against a deployed (shared-cache) backend. Sent as X-Force-Prod: 1; a deployed backend refuses destructive cache ops without it (403) — including calls routed via /api/cli/exec and MCP ib_exec." },
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason)" },
     ];
+    const contradictoryWriteFlags: CommandError = {
+      origin: "client",
+      exit: 4,
+      match: "mutually exclusive",
+      meaning: "--dry-run and --confirm passed together",
+      remedy: "drop --dry-run to execute, or drop --confirm to preview (preview is the default)",
+    };
     return [
       {
         command: "ib dev cache stats",
@@ -6932,10 +6943,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
           apiErr(403, "Not an admin, or cross-tenant entity needs developer", "cross-tenant entities (keikka, grid, stat, attachment) require isSystemAdmin/isDeveloper; others need an admin role"),
           refusedRemote,
           readOnlyErr,
+          contradictoryWriteFlags,
           ...COMMON_AUTH_ERRORS,
         ],
         notes: [
           "Without --confirm the command only PREVIEWS (counts keys) and never deletes.",
+          "This group INVERTS the CLI-wide write-safety idiom: elsewhere a write performs by default and --dry-run previews; here it previews by default and --confirm performs. --dry-run is accepted as an explicit spelling of that default so the two idioms compose.",
           "Single-entity invalidate may leave related caches (grid/stepLog/attachments) stale — use --cascade (keikka) or invalidate each family.",
         ],
         seeAlso: ["ib dev cache entities", "ib dev cache keys"],
@@ -6953,7 +6966,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         mutates: true,
         flags: writeFlags,
         outputShape: "preview: { dryRun:true, wouldDelete } | execute: { deleted }",
-        errors: [...devErrors, refusedRemote, readOnlyErr],
+        errors: [...devErrors, refusedRemote, readOnlyErr, contradictoryWriteFlags],
         examples: ["ib dev cache clear", "ib dev cache clear --confirm --force-prod"],
       },
       {
@@ -6962,12 +6975,31 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
         permissions: DEV_PERMS,
         tier: "developer",
         mutates: true,
-        args: [{ name: "glob", type: "string", description: "Raw Redis key glob (e.g. 'keikka:*')" }],
-        flags: writeFlags,
+        args: [{ name: "glob", type: "string", required: false, description: "Raw Redis key glob (e.g. 'keikka:*'). Alias: --pattern <glob>, matching the spelling the sibling `ib dev cache keys` uses for the same concept — exactly one is required, both only if they agree." }],
+        flags: [
+          { name: "pattern", type: "string", description: "Raw Redis key glob (alias for the positional)" },
+          ...writeFlags,
+        ],
         outputShape:
           "preview: { dryRun:true, wouldDelete, pattern, sampleKeys } | execute: { deleted, pattern }. When wouldDelete is 0 the preview ALSO carries { totalKeys, existingPrefixes[], hint } — a zero alone cannot tell 'cache is clean' from 'your glob is wrong', so those fields settle it without a second command (feedback #431).",
-        errors: [...devErrors, refusedRemote, readOnlyErr],
-        examples: ["ib dev cache pattern 'keikka:*'", "ib dev cache pattern 'person:*' --confirm --force-prod"],
+        errors: [
+          ...devErrors,
+          refusedRemote,
+          readOnlyErr,
+          contradictoryWriteFlags,
+          {
+            origin: "client",
+            exit: 4,
+            match: "missing target",
+            meaning: "No glob given, positionally or via --pattern",
+            remedy: "pass the glob positionally (`ib dev cache pattern 'keikka:*'`) or as --pattern 'keikka:*'",
+          },
+        ],
+        examples: [
+          "ib dev cache pattern 'keikka:*'",
+          "ib dev cache pattern --pattern 'keikka:*'",
+          "ib dev cache pattern 'person:*' --confirm --force-prod",
+        ],
       },
       {
         command: "ib dev cache entities",

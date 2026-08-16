@@ -1415,6 +1415,25 @@ export interface CustomerPersonListItem {
   name: string;
   email: string | null;
   /**
+   * The CANONICAL person vocabulary, carried alongside the short `name`/`email`
+   * this command has always returned (fb#621).
+   *
+   * `ib person get <id>` returns `personFirstName`/`personLastName`/`personEmail`;
+   * this list returned only `name`/`email`. Projecting the sibling's spelling
+   * here produced no error and no warning — just blank cells, which read as
+   * "people with no name or email on file" rather than "wrong field name". For a
+   * CLI whose audience is AI assistants, silently-empty is worse than an error,
+   * because the empty result gets reported onward as a finding.
+   *
+   * Additive on purpose: `name`/`email` keep working, so nothing that consumes
+   * this list breaks. Which vocabulary is CANONICAL long-term (and whether a
+   * shared projection helper should own it, so a third command cannot invent a
+   * third spelling) is deliberately still open.
+   */
+  personFirstName: string | null;
+  personLastName: string | null;
+  personEmail: string | null;
+  /**
    * The single asiakasPersonSettingTypeId echoing the `--role` filter (null
    * when listed unfiltered — the base membership row). This is NOT the
    * person's role set: for that pass `--include-roles` (→ `permissionRoles`)
@@ -1465,6 +1484,11 @@ export async function runCustomerPersonList(
     personId: r.personId,
     name: `${r.personFirstName || ""} ${r.personLastName || ""}`.trim(),
     email: r.personEmail || null,
+    // Canonical spellings passed through verbatim (fb#621) — the backend already
+    // sends exactly these names; this command was the one renaming them.
+    personFirstName: r.personFirstName || null,
+    personLastName: r.personLastName || null,
+    personEmail: r.personEmail || null,
     roleTypeId: r.asiakasPersonSettingTypeId || null,
   }));
   // --include-roles: each list row carries only ONE filter-echo typeId, so to

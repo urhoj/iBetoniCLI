@@ -26,6 +26,7 @@
 import type { Command } from "commander";
 import { domainBlurb } from "../reference/domain.js";
 import { canonicalPath } from "../reference/aliasPaths.js";
+import { globalFlagsSummary } from "../globals.js";
 import {
   type CallerTier,
   getCallerTier,
@@ -375,9 +376,7 @@ export function formatHelp(spec: CommandSpec): string {
 
   lines.push("");
   lines.push("GLOBAL FLAGS");
-  lines.push(
-    "  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV"
-  );
+  lines.push(`  ${globalFlagsSummary()}`);
   // One pointer, not ten expanded descriptions: `--company` is the only global
   // whose SEMANTICS a caller cannot guess from the name (it is an ephemeral
   // company switch, not a target-id filter — see the naming note in globals.ts),
