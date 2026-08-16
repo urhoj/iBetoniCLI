@@ -1568,7 +1568,7 @@ describe("ib feedback list — partly-shipped rows are named (fb#647)", () => {
       { feedbackId: 500, status: "open", changelogLinks: [] },
     ]);
     await runFeedbackList(mockClient, { all: true });
-    expect(note()).toMatch(/1 of 2 rows already carry changelog links/);
+    expect(note()).toMatch(/1 of 2 un-closed rows already carry changelog links/);
     expect(note()).toMatch(/fb#418 → cl#1189/);
   });
 
@@ -1592,10 +1592,33 @@ describe("ib feedback list — partly-shipped rows are named (fb#647)", () => {
     expect(note()).not.toMatch(/changelog links/);
   });
 
+  test("a CLOSED page stays silent — every closed row has a resolves link by construction", async () => {
+    // Counting those made the note fire on all three rows of `--status applied`
+    // while asserting they had shipped "without closing the row".
+    get.mockResolvedValueOnce([
+      { feedbackId: 647, status: "applied", changelogLinks: [{ changelogId: 1396, role: "resolves" }] },
+      { feedbackId: 646, status: "dismissed", changelogLinks: [{ changelogId: 1393, role: "resolves" }] },
+    ]);
+    await runFeedbackList(mockClient, { status: "applied,dismissed" });
+    expect(note()).not.toMatch(/changelog links/);
+  });
+
+  test("the count is of UN-CLOSED rows, not the whole page", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 418, status: "open", changelogLinks: [{ changelogId: 1189, role: "references" }] },
+      { feedbackId: 647, status: "applied", changelogLinks: [{ changelogId: 1396, role: "resolves" }] },
+      { feedbackId: 500, status: "reviewed", changelogLinks: [] },
+    ]);
+    await runFeedbackList(mockClient, { all: true });
+    expect(note()).toMatch(/1 of 2 un-closed rows/);
+    expect(note()).not.toMatch(/fb#647/);
+  });
+
   test("names at most five rows, then counts the rest", async () => {
     get.mockResolvedValueOnce(
       Array.from({ length: 7 }, (_, i) => ({
         feedbackId: 400 + i,
+        status: "open",
         changelogLinks: [{ changelogId: 1000 + i, role: "references" }],
       }))
     );
@@ -1608,6 +1631,7 @@ describe("ib feedback list — partly-shipped rows are named (fb#647)", () => {
     get.mockResolvedValueOnce([
       {
         feedbackId: 168,
+        status: "open",
         changelogLinks: [
           { changelogId: 900, role: "references" },
           { changelogId: 901, role: "references" },

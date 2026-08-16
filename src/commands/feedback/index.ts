@@ -39,6 +39,12 @@ type Kind = (typeof KINDS)[number];
 export const SCOPES = ["cli", "app", "jerry", "bsg2", "workspace", "security", "ops", "impeccable", "other"] as const;
 type Scope = (typeof SCOPES)[number];
 export const STATUSES = ["open", "reviewed", "applied", "dismissed"] as const;
+/**
+ * The statuses a row can still be WORKED in — the default list bucket, and the
+ * only rows for which "part of this shipped without closing it" is a true
+ * statement (fb#647). A closed row cannot be claimed, so it needs no warning.
+ */
+export const ACTIVE_STATUSES = ["open", "reviewed"] as const;
 export const SEVERITIES = ["critical", "major", "minor", "cosmetic"] as const;
 type Severity = (typeof SEVERITIES)[number];
 
@@ -310,7 +316,7 @@ function resolveStatuses(opts: {
     if (list.length) return list;
   }
   // Default (and --unresolved): the active bucket. Closed items need --all/--status.
-  return ["open", "reviewed"];
+  return [...ACTIVE_STATUSES];
 }
 
 /**
@@ -594,9 +600,15 @@ const LINKED_ROWS_NAMED = 5;
  *
  * Deploy-gated the safe way: an older backend sends no links, so the note simply
  * does not fire. It never claims a row is untouched.
+ *
+ * Only ACTIVE rows count. Every closed row has a `resolves` link by
+ * construction, so counting those made the note fire on all three rows of a
+ * `--status applied` page while asserting they had shipped "without closing the
+ * row" — the opposite of true, on the browse this feature does not even serve.
  */
 function warnPartlyShipped(items: Record<string, unknown>[]): void {
-  const linked = items.filter((r) => readChangelogLinks(r).length > 0);
+  const active = items.filter((r) => ACTIVE_STATUSES.includes(r.status as never));
+  const linked = active.filter((r) => readChangelogLinks(r).length > 0);
   if (!linked.length) return;
   const named = linked
     .slice(0, LINKED_ROWS_NAMED)
@@ -604,7 +616,7 @@ function warnPartlyShipped(items: Record<string, unknown>[]): void {
     .join(", ");
   const rest = linked.length - Math.min(linked.length, LINKED_ROWS_NAMED);
   warnNote(
-    `[ib] note: ${linked.length} of ${items.length} rows already carry changelog links (${named}${rest > 0 ? `, +${rest} more` : ""}) — ` +
+    `[ib] note: ${linked.length} of ${active.length} un-closed rows already carry changelog links (${named}${rest > 0 ? `, +${rest} more` : ""}) — ` +
       `part of that work has shipped without closing the row. Read the entry (ib dev changelog get <id>) before claiming one.`
   );
 }
