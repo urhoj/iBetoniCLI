@@ -155,10 +155,17 @@ const LEGAL_DEV_ERRORS: CommandError[] = [
 // hasVehicleAccessOnAsiakas gate in puminet5api).
 const VEHICLE_ASIAKAS_PERMISSION =
   "--asiakas: sysadmin/developer or a vehicle-manage role (admin/owner/vehicleHandler) on the target tenant";
+// `match` is load-bearing (fb#668): every spec carrying this row ALSO carries a
+// permErrors 403, and `matchHttpRow` falls back to the first row with no `match`
+// — so without one this row answered every 403, including a plain
+// auth.page.vehicle.read denial, and told that caller to go get a role on
+// another tenant. Substring is the backend's own text (vehicleCliRoutes.js
+// `sendForbidden(res, "no vehicle access on the requested company")`).
 const VEHICLE_ASIAKAS_403: CommandError = apiErr(
   403,
   "No vehicle access on the requested --asiakas company",
-  "use a tenant you have a vehicle-manage role on, or a developer token"
+  "use a tenant you have a vehicle-manage role on, or a developer token",
+  "no vehicle access on the requested company"
 );
 /** Shared by every vehicle-row list (list/search/driver board/driver gaps) — they
  *  all read `dbo.vehicle`, so they all surface the legacy sentinel rows that no
@@ -176,6 +183,18 @@ const VEHICLE_ORDERING_NOTE =
  *  within one response (fb#394). */
 const VEHICLE_OWNER_NOTE =
   "`asiakasId` and `ownerAsiakasId` are distinct columns and often equal. `ownerAsiakasId` is the tenant this read is scoped to, so it is the SAME on every row of one response (the active company, or `--asiakas`); `asiakasId` is the assigned company and is what the grid splits own-vs-foreign vehicles on.";
+/**
+ * The isPublic admin gate's own words (fb#668).
+ *
+ * `sijainti update` and `set-public` each pair this row with a permErrors 403,
+ * and `matchHttpRow` answers with the first MATCHLESS row at a status — so
+ * without a `match` this one swallowed every 403 on both commands, including a
+ * plain auth.page.sijainnit.edit denial. The substring is the backend's literal
+ * Finnish text (modules/geocode/geocode.js `sendForbidden`); matching is
+ * case-insensitive, so the lowercase form is fine.
+ */
+const SIJAINTI_PUBLIC_403_MATCH = "vain yrityksen ylläpitäjä voi muuttaa sijainnin julkisuutta";
+
 // ─── person 404: say which DIMENSION failed (fb#620) ─────────────────────────
 // `verify personId` is the wrong instruction most of the time this fires: the
 // id is usually right and the SCOPE is wrong, because every person command is
@@ -1743,7 +1762,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     outputShape: "{ ok: true, ... } (raw backend response); --dry-run returns { dryRun: true, wouldUpdate: { <provided fields>, omittedFieldsPreserved: true } }",
     errors: [
-      apiErr(400, "No fields to update", "pass at least one typed flag or a --body/--from-json patch"),
+      // CLIENT-side, not a backend 400 (fb#668): the empty-patch guard is a
+      // `failWith(..., 4)` in the action, so nothing ever arrives over HTTP with
+      // this meaning. Documented as `http: 400` it was doubly broken — dead by
+      // the fb#280 rule (a client failure can only be matched via `origin`), AND
+      // it shadowed the real "Validation failed" 400 below it.
+      { origin: "client", exit: 4, match: "requires at least one field", meaning: "No fields to update", remedy: "pass at least one typed flag or a --body/--from-json patch" },
       apiErr(400, "Validation failed", "fix the patch fields"),
       apiErr(404, "Worksite not found", "verify tyomaaId"),
       ...permErrors("auth.page.tyomaa.edit"),
@@ -2595,7 +2619,15 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape: "{ vehicleId, ... } (raw backend save response) | { dryRun, wouldCreate }",
     errors: [
       apiErr(400, "Validation failed", "fix the field flags"),
-      apiErr(403, "No access to this tenant's vehicles (--asiakas)", "you need an admin/owner/vehicleHandler role on the target tenant"),
+      // Matched on the backend's Finnish denyMessage (vehicleRoutes.js
+      // `vehicleEdit` → requireCompanyRole denyMessage), so the permErrors row
+      // below stays reachable as the catch-all (fb#668).
+      apiErr(
+        403,
+        "No access to this tenant's vehicles (--asiakas)",
+        "you need an admin/owner/vehicleHandler role on the target tenant",
+        "ei oikeuksia tämän asiakkaan ajoneuvoihin"
+      ),
       ...permErrors("auth.page.vehicle.edit"),
     ],
     examples: [
@@ -3404,7 +3436,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape: "{ sijaintiId, success, lat?, lng?, coordsPersisted? } — lat/lng/coordsPersisted present when coordinates were given (coordsPersisted:false on --dry-run)",
     errors: [
       apiErr(400, "Validation failed", "fix --body fields"),
-      apiErr(400, 'Address could not be geocoded (--geocode, status ZERO_RESULTS)', "supply a fuller --address or pass --lat/--lng directly"),
+      // Narrowed so the generic "Validation failed" row above stays the 400
+      // catch-all it is meant to be (fb#668). Note the ordinary address-change
+      // geocode is SOFT-fail — it reports `geocodeFailed` on a successful
+      // response rather than 400-ing — so this row only ever describes the
+      // forced `--geocode` path.
+      apiErr(400, 'Address could not be geocoded (--geocode, status ZERO_RESULTS)', "supply a fuller --address or pass --lat/--lng directly", ["geocod", "ZERO_RESULTS"]),
       { origin: "client", exit: 4, meaning: "--puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max", remedy: "pass metres 0–999.99 with min ≤ max" },
       ...permErrors("auth.page.sijainnit.edit"),
     ],
@@ -3447,11 +3484,16 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape: "{ ok: true, ..., lat?, lng?, coordsPersisted?, geocodeFailed? } — lat/lng/coordsPersisted present when coordinates were supplied or geocoded; geocodeFailed when the automatic address-change geocode found no match (update still ran, coords now NULL)",
     errors: [
       apiErr(400, "Validation failed", "fix --body fields"),
-      apiErr(400, 'Address could not be geocoded (--geocode, status ZERO_RESULTS)', "supply a fuller --address or pass --lat/--lng directly"),
+      // Narrowed so the generic "Validation failed" row above stays the 400
+      // catch-all it is meant to be (fb#668). Note the ordinary address-change
+      // geocode is SOFT-fail — it reports `geocodeFailed` on a successful
+      // response rather than 400-ing — so this row only ever describes the
+      // forced `--geocode` path.
+      apiErr(400, 'Address could not be geocoded (--geocode, status ZERO_RESULTS)', "supply a fuller --address or pass --lat/--lng directly", ["geocod", "ZERO_RESULTS"]),
       apiErr(404, "Sijainti not found", "verify sijaintiId"),
       { origin: "client", exit: 4, match: ["non-negative number of metres", "cannot exceed"], meaning: "--puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max — would otherwise clear the stored bound", remedy: "pass metres 0–999.99 with min ≤ max" },
       { origin: "client", exit: 4, match: "at most one of --public", meaning: "Both --public and --private given", remedy: "pass at most one — omit both to leave visibility untouched" },
-      apiErr(403, "Not a company admin — only admins may CHANGE isPublic", "drop --public/--private to edit the other fields, or ask a company admin; see `ib sijainti set-public`"),
+      apiErr(403, "Not a company admin — only admins may CHANGE isPublic", "drop --public/--private to edit the other fields, or ask a company admin; see `ib sijainti set-public`", SIJAINTI_PUBLIC_403_MATCH),
       ...permErrors("auth.page.sijainnit.edit"),
     ],
     examples: [
@@ -3512,7 +3554,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "{ ok: true, ... } (raw backend response) or { dryRun: true, wouldUpdate: {...} }",
     errors: [
       { origin: "client", exit: 4, meaning: "Neither or both of --on/--off given", remedy: "pass exactly one — visibility is never inferred" },
-      apiErr(403, "Not a company admin — only admins may change visibility", "the edit tier can change every other field; ask a company admin (or a developer) to flip this one"),
+      apiErr(403, "Not a company admin — only admins may change visibility", "the edit tier can change every other field; ask a company admin (or a developer) to flip this one", SIJAINTI_PUBLIC_403_MATCH),
       apiErr(404, "Sijainti not found", "verify sijaintiId"),
       ...permErrors("auth.page.sijainnit.edit"),
     ],
@@ -4459,7 +4501,9 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     reasonPolicy: "always",
     outputShape: "{ ok: true, updated: { personId } } or { dryRun: true, wouldUpdate: { personId, ... } }",
     errors: [
-      apiErr(400, "No fields to update", "pass at least one typed flag (--first/--last/--phone/--email/--memo) or a --body/--from-json patch"),
+      // Same client-side guard as `worksite update` (fb#668) — not shadowing
+      // anything here, but equally unreachable as an `http: 400` row.
+      { origin: "client", exit: 4, match: "requires at least one field", meaning: "No fields to update", remedy: "pass at least one typed flag (--first/--last/--phone/--email/--memo) or a --body/--from-json patch" },
       apiErr(404, "Person not found IN SCOPE", PERSON_SCOPE_404_REMEDY),
       ...permErrors("auth.page.person.edit"),
     ],
@@ -6357,10 +6401,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     ],
     outputShape:
       "{ items:[{ sessionId, actorPersonId, targetPersonId, reason, ip, userAgent, startTime, extendCount, lastExtendTime, endTime, endReason, durationSeconds, active }], nextCursor, count, truncated } — sorted startTime desc, 90-day window.",
-    errors: [
-      apiErr(500, "Backend error", "retry with --verbose"),
-      ...permErrors("developer access (isSystemAdmin or isDeveloper)"),
-    ],
+    // No hand-written 500 row here: `permErrors` → `authErrors` already appends
+    // the identical "Backend error / retry with --verbose" (fb#668). Two
+    // byte-identical rows at one status is not a choice the matcher can make —
+    // it takes the first and the second is simply dead weight in the dump.
+    errors: permErrors("developer access (isSystemAdmin or isDeveloper)"),
     notes: [
       "Developer-gated server-side and hidden from non-developer discovery.",
       "Sessions are reconstructed from personLog 30/31/32 (personLog.personId is always the actor). Deploy-gated: no-op until the puminet5api backend ships GET /api/cli/impersonation-sessions.",
@@ -7793,7 +7838,9 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape: "{ threadId, personId, role, added:true }",
     errors: [
       apiErr(403, "Not a manager of this thread", "requires owning-company admin role or sysadmin/developer"),
-      apiErr(403, "Person not in owning company", "the person must be a member of thread.ownerAsiakasId (asiakasPerson membership — privacy gate; cross-company adds are blocked)"),
+      // Matched on the backend's own Finnish text so it is reachable past the
+      // manager row above, which stays the 403 catch-all (fb#668).
+      apiErr(403, "Person not in owning company", "the person must be a member of thread.ownerAsiakasId (asiakasPerson membership — privacy gate; cross-company adds are blocked)", "henkilö ei kuulu keskustelun omistajayritykseen"),
       apiErr(404, "Thread not found", "check the threadId via `ib message chat threads`"),
       ...COMMON_AUTH_ERRORS,
     ],
@@ -7948,7 +7995,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     errors: [
       { http: 403, exit: 3, meaning: "Not a developer", remedy: "Developer access required" },
       { http: 404, exit: 5, meaning: "Term not found (with --update-only)", remedy: "Omit --update-only to create the entry" },
-      { http: 404, exit: 5, meaning: "append/add/remove on a non-existent term", remedy: "Create the term first (set --definition …); append requires an existing entry" },
+      // Both 404s say "glossary term 'X' not found"; only the parenthetical
+      // differs, so the append row matches on that and --update-only stays the
+      // catch-all (fb#668).
+      { http: 404, exit: 5, match: "append/add/remove requires an existing term", meaning: "append/add/remove on a non-existent term", remedy: "Create the term first (set --definition …); append requires an existing entry" },
       { http: 400, exit: 4, meaning: "definition >2000 chars (the message names the effective length; --append-definition reports the MERGED current+appended length)", remedy: "Shorten the definition" },
       { origin: "client", exit: 4, meaning: "--from-json file is not valid JSON or not readable", remedy: "Check the file path and contents" },
     ],

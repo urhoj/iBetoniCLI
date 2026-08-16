@@ -3200,7 +3200,6 @@ OUTPUT (JSON, stdout)
   { items:[{ sessionId, actorPersonId, targetPersonId, reason, ip, userAgent, startTime, extendCount, lastExtendTime, endTime, endReason, durationSeconds, active }], nextCursor, count, truncated } — sorted startTime desc, 90-day window.
 
 ERRORS (stderr, exit non-zero)
-  exit 6 (HTTP 500)  Backend error          → retry with --verbose
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check developer access (isSystemAdmin or isDeveloper)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
@@ -10177,7 +10176,7 @@ OUTPUT (JSON, stdout)
   { ok: true, updated: { personId } } or { dryRun: true, wouldUpdate: { personId, ... } }
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  No fields to update    → pass at least one typed flag (--first/--last/--phone/--email/--memo) or a --body/--from-json patch
+  exit 4 (client-side)  No fields to update    → pass at least one typed flag (--first/--last/--phone/--email/--memo) or a --body/--from-json patch
   exit 5 (HTTP 404)  Person not found IN SCOPE → the id may be fine and the SCOPE wrong — these commands read the ACTIVE company only. Either the personId does not exist, or it belongs to another tenant: retry with \`--asiakas <id>\` (on \`person get\`), find them with \`ib customer person list --asiakas <id>\` or \`ib person search --my-companies\`, or switch lens with \`ib company switch <id>\`. Do NOT conclude the person does not exist and create a new one — that mints a duplicate.
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.person.edit
@@ -13223,7 +13222,7 @@ OUTPUT (JSON, stdout)
   { ok: true, ... } (raw backend response); --dry-run returns { dryRun: true, wouldUpdate: { <provided fields>, omittedFieldsPreserved: true } }
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  No fields to update    → pass at least one typed flag or a --body/--from-json patch
+  exit 4 (client-side)  No fields to update    → pass at least one typed flag or a --body/--from-json patch
   exit 4 (HTTP 400)  Validation failed      → fix the patch fields
   exit 5 (HTTP 404)  Worksite not found     → verify tyomaaId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh

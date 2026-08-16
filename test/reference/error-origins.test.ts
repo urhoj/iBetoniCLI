@@ -155,3 +155,97 @@ describe("ambiguous client rows no longer serve an unrelated remedy", () => {
     ).toBeNull();
   });
 });
+
+/**
+ * fb#668 — the SERVER-side twin of the dead-row rule above.
+ *
+ * `matchHttpRow` narrows to the rows sharing the error's status, prefers one
+ * whose `match` substring hits, and otherwise falls back to
+ * `rows.find(r => r.match === undefined)`. That fallback can only ever return
+ * ONE row, so a second matchless row at the same status is unreachable — its
+ * remedy is dead and the first row answers every occurrence of that status.
+ *
+ * Nothing fails when this happens; the caller just gets the wrong advice. It
+ * reached 14 commands before anyone read the matcher, which is exactly how
+ * fb#280/#289 went. The rule is exact rather than heuristic, so it is worth
+ * enforcing rather than re-auditing.
+ *
+ * The fix for a real second cause is a `match` substring on the NARROW row
+ * (leaving the general row as the catch-all) — not reordering, which the
+ * matcher ignores.
+ */
+describe("no spec shadows one of its own error rows (fb#668)", () => {
+  test("at most ONE matchless row per HTTP status, per command", () => {
+    const offenders: string[] = [];
+    for (const spec of COMMAND_SPECS) {
+      const matchless = new Map<number, CommandError[]>();
+      for (const row of spec.errors ?? []) {
+        if (row.http === undefined || row.match !== undefined) continue;
+        if (!matchless.has(row.http)) matchless.set(row.http, []);
+        matchless.get(row.http)!.push(row);
+      }
+      for (const [http, rows] of matchless) {
+        if (rows.length < 2) continue;
+        offenders.push(
+          `${spec.command} :: HTTP ${http} — ${rows.length} matchless rows, only "${rows[0].meaning}" is reachable ` +
+            `(dead: ${rows.slice(1).map((r) => `"${r.meaning}"`).join(", ")})`
+        );
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("the repaired rows are genuinely reachable, not just annotated", () => {
+    // A `match` that does not correspond to the backend's real text would pass
+    // the structural check above while remaining just as dead, so assert the
+    // actual routing for the cases fb#668 repaired.
+    const server = (msg: string, status: number) =>
+      new CliError(msg, status, null, status === 403 ? 3 : status === 404 ? 5 : 4);
+
+    // Cross-tenant vehicle read vs a plain permission denial.
+    expect(
+      hintForError(server("no vehicle access on the requested company", 403), rowsOf("ib vehicle get"))
+    ).toMatch(/vehicle-manage role/);
+    expect(hintForError(server("Permission denied", 403), rowsOf("ib vehicle get"))).toMatch(
+      /auth\.page\.vehicle\.read/
+    );
+
+    // The isPublic admin gate speaks Finnish; matching is case-insensitive.
+    expect(
+      hintForError(
+        server("Vain yrityksen ylläpitäjä voi muuttaa sijainnin julkisuutta", 403),
+        rowsOf("ib sijainti set-public")
+      )
+    ).toMatch(/ask a company admin/);
+    expect(hintForError(server("Permission denied", 403), rowsOf("ib sijainti set-public"))).toMatch(
+      /auth\.page\.sijainnit\.edit/
+    );
+
+    // Two 404s whose text differs only in the parenthetical.
+    expect(
+      hintForError(
+        server("glossary term 'puomi' not found (append/add/remove requires an existing term)", 404),
+        rowsOf("ib glossary set")
+      )
+    ).toMatch(/Create the term first/);
+    expect(
+      hintForError(server("glossary term 'puomi' not found (update-only)", 404), rowsOf("ib glossary set"))
+    ).toMatch(/Omit --update-only/);
+  });
+
+  test("the empty-patch guard is answered as a CLIENT error, not a backend 400", () => {
+    // It is raised by failWith(..., 4) before any request, so an `http: 400`
+    // row could never match it — and while it sat there it also shadowed the
+    // real 400.
+    const hint = hintForError(
+      new CliError(
+        "update requires at least one field: typed flags (--name/--num/...) or a --body/--from-json JSON patch",
+        0,
+        null,
+        4
+      ),
+      rowsOf("ib worksite update")
+    );
+    expect(hint).toMatch(/at least one typed flag/);
+  });
+});
