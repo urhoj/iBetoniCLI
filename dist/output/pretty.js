@@ -23,6 +23,35 @@ let _tableUtils = null;
 function tableUtils() {
     return (_tableUtils ??= cjsRequire()("cli-table3/src/utils.js"));
 }
+/**
+ * Work around a cli-table3 0.6.5 bug that makes any cell containing a NEWLINE
+ * render in O(lines × chars²) — `ib dev feedback get 528 --pretty` took 18.6 s
+ * against 0.45 s for the same command in JSON, which reads as a hang (fb#604).
+ * 0.6.5 is the newest published release, so there is no upgrade that fixes it.
+ *
+ * `Cell.draw` (cell.js:136) runs `utils.truncate(this.content, 10)` on EVERY
+ * output line of the cell, purely to build a debug string it then discards. On
+ * multi-line input that call takes truncate's slow branch — `strlen` of a
+ * multi-line string is its longest LINE, not its total length, so
+ * `truncateWidth`'s `str.length === strlen(str)` fast path misses and it slices
+ * ONE character at a time, each iteration re-running `strlen` → `string-width`
+ * → `strip-ansi` → `ansi-regex()`, which rebuilds a ~4 KB regex per call (6.4 s
+ * of an 8.9 s profile). Same-length SINGLE-line text renders in 7 ms.
+ *
+ * Safe to patch because `utils.truncate` has exactly two call sites and only
+ * the debug one can be handed a multi-line string: the other (cell.js:259)
+ * truncates one line off `this.lines`, which `computeLines` built by splitting
+ * on "\n". Rendered output is byte-identical; renderRecord on fb#528's row
+ * goes 17482 → 3 ms.
+ *
+ * The multi-line return is deliberately NOT upstream-equivalent — upstream
+ * compares the longest LINE's width, this compares total length, so the two
+ * disagree on a short multi-line cell. Harmless: the value is only interpolated
+ * into a debug message that `debug.js` discards at its default level. It is
+ * kept short because the function is called `truncate` and was asked for 10
+ * characters, not for any measured saving (returning `str` whole also renders
+ * in 2 ms).
+ */
 function patchTableTruncate() {
     const utils = tableUtils();
     const slow = utils.truncate;
@@ -328,6 +357,27 @@ const MIN_VALUE_WIDTH = 20;
 function isPlainObject(v) {
     return typeof v === "object" && v !== null && !Array.isArray(v);
 }
+/**
+ * Normalise to NFC for DISPLAY only (fb#627, second half).
+ *
+ * Fixing `visibleWidth` made the MEASURE display-column-accurate, but `clampCell`
+ * still SLICES by code units — so decomposed text lost one character of content
+ * per combining mark: identical Finnish rendered 26 visible columns in NFD
+ * against 29 in NFC in the same cell. Finnish ä/ö arrive decomposed from some
+ * sources, so this is the very case that justified reopening fb#627, and the
+ * measure fix alone did not close it.
+ *
+ * Normalising at the source removes the unit disagreement rather than teaching a
+ * second function about it. The two obvious alternatives were tried and rejected:
+ * delegating `clampCell` to cli-table3's display-aware `utils.truncate` fixes the
+ * slice but breaks the fb#341 one-line-per-record invariant (its `textWrap` also
+ * slices by code units, so the result re-wraps), and a grapheme-aware slice is far
+ * more machinery than a display concern warrants.
+ *
+ * Display-only and safe: `formatCell` is local to this module and never touches
+ * the JSON output path, so the data contract is unchanged — only what is drawn.
+ */
+const forDisplay = (s) => s.normalize("NFC");
 function formatCell(value) {
     if (value === null || value === undefined)
         return chalk().dim("—");
@@ -343,7 +393,7 @@ function formatCell(value) {
             .join("\n");
     }
     if (typeof value === "object")
-        return JSON.stringify(value);
-    return String(value);
+        return forDisplay(JSON.stringify(value));
+    return forDisplay(String(value));
 }
 //# sourceMappingURL=pretty.js.map

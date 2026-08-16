@@ -22,6 +22,23 @@ function tableCtor(): typeof import("cli-table3") {
   return (_Table = cjsRequire()("cli-table3"));
 }
 
+interface TableUtils {
+  truncate: (str: string, len: number, char?: string) => string;
+  /**
+   * cli-table3's own width measure — strip ANSI, split on newline, max
+   * `string-width`. It IS `visibleWidth`'s contract, and sharing the instance is
+   * what guarantees the two agree exactly (fb#627).
+   */
+  strlen: (str: string) => number;
+}
+
+let _tableUtils: TableUtils | null = null;
+
+/** Lazily-resolved cli-table3 internals, cached like the two module handles above. */
+function tableUtils(): TableUtils {
+  return (_tableUtils ??= cjsRequire()("cli-table3/src/utils.js") as TableUtils);
+}
+
 /**
  * Work around a cli-table3 0.6.5 bug that makes any cell containing a NEWLINE
  * render in O(lines × chars²) — `ib dev feedback get 528 --pretty` took 18.6 s
@@ -51,23 +68,6 @@ function tableCtor(): typeof import("cli-table3") {
  * characters, not for any measured saving (returning `str` whole also renders
  * in 2 ms).
  */
-interface TableUtils {
-  truncate: (str: string, len: number, char?: string) => string;
-  /**
-   * cli-table3's own width measure — strip ANSI, split on newline, max
-   * `string-width`. It IS `visibleWidth`'s contract, and sharing the instance is
-   * what guarantees the two agree exactly (fb#627).
-   */
-  strlen: (str: string) => number;
-}
-
-let _tableUtils: TableUtils | null = null;
-
-/** Lazily-resolved cli-table3 internals, cached like the two module handles above. */
-function tableUtils(): TableUtils {
-  return (_tableUtils ??= cjsRequire()("cli-table3/src/utils.js") as TableUtils);
-}
-
 function patchTableTruncate(): void {
   const utils = tableUtils();
   const slow = utils.truncate;
@@ -404,6 +404,28 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+/**
+ * Normalise to NFC for DISPLAY only (fb#627, second half).
+ *
+ * Fixing `visibleWidth` made the MEASURE display-column-accurate, but `clampCell`
+ * still SLICES by code units — so decomposed text lost one character of content
+ * per combining mark: identical Finnish rendered 26 visible columns in NFD
+ * against 29 in NFC in the same cell. Finnish ä/ö arrive decomposed from some
+ * sources, so this is the very case that justified reopening fb#627, and the
+ * measure fix alone did not close it.
+ *
+ * Normalising at the source removes the unit disagreement rather than teaching a
+ * second function about it. The two obvious alternatives were tried and rejected:
+ * delegating `clampCell` to cli-table3's display-aware `utils.truncate` fixes the
+ * slice but breaks the fb#341 one-line-per-record invariant (its `textWrap` also
+ * slices by code units, so the result re-wraps), and a grapheme-aware slice is far
+ * more machinery than a display concern warrants.
+ *
+ * Display-only and safe: `formatCell` is local to this module and never touches
+ * the JSON output path, so the data contract is unchanged — only what is drawn.
+ */
+const forDisplay = (s: string): string => s.normalize("NFC");
+
 function formatCell(value: unknown): string {
   if (value === null || value === undefined) return chalk().dim("—");
   if (Array.isArray(value) && value.length > 0 && value.every(isPlainObject)) {
@@ -422,6 +444,6 @@ function formatCell(value: unknown): string {
       )
       .join("\n");
   }
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
+  if (typeof value === "object") return forDisplay(JSON.stringify(value));
+  return forDisplay(String(value));
 }

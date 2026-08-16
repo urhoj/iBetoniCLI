@@ -120,7 +120,7 @@ describe("pretty output", () => {
 
     // Combining mark: 2 code units, 1 display column. Finnish ä/ö arrive this
     // way (NFD) from some sources, so this direction is not hypothetical here.
-    const decomposedA = "ä";
+    const decomposedA = "a\u0308";
     expect(decomposedA.length).toBe(2);
     expect(visibleWidth(decomposedA)).toBe(1);
     expect(visibleWidth("Hämeenlinna".normalize("NFD"))).toBe(
@@ -129,8 +129,38 @@ describe("pretty output", () => {
 
     // Unchanged contracts: colour escapes are not width, and a multi-line cell
     // measures as its LONGEST line.
-    expect(visibleWidth("[31mred[39m")).toBe(3);
+    expect(visibleWidth("\u001b[31mred\u001b[39m")).toBe(3);
     expect(visibleWidth("ab\nabcd\na")).toBe(4);
+  });
+
+  // The OTHER half of fb#627, and the one the measure fix did NOT close: with
+  // `visibleWidth` corrected, `clampCell` still SLICED by code units, so
+  // decomposed text lost one character of content per combining mark — the same
+  // Finnish rendered 26 visible columns in NFD against 29 in NFC. The unit test
+  // above passes either way, which is exactly why this one has to exist.
+  test("NFD and NFC render identical content in a CLAMPED cell (fb#627)", () => {
+    const long = "Hämeenlinnan työmaa Hämeenlinnan työmaa Hämeenlinnan työmaa";
+    // Wide enough that fitColumns MUST cap this column, so clampCell runs at all.
+    const rows = (t: string) => ({
+      items: [
+        { id: 1, paikka: `${t} yksi`, muu: "a".repeat(24), m3: 12 },
+        { id: 2, paikka: `${t} kaksi`, muu: "b".repeat(24), m3: 34 },
+        { id: 3, paikka: `${t} kolme`, muu: "c".repeat(24), m3: 56 },
+      ],
+      nextCursor: null,
+      count: 3,
+    });
+    const bodyOf = (s: string) =>
+      stripAnsi(renderList(rows(s)))
+        .split("\n")
+        .filter((l) => l.includes("meenlinnan"));
+
+    const nfc = bodyOf(long.normalize("NFC"));
+    const nfd = bodyOf(long.normalize("NFD"));
+
+    expect(nfd.length).toBeGreaterThan(0);
+    expect(nfd).toEqual(nfc);
+    expect(maxDisplayWidth(nfd.join("\n"))).toBeLessThanOrEqual(TERM);
   });
 
   test("a WIDE-character table still fits the terminal (fb#627)", () => {
@@ -154,6 +184,10 @@ describe("pretty output", () => {
     const out = renderList({ items, nextCursor: null, count: items.length });
 
     expect(maxDisplayWidth(out)).toBeLessThanOrEqual(TERM);
+    // Width alone would also pass against an implementation that grossly
+    // OVER-measures (table merely too narrow). Pin the fb#341 invariant too:
+    // one line per record, not re-wrapped.
+    expect(stripAnsi(out).split("\n").filter((l) => l.includes("混凝土")).length).toBe(3);
   });
 
   test("renderList caps table width and keeps narrow columns intact", () => {

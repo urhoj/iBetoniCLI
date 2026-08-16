@@ -6492,7 +6492,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "limit", type: "number", default: "50", description: "Max recent events for an address (1..200)" },
     ],
     outputShape:
-      "Address form: { email, verdict: \"delivering\"|\"failing\"|\"no-data\", lastEventAt, lastDeliveredAt, lastFailureAt, lastFailure:{ event, reason, at }|null, events:[{ id, receivedTime, event, sg_message_id, category, reason, response, sg_template_id, sg_template_name }], eventCount, truncated, coverage:{ oldestEvent, newestEvent, totalEvents } }. Message form: { sgMessageId, found, recipients[], categories[], events[], eventCount, coverage }.",
+      "Address form: { email, verdict: \"delivering\"|\"pending\"|\"failing\"|\"no-data\", lastEventAt, lastDeliveredAt, lastFailureAt, lastFailure:{ event, reason, at }|null, events:[{ id, receivedTime, event, sg_message_id, category, reason, response, sg_template_id, sg_template_name }], eventCount, truncated, coverage:{ oldestEvent, newestEvent, totalEvents } }. Message form: { sgMessageId, found, recipients[], categories[], events[], eventCount, coverage }.",
     errors: [
       { origin: "client", exit: 2, meaning: "Not logged in", remedy: "ib auth login (or set IB_TOKEN)" },
       { origin: "client", exit: 4, meaning: "No target, or both an address and --message", remedy: "pass exactly one: an address positional OR --message <sgMessageId>" },
@@ -6505,7 +6505,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "`verdict: \"no-data\"` means NO EVIDENCE, not a failure. The event log only starts 2026-08-07, so an address with no rows was never observed either way — always read `coverage` before concluding anything. Treating absence as failure is exactly the fb#506 mistake: a Jerry provider was declared unreachable on suppression-list membership while this log showed the same message delivered one second later.",
       "`failing` means a hard failure (bounce/blocked/dropped/spamreport) that NO later delivery superseded. A `deferred` event is deliberately not a failure — it is a transient retry (Gmail's 421 4.7.28), and SendGrid retries on its own.",
       "`category` names the code path that sent the message (fb#602) — e.g. jerry-provider-request, password-reset, mass-campaign, dev-test. It is NULL on anything sent before that shipped, so an old event says nothing about which feature sent it.",
-      "The message form prefix-matches: SendGrid appends a per-event suffix to sg_message_id (`<base>.filterdrecv-…`), so pass the base id you got from the send and every event for that message is returned.",
+      "`verdict: \"pending\"` means events exist but NOTHING has come back yet — no delivery, and no unsuperseded failure. Repeated `deferred` events land here, and that is the signal worth acting on: it is the fb#575 Gmail-throttling shape (`421 4.7.28`). Do NOT read it as healthy; `delivering` requires an actual delivery event, not merely the absence of a failure.",
+      "The message form accepts EITHER spelling of the id. What the log stores is the full `<base>.<suffix>` form, and every event of one message carries the SAME one — the suffix is per-message, not per-event. So the base id from a send result matches by prefix, the stored id matches exactly, and both return the whole history.",
     ],
     seeAlso: ["ib dev email-health", "ib jerry email-activity"],
     examples: [
