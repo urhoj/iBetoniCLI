@@ -14,15 +14,19 @@
     "node": "^22.18.0 || >=24.11.0"
   },
   "scripts": {
-    "prebuild": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\"",
+    "check:invocation": "node scripts/check-invocation.js",
+    "prebuild": "npm run check:invocation && node -e \"fs.rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc -p tsconfig.json && node scripts/pack-specs.mjs dist",
+    "precheck:dist": "npm run check:invocation",
     "check:dist": "node scripts/check-dist-fresh.js",
     "dev": "tsx src/bin/ib.ts",
+    "pretest": "npm run check:invocation",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src test",
     "lint:fix": "eslint --fix src test",
+    "pretype-check": "npm run check:invocation",
     "type-check": "tsc -p tsconfig.json --noEmit && npm run type-check:test",
     "type-check:test": "tsc -p tsconfig.test.json"
   },
