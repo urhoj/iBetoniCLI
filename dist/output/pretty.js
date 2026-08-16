@@ -18,37 +18,13 @@ function tableCtor() {
     patchTableTruncate();
     return (_Table = cjsRequire()("cli-table3"));
 }
-/**
- * Work around a cli-table3 0.6.5 bug that makes any cell containing a NEWLINE
- * render in O(lines × chars²) — `ib dev feedback get 528 --pretty` took 18.6 s
- * against 0.45 s for the same command in JSON, which reads as a hang (fb#604).
- * 0.6.5 is the newest published release, so there is no upgrade that fixes it.
- *
- * `Cell.draw` (cell.js:136) runs `utils.truncate(this.content, 10)` on EVERY
- * output line of the cell, purely to build a debug string it then discards. On
- * multi-line input that call takes truncate's slow branch — `strlen` of a
- * multi-line string is its longest LINE, not its total length, so
- * `truncateWidth`'s `str.length === strlen(str)` fast path misses and it slices
- * ONE character at a time, each iteration re-running `strlen` → `string-width`
- * → `strip-ansi` → `ansi-regex()`, which rebuilds a ~4 KB regex per call (6.4 s
- * of an 8.9 s profile). Same-length SINGLE-line text renders in 7 ms.
- *
- * Safe to patch because `utils.truncate` has exactly two call sites and only
- * the debug one can be handed a multi-line string: the other (cell.js:259)
- * truncates one line off `this.lines`, which `computeLines` built by splitting
- * on "\n". Rendered output is byte-identical; renderRecord on fb#528's row
- * goes 17482 → 3 ms.
- *
- * The multi-line return is deliberately NOT upstream-equivalent — upstream
- * compares the longest LINE's width, this compares total length, so the two
- * disagree on a short multi-line cell. Harmless: the value is only interpolated
- * into a debug message that `debug.js` discards at its default level. It is
- * kept short because the function is called `truncate` and was asked for 10
- * characters, not for any measured saving (returning `str` whole also renders
- * in 2 ms).
- */
+let _tableUtils = null;
+/** Lazily-resolved cli-table3 internals, cached like the two module handles above. */
+function tableUtils() {
+    return (_tableUtils ??= cjsRequire()("cli-table3/src/utils.js"));
+}
 function patchTableTruncate() {
-    const utils = cjsRequire()("cli-table3/src/utils.js");
+    const utils = tableUtils();
     const slow = utils.truncate;
     utils.truncate = (str, len, char) => {
         if (!str.includes("\n"))
@@ -74,9 +50,39 @@ function terminalWidth() {
 }
 // eslint-disable-next-line no-control-regex
 const ANSI_RE = /\u001b\[\d+(?:;\d+)*m/g;
-/** Longest visible line of a (possibly multi-line, possibly colored) cell. */
-function visibleWidth(cell) {
-    return Math.max(...cell.replace(ANSI_RE, "").split("\n").map((line) => line.length));
+/**
+ * Longest visible line of a (possibly multi-line, possibly colored) cell,
+ * measured in DISPLAY COLUMNS.
+ *
+ * It used to measure with `line.length` — UTF-16 code units — while cli-table3
+ * measures with `string-width` (fb#627). The two disagree in BOTH directions,
+ * and each way breaks the fb#34 invariant that a `--pretty` table must never be
+ * wider than the terminal:
+ *   · a wide character is 1 code unit but 2 columns, so `fitColumns` concluded
+ *     the natural widths already fit and applied NO constraint at all — a CJK
+ *     record rendered at 139 columns against a 100-column budget;
+ *   · a COMBINING MARK is an extra code unit but 0 columns, which over-counts
+ *     and needlessly narrows the table. That half is NOT hypothetical in a
+ *     Finnish app: ä/ö arrive decomposed (NFD) from some sources, where "ä" is
+ *     `a` + U+0308 — 2 code units, 1 column.
+ *
+ * It delegates to cli-table3's own `utils.strlen` rather than to a directly
+ * declared `string-width`. fb#627 worried that this would make the private deep
+ * require load-bearing for CORRECTNESS when it is only a PERFORMANCE workaround
+ * today — but `tableCtor()` already deep-requires that same file on every
+ * pretty render and throws if it is gone, so no new failure mode is introduced.
+ * And it is the stronger choice: cli-table3 pins `string-width@^4.2.0`, so a
+ * separately resolved copy could measure differently from the renderer we are
+ * trying to agree with. Borrowing its instance makes agreement exact by
+ * construction, which is the whole point.
+ *
+ * Exported for the fb#627 measure tests: asserting through `renderList` alone
+ * cannot pin this, because a fixture only reveals the skew once it crosses the
+ * fit/no-fit boundary — the first draft of those tests passed against the
+ * BROKEN implementation and proved nothing.
+ */
+export function visibleWidth(cell) {
+    return tableUtils().strlen(plain(cell));
 }
 /** Below this per-column width a capped table stops being readable. */
 const READABLE_COL_WIDTH = 12;

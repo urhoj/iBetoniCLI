@@ -2659,6 +2659,52 @@ EXAMPLES
 "
 `;
 
+exports[`Help snapshots — contract stability > help for ib dev email-delivery matches snapshot 1`] = `
+"USAGE
+  ib dev email-delivery [<address>] [flags]
+
+DESCRIPTION
+  What our SendGrid event log knows about ONE recipient address, or ONE message — the per-recipient half of \`ib dev email-health\`. Answers "did this customer actually get it?" from the authoritative record of every send (tarjouspyyntö fanout, offers, invoices, support, registration), instead of guessing or opening the SendGrid dashboard by hand.
+  Permissions: requires isSystemAdmin or isDeveloper.
+
+ARGUMENTS
+  <address> STRING    Recipient email address (omit when using --message) (optional)
+
+FLAGS
+  --message STRING    Look up one message's event history by sg_message_id instead of an address
+  --limit NUMBER    Max recent events for an address (1..200) (default: 50)
+
+GLOBAL FLAGS
+  --endpoint URL  --request-id ID  --quiet  --verbose  --pretty  --json  --read-only  --company ID  --stats  --columns CSV  --print-payload
+  --company runs ONE command as another company (ephemeral, not persisted) · ib help multi-tenancy
+
+OUTPUT (JSON, stdout)
+  Address form: { email, verdict: "delivering"|"failing"|"no-data", lastEventAt, lastDeliveredAt, lastFailureAt, lastFailure:{ event, reason, at }|null, events:[{ id, receivedTime, event, sg_message_id, category, reason, response, sg_template_id, sg_template_name }], eventCount, truncated, coverage:{ oldestEvent, newestEvent, totalEvents } }. Message form: { sgMessageId, found, recipients[], categories[], events[], eventCount, coverage }.
+
+ERRORS (stderr, exit non-zero)
+  exit 2 (client-side)  Not logged in          → ib auth login (or set IB_TOKEN)
+  exit 4 (client-side)  No target, or both an address and --message → pass exactly one: an address positional OR --message <sgMessageId>
+  exit 2 (HTTP 401)  Token expired or invalid → ib auth refresh (IB_TOKEN sessions: mint a fresh JWT)
+  exit 3 (HTTP 403)  Developer/sysadmin only (server-enforced) → use a developer account token
+  exit 5 (HTTP 404)  Route not deployed yet → the backend half is deploy-gated — deploy puminet5api first
+  exit 6 (HTTP 500)  Backend error          → retry with --verbose
+
+NOTES
+  - \`verdict: "no-data"\` means NO EVIDENCE, not a failure. The event log only starts 2026-08-07, so an address with no rows was never observed either way — always read \`coverage\` before concluding anything. Treating absence as failure is exactly the fb#506 mistake: a Jerry provider was declared unreachable on suppression-list membership while this log showed the same message delivered one second later.
+  - \`failing\` means a hard failure (bounce/blocked/dropped/spamreport) that NO later delivery superseded. A \`deferred\` event is deliberately not a failure — it is a transient retry (Gmail's 421 4.7.28), and SendGrid retries on its own.
+  - \`category\` names the code path that sent the message (fb#602) — e.g. jerry-provider-request, password-reset, mass-campaign, dev-test. It is NULL on anything sent before that shipped, so an old event says nothing about which feature sent it.
+  - The message form prefix-matches: SendGrid appends a per-event suffix to sg_message_id (\`<base>.filterdrecv-…\`), so pass the base id you got from the send and every event for that message is returned.
+
+SEE ALSO
+  ib dev email-health, ib jerry email-activity
+
+EXAMPLES
+  ib dev email-delivery sami@nr-urakointi.fi
+  ib dev email-delivery asiakas@example.fi --limit 10 --pretty
+  ib dev email-delivery --message 142d9f3f351.7618.254f56
+"
+`;
+
 exports[`Help snapshots — contract stability > help for ib dev email-health matches snapshot 1`] = `
 "USAGE
   ib dev email-health [flags]
@@ -2690,7 +2736,7 @@ NOTES
   - A deferral is transient and the mail still arrives, which is why the deploy health check ignores it. The RATE is the signal: 421 4.7.28 is the polite warning that precedes real blocking.
 
 SEE ALSO
-  ib jerry email-activity
+  ib jerry email-activity, ib dev email-delivery
 
 EXAMPLES
   ib dev email-health

@@ -1,5 +1,6 @@
 import { describe, test, expect } from "vitest";
-import { renderList, renderRecord } from "../../src/output/pretty";
+import { createRequire } from "node:module";
+import { renderList, renderRecord, visibleWidth } from "../../src/output/pretty";
 
 describe("pretty output", () => {
   test("renderList formats an envelope into a table string", () => {
@@ -97,6 +98,62 @@ describe("pretty output", () => {
     expect(Date.now() - started).toBeLessThan(2000);
     // and nothing was dropped on the way — the LAST line survives
     expect(out).toContain("Line 49:");
+  });
+
+  // fb#627: `visibleWidth` measured cells in UTF-16 CODE UNITS while cli-table3
+  // measures in DISPLAY COLUMNS, so the two disagreed and `fitColumns` applied
+  // the wrong constraint — or none at all. These assert in DISPLAY columns,
+  // using the same measure the renderer does; `maxLineWidth` above counts code
+  // units and would pass on exactly the broken case.
+  const strlen = (createRequire(import.meta.url)("cli-table3/src/utils.js") as {
+    strlen: (s: string) => number;
+  }).strlen;
+  const maxDisplayWidth = (s: string) => strlen(stripAnsi(s));
+
+  // The measure itself, asserted directly. This is the discriminating test:
+  // `line.length` (the old implementation) returns 1 for a wide char and 2 for
+  // a decomposed "ä", so each case below pins one direction of the skew.
+  test("visibleWidth measures DISPLAY columns, not code units (fb#627)", () => {
+    // Wide: 1 UTF-16 code unit, 2 display columns.
+    expect("混".length).toBe(1);
+    expect(visibleWidth("混")).toBe(2);
+
+    // Combining mark: 2 code units, 1 display column. Finnish ä/ö arrive this
+    // way (NFD) from some sources, so this direction is not hypothetical here.
+    const decomposedA = "ä";
+    expect(decomposedA.length).toBe(2);
+    expect(visibleWidth(decomposedA)).toBe(1);
+    expect(visibleWidth("Hämeenlinna".normalize("NFD"))).toBe(
+      visibleWidth("Hämeenlinna".normalize("NFC"))
+    );
+
+    // Unchanged contracts: colour escapes are not width, and a multi-line cell
+    // measures as its LONGEST line.
+    expect(visibleWidth("[31mred[39m")).toBe(3);
+    expect(visibleWidth("ab\nabcd\na")).toBe(4);
+  });
+
+  test("a WIDE-character table still fits the terminal (fb#627)", () => {
+    // Sized so the two measures DISAGREE about fitting: 54 CJK chars is 54 code
+    // units (old measure: "fits, no constraint needed") but 108 display columns
+    // — wider than the whole 100-column budget on its own. That gap is what let
+    // a table render 139 columns wide. A smaller fixture passes either way and
+    // tests nothing.
+    //
+    // The note must also DIFFER per row: a value identical in every row is
+    // folded out as a constant column above the table, which would quietly
+    // remove the very cell under test (this fixture's first draft did exactly
+    // that and passed against the broken code).
+    const items = Array.from({ length: 3 }, (_, i) => ({
+      id: i,
+      note: `${"混凝土泵送作业记録".repeat(6)}${i}`,
+      site: `工地${i}`,
+    }));
+    expect(items[0].note.length).toBeLessThan(TERM);
+
+    const out = renderList({ items, nextCursor: null, count: items.length });
+
+    expect(maxDisplayWidth(out)).toBeLessThanOrEqual(TERM);
   });
 
   test("renderList caps table width and keeps narrow columns intact", () => {

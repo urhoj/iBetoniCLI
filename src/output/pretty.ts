@@ -51,10 +51,25 @@ function tableCtor(): typeof import("cli-table3") {
  * characters, not for any measured saving (returning `str` whole also renders
  * in 2 ms).
  */
+interface TableUtils {
+  truncate: (str: string, len: number, char?: string) => string;
+  /**
+   * cli-table3's own width measure — strip ANSI, split on newline, max
+   * `string-width`. It IS `visibleWidth`'s contract, and sharing the instance is
+   * what guarantees the two agree exactly (fb#627).
+   */
+  strlen: (str: string) => number;
+}
+
+let _tableUtils: TableUtils | null = null;
+
+/** Lazily-resolved cli-table3 internals, cached like the two module handles above. */
+function tableUtils(): TableUtils {
+  return (_tableUtils ??= cjsRequire()("cli-table3/src/utils.js") as TableUtils);
+}
+
 function patchTableTruncate(): void {
-  const utils = cjsRequire()("cli-table3/src/utils.js") as {
-    truncate: (str: string, len: number, char?: string) => string;
-  };
+  const utils = tableUtils();
   const slow = utils.truncate;
   utils.truncate = (str, len, char) => {
     if (!str.includes("\n")) return slow(str, len, char);
@@ -85,11 +100,39 @@ function terminalWidth(): number {
 // eslint-disable-next-line no-control-regex
 const ANSI_RE = /\u001b\[\d+(?:;\d+)*m/g;
 
-/** Longest visible line of a (possibly multi-line, possibly colored) cell. */
-function visibleWidth(cell: string): number {
-  return Math.max(
-    ...cell.replace(ANSI_RE, "").split("\n").map((line) => line.length)
-  );
+/**
+ * Longest visible line of a (possibly multi-line, possibly colored) cell,
+ * measured in DISPLAY COLUMNS.
+ *
+ * It used to measure with `line.length` — UTF-16 code units — while cli-table3
+ * measures with `string-width` (fb#627). The two disagree in BOTH directions,
+ * and each way breaks the fb#34 invariant that a `--pretty` table must never be
+ * wider than the terminal:
+ *   · a wide character is 1 code unit but 2 columns, so `fitColumns` concluded
+ *     the natural widths already fit and applied NO constraint at all — a CJK
+ *     record rendered at 139 columns against a 100-column budget;
+ *   · a COMBINING MARK is an extra code unit but 0 columns, which over-counts
+ *     and needlessly narrows the table. That half is NOT hypothetical in a
+ *     Finnish app: ä/ö arrive decomposed (NFD) from some sources, where "ä" is
+ *     `a` + U+0308 — 2 code units, 1 column.
+ *
+ * It delegates to cli-table3's own `utils.strlen` rather than to a directly
+ * declared `string-width`. fb#627 worried that this would make the private deep
+ * require load-bearing for CORRECTNESS when it is only a PERFORMANCE workaround
+ * today — but `tableCtor()` already deep-requires that same file on every
+ * pretty render and throws if it is gone, so no new failure mode is introduced.
+ * And it is the stronger choice: cli-table3 pins `string-width@^4.2.0`, so a
+ * separately resolved copy could measure differently from the renderer we are
+ * trying to agree with. Borrowing its instance makes agreement exact by
+ * construction, which is the whole point.
+ *
+ * Exported for the fb#627 measure tests: asserting through `renderList` alone
+ * cannot pin this, because a fixture only reveals the skew once it crosses the
+ * fit/no-fit boundary — the first draft of those tests passed against the
+ * BROKEN implementation and proved nothing.
+ */
+export function visibleWidth(cell: string): number {
+  return tableUtils().strlen(plain(cell));
 }
 
 /** Below this per-column width a capped table stops being readable. */

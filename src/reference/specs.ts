@@ -6476,8 +6476,43 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "coverage.oldestEvent bounds what the window can possibly show — the log is young, so a --days 30 request can silently cover far fewer days. A quiet report is not proof of a quiet month.",
       "A deferral is transient and the mail still arrives, which is why the deploy health check ignores it. The RATE is the signal: 421 4.7.28 is the polite warning that precedes real blocking.",
     ],
-    seeAlso: ["ib jerry email-activity"],
+    seeAlso: ["ib jerry email-activity", "ib dev email-delivery"],
     examples: ["ib dev email-health", "ib dev email-health --days 30 --pretty"],
+  },
+  // ─── email-delivery (1) ──────────────────────────────────────────────────
+  {
+    command: "ib dev email-delivery",
+    description:
+      "What our SendGrid event log knows about ONE recipient address, or ONE message — the per-recipient half of `ib dev email-health`. Answers \"did this customer actually get it?\" from the authoritative record of every send (tarjouspyyntö fanout, offers, invoices, support, registration), instead of guessing or opening the SendGrid dashboard by hand.",
+    permissions: ["isSystemAdmin or isDeveloper"],
+    tier: "developer",
+    args: [{ name: "address", type: "string", required: false, description: "Recipient email address (omit when using --message)" }],
+    flags: [
+      { name: "message", type: "string", description: "Look up one message's event history by sg_message_id instead of an address" },
+      { name: "limit", type: "number", default: "50", description: "Max recent events for an address (1..200)" },
+    ],
+    outputShape:
+      "Address form: { email, verdict: \"delivering\"|\"failing\"|\"no-data\", lastEventAt, lastDeliveredAt, lastFailureAt, lastFailure:{ event, reason, at }|null, events:[{ id, receivedTime, event, sg_message_id, category, reason, response, sg_template_id, sg_template_name }], eventCount, truncated, coverage:{ oldestEvent, newestEvent, totalEvents } }. Message form: { sgMessageId, found, recipients[], categories[], events[], eventCount, coverage }.",
+    errors: [
+      { origin: "client", exit: 2, meaning: "Not logged in", remedy: "ib auth login (or set IB_TOKEN)" },
+      { origin: "client", exit: 4, meaning: "No target, or both an address and --message", remedy: "pass exactly one: an address positional OR --message <sgMessageId>" },
+      apiErr(401, "Token expired or invalid", "ib auth refresh (IB_TOKEN sessions: mint a fresh JWT)"),
+      apiErr(403, "Developer/sysadmin only (server-enforced)", "use a developer account token"),
+      apiErr(404, "Route not deployed yet", "the backend half is deploy-gated — deploy puminet5api first"),
+      apiErr(500, "Backend error", "retry with --verbose"),
+    ],
+    notes: [
+      "`verdict: \"no-data\"` means NO EVIDENCE, not a failure. The event log only starts 2026-08-07, so an address with no rows was never observed either way — always read `coverage` before concluding anything. Treating absence as failure is exactly the fb#506 mistake: a Jerry provider was declared unreachable on suppression-list membership while this log showed the same message delivered one second later.",
+      "`failing` means a hard failure (bounce/blocked/dropped/spamreport) that NO later delivery superseded. A `deferred` event is deliberately not a failure — it is a transient retry (Gmail's 421 4.7.28), and SendGrid retries on its own.",
+      "`category` names the code path that sent the message (fb#602) — e.g. jerry-provider-request, password-reset, mass-campaign, dev-test. It is NULL on anything sent before that shipped, so an old event says nothing about which feature sent it.",
+      "The message form prefix-matches: SendGrid appends a per-event suffix to sg_message_id (`<base>.filterdrecv-…`), so pass the base id you got from the send and every event for that message is returned.",
+    ],
+    seeAlso: ["ib dev email-health", "ib jerry email-activity"],
+    examples: [
+      "ib dev email-delivery sami@nr-urakointi.fi",
+      "ib dev email-delivery asiakas@example.fi --limit 10 --pretty",
+      "ib dev email-delivery --message 142d9f3f351.7618.254f56",
+    ],
   },
   // ─── feedback (5) ────────────────────────────────────────────────────────
   // NOTE on classification: feedback create/resolve carry custom write semantics
