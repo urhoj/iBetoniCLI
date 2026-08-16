@@ -141,12 +141,40 @@ export function hintForError(
   err: CliError,
   specErrors?: CommandError[] | null
 ): string | null {
+  return hintDetailForError(err, specErrors).hint;
+}
+
+/**
+ * Where a hint came from. `spec` (a matching ERRORS row) and `error` (a remedy
+ * the throwing code attached via `failUsage`) mean the COMMAND anticipated this
+ * failure; `route-not-found` and `generic` are the CLI's own fallbacks and say
+ * nothing about whether the command handled the case.
+ */
+export type HintSource = "route-not-found" | "error" | "spec" | "generic";
+export type HintDetail = { hint: string | null; source: HintSource | null };
+
+/**
+ * The hint PLUS its provenance — same resolution as {@link hintForError}, one
+ * source of truth, so the two can never drift apart.
+ *
+ * The distinction is what friction capture keys on (fb#579): a 404 the command
+ * DOCUMENTED is evidence the command works, so recording it as friction taxes
+ * exactly the negative-path verification that should be encouraged. An
+ * undeployed-route or unclassified 404 has no such witness and is still logged.
+ */
+export function hintDetailForError(
+  err: CliError,
+  specErrors?: CommandError[] | null
+): HintDetail {
   // A not-deployed/unknown route is a DIFFERENT failure class than any documented
   // resource-404, so it wins over the command's own 404 remedy. The backend marks
   // an unmatched /api/* route with code "ROUTE_NOT_FOUND" (app.js catch-all); a
   // deployed route's resource-404 (sendNotFound) carries no such code.
   if (err.statusCode === 404 && isRouteNotFound(err.body)) {
-    return "route not found — this endpoint is not deployed on this backend (or the path is wrong). Check the deployed build with `ib version`; deploy-gated commands flag this in their --help NOTES.";
+    return {
+      hint: "route not found — this endpoint is not deployed on this backend (or the path is wrong). Check the deployed build with `ib version`; deploy-gated commands flag this in their --help NOTES.",
+      source: "route-not-found",
+    };
   }
   // An error may carry its OWN remedy hint (set via `failUsage`). It wins over
   // the command's generic spec remedy — an empty string suppresses the spec
@@ -154,15 +182,23 @@ export function hintForError(
   // self-explanatory client-side usage error (e.g. "--replace text not found")
   // from inheriting the command's unrelated exit-4 remedy (e.g. legal save's
   // "pass --file OR --content").
-  if (typeof err.hint === "string") return err.hint.length ? err.hint : null;
+  if (typeof err.hint === "string") {
+    return err.hint.length ? { hint: err.hint, source: "error" } : { hint: null, source: null };
+  }
   // Keyed on the row's DECLARED origin (`CommandError` forces every row to state
   // one): an HTTP failure matches by status, a locally-raised one (statusCode 0)
   // by exit code. Never fall back to exit-matching for HTTP errors — see the
   // CommandError doc comment for why that mis-hints ~84 rows (feedback #289).
   const httpRow = matchHttpRow(err, specErrors);
-  if (httpRow?.remedy) return httpRow.remedy;
+  if (httpRow?.remedy) return { hint: httpRow.remedy, source: "spec" };
   const clientRow = err.statusCode === 0 ? matchClientRow(err, specErrors) : undefined;
-  if (clientRow?.remedy) return clientRow.remedy;
+  if (clientRow?.remedy) return { hint: clientRow.remedy, source: "spec" };
+  const generic = genericHint(err);
+  return generic ? { hint: generic, source: "generic" } : { hint: null, source: null };
+}
+
+/** The per-status / per-exit fallback remedy — what to say when nothing command-specific matched. */
+function genericHint(err: CliError): string | null {
   if (err.exitCode === 7) {
     // Idempotent reads are already retried twice with backoff before this
     // surfaces (feedback #318), so by the time a caller sees exit 7 on a GET

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { recordFriction, frictionPath } from "../src/friction.js";
 import { CliError } from "../src/api/errors.js";
+import { setActiveCommandErrors, writeError } from "../src/output/json.js";
 import {
   buildProgram,
   enableParserThrow,
@@ -187,6 +188,84 @@ describe("recordFriction", () => {
       expect(String(e.message)).toContain('unknown command "view" under `ib dev feedback`');
       expect(String(e.message)).toContain("Did you mean `ib dev feedback get`?");
     } finally {
+      stderrSpy.mockRestore();
+      process.exitCode = prevExitCode;
+    }
+  });
+});
+
+// fb#579: `ib betoni laatu get 2` exits 5 with the command's OWN remedy — that
+// is evidence the command works, not friction. Capturing it blocked the stop
+// gate and cost a triage round to reach the conclusion the gate's instructions
+// already prescribe ("skip expected 404s").
+describe("anticipated not-found is not friction (#579)", () => {
+  const read = () => readFileSync(frictionPath(), "utf8");
+
+  test("exit 5 WITH a command-owned remedy is not captured", () => {
+    const before = read();
+    recordFriction(
+      new CliError("Grade not found in this supplier's catalogue: 2", 404, null, 5),
+      undefined,
+      "Grade not found — list the catalogue with `ib betoni laatu list`",
+      true
+    );
+    expect(read()).toBe(before);
+  });
+
+  test("exit 5 WITHOUT one is still captured (wrong path / undeployed route)", () => {
+    recordFriction(new CliError("Route not found", 404, null, 5), undefined, "route not found — not deployed");
+    expect(lastEntry().exitCode).toBe(5);
+    expect(String(lastEntry().message)).toContain("not deployed");
+  });
+
+  test("the skip is exit-5 ONLY — a curated 4 or 6 still captures", () => {
+    recordFriction(new CliError("bad flag", 400, null, 4), undefined, "curated exit 4", true);
+    expect(lastEntry().message).toBe("curated exit 4");
+    recordFriction(new CliError("boom", 500, null, 6), undefined, "curated exit 6", true);
+    expect(lastEntry().message).toBe("curated exit 6");
+  });
+});
+
+// The unit above proves recordFriction obeys the flag; this proves the CALLER
+// passes it. writeError is the funnel every command error goes through, so a
+// correct helper wired to nothing would leave the bug fully live.
+describe("writeError → friction wiring (#579)", () => {
+  const read = () => readFileSync(frictionPath(), "utf8");
+  const laatuSpec = [
+    {
+      http: 404,
+      exit: 5,
+      meaning: "Grade not found",
+      remedy: "list the catalogue with `ib betoni laatu list`",
+    },
+  ];
+
+  test("a 404 answered by the command's own ERRORS row is not logged", () => {
+    const prevExitCode = process.exitCode;
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      setActiveCommandErrors(laatuSpec);
+      const before = read();
+      writeError(new CliError("Grade not found in this supplier's catalogue: 2", 404, null, 5));
+      expect(read()).toBe(before);
+    } finally {
+      setActiveCommandErrors(null);
+      stderrSpy.mockRestore();
+      process.exitCode = prevExitCode;
+    }
+  });
+
+  test("an undeployed-route 404 IS logged even while that ERRORS row is active", () => {
+    const prevExitCode = process.exitCode;
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      setActiveCommandErrors(laatuSpec);
+      writeError(new CliError("Route not found", 404, { code: "ROUTE_NOT_FOUND" }, 5));
+      const e = lastEntry();
+      expect(e.exitCode).toBe(5);
+      expect(String(e.message)).toMatch(/not deployed/i);
+    } finally {
+      setActiveCommandErrors(null);
       stderrSpy.mockRestore();
       process.exitCode = prevExitCode;
     }

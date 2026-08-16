@@ -63,10 +63,17 @@ export function frictionPath(): string {
   return join(frictionDir(), "cli-friction.jsonl");
 }
 
+/**
+ * @param curatedHint the error was answered by a remedy the COMMAND owns — a
+ *   matching spec ERRORS row, or one attached at the throw site (see
+ *   `hintDetailForError`'s `source`). Only meaningful for exit 5; see the
+ *   not-found skip below.
+ */
 export function recordFriction(
   err: unknown,
   exitCodeOverride?: number,
-  displayed?: string
+  displayed?: string,
+  curatedHint = false
 ): void {
   try {
     if (getEmbeddedCtx()) return; // real local CLI only
@@ -79,6 +86,18 @@ export function recordFriction(
     // don't map through exitCodeForError); everything else derives it.
     const exitCode = exitCodeOverride ?? exitCodeForError(err);
     if (!exitCode) return; // 0 / success is never friction
+    // A not-found the command ANTICIPATED is not friction — it is evidence the
+    // command works (feedback #579). `ib betoni laatu get 2` exits 5 with the
+    // command's own remedy ("list the catalogue with `ib betoni laatu list`");
+    // capturing that blocked the stop gate and cost a triage round to reach the
+    // conclusion the gate's own instructions already prescribe ("skip expected
+    // 404s"). Moving that filter from triage time to capture time is free.
+    //
+    // NARROW BY DESIGN: only exit 5, and only with a COMMAND-OWNED remedy. An
+    // undeployed route (`ROUTE_NOT_FOUND`) or an unclassified 404 falls through
+    // and is still captured — those are the wrong-path / deploy-gate cases,
+    // where a 404 is the symptom rather than the answer.
+    if (exitCode === 5 && curatedHint) return;
     const argv = process.argv.slice(2).join(" ").slice(0, 400);
     // `displayed` is what the caller actually SAW (enriched envelope error +
     // hint) — prefer it over the raw internal err.message so the groom step

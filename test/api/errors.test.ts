@@ -1,5 +1,10 @@
 import { describe, test, expect } from "vitest";
-import { CliError, exitCodeForError, hintForError } from "../../src/api/errors.js";
+import {
+  CliError,
+  exitCodeForError,
+  hintDetailForError,
+  hintForError,
+} from "../../src/api/errors.js";
 import { failUsage } from "../../src/output/json.js";
 
 describe("exitCodeForError", () => {
@@ -263,5 +268,68 @@ describe("hintForError — http rows disambiguated by `match` (fb#485)", () => {
     // A client-origin error at the same exit code must still find no http row.
     const err = new CliError("liian pitkä", 0, null, 4);
     expect(hintForError(err, legalSave400s)).toBeNull();
+  });
+});
+
+// fb#579: the friction log must be able to tell "the command anticipated this
+// 404" from "the CLI produced a fallback". Same resolution as hintForError —
+// it is now literally the same function — plus where the hint came from.
+describe("hintDetailForError — hint provenance", () => {
+  const notFoundSpec = [
+    { http: 404, exit: 5, meaning: "Grade not found", remedy: "list the catalogue with `ib betoni laatu list`" },
+  ];
+
+  test("a matching spec ERRORS row is `spec` (the command documented this failure)", () => {
+    const err = new CliError("Grade not found in this supplier's catalogue: 2", 404, null, 5);
+    const d = hintDetailForError(err, notFoundSpec);
+    expect(d.source).toBe("spec");
+    expect(d.hint).toBe("list the catalogue with `ib betoni laatu list`");
+  });
+
+  test("a remedy attached at the throw site is `error`", () => {
+    const err = new CliError("--replace text not found", 0, null, 4, "read the current field first");
+    expect(hintDetailForError(err, null).source).toBe("error");
+  });
+
+  test("an UNDEPLOYED route is `route-not-found`, never `spec` — even with a 404 row present", () => {
+    const err = new CliError("Route not found", 404, { code: "ROUTE_NOT_FOUND" }, 5);
+    expect(hintDetailForError(err, notFoundSpec).source).toBe("route-not-found");
+  });
+
+  test("an unclassified 404 falls back to `generic`", () => {
+    const err = new CliError("404 no such worksite", 404, { code: null }, 5);
+    const d = hintDetailForError(err, null);
+    expect(d.source).toBe("generic");
+    expect(d.hint).toMatch(/no such resource/i);
+  });
+
+  test("no hint at all -> both null", () => {
+    expect(hintDetailForError(new CliError("local gate", 0, null, 3), null)).toEqual({
+      hint: null,
+      source: null,
+    });
+  });
+
+  // An empty err.hint deliberately SUPPRESSES the spec remedy (the message is
+  // already the whole remedy). That is a null hint, so there is nothing to
+  // attribute — and it must not read as a curated witness.
+  test("an empty error-carried hint suppresses the hint and reports no source", () => {
+    const err = new CliError("self-explanatory", 400, null, 4, "");
+    expect(hintDetailForError(err, [{ http: 400, exit: 4, meaning: "m", remedy: "r" }])).toEqual({
+      hint: null,
+      source: null,
+    });
+  });
+
+  test("hintForError stays exactly hintDetailForError's hint (no drift)", () => {
+    const cases: CliError[] = [
+      new CliError("Grade not found", 404, null, 5),
+      new CliError("Route not found", 404, { code: "ROUTE_NOT_FOUND" }, 5),
+      new CliError("boom", 500, null, 6),
+      new CliError("local gate", 0, null, 3),
+    ];
+    for (const err of cases) {
+      expect(hintForError(err, notFoundSpec)).toBe(hintDetailForError(err, notFoundSpec).hint);
+    }
   });
 });

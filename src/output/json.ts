@@ -2,7 +2,7 @@ import {
   CliError,
   errorMessage,
   exitCodeForError,
-  hintForError,
+  hintDetailForError,
 } from "../api/errors.js";
 import { isListEnvelope, type ListEnvelope } from "../api/envelopes.js";
 import { renderError, renderList, renderRecord } from "./pretty.js";
@@ -228,12 +228,19 @@ export function writeError(err: unknown): void {
     // `hint` points an agent at the next step without it having to have read
     // the command's --help NOTES beforehand (e.g. 404 = deploy-gated endpoint?).
     // Prefers the running command's own spec remedy when one matches.
-    const hint = hintForError(err, activeErrors);
+    const { hint, source } = hintDetailForError(err, activeErrors);
     // Local best-effort friction capture (non-embedded only) — the universal
     // error funnel, so every non-zero exit is logged for the feedback groom
     // step. Record the hint alongside the message when one was displayed, so
     // the groomer sees what the caller saw (fb#275 fidelity contract).
-    recordFriction(err, undefined, hint ? `${err.message} — ${hint}` : undefined);
+    // `source` lets an anticipated not-found opt out of capture entirely
+    // (fb#579) — a fallback hint the CLI generated is NOT such a witness.
+    recordFriction(
+      err,
+      undefined,
+      hint ? `${err.message} — ${hint}` : undefined,
+      source === "spec" || source === "error"
+    );
     // A prescriptive validation error (thrown via `failValidation`) carries an
     // aggregated `problems` list (+ optional `sample`) in its body — spread them
     // into the envelope so the caller gets every missing/invalid flag, its
