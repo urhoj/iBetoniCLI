@@ -21,6 +21,7 @@ const EMPTY_GLOBAL: GlobalOptions = {
   asiakas: null,
   stats: false,
   columns: null,
+  printPayload: false,
 };
 
 describe("createCliContext", () => {

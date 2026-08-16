@@ -1542,3 +1542,79 @@ describe("ib feedback list — the 200-row cap is reported (fb#605)", () => {
     expect(out.truncated).toBeUndefined();
   });
 });
+
+/**
+ * fb#647: a PARTLY-fixed row was indistinguishable from an untouched one at the
+ * moment an agent picks its next item.
+ *
+ * `ib dev changelog add --feedback <id> --no-resolve` has always been able to
+ * record a shipped half WITHOUT closing the row — but the list read never
+ * carried the resulting link, so browsing `--unclaimed` showed nothing, the row
+ * got claimed, and a full investigation cycle went into rediscovering work that
+ * had already shipped. One stderr line at list time replaces that.
+ */
+describe("ib feedback list — partly-shipped rows are named (fb#647)", () => {
+  let errSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    errSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  });
+  afterEach(() => errSpy.mockRestore());
+
+  const note = () => errSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
+
+  test("THE BUG: a linked-but-open row is called out before it can be claimed", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 418, status: "open", changelogLinks: [{ changelogId: 1189, role: "references" }] },
+      { feedbackId: 500, status: "open", changelogLinks: [] },
+    ]);
+    await runFeedbackList(mockClient, { all: true });
+    expect(note()).toMatch(/1 of 2 rows already carry changelog links/);
+    expect(note()).toMatch(/fb#418 → cl#1189/);
+  });
+
+  test("the links survive into the items — the JSON contract, not just the note", async () => {
+    get.mockResolvedValueOnce([
+      { feedbackId: 418, description: "x", changelogLinks: [{ changelogId: 1189, role: "references" }] },
+    ]);
+    const out = await runFeedbackList(mockClient, { all: true });
+    expect(out.items[0].changelogLinks).toEqual([{ changelogId: 1189, role: "references" }]);
+  });
+
+  test("a page with no linked rows stays silent", async () => {
+    get.mockResolvedValueOnce([{ feedbackId: 500, changelogLinks: [] }, { feedbackId: 501 }]);
+    await runFeedbackList(mockClient, { all: true });
+    expect(note()).not.toMatch(/changelog links/);
+  });
+
+  test("an older backend (no field at all) stays silent — absence is not 'nothing shipped'", async () => {
+    get.mockResolvedValueOnce([{ feedbackId: 500 }, { feedbackId: 501 }]);
+    await runFeedbackList(mockClient, { all: true });
+    expect(note()).not.toMatch(/changelog links/);
+  });
+
+  test("names at most five rows, then counts the rest", async () => {
+    get.mockResolvedValueOnce(
+      Array.from({ length: 7 }, (_, i) => ({
+        feedbackId: 400 + i,
+        changelogLinks: [{ changelogId: 1000 + i, role: "references" }],
+      }))
+    );
+    await runFeedbackList(mockClient, { all: true });
+    expect(note()).toMatch(/\+2 more/);
+    expect(note()).not.toMatch(/fb#405/);
+  });
+
+  test("a row with several links renders them all", async () => {
+    get.mockResolvedValueOnce([
+      {
+        feedbackId: 168,
+        changelogLinks: [
+          { changelogId: 900, role: "references" },
+          { changelogId: 901, role: "references" },
+        ],
+      },
+    ]);
+    await runFeedbackList(mockClient, { all: true });
+    expect(note()).toMatch(/fb#168 → cl#900\+cl#901/);
+  });
+});

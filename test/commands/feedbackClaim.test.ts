@@ -355,3 +355,76 @@ describe("claim identity — in-process ctx (fb#616)", () => {
     expect(await runEmbedded(ctx(null), async () => resolveClaimId(undefined))).toMatch(/@/);
   });
 });
+
+/**
+ * fb#647: claiming a row that already carries changelog links must SAY so.
+ *
+ * This is the last moment before the wasted work starts. An open row can carry
+ * links — `changelog add --feedback <id> --no-resolve` records a partial fix
+ * without closing the row — and the claim response has always included them; it
+ * simply never surfaced them, so the agent found out only after re-deriving the
+ * shipped half by hand.
+ */
+describe("runFeedbackClaim — already-linked warning (fb#647)", () => {
+  let errSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    errSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  });
+  afterEach(() => errSpy.mockRestore());
+
+  const note = () => errSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
+
+  /** A claim client whose POST answers with the given row. */
+  const clientReturning = (row: Record<string, unknown>) =>
+    ({ post: vi.fn().mockResolvedValue(row) }) as never;
+
+  test("THE BUG: a linked row warns, and names the entry to read first", async () => {
+    await runFeedbackClaim(
+      clientReturning({
+        feedbackId: 418,
+        claimedBy: "c6b96c",
+        changelogLinks: [{ changelogId: 1189, role: "references" }],
+      }),
+      418,
+      { by: "c6b96c" }
+    );
+    expect(note()).toMatch(/fb#418 already carries 1 changelog link/);
+    expect(note()).toMatch(/cl#1189 \(references\)/);
+    expect(note()).toMatch(/ib dev changelog get 1189/);
+  });
+
+  test("an unlinked row claims silently — no false alarm on the ordinary path", async () => {
+    await runFeedbackClaim(
+      clientReturning({ feedbackId: 42, claimedBy: "c6b96c", changelogLinks: [] }),
+      42,
+      { by: "c6b96c" }
+    );
+    expect(note()).not.toMatch(/changelog link/);
+  });
+
+  test("an older backend (no field) stays silent rather than asserting 'nothing shipped'", async () => {
+    await runFeedbackClaim(clientReturning({ feedbackId: 42, claimedBy: "c6b96c" }), 42, { by: "c6b96c" });
+    expect(note()).not.toMatch(/changelog link/);
+  });
+
+  test("several links are all named, pluralised", async () => {
+    await runFeedbackClaim(
+      clientReturning({
+        feedbackId: 168,
+        changelogLinks: [
+          { changelogId: 900, role: "references" },
+          { changelogId: 901, role: "resolves" },
+        ],
+      }),
+      168,
+      { by: "c6b96c" }
+    );
+    expect(note()).toMatch(/2 changelog links/);
+    expect(note()).toMatch(/cl#900 \(references\), cl#901 \(resolves\)/);
+  });
+
+  test("the row is still returned unchanged — the note is stderr, not the payload", async () => {
+    const row = { feedbackId: 418, changelogLinks: [{ changelogId: 1189, role: "references" }] };
+    expect(await runFeedbackClaim(clientReturning(row), 418, { by: "c6b96c" })).toEqual(row);
+  });
+});

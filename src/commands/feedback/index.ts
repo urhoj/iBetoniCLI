@@ -451,6 +451,8 @@ export async function runFeedbackList(
       return c.row;
     });
   }
+  warnPartlyShipped(items);
+
   const env = listEnvelope(items);
   if (truncated) env.truncated = true;
   const hints: string[] = [];
@@ -535,6 +537,76 @@ async function countClientSide(
       "count is a lower bound — this backend has no /api/feedback/stats, so the rollup ran client-side and hit the 200-row cap. The rows dropped are the OLDEST, so `open` is understated most.";
   }
   return out;
+}
+
+/**
+ * The changelog entries linked to a feedback row, as a junction-aware backend
+ * attaches them (`changelogLinks: [{changelogId, role}]`, the same shape on
+ * `list`, `get` and `claim`).
+ *
+ * An older backend omits the key entirely, which reads as `[]` here — correct,
+ * because the only safe reading of "this backend cannot tell me" is to say
+ * nothing rather than assert that nothing shipped.
+ */
+function readChangelogLinks(row: Record<string, unknown>): { changelogId: number; role: string }[] {
+  const raw = row.changelogLinks;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((l): l is Record<string, unknown> => !!l && typeof l === "object")
+    .map((l) => ({ changelogId: Number(l.changelogId), role: String(l.role ?? "") }))
+    .filter((l) => Number.isFinite(l.changelogId));
+}
+
+/**
+ * Say so when the row you just claimed already carries changelog links (fb#647).
+ *
+ * This is the moment the wasted work would otherwise start. A partial fix is
+ * recordable — `ib dev changelog add --feedback <id> --no-resolve` links the
+ * shipped half WITHOUT closing the row — but nothing ever SAID so at claim time,
+ * so an agent picked a row whose CLI half had already shipped and spent a full
+ * investigation cycle rediscovering it. The links have always been in the claim
+ * response; they were simply never surfaced.
+ *
+ * stderr, never stdout: the JSON data contract is untouched.
+ */
+function warnAlreadyLinked(row: Record<string, unknown>): void {
+  const links = readChangelogLinks(row);
+  if (!links.length) return;
+  const id = row.feedbackId ?? "?";
+  const rendered = links.map((l) => `cl#${l.changelogId} (${l.role})`).join(", ");
+  warnNote(
+    `[ib] note: fb#${id} already carries ${links.length} changelog link${links.length > 1 ? "s" : ""} — ${rendered}. ` +
+      `Part of this item may already have shipped; read the entry before investigating: ib dev changelog get ${links[0].changelogId}`
+  );
+}
+
+/** How many linked rows a list note names before it summarises the rest. */
+const LINKED_ROWS_NAMED = 5;
+
+/**
+ * Make partly-shipped rows legible at BROWSE time (fb#647).
+ *
+ * `--unclaimed` is where an agent picks its next item, and a row carrying a
+ * `references` link — work recorded but deliberately not closed — used to look
+ * identical to an untouched one. Claiming it and only then discovering the
+ * shipped half is the expensive order to find out in; one stderr line at list
+ * time is the cheap one.
+ *
+ * Deploy-gated the safe way: an older backend sends no links, so the note simply
+ * does not fire. It never claims a row is untouched.
+ */
+function warnPartlyShipped(items: Record<string, unknown>[]): void {
+  const linked = items.filter((r) => readChangelogLinks(r).length > 0);
+  if (!linked.length) return;
+  const named = linked
+    .slice(0, LINKED_ROWS_NAMED)
+    .map((r) => `fb#${r.feedbackId} → ${readChangelogLinks(r).map((l) => `cl#${l.changelogId}`).join("+")}`)
+    .join(", ");
+  const rest = linked.length - Math.min(linked.length, LINKED_ROWS_NAMED);
+  warnNote(
+    `[ib] note: ${linked.length} of ${items.length} rows already carry changelog links (${named}${rest > 0 ? `, +${rest} more` : ""}) — ` +
+      `part of that work has shipped without closing the row. Read the entry (ib dev changelog get <id>) before claiming one.`
+  );
 }
 
 /**
@@ -828,9 +900,11 @@ export async function runFeedbackClaim(
   const body: Record<string, unknown> = { by: resolveClaimId(input.by) };
   if (input.ttlHours !== undefined) body.ttlHours = input.ttlHours;
   if (input.steal) body.steal = true;
-  return client.post<Record<string, unknown>>(`/api/feedback/${id}/claim`, body, {
+  const row = await client.post<Record<string, unknown>>(`/api/feedback/${id}/claim`, body, {
     headers: writeFlagsToHeaders({ reason: input.reason }),
   });
+  warnAlreadyLinked(row);
+  return row;
 }
 
 /** Release one lease (DELETE) or every lease held by the label (--all). */

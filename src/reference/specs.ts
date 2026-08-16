@@ -6562,7 +6562,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "claimed-by", type: "string", description: "Only items held by this label, and only while the claim is still LIVE" },
     ],
     outputShape:
-      "{ items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }",
+      "{ items: FeedbackRow[] (description/resolution/errorText capped at 200 chars unless --full), nextCursor: null, count, truncated?, hint? }. Each row carries `changelogLinks: [{changelogId, role}]` — the same shape `get` returns — so a PARTLY-shipped row is visible before you claim it (fb#647).",
     // 18 columns is far past what a terminal table holds, and the triage-
     // relevant ones (scope/severity/complexity) sit at the END of the row, so
     // the automatic leftmost-fits fallback would hide exactly the wrong half.
@@ -6579,6 +6579,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "--complexity / --max-complexity filter on the AI-triage complexity estimate (1-5). `--max-complexity 3 --unresolved` is the autonomously-workable backlog for a batch-fix agent; also deploy-gated (ignored by an older backend).",
       "--oldest sorts createdAt ASC so the automated triage loop drains the backlog oldest-first (FIFO) instead of favouring the newest reports it reads first; the human default stays newest-first. Layer it under a priority filter (e.g. `--kind bug --oldest`) to keep breakages ahead of age.",
       "Each row carries claimState (free|held|mine). An expired claim reads as `free` — the lease is evaluated against the clock, never a stored flag, so a lapsed 24h claim reappears here automatically.",
+      "PARTLY-SHIPPED ROWS (fb#647): a row can carry `changelogLinks` and still be open — that is a fix recorded with `ib dev changelog add --feedback <id> --no-resolve`, which links the shipped half WITHOUT closing the row. Any linked row in the page is also named in a one-line stderr note. Read the entry (`ib dev changelog get <id>`) BEFORE claiming it, or you will re-investigate work that already shipped. Deploy-gated: an older backend sends no links and the note simply does not fire — its absence never means 'nothing shipped'.",
     ],
     examples: [
       "ib dev feedback list",
@@ -6660,8 +6661,9 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "A note WITHOUT --status does NOT close the row — it stays open/reviewed and the ack carries a hint saying so; pass --status applied|dismissed to close (feedback #270).",
       "The two ways to close a row have OPPOSITE defaults, so don't assume this one closes: `ib dev changelog add --feedback <id>` closes it for you (status=applied plus a `Shipped: changelog #N` resolution), while this command leaves the status alone unless you pass --status. Recording the fix in the changelog is the one-call path (feedback #293). Note the one-call path only advances a row from `open` — if you set this row to `reviewed` first, a later `changelog add --feedback` will preserve that and tell you so, rather than claiming shipped work that is only staged (fb#517).",
       "SHELL QUOTING (fb#327): a resolution note quotes commands and errors, and a quote-split can even store the note TRUNCATED at the first quote — use --from-json <file|-> for any quote-bearing note; see `ib help shell-quoting`.",
+      "FIXED ONLY PART OF IT? Do not choose between closing the row and recording nothing — there is a third path (fb#647). `ib dev changelog add --feedback <id> --no-resolve` links the entry with role `references`, recording the shipped half WITHOUT touching the status; then `ib dev feedback update <id> --append-description \"shipped: X; remaining: Y\"` (and `--scope` if the residue belongs to another repo) narrows the row to what is left. The link is what makes it legible: `feedback list` and `claim` both name a linked row, so the next agent reads your entry instead of rediscovering it. Leaving a partial fix unrecorded is the failure this exists to prevent — it costs every later agent the same investigation.",
     ],
-    seeAlso: ["ib dev changelog add", "ib dev feedback list"],
+    seeAlso: ["ib dev changelog add", "ib dev feedback list", "ib dev feedback update"],
     examples: [
       'ib dev feedback resolve 42 --status applied --note "added row counts in CLI v1.3"',
       'ib dev feedback resolve 42 --status applied -- "the note works positionally too"',
@@ -6731,7 +6733,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { name: "steal", type: "boolean", description: "Take a row that is under another agent's LIVE claim. For human recovery; normal contention should pick a different item instead." },
       { name: "reason", type: "string", description: "Audit-log reason (X-Action-Reason)" },
     ],
-    outputShape: "The claimed feedback row, including claimedBy, claimedAt and claimExpiresAt.",
+    outputShape:
+      "The claimed feedback row, including claimedBy, claimedAt, claimExpiresAt and `changelogLinks: [{changelogId, role}]`.",
     errors: [
       // The 1-24 range check is SERVER-side (feedback.js claim(): sendValidationError
       // -> HTTP 400), not client-side — runFeedbackClaim forwards ttlHours unchecked.
@@ -6749,6 +6752,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "Re-claiming an item you already hold is idempotent and doubles as the RENEWAL path; there is no separate renew command. It cannot extend the lease past 24h from your first acquire.",
       "An abandoned claim frees itself: expiry is evaluated at read time, so after 24h the row is claimable again with no sweeper and no manual cleanup.",
       "Closing a row (`resolve --status applied|dismissed`) releases the claim automatically.",
+      "If the row already carries changelog links, claiming it prints a one-line stderr note naming them (fb#647). An open row CAN have links: `ib dev changelog add --feedback <id> --no-resolve` records a partial fix without closing the row, so part of the item may already have shipped. Read the named entry (`ib dev changelog get <id>`) before starting — that note exists because an agent once spent a whole investigation cycle rediscovering a half that had already shipped.",
     ],
     seeAlso: ["ib dev feedback release", "ib dev feedback list", "ib dev feedback resolve"],
     examples: [
