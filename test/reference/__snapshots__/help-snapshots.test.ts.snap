@@ -612,7 +612,7 @@ ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Impersonation not allowed for the target → needs systemAdmin/roleManager, same-tenant admin, or a grant
   exit 5 (HTTP 404)  Target not found (or has no personEmail) → no impersonatable person for that personId/email. NB: a personId that EXISTS but has no personEmail also 404s here (impersonation is email-keyed) — verify with \`ib person get <id>\`; an email-less person cannot be impersonated.
   exit 3 (client-side)  Read-only mode active (--read-only / IB_READ_ONLY) → impersonation persists a rotated JWT; drop read-only
-  exit 4 (client-side)  A session is already active — starting a second would silently retarget it → end the current one first with \`ib auth impersonate --end\` (or \`--extend\` to keep it), then start the new target
+  exit 4 (client-side)  A session is already active — starting a second would overwrite the stashed admin profile, so --end could no longer restore you → end the current one first with \`ib auth impersonate --end\` (or \`--extend\` to keep it), then start the new target
   exit 4 (client-side)  No active session (--end/--extend), or neither personId nor --email given → start with \`ib auth impersonate <personId>\`
 
 NOTES
@@ -9256,6 +9256,8 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  A required field is missing (the message names which) → pass the flags the message names — --first and --last are required; email is optional
+  exit 4 (client-side)  Both --global and --asiakas given — contradictory owner directives → pass one: --global for a self-managing person (ownerAsiakasId null), or --asiakas <id> to own it
+  exit 4 (client-side)  --get-or-create matched an email owned by a company you cannot see, so it can neither reuse nor create → find the owner with \`ib person search --my-companies\`, or create with a different email
   exit 4 (HTTP 400)  Duplicate email without --get-or-create → add --get-or-create to reuse an existing visible person, or use a different email
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.person.edit
@@ -10991,7 +10993,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Neither/both of --on/--off given, or --radius not a positive number → pass exactly one of --on / --off; --radius is km > 0
-  exit 4 (client-side)  --puomi-min/--puomi-max not a non-negative number or min > max → pass metres 0–999.99 with min ≤ max
+  exit 4 (client-side)  --puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max → pass metres 0–999.99 with min ≤ max
   exit 5 (HTTP 404)  Sijainti not found     → verify sijaintiId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.edit
@@ -11141,7 +11143,7 @@ DESCRIPTION
   Permissions: requires auth.page.sijainnit.edit.
 
 FLAGS
-  --body JSON    JSON object with fields to update (optional if typed flags given) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see \`ib help shell-quoting\`).
+  --body JSON    JSON object with fields to update (optional if typed flags given) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use the typed flags there (this command has no --from-json; see \`ib help shell-quoting\`).
   --id NUMBER    Target sijaintiId (or include sijaintiId in --body)
   --name STRING    sijaintiNimi
   --address STRING    sijaintiOsoite1 (street)
@@ -11176,7 +11178,7 @@ ERRORS (stderr, exit non-zero)
   exit 5 (HTTP 404)  Sijainti not found     → verify sijaintiId
   exit 4 (client-side)  --puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max — would otherwise clear the stored bound → pass metres 0–999.99 with min ≤ max
   exit 4 (client-side)  Both --public and --private given → pass at most one — omit both to leave visibility untouched
-  exit 4 (client-side)  No sijaintiId given (neither --id nor a sijaintiId in --body) → pass --id <sijaintiId>, or include sijaintiId in --body/--from-json
+  exit 4 (client-side)  No sijaintiId given (neither --id nor a sijaintiId in --body) → pass --id <sijaintiId>, or include sijaintiId in --body
   exit 3 (HTTP 403)  Not a company admin — only admins may CHANGE isPublic → drop --public/--private to edit the other fields, or ask a company admin; see \`ib sijainti set-public\`
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.edit
@@ -11569,7 +11571,7 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed      → fix the field flags
-  exit 3 (HTTP 403)  No access to this tenant's vehicles (--asiakas) → you need an admin/owner/vehicleHandler role on the target tenant
+  exit 3 (HTTP 403)  No vehicle-edit access on the target tenant (--asiakas if given, otherwise your active company) → you need an admin/owner/vehicleHandler role on that tenant
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.vehicle.edit
   exit 6 (HTTP 500)  Backend error          → retry with --verbose

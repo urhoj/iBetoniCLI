@@ -155,12 +155,17 @@ const LEGAL_DEV_ERRORS: CommandError[] = [
 // hasVehicleAccessOnAsiakas gate in puminet5api).
 const VEHICLE_ASIAKAS_PERMISSION =
   "--asiakas: sysadmin/developer or a vehicle-manage role (admin/owner/vehicleHandler) on the target tenant";
-// `match` is load-bearing (fb#668): every spec carrying this row ALSO carries a
-// permErrors 403, and `matchHttpRow` falls back to the first row with no `match`
-// — so without one this row answered every 403, including a plain
-// auth.page.vehicle.read denial, and told that caller to go get a role on
-// another tenant. Substring is the backend's own text (vehicleCliRoutes.js
-// `sendForbidden(res, "no vehicle access on the requested company")`).
+// `match` narrows this row so the permErrors 403 alongside it stays structurally
+// reachable (fb#668) — `matchHttpRow` falls back to the FIRST matchless row, so
+// two matchless rows at one status make the second dead.
+//
+// Honest scope, corrected after review: on the four READ commands this is
+// DEFENSIVE, not a bug that fired. `/api/cli/vehicle/{list,get,types,search}`
+// are registered with `jwt` + cache middleware only, and the sole `sendForbidden`
+// in vehicleCliRoutes.js is the cross-tenant one — so no plain permission 403
+// exists there to be swallowed, and the permErrors row is unreachable either
+// way. (The sijainti twin below is the case where the shadowing really did fire.)
+// Substring is the backend's own text (vehicleCliRoutes.js:216/449/699).
 const VEHICLE_ASIAKAS_403: CommandError = apiErr(
   403,
   "No vehicle access on the requested --asiakas company",
@@ -215,6 +220,23 @@ const GEOCODE_CLIENT_ERR: CommandError = {
   meaning: "--geocode found no match for the address (Google returned ZERO_RESULTS or another non-OK status)",
   remedy: "supply a fuller --address, or pass --lat/--lng directly and drop --geocode",
 };
+/**
+ * The `--puomi-min/--puomi-max` row, shared by `sijainti create|update|set-jerry`.
+ *
+ * All three mirror ONE guard (`assertPuomiFlags`), so the match array had three
+ * maintenance sites for a single source — and had already drifted: set-jerry's
+ * copy had lost the "(e.g. a typo …)" parenthetical the other two carry. `extra`
+ * is the only genuine difference (update warns that a bad value would CLEAR the
+ * stored bound).
+ */
+const puomiErr = (extra = ""): CommandError => ({
+  origin: "client",
+  exit: 4,
+  match: ["non-negative number of metres", "cannot exceed"],
+  meaning: `--puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max${extra}`,
+  remedy: "pass metres 0–999.99 with min ≤ max",
+});
+
 const GEOCODE_NO_ADDRESS_ERR: CommandError = {
   origin: "client",
   exit: 4,
@@ -674,7 +696,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       // row it answered ALL of them, so "Already impersonating — run --end
       // first" was told to START a session (fb#668 class). The already-active
       // case is the opposite instruction, so it gets its own row.
-      { origin: "client", exit: 4, match: "already impersonating", meaning: "A session is already active — starting a second would silently retarget it", remedy: "end the current one first with `ib auth impersonate --end` (or `--extend` to keep it), then start the new target" },
+      // The guard is protecting more than a retarget: without it the second
+      // start overwrites the STASHED ADMIN profile with the current impersonation
+      // profile, so `--end` would "restore" you to the impersonated identity and
+      // the admin session would be unrecoverable.
+      { origin: "client", exit: 4, match: "already impersonating", meaning: "A session is already active — starting a second would overwrite the stashed admin profile, so --end could no longer restore you", remedy: "end the current one first with `ib auth impersonate --end` (or `--extend` to keep it), then start the new target" },
       { origin: "client", exit: 4, match: ["no active impersonation session", "provide a target personid"], meaning: "No active session (--end/--extend), or neither personId nor --email given", remedy: "start with `ib auth impersonate <personId>`" },
     ],
     notes: [
@@ -2660,12 +2686,16 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     errors: [
       apiErr(400, "Validation failed", "fix the field flags"),
       // Matched on the backend's Finnish denyMessage (vehicleRoutes.js
-      // `vehicleEdit` → requireCompanyRole denyMessage), so the permErrors row
-      // below stays reachable as the catch-all (fb#668).
+      // `vehicleEdit` → requireCompanyRole denyMessage).
+      //
+      // The target is `--asiakas ?? your own company`, so this fires for a
+      // caller lacking the edit role on their OWN company too — the meaning must
+      // not blame `--asiakas`, which was the pre-review wording and would send
+      // someone hunting a flag they never passed.
       apiErr(
         403,
-        "No access to this tenant's vehicles (--asiakas)",
-        "you need an admin/owner/vehicleHandler role on the target tenant",
+        "No vehicle-edit access on the target tenant (--asiakas if given, otherwise your active company)",
+        "you need an admin/owner/vehicleHandler role on that tenant",
         "ei oikeuksia tämän asiakkaan ajoneuvoihin"
       ),
       ...permErrors("auth.page.vehicle.edit"),
@@ -3491,7 +3521,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, match: "create requires:", meaning: "A required field is missing (the message names which)", remedy: "pass the flags the message names — --name and --type are the two the guard requires" },
       // `match` added so the row stops acting as this command's catch-all
       // (fb#668 follow-up); its `sijainti update` twin already had one.
-      { origin: "client", exit: 4, match: ["non-negative number of metres", "cannot exceed"], meaning: "--puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max", remedy: "pass metres 0–999.99 with min ≤ max" },
+      puomiErr(),
       ...permErrors("auth.page.sijainnit.edit"),
     ],
     notes: [
@@ -3513,7 +3543,9 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       "Update a sijainti via read-merge-write (GET current row + POST /api/geocode/updateSijainti). sijaintiId via --id or in --body. Omitted fields KEEP their current values (the save proc assigns directly — a sparse body would NULL e.g. jerryActiveUntil, dates, phone); pass an explicit null in --body to clear a field. --max-distance is the general delivery radius in km (stored as maxDeliveryDistance), independent of BetoniJerry enrolment. An address change re-geocodes the new address automatically when no --lat/--lng are given (soft-fail: geocodeFailed echoed; --geocode forces re-resolution and fails fast). --lat/--lng are persisted via a follow-up updateLatLng call (the save proc itself binds no lat/lng) and echoed as { lat, lng, coordsPersisted }. Provide typed flags or --body JSON; typed flags win over --body.",
     permissions: ["auth.page.sijainnit.edit"],
     flags: [
-      { name: "body", type: "json", description: "JSON object with fields to update (optional if typed flags given) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use --from-json <file|-> there, or typed flags (fb#437; see `ib help shell-quoting`)." },
+      // NB: unlike `person update` / `worksite update`, this command has NO
+      // --from-json, so the PowerShell escape hatch here is typed flags only.
+      { name: "body", type: "json", description: "JSON object with fields to update (optional if typed flags given) ⚠ Windows PowerShell splits this argument on its inner double-quotes, so inline JSON arrives mangled and exits 4 as a too-many-arguments usage error — use the typed flags there (this command has no --from-json; see `ib help shell-quoting`)." },
       { name: "id", type: "number", description: "Target sijaintiId (or include sijaintiId in --body)" },
       { name: "name", type: "string", description: "sijaintiNimi" },
       { name: "address", type: "string", description: "sijaintiOsoite1 (street)" },
@@ -3537,10 +3569,13 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       GEOCODE_CLIENT_ERR,
       GEOCODE_NO_ADDRESS_ERR,
       apiErr(404, "Sijainti not found", "verify sijaintiId"),
-      { origin: "client", exit: 4, match: ["non-negative number of metres", "cannot exceed"], meaning: "--puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max — would otherwise clear the stored bound", remedy: "pass metres 0–999.99 with min ≤ max" },
+      puomiErr(" — would otherwise clear the stored bound"),
       { origin: "client", exit: 4, match: "at most one of --public", meaning: "Both --public and --private given", remedy: "pass at most one — omit both to leave visibility untouched" },
       // Previously undocumented, so it fell through to no hint at all.
-      { origin: "client", exit: 4, match: "update requires sijaintiid", meaning: "No sijaintiId given (neither --id nor a sijaintiId in --body)", remedy: "pass --id <sijaintiId>, or include sijaintiId in --body/--from-json" },
+      // `--body` only: this command does NOT register --from-json (person/worksite
+      // update do). Naming it here would send the caller to an unknown-option
+      // exit 4 — the guard's own message names only --body, and so does this.
+      { origin: "client", exit: 4, match: "update requires sijaintiid", meaning: "No sijaintiId given (neither --id nor a sijaintiId in --body)", remedy: "pass --id <sijaintiId>, or include sijaintiId in --body" },
       apiErr(403, "Not a company admin — only admins may CHANGE isPublic", "drop --public/--private to edit the other fields, or ask a company admin; see `ib sijainti set-public`", SIJAINTI_PUBLIC_403_MATCH),
       ...permErrors("auth.page.sijainnit.edit"),
     ],
@@ -3573,7 +3608,7 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       { origin: "client", exit: 4, match: ["pass exactly one of --on", "--radius must be a positive"], meaning: "Neither/both of --on/--off given, or --radius not a positive number", remedy: "pass exactly one of --on / --off; --radius is km > 0" },
       // `match` added so this narrow row stops answering every client failure on
       // the command (fb#668 follow-up).
-      { origin: "client", exit: 4, match: ["non-negative number of metres", "cannot exceed"], meaning: "--puomi-min/--puomi-max not a non-negative number or min > max", remedy: "pass metres 0–999.99 with min ≤ max" },
+      puomiErr(),
       apiErr(404, "Sijainti not found", "verify sijaintiId"),
       ...permErrors("auth.page.sijainnit.edit"),
     ],
@@ -4523,6 +4558,11 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       // http row the local half was unreachable (fb#280/fb#668 class). Twin of
       // the `sijainti create` row.
       { origin: "client", exit: 4, match: "create requires:", meaning: "A required field is missing (the message names which)", remedy: "pass the flags the message names — --first and --last are required; email is optional" },
+      // Two more exit-4 guards this command owns. Missed by the af8553e audit
+      // pass — its method (guard messages vs documented rows) is only as good as
+      // the sweep, and these two were in the tail.
+      { origin: "client", exit: 4, match: "--global and --asiakas are mutually exclusive", meaning: "Both --global and --asiakas given — contradictory owner directives", remedy: "pass one: --global for a self-managing person (ownerAsiakasId null), or --asiakas <id> to own it" },
+      { origin: "client", exit: 4, match: "already in use by a person you cannot access", meaning: "--get-or-create matched an email owned by a company you cannot see, so it can neither reuse nor create", remedy: "find the owner with `ib person search --my-companies`, or create with a different email" },
       apiErr(400, "Duplicate email without --get-or-create", "add --get-or-create to reuse an existing visible person, or use a different email"),
       ...permErrors("auth.page.person.edit"),
     ],

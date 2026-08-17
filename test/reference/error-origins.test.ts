@@ -420,6 +420,20 @@ describe("narrow client rows stop answering for their neighbours (fb#668)", () =
     }
   });
 
+  test("person create's other two exit-4 guards reach their own remedy", () => {
+    // Both were missed by af8553e's own audit sweep — its method is only as good
+    // as the extraction, and these sat in the tail.
+    expect(
+      hintForError(client4("--global and --asiakas are mutually exclusive"), rowsOf("ib person create"))
+    ).toMatch(/--global for a self-managing person/);
+    expect(
+      hintForError(
+        client4("email x@y.fi is already in use by a person you cannot access (likely owned by another company)."),
+        rowsOf("ib person create")
+      )
+    ).toMatch(/search --my-companies/);
+  });
+
   test("the two previously-undocumented guards now reach a remedy", () => {
     expect(
       hintForError(client4("update requires sijaintiId — pass --id or include it in --body"), rowsOf("ib sijainti update"))
