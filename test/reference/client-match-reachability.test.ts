@@ -156,8 +156,8 @@ describe("shared-helper guards still reach their command's own remedy (fb#672)",
  *
  * This does not prove the string matches the live source (nothing mechanical
  * can, see the header), but it does catch the ordering/shadowing class across
- * all 90 rows at zero maintenance cost, and it fails loudly if a future edit
- * makes two rows collide.
+ * the whole client-match corpus at zero maintenance cost, and it fails loudly
+ * if a future edit makes two rows collide.
  */
 // Deliberately count-free: the corpus is derived, so a number in the title goes
 // stale the moment anyone adds a `match` row (fb#697 took it 90 -> 121).
