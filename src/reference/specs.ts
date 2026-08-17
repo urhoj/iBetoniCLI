@@ -195,6 +195,34 @@ const VEHICLE_OWNER_NOTE =
  */
 const SIJAINTI_PUBLIC_403_MATCH = "vain yrityksen ylläpitäjä voi muuttaa sijainnin julkisuutta";
 
+/**
+ * `--geocode` fails CLIENT-side, before the write (fb#668 follow-up).
+ *
+ * These were documented as `http: 400`, which no path can produce:
+ * `applyGeocodeToBody` resolves the address first and `failWith(..., 4)`s on no
+ * match, so the request is never sent. Documented as HTTP they were dead by the
+ * fb#280 rule AND shadowed the real "Validation failed" 400 — and because the
+ * puomi row was the only matchless CLIENT row on `sijainti create`, a failed
+ * geocode was actually answered with "pass metres 0–999.99 with min ≤ max".
+ *
+ * `status` varies (ZERO_RESULTS, NO_ROUTE_FOUND, …) so the match is on the
+ * stable prefix the CLI itself writes, not on any one Google status.
+ */
+const GEOCODE_CLIENT_ERR: CommandError = {
+  origin: "client",
+  exit: 4,
+  match: "could not geocode address",
+  meaning: "--geocode found no match for the address (Google returned ZERO_RESULTS or another non-OK status)",
+  remedy: "supply a fuller --address, or pass --lat/--lng directly and drop --geocode",
+};
+const GEOCODE_NO_ADDRESS_ERR: CommandError = {
+  origin: "client",
+  exit: 4,
+  match: "--geocode requires --address",
+  meaning: "--geocode passed with no address to resolve",
+  remedy: "pass --address (or sijaintiOsoite1 in --body), or drop --geocode and give --lat/--lng",
+};
+
 // ─── person 404: say which DIMENSION failed (fb#620) ─────────────────────────
 // `verify personId` is the wrong instruction most of the time this fires: the
 // id is usually right and the SCOPE is wrong, because every person command is
@@ -3436,13 +3464,22 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape: "{ sijaintiId, success, lat?, lng?, coordsPersisted? } — lat/lng/coordsPersisted present when coordinates were given (coordsPersisted:false on --dry-run)",
     errors: [
       apiErr(400, "Validation failed", "fix --body fields"),
-      // Narrowed so the generic "Validation failed" row above stays the 400
-      // catch-all it is meant to be (fb#668). Note the ordinary address-change
-      // geocode is SOFT-fail — it reports `geocodeFailed` on a successful
-      // response rather than 400-ing — so this row only ever describes the
-      // forced `--geocode` path.
-      apiErr(400, 'Address could not be geocoded (--geocode, status ZERO_RESULTS)', "supply a fuller --address or pass --lat/--lng directly", ["geocod", "ZERO_RESULTS"]),
-      { origin: "client", exit: 4, meaning: "--puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max", remedy: "pass metres 0–999.99 with min ≤ max" },
+      // CLIENT-side, not a backend 400 (fb#668 follow-up). `--geocode` is
+      // resolved entirely in the CLI: applyGeocodeToBody geocodes FIRST and
+      // `failWith(..., 4)`s on no match, so the POST never happens and no 400
+      // ever arrives. Verified live — the real error is
+      // `could not geocode address "..." (status: ZERO_RESULTS|NO_ROUTE_FOUND)`
+      // with statusCode 0. (The ordinary address-change geocode is separate and
+      // SOFT-fails, reporting `geocodeFailed` on a SUCCESSFUL response.)
+      GEOCODE_CLIENT_ERR,
+      GEOCODE_NO_ADDRESS_ERR,
+      // Required-field guard, previously undocumented — and while the puomi row
+      // below was the command's only matchless client row, matchClientRow's
+      // sole-row fallback answered THIS failure with the puomi remedy.
+      { origin: "client", exit: 4, match: "create requires:", meaning: "A required field is missing (the message names which)", remedy: "pass the flags the message names — --name and --type are the two the guard requires" },
+      // `match` added so the row stops acting as this command's catch-all
+      // (fb#668 follow-up); its `sijainti update` twin already had one.
+      { origin: "client", exit: 4, match: ["non-negative number of metres", "cannot exceed"], meaning: "--puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max", remedy: "pass metres 0–999.99 with min ≤ max" },
       ...permErrors("auth.page.sijainnit.edit"),
     ],
     notes: [
@@ -3484,12 +3521,9 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape: "{ ok: true, ..., lat?, lng?, coordsPersisted?, geocodeFailed? } — lat/lng/coordsPersisted present when coordinates were supplied or geocoded; geocodeFailed when the automatic address-change geocode found no match (update still ran, coords now NULL)",
     errors: [
       apiErr(400, "Validation failed", "fix --body fields"),
-      // Narrowed so the generic "Validation failed" row above stays the 400
-      // catch-all it is meant to be (fb#668). Note the ordinary address-change
-      // geocode is SOFT-fail — it reports `geocodeFailed` on a successful
-      // response rather than 400-ing — so this row only ever describes the
-      // forced `--geocode` path.
-      apiErr(400, 'Address could not be geocoded (--geocode, status ZERO_RESULTS)', "supply a fuller --address or pass --lat/--lng directly", ["geocod", "ZERO_RESULTS"]),
+      // Client-side — see the twin on `sijainti create` (fb#668 follow-up).
+      GEOCODE_CLIENT_ERR,
+      GEOCODE_NO_ADDRESS_ERR,
       apiErr(404, "Sijainti not found", "verify sijaintiId"),
       { origin: "client", exit: 4, match: ["non-negative number of metres", "cannot exceed"], meaning: "--puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max — would otherwise clear the stored bound", remedy: "pass metres 0–999.99 with min ≤ max" },
       { origin: "client", exit: 4, match: "at most one of --public", meaning: "Both --public and --private given", remedy: "pass at most one — omit both to leave visibility untouched" },
@@ -3520,8 +3554,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ ok: true, ... } (raw backend response) or { dryRun: true, wouldUpdate: {...} }",
     errors: [
-      apiErr(400, "Neither/both of --on/--off given, or --radius not a positive number", "pass exactly one of --on / --off; --radius is km > 0"),
-      { origin: "client", exit: 4, meaning: "--puomi-min/--puomi-max not a non-negative number or min > max", remedy: "pass metres 0–999.99 with min ≤ max" },
+      // Both guards are CLIENT-side `failWith(..., 4)` in the action, not a
+      // backend 400 (fb#668 follow-up) — the request is never sent.
+      { origin: "client", exit: 4, match: ["pass exactly one of --on", "--radius must be a positive"], meaning: "Neither/both of --on/--off given, or --radius not a positive number", remedy: "pass exactly one of --on / --off; --radius is km > 0" },
+      // `match` added so this narrow row stops answering every client failure on
+      // the command (fb#668 follow-up).
+      { origin: "client", exit: 4, match: ["non-negative number of metres", "cannot exceed"], meaning: "--puomi-min/--puomi-max not a non-negative number or min > max", remedy: "pass metres 0–999.99 with min ≤ max" },
       apiErr(404, "Sijainti not found", "verify sijaintiId"),
       ...permErrors("auth.page.sijainnit.edit"),
     ],

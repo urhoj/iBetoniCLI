@@ -10651,7 +10651,9 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed      → fix --body fields
-  exit 4 (HTTP 400)  Address could not be geocoded (--geocode, status ZERO_RESULTS) → supply a fuller --address or pass --lat/--lng directly
+  exit 4 (client-side)  --geocode found no match for the address (Google returned ZERO_RESULTS or another non-OK status) → supply a fuller --address, or pass --lat/--lng directly and drop --geocode
+  exit 4 (client-side)  --geocode passed with no address to resolve → pass --address (or sijaintiOsoite1 in --body), or drop --geocode and give --lat/--lng
+  exit 4 (client-side)  A required field is missing (the message names which) → pass the flags the message names — --name and --type are the two the guard requires
   exit 4 (client-side)  --puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max → pass metres 0–999.99 with min ≤ max
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 3 (HTTP 403)  Permission denied      → check auth.page.sijainnit.edit
@@ -10985,7 +10987,7 @@ OUTPUT (JSON, stdout)
   { ok: true, ... } (raw backend response) or { dryRun: true, wouldUpdate: {...} }
 
 ERRORS (stderr, exit non-zero)
-  exit 4 (HTTP 400)  Neither/both of --on/--off given, or --radius not a positive number → pass exactly one of --on / --off; --radius is km > 0
+  exit 4 (client-side)  Neither/both of --on/--off given, or --radius not a positive number → pass exactly one of --on / --off; --radius is km > 0
   exit 4 (client-side)  --puomi-min/--puomi-max not a non-negative number or min > max → pass metres 0–999.99 with min ≤ max
   exit 5 (HTTP 404)  Sijainti not found     → verify sijaintiId
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
@@ -11166,7 +11168,8 @@ OUTPUT (JSON, stdout)
 
 ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation failed      → fix --body fields
-  exit 4 (HTTP 400)  Address could not be geocoded (--geocode, status ZERO_RESULTS) → supply a fuller --address or pass --lat/--lng directly
+  exit 4 (client-side)  --geocode found no match for the address (Google returned ZERO_RESULTS or another non-OK status) → supply a fuller --address, or pass --lat/--lng directly and drop --geocode
+  exit 4 (client-side)  --geocode passed with no address to resolve → pass --address (or sijaintiOsoite1 in --body), or drop --geocode and give --lat/--lng
   exit 5 (HTTP 404)  Sijainti not found     → verify sijaintiId
   exit 4 (client-side)  --puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max — would otherwise clear the stored bound → pass metres 0–999.99 with min ≤ max
   exit 4 (client-side)  Both --public and --private given → pass at most one — omit both to leave visibility untouched

@@ -249,3 +249,76 @@ describe("no spec shadows one of its own error rows (fb#668)", () => {
     expect(hint).toMatch(/at least one typed flag/);
   });
 });
+
+/**
+ * fb#668 follow-up — the CLIENT-side twin of the shadowing above, found by
+ * probing the fixed build rather than by reading.
+ *
+ * `matchClientRow` prefers a row whose `match` hits and otherwise falls back to
+ * the command's SOLE matchless client row at that exit. That fallback is
+ * deliberate (one client failure needs no substring), but it turns a NARROW sole
+ * row into a catch-all: on `sijainti create` the only matchless client row was
+ * the --puomi one, so a missing --type AND a failed --geocode were both answered
+ * with "pass metres 0–999.99 with min ≤ max".
+ *
+ * Underneath it sat the same mislabel as fb#280: `--geocode` is resolved
+ * CLIENT-side (applyGeocodeToBody geocodes first and failWith(...,4)s on no
+ * match, so the write never happens), yet it was documented as `http: 400` —
+ * unreachable no matter what the caller does.
+ *
+ * Deliberately NOT guarded by a test: the only mechanical signal is "a sole
+ * matchless client row whose meaning names a flag", which fires on 31 of 85
+ * commands, nearly all of them correct. A guard that noisy gets rubber-stamped
+ * rather than read (the reasoning that already shaped flag-vocabulary's stem
+ * rule), so these are pinned by behaviour instead.
+ */
+describe("sijainti client-side rows answer their own failure (fb#668 follow-up)", () => {
+  const client4 = (message: string) => new CliError(message, 0, null, 4);
+
+  test("THE BUG: a failed --geocode is no longer answered with the puomi remedy", () => {
+    // Real message, copied from a live probe against production.
+    const hint = hintForError(
+      client4('could not geocode address "qqqqzzzz nonexistent street" (status: NO_ROUTE_FOUND)'),
+      rowsOf("ib sijainti create")
+    );
+    expect(hint).toMatch(/fuller --address/);
+    expect(hint).not.toMatch(/metres/);
+  });
+
+  test("a missing required field is answered as a missing required field", () => {
+    const hint = hintForError(client4("create requires: --type (sijaintiTypeId)"), rowsOf("ib sijainti create"));
+    expect(hint).toMatch(/--name and --type/);
+    expect(hint).not.toMatch(/metres/);
+  });
+
+  test("the puomi remedy still reaches its OWN failure on all three commands", () => {
+    for (const cmd of ["ib sijainti create", "ib sijainti update", "ib sijainti set-jerry"]) {
+      expect(hintForError(client4("--puomi-min must be a non-negative number of metres"), rowsOf(cmd))).toMatch(
+        /metres/
+      );
+    }
+  });
+
+  test("`--geocode` with no address gets its own remedy on create and update", () => {
+    for (const cmd of ["ib sijainti create", "ib sijainti update"]) {
+      expect(
+        hintForError(client4("--geocode requires --address (or sijaintiOsoite1 in --body)"), rowsOf(cmd))
+      ).toMatch(/pass --address/);
+    }
+  });
+
+  test("set-jerry's --on/--off and --radius guards reach their own row", () => {
+    expect(hintForError(client4("Pass exactly one of --on / --off"), rowsOf("ib sijainti set-jerry"))).toMatch(
+      /exactly one of --on/
+    );
+    expect(
+      hintForError(client4("--radius must be a positive number of km"), rowsOf("ib sijainti set-jerry"))
+    ).toMatch(/km > 0/);
+  });
+
+  test("an undocumented client failure now gets NO hint rather than the puomi one", () => {
+    // The sole-matchless-row fallback is gone from these commands by design:
+    // silence beats confidently wrong advice.
+    expect(hintForError(client4("something no ERRORS row documents"), rowsOf("ib sijainti create"))).toBeNull();
+  });
+});
