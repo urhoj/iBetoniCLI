@@ -2239,7 +2239,7 @@ ERRORS (stderr, exit non-zero)
   exit 4 (HTTP 400)  Validation (bad enum/date) → check --type/--area/--date
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 4 (client-side)  too many arguments — the shell split a quoted flag value on its inner double-quotes (typical on Windows PowerShell) → Pass the whole entry via --from-json <file|-> instead of argv
-  exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → Check the path; the root must be an object and every key an accepted field name (the error lists them)
+  exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → The error says WHICH of the four: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, or an unknown / wrong-typed key. Only the last two are about field names
   exit 4 (client-side)  a bounded free-text flag exceeds its devChangelog column width → trim the named flag by the stated overflow — a column-width limit, so --from-json does not help
 
 NOTES
@@ -2558,7 +2558,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 3 (HTTP 403)  Developer only         → dev token
   exit 4 (HTTP 400)  Validation — a bad enum/language value, OR --bump-level on an already-RELEASED entry (one carrying a versionTag; that bump has already shipped) → For enums the error names the allowed values (language must be fi|en). For a released entry leave the level as recorded — every other field is still editable; only UNRELEASED entries (ib dev changelog pending) still drive a deploy.
-  exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → Check the path; the root must be an object and every key an accepted field name (the error lists them)
+  exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → The error says WHICH of the four: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, or an unknown / wrong-typed key. Only the last two are about field names
   exit 4 (client-side)  a bounded free-text flag exceeds its devChangelog column width → trim the named flag by the stated overflow — a column-width limit, so --from-json does not help
 
 NOTES
@@ -2866,7 +2866,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Validation             → description is required; all three enums are STRICT — an unknown value exits 4 and is never rewritten: --kind must be improvement|bug|idea|legal, --scope must be cli|app|jerry|bsg2|workspace|security|ops|impeccable|other, --severity (when given) must be critical|major|minor|cosmetic (NOT the high|medium|low vocabulary — high≈major, medium≈minor, low≈cosmetic); --complexity, when given, must be an integer 1-5. The message names the closest valid value when there is one
   exit 4 (client-side)  too many arguments — the shell split the description on its inner double-quotes (typical on Windows PowerShell) → Pass the report via --from-json <file|-> instead of argv
-  exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → Check the path; the root must be an object and every key an accepted field name (the error lists them)
+  exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → The error says WHICH of the four: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, or an unknown / wrong-typed key. Only the last two are about field names
   exit 2 (HTTP 401)  Token expired          → ib auth refresh
   exit 6 (HTTP 500)  Backend error          → retry with --verbose
 
@@ -3119,7 +3119,7 @@ OUTPUT (JSON, stdout)
 ERRORS (stderr, exit non-zero)
   exit 4 (client-side)  Validation             → provide at least one of --scope/--kind/--severity/--complexity/--description/--append-description; enum values must be valid; --complexity must be an integer 1-5; --description and --append-description are mutually exclusive
   exit 4 (client-side)  The shell split the description on its inner double-quotes (typical on Windows PowerShell) → pass the text via --from-json <file|-> instead of argv
-  exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → check the path; the root must be an object and every key an accepted field name (the error lists them)
+  exit 4 (client-side)  --from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key → the error says WHICH of the four: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, or an unknown / wrong-typed key. Only the last two are about field names
   exit 3 (HTTP 403)  Permission denied      → requires a developer token; also refused under --read-only
   exit 5 (HTTP 404)  Not found              → check the id via \`ib dev feedback list\` — a bare id that is actually a changelog id 404s here and the error hint names the changelog command (feedback #230)
   exit 6 (HTTP 500)  Backend error          → retry with --verbose

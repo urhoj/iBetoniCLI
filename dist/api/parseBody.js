@@ -47,6 +47,68 @@ export function parseJsonBodyFlag(raw, flag = "--body") {
     }
     return parsed;
 }
+/**
+ * The character offset a `JSON.parse` SyntaxError reports, if it named one.
+ *
+ * V8 emits TWO shapes and they are complementary — which is why the caller must
+ * tolerate a null rather than treating it as a parsing bug:
+ *   "Expected ',' or '}' … in JSON at position 19 (line 1 column 20)"
+ *        → an offset, and NO excerpt of the document
+ *   "Unexpected token ',', ...\":1,\"beta\":,\"gamma\"... is not valid JSON"
+ *        → an excerpt V8 built itself, and no offset
+ * So a null here means V8 already showed the caller the offending text, and
+ * {@link offendingRegion} would only print it twice.
+ */
+function parseOffset(detail) {
+    const m = /at position (\d+)/.exec(detail);
+    return m ? Number(m[1]) : null;
+}
+/**
+ * Show the text AROUND the offset the parser choked on, with a caret. The
+ * position alone is not actionable when the payload arrived mangled: the bytes
+ * the CLI received are not the bytes the author typed, so "line 8 column 770"
+ * describes a document the caller cannot see.
+ */
+function offendingRegion(raw, offset) {
+    const from = Math.max(0, offset - 30);
+    const to = Math.min(raw.length, offset + 30);
+    const slice = raw.slice(from, to).replace(/\n/g, "\\n");
+    const caretAt = raw.slice(from, offset).replace(/\n/g, "\\n").length;
+    return `  ${slice}\n  ${" ".repeat(caretAt)}^`;
+}
+/**
+ * Remedy hint for a `--from-json` document that did not PARSE.
+ *
+ * Deliberately says what the failure is NOT: the generic `--from-json` spec row
+ * covers four different failures (unreadable path, bad syntax, non-object root,
+ * unknown key) and its remedy talks about the path and the key names. On a syntax
+ * error the parser never reached a key, so that advice sends the caller off to
+ * audit field names that are already correct — which is exactly what happened in
+ * feedback #705.
+ *
+ * The backslash branch is the other half of that report, and it is measured, not
+ * guessed: piping a heredoc into `-` on Windows Git Bash delivers BOTH `\\` and a
+ * lone `\` to the process as ONE backslash, so an escaped backslash cannot be
+ * expressed that way at all, while the same bytes in a real FILE survive intact.
+ * `--from-json` is advertised as the shell-safe route, so when the payload holds a
+ * backslash and did not parse, that is the likeliest cause and worth naming.
+ */
+function fromJsonParseHint(raw, detail) {
+    const offset = parseOffset(detail);
+    const lines = [
+        "The document is not valid JSON, so no field was read yet — this is NOT about the key names or the path.",
+    ];
+    if (offset !== null && offset <= raw.length) {
+        lines.push("Received, around the reported offset:", offendingRegion(raw, offset));
+    }
+    if (/\\/.test(raw)) {
+        lines.push("It contains a backslash. If this came through a pipe (`--from-json -`), the shell may have " +
+            "collapsed an escaped `\\\\` to a single `\\`, which JSON then reads as a bad escape — a heredoc " +
+            "on Windows Git Bash does exactly that. Write the payload to a FILE and pass its path instead: " +
+            "the bytes are then whatever the file holds.");
+    }
+    return lines.join("\n");
+}
 /** Read a file (or stdin when the path is `-`) as UTF-8, stripping a leading BOM. */
 function readRawInput(pathOrDash) {
     const raw = pathOrDash === "-" ? readFileSync(0, "utf8") : readFileSync(pathOrDash, "utf8");
@@ -83,7 +145,14 @@ export function readJsonObjectInput(pathOrDash) {
     }
     catch (e) {
         const detail = errorMessage(e);
-        throw new CliError(`Could not read --from-json ${pathOrDash}: ${detail}`, 0, null, 4);
+        // Each of the three failures below carries its OWN hint. They used to share
+        // the command's generic `--from-json` spec row, whose remedy names the path
+        // and the key names — right for this one and for an unknown key, wrong for a
+        // syntax error and for a non-object root (feedback #705).
+        const hint = pathOrDash === "-"
+            ? "Nothing readable arrived on stdin. Pipe the JSON in (`… | ib … --from-json -`) or pass a file path instead of `-`."
+            : "Could not open that path. Check it exists and is readable; the argument is a file path, or `-` to read stdin.";
+        throw new CliError(`Could not read --from-json ${pathOrDash}: ${detail}`, 0, null, 4, hint);
     }
     let parsed;
     try {
@@ -91,10 +160,14 @@ export function readJsonObjectInput(pathOrDash) {
     }
     catch (e) {
         const detail = errorMessage(e);
-        throw new CliError(`--from-json ${pathOrDash} is not valid JSON: ${detail}`, 0, null, 4);
+        throw new CliError(`--from-json ${pathOrDash} is not valid JSON: ${detail}`, 0, null, 4, fromJsonParseHint(raw, detail));
     }
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-        throw new CliError("--from-json must contain a JSON object", 0, null, 4);
+        // Name what the root ACTUALLY was: "must contain a JSON object" alone leaves
+        // the caller re-reading a document that is valid JSON, just the wrong shape.
+        const got = Array.isArray(parsed) ? "an array" : parsed === null ? "null" : `a ${typeof parsed}`;
+        throw new CliError("--from-json must contain a JSON object", 0, null, 4, `The document parsed fine but its root is ${got}, not an object. Wrap the fields in { … }` +
+            (Array.isArray(parsed) ? " — an array of entries is a different, per-command flag (e.g. `ib glossary import`)." : "."));
     }
     return parsed;
 }

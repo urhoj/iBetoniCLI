@@ -1095,7 +1095,7 @@ export const CHANGELOG_SPECS = [
                 exit: 4,
                 match: "--from-json",
                 meaning: "--from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key",
-                remedy: "Check the path; the root must be an object and every key an accepted field name (the error lists them)",
+                remedy: "The error says WHICH of the four: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, or an unknown / wrong-typed key. Only the last two are about field names",
             },
             {
                 origin: "client",
@@ -1370,7 +1370,7 @@ export const CHANGELOG_SPECS = [
                 exit: 4,
                 match: "--from-json",
                 meaning: "--from-json file is unreadable, not valid JSON, not a JSON object, or carries an unknown / wrong-typed key",
-                remedy: "Check the path; the root must be an object and every key an accepted field name (the error lists them)",
+                remedy: "The error says WHICH of the four: an unopenable path, a JSON syntax error (no field has been read yet, so the key names are not the problem), a root that is not an object, or an unknown / wrong-typed key. Only the last two are about field names",
             },
             {
                 origin: "client",
