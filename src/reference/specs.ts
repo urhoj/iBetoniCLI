@@ -670,7 +670,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(403, "Impersonation not allowed for the target", "needs systemAdmin/roleManager, same-tenant admin, or a grant"),
       apiErr(404, "Target not found (or has no personEmail)", "no impersonatable person for that personId/email. NB: a personId that EXISTS but has no personEmail also 404s here (impersonation is email-keyed) — verify with `ib person get <id>`; an email-less person cannot be impersonated."),
       { origin: "client", exit: 3, meaning: "Read-only mode active (--read-only / IB_READ_ONLY)", remedy: "impersonation persists a rotated JWT; drop read-only" },
-      { origin: "client", exit: 4, meaning: "No active session (--end/--extend), or neither personId nor --email given", remedy: "start with `ib auth impersonate <personId>`" },
+      // Three exit-4 guards, one documented row: as the sole matchless client
+      // row it answered ALL of them, so "Already impersonating — run --end
+      // first" was told to START a session (fb#668 class). The already-active
+      // case is the opposite instruction, so it gets its own row.
+      { origin: "client", exit: 4, match: "already impersonating", meaning: "A session is already active — starting a second would silently retarget it", remedy: "end the current one first with `ib auth impersonate --end` (or `--extend` to keep it), then start the new target" },
+      { origin: "client", exit: 4, match: ["no active impersonation session", "provide a target personid"], meaning: "No active session (--end/--extend), or neither personId nor --email given", remedy: "start with `ib auth impersonate <personId>`" },
     ],
     notes: [
       "Persists a 10-minute impersonation JWT as the active credential — blocked under read-only (exit 3).",
@@ -1116,7 +1121,14 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     dryRunKind: "server",
     outputShape: "{ ok: true } or backend response",
     errors: [
-      { origin: "client", exit: 4, meaning: "--status not a numeric keikkaTilaId", remedy: "pass a number, e.g. --status 9" },
+      // The THIRD twin of the fb#668 class, and the client-side shape of it:
+      // this command has two exit-4 client guards but documented only one, and a
+      // sole matchless client row is `matchClientRow`'s fallback — so
+      // `ib keikka update <id>` with no flags was answered "pass a number, e.g.
+      // --status 9", advice for a problem the caller does not have. Both rows
+      // now carry a `match`, so each guard reaches its own remedy.
+      { origin: "client", exit: 4, match: "nothing to update", meaning: "No field flags given at all", remedy: "pass --status <keikkaTilaId> — it is the only field v1.0 can update" },
+      { origin: "client", exit: 4, match: "--status must be a numeric", meaning: "--status not a numeric keikkaTilaId", remedy: "pass a number, e.g. --status 9" },
       apiErr(404, "Keikka not found OR outside your visible scope", "verify keikkaId — but note this is NOT proof the row is absent: results mirror your permissions, so an existing keikka in another tenant 404s identically"),
       ...permErrors("auth.page.grid.tilaus.edit"),
     ],
@@ -3527,6 +3539,8 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
       apiErr(404, "Sijainti not found", "verify sijaintiId"),
       { origin: "client", exit: 4, match: ["non-negative number of metres", "cannot exceed"], meaning: "--puomi-min/--puomi-max not a non-negative number (e.g. a typo Commander coerced to NaN) or min > max — would otherwise clear the stored bound", remedy: "pass metres 0–999.99 with min ≤ max" },
       { origin: "client", exit: 4, match: "at most one of --public", meaning: "Both --public and --private given", remedy: "pass at most one — omit both to leave visibility untouched" },
+      // Previously undocumented, so it fell through to no hint at all.
+      { origin: "client", exit: 4, match: "update requires sijaintiid", meaning: "No sijaintiId given (neither --id nor a sijaintiId in --body)", remedy: "pass --id <sijaintiId>, or include sijaintiId in --body/--from-json" },
       apiErr(403, "Not a company admin — only admins may CHANGE isPublic", "drop --public/--private to edit the other fields, or ask a company admin; see `ib sijainti set-public`", SIJAINTI_PUBLIC_403_MATCH),
       ...permErrors("auth.page.sijainnit.edit"),
     ],
@@ -4504,7 +4518,12 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     reasonPolicy: "always",
     outputShape: "{ personId, name, email, ... } (re-fetched) · with --get-or-create adds reused:boolean · dry-run: { dryRun: true, wouldCreate: ... }",
     errors: [
-      apiErr(400, "Missing required field, or duplicate email without --get-or-create", "provide --first and --last (email is optional); add --get-or-create to reuse an existing visible person, or use a different email"),
+      // The required-field half is a CLIENT guard (`create requires: …`) and
+      // never reaches the backend, so the two causes need separate rows — as one
+      // http row the local half was unreachable (fb#280/fb#668 class). Twin of
+      // the `sijainti create` row.
+      { origin: "client", exit: 4, match: "create requires:", meaning: "A required field is missing (the message names which)", remedy: "pass the flags the message names — --first and --last are required; email is optional" },
+      apiErr(400, "Duplicate email without --get-or-create", "add --get-or-create to reuse an existing visible person, or use a different email"),
       ...permErrors("auth.page.person.edit"),
     ],
     notes: [
@@ -7498,7 +7517,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ messageId, threadId, senderPersonId, senderAsiakasId, kind, body, source, sourceNote, createdAt } · { dryRun:true, threadId, wouldSend:{ body, source, sourceNote, recipients:[{ personId, name, role }] } } on --dry-run",
     errors: [
-      apiErr(400, "Empty / too-long body", "body is required, max 4000 chars"),
+      // CLIENT-side, not a backend 400 (fb#668 class): both length guards are
+      // `failWith(..., 4)` in the action, so the request is never sent and no
+      // 400 can arrive — dead by the fb#280 rule, leaving the caller no hint.
+      { origin: "client", exit: 4, match: ["message body cannot be empty", "message body too long"], meaning: "Empty or over-length --body", remedy: "body is required, max 4000 chars" },
       apiErr(403, "Not a participant of this thread", "you can only post to threads you are part of"),
       apiErr(409, "Thread archived", "archived threads are read-only"),
       ...COMMON_AUTH_ERRORS,
@@ -7588,7 +7610,10 @@ const BASE_COMMAND_SPECS: CommandSpec[] = [
     outputShape:
       "{ messageId, threadId, senderPersonId, body, editedAt, ... } (enriched row) · { messageId, threadId, unchanged:true } on no-op · { dryRun:true, threadId, wouldEdit:{ messageId, from, to } } on --dry-run",
     errors: [
-      apiErr(400, "Empty / too-long body", "body is required, max 4000 chars"),
+      // CLIENT-side, not a backend 400 (fb#668 class): both length guards are
+      // `failWith(..., 4)` in the action, so the request is never sent and no
+      // 400 can arrive — dead by the fb#280 rule, leaving the caller no hint.
+      { origin: "client", exit: 4, match: ["message body cannot be empty", "message body too long"], meaning: "Empty or over-length --body", remedy: "body is required, max 4000 chars" },
       apiErr(403, "Not the author", "you can only edit your own messages"),
       apiErr(404, "Thread or message not found", "check the threadId/messageId"),
       apiErr(409, "Answered or deleted", "you cannot edit a message that was replied to, or a deleted one"),

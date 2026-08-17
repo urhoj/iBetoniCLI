@@ -1,6 +1,6 @@
 import { describe, test, expect } from "vitest";
 import { COMMAND_SPECS } from "../../src/reference/specs.js";
-import { CliError, hintForError } from "../../src/api/errors.js";
+import { CliError, hintForError, exitCodeFromStatus } from "../../src/api/errors.js";
 import type { CommandError } from "../../src/output/help.js";
 
 /**
@@ -18,6 +18,18 @@ function rowsOf(command: string): CommandError[] {
   if (!spec) throw new Error(`no spec for ${command}`);
   return spec.errors;
 }
+
+/** A locally-raised failure: `statusCode 0` is what marks a row `origin: "client"`. */
+const client4 = (message: string) => new CliError(message, 0, null, 4);
+
+/**
+ * A backend failure. The exit comes from `exitCodeFromStatus` rather than a
+ * hand-rolled ternary — a local copy silently disagreed with the real mapping
+ * for 5xx, which would have quietly mis-set up the first 500-routing assertion
+ * anyone added.
+ */
+const server = (message: string, status: number) =>
+  new CliError(message, status, null, exitCodeFromStatus(status));
 
 describe("every documented error row declares exactly one origin", () => {
   test("no row omits both `http` and `origin` (dead row), and none declares both", () => {
@@ -70,19 +82,41 @@ describe("client rows sharing an exit code are disambiguated by `match`", () => 
     expect(offenders).toEqual([]);
   });
 
-  test("a `match` string actually appears in no OTHER row's match at the same exit", () => {
+  test("no row's `match` is shadowed by an EARLIER row in the same bucket", () => {
     // Overlapping matchers would reintroduce order-dependence by the back door.
+    //
+    // Widened twice from the original client-only, exact-equality check:
+    //  - HTTP rows share the identical hazard (`matchHttpRow` also takes the
+    //    FIRST hit), so the bucket is `http:<status>` OR `client:<exit>`;
+    //  - CONTAINMENT, not equality: if every alternative of a later row contains
+    //    some alternative of an earlier one, every message reaching the later row
+    //    hit the earlier one first, so the later row is unreachable. Equality is
+    //    the special case (`a === b` implies `b.includes(a)`), so nothing the old
+    //    check caught is lost.
+    const alts = (r: CommandError) =>
+      r.match === undefined ? [] : [r.match].flat().map((s) => s.toLowerCase());
     const offenders: string[] = [];
     for (const spec of COMMAND_SPECS) {
-      const rows = (spec.errors ?? []).filter((r) => r.origin === "client");
-      for (const a of rows) {
-        for (const b of rows) {
-          if (a === b || a.exit !== b.exit) continue;
-          const as = a.match === undefined ? [] : [a.match].flat();
-          const bs = b.match === undefined ? [] : [b.match].flat();
-          if (as.some((x) => bs.some((y) => x.toLowerCase() === y.toLowerCase())))
-            offenders.push(`${spec.command} :: exit ${a.exit} — duplicate match`);
-        }
+      const buckets = new Map<string, CommandError[]>();
+      for (const row of spec.errors ?? []) {
+        const key = row.http !== undefined ? `http:${row.http}` : `client:${row.exit}`;
+        buckets.set(key, [...(buckets.get(key) ?? []), row]);
+      }
+      for (const [key, rows] of buckets) {
+        rows.forEach((later, i) => {
+          const mine = alts(later);
+          if (!mine.length) return;
+          const shadowedBy = rows
+            .slice(0, i)
+            .find((earlier) => {
+              const theirs = alts(earlier);
+              return theirs.length > 0 && mine.every((m) => theirs.some((t) => m.includes(t)));
+            });
+          if (shadowedBy)
+            offenders.push(
+              `${spec.command} :: ${key} — "${later.meaning}" is unreachable behind "${shadowedBy.meaning}"`
+            );
+        });
       }
     }
     expect(offenders).toEqual([]);
@@ -113,7 +147,6 @@ describe("previously dead rows now reach their own remedy", () => {
 
 // The three mis-hints reproduced live while investigating fb#305.
 describe("ambiguous client rows no longer serve an unrelated remedy", () => {
-  const client4 = (message: string) => new CliError(message, 0, null, 4);
 
   test("`ib commands` unknown domain is not answered with the --mutations/--reads remedy", () => {
     const hint = hintForError(
@@ -199,8 +232,6 @@ describe("no spec shadows one of its own error rows (fb#668)", () => {
     // A `match` that does not correspond to the backend's real text would pass
     // the structural check above while remaining just as dead, so assert the
     // actual routing for the cases fb#668 repaired.
-    const server = (msg: string, status: number) =>
-      new CliError(msg, status, null, status === 403 ? 3 : status === 404 ? 5 : 4);
 
     // Cross-tenant vehicle read vs a plain permission denial.
     expect(
@@ -273,7 +304,6 @@ describe("no spec shadows one of its own error rows (fb#668)", () => {
  * rule), so these are pinned by behaviour instead.
  */
 describe("sijainti client-side rows answer their own failure (fb#668 follow-up)", () => {
-  const client4 = (message: string) => new CliError(message, 0, null, 4);
 
   test("THE BUG: a failed --geocode is no longer answered with the puomi remedy", () => {
     // Real message, copied from a live probe against production.
@@ -320,5 +350,82 @@ describe("sijainti client-side rows answer their own failure (fb#668 follow-up)"
     // The sole-matchless-row fallback is gone from these commands by design:
     // silence beats confidently wrong advice.
     expect(hintForError(client4("something no ERRORS row documents"), rowsOf("ib sijainti create"))).toBeNull();
+  });
+});
+
+/**
+ * fb#668, third pass — the remaining commands where a NARROW sole client row was
+ * acting as `matchClientRow`'s catch-all, plus two more rows mislabeled `http`
+ * for a failure the CLI raises locally.
+ *
+ * Found by a source-coverage audit (guard messages vs documented rows), run as a
+ * ONE-OFF rather than added as a test: as a gate it is ~75% false-positive and
+ * structurally blind to guards living in shared helpers — which is exactly where
+ * the previous round's bug hid. The audit is the right tool; the guard is not.
+ */
+describe("narrow client rows stop answering for their neighbours (fb#668)", () => {
+  test("THE BUG: `keikka update` with no flags is not told to pass a NUMBER", () => {
+    // Reproduced live before the fix: the sole matchless row was the
+    // "--status must be numeric" one, so "you passed nothing" got "pass a
+    // number, e.g. --status 9" — advice for a problem the caller does not have.
+    const hint = hintForError(
+      client4("Nothing to update: pass --status (v1.0 supports --status only)"),
+      rowsOf("ib keikka update")
+    );
+    expect(hint).toMatch(/only field v1\.0 can update/);
+    expect(hint).not.toMatch(/pass a number/);
+  });
+
+  test("`keikka update --status abc` still gets the numeric remedy", () => {
+    expect(
+      hintForError(
+        client4('--status must be a numeric keikkaTilaId (e.g. 9 = Toimitettu); got "abc"'),
+        rowsOf("ib keikka update")
+      )
+    ).toMatch(/pass a number/);
+  });
+
+  test("`auth impersonate` tells an ALREADY-impersonating caller to END, not start", () => {
+    // The sharpest of the set: the old remedy said "start with `ib auth
+    // impersonate <personId>`" for a caller whose problem was that a session was
+    // already running — the exact opposite instruction.
+    const hint = hintForError(
+      client4("Already impersonating. Run `ib auth impersonate --end` first."),
+      rowsOf("ib auth impersonate")
+    );
+    expect(hint).toMatch(/--end/);
+    expect(hint).not.toMatch(/start with/);
+  });
+
+  test("`auth impersonate` with no session still gets the start remedy", () => {
+    expect(
+      hintForError(client4("No active impersonation session to end."), rowsOf("ib auth impersonate"))
+    ).toMatch(/start with/);
+  });
+
+  test("both --puomi alternatives are exercised, not just the first", () => {
+    // The match array is ["non-negative number of metres", "cannot exceed"] and
+    // each alternative corresponds to a DIFFERENT guard line in the source; only
+    // the first was covered.
+    for (const cmd of ["ib sijainti create", "ib sijainti update", "ib sijainti set-jerry"]) {
+      expect(hintForError(client4("--puomi-min must be a non-negative number of metres"), rowsOf(cmd))).toMatch(/metres/);
+      expect(hintForError(client4("--puomi-min cannot exceed --puomi-max"), rowsOf(cmd))).toMatch(/metres/);
+    }
+  });
+
+  test("message body limits are answered as CLIENT errors on both send and edit", () => {
+    for (const cmd of ["ib message chat send", "ib message chat edit"]) {
+      expect(hintForError(client4("Message body cannot be empty"), rowsOf(cmd))).toMatch(/max 4000/);
+      expect(hintForError(client4("Message body too long (max 4000 chars)"), rowsOf(cmd))).toMatch(/max 4000/);
+    }
+  });
+
+  test("the two previously-undocumented guards now reach a remedy", () => {
+    expect(
+      hintForError(client4("update requires sijaintiId — pass --id or include it in --body"), rowsOf("ib sijainti update"))
+    ).toMatch(/--id <sijaintiId>/);
+    expect(hintForError(client4("create requires: --first, --last"), rowsOf("ib person create"))).toMatch(
+      /--first and --last/
+    );
   });
 });
